@@ -2,7 +2,7 @@
 
 Phase II turns validated specs into a running system while keeping runtime behavior traceable back to the artifacts.
 
-All commands in this guide assume you run them from repo root with the toolkit available at `./devspec_toolkit/`.
+All commands in this guide assume you run them from repo root with the toolkit available at [./devspec_toolkit/](../../../).
 
 ## Step Progression
 | Step | Purpose | Key Activities |
@@ -25,7 +25,7 @@ All commands in this guide assume you run them from repo root with the toolkit a
 - **deploy** — deploys via the plan in Step 09/16
 - **drift-audit** — compares runtime data to spec assertions as defined in Step 17
 
-Ensure `.github/workflows/ci.yml` (generated via `gen-ci`) reflects these jobs and references the spec IDs they enforce. For example:
+Ensure [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) (generated via `gen-ci`) reflects these jobs and references the spec IDs they enforce. For example:
 
 ```bash
 python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml

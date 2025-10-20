@@ -3,21 +3,21 @@
 This document defines how automated agents should work with the AI Spec Driven Development Toolkit. Follow it verbatim to avoid hallucinations and maintain deterministic outputs.
 
 ## 1. Locating Agent Guidance
-- Prefer machine-readable metadata in `docs/agents/manifest.json`.
-- If the manifest is missing, fall back to this file (`docs/agents/agents.md`).
-- A root-level pointer (`agents.md`) also links here; use it to discover agent docs when scanning the repository top-down.
+- Prefer machine-readable metadata in [docs/agents/manifest.json](manifest.json).
+- If the manifest is missing, fall back to this file ([docs/agents/agents.md](agents.md)).
+- A root-level pointer ([agents.md](../../agents.md)) also links here; use it to discover agent docs when scanning the repository top-down.
 
 ## 2. Repository Expectations
-- The toolkit is checked out at repo root as `./devspec_toolkit/`; adjust if your checkout differs.
+- The toolkit is checked out at repo root as [./devspec_toolkit/](../../); adjust if your checkout differs.
 - Live spec artifacts reside in the host repository under `spec/` (sibling to the toolkit submodule).
-- Prompts required to generate artifacts live under `./devspec_toolkit/prompts/` (adjust the path if you store the toolkit elsewhere).
-- Schemas are referenced from `./devspec_toolkit/schema/` and resolved using `./devspec_toolkit/tools/schema_registry.json`.
+- Prompts required to generate artifacts live under [./devspec_toolkit/prompts/](../../prompts/) (adjust the path if you store the toolkit elsewhere).
+- Schemas are referenced from [./devspec_toolkit/schema/](../../schema/) and resolved using [./devspec_toolkit/tools/schema_registry.json](../../tools/schema_registry.json).
 - Validation commands are executed via `python -m specdev_tools.cli ... --repo-root <toolkit-path>` with `PYTHONPATH` including `<toolkit-path>/tools`.
 
 ## 3. Operating Protocol
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
-   - Load the deterministic prompt: `./devspec_toolkit/prompts/prompt_NN_name.md`.
+   - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
 2. **Prepare Context**
    - Capture all `Clarification Questions` blocks from the prompt.
    - Record step dependencies listed in the guide (`consumers`, `inputs`).
@@ -40,7 +40,7 @@ This document defines how automated agents should work with the AI Spec Driven D
 | 00–03 | `spec/0*_*.json` | Validate-only |
 | 04 | `spec/04_fr_list.json` | Recompute trace matrix |
 | 05 | `spec/05_interface_contracts.json` | Recompute trace matrix + fixtures lint |
-| 06 | `spec/06_invariants.json` | Re-run invariants check if `tests/samples/` updated |
+| 06 | `spec/06_invariants.json` | Re-run invariants check if [tests/samples/](../../tests/samples/) updated |
 | 07 | `spec/07_nfrs.json` | Ensure `16_delivery_monitoring.json` links remain valid |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |

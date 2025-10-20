@@ -1,6 +1,6 @@
 # Developer Documentation Index
 
-Use this index to locate the developer-facing material while working through the AI Spec Driven Development Toolkit. Automation-specific instructions live under `../agents/`.
+Use this index to locate the developer-facing material while working through the AI Spec Driven Development Toolkit. Automation-specific instructions live under [../agents/](../agents/).
 
 ## Onboarding
 - [`getting_started.md`](getting_started.md) — single-path setup guide and workflow primer.
@@ -22,12 +22,12 @@ Each spec step ships with two authoritative files in `spec/`:
 Refer directly to those guides when authoring or reviewing a given step.
 
 ## Related Resources
-- CLI and schema registry: `../tools/README.md`, `../tools/schema_registry.json`
-- Example specs: `../example/`
+- CLI and schema registry: [../tools/README.md](../tools/README.md), [../tools/schema_registry.json](../tools/schema_registry.json)
+- Example specs: [../example/](../example/)
 - Validation scripts & fixtures: [`../tests/README.md`](../tests/README.md)
-- Test data: `../tests/fixtures/`, `../tests/samples/`
+- Test data: [../tests/fixtures/](../tests/fixtures/), [../tests/samples/](../tests/samples/)
 
 ## Contributing Improvements
 1. Review open issues for existing documentation requests.
-2. Apply the conventions described in `reference.md`.
+2. Apply the conventions described in [reference.md](reference.md).
 3. Open a PR summarizing the problem solved and linking impacted spec steps.

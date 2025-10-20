@@ -12,7 +12,7 @@ Follow the environment setup in [`docs/developers/getting_started.md`](../docs/d
 
 The toolkit root is the directory that contains this submodule (for example, `./devspec_toolkit`). For the canonical directory map, see [Toolkit Layout](../README.md#toolkit-layout).
 
-The CLI resolves `$schema` URIs via `tools/schema_registry.json`. When you run commands from your product repository, pass `--repo-root <toolkit-root>` so those paths resolve correctly.
+The CLI resolves `$schema` URIs via [tools/schema_registry.json](schema_registry.json). When you run commands from your product repository, pass `--repo-root <toolkit-root>` so those paths resolve correctly.
 
 Examples (assuming `./devspec_toolkit`):
 
@@ -42,7 +42,7 @@ From any location, run:
 python -m specdev_tools.cli --help
 ```
 
-Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the toolkit directory so schema resolution goes through `tools/schema_registry.json`.
+Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the toolkit directory so schema resolution goes through [tools/schema_registry.json](schema_registry.json).
 
 ---
 
@@ -56,7 +56,7 @@ Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the
 
 ## CI Integration
 
-Generate a starter workflow with `python -m specdev_tools.cli gen-ci …` and extend it with your own jobs. For the authoritative list of validation commands enforced in CI, see `docs/developers/reference.md#validation-workflow`.
+Generate a starter workflow with `python -m specdev_tools.cli gen-ci …` and extend it with your own jobs. For the authoritative list of validation commands enforced in CI, see [docs/developers/reference.md#validation-workflow](../docs/developers/reference.md#validation-workflow).
 
 ---
 

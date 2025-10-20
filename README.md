@@ -13,10 +13,10 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 ---
 
 ## Start Here
-- Onboard with `docs/developers/getting_started.md`.
-- Keep `docs/developers/reference.md#core-validation-commands` handy for the canonical command list, troubleshooting flow, and naming conventions.
-- Use the workflow overviews in `docs/developers/workflows/` as you progress through Steps 00–17.
-- Automation agents begin at `agents.md` → `docs/agents/agents.md`.
+- Onboard with [docs/developers/getting_started.md](docs/developers/getting_started.md).
+- Keep [docs/developers/reference.md#core-validation-commands](docs/developers/reference.md#core-validation-commands) handy for the canonical command list, troubleshooting flow, and naming conventions.
+- Use the workflow overviews in [docs/developers/workflows/](docs/developers/workflows/) as you progress through Steps 00–17.
+- Automation agents begin at [agents.md](agents.md) → [docs/agents/agents.md](docs/agents/agents.md).
 
 ---
 
@@ -38,26 +38,26 @@ Most teams vendor the toolkit as a git submodule at `<product-repo>/devspec_tool
 ---
 
 ## Working With The Toolkit
-- Follow the environment setup in `docs/developers/getting_started.md#1-set-up-your-environment` (virtualenv + `PYTHONPATH`).
+- Follow the environment setup in [docs/developers/getting_started.md#1-set-up-your-environment](docs/developers/getting_started.md#1-set-up-your-environment) (virtualenv + `PYTHONPATH`).
 - Run validations with `python -m specdev_tools.cli … --repo-root <toolkit-root>`.
-- Lean on the bundled scripts in `docs/developers/reference.md#bundled-scripts` when you want the core validation cadence or to smoke-test the example artifacts.
-- Regenerate guides from `template/` before editing human-facing step docs.
+- Lean on the bundled scripts in [docs/developers/reference.md#bundled-scripts](docs/developers/reference.md#bundled-scripts) when you want the core validation cadence or to smoke-test the example artifacts.
+- Regenerate guides from [template/](template/) before editing human-facing step docs.
 
 ---
 
 ## Commands & Troubleshooting
-All authoritative CLI examples, guardrails, and troubleshooting checklists live in `docs/developers/reference.md`.
+All authoritative CLI examples, guardrails, and troubleshooting checklists live in [docs/developers/reference.md](docs/developers/reference.md).
 
 ---
 
 ## Additional Resources
-- `docs/README.md` — documentation map.
-- `tools/README.md` — CLI packaging details.
-- `example/devspec_kit/` — end-state example spec set.
-- `tests/README.md` — structure of fixtures, samples, and expectations.
-- `.github/workflows/ci.yml` — sample workflow generated via `gen-ci`.
+- [docs/README.md](docs/README.md) — documentation map.
+- [tools/README.md](tools/README.md) — CLI packaging details.
+- [example/devspec_kit/](example/devspec_kit/) — end-state example spec set.
+- [tests/README.md](tests/README.md) — structure of fixtures, samples, and expectations.
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) — sample workflow generated via `gen-ci`.
 
 ---
 
 ## License
-Choose what suits your org (Apache-2.0, MIT, etc.) and place it in `LICENSE`.
+Choose what suits your org (Apache-2.0, MIT, etc.) and place it in [LICENSE](LICENSE).
