@@ -29,16 +29,10 @@ This document defines how automated agents should work with the AI Spec Driven D
    - Replace the contents of `spec/NN_name.json` with the generated block.
    - Preserve the `$schema` field already present in the file.
 5. **Validate**
-   ```bash
-   python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
-   ```
+   - Run the [core validation commands](../developers/reference.md#core-validation-commands) and inspect results.
    - On failure, re-run with additional clarifications from the guide.
 6. **Update Traceability**
-   - When FRs, APIs, fixtures, or NFRs change, also run:
-     ```bash
-     python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-     python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-     ```
+   - When FRs, APIs, fixtures, or NFRs change, ensure the validation sequence above completes successfully.
 
 ## 4. Step Reference
 | Step | Artifact | Required Follow-Up |

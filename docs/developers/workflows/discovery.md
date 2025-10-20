@@ -28,13 +28,7 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 
 ## Validation Cadence
-```bash
-python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
-
-These commands ensure the discovery artifacts remain consistent and cover the necessary trace links before you advance to implementation work.
+Use the [core validation commands](../reference.md#core-validation-commands) after each artifact update to keep discovery outputs consistent before moving to implementation.
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.

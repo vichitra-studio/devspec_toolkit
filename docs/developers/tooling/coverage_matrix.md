@@ -3,9 +3,7 @@
 The coverage matrix ties every requirement to a verifying artifact so that the spec, fixtures, and implementation stay aligned.
 
 ## Command
-```bash
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
+Run `python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json` (documented in the [command cheatsheet](../reference.md#command-cheatsheet)).
 
 - `spec/` — root of the spec artifacts.
 - `--out` — optional path for the generated JSON report (`-` to print to stdout).
@@ -24,11 +22,7 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 | `17_spec_drift.json` | Drift checks | Backstop runtime verification jobs. |
 
 ## CI Integration
-Add the matrix command to CI alongside validation:
-```bash
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
+Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically.
 
 Fail the pipeline if the matrix changes without an accompanying spec update or if required trace links are missing.
 

@@ -4,14 +4,7 @@ Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit
 
 ## Install
 
-```bash
-# run from repo root; adjust ./devspec_toolkit if you placed the toolkit elsewhere
-python -m venv .venv && . .venv/bin/activate
-pip install -r ./devspec_toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-```
-
-Run these commands from the root of your host repository; adjust the paths if you invoke them from inside the submodule. Python 3.10+ recommended.
+Follow the environment setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment). Those instructions are the canonical source for creating the virtualenv, installing requirements, and exporting `PYTHONPATH`.
 
 ---
 
@@ -53,6 +46,8 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 ---
 
 ## CLI overview
+
+The examples below expand on the command list maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#command-cheatsheet).
 
 Show help:
 

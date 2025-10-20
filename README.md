@@ -203,13 +203,7 @@ Choose what suits your org (Apache‑2.0, MIT, etc.). Put it in `LICENSE` and re
 
 ### 0) Install
 
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r ./devspec_toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-```
-
-Always pass `--repo-root <toolkit-path>` (for example, `./devspec_toolkit`) when you invoke the CLI from your host repository so the schema registry resolves correctly.
+Follow the environment setup steps in [`docs/developers/getting_started.md`](docs/developers/getting_started.md#1-set-up-your-environment). Always pass `--repo-root <toolkit-path>` (for example, `./devspec_toolkit`) when you invoke the CLI from your host repository so the schema registry resolves correctly.
 
 ### 1) Author step artifacts
 
@@ -218,19 +212,12 @@ Repeat for each step (`00` → `17`, including `02a` where applicable):
 1. **Read** `spec/NN_name.guide.md` to align on purpose and guardrails.
 2. **Run** the corresponding prompt in `./devspec_toolkit/prompts/prompt_NN_name.md` and produce a single fenced `json` output.
 3. **Paste** the output into `spec/NN_name.json` (which already contains `$schema`).
-4. **Validate:**
-   ```bash
-   python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
-   ```
+4. **Validate** using the commands in the [core validation reference](docs/developers/reference.md#core-validation-commands).
 5. **Commit** with a governance-compliant message (Step 10).
 
 ### 2) Validate the whole spec set
 
-```bash
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-```
+Use the [core validation commands](docs/developers/reference.md#core-validation-commands) to keep artifacts, traceability, and fixtures in sync.
 
 ### 3) Generate scaffold (Steps 05 ↔ 13)
 
@@ -294,28 +281,9 @@ The scaffold registers routes listed in `13_scaffold.json` and references the re
 
 ## Example sessions
 
-Create charter and capabilities, then validate:
-
-```bash
-python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
-python -m specdev_tools.cli validate spec/01_capabilities.json --repo-root ./devspec_toolkit
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
-
-Scaffold and boot the server for manual smoke:
-
-```bash
-python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
-node scaffold_out/src/index.js
-```
-
-Generate CI and commit:
-
-```bash
-python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
-git add . && git commit -m "feat(spec): baseline CI [fr-initial-login]"
-```
+- Create charter and capabilities, then validate them with the [core validation commands](docs/developers/reference.md#core-validation-commands).
+- Generate a scaffold via `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out` and boot it (`node scaffold_out/src/index.js`) for manual smoke checks.
+- Produce baseline CI with `python -m specdev_tools.cli gen-ci ...` (see [`docs/developers/reference.md`](docs/developers/reference.md#command-cheatsheet)) and commit using the governance pattern.
 
 ---
 
@@ -465,39 +433,22 @@ Each step has two files in `spec/`: `NN_name.json` (machine artifact) and `NN_na
 This is the fastest way to get from blank repo to a running, validated scaffold, using prompts plus CI.
 
 ### A. Setup
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r ./devspec_toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-```
-Run every CLI command from your host repo root and include `--repo-root ./devspec_toolkit` (or the toolkit path you use) so the schema registry resolves.
+Follow the environment setup in [`docs/developers/getting_started.md`](docs/developers/getting_started.md#1-set-up-your-environment). Run every CLI command from your host repo root and include `--repo-root ./devspec_toolkit` (or your toolkit path) so the schema registry resolves.
 
 ### B. Author early steps (00 → 05)
 1. Open `./devspec_toolkit/prompts/prompt_00_project_charter.md`. Feed it to your AI as-is. Answer the Clarification Questions block if needed.
-2. Paste the single fenced `json` output into `spec/00_charter.json`.  
-   Validate:
-   ```bash
-   python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
-   ```
+2. Paste the single fenced `json` output into `spec/00_charter.json`, then run `python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit` to confirm it shapes correctly.
 3. Repeat for:
    - `./devspec_toolkit/prompts/prompt_01_capabilities.md` → `spec/01_capabilities.json`
    - `./devspec_toolkit/prompts/prompt_02_system_sketch.md` → `spec/02_system_sketch.json`
    - `./devspec_toolkit/prompts/prompt_05_interface_contracts.md` → `spec/05_interface_contracts.json`
 
-Run whole‑tree checks:
-```bash
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
+Run the [core validation commands](docs/developers/reference.md#core-validation-commands) to make sure early artifacts stay aligned.
 
 ### C. Lock traceability via FRs and Fixtures (04, 08)
 1. Fill `spec/04_fr_list.json` linking each FR to `05` APIs using `traceRef`.
 2. Create initial fixtures in `spec/08_fixtures.json` and put raw request/expectation pairs under `tests/fixtures/`.
-3. Lint and cover:
-```bash
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
+3. Lint and regenerate trace coverage using the [core validation commands](docs/developers/reference.md#core-validation-commands).
 
 ### D. Generate scaffold (13) and smoke
 ```bash
@@ -507,10 +458,7 @@ node scaffold_out/src/index.js  # optional: boots minimal server for manual ping
 
 ### E. Implement to green (14)
 - Implement each route to satisfy `tests/fixtures/*` and the expectations embedded in `spec/08_fixtures.json`.
-- Update `spec/14_fixture_impl.json` and keep running:
-```bash
-python -m specdev_tools.cli validate spec/14_fixture_impl.json --repo-root ./devspec_toolkit
-```
+- Update `spec/14_fixture_impl.json` and keep running `python -m specdev_tools.cli validate spec/14_fixture_impl.json --repo-root ./devspec_toolkit`.
 
 ### F. Add invariants and NFRs (06, 07)
 - Encode rules in `spec/06_invariants.json`; verify:
@@ -522,7 +470,7 @@ python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit 
 ### G. Red-team and harden (11, 15)
 - Capture threats in `spec/11_redteam.json`.
 - Add new fixtures from findings and record them in `spec/15_redteam_loop.json`.
-- Re‑run `fixtures-lint`, `validate-all`, and your runtime tests.
+- Re‑run the [core validation commands](docs/developers/reference.md#core-validation-commands) and your runtime tests.
 
 ### H. CI & governance (10, 12, 02a, .github)
 - Generate or update CI:

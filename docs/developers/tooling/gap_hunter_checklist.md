@@ -10,16 +10,8 @@ Run this checklist after meaningful spec changes to catch missing or ambiguous e
 5. **Stale Fixtures** — Expected payloads no longer match contracts or invariants.
 
 ## Procedure
-```bash
-# 1. Check schema compliance everywhere
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-
-# 2. Inspect trace coverage (FR ↔ API ↔ Fixture ↔ NFR)
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-
-# 3. Lint fixtures for missing or unknown targets
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-```
+1. Run the [core validation commands](../reference.md#core-validation-commands) to verify schema compliance, trace coverage, and fixture health.
+2. Lint fixtures specifically when targeting new APIs or updating payloads.
 
 ### Manual Review Pass
 - Compare the generated `tools/trace_matrix.json` with expectations under `./devspec_toolkit/tests/expectations/`.

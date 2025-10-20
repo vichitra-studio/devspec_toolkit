@@ -33,22 +33,7 @@ tests/
 
 From your host repo root (adjust `./devspec_toolkit` if the toolkit lives elsewhere):
 
-```bash
-# Add the toolkit to PYTHONPATH (adjust the path if needed)
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-
-# Validate specs first
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-
-# Lint fixtures structure and targets
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-
-# Build trace matrix and compare to expectations (manual diff)
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json && diff -u ./devspec_toolkit/tests/expectations/trace_matrix.json tools/trace_matrix.json || true
-
-# Evaluate invariants against sample context
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
-
-# Run bundled CLI smoke tests against example artifacts
-./devspec_toolkit/tests/unit
-```
+- Export `PYTHONPATH` as described in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment).
+- Run the [core validation commands](../docs/developers/reference.md#core-validation-commands), then compare `tools/trace_matrix.json` against `tests/expectations/trace_matrix.json` (e.g., `diff -u ... || true`).
+- Evaluate invariants when needed: `python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json`.
+- Execute the bundled smoke tests: `./devspec_toolkit/tests/unit`.

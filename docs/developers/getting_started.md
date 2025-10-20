@@ -1,6 +1,6 @@
 # Getting Started With The AI Spec Driven Development Toolkit
 
-This guide onboards developers to the end-to-end spec workflow and shows how to work with the repository, prompts, and validation tooling. It consolidates the information that previously lived in the quick start and tutorial documents so there is a single source of truth for human readers.
+This guide onboards developers to the end-to-end spec workflow and shows how to work with the repository, prompts, and validation tooling. It consolidates the information that previously lived in the quick start and tutorial documents so there is a single source of truth for human readers. Other docs reference this file for environment setup so keep it authoritative.
 
 ## Prerequisites
 - Python 3.10+ for running the CLI and validation commands
@@ -43,12 +43,8 @@ The [developer index](index.md) links to deeper explanations when you need them.
 2. Read the guide to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from `./devspec_toolkit/prompts/prompt_NN_name.md`.
 4. Paste the single fenced `json` block into `spec/NN_name.json` in your host repo.
-5. Validate the artifact:
-   ```bash
-   python -m specdev_tools.cli validate spec/NN_name.json \
-     --repo-root ./devspec_toolkit
-   ```
-6. Keep traceability up to date; use `matrix`, `fixtures-lint`, and `validate-all` with the same `--repo-root` flag as guardrails.
+5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
+6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
 ### Phase II · Spec → Implementation (Steps 13–17)
 1. Generate scaffolds and validate contracts:
@@ -76,14 +72,7 @@ Keep `reference.md` handy for the complete command catalogue, flags, and trouble
 Automation-specific rules and escalation paths reside in `../agents/agents.md`; developers rarely need to reference them.
 
 ## 6. Validation Rituals
-Run the following whenever you change specs:
-```bash
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-```
-
-These commands enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
+Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
 Prefer a single command that chains those checks? Run `./devspec_toolkit/tests/run.sh` from your host repo root; it executes the same validation trio plus an invariants check and stores outputs under `tests/`.
 

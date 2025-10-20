@@ -14,17 +14,8 @@ All commands in this guide assume you run them from repo root with the toolkit a
 | 17 — Spec-Drift Audit | Detect runtime vs spec divergence | Schedule checks defined in `17_spec_drift.json` and feed outputs back into governance. |
 
 ## Command Cadence
-```bash
-# Generate scaffold and optionally boot it
-python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
-
-# Track fixture-driven progress
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-
-# Continuous validation as implementation evolves
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
+- Generate scaffolds with `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out`.
+- Run the [core validation commands](../reference.md#core-validation-commands) to track fixture progress and trace coverage as implementation evolves.
 
 ## CI Integration
 - **validate** — schema + fixture lint

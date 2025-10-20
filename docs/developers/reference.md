@@ -20,7 +20,9 @@ This reference collects recurring facts that developers need while authoring or 
 - **No redefining primitives**: reuse atoms/collections/errors from `schema/core/`.
 
 ## Command Cheatsheet
-Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-your-environment) before running these commands.
+Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-your-environment) before running these commands. Every other document links back here so this serves as the canonical command reference.
+
+### Core validation commands
 ```bash
 # Validation
 python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
