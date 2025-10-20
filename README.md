@@ -42,6 +42,7 @@ Most teams vendor the toolkit as a git submodule at `<product-repo>/devspec_tool
 - Run validations with `python -m specdev_tools.cli … --repo-root <toolkit-root>`.
 - Lean on the bundled scripts in [docs/developers/reference.md#bundled-scripts](docs/developers/reference.md#bundled-scripts) when you want the core validation cadence or to smoke-test the example artifacts.
 - Regenerate guides from [template/](template/) before editing human-facing step docs.
+- AI runners follow a two-phase flow (Clarify → Emit). See [docs/agents/manifest.json](docs/agents/manifest.json) and [docs/agents/agents.md](docs/agents/agents.md) for the operating protocol. Clarify responses are short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items.
 
 ---
 

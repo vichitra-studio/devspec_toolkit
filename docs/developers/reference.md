@@ -46,6 +46,12 @@ python -m specdev_tools.cli ai-help --step 04
 
 Invoke commands from the root of your host repository so relative paths to `spec/` and [./devspec_toolkit/](../../) resolve cleanly.
 
+## Two-Phase AI Runner Mode
+- Prompts support a two-phase flow: Clarify (questions only) → Emit (single fenced `json`).
+- Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
+- Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
+- Operational guidance for agents and runner tips: `docs/agents/agents.md`.
+
 ## Validation Workflow
 1. Edit the JSON artifact.
 2. Run `validate`.

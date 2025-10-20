@@ -4,6 +4,12 @@ Phase II turns validated specs into a running system while keeping runtime behav
 
 All commands in this guide assume you run them from repo root with the toolkit available at [./devspec_toolkit/](../../../).
 
+## AI Assist Flow
+Where prompts apply in this phase (e.g., Scaffold updates, Red‑Team Loop, Monitoring, Drift), use the two‑phase flow:
+- Phase A — Clarify: ask targeted questions based on the prompt’s “Self‑Audit Gate”.
+- Phase B — Emit: output exactly one fenced `json` block for the step’s artifact.
+Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
+
 ## Step Progression
 | Step | Purpose | Key Activities |
 |------|---------|----------------|

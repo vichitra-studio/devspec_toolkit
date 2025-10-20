@@ -9,6 +9,29 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
+## Context To Ingest
+- Charter `spec/00_charter.json` for organizational goals/constraints; Implementation Plan `spec/09_impl_plan.json` for cadence.
+- CI Gates `spec/12_ci_gates.json` to ensure governance aligns with automation.
+- Current commit conventions (if any) found in repo history or CONTRIBUTING docs.
+- Guides: `devspec_toolkit/template/10_governance.guide.md`, shared expectations, developer reference.
+
+## Operating Flow: Synthesize → Clarify → Emit
+- Build a private Governance Ledger: versioning strategy, PR rules (required validations), spec_first_policy, commit message pattern, reviewers/roles. Do not output it.
+- Validate PR rules cover core spec validations; ensure commit pattern supports traceability.
+- Self-audit; if policies are ambiguous or unenforceable, ask Gap Questions.
+- Rewrite into concise, enforceable statements and patterns; finalize reviewers.
+- Emit JSON when enforceable.
+
+## Heuristics For Completeness
+- Optional→expected: include commit pattern if `require_spec_ids=true`; include PR rules invoking `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`.
+- Ambiguity scrub: make each rule testable (yes/no), not advisory.
+
+## Self-Audit Gate
+- If completeness < 0.9, ask.
+- Gating items:
+  - Versioning strategy present; spec_first_policy explicit; commit message requirements clear and actionable.
+  - PR rules list core validations; reviewers cover necessary disciplines.
+
 # Output Rules
 1. Return exactly one fenced code block with language `json`. No prose before or after.
 2. The JSON must validate against the Embedded Schema below.

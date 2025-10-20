@@ -1,8 +1,46 @@
 {
   "name": "specdev-agent-guide",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "entrypoint": "docs/agents/agents.md",
   "description": "Operational contract for AI agents working with the AI Spec Driven Development Toolkit",
+  "interaction_mode": "two_phase",
+  "modes": {
+    "clarify": {
+      "purpose": "Collect missing, high-impact details before artifact emission using the prompts’ Context To Ingest, Operating Flow, Heuristics, and Self-Audit Gate sections.",
+      "output_contract": {
+        "type": "questions",
+        "format": "markdown_bullets_only",
+        "restrictions": [
+          "Do not emit JSON or code fences",
+          "Ask targeted questions grouped by field/impact",
+          "Prioritize gating items from the Self-Audit Gate"
+        ]
+      }
+    },
+    "emit": {
+      "purpose": "Generate the canonical JSON artifact once clarifications resolve gating items.",
+      "output_contract": {
+        "type": "json_artifact",
+        "fenced_code_block": true,
+        "language": "json",
+        "restrictions": [
+          "Exactly one fenced json block",
+          "No prose before or after",
+          "Must validate against the embedded schema"
+        ]
+      }
+    }
+  },
+  "phase_triggers": {
+    "clarify": [
+      "self_audit_score < 0.9",
+      "any gating item missing"
+    ],
+    "emit": [
+      "self_audit_score >= 0.9",
+      "no gating item missing"
+    ]
+  },
   "commands": [
     "See docs/developers/reference.md#core-validation-commands for the canonical CLI usage."
   ]

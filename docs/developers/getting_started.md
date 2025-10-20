@@ -42,7 +42,9 @@ The [developer index](index.md) links to deeper explanations when you need them.
 ### Phase I · Spec Discovery (Steps 00–12)
 1. Copy the matching guide blueprint from [./devspec_toolkit/template/](../../template/) into `spec/NN_name.guide.md` if it does not exist yet, then tailor it for your product.
 2. Read the guide to internalise the Definition of Ready and dependencies.
-3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
+3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
+   - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
+   - Phase B — Emit: after answering questions, rerun to emit exactly one fenced `json` block.
 4. Paste the single fenced `json` block into `spec/NN_name.json` in your host repo.
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
@@ -66,11 +68,14 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 ## 5. Working With AI Assistants
 - Read the human guide before invoking an assistant so you know the Definition of Ready (DoR) and guardrails.
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
-- Instruct the assistant to output **exactly one** fenced `json` block that validates against the embedded schema.
-- If validation fails, consult the guide, adjust the prompt, and re-run the command.
+- Use the two‑phase flow:
+  - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
+  - Phase B — Emit: the assistant then emits **exactly one** fenced `json` block that validates against the embedded schema.
+- Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
+- If validation fails, consult the guide, address errors, and re-run the emission.
 - Need a quick reminder of the workflow for a given step? Run `python -m specdev_tools.cli ai-help --step NN`.
 
-Automation-specific rules and escalation paths reside in [../agents/agents.md](../agents/agents.md); developers rarely need to reference them.
+Automation protocol and runner tips live in [../agents/manifest.json](../agents/manifest.json) and [../agents/agents.md](../agents/agents.md).
 
 ## 6. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.

@@ -11,7 +11,9 @@ Set the policies that keep the spec authoritative by covering change control, ve
 
 ## Prompt File
 - Contract: `prompts/prompt_10_governance.md`
-- Prompts produce exactly one fenced ```json``` block that validates against the above schema.
+- Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
+  - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
+  - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
 
 ## Definition of Ready (DoR) / Guardrails
 See [Shared Template Expectations](../docs/templates/shared_expectations.md#definition-of-ready-dor-guardrails).

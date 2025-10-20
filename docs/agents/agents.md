@@ -14,24 +14,31 @@ This document defines how automated agents should work with the AI Spec Driven D
 - Schemas are referenced from [./devspec_toolkit/schema/](../../schema/) and resolved using [./devspec_toolkit/tools/schema_registry.json](../../tools/schema_registry.json).
 - Validation commands are executed via `python -m specdev_tools.cli ... --repo-root <toolkit-path>` with `PYTHONPATH` including `<toolkit-path>/tools`.
 
-## 3. Operating Protocol
+## 3. Operating Protocol (Two‑Phase)
+This toolkit uses a two‑phase interaction to maximize completeness without hard‑coding schemas.
+
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
    - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
+   - In prompts, use the new sections: `Context To Ingest`, `Operating Flow`, `Heuristics For Completeness`, and `Self‑Audit Gate`.
 2. **Prepare Context**
-   - Capture all `Clarification Questions` blocks from the prompt.
-   - Record step dependencies listed in the guide (`consumers`, `inputs`).
-3. **Generate Output**
-   - Run the prompt unchanged against the target model.
-   - Ensure the response is exactly one fenced `json` code block.
-   - Reject outputs containing examples, commentary, or extra fencing.
-4. **Persist Artifact**
+   - Ingest the paths listed in `Context To Ingest` for the step.
+   - Build a private ledger per step (e.g., FR ledger, API ledger) as described in `Operating Flow` (do not output it).
+3. **Phase A — Clarify**
+   - Apply the `Self‑Audit Gate`. If the private completeness score is < 0.9 or any gating item is missing:
+     - Output only a short, bulleted list of targeted gap questions (no code fences, no JSON).
+     - Group questions by field/impact (e.g., “Success Metrics”, “Security”, “Schemas”).
+     - Stop and wait for human answers.
+4. **Phase B — Emit**
+   - Once answers resolve gating items, run the same prompt to generate the artifact.
+   - Output exactly one fenced `json` code block that validates against the embedded schema; no extra prose.
+5. **Persist Artifact**
    - Replace the contents of `spec/NN_name.json` with the generated block.
    - Preserve the `$schema` field already present in the file.
-5. **Validate**
+6. **Validate**
    - Run the [core validation commands](../developers/reference.md#core-validation-commands) and inspect results.
    - On failure, re-run with additional clarifications from the guide.
-6. **Update Traceability**
+7. **Update Traceability**
    - When FRs, APIs, fixtures, or NFRs change, ensure the validation sequence above completes successfully.
 
 ## 4. Step Reference
@@ -52,6 +59,7 @@ This document defines how automated agents should work with the AI Spec Driven D
 
 ## 5. Escalation Triggers
 - Schema validation fails after two retries → request human clarification.
+- Phase A repeated twice without sufficient answers → summarize blockers and request escalation/decisions.
 - A referenced ID is missing from expected step → highlight the missing ID and halt.
 - `fixtures-lint` or `matrix` produce new warnings → include the command output in your response and stop.
 - Unrecognized command or missing tool → inform the user; do not attempt to install packages without approval.
@@ -65,5 +73,22 @@ When reporting back to humans, include:
 1. List of files touched (spec, prompts, docs, etc.).
 2. Commands executed and whether they succeeded.
 3. Outstanding issues or reasons for escalation.
+
+During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), output only the single fenced `json` block.
+
+## 8. Runner Tips
+- Treat prompts as the contract; do not modify them at runtime.
+- Honor `interaction_mode` and `phase_triggers` from the manifest; switch phases only when conditions are met.
+- Read only the paths listed in the prompt’s “Context To Ingest” for that step; avoid external sources.
+- Build private ledgers in memory only; never persist them or include them in outputs.
+- In Phase A, emit only grouped, concise questions; never include JSON, code fences, or speculative answers.
+- Stop generation when the self‑audit gate is not met; wait for human input rather than guessing.
+- Prefer deterministic decoding to keep outputs stable across retries.
+- De‑duplicate questions and prioritize gating items that block emission.
+- Resolve IDs and traces against current artifacts; flag unknown or missing IDs as gaps instead of inventing them.
+- Preserve `$schema` and file naming; do not add fields outside the schema.
+- After emission, run validations and surface short, actionable failure summaries; do not auto‑correct silently.
+- Do not perform network/package installs; report missing tools or commands succinctly.
+- Keep file paths relative to the repo root in user‑visible output; avoid absolute paths.
 
 Following this contract keeps the spec workflow repeatable and predictable for both automated and human contributors.

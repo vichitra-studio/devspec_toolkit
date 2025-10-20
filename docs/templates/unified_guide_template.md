@@ -11,7 +11,9 @@
 
 ## Prompt File
 - Contract: `prompts/prompt_{{STEP_ID}}_{{STEP_SLUG}}.md`
-- Prompts produce exactly one fenced ```json``` block that validates against the above schema.
+- Prompts include sections for context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
+  - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
+  - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
 
 ## Definition of Ready (DoR) / Guardrails
 - All required fields present and semantically filled, not placeholders like "TBD" except where explicitly allowed for bootstrapping.

@@ -9,6 +9,30 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
+## Context To Ingest
+- Interface Contracts `spec/05_interface_contracts.json` for attack surface (routes/methods/schemas/security).
+- FRs `spec/04_fr_list.json` and Invariants `spec/06_invariants.json` for critical behaviors and rules.
+- NFRs `spec/07_nfrs.json` and Monitoring `spec/16_delivery_monitoring.json` for SLO/SLA and alerting context.
+- Incident notes or runbooks (if present); Guides: `devspec_toolkit/template/11_redteam.guide.md`, shared expectations, reference.
+
+## Operating Flow: Synthesize → Clarify → Emit
+- Build a private Threat Ledger: enumerate threats per surface (authn, authz, input validation, transport, business logic, data privacy), with vectors, impacted assets, severity, and concrete mitigations; list edge cases. Do not output it.
+- Map mitigations to fixtures and invariants; check if monitoring covers detection.
+- Self-audit; if any public API lacks at least one plausible threat or mitigation, ask Gap Questions.
+- Rewrite threats to specific, testable statements; include mitigations and references.
+- Emit JSON when coverage is meaningful.
+
+## Heuristics For Completeness
+- Optional→expected: include mitigations for high/critical threats; include edge_cases (timeouts, retries, race conditions).
+- Auto-link: reference `fixture-*` and `invariant-*` where feasible; align severities with NFRs and alerting.
+- Ambiguity scrub: name vectors (e.g., replay, injection, scraping) and affected assets/services.
+
+## Self-Audit Gate
+- If completeness < 0.9, ask.
+- Gating items:
+  - Each public API has at least one enumerated threat; high/critical entries have mitigations.
+  - Edge cases listed for fragile flows; severities assigned with rationale; links to fixtures/invariants where applicable.
+
 # Output Rules
 1. Return exactly one fenced code block with language `json`. No prose before or after.
 2. The JSON must validate against the Embedded Schema below.

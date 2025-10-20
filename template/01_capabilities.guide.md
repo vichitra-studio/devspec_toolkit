@@ -11,7 +11,9 @@ Translate the charter into a catalog of system capabilities with explicit verbs,
 
 ## Prompt File
 - Contract: `prompts/prompt_01_capabilities.md`
-- Prompts produce exactly one fenced ```json``` block that validates against the above schema.
+- Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
+  - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
+  - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
 
 ## Definition of Ready (DoR) / Guardrails
 See [Shared Template Expectations](../docs/templates/shared_expectations.md#definition-of-ready-dor-guardrails).

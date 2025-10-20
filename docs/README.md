@@ -9,7 +9,7 @@ The AI Spec Driven Development Toolkit separates documentation by audience to ke
 
 ## Start Here
 1. Developers: open [developers/index.md](developers/index.md) and follow the links to [getting_started.md](developers/getting_started.md), [reference.md](developers/reference.md), or the workflow guides.
-2. Agents: consume [agents/manifest.json](agents/manifest.json) (machine hints) and [agents/agents.md](agents/agents.md) (detailed protocol).
+2. Agents: consume [agents/manifest.json](agents/manifest.json) (machine hints) and [agents/agents.md](agents/agents.md) (two‑phase protocol: Clarify → Emit).
 
 ## Related Assets
 - Toolkit overview: [../README.md](../README.md)

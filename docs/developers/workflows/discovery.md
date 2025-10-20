@@ -27,6 +27,12 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 
+## AI Assist Flow
+Prompts are designed for a two‑phase interaction to reduce rework:
+- Phase A — Clarify: the assistant ingests the step’s context and asks targeted Gap Questions when the “Self‑Audit Gate” is not satisfied.
+- Phase B — Emit: once answers are provided, the assistant emits a single fenced `json` block that validates against the schema.
+Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; the assistant stops until answers are provided.
+
 ## Validation Cadence
 Use the [core validation commands](../reference.md#core-validation-commands) after each artifact update to keep discovery outputs consistent before moving to implementation.
 

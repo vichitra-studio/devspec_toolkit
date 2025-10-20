@@ -9,6 +9,32 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
+## Context To Ingest
+- Capabilities and owners from `spec/01_capabilities.json` to inform components.
+- Any existing `spec/05_interface_contracts.json` to align external interfaces and protocols.
+- Glossary terms `spec/03_glossary.json` to name components and connections consistently.
+- NFRs `spec/07_nfrs.json` that imply reliability and rate limits.
+- Guides: `devspec_toolkit/template/02_system_sketch.guide.md`, shared expectations, developer reference.
+
+## Operating Flow: Synthesize → Clarify → Emit
+- Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, auth, rate_limit, reliability, schema_ref). Do not output it.
+- Map external dependencies explicitly; align connection security and reliability with NFRs and interface contracts.
+- Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
+- Rewrite responsibilities into 3–6 crisp bullets per component; complete connection details based on protocols and policy; ensure IDs are stable.
+- Emit JSON once reconciled.
+
+## Heuristics For Completeness
+- Optional→expected: set `auth` and `reliability` for any connection crossing trust boundaries; include `rate_limit` for public/partner interfaces.
+- Implicit mapping: responsibilities should cover all in-scope capabilities; if not, propose a missing component.
+- Ambiguity scrub: avoid generic “owns data”; specify data domains and SLAs.
+
+## Self-Audit Gate
+- If completeness < 0.9, ask questions.
+- Gating items:
+  - Each in-scope capability maps to at least one component.
+  - All cross-component integrations appear as connections with protocol/auth; event connections include reliability.
+  - External systems are identified with clear boundaries and owners.
+
 # Output Rules
 1. Return exactly one fenced code block with language `json`. No prose before or after.
 2. The JSON must validate against the Embedded Schema below.

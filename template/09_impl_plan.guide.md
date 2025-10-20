@@ -11,7 +11,9 @@ Translate the validated spec into an executable delivery roadmap that covers tec
 
 ## Prompt File
 - Contract: `prompts/prompt_09_impl_plan.md`
-- Prompts produce exactly one fenced ```json``` block that validates against the above schema.
+- Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
+  - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
+  - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
 
 ## Definition of Ready (DoR) / Guardrails
 See [Definition of Ready](../docs/templates/definition_of_ready.md)
