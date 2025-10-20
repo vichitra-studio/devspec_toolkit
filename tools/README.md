@@ -10,19 +10,7 @@ Follow the environment setup in [`docs/developers/getting_started.md`](../docs/d
 
 ## What is **toolkit root**?
 
-The toolkit root is the directory that contains this submodule (for example, `./devspec_toolkit`). That folder ships with:
-
-```
-<toolkit-root>/
-├─ tools/
-│  ├─ schema_registry.json
-│  └─ specdev_tools/...
-├─ schema/
-├─ prompts/
-├─ docs/
-├─ template/
-└─ tests/
-```
+The toolkit root is the directory that contains this submodule (for example, `./devspec_toolkit`). For the canonical directory map, see [Toolkit Layout](../README.md#toolkit-layout).
 
 The CLI resolves `$schema` URIs via `tools/schema_registry.json`. When you run commands from your product repository, pass `--repo-root <toolkit-root>` so those paths resolve correctly.
 

@@ -52,6 +52,17 @@ Invoke commands from the root of your host repository so relative paths to `spec
 3. If any traceability changed, regenerate the matrix and lint fixtures.
 4. Update governance-compliant commit messages per `spec/10_governance.json`.
 
+## Bundled Scripts
+- `tests/run.sh` — chains the validation workflow for any spec set. Run it from your host repository root, pointing `--repo-root` at the toolkit path (defaults to the script parent) and optionally `--spec-dir` at an alternate spec directory:
+  ```bash
+  ./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit [--spec-dir ./path/to/spec]
+  ```
+  The script writes the trace matrix to `tools/trace_matrix.json` beside your spec directory and the invariants log to `tests/.invariants.out.json`.
+- `tests/unit` — smoke-tests the bundled example artifacts. Execute it from the toolkit root to confirm the reference set remains healthy:
+  ```bash
+  ./devspec_toolkit/tests/unit
+  ```
+
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm `tools/schema_registry.json`.
 - **Unknown API in fixtures**: ensure the target exists in `05_interface_contracts.json`.

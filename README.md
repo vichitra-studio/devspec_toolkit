@@ -40,11 +40,7 @@ Most teams vendor the toolkit as a git submodule at `<product-repo>/devspec_tool
 ## Working With The Toolkit
 - Follow the environment setup in `docs/developers/getting_started.md#1-set-up-your-environment` (virtualenv + `PYTHONPATH`).
 - Run validations with `python -m specdev_tools.cli … --repo-root <toolkit-root>`.
-- Use the bundled smoke script to mirror the core validation cadence:
-  ```bash
-  ./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit
-  ```
-  Pass `--spec-dir <path>` when your artifacts live outside `../spec/`.
+- Lean on the bundled scripts in `docs/developers/reference.md#bundled-scripts` when you want the core validation cadence or to smoke-test the example artifacts.
 - Regenerate guides from `template/` before editing human-facing step docs.
 
 ---

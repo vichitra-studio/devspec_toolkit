@@ -26,6 +26,7 @@ python -m specdev_tools.cli --help
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
 ## 2. Understand The Repository Layout
+Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the canonical directory map, then keep these working pointers in mind:
 - `spec/` (in your host repo) — machine artifacts (`NN_step.json`) and human guides (`NN_step.guide.md`) you actively maintain.
 - `./devspec_toolkit/` — the toolkit submodule providing schemas, prompts, docs, templates, and CLI code (substitute your path if different).
   - `schema/` — JSON Schemas for every spec step plus shared atoms/collections/errors
@@ -74,7 +75,7 @@ Automation-specific rules and escalation paths reside in `../agents/agents.md`; 
 ## 6. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
-Prefer a single command that chains those checks? Run `./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit` from your host repo root; it executes the same validation trio plus an invariants check and stores outputs under `tests/`. Supply `--spec-dir` if your artifacts live outside `spec/`.
+Prefer a single command that chains those checks? Consult [`reference.md#bundled-scripts`](reference.md#bundled-scripts) for the `tests/run.sh` wrapper and the example smoke test so the command details stay canonical.
 
 ## 7. Where To Go Next
 - Need a conceptual model? See `workflows/discovery.md` and `workflows/spec_to_impl.md`.

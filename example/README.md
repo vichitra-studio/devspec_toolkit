@@ -10,6 +10,6 @@
 ## How To Use This Reference
 - Follow the environment setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment).
 - Run `python -m specdev_tools.cli validate-all example/devspec_kit --repo-root ./devspec_toolkit` to confirm the reference artifacts stay healthy.
-- Generate a comparison matrix with `python -m specdev_tools.cli matrix example/devspec_kit --repo-root ./devspec_toolkit --out example/devspec_kit/trace_matrix.out.json`.
+- Generate a comparison matrix with `python -m specdev_tools.cli matrix example/devspec_kit --repo-root ./devspec_toolkit --out example/tools/trace_matrix.json`.
 
 Use this directory to answer “what does complete look like?”—not as scaffolding for new projects. When creating your own specs, copy templates from `./devspec_toolkit/template/` (or your toolkit path) into your host repository’s `spec/` folder and generate fresh artifacts via the prompts.

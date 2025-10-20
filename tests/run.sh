@@ -67,7 +67,8 @@ spec_parent="$(cd "$spec_dir/.." && pwd)"
 out_dir="$spec_parent/tests"
 mkdir -p "$out_dir"
 
-matrix_out="$out_dir/.matrix.out.json"
+matrix_out="$spec_parent/tools/trace_matrix.json"
+mkdir -p "$(dirname "$matrix_out")"
 invariants_out="$out_dir/.invariants.out.json"
 invariants_sample="$toolkit_root/tests/samples/invariants/password_ok.json"
 

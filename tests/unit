@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KIT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MATRIX_OUT="$KIT_ROOT/tests/.specdev_example_matrix.json"
+MATRIX_OUT="$KIT_ROOT/tools/trace_matrix.json"
 export PYTHONPATH="$KIT_ROOT/tools"
 
 echo "==> AI Spec Driven Development toolkit smoke tests"

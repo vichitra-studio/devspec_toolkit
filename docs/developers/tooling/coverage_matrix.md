@@ -3,7 +3,7 @@
 The coverage matrix ties every requirement to a verifying artifact so that the spec, fixtures, and implementation stay aligned.
 
 ## Command
-Run `python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json` (documented in the [command cheatsheet](../reference.md#command-cheatsheet)).
+Use the `matrix` subcommand documented in the [command cheatsheet](../reference.md#command-cheatsheet). When invoked with `--out tools/trace_matrix.json`, it writes the canonical report alongside other toolkit outputs.
 
 - `spec/` — root of the spec artifacts.
 - `--out` — optional path for the generated JSON report (`-` to print to stdout).

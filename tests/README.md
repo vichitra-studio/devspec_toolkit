@@ -35,6 +35,6 @@ From your host repo root (adjust `./devspec_toolkit` if the toolkit lives elsewh
 
 - Export `PYTHONPATH` as described in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment).
 - Run the [core validation commands](../docs/developers/reference.md#core-validation-commands), then compare `tools/trace_matrix.json` against `tests/expectations/trace_matrix.json` (e.g., `diff -u ... || true`).
-- Evaluate invariants when needed: `python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json`.
-- Execute the bundled smoke tests: `./devspec_toolkit/tests/unit`.
-- Run the validation suite wrapper: `./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit [--spec-dir <path-to-spec>]`.
+- When invariants fail, rerun the `invariants-check` command documented in the reference, pointing at the sample payload in `tests/samples/invariants/password_ok.json`.
+- Execute the bundled smoke tests (`tests/unit`) as described in [`../docs/developers/reference.md#bundled-scripts`](../docs/developers/reference.md#bundled-scripts).
+- Run the validation suite wrapper (`tests/run.sh`) using the same reference section for flag details.
