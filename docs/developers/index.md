@@ -24,6 +24,7 @@ Refer directly to those guides when authoring or reviewing a given step.
 ## Related Resources
 - CLI and schema registry: `../tools/README.md`, `../tools/schema_registry.json`
 - Example specs: `../example/`
+- Validation scripts & fixtures: [`../tests/README.md`](../tests/README.md)
 - Test data: `../tests/fixtures/`, `../tests/samples/`
 
 ## Contributing Improvements

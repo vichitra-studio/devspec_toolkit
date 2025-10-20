@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KIT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+MATRIX_OUT="$KIT_ROOT/tests/.specdev_example_matrix.json"
 export PYTHONPATH="$KIT_ROOT/tools"
 
 echo "==> AI Spec Driven Development toolkit smoke tests"
@@ -16,7 +17,7 @@ echo "==> AI Spec Driven Development toolkit smoke tests"
   python3 -m specdev_tools.cli fixtures-lint example/devspec_kit --repo-root "$KIT_ROOT"
 
   echo "[3/3] build example trace matrix"
-  python3 -m specdev_tools.cli matrix example/devspec_kit --repo-root "$KIT_ROOT" --out /tmp/specdev_example_matrix.json
+  python3 -m specdev_tools.cli matrix example/devspec_kit --repo-root "$KIT_ROOT" --out "$MATRIX_OUT"
 )
 
 echo "AI Spec Driven Development toolkit smoke tests completed."

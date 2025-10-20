@@ -20,10 +20,8 @@ This reference collects recurring facts that developers need while authoring or 
 - **No redefining primitives**: reuse atoms/collections/errors from `schema/core/`.
 
 ## Command Cheatsheet
+Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-your-environment) before running these commands.
 ```bash
-# One-time per shell: expose the toolkit modules (adjust the path if needed)
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-
 # Validation
 python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
 python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit

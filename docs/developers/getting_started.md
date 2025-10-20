@@ -85,6 +85,8 @@ python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 These commands enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
+Prefer a single command that chains those checks? Run `./devspec_toolkit/tests/run.sh` from your host repo root; it executes the same validation trio plus an invariants check and stores outputs under `tests/`.
+
 ## 7. Where To Go Next
 - Need a conceptual model? See `workflows/discovery.md` and `workflows/spec_to_impl.md`.
 - Looking for troubleshooting tactics? Review `tooling/gap_hunter_checklist.md` and `tooling/coverage_matrix.md`.

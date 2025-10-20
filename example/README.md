@@ -18,7 +18,7 @@ export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 python -m specdev_tools.cli validate-all example/devspec_kit --repo-root ./devspec_toolkit
 
 # Compare your trace matrix to the reference
-python -m specdev_tools.cli matrix example/devspec_kit --repo-root ./devspec_toolkit --out /tmp/reference_matrix.json
+python -m specdev_tools.cli matrix example/devspec_kit --repo-root ./devspec_toolkit --out example/devspec_kit/trace_matrix.out.json
 ```
 
 Use this directory to answer “what does complete look like?”—not as scaffolding for new projects. When creating your own specs, copy templates from `./devspec_toolkit/template/` (or your toolkit path) into your host repository’s `spec/` folder and generate fresh artifacts via the prompts.

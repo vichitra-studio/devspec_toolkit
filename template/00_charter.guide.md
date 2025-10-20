@@ -6,8 +6,8 @@ Define problem, scope, users, and success metrics in falsifiable terms.
 ## Template / Fields
 - Canonical artifact: **spec/00_charter.json**
 - Schema reference: `schema/00_charter.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
-- Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms/1`)
-- Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections/1`)
+- Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
+- Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
 - Contract: `prompts/prompt_00_project_charter.md`

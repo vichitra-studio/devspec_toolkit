@@ -114,8 +114,8 @@ Evaluate invariant expressions against a sample JSON context.
 
 **Example**
 ```bash
-echo '{ "password": { "length": 12 } }' > /tmp/sample.json
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample /tmp/sample.json
+mkdir -p ./scratch && echo '{ "password": { "length": 12 } }' > ./scratch/invariants_sample.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./scratch/invariants_sample.json
 ```
 
 ### 6) `governance-check`

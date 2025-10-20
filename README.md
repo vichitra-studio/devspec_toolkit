@@ -63,18 +63,9 @@ The `example/devspec_kit/` directory shows a fully specced reference implementat
 
 ## Quick start
 
-```bash
-# ensure you run this from repo root so ./devspec_toolkit/... resolves
-
-python -m venv .venv && . .venv/bin/activate
-pip install -r ./devspec_toolkit/tools/requirements.txt
-
-# Make the toolkit modules importable
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
-
-The CLI covers validation, traceability, fixtures, invariants, governance, CI generation, scaffolding, and ai-help reminders. `docs/developers/reference.md` is the canonical cheat sheet showing each command with the required `--repo-root ./devspec_toolkit` flag.
-
-➡️ For a narrated walkthrough of the workflow, see `docs/developers/getting_started.md` in this toolkit.
+1. Complete the environment setup in [`docs/developers/getting_started.md`](docs/developers/getting_started.md#1-set-up-your-environment).
+2. Keep [`docs/developers/reference.md`](docs/developers/reference.md) nearby for the CLI command catalogue and troubleshooting flow.
+3. Use the workflow guides under `docs/developers/workflows/` as you progress through Steps 00–17.
 
 ---
 
