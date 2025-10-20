@@ -1,7 +1,7 @@
 # 13. Scaffold Generation
 
 ## Purpose
-Generate compile-clean route stubs from contracts and capture follow-up validation tasks.
+Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
 ## Template / Fields
 - Canonical artifact: **spec/13_scaffold.json**
@@ -28,3 +28,25 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#chec
 ## Failure Modes
 See [Shared Template Expectations](../docs/templates/shared_expectations.md#failure-modes).
 
+## Best Practices
+- Mirror Step 05 interface contracts when building the `route_map`, keeping `api_ref`, `path`, and `method` in sync.
+- Document `service_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
+- Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
+- Track `build_status` honestly (`green`, `red`, `pending`) to surface blockers before implementation accelerates.
+
+## Common Pitfalls
+- Leaving modules unspecified, forcing teams to rediscover scaffold layout.
+- Forgetting to include new or versioned APIs, leading to missing routes and broken fixtures.
+- Marking build status green without running validators, giving a false sense of readiness.
+- Creating route paths that differ from Step 05 definitions, breaking client compatibility.
+
+## Related Steps
+- Step 5: Interface Contracts - Supplies the API definitions that scaffolding must honor.
+- Step 9: Implementation Plan - Uses scaffold status to schedule feature development.
+- Step 14: Fixture Implementation - Builds on the scaffold to satisfy fixtures and acceptance criteria.
+
+## Quick Reference
+- **ID Format**: `scaffold-<descriptor>`; routes reference `api-*` IDs.
+- **Required Fields**: must include `service_skeleton.language` and a non-empty `route_map`.
+- **Build Status**: one of `pending`, `green`, or `red`; update as validators run.
+- **Validator List**: capture exact CLI commands to reproduce scaffold health checks.

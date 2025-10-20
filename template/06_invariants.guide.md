@@ -1,7 +1,7 @@
 # 6. Invariants & Rules
 
 ## Purpose
-Codify truths and constraints that must always hold.
+Capture the non-negotiable truths, guardrails, and data relationships the system must uphold regardless of implementation. These invariants feed governance, contract validation, and monitoring so deviations trigger alerts before customers feel impact.
 
 ## Template / Fields
 - Canonical artifact: **spec/06_invariants.json**
@@ -28,3 +28,25 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#chec
 ## Failure Modes
 See [Shared Template Expectations](../docs/templates/shared_expectations.md#failure-modes).
 
+## Best Practices
+- Choose the appropriate `language` (`jsonlogic`, `cel`, or `text`) and write evaluable `expression` strings for automated enforcement.
+- Describe each invariant in business language first, then map `scope.components` or `scope.apis` to constrain where it applies.
+- Tag severity as `error` for hard guarantees and `warn` for observability alerts to guide escalation paths.
+- Link invariants to FRs, NFRs, or governance rules using `trace` so auditors know why the rule exists.
+
+## Common Pitfalls
+- Leaving the `expression` empty or non-executable, which prevents automation in CI and runtime.
+- Setting severity to `warn` for hard requirements, letting regressions slip past controls.
+- Forgetting to scope the invariant, causing false positives across unrelated components.
+- Failing to version or reuse `inv_id`, leading to duplicate or orphaned invariants.
+
+## Related Steps
+- Step 4: Functional Requirements - Supplies behaviors that likely require invariants for enforcement.
+- Step 7: NFRs - Ensures performance and reliability targets have matching invariants where feasible.
+- Step 12: CI Gates - Implements automated checks that evaluate these invariants.
+
+## Quick Reference
+- **ID Format**: `invariant-<descriptor>`; keep stable for cross-step traceability.
+- **Required Fields**: every rule needs `inv_id`, `description`, `language`, and `expression`.
+- **Scope Usage**: populate `components` or `apis` arrays to target enforcement precisely.
+- **Trace Hooks**: reference FR (`fr-*`), API (`api-*`), or governance policy IDs to show motivation.

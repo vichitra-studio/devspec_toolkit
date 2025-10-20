@@ -1,7 +1,7 @@
 # 4. Functional Requirements
 
 ## Purpose
-State behavioral requirements with acceptance criteria and traces.
+Turn capabilities into falsifiable statements of system behavior with clear entry conditions, expected outcomes, and measurable acceptance evidence. These requirements become the contract linking stakeholder intent to APIs, fixtures, and monitoring.
 
 ## Template / Fields
 - Canonical artifact: **spec/04_fr_list.json**
@@ -30,24 +30,25 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#fail
 
 
 ## Best Practices
-- Write FRs that are testable and measurable.
-- Include clear acceptance criteria for each requirement.
-- Link FRs to specific capabilities or APIs using trace references.
-- Keep statements concise and avoid ambiguity.
+- Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
+- Provide `preconditions` and `postconditions` so testers and implementers know the boundaries of each requirement.
+- Ensure every acceptance criterion has a stable `criterion_id` and, when possible, a `fixture_ref` to drive automation.
+- Use `trace` arrays to link FRs back to capabilities, APIs, NFRs, or governance rules.
 
 ## Common Pitfalls
-- Non-testable requirements that cannot be verified.
-- Missing acceptance criteria for functional requirements.
-- Failure to link FRs to underlying APIs or capabilities.
-- Including too much implementation detail in the requirement.
+- Bundling multiple behaviors into one FR, making it impossible to prove completeness.
+- Leaving acceptance criteria generic or missing, which blocks fixture authoring.
+- Skipping trace links, severing coverage reporting across spec steps.
+- Embedding implementation details (e.g., method names) instead of outcomes, limiting design options.
 
 ## Related Steps
-- Step 0: Project Charter - Provides context for defining requirements
-- Step 1: Capabilities - Functional requirements derive from capabilities
-- Step 5: Interface Contracts - FRs map to API contracts
-- Step 8: Test Plan & Fixtures - FR acceptance criteria become fixtures
+- Step 0: Project Charter - Supplies success metrics and scope constraints.
+- Step 1: Capabilities - Provides the verbs and boundaries each FR must honor.
+- Step 5: Interface Contracts - Converts FR expectations into request/response semantics.
+- Step 8: Fixtures - Operationalizes acceptance criteria into automated checks.
 
 ## Quick Reference
-- **ID Format**: `fr-<descriptor>`
-- **Owner**: Typically `api`, `ui`, or `system`
-- **Key Fields**: statement, acceptance_criteria, trace
+- **ID Format**: `fr-<descriptor>` with stable suffixes for traceability.
+- **Required Fields**: every FR needs `statement`, `acceptance_criteria`, and `fr_id`.
+- **Criteria Structure**: each criterion requires `criterion_id` and `text`; add `fixture_ref` when automation exists.
+- **Trace Hooks**: expect coverage from `trace` to Capabilities (`capability-*`), APIs (`api-*`), or NFRs.

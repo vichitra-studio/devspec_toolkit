@@ -1,7 +1,7 @@
 # 8. Test Plan & Fixtures
 
 ## Purpose
-Provide traceable fixtures for happy-path and edge cases.
+Supply deterministic inputs and expected outputs that exercise functional and non-functional behaviors across the spec. These fixtures form the backbone of automated validation, red-team loops, and regression detection.
 
 ## Template / Fields
 - Canonical artifact: **spec/08_fixtures.json**
@@ -28,3 +28,25 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#chec
 ## Failure Modes
 See [Shared Template Expectations](../docs/templates/shared_expectations.md#failure-modes).
 
+## Best Practices
+- Cover happy-path, edge, and failure scenarios by mixing `mode` values (unit, contract, e2e, redteam).
+- Use `targets` to reference FRs, APIs, NFRs, or invariants so coverage reports stay accurate.
+- Keep `input` and `expected` payloads minimal but sufficient to prove the requirement, reusing glossary terms and schema definitions.
+- Tag fixtures (e.g., `smoke`, `load`) to guide CI gating and spec-to-impl planning.
+
+## Common Pitfalls
+- Creating fixtures without trace links, which prevents coverage tooling from counting them.
+- Treating fixtures as documentation rather than executable payloads, leading to mismatch with generated tests.
+- Overloading fixtures with multiple expectations, making failures hard to diagnose.
+- Forgetting to update fixtures when interface contracts version, causing format mismatches.
+
+## Related Steps
+- Step 4: Functional Requirements - Acceptance criteria should map directly to fixture cases.
+- Step 5: Interface Contracts - Provides schema refs that shape fixture input/output payloads.
+- Step 15: Red-Team Loop - Extends fixtures with adversarial cases discovered later.
+
+## Quick Reference
+- **ID Format**: `fixture-<scenario>`; remain stable across revisions.
+- **Required Fields**: `fixture_id`, `mode`, `input`, and `expected`.
+- **Mode Choices**: `unit`, `contract`, `e2e`, `redteam`; use multiple to cover layers.
+- **Trace Hooks**: populate `targets` with IDs like `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.

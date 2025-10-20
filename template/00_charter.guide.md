@@ -1,7 +1,7 @@
 # 0. Project Charter
 
 ## Purpose
-Define problem, scope, users, and success metrics in falsifiable terms.
+Establish the authoritative charter that captures the business problem, intended users, constraints, and measurable success criteria in falsifiable language. This artifact anchors downstream decisions by making scope boundaries, stakeholder needs, and success metrics explicit enough to trace through every later step.
 
 ## Template / Fields
 - Canonical artifact: **spec/00_charter.json**
@@ -30,23 +30,24 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#fail
 
 
 ## Best Practices
-- Clearly define success metrics with units and baselines.
-- Use concrete language instead of vague terms like "good" or "efficient".
-- Ensure stakeholder needs are captured in the problem statement.
-- Include explicit preconditions and postconditions where applicable.
+- Pair each `success_metric` with a realistic baseline, target, unit, and measurement method so CI can validate progress.
+- Capture scope in both `in_scope` and `out_of_scope` lists to prevent downstream capability creep.
+- Describe each `user_segment` with jobs-to-be-done, pains, and gains so requirements map cleanly to user value.
+- Record critical `assumptions` and `risks` with enough context to inform governance and red-team work.
 
 ## Common Pitfalls
-- Vague problem statements that cannot be tested or verified.
-- Missing success metrics or metrics without baselines.
-- Failing to distinguish between in-scope and out-of-scope items.
-- Not identifying key assumptions that could impact the solution.
+- Writing solution statements instead of clear problem statements, which hides falsifiable success measures.
+- Leaving success metrics without baselines or units, making progress impossible to evaluate.
+- Forgetting stakeholders or user segments, which breaks traceability to downstream capabilities and FRs.
+- Treating assumptions as implicit, leaving governance and risk mitigation blind.
 
 ## Related Steps
-- Step 1: Capabilities - Links to capabilities that this charter supports
-- Step 4: Functional Requirements - Provides context for FRs to be defined
-- Step 9: Implementation Plan - Uses charter as a foundation for planning
+- Step 1: Capabilities - Derive verbs and boundaries from the charter's scope statements.
+- Step 4: Functional Requirements - Translate the problem statement and metrics into falsifiable behaviors.
+- Step 9: Implementation Plan - Sequence delivery to hit the charter's success metrics and mitigate captured risks.
 
 ## Quick Reference
-- **ID Format**: `project_charter-<descriptor>`
-- **Owner**: Typically `api`, `ui`, or `system`
-- **Key Fields**: problem_statement, success_metrics, in_scope, out_of_scope
+- **ID Format**: `project_charter-<descriptor>`; keep stable once referenced.
+- **Minimum Required**: `problem_statement` plus at least one `success_metric`.
+- **Trace Hooks**: Use `links` to connect governance docs or discovery research.
+- **Stakeholder Data**: `stakeholders` and `user_segments` should align with FR owners and test personas.
