@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/13_scaffold.schema.json",
+  "title": "13_scaffold",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "service_skeleton": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "type": "string"
+        },
+        "framework": {
+          "type": "string"
+        },
+        "modules": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        }
+      },
+      "required": [
+        "language"
+      ]
+    },
+    "route_map": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "api_ref": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "path": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_ref",
+          "path",
+          "method"
+        ]
+      }
+    },
+    "validators": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "build_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "green",
+        "red"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "service_skeleton",
+    "route_map"
+  ]
+}

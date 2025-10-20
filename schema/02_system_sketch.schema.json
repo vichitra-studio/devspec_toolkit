@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/02_system_sketch.schema.json",
+  "title": "02_system_sketch",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "component_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "service",
+              "db",
+              "queue",
+              "cache",
+              "job",
+              "ui",
+              "lib",
+              "external"
+            ]
+          },
+          "responsibilities": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/atoms/1#tag"
+            }
+          }
+        },
+        "required": [
+          "component_id",
+          "type"
+        ]
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "to": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "grpc",
+              "event",
+              "rpc",
+              "db",
+              "file"
+            ]
+          },
+          "schema_ref": {
+            "type": "string"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "none",
+              "basic",
+              "oauth2",
+              "jwt",
+              "mTLS",
+              "key"
+            ]
+          },
+          "rate_limit": {
+            "type": "string"
+          },
+          "reliability": {
+            "type": "string",
+            "enum": [
+              "best-effort",
+              "at-least-once",
+              "exactly-once"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "protocol"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "components"
+  ]
+}

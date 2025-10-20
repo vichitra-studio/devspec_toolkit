@@ -1,0 +1,25 @@
+{
+  "$schema": "https://specdev.local/schema/17_spec_drift.schema.json",
+  "id": "spec-drift-core",
+  "owner": "ops",
+  "created_at": "2025-10-17T00:00:00Z",
+  "checks": [
+    {
+      "check_id": "check-api-contract",
+      "target": "api",
+      "method": "schema-diff",
+      "schedule": "0 * * * *",
+      "severity": "medium",
+      "remediation": "Open PR to update contracts or code"
+    },
+    {
+      "check_id": "check-login-latency",
+      "target": "nfr",
+      "method": "runtime-sample",
+      "schedule": "*/15 * * * *",
+      "severity": "high",
+      "remediation": "Scale service or optimize handler"
+    }
+  ],
+  "last_run_at": "2025-10-17T00:00:00Z"
+}

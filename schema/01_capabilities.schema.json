@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/01_capabilities.schema.json",
+  "title": "01_capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "verb": {
+            "type": "string",
+            "minLength": 2
+          },
+          "description": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "future"
+            ]
+          },
+          "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+          },
+          "inputs": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "outputs": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "preconditions": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "postconditions": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "error_states": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#errorState"
+            }
+          },
+          "trace": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
+          }
+        },
+        "required": [
+          "capability_id",
+          "verb",
+          "scope"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "capabilities"
+  ]
+}

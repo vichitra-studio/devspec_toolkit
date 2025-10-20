@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/02a_delivery_baseline.schema.json",
+  "title": "02a_delivery_baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "environments": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dev": {
+          "type": "object"
+        },
+        "ci": {
+          "type": "object"
+        },
+        "staging": {
+          "type": "object"
+        },
+        "prod": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "dev",
+        "ci",
+        "staging",
+        "prod"
+      ]
+    },
+    "ci_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "secrets": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "compliance": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "environments",
+    "ci_gates"
+  ]
+}

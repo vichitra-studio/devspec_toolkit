@@ -1,0 +1,42 @@
+{
+  "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+  "id": "capabilities-core",
+  "owner": "system",
+  "created_at": "2025-10-17T00:00:00Z",
+  "capabilities": [
+    {
+      "capability_id": "cap-authenticate-user",
+      "verb": "authenticate",
+      "description": "Validate user credentials to issue a session token.",
+      "scope": "in",
+      "owner": "api",
+      "inputs": [
+        "email",
+        "password"
+      ],
+      "outputs": [
+        "token"
+      ],
+      "preconditions": [
+        "User exists",
+        "Password policy met"
+      ],
+      "postconditions": [
+        "Session token issued or error returned"
+      ],
+      "error_states": [
+        {
+          "code": "err-invalid-credentials",
+          "message": "Invalid email or password",
+          "severity": "warn"
+        }
+      ],
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-login"
+        }
+      ]
+    }
+  ]
+}

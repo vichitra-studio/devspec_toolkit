@@ -1,0 +1,15 @@
+{
+  "input": {
+    "username": "user@example.com",
+    "password": "CorrectHorseBatteryStaple"
+  },
+  "expected": {
+    "status": 200,
+    "body": {
+      "jwt": "<token>"
+    },
+    "headers": {
+      "content-type": "application/json"
+    }
+  }
+}

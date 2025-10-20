@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/17_spec_drift.schema.json",
+  "title": "17_spec_drift",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "check_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "api",
+              "schema",
+              "nfr",
+              "invariant",
+              "fixture",
+              "config"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "runtime-sample",
+              "log-diff",
+              "schema-diff",
+              "trace-replay"
+            ]
+          },
+          "schedule": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "remediation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "target",
+          "method"
+        ]
+      }
+    },
+    "last_run_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "checks"
+  ]
+}

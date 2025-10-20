@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/03_glossary.schema.json",
+  "title": "03_glossary",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "terms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "term_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "term": {
+            "type": "string"
+          },
+          "definition": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "term_id",
+          "term",
+          "definition"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "terms"
+  ]
+}

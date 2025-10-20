@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "title": "12_ci_gates",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "requires": {
+            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+          },
+          "steps": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          }
+        },
+        "required": [
+          "job_id",
+          "name",
+          "steps"
+        ]
+      }
+    },
+    "coverage_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "branches": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "jobs"
+  ]
+}

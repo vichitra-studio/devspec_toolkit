@@ -1,0 +1,22 @@
+{
+  "$schema": "https://specdev.local/schema/14_fixture_impl.schema.json",
+  "id": "fixture-impl-core",
+  "owner": "api",
+  "created_at": "2025-10-17T00:00:00Z",
+  "implemented_endpoints": [
+    "api-login"
+  ],
+  "test_results": [
+    {
+      "fixture_ref": "fx-login-success",
+      "status": "pass",
+      "notes": "Token stubbed"
+    },
+    {
+      "fixture_ref": "fx-login-invalid",
+      "status": "pass",
+      "notes": "Proper 401 with error code"
+    }
+  ],
+  "ci_status": "green"
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/04_fr_list.schema.json",
+  "title": "04_fr_list",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "functional_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fr_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 10
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "preconditions": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "postconditions": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "criterion_id": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "fixture_ref": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                }
+              },
+              "required": [
+                "criterion_id",
+                "text"
+              ]
+            }
+          },
+          "trace": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
+          }
+        },
+        "required": [
+          "fr_id",
+          "statement",
+          "acceptance_criteria"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "functional_requirements"
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/11_redteam.schema.json",
+  "title": "11_redteam",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "threats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "threat_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "description": {
+            "type": "string"
+          },
+          "vector": {
+            "type": "string"
+          },
+          "mitigations": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          }
+        },
+        "required": [
+          "threat_id",
+          "description",
+          "severity"
+        ]
+      }
+    },
+    "edge_cases": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "threats"
+  ]
+}

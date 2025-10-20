@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/core/atoms/1",
+  "title": "Core Atoms",
+  "$defs": {
+    "kebabId": {
+      "$anchor": "kebabId",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "examples": [
+        "fr-user-login",
+        "api-login",
+        "cap-export-reports"
+      ]
+    },
+    "timestamp": {
+      "$anchor": "timestamp",
+      "type": "string",
+      "format": "date-time",
+      "examples": [
+        "2025-10-16T22:06:04.202593Z"
+      ]
+    },
+    "owner": {
+      "$anchor": "owner",
+      "type": "string",
+      "enum": [
+        "api",
+        "ui",
+        "system",
+        "ops",
+        "data"
+      ]
+    },
+    "tag": {
+      "$anchor": "tag",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "id": "ci-gates-core",
+  "owner": "ops",
+  "created_at": "2025-10-17T00:00:00Z",
+  "jobs": [
+    {
+      "job_id": "spec-validate",
+      "name": "Validate Schemas and Specs",
+      "steps": [
+        "schema-validate",
+        "trace-check"
+      ]
+    },
+    {
+      "job_id": "scaffold",
+      "name": "Build Scaffold",
+      "requires": [
+        "spec-validate"
+      ],
+      "steps": [
+        "generate",
+        "compile"
+      ]
+    },
+    {
+      "job_id": "test",
+      "name": "Run Tests",
+      "requires": [
+        "scaffold"
+      ],
+      "steps": [
+        "unit",
+        "contract",
+        "coverage"
+      ]
+    },
+    {
+      "job_id": "redteam",
+      "name": "Red-Team Fixtures",
+      "requires": [
+        "test"
+      ],
+      "steps": [
+        "adversarial"
+      ]
+    },
+    {
+      "job_id": "deploy-staging",
+      "name": "Deploy to Staging",
+      "requires": [
+        "redteam"
+      ],
+      "steps": [
+        "deploy",
+        "smoke"
+      ]
+    },
+    {
+      "job_id": "deploy-prod",
+      "name": "Deploy to Prod",
+      "requires": [
+        "deploy-staging"
+      ],
+      "steps": [
+        "deploy",
+        "smoke"
+      ]
+    },
+    {
+      "job_id": "drift-audit",
+      "name": "Spec-Drift Audit",
+      "requires": [
+        "deploy-prod"
+      ],
+      "steps": [
+        "runtime-diff"
+      ]
+    }
+  ],
+  "coverage_thresholds": {
+    "lines": 85,
+    "branches": 70
+  }
+}

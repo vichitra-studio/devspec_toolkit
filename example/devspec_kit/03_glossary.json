@@ -1,0 +1,29 @@
+{
+  "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+  "id": "glossary-core",
+  "owner": "system",
+  "created_at": "2025-10-17T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-fixture",
+      "term": "Fixture",
+      "definition": "Canonical input/expected pair used by CI to verify behavior.",
+      "domain": "testing",
+      "units": ""
+    },
+    {
+      "term_id": "term-invariant",
+      "term": "Invariant",
+      "definition": "A logical truth that must always hold under specified scope.",
+      "domain": "validation",
+      "units": ""
+    },
+    {
+      "term_id": "term-slo",
+      "term": "SLO",
+      "definition": "Service Level Objective, measurable target derived from NFRs.",
+      "domain": "reliability",
+      "units": ""
+    }
+  ]
+}

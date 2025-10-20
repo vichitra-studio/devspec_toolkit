@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/00_charter.schema.json",
+  "title": "00_charter",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "title": {
+      "type": "string"
+    },
+    "problem_statement": {
+      "type": "string",
+      "minLength": 20
+    },
+    "in_scope": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "out_of_scope": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "assumptions": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "risks": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "stakeholders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "type": "string"
+          },
+          "needs": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      }
+    },
+    "user_segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "segment_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "description": {
+            "type": "string"
+          },
+          "jobs_to_be_done": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "pains": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "gains": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          }
+        },
+        "required": [
+          "segment_id",
+          "description"
+        ]
+      }
+    },
+    "success_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metric_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baseline": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "target": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "measurement_method": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric_id",
+          "name",
+          "target",
+          "unit"
+        ]
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#link"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "problem_statement",
+    "success_metrics"
+  ]
+}

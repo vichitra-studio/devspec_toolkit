@@ -1,0 +1,165 @@
+
+name: SpecDev CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"  # daily drift audit (UTC)
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Schema & Spec Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -r tools/requirements.txt
+      - name: Validate all specs
+        run: python -m specdev_tools.cli validate-all spec --repo-root .
+      - name: Fixtures lint
+        run: python -m specdev_tools.cli fixtures-lint spec
+      - name: Build trace matrix
+        run: python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+      - name: Upload matrix
+        uses: actions/upload-artifact@v4
+        with:
+          name: trace-matrix
+          path: tools/trace_matrix.json
+          if-no-files-found: error
+
+  scaffold:
+    name: Generate Scaffold & Smoke
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -r tools/requirements.txt
+      - name: Generate scaffold
+        run: python -m specdev_tools.cli scaffold spec --out scaffold_out
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Smoke boot server
+        run: |
+          node scaffold_out/src/index.js &
+          pid=$!
+          sleep 1
+          kill $pid || true
+      - name: Upload scaffold
+        uses: actions/upload-artifact@v4
+        with:
+          name: scaffold-out
+          path: scaffold_out
+
+  tests:
+    name: Invariants & Matrix Checks
+    needs: scaffold
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -r tools/requirements.txt
+      - name: Invariants check
+        run: |
+          python -m specdev_tools.cli invariants-check spec --sample tests/samples/invariants/password_ok.json > tests/.invariants.out.json
+      - name: Upload invariants result
+        uses: actions/upload-artifact@v4
+        with:
+          name: invariants-out
+          path: tests/.invariants.out.json
+      - name: Rebuild trace matrix
+        run: python -m specdev_tools.cli matrix spec --out /tmp/matrix.json
+      - name: Diff against expectations
+        run: |
+          if [ -f tests/expectations/trace_matrix.json ]; then
+            diff -u tests/expectations/trace_matrix.json /tmp/matrix.json
+          else
+            echo "No expectations found; skipping diff."
+          fi
+
+  redteam:
+    name: Red-Team Lint
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -r tools/requirements.txt
+      - name: Lint adversarial fixtures (same mechanism as fixtures)
+        run: python -m specdev_tools.cli fixtures-lint spec
+
+  deploy-staging:
+    name: Deploy Staging (placeholder)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: redteam
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Deploy to staging goes here (wire your real deploy step)."
+
+  deploy-prod:
+    name: Deploy Production (gated placeholder)
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Deploy to production goes here behind manual approval."
+
+  drift-audit:
+    name: Spec-Drift Audit
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -r tools/requirements.txt
+      - name: Compute matrix
+        run: python -m specdev_tools.cli matrix spec --out /tmp/matrix.json
+      - name: Diff against expectations
+        run: |
+          if [ -f tests/expectations/trace_matrix.json ]; then
+            diff -u tests/expectations/trace_matrix.json /tmp/matrix.json
+          else
+            echo "No expectations found; skipping diff."
+          fi

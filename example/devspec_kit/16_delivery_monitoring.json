@@ -1,0 +1,31 @@
+{
+  "$schema": "https://specdev.local/schema/16_delivery_monitoring.schema.json",
+  "id": "delivery-monitoring-core",
+  "owner": "ops",
+  "created_at": "2025-10-17T00:00:00Z",
+  "deployments": [
+    {
+      "env": "staging",
+      "build_id": "build-001",
+      "artifact_uri": "artifact://staging/build-001",
+      "status": "success"
+    }
+  ],
+  "dashboards": [
+    {
+      "dashboard_id": "dash-auth",
+      "nfr_refs": [
+        "nfr-login-latency-p50"
+      ],
+      "url": "FR-TBD/dashboards/auth"
+    }
+  ],
+  "alerts": [
+    {
+      "alert_id": "alert-login-latency",
+      "nfr_ref": "nfr-login-latency-p50",
+      "rule": "p50_login_latency_ms > 150 for 5m",
+      "severity": "high"
+    }
+  ]
+}

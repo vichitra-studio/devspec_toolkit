@@ -1,0 +1,62 @@
+{
+  "$schema": "https://specdev.local/schema/02_system_sketch.schema.json",
+  "id": "system-sketch-core",
+  "owner": "system",
+  "created_at": "2025-10-17T00:00:00Z",
+  "components": [
+    {
+      "component_id": "ui-app",
+      "type": "ui",
+      "responsibilities": [
+        "Collect credentials",
+        "Display results"
+      ],
+      "owner": "ui",
+      "tags": [
+        "client"
+      ]
+    },
+    {
+      "component_id": "auth-service",
+      "type": "service",
+      "responsibilities": [
+        "Expose /login",
+        "Validate inputs",
+        "Issue token"
+      ],
+      "owner": "api",
+      "tags": [
+        "stateless"
+      ]
+    },
+    {
+      "component_id": "auth-db",
+      "type": "db",
+      "responsibilities": [
+        "Store users",
+        "Password hashes"
+      ],
+      "owner": "system",
+      "tags": [
+        "stateful"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "ui-app",
+      "to": "auth-service",
+      "protocol": "http",
+      "schema_ref": "05_interface_contracts.json#api-login",
+      "auth": "none",
+      "rate_limit": "100r/m",
+      "reliability": "best-effort"
+    },
+    {
+      "from": "auth-service",
+      "to": "auth-db",
+      "protocol": "db",
+      "reliability": "at-least-once"
+    }
+  ]
+}

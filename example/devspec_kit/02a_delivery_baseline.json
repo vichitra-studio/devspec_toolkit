@@ -1,0 +1,28 @@
+{
+  "$schema": "https://specdev.local/schema/02a_delivery_baseline.schema.json",
+  "id": "delivery-baseline-core",
+  "owner": "ops",
+  "created_at": "2025-10-17T00:00:00Z",
+  "environments": {
+    "dev": {},
+    "ci": {},
+    "staging": {},
+    "prod": {}
+  },
+  "ci_gates": [
+    "spec-validate",
+    "scaffold",
+    "test",
+    "redteam",
+    "deploy-staging",
+    "deploy-prod",
+    "drift-audit"
+  ],
+  "secrets": [
+    "JWT_SECRET",
+    "DB_URL"
+  ],
+  "compliance": [
+    "PII-logging-ban"
+  ]
+}

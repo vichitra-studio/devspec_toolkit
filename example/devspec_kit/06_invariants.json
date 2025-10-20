@@ -1,0 +1,29 @@
+{
+  "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+  "id": "invariants-core",
+  "owner": "system",
+  "created_at": "2025-10-17T00:00:00Z",
+  "rules": [
+    {
+      "inv_id": "inv-no-pii-logs",
+      "description": "No passwords or tokens are written to logs.",
+      "language": "cel",
+      "expression": "!(log.message.contains('password') || log.message.contains('token'))",
+      "scope": {
+        "components": [
+          "auth-service"
+        ],
+        "apis": [
+          "api-login"
+        ]
+      },
+      "severity": "error",
+      "trace": [
+        {
+          "type": "api",
+          "id": "api-login"
+        }
+      ]
+    }
+  ]
+}

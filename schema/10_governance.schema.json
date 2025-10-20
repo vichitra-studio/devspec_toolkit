@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/10_governance.schema.json",
+  "title": "10_governance",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "versioning": {
+      "type": "string"
+    },
+    "pr_rules": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "spec_first_policy": {
+      "type": "boolean"
+    },
+    "commit_message_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_spec_ids": {
+          "type": "boolean"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "require_spec_ids"
+      ]
+    },
+    "reviewers": {
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "spec_first_policy"
+  ]
+}

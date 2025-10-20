@@ -1,0 +1,12 @@
+{
+  "name": "specdev-agent-guide",
+  "version": "1.0.0",
+  "entrypoint": "docs/agents/agents.md",
+  "description": "Operational contract for AI agents working with the AI Spec Driven Development Toolkit",
+  "commands": [
+    "python -m specdev_tools.cli validate <artifact> --repo-root tools/ai-spec-toolkit",
+    "python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit",
+    "python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json",
+    "python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit"
+  ]
+}

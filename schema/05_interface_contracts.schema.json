@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "title": "05_interface_contracts",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "apis": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "api_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v\\d+(?:\\.\\d+)*$"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "grpc",
+              "ws",
+              "mqtt"
+            ]
+          },
+          "route": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "request_schema_ref": {
+            "type": "string"
+          },
+          "response_schema_ref": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#errorState"
+            }
+          },
+          "example_refs": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "security": {
+            "type": "string",
+            "enum": [
+              "none",
+              "api-key",
+              "oauth2",
+              "jwt",
+              "mTLS"
+            ]
+          },
+          "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+          },
+          "trace": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
+          }
+        },
+        "required": [
+          "api_id",
+          "name",
+          "version",
+          "protocol",
+          "owner"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "apis"
+  ]
+}

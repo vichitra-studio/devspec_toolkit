@@ -1,0 +1,20 @@
+{
+  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "id": "governance-core",
+  "owner": "system",
+  "created_at": "2025-10-17T00:00:00Z",
+  "versioning": "Semantic versioning for prompts and schemas independently",
+  "pr_rules": [
+    "Spec-first: update spec before code",
+    "Require reviewer from owner area"
+  ],
+  "spec_first_policy": true,
+  "commit_message_rules": {
+    "require_spec_ids": true,
+    "pattern": "^(feat|fix|docs|refactor): .* \\[(fr|api|nfr|inv|fixture|doc)-[a-z0-9-]+\\]$"
+  },
+  "reviewers": [
+    "spec-owners",
+    "qa"
+  ]
+}

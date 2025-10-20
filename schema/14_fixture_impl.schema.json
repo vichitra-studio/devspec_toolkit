@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/14_fixture_impl.schema.json",
+  "title": "14_fixture_impl",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "implemented_endpoints": {
+      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+    },
+    "test_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fixture_ref": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "skip"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fixture_ref",
+          "status"
+        ]
+      }
+    },
+    "ci_status": {
+      "type": "string",
+      "enum": [
+        "green",
+        "red"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "implemented_endpoints",
+    "test_results"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/07_nfrs.schema.json",
+  "title": "07_nfrs",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "nfrs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nfr_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "latency",
+              "throughput",
+              "availability",
+              "durability",
+              "cost",
+              "security",
+              "privacy",
+              "maintainability",
+              "usability",
+              "portability",
+              "energy"
+            ]
+          },
+          "metric": {
+            "type": "string"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "measurement_method": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "staging",
+              "prod"
+            ]
+          },
+          "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+          },
+          "trace": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
+          }
+        },
+        "required": [
+          "nfr_id",
+          "category",
+          "metric",
+          "target",
+          "unit"
+        ]
+      }
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "nfrs"
+  ]
+}
