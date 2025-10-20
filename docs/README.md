@@ -19,5 +19,4 @@ The AI Spec Driven Development Toolkit separates documentation by audience to ke
 
 ## Contributing Improvements
 1. Align updates with the structure above (developers vs. agents).
-2. Document notable changes in `developers/changelog.md`.
-3. Open a PR summarizing the gap addressed and include validation steps.
+2. Open a PR summarizing the gap addressed and include validation steps.

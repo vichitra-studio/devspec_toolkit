@@ -87,6 +87,5 @@ These commands enforce schema compliance, traceability coverage, and fixture hea
 ## 7. Where To Go Next
 - Need a conceptual model? See `workflows/discovery.md` and `workflows/spec_to_impl.md`.
 - Looking for troubleshooting tactics? Review `tooling/gap_hunter_checklist.md` and `tooling/coverage_matrix.md`.
-- Want historical changes? Check `changelog.md`.
 
 By following this single guide, developers share the same source of truth and can collaborate with AI agents without duplicating knowledge across multiple documents.

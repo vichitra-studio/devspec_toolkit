@@ -5,7 +5,6 @@ Use this index to locate the developer-facing material while working through the
 ## Onboarding
 - [`getting_started.md`](getting_started.md) — single-path setup guide and workflow primer.
 - [`reference.md`](reference.md) — command cheatsheet, naming rules, and troubleshooting steps.
-- [`changelog.md`](changelog.md) — timeline of notable documentation updates.
 
 ## Workflow Guides
 - [`workflows/discovery.md`](workflows/discovery.md) — steps 00–12 overview.

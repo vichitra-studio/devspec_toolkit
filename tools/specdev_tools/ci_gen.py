@@ -1,20 +1,25 @@
 from __future__ import annotations
 import yaml
+import shlex
 
 
-def generate_ci_yaml(toolkit_path: str) -> str:
+def generate_ci_yaml(spec_dir: str, repo_root: str, toolkit_path: str) -> str:
     """Return a GitHub Actions workflow that validates specs and scaffolds code."""
 
-    install_cmd = f"pip install -r \"{toolkit_path}/tools/requirements.txt\""
-    export_pythonpath = f"export PYTHONPATH=\"{toolkit_path}/tools\""
+    requirements_path = shlex.quote(f"{toolkit_path}/tools/requirements.txt")
+    pythonpath_value = shlex.quote(f"{toolkit_path}/tools")
+    spec_dir_arg = shlex.quote(spec_dir)
+    repo_root_arg = shlex.quote(repo_root)
+    install_cmd = f"pip install -r {requirements_path}"
+    export_pythonpath = f"export PYTHONPATH={pythonpath_value}"
 
     validate_cmd = (
         f"{export_pythonpath} && "
-        f"python -m specdev_tools.cli validate-all spec --repo-root \"{toolkit_path}\""
+        f"python -m specdev_tools.cli validate-all {spec_dir_arg} --repo-root {repo_root_arg}"
     )
     scaffold_cmd = (
         f"{export_pythonpath} && "
-        f"python -m specdev_tools.cli scaffold spec --repo-root \"{toolkit_path}\" --out scaffold_out"
+        f"python -m specdev_tools.cli scaffold {spec_dir_arg} --repo-root {repo_root_arg} --out scaffold_out"
     )
 
     return yaml.safe_dump({

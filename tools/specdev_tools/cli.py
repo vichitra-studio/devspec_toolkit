@@ -43,6 +43,8 @@ def main():
     ci = sub.add_parser("gen-ci")
     ci.add_argument("spec_dir")
     ci.add_argument("--out", default="-")
+    ci.add_argument("--repo-root", default=".",
+                    help="Toolkit root used when running generated commands (defaults to current directory)")
     ci.add_argument("--toolkit-path", default="./devspec_toolkit",
                     help="Relative path to the toolkit inside the host repository (defaults to ./devspec_toolkit)")
 
@@ -54,11 +56,6 @@ def main():
     # Add a new command for AI interaction help
     ai = sub.add_parser("ai-help")
     ai.add_argument("--step", help="Specific step to get help for")
-
-    # Add a new command for performance benchmarking
-    bench = sub.add_parser("benchmark")
-    bench.add_argument("--test", help="Test to benchmark")
-    bench.add_argument("--iterations", type=int, default=1, help="Number of iterations")
 
     args = p.parse_args()
 
@@ -107,7 +104,7 @@ def main():
             sys.exit(1)
         print("OK")
     elif args.cmd == "gen-ci":
-        yml = generate_ci_yaml(args.toolkit_path)
+        yml = generate_ci_yaml(args.spec_dir, args.repo_root, args.toolkit_path)
         if args.out == "-":
             print(yml)
         else:
@@ -123,22 +120,16 @@ def main():
             print(f"1. Read the guide: spec/{args.step}_*.guide.md")
             print(f"2. Run the prompt: prompts/prompt_{args.step}_*.md")
             print(f"3. Paste output into spec/{args.step}_*.json")
-            print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json")
+            print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root ./devspec_toolkit")
         else:
             print("AI Interaction Guide:")
             print("1. Read the corresponding guide.md file")
             print("2. Run the prompt from prompts/prompt_XX_stepname.md")
             print("3. Paste only the fenced JSON block into spec/NN_name.json")
-            print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json")
+            print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit")
             print("5. Follow the DoR requirements from the guide")
             print("6. Ensure all IDs use kebab-case format")
             print("7. No examples should be included in the AI output")
-    elif args.cmd == "benchmark":
-        print("Benchmarking functionality would be implemented here")
-        print("(This is a placeholder for performance testing)")
-        if args.test:
-            print(f"Benchmarking test: {args.test}")
-        print(f"Iterations: {args.iterations}")
     else:
         p.print_help()
 

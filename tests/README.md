@@ -44,11 +44,11 @@ python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
 python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Build trace matrix and compare to expectations (manual diff)
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out /tmp/matrix.json && diff -u tests/expectations/trace_matrix.json /tmp/matrix.json || true
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out /tmp/matrix.json && diff -u ./devspec_toolkit/tests/expectations/trace_matrix.json /tmp/matrix.json || true
 
 # Evaluate invariants against sample context
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
 
 # Run bundled CLI smoke tests against example artifacts
-./tests/unit
+./devspec_toolkit/tests/unit
 ```
