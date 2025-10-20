@@ -19,10 +19,35 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `implemented_endpoints` lists all API IDs implemented against Step 5 contracts.
+- `test_results` includes entries for all key fixtures (Step 8) with pass/fail/skip and notes for failures.
+- `ci_status` reflects overall CI outcome and is consistent with test results.
+
+## Field-by-Field Guidance
+- implemented_endpoints: array of `api-*` IDs that now exist.
+- test_results[*].fixture_ref: `fixture-*` id; ensure all critical fixtures are represented.
+- test_results[*].status: `pass`, `fail`, or `skip`; set `notes` with brief context on failures or skips.
+- ci_status: `green` or `red` to summarize the pipeline state.
+
+## Best Practices
+- Keep implemented_endpoints and test_results synchronized with CI outputs to reflect reality.
+- Use notes to capture flaky tests or environment-specific issues for follow-up.
+- Treat red CI status as actionable; tie back to failing fixtures and create spec updates if needed.
+
+## Common Pitfalls
+- Marking endpoints implemented without corresponding passing fixtures.
+- Omitting failing fixtures from test_results, hiding instability.
+- Stale `ci_status` inconsistent with current pipeline.
+
+## Quick Reference
+- Implemented: list of `api-*` now live.
+- Results: `fixture_ref`, `status`, optional `notes`.
+
 # Clarification Questions
-- What domain context is essential for step 14 · fixture‑driven implementation that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which endpoints are now implemented and tested? Which remain pending?
+- Which fixtures pass vs fail vs skip, and why? Any blockers or environment issues?
+- What is the overall CI status and what actions are needed to reach or maintain green?
 
 # Embedded Schema
 ```json

@@ -19,10 +19,36 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `new_fixtures` lists newly added red-team or regression fixtures to cover discovered issues.
+- `spec_updates` capture references to spec artifacts changed, the change description, and reason.
+- `redteam_status` summarizes whether the system currently withstands red-team checks.
+
+## Field-by-Field Guidance
+- new_fixtures: array of `fixture-*` IDs added since last cycle.
+- spec_updates[*].ref: `traceRef` to the affected artifact (FR, API, NFR, invariant, fixture).
+- spec_updates[*].change: concise description of the modification.
+- spec_updates[*].reason: rationale or incident link if available.
+- redteam_status: `green` if mitigations validated; `red` if gaps remain.
+
+## Best Practices
+- Convert findings into fixtures and targeted spec updates in the same cycle.
+- Keep reasons concise and link to incidents or CVEs where applicable.
+- Use status to drive priority and communicate risk transparently.
+
+## Common Pitfalls
+- Logging findings without adding fixtures, causing regressions later.
+- Unclear change descriptions that make it hard to audit spec evolution.
+- Declaring green status without covering critical threats.
+
+## Quick Reference
+- New fixtures: `fixture-*` IDs.
+- Spec updates: `ref`, `change`, optional `reason`.
+
 # Clarification Questions
-- What domain context is essential for step 15 · continuous red‑team / qa loop that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What new adversarial scenarios or regressions were found? Which fixtures were added to cover them?
+- Which spec artifacts changed as a result? Why were the changes necessary?
+- Is the system currently passing red-team checks end-to-end? If not, what remains outstanding?
 
 # Embedded Schema
 ```json

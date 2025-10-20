@@ -19,10 +19,42 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
+- Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 16 dashboards/alerts.
+- Stage is set for when the target must be met (dev/staging/prod) and owner is named.
+- `trace` links to FRs, interfaces, or invariants where the NFR applies.
+
+## Field-by-Field Guidance
+- nfr_id: `nfr-<category>-<metric>`.
+- category: choose from schema enum; pick most specific dimension.
+- metric: human-readable metric name (e.g., p95 latency, monthly cost).
+- target: concrete target (e.g., 300, "99.95%", "<= $1k/mo").
+- unit: units like ms, rps, %, USD.
+- measurement_method: how/where measured (e.g., PromQL query, vendor dashboard).
+- stage: `dev`, `staging`, or `prod`.
+- owner: who is accountable for meeting the target.
+- trace: references to FRs/APIs/components/invariants.
+
+## Best Practices
+- Use targets that are realistic and aligned with baseline measurements and capacity planning.
+- Tie measurement_method to an actual query or dashboard to ensure observability.
+- Set stage expectations (dev/staging/prod) to phase in stricter targets appropriately.
+
+## Common Pitfalls
+- Ambiguous metrics or missing units leading to misinterpretation.
+- Targets that cannot be measured with existing tooling.
+- No owner assigned, causing untracked regressions.
+
+## Quick Reference
+- Categories: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy.
+- Stage: `dev`, `staging`, `prod`.
+
 # Clarification Questions
-- What domain context is essential for step 7 · non‑functional requirements that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which performance, reliability, cost, security/privacy, and energy targets are non-negotiable? Which are stretch?
+- What are the exact units and where will each metric be measured (tool/query/url)?
+- At what stage must each target be met (dev/staging/prod)? Who owns it?
+- Which FRs, APIs, or components does each NFR apply to? Any invariants required to enforce it?
 
 # Embedded Schema
 ```json

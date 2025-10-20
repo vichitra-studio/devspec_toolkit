@@ -19,10 +19,39 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Threats list covers likely attack vectors and abuse cases across auth, data, transport, and business logic.
+- Each threat specifies severity, vector, and actionable mitigations.
+- Include `edge_cases` to capture non-malicious but risky scenarios (timeouts, retries, partial failures).
+- Align threats with fixtures (Step 8) and invariants (Step 6) where enforcement is possible.
+
+## Field-by-Field Guidance
+- threats[*].threat_id: `threat-<area>-<vector>`.
+- description: succinct problem statement; include affected assets or flows.
+- vector: the entry point or technique (e.g., injection, replay, brute-force, scraping).
+- mitigations: concrete steps (rate limiting, input validation, CAPTCHAs, mTLS, content filters).
+- severity: `low`, `medium`, `high`, or `critical` based on impact and likelihood.
+- edge_cases: non-malicious but failure-prone scenarios.
+
+## Best Practices
+- Translate threats into actionable mitigations and fixtures where possible.
+- Cover both technical (injection, auth bypass) and business logic abuses (fraud, scraping).
+- Use severity to prioritize mitigation work and CI gating for critical issues.
+
+## Common Pitfalls
+- Listing abstract threats without specific vectors or mitigations.
+- Ignoring edge cases that frequently cause incidents (timeouts, retries, race conditions).
+- Failing to connect threats to fixtures or invariants, leaving gaps untested.
+
+## Quick Reference
+- Threats: `threat_id`, `description`, `vector`, `mitigations`, `severity`.
+- Edge cases: list of non-malicious but risky scenarios.
+
 # Clarification Questions
-- What domain context is essential for step 11 · red‑team / failure modes that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What are the top abuse cases or attack vectors for our APIs and UIs? How would an adversary exploit them?
+- Which controls do we have or plan (authz, rate limits, validation, anomaly detection)?
+- Which sensitive data paths exist and how are they protected in transit and at rest?
+- Which edge cases often break systems (timeouts, race conditions, idempotency)? How will we detect and handle them?
 
 # Embedded Schema
 ```json

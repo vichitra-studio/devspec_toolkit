@@ -19,10 +19,41 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `checks` cover APIs, schemas, NFRs, invariants, fixtures, and config as applicable.
+- Each check defines a method (runtime-sample, log-diff, schema-diff, trace-replay) matched to the target.
+- `schedule` indicates cadence (cron-like string or human-readable) to run checks.
+- `severity` reflects impact; `remediation` provides clear next steps.
+- `last_run_at` optionally records the timestamp of the last drift audit.
+
+## Field-by-Field Guidance
+- checks[*].check_id: `drift-<target>-<name>`.
+- target: one of `api`, `schema`, `nfr`, `invariant`, `fixture`, `config`.
+- method: pick the mechanism to detect drift for the target.
+- schedule: string cadence (e.g., `daily 02:00 UTC`, `0 2 * * *`).
+- severity: `low`, `medium`, `high`, `critical`.
+- remediation: concrete steps (open spec PR, update fixtures, rollback deployment).
+- last_run_at: ISO 8601 timestamp.
+
+## Best Practices
+- Choose detection methods that can run automatically and produce artifacts for audit.
+- Schedule checks at a cadence matching risk (e.g., daily schema diff, hourly runtime sampling).
+- Provide clear remediation steps that map to owners and standard playbooks.
+
+## Common Pitfalls
+- Running drift checks ad hoc without recording results.
+- Choosing methods that cannot detect the most common drift types in your system.
+- Missing remediation guidance, leaving teams unsure how to resolve drift.
+
+## Quick Reference
+- Targets: `api`, `schema`, `nfr`, `invariant`, `fixture`, `config`.
+- Methods: `runtime-sample`, `log-diff`, `schema-diff`, `trace-replay`.
+
 # Clarification Questions
-- What domain context is essential for step 17 · spec‑drift audit that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which types of drift matter most (APIs, schemas, configs, behaviors)? How will we detect each?
+- What cadence should each check run on? Where will results be recorded?
+- What is the remediation path for each kind of drift? Who owns it?
+- Are there known high-risk areas where additional checks are required?
 
 # Embedded Schema
 ```json

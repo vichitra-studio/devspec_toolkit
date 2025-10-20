@@ -19,10 +19,37 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Job graph is complete: all required jobs listed with dependencies in `requires` as needed.
+- Steps include validations for schema, fixtures, matrix, invariants, coverage, governance, scaffolding checks where applicable.
+- Coverage thresholds are set (lines/branches) or intentionally omitted with rationale (not in JSON).
+- Job names and IDs map to actual CI runner capabilities.
+
+## Field-by-Field Guidance
+- jobs[*].job_id/name: stable identifiers; names are human-readable.
+- jobs[*].requires: upstream job IDs to create a DAG; omit or empty for roots.
+- jobs[*].steps: shellable or conceptual step names (e.g., `validate-all`, `fixtures-lint`, `matrix`).
+- coverage_thresholds: set lines/branches numbers between 0 and 100.
+
+## Best Practices
+- Include schema validation, fixtures-lint, trace matrix generation, invariants check, governance check, and coverage checks.
+- Build a clear DAG with `requires` to maximize parallelism while preserving correctness.
+- Keep job IDs stable so external systems and docs can reference them.
+
+## Common Pitfalls
+- Missing critical checks (governance, invariants), allowing drift or policy breaches.
+- Over-serializing jobs and slowing down feedback loops.
+- Setting unrealistic coverage thresholds that block delivery without value.
+
+## Quick Reference
+- Jobs: `job_id`, `name`, `requires`, `steps`.
+- Coverage: `lines`, `branches` between 0 and 100.
+
 # Clarification Questions
-- What domain context is essential for step 12 · ci gates that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which validation steps must be enforced in CI to block merges? Any coverage targets?
+- How should jobs depend on one another (DAG)? Which can run in parallel?
+- What environment/runners are available to execute these jobs? Any secrets required?
+- Should scaffolding or codegen checks be included to prevent drift from specs?
 
 # Embedded Schema
 ```json

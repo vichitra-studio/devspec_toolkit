@@ -19,10 +19,46 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Every rule has a precise description, executable `language`, and concrete `expression` when automation is possible.
+- `scope` limits rules to specific components or APIs to avoid false positives.
+- `severity` set to `error` for hard guarantees and `warn` for observability; choose deliberately.
+- `trace` connects rules to FRs/NFRs/governance to explain rationale.
+- Avoid purely textual rules unless automation is truly not feasible.
+
+## Field-by-Field Guidance
+- inv_id: kebab-case; prefer `invariant-<domain>-<constraint>`.
+- description: business-readable statement of the invariant.
+- language: `jsonlogic`, `cel`, or `text`; prefer executable forms.
+- expression: the actual rule; test for syntactic validity.
+- scope.components/apis: k-ID lists to constrain where the rule applies.
+- severity: `warn` or `error` based on impact.
+- trace: `fr-*`, `nfr-*`, `api-*`, or governance refs.
+
+## Best Practices
+- Choose an executable language (jsonlogic or CEL) whenever possible and validate syntax.
+- Describe each invariant in business language first, then map scope.components or scope.apis to constrain where it applies.
+- Tag severity as error for hard guarantees and warn for observability alerts to guide escalation paths.
+- Link invariants to FRs, NFRs, or governance rules using trace so auditors know why the rule exists.
+
+## Common Pitfalls
+- Leaving the expression empty or non-executable, which prevents automation in CI and runtime.
+- Setting severity to warn for hard requirements, letting regressions slip past controls.
+- Forgetting to scope the invariant, causing false positives across unrelated components.
+- Failing to keep inv_id stable, leading to duplicate or orphaned invariants.
+
+## Quick Reference
+- ID Format: `invariant-<descriptor>`; keep stable for cross-step traceability.
+- Required Fields: every rule needs `inv_id`, `description`, `language`, and `expression`.
+- Scope Usage: populate `components` or `apis` arrays to target enforcement precisely.
+- Trace Hooks: reference FR (`fr-*`), API (`api-*`), or governance policy IDs to show motivation.
+
 # Clarification Questions
-- What domain context is essential for step 6 · invariants & rules that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which truths must always hold regardless of implementation (data relationships, auth requirements, idempotency)?
+- Where can we encode these as executable rules (jsonlogic or CEL)? Provide expressions or field-level specs.
+- What scope should each rule have (components, APIs) to reduce noise and false alerts?
+- Which rules are hard errors vs warnings? Who is accountable for remediation?
+- Which FRs, NFRs, or governance policies motivate each invariant?
 
 # Embedded Schema
 ```json

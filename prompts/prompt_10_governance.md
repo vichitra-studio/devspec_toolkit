@@ -19,10 +19,45 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Governance defines a clear versioning strategy for spec and artifacts.
+- `pr_rules` encode spec-first expectations and validation commands to run.
+- `spec_first_policy` is explicitly true or false; exceptions documented via PR rules if false.
+- `commit_message_rules` require spec IDs and provide a regex pattern compatible with CI.
+- `reviewers` list includes cross-functional approvers (engineering, QA, security, ops) as needed.
+
+## Field-by-Field Guidance
+- versioning: e.g., calendar-based, semver, or spec rev; state how bumps occur.
+- pr_rules: list of checks or requirements (e.g., "run matrix", "fixtures-lint", "invariants-check").
+- spec_first_policy: boolean indicating spec-before-impl requirement.
+- commit_message_rules.require_spec_ids: true if commits must include spec IDs.
+- commit_message_rules.pattern: regex enforcing prefix and ID inclusion.
+- reviewers: stable names/roles accountable for approvals.
+
+## Best Practices
+- Document the versioning strategy (calendar, semver, spec revision) so downstream tooling can bump versions consistently.
+- Encode PR rules that require spec diffs before implementation merges, including checklist items for validation commands.
+- Flip `spec_first_policy` to true and describe when, if ever, exceptions are granted.
+- Configure commit_message_rules with regex patterns and spec ID requirements to maintain traceability.
+- List accountable reviewers with rotation notes or escalation paths to avoid approval bottlenecks.
+
+## Common Pitfalls
+- Leaving governance implied, leading teams to bypass spec updates during urgent fixes.
+- Setting commit patterns that conflict with CI verification, causing constant false negatives.
+- Forgetting to identify reviewers across disciplines, resulting in siloed approvals.
+- Treating versioning as incidental, which breaks automation in CI and drift audits.
+
+## Quick Reference
+- ID Format: `governance-<descriptor>`; owner commonly `ops` or `system`.
+- Required Fields: must declare `spec_first_policy`; other sections should be filled for practical governance.
+- Commit Rules: `require_spec_ids` should align with ID formats like `fr-*`, `api-*`, `fixture-*`.
+- Reviewer List: maintain stable names or roles; update when ownership shifts.
+
 # Clarification Questions
-- What domain context is essential for step 10 · governance & change control that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What versioning scheme should we follow for specs and APIs? Who owns version bumps?
+- Which CI validations must be mandatory before merge? Any coverage thresholds?
+- Must commit messages include spec IDs? Provide the exact regex/pattern to enforce.
+- Who are the required reviewers by change type (spec vs code)? Any escalation paths?
 
 # Embedded Schema
 ```json

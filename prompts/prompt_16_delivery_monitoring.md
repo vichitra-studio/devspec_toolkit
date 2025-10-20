@@ -19,10 +19,46 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `deployments` include entries for each environment with build IDs and current status; artifact URIs provided where applicable.
+- `dashboards` link NFRs to concrete dashboards with URLs.
+- `alerts` define alert rules for important NFRs with severities and references.
+- Ensure coverage: every high-priority NFR has at least one dashboard and, if applicable, an alert.
+
+## Field-by-Field Guidance
+- deployments[*].env: `dev`, `staging`, `prod`.
+- deployments[*].build_id: kebab-case ID of the build artifact.
+- deployments[*].artifact_uri: storage or registry URL where applicable.
+- deployments[*].status: `pending`, `success`, or `failed`.
+- dashboards[*].dashboard_id: identifier for the monitoring board.
+- dashboards[*].nfr_refs: list of `nfr-*` covered.
+- dashboards[*].url: link to the actual dashboard.
+- alerts[*].alert_id: identifier for alert.
+- alerts[*].nfr_ref: `nfr-*` target of the alert.
+- alerts[*].rule: query or condition; write clearly.
+- alerts[*].severity: `low`, `medium`, `high`, `critical`.
+
+## Best Practices
+- Keep deployment status current across environments to support auditability and rollback.
+- Map each high-priority NFR to at least one dashboard and alert; include URLs and owners.
+- Write alert rules that are actionable and include severity aligned with on-call policy.
+- Reuse glossary terms and NFR IDs to keep monitoring consistent with specs.
+
+## Common Pitfalls
+- Missing dashboards or alerts for critical NFRs, leaving blind spots in production.
+- Stale deployment metadata that does not reflect actual rollouts.
+- Ambiguous alert rules that fire frequently without actionability (alert fatigue).
+
+## Quick Reference
+- Environments: `dev`, `staging`, `prod`.
+- NFR Coverage: ensure dashboards/alerts are linked to `nfr-*` IDs.
+- Status: set `pending`, `success`, or `failed` per deployment.
+
 # Clarification Questions
-- What domain context is essential for step 16 · delivery & monitoring that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What is the current deployment status per environment? Where are artifacts stored?
+- Which dashboards monitor our key NFRs? Provide URLs and the NFR IDs they cover.
+- Which alerts are required for critical NFRs? Provide rule expressions and severities.
+- Are there gaps where an NFR lacks a dashboard or alert? How will we close them?
 
 # Embedded Schema
 ```json

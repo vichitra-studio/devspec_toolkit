@@ -19,10 +19,47 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
+- Each FR includes preconditions and postconditions where relevant to bound the behavior.
+- Every FR has at least one acceptance criterion with a stable `criterion_id` and specific, measurable text.
+- Where possible, acceptance criteria reference a `fixture_ref` that can be authored in Step 8.
+- `trace` links map FRs to capabilities, APIs, NFRs, or governance where applicable.
+- IDs are stable and descriptive (avoid renaming once referenced downstream).
+
+## Field-by-Field Guidance
+- functional_requirements[*].fr_id: `fr-<behavior>`; one behavior per FR.
+- statement: outcome-oriented phrasing; avoid implementation details and multiple behaviors.
+- rationale: why this FR exists (tie to business value or risk).
+- preconditions/postconditions: set when environment or state boundaries exist.
+- acceptance_criteria[*].text: exact observable outcome; include inputs and expected outputs/state changes.
+- acceptance_criteria[*].fixture_ref: reference `fixture-*` to drive automation; use `fixture-*-tbd` if not yet created.
+- trace: link to `capability-*`, `api-*`, `nfr-*`, or `invariant-*` as known.
+
+## Best Practices
+- Write statement text that is testable, scoped to a single behavior, and measurable against success metrics.
+- Provide preconditions and postconditions so testers and implementers know the boundaries of each requirement.
+- Ensure every acceptance criterion has a stable criterion_id and, when possible, a fixture_ref to drive automation.
+- Use trace arrays to link FRs back to capabilities, APIs, NFRs, or governance rules.
+
+## Common Pitfalls
+- Bundling multiple behaviors into one FR, making it impossible to prove completeness.
+- Leaving acceptance criteria generic or missing, which blocks fixture authoring.
+- Skipping trace links, severing coverage reporting across spec steps.
+- Embedding implementation details instead of outcomes, limiting design options.
+
+## Quick Reference
+- ID Format: `fr-<descriptor>` with stable suffixes for traceability.
+- Required Fields: every FR needs `statement`, `acceptance_criteria`, and `fr_id`.
+- Criteria Structure: each criterion requires `criterion_id` and `text`; add `fixture_ref` when automation exists.
+- Trace Hooks: expect coverage from `trace` to Capabilities (`capability-*`), APIs (`api-*`), or NFRs.
+
 # Clarification Questions
-- What domain context is essential for step 4 · functional requirements that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which specific user or system behaviors must we guarantee in this phase? What is explicitly excluded?
+- For each FR, what are the minimal inputs and exact expected outputs or state changes?
+- What are the preconditions (auth, data presence, configuration) and postconditions (side effects, persisted state)?
+- What are the negative paths and error conditions we must handle? Which belong in acceptance criteria?
+- Which capabilities, APIs, or NFRs does each FR map to? Any governance constraints to reflect?
 
 # Embedded Schema
 ```json

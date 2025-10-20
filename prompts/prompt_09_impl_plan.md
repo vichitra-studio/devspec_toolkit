@@ -19,10 +19,39 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `tech_stack` declares languages, frameworks, data stores, and major infra choices with rationale where contentious.
+- Milestones include clear names, target dates, risks, and spikes for unknowns.
+- `migration_plan` describes data or API migration if replacing existing systems.
+- `dependencies` enumerate external systems, teams, or contracts that impact delivery.
+
+## Field-by-Field Guidance
+- tech_stack: structured object; include versions if known.
+- milestones[*].milestone_id/name: kebab-case ID and descriptive name.
+- milestones[*].target_date: ISO date for planning; can be tentative.
+- milestones[*].risks/spikes: concrete bullets (e.g., perf unknowns, vendor limits, schema evolution).
+- migration_plan: narrative plan for cutover/backfill/rollback.
+- dependencies: list of external dependencies and agreements.
+
+## Best Practices
+- State tech choices with versions to avoid ambiguity; document rationale briefly.
+- Timebox spikes and list exit criteria; connect to risks.
+- Keep milestones small and outcome-focused; link to FRs/APIs where relevant.
+
+## Common Pitfalls
+- Vague milestones without dates or acceptance signals.
+- Ignoring migration/rollback planning when replacing existing systems.
+- Untracked external dependencies leading to surprise blockers.
+
+## Quick Reference
+- Required: `tech_stack`.
+- Milestones: `milestone_id`, `name`, optional `target_date`, `risks`, `spikes`.
+
 # Clarification Questions
-- What domain context is essential for step 9 · implementation plan that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What tech choices are locked vs flexible? Any org standards to follow?
+- What are the major deliverable milestones with dates? What risks or spikes accompany each?
+- Are we migrating from an existing system? What is the plan for data, compatibility, and rollback?
+- What external dependencies (teams, vendors) could block delivery? How will we mitigate?
 
 # Embedded Schema
 ```json

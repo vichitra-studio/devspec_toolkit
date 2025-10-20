@@ -19,10 +19,51 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
+- Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
+- `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
+- `security` reflects real enforcement aligned with governance (e.g., `jwt`, `mTLS`).
+- `trace` links to FRs/capabilities that justify the API; add example_refs where helpful for fixtures.
+- No mixed concerns: separate entries for distinct behaviors or versioned variants.
+
+## Field-by-Field Guidance
+- api_id: `api-<resource>-<action>`; stable across codegen and monitoring.
+- name: human-readable, maps to resource/action.
+- version: `v<major>[.<minor>]` per semver pattern in schema.
+- protocol: `http`, `grpc`, `ws`, or `mqtt`; route/method must align with protocol semantics.
+- route/method: concrete path and verb for HTTP; use gRPC service/method names for grpc.
+- request_schema_ref/response_schema_ref: pointers to canonical schemas; prefer machine-resolvable locations.
+- errors: use shared error objects where possible; include codes/messages.
+- security: `none`, `api-key`, `oauth2`, `jwt`, or `mTLS` based on threat model.
+- trace: `fr-*`, `capability-*`, `nfr-*` as applicable to justify existence.
+
+## Best Practices
+- Keep api_id stable and map each entry to an owning component from the system sketch.
+- Use semver-compatible version strings (`v1`, `v1.1`) and update in lockstep with schema changes.
+- Provide request_schema_ref, response_schema_ref, and enumerated errors so fixtures and clients know exact payloads.
+- Define security explicitly to align with governance and monitoring.
+- Populate trace references to FR IDs or capabilities proving why the interface exists.
+
+## Common Pitfalls
+- Forgetting to sync route or method with implementation scaffolds, breaking generated clients.
+- Mixing multiple behaviors into a single API entry, hiding error handling and version strategy.
+- Leaving errors empty, which prevents negative fixture coverage and red-team planning.
+- Using free-form version strings that violate the schema pattern and confuse change management.
+
+## Quick Reference
+- ID Format: `interface_contracts-<descriptor>`; APIs use `api-<resource>-<action>`.
+- Required Fields: each API needs `api_id`, `name`, `version`, `protocol`, and `owner`.
+- Allowed Protocols: `http`, `grpc`, `ws`, `mqtt`.
+- Security Flag: choose from `none`, `api-key`, `oauth2`, `jwt`, `mTLS`.
+- Trace Hooks: use `trace` to reference FRs (`fr-*`) or Capabilities (`capability-*`).
+
 # Clarification Questions
-- What domain context is essential for step 5 · interface contracts that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- For each API, what is the exact behavior and which FR(s) does it satisfy?
+- What are the request/response schemas and example payloads? Where are schemas versioned?
+- What authentication, authorization, and transport security are required? Any tenant or PII handling constraints?
+- What error conditions must be first-class (validation, authorization, conflict, not found, rate limit)?
+- What is the versioning strategy and deprecation policy? Any breaking changes planned soon?
 
 # Embedded Schema
 ```json

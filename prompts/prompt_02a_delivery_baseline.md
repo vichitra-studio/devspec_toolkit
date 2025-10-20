@@ -19,10 +19,37 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- All environments (`dev`, `ci`, `staging`, `prod`) present with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
+- `ci_gates` enumerates the gates we actually enforce (schema validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
+- `secrets` includes names of required secrets; values are not embedded.
+- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI) if relevant.
+
+## Field-by-Field Guidance
+- environments.dev/ci/staging/prod: include minimal structure describing infra/tooling expectations (e.g., cloud, region, cluster, runners).
+- ci_gates: ordered list of gate names as strings.
+- secrets: namespaced identifiers (e.g., `PAYMENTS_API_KEY`), not values.
+- compliance: list of applicable labels/policies (e.g., `gdpr-data-exportable`).
+
+## Best Practices
+- Define minimal environment descriptors to make CI/CD reproducible (runner type, region, base images).
+- Include gates for schema validation, fixtures, invariants, governance, and coverage early.
+- Track secrets by name only and ensure secure storage policies are in place.
+
+## Common Pitfalls
+- Vague CI gates that do not map to concrete checks.
+- Missing staging environment parity causing late-stage surprises.
+- Embedding secret values instead of names.
+
+## Quick Reference
+- Environments: objects for `dev`, `ci`, `staging`, `prod`.
+- CI Gates: strings naming the checks to run.
+
 # Clarification Questions
-- What domain context is essential for step 2.5 · delivery baseline that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What deployment environments are required now and in the near term? Any differences in config or data sources?
+- Which CI gates must block merges? Any minimum coverage thresholds or invariants that must run?
+- What secrets are needed to run locally, in CI, and in prod? Where are they stored?
+- What compliance or audit requirements apply to environments and pipelines?
 
 # Embedded Schema
 ```json

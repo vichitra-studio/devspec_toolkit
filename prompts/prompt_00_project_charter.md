@@ -19,10 +19,50 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Problem statement specifies the primary pain, affected users, measurable business impact, and hard constraints (time, budget, compliance).
+- Scope is explicit: at least 3–5 in-scope items and 3–5 out-of-scope items; avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
+- Stakeholders list covers decision-makers and operators; each stakeholder has a role and specific needs that drive requirements or success metrics.
+- User segments are distinct; each includes jobs-to-be-done, pains, and gains that map to capabilities and FRs.
+- Success metrics: each metric includes metric_id, name, unit, target, measurement_method, and—where known—baseline grounded in existing data.
+- Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
+- Owner is set based on who will maintain the charter and is not just a default.
+
+## Field-by-Field Guidance
+- id: stable kebab-case; prefer `project_charter-<initiative>`.
+- owner: `api`, `ui`, `system`, `ops`, or `data`; pick the accountable group for charter updates.
+- problem_statement: 1–3 sentences, explicit on users, pain, outcome, and constraints.
+- in_scope/out_of_scope: concrete bullets; include integrations, data domains, and delivery boundaries.
+- assumptions: facts taken for granted (e.g., existing identity provider, data retention rules).
+- risks: delivery and operational risks with concise phrasing (e.g., dependency readiness, legal review timelines).
+- stakeholders: roles (e.g., Security Lead, Support Manager) with clear needs (e.g., audit logs retained 1 year).
+- user_segments: include description and JTBD; pains and gains should be testable or observable later.
+- success_metrics: target must be measurable in units; measurement_method states how/where it will be captured (e.g., analytics event, dashboard query).
+- links: trace to FRs/NFRs/governance ids when known; use temporary `*-tbd` anchors if not yet defined.
+
+## Best Practices
+- Write a crisp problem statement grounded in user pain and measurable outcomes.
+- Define in/out of scope explicitly to prevent scope creep; tie to capabilities and FRs later.
+- Choose success metrics with clear baselines, targets, and measurement methods that feed Step 16 monitoring.
+- Identify real stakeholders and user segments to drive prioritization and acceptance criteria.
+
+## Common Pitfalls
+- Vague goals without units or timelines, making success unverifiable.
+- Missing out-of-scope list, causing later ambiguity and churn.
+- Success metrics with no measurement path or undefined units.
+
+## Quick Reference
+- Required: `id`, `owner`, `created_at`, `problem_statement`, `success_metrics`.
+- Stakeholders: list roles and needs; must inform later FRs and NFRs.
+
 # Clarification Questions
-- What domain context is essential for step 0 · project charter that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What are the top 3 measurable business outcomes (with units and targets) and by when?
+- Which user segments are in primary focus, and what critical JTBD do they have today that we must address?
+- What must be explicitly out of scope for this phase (integrations, regions, personas, features)?
+- What non-negotiable constraints apply (compliance, security posture, SLOs, data residency, budget)?
+- Who are the accountable stakeholders for sign-off and ongoing ownership? Any external regulators or auditors involved?
+- What baselines exist today for each success metric, and how will we measure them (tool, dashboard, query)?
+- Which upstream systems, dependencies, or programs does this charter rely on, and what risks do they introduce?
 
 # Embedded Schema
 ```json

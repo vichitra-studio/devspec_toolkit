@@ -19,10 +19,45 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Components enumerate services, data stores, queues, jobs, caches, UIs, libs, and external systems; each has a type and clear responsibilities.
+- Connections cover all cross-component interactions; ensure `from` and `to` component IDs exist.
+- Protocols/auth match real integration constraints (e.g., gRPC with mTLS, events with exactly-once semantics where needed).
+- Include reliability semantics on event/async paths; specify rate limits where known.
+- Tag external dependencies and their owners.
+
+## Field-by-Field Guidance
+- components[*].component_id: kebab-case; map to ownership later in scaffolding.
+- components[*].type: one of service, db, queue, cache, job, ui, lib, external.
+- components[*].responsibilities: top 3–6 duties with clear boundaries; avoid overlap across components.
+- connections[*].from/to: existing component IDs.
+- connections[*].protocol: `http`, `grpc`, `event`, `rpc`, `db`, or `file` matching the interface.
+- connections[*].schema_ref: pointer to schema used on the wire (if known) or `-tbd`.
+- connections[*].auth: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, or `key`.
+- connections[*].rate_limit: numeric rule or policy string (e.g., `100 rps burst 200`).
+- connections[*].reliability: `best-effort`, `at-least-once`, `exactly-once` aligned with business risk.
+
+## Best Practices
+- Model only the necessary components and connections to support in-scope capabilities.
+- Reuse common integration patterns (e.g., pub/sub for async flows) and record auth and reliability requirements.
+- Keep responsibilities tight to reduce coupling and clarify ownership.
+
+## Common Pitfalls
+- Omitting external systems, causing integration work to be underestimated.
+- Vague responsibilities that lead to overlapping ownership.
+- Missing auth/reliability on connections, hiding important constraints.
+
+## Quick Reference
+- Component Types: `service`, `db`, `queue`, `cache`, `job`, `ui`, `lib`, `external`.
+- Connection Protocols: `http`, `grpc`, `event`, `rpc`, `db`, `file`.
+- Auth Methods: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, `key`.
+
 # Clarification Questions
-- What domain context is essential for step 2 · system sketch that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What components exist (or must be created) to deliver the in-scope capabilities? Who owns each?
+- Which third-party systems are involved (identity, payments, analytics), and how are they integrated and secured?
+- For each connection, what protocol, auth method, and reliability semantics are required?
+- What data schemas or message contracts exist for each integration? Where are they tracked?
+- What rate limits and backpressure expectations apply? Any multi-region or data-residency constraints?
 
 # Embedded Schema
 ```json

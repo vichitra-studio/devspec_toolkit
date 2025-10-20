@@ -19,10 +19,38 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- Terms include all domain objects, key metrics, roles, and acronyms used across specs.
+- Each term has an unambiguous definition written for engineers and auditors.
+- Include `domain` and `units` where relevant (especially for quantities used in NFRs/monitoring).
+- Avoid synonyms and duplicates; prefer one canonical term with aliases captured in the definition text.
+
+## Field-by-Field Guidance
+- terms[*].term_id: kebab-case; consider `term-<domain>-<concept>`.
+- terms[*].term: canonical business term or metric name.
+- terms[*].definition: concise, testable definition; state inclusions/exclusions.
+- terms[*].domain: business area (e.g., billing, auth) or data domain; optional but recommended.
+- terms[*].units: base units for metrics (e.g., ms, req/s, USD) to align with NFRs and dashboards.
+
+## Best Practices
+- Define ambiguous or overloaded terms first; include examples in definition text if needed.
+- Align metric terms and units with NFRs and monitoring to prevent mismatch.
+- Prefer one canonical term; note aliases in the definition.
+
+## Common Pitfalls
+- Duplicates or synonyms that fragment communication.
+- Missing units for metrics, leading to inconsistent targets and dashboards.
+- Definitions that are too broad or business-jargon-heavy to guide engineers.
+
+## Quick Reference
+- Required: `term_id`, `term`, `definition`.
+- Optional but recommended: `domain`, `units`.
+
 # Clarification Questions
-- What domain context is essential for step 3 · glossary that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- Which terms cause confusion today between engineering, product, and ops? Define these first.
+- What metrics appear in success metrics and NFRs? What are their precise units and definitions?
+- Are there any external industry terms or compliance terms we must adopt verbatim?
+- Which acronyms must be expanded and standardized across docs and code?
 
 # Embedded Schema
 ```json

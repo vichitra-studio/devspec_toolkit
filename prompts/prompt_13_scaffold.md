@@ -19,10 +19,39 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Step-Specific Completeness Checklist
+- `service_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
+- `route_map` covers all in-scope APIs (Step 5) with path/method and `api_ref` links.
+- `validators` list includes code or config checks needed to keep generated code aligned with specs.
+- `build_status` reflects current build health based on CI outcomes.
+
+## Field-by-Field Guidance
+- service_skeleton.language/framework: e.g., `python` + `fastapi`, `node` + `express`.
+- service_skeleton.modules: high-level modules or packages to generate.
+- route_map[*].api_ref: `api-*` from interface contracts.
+- route_map[*].path/method: concrete routing info for the chosen framework.
+- validators: names of validators or scripts to run (e.g., `spec-validate`, `openapi-sync`).
+- build_status: `pending`, `green`, or `red`.
+
+## Best Practices
+- Keep route_map in sync with Step 5 API definitions to ensure generated code is correct.
+- Prefer minimal viable modules to start; evolve with spec changes.
+- Add validators that prevent drift between specs and code (e.g., openapi/schema sync, trace checks).
+
+## Common Pitfalls
+- Generating routes without linking to `api_ref`, breaking traceability.
+- Overly complex skeletons that slow initial delivery.
+- Missing validators leading to silent drift.
+
+## Quick Reference
+- Service Skeleton: `language` (required), optional `framework` and `modules`.
+- Route Map: `api_ref`, `path`, `method` for each route.
+
 # Clarification Questions
-- What domain context is essential for step 13 · scaffold generation that is not already captured in the Charter or Glossary?
-- Which scope boundaries are hard constraints vs soft preferences?
-- What identifiers or external references must be preserved for traceability (e.g., FR IDs, API IDs)?
+- What language/framework should the scaffold target? Any org standards or templates to reuse?
+- Which APIs from Step 5 must be present in the initial route map?
+- What validators or code checks should run to keep generated code aligned with the spec?
+- What is the current build status and criteria for moving to `green`?
 
 # Embedded Schema
 ```json
