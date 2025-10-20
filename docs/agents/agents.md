@@ -8,15 +8,16 @@ This document defines how automated agents should work with the AI Spec Driven D
 - A root-level pointer (`agents.md`) also links here; use it to discover agent docs when scanning the repository top-down.
 
 ## 2. Repository Expectations
+- The toolkit is checked out at repo root as `./devspec_toolkit/`; adjust if your checkout differs.
 - Live spec artifacts reside in the host repository under `spec/` (sibling to the toolkit submodule).
-- Prompts required to generate artifacts live under `tools/ai-spec-toolkit/prompts/` (adjust the path if you store the toolkit elsewhere).
-- Schemas are referenced from `tools/ai-spec-toolkit/schema/` and resolved using `tools/ai-spec-toolkit/tools/schema_registry.json`.
+- Prompts required to generate artifacts live under `./devspec_toolkit/prompts/` (adjust the path if you store the toolkit elsewhere).
+- Schemas are referenced from `./devspec_toolkit/schema/` and resolved using `./devspec_toolkit/tools/schema_registry.json`.
 - Validation commands are executed via `python -m specdev_tools.cli ... --repo-root <toolkit-path>` with `PYTHONPATH` including `<toolkit-path>/tools`.
 
 ## 3. Operating Protocol
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
-   - Load the deterministic prompt: `tools/ai-spec-toolkit/prompts/prompt_NN_name.md`.
+   - Load the deterministic prompt: `./devspec_toolkit/prompts/prompt_NN_name.md`.
 2. **Prepare Context**
    - Capture all `Clarification Questions` blocks from the prompt.
    - Record step dependencies listed in the guide (`consumers`, `inputs`).
@@ -29,14 +30,14 @@ This document defines how automated agents should work with the AI Spec Driven D
    - Preserve the `$schema` field already present in the file.
 5. **Validate**
    ```bash
-   python -m specdev_tools.cli validate spec/NN_name.json --repo-root tools/ai-spec-toolkit
+   python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
    ```
    - On failure, re-run with additional clarifications from the guide.
 6. **Update Traceability**
    - When FRs, APIs, fixtures, or NFRs change, also run:
      ```bash
-     python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
-     python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit
+     python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+     python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
      ```
 
 ## 4. Step Reference

@@ -43,8 +43,8 @@ def main():
     ci = sub.add_parser("gen-ci")
     ci.add_argument("spec_dir")
     ci.add_argument("--out", default="-")
-    ci.add_argument("--toolkit-path", default="tools/ai-spec-toolkit",
-                    help="Relative path to the toolkit inside the host repository")
+    ci.add_argument("--toolkit-path", default="./devspec_toolkit",
+                    help="Relative path to the toolkit inside the host repository (defaults to ./devspec_toolkit)")
 
     sc = sub.add_parser("scaffold")
     sc.add_argument("spec_dir")

@@ -5,10 +5,10 @@ Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit
 ## Install
 
 ```bash
-# adjust tools/ai-spec-toolkit if the submodule lives elsewhere
+# run from repo root; adjust ./devspec_toolkit if you placed the toolkit elsewhere
 python -m venv .venv && . .venv/bin/activate
-pip install -r tools/ai-spec-toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+pip install -r ./devspec_toolkit/tools/requirements.txt
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 ```
 
 Run these commands from the root of your host repository; adjust the paths if you invoke them from inside the submodule. Python 3.10+ recommended.
@@ -17,7 +17,7 @@ Run these commands from the root of your host repository; adjust the paths if yo
 
 ## What is **toolkit root**?
 
-The toolkit root is the directory that contains this submodule (for example, `tools/ai-spec-toolkit`). That folder ships with:
+The toolkit root is the directory that contains this submodule (for example, `./devspec_toolkit`). That folder ships with:
 
 ```
 <toolkit-root>/
@@ -33,11 +33,11 @@ The toolkit root is the directory that contains this submodule (for example, `to
 
 The CLI resolves `$schema` URIs via `tools/schema_registry.json`. When you run commands from your product repository, pass `--repo-root <toolkit-root>` so those paths resolve correctly.
 
-Examples (assuming `tools/ai-spec-toolkit`):
+Examples (assuming `./devspec_toolkit`):
 
 - Host repo root:
   ```bash
-  python -m specdev_tools.cli validate spec/00_charter.json --repo-root tools/ai-spec-toolkit
+  python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
   ```
 - Inside the toolkit directory:
   ```bash
@@ -45,7 +45,7 @@ Examples (assuming `tools/ai-spec-toolkit`):
   ```
 - Arbitrary location:
   ```bash
-  python -m specdev_tools.cli validate /abs/path/spec/00_charter.json --repo-root /abs/path/tools/ai-spec-toolkit
+  python -m specdev_tools.cli validate /abs/path/spec/00_charter.json --repo-root /abs/path/devspec_toolkit
   ```
 
 If you vend the toolkit elsewhere, substitute that path in the commands above and below.
@@ -70,7 +70,7 @@ Validate a single JSON artifact. Exit code `0` means success.
 
 **Example**
 ```bash
-python -m specdev_tools.cli validate spec/00_charter.json --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
 ```
 
 ### 2) `validate-all`
@@ -81,7 +81,7 @@ Validate every `*.json` recursively.
 
 **Example**
 ```bash
-python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
 ```
 
 ### 3) `matrix`
@@ -92,7 +92,7 @@ Emit the FR→API→Fixture→NFR coverage matrix.
 
 **Example**
 ```bash
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 ### 4) `fixtures-lint`
@@ -103,7 +103,7 @@ Static lint for fixture structure and targets.
 
 **Example**
 ```bash
-python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 ```
 
 ### 5) `invariants-check`
@@ -115,7 +115,7 @@ Evaluate invariant expressions against a sample JSON context.
 **Example**
 ```bash
 echo '{ "password": { "length": 12 } }' > /tmp/sample.json
-python -m specdev_tools.cli invariants-check spec --repo-root tools/ai-spec-toolkit --sample /tmp/sample.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample /tmp/sample.json
 ```
 
 ### 6) `governance-check`
@@ -126,7 +126,7 @@ Verify commit messages against Step 10.
 
 **Example**
 ```bash
-python -m specdev_tools.cli governance-check spec --repo-root tools/ai-spec-toolkit --message "feat(spec): add login [fr-initial-login]"
+python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
 ```
 
 ### 7) `gen-ci`
@@ -137,7 +137,7 @@ Generate a baseline CI workflow aligned with Step 12.
 
 **Example**
 ```bash
-python -m specdev_tools.cli gen-ci spec --repo-root tools/ai-spec-toolkit --toolkit-path tools/ai-spec-toolkit --out .github/workflows/ci.yml
+python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 ```
 
 ### 8) `scaffold`
@@ -148,7 +148,7 @@ Create a minimal HTTP scaffold from Steps 05 + 13 contracts.
 
 **Example**
 ```bash
-python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 ```
 
 ---
@@ -165,8 +165,8 @@ python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --ou
 
 A minimal workflow (via `gen-ci`) typically runs:
 
-1. `python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit`
-2. `python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out`
+1. `python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit`
+2. `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out`
 
 Extend with unit tests, fixture execution, red-team loops, deploy, and drift audit steps as your pipeline matures.
 

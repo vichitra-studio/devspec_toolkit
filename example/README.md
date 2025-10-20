@@ -9,16 +9,16 @@
 
 ## How To Use This Reference
 ```bash
-# From your host repo root (adjust tools/ai-spec-toolkit if needed)
+# From your host repo root (adjust ./devspec_toolkit if needed)
 python -m venv .venv && . .venv/bin/activate
-pip install -r tools/ai-spec-toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+pip install -r ./devspec_toolkit/tools/requirements.txt
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 
 # Validate the reference artifacts
-python -m specdev_tools.cli validate-all example/devspec_kit --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate-all example/devspec_kit --repo-root ./devspec_toolkit
 
 # Compare your trace matrix to the reference
-python -m specdev_tools.cli matrix example/devspec_kit --repo-root tools/ai-spec-toolkit --out /tmp/reference_matrix.json
+python -m specdev_tools.cli matrix example/devspec_kit --repo-root ./devspec_toolkit --out /tmp/reference_matrix.json
 ```
 
-Use this directory to answer “what does complete look like?”—not as scaffolding for new projects. When creating your own specs, copy templates from `tools/ai-spec-toolkit/template/` (or your toolkit path) into your host repository’s `spec/` folder and generate fresh artifacts via the prompts.
+Use this directory to answer “what does complete look like?”—not as scaffolding for new projects. When creating your own specs, copy templates from `./devspec_toolkit/template/` (or your toolkit path) into your host repository’s `spec/` folder and generate fresh artifacts via the prompts.

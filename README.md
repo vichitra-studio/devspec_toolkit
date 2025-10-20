@@ -18,14 +18,12 @@ If you want vibes, go start a mood board. If you want software that ships, keep 
 
 ## How it fits in your repo
 
-Most teams vendor this toolkit as a git submodule (for example under `tools/ai-spec-toolkit/`) inside their primary product repository. All mutable specification artifacts belong in the host repo, typically under `spec/`, while this toolkit supplies schemas, prompts, guides, and CLI utilities.
-
-Examples in this README assume the toolkit lives at `tools/ai-spec-toolkit/`. Adjust commands if you keep the submodule elsewhere.
+Most teams vendor this toolkit as a git submodule in their primary product repository. This toolkit expects to live at the repo root as `./devspec_toolkit/`, and every command shown below assumes you run it from that root. If you keep the toolkit somewhere else, substitute your path consistently.
 
 ```
 <product-repo>/
 ├─ spec/                         # your live artifacts (json + guides)
-├─ tools/ai-spec-toolkit/        # this toolkit (read-only unless upgrading)
+├─ ./devspec_toolkit/        # this toolkit (read-only unless upgrading)
 │  ├─ README.md
 │  ├─ docs/
 │  ├─ prompts/
@@ -59,52 +57,52 @@ The `example/devspec_kit/` directory shows a fully specced reference implementat
 └─ .github/workflows/ci.yml      # generated or hand-curated pipeline
 ```
 
-**Toolkit root** is the directory where you checked out the toolkit (e.g., `tools/ai-spec-toolkit/`). The CLI resolves `$schema` via `tools/schema_registry.json` relative to this folder, even when your spec artifacts live in the host repo.
+**Toolkit root** is the directory where you checked out the toolkit (for example, `./devspec_toolkit/`). The CLI resolves `$schema` via `tools/schema_registry.json` relative to this folder, even when your spec artifacts live in the host repo.
 
 ---
 
 ## Quick start
 
 ```bash
-# adjust tools/ai-spec-toolkit if you place the submodule elsewhere
+# ensure you run this from repo root so ./devspec_toolkit/... resolves
 
 python -m venv .venv && . .venv/bin/activate
-pip install -r tools/ai-spec-toolkit/tools/requirements.txt
+pip install -r ./devspec_toolkit/tools/requirements.txt
 
 # Make the toolkit modules importable
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 
 # Validate a single artifact stored in your host repo
 python -m specdev_tools.cli validate spec/00_charter.json \
-  --repo-root tools/ai-spec-toolkit
+  --repo-root ./devspec_toolkit
 
 # Validate everything under spec/
 python -m specdev_tools.cli validate-all spec \
-  --repo-root tools/ai-spec-toolkit
+  --repo-root ./devspec_toolkit
 
 # Build FR→API→Fixture→NFR matrix
 python -m specdev_tools.cli matrix spec \
-  --repo-root tools/ai-spec-toolkit \
+  --repo-root ./devspec_toolkit \
   --out tools/trace_matrix.json
 
 # Lint fixtures
 python -m specdev_tools.cli fixtures-lint spec \
-  --repo-root tools/ai-spec-toolkit
+  --repo-root ./devspec_toolkit
 
 # Evaluate invariants with a sample context
 python -m specdev_tools.cli invariants-check spec \
-  --repo-root tools/ai-spec-toolkit \
+  --repo-root ./devspec_toolkit \
   --sample tests/samples/invariants/password_ok.json
 
 # Generate baseline CI (pass the same toolkit path you want embedded in the workflow)
 python -m specdev_tools.cli gen-ci spec \
-  --repo-root tools/ai-spec-toolkit \
-  --toolkit-path tools/ai-spec-toolkit \
+  --repo-root ./devspec_toolkit \
+  --toolkit-path ./devspec_toolkit \
   --out .github/workflows/ci.yml
 
 # Generate minimal HTTP scaffold from contracts (05) + route map (13)
 python -m specdev_tools.cli scaffold spec \
-  --repo-root tools/ai-spec-toolkit \
+  --repo-root ./devspec_toolkit \
   --out scaffold_out
 ```
 
@@ -149,7 +147,7 @@ Artifacts carry `$schema` URIs like:
 ```
 The CLI looks up that URI in `tools/schema_registry.json` and loads the corresponding file from `schema/`. If you move files, update the registry. If you run outside repo root, pass `--repo-root`.
 
-> ⚠️ Editors do not know about `specdev.local`. To avoid “schema cannot be resolved” warnings in VS Code/JetBrains, either map your spec files to the local schema paths via editor settings (e.g. `.vscode/settings.json`) or serve the schemas yourself (add `specdev.local` to `/etc/hosts` and run `python -m http.server` inside `tools/ai-spec-toolkit/schema`). The CLI already resolves everything offline; this caveat only affects IDE hints.
+> ⚠️ Editors do not know about `specdev.local`. To avoid “schema cannot be resolved” warnings in VS Code/JetBrains, either map your spec files to the local schema paths via editor settings (e.g. `.vscode/settings.json`) or serve the schemas yourself (add `specdev.local` to `/etc/hosts` and run `python -m http.server` inside `./devspec_toolkit/schema`). The CLI already resolves everything offline; this caveat only affects IDE hints.
 
 ---
 
@@ -211,7 +209,7 @@ Choose what suits your org (Apache‑2.0, MIT, etc.). Put it in `LICENSE` and re
 - **Rule:** no examples inside prompts; reference material lives under `example/` and `tests/fixtures/`.
 
 ### 3) `spec/` (authoritative specs)
-- Stored in your host repository’s `spec/` directory; copy guide templates from `tools/ai-spec-toolkit/template/` before editing.
+- Stored in your host repository’s `spec/` directory; copy guide templates from `./devspec_toolkit/template/` before editing.
 - **Two files per step:**
   - `NN_name.json` — canonical, machine-checkable artifact with `$schema`.
   - `NN_name.guide.md` — human playbook: purpose, DoR/guardrails, checks, failure modes, best practices.
@@ -222,7 +220,7 @@ Choose what suits your org (Apache‑2.0, MIT, etc.). Put it in `LICENSE` and re
 - **Entry:** `python -m specdev_tools.cli --help`.
 - **Registry:** `tools/schema_registry.json` maps `$schema` URIs → `schema/*.schema.json` paths.
 - **Key commands:** `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `gen-ci`, `scaffold`.
-- **Toolkit root:** the submodule directory (e.g., `tools/ai-spec-toolkit`) containing `tools/`, `schema/`, `prompts/`, `docs/`, and `template/`. Pass `--repo-root` pointing here when running from your host repo.
+- **Toolkit root:** the submodule directory (e.g., `./devspec_toolkit`) containing `tools/`, `schema/`, `prompts/`, `docs/`, and `template/`. Pass `--repo-root` pointing here when running from your host repo.
 
 ### 5) `tests/` (data-first checks)
 - **fixtures/** data referenced by contracts; **samples/** contexts for invariants; **expectations/** matrices for drift checks.
@@ -248,37 +246,37 @@ Choose what suits your org (Apache‑2.0, MIT, etc.). Put it in `LICENSE` and re
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -r tools/ai-spec-toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+pip install -r ./devspec_toolkit/tools/requirements.txt
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 ```
 
-Always pass `--repo-root <toolkit-path>` (for example, `tools/ai-spec-toolkit`) when you invoke the CLI from your host repository so the schema registry resolves correctly.
+Always pass `--repo-root <toolkit-path>` (for example, `./devspec_toolkit`) when you invoke the CLI from your host repository so the schema registry resolves correctly.
 
 ### 1) Author step artifacts
 
 Repeat for each step (`00` → `17`, including `02a` where applicable):
 
 1. **Read** `spec/NN_name.guide.md` to align on purpose and guardrails.
-2. **Run** the corresponding prompt in `tools/ai-spec-toolkit/prompts/prompt_NN_name.md` and produce a single fenced `json` output.
+2. **Run** the corresponding prompt in `./devspec_toolkit/prompts/prompt_NN_name.md` and produce a single fenced `json` output.
 3. **Paste** the output into `spec/NN_name.json` (which already contains `$schema`).
 4. **Validate:**
    ```bash
-   python -m specdev_tools.cli validate spec/NN_name.json --repo-root tools/ai-spec-toolkit
+   python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
    ```
 5. **Commit** with a governance-compliant message (Step 10).
 
 ### 2) Validate the whole spec set
 
 ```bash
-python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
-python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 ```
 
 ### 3) Generate scaffold (Steps 05 ↔ 13)
 
 ```bash
-python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 node scaffold_out/src/index.js  # optional, to boot the minimal server
 ```
 
@@ -340,23 +338,23 @@ The scaffold registers routes listed in `13_scaffold.json` and references the re
 Create charter and capabilities, then validate:
 
 ```bash
-python -m specdev_tools.cli validate spec/00_charter.json --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli validate spec/01_capabilities.json --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
+python -m specdev_tools.cli validate spec/01_capabilities.json --repo-root ./devspec_toolkit
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 Scaffold and boot the server for manual smoke:
 
 ```bash
-python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 node scaffold_out/src/index.js
 ```
 
 Generate CI and commit:
 
 ```bash
-python -m specdev_tools.cli gen-ci spec --repo-root tools/ai-spec-toolkit --toolkit-path tools/ai-spec-toolkit --out .github/workflows/ci.yml
+python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 git add . && git commit -m "feat(spec): baseline CI [fr-initial-login]"
 ```
 
@@ -510,27 +508,27 @@ This is the fastest way to get from blank repo to a running, validated scaffold,
 ### A. Setup
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -r tools/ai-spec-toolkit/tools/requirements.txt
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+pip install -r ./devspec_toolkit/tools/requirements.txt
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 ```
-Run every CLI command from your host repo root and include `--repo-root tools/ai-spec-toolkit` (or the toolkit path you use) so the schema registry resolves.
+Run every CLI command from your host repo root and include `--repo-root ./devspec_toolkit` (or the toolkit path you use) so the schema registry resolves.
 
 ### B. Author early steps (00 → 05)
-1. Open `tools/ai-spec-toolkit/prompts/prompt_00_project_charter.md`. Feed it to your AI as-is. Answer the Clarification Questions block if needed.
+1. Open `./devspec_toolkit/prompts/prompt_00_project_charter.md`. Feed it to your AI as-is. Answer the Clarification Questions block if needed.
 2. Paste the single fenced `json` output into `spec/00_charter.json`.  
    Validate:
    ```bash
-   python -m specdev_tools.cli validate spec/00_charter.json --repo-root tools/ai-spec-toolkit
+   python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
    ```
 3. Repeat for:
-   - `tools/ai-spec-toolkit/prompts/prompt_01_capabilities.md` → `spec/01_capabilities.json`
-   - `tools/ai-spec-toolkit/prompts/prompt_02_system_sketch.md` → `spec/02_system_sketch.json`
-   - `tools/ai-spec-toolkit/prompts/prompt_05_interface_contracts.md` → `spec/05_interface_contracts.json`
+   - `./devspec_toolkit/prompts/prompt_01_capabilities.md` → `spec/01_capabilities.json`
+   - `./devspec_toolkit/prompts/prompt_02_system_sketch.md` → `spec/02_system_sketch.json`
+   - `./devspec_toolkit/prompts/prompt_05_interface_contracts.md` → `spec/05_interface_contracts.json`
 
 Run whole‑tree checks:
 ```bash
-python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 ### C. Lock traceability via FRs and Fixtures (04, 08)
@@ -538,13 +536,13 @@ python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out 
 2. Create initial fixtures in `spec/08_fixtures.json` and put raw request/expectation pairs under `tests/fixtures/`.
 3. Lint and cover:
 ```bash
-python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 ### D. Generate scaffold (13) and smoke
 ```bash
-python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 node scaffold_out/src/index.js  # optional: boots minimal server for manual pings
 ```
 
@@ -552,13 +550,13 @@ node scaffold_out/src/index.js  # optional: boots minimal server for manual ping
 - Implement each route to satisfy `tests/fixtures/*` and the expectations embedded in `spec/08_fixtures.json`.
 - Update `spec/14_fixture_impl.json` and keep running:
 ```bash
-python -m specdev_tools.cli validate spec/14_fixture_impl.json --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate spec/14_fixture_impl.json --repo-root ./devspec_toolkit
 ```
 
 ### F. Add invariants and NFRs (06, 07)
 - Encode rules in `spec/06_invariants.json`; verify:
 ```bash
-python -m specdev_tools.cli invariants-check spec --repo-root tools/ai-spec-toolkit --sample tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample tests/samples/invariants/password_ok.json
 ```
 - Define NFRs in `spec/07_nfrs.json` and wire dashboards/alerts in `spec/16_delivery_monitoring.json`.
 
@@ -570,11 +568,11 @@ python -m specdev_tools.cli invariants-check spec --repo-root tools/ai-spec-tool
 ### H. CI & governance (10, 12, 02a, .github)
 - Generate or update CI:
 ```bash
-python -m specdev_tools.cli gen-ci spec --repo-root tools/ai-spec-toolkit --toolkit-path tools/ai-spec-toolkit --out .github/workflows/ci.yml
+python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 ```
 - Enforce commit messages against governance:
 ```bash
-python -m specdev_tools.cli governance-check spec --repo-root tools/ai-spec-toolkit --message "feat(spec): add login [fr-initial-login]"
+python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
 ```
 
 ### I. Drift audit (17)

@@ -16,32 +16,32 @@ This reference collects recurring facts that developers need while authoring or 
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).
 - **Owner enum**: one of `{api, ui, system, ops, data}`.
 - **Artifacts**: include the canonical `$schema` URI exactly as emitted in the prompt.
-- **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, `tools/ai-spec-toolkit/prompts/prompt_NN_name.md` (adjust the toolkit path as needed).
+- **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, `./devspec_toolkit/prompts/prompt_NN_name.md` (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from `schema/core/`.
 
 ## Command Cheatsheet
 ```bash
 # One-time per shell: expose the toolkit modules (adjust the path if needed)
-export PYTHONPATH="${PWD}/tools/ai-spec-toolkit/tools"
+export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 
 # Validation
-python -m specdev_tools.cli validate spec/00_charter.json --repo-root tools/ai-spec-toolkit
-python -m specdev_tools.cli validate-all spec --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
 
 # Traceability & fixtures
-python -m specdev_tools.cli matrix spec --repo-root tools/ai-spec-toolkit --out tools/trace_matrix.json
-python -m specdev_tools.cli fixtures-lint spec --repo-root tools/ai-spec-toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Invariants, governance, CI
-python -m specdev_tools.cli invariants-check spec --repo-root tools/ai-spec-toolkit --sample tests/samples/invariants/password_ok.json
-python -m specdev_tools.cli governance-check spec --repo-root tools/ai-spec-toolkit --message "feat(spec): add login [fr-initial-login]"
-python -m specdev_tools.cli gen-ci spec --repo-root tools/ai-spec-toolkit --toolkit-path tools/ai-spec-toolkit --out .github/workflows/ci.yml
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
+python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 
 # Scaffold generation
-python -m specdev_tools.cli scaffold spec --repo-root tools/ai-spec-toolkit --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 ```
 
-Invoke commands from the root of your host repository so relative paths to `spec/` and `tools/ai-spec-toolkit/` resolve cleanly.
+Invoke commands from the root of your host repository so relative paths to `spec/` and `./devspec_toolkit/` resolve cleanly.
 
 ## Validation Workflow
 1. Edit the JSON artifact.

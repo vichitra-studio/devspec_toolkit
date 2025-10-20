@@ -2,6 +2,8 @@
 
 Phase II turns validated specs into a running system while keeping runtime behavior traceable back to the artifacts.
 
+All commands in this guide assume you run them from repo root with the toolkit available at `./devspec_toolkit/`.
+
 ## Step Progression
 | Step | Purpose | Key Activities |
 |------|---------|----------------|
@@ -14,14 +16,14 @@ Phase II turns validated specs into a running system while keeping runtime behav
 ## Command Cadence
 ```bash
 # Generate scaffold and optionally boot it
-python -m specdev_tools.cli scaffold spec --out scaffold_out
+python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 
 # Track fixture-driven progress
-python -m specdev_tools.cli fixtures-lint spec
+python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Continuous validation as implementation evolves
-python -m specdev_tools.cli validate-all spec
-python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 ## CI Integration
@@ -35,7 +37,7 @@ python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
 Ensure `.github/workflows/ci.yml` (generated via `gen-ci`) reflects these jobs and references the spec IDs they enforce. For example:
 
 ```bash
-python -m specdev_tools.cli gen-ci spec --repo-root tools/ai-spec-toolkit --toolkit-path tools/ai-spec-toolkit --out .github/workflows/ci.yml
+python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 ```
 
 ## Outputs
