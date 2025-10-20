@@ -80,9 +80,13 @@ def main():
         spec_dir = os.path.abspath(args.spec_dir)
         res = build_trace_matrix(repo_root, spec_dir)
         out = json.dumps(res, indent=2)
-        if args.out == "-": print(out)
+        if args.out == "-":
+            print(out)
         else:
-            with open(args.out, "w", encoding="utf-8") as f: f.write(out)
+            out_path = os.path.abspath(args.out)
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(out)
             print(args.out)
     elif args.cmd == "fixtures-lint":
         spec_dir = os.path.abspath(args.spec_dir)

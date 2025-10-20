@@ -151,6 +151,21 @@ Create a minimal HTTP scaffold from Steps 05 + 13 contracts.
 python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 ```
 
+### 9) `ai-help`
+```
+python -m specdev_tools.cli ai-help [--step <NN>]
+```
+Prints a condensed reminder for running prompts and validations. Passing `--step` narrows the tips to a single spec step.
+
+**Examples**
+```bash
+# General reminders
+python -m specdev_tools.cli ai-help
+
+# Focus on Functional Requirements (Step 04)
+python -m specdev_tools.cli ai-help --step 04
+```
+
 ---
 
 ## How schema resolution works

@@ -1,7 +1,7 @@
 # 13. Scaffold Generation
 
 ## Purpose
-Generate compile-clean stubs and validators from contracts.
+Generate compile-clean route stubs from contracts and capture follow-up validation tasks.
 
 ## Template / Fields
 - Canonical artifact: **spec/13_scaffold.json**

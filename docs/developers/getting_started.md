@@ -71,6 +71,7 @@ Keep `reference.md` handy for the complete command catalogue, flags, and trouble
 - Copy the prompt exactly as stored under `./devspec_toolkit/prompts/`.
 - Instruct the assistant to output **exactly one** fenced `json` block that validates against the embedded schema.
 - If validation fails, consult the guide, adjust the prompt, and re-run the command.
+- Need a quick reminder of the workflow for a given step? Run `python -m specdev_tools.cli ai-help --step NN`.
 
 Automation-specific rules and escalation paths reside in `../agents/agents.md`; developers rarely need to reference them.
 

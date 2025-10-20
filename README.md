@@ -72,39 +72,7 @@ pip install -r ./devspec_toolkit/tools/requirements.txt
 # Make the toolkit modules importable
 export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 
-# Validate a single artifact stored in your host repo
-python -m specdev_tools.cli validate spec/00_charter.json \
-  --repo-root ./devspec_toolkit
-
-# Validate everything under spec/
-python -m specdev_tools.cli validate-all spec \
-  --repo-root ./devspec_toolkit
-
-# Build FR→API→Fixture→NFR matrix
-python -m specdev_tools.cli matrix spec \
-  --repo-root ./devspec_toolkit \
-  --out tools/trace_matrix.json
-
-# Lint fixtures
-python -m specdev_tools.cli fixtures-lint spec \
-  --repo-root ./devspec_toolkit
-
-# Evaluate invariants with a sample context
-python -m specdev_tools.cli invariants-check spec \
-  --repo-root ./devspec_toolkit \
-  --sample tests/samples/invariants/password_ok.json
-
-# Generate baseline CI (pass the same toolkit path you want embedded in the workflow)
-python -m specdev_tools.cli gen-ci spec \
-  --repo-root ./devspec_toolkit \
-  --toolkit-path ./devspec_toolkit \
-  --out .github/workflows/ci.yml
-
-# Generate minimal HTTP scaffold from contracts (05) + route map (13)
-python -m specdev_tools.cli scaffold spec \
-  --repo-root ./devspec_toolkit \
-  --out scaffold_out
-```
+The CLI covers validation, traceability, fixtures, invariants, governance, CI generation, scaffolding, and ai-help reminders. `docs/developers/reference.md` is the canonical cheat sheet showing each command with the required `--repo-root ./devspec_toolkit` flag.
 
 ➡️ For a narrated walkthrough of the workflow, see `docs/developers/getting_started.md` in this toolkit.
 
@@ -219,7 +187,7 @@ Choose what suits your org (Apache‑2.0, MIT, etc.). Put it in `LICENSE` and re
 ### 4) `tools/` (CLI utilities)
 - **Entry:** `python -m specdev_tools.cli --help`.
 - **Registry:** `tools/schema_registry.json` maps `$schema` URIs → `schema/*.schema.json` paths.
-- **Key commands:** `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `gen-ci`, `scaffold`.
+- **Key commands:** `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `gen-ci`, `scaffold`, `ai-help`.
 - **Toolkit root:** the submodule directory (e.g., `./devspec_toolkit`) containing `tools/`, `schema/`, `prompts/`, `docs/`, and `template/`. Pass `--repo-root` pointing here when running from your host repo.
 
 ### 5) `tests/` (data-first checks)
@@ -466,9 +434,9 @@ Each step has two files in `spec/`: `NN_name.json` (machine artifact) and `NN_na
 
 ### 13 · Scaffold Generation
 - **Artifact:** `spec/13_scaffold.json`  • **Schema:** `schema/13_scaffold.schema.json`
-- **Purpose:** language/framework skeleton, route map, validators.
+- **Purpose:** language/framework skeleton plus route map with TODOs for wiring validation.
 - **DoR:** service_skeleton.language set; route_map aligns with 05.
-- **Checks:** each route_map.api_ref exists in 05.
+- **Checks:** each route_map.api_ref exists in 05; follow-up work wires validators manually.
 - **Consumers:** scaffolder output, build status.
 
 ### 14 · Fixture-Driven Implementation
@@ -556,7 +524,7 @@ python -m specdev_tools.cli validate spec/14_fixture_impl.json --repo-root ./dev
 ### F. Add invariants and NFRs (06, 07)
 - Encode rules in `spec/06_invariants.json`; verify:
 ```bash
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
 ```
 - Define NFRs in `spec/07_nfrs.json` and wire dashboards/alerts in `spec/16_delivery_monitoring.json`.
 

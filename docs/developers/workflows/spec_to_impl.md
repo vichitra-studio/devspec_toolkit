@@ -7,7 +7,7 @@ All commands in this guide assume you run them from repo root with the toolkit a
 ## Step Progression
 | Step | Purpose | Key Activities |
 |------|---------|----------------|
-| 13 — Scaffold | Generate compile-clean skeleton aligned with API contracts and system sketch | Run `python -m specdev_tools.cli scaffold ...`; inspect generated routes and validators. |
+| 13 — Scaffold | Generate compile-clean skeleton aligned with API contracts and system sketch | Run `python -m specdev_tools.cli scaffold ...`; inspect generated routes and TODO markers for validation. |
 | 14 — Fixture Implementation | Drive development with fixtures until they all pass | Implement handlers, update `14_fixture_impl.json`, rerun fixtures. |
 | 15 — Red-Team Loop | Add adversarial cases and capture mitigations | Extend `11_redteam.json`, feed new fixtures into `15_redteam_loop.json`. |
 | 16 — Delivery & Monitoring | Map NFRs to dashboards, alerts, and deployments | Keep `16_delivery_monitoring.json` synced with operations tooling. |

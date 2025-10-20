@@ -33,12 +33,15 @@ python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tool
 python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Invariants, governance, CI
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
 python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
 python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
 
 # Scaffold generation
 python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
+
+# Prompt workflow reminders
+python -m specdev_tools.cli ai-help --step 04
 ```
 
 Invoke commands from the root of your host repository so relative paths to `spec/` and `./devspec_toolkit/` resolve cleanly.

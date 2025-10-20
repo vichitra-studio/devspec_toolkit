@@ -29,9 +29,9 @@ Consult the matching `spec/NN_name.guide.md` before running the prompt for each 
 
 ## Validation Cadence
 ```bash
-python -m specdev_tools.cli validate spec/NN_name.json
-python -m specdev_tools.cli validate-all spec
-python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 These commands ensure the discovery artifacts remain consistent and cover the necessary trace links before you advance to implementation work.

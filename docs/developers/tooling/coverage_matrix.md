@@ -4,7 +4,7 @@ The coverage matrix ties every requirement to a verifying artifact so that the s
 
 ## Command
 ```bash
-python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 - `spec/` — root of the spec artifacts.
@@ -26,8 +26,8 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 ## CI Integration
 Add the matrix command to CI alongside validation:
 ```bash
-python -m specdev_tools.cli validate-all spec
-python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 Fail the pipeline if the matrix changes without an accompanying spec update or if required trace links are missing.
