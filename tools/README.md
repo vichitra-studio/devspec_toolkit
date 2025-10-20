@@ -45,144 +45,34 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 
 ---
 
-## CLI overview
+## CLI Overview
 
-The examples below expand on the command list maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#command-cheatsheet).
+The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `gen-ci`, and `scaffold`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
 
-Show help:
-
+From any location, run:
 ```bash
 python -m specdev_tools.cli --help
 ```
 
-Subcommands (all arguments documented; nothing hidden):
-
-### 1) `validate`
-```
-python -m specdev_tools.cli validate <file> [--repo-root <toolkit-root>]
-```
-Validate a single JSON artifact. Exit code `0` means success.
-
-**Example**
-```bash
-python -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit
-```
-
-### 2) `validate-all`
-```
-python -m specdev_tools.cli validate-all <spec_dir> [--repo-root <toolkit-root>]
-```
-Validate every `*.json` recursively.
-
-**Example**
-```bash
-python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
-```
-
-### 3) `matrix`
-```
-python -m specdev_tools.cli matrix <spec_dir> [--repo-root <toolkit-root>] [--out -]
-```
-Emit the FR→API→Fixture→NFR coverage matrix.
-
-**Example**
-```bash
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
-```
-
-### 4) `fixtures-lint`
-```
-python -m specdev_tools.cli fixtures-lint <spec_dir> [--repo-root <toolkit-root>]
-```
-Static lint for fixture structure and targets.
-
-**Example**
-```bash
-python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
-```
-
-### 5) `invariants-check`
-```
-python -m specdev_tools.cli invariants-check <spec_dir> --sample <file> [--repo-root <toolkit-root>]
-```
-Evaluate invariant expressions against a sample JSON context.
-
-**Example**
-```bash
-mkdir -p ./scratch && echo '{ "password": { "length": 12 } }' > ./scratch/invariants_sample.json
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./scratch/invariants_sample.json
-```
-
-### 6) `governance-check`
-```
-python -m specdev_tools.cli governance-check <spec_dir> --message "<text>" [--repo-root <toolkit-root>]
-```
-Verify commit messages against Step 10.
-
-**Example**
-```bash
-python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
-```
-
-### 7) `gen-ci`
-```
-python -m specdev_tools.cli gen-ci <spec_dir> [--repo-root <toolkit-root>] [--toolkit-path <toolkit-root>] [--out -]
-```
-Generate a baseline CI workflow aligned with Step 12.
-
-**Example**
-```bash
-python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
-```
-
-### 8) `scaffold`
-```
-python -m specdev_tools.cli scaffold <spec_dir> --out <dir> [--repo-root <toolkit-root>]
-```
-Create a minimal HTTP scaffold from Steps 05 + 13 contracts.
-
-**Example**
-```bash
-python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
-```
-
-### 9) `ai-help`
-```
-python -m specdev_tools.cli ai-help [--step <NN>]
-```
-Prints a condensed reminder for running prompts and validations. Passing `--step` narrows the tips to a single spec step.
-
-**Examples**
-```bash
-# General reminders
-python -m specdev_tools.cli ai-help
-
-# Focus on Functional Requirements (Step 04)
-python -m specdev_tools.cli ai-help --step 04
-```
+Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the toolkit directory so schema resolution goes through `tools/schema_registry.json`.
 
 ---
 
-## How schema resolution works
+## Schema Resolution
 
-- Artifacts embed `$schema` URIs (e.g., `https://specdev.local/schema/04_fr_list.schema.json`).
-- The CLI maps that URI via `tools/schema_registry.json` under the toolkit root.
-- If you move files, update the registry accordingly.
+- Artifacts embed `$schema` URIs (for example `https://specdev.local/schema/04_fr_list.schema.json`).
+- The CLI maps each URI using `tools/schema_registry.json` relative to the toolkit root.
+- After moving or versioning schema files, update the registry to keep validation deterministic.
 
 ---
 
-## CI integration (quick start)
+## CI Integration
 
-A minimal workflow (via `gen-ci`) typically runs:
-
-1. `python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit`
-2. `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out`
-
-Extend with unit tests, fixture execution, red-team loops, deploy, and drift audit steps as your pipeline matures.
+Generate a starter workflow with `python -m specdev_tools.cli gen-ci …` and extend it with your own jobs. For the authoritative list of validation commands enforced in CI, see `docs/developers/reference.md#validation-workflow`.
 
 ---
 
 ## FAQ
 
-- **Do I always need `--repo-root`?** From inside the toolkit root it defaults correctly; otherwise pass the path to your toolkit checkout.
-- **Can I vendor the toolkit elsewhere?** Yes—update the paths in the commands above (and when running `gen-ci --toolkit-path <path>`).
+- **Do I always need `--repo-root`?** Inside the toolkit directory it defaults correctly; elsewhere pass the toolkit path explicitly.
+- **Can I vendor the toolkit elsewhere?** Yes—use the same flag (and update any generated workflow paths) to point to the new location.

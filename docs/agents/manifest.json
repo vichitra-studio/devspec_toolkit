@@ -4,9 +4,6 @@
   "entrypoint": "docs/agents/agents.md",
   "description": "Operational contract for AI agents working with the AI Spec Driven Development Toolkit",
   "commands": [
-    "python -m specdev_tools.cli validate <artifact> --repo-root ./devspec_toolkit",
-    "python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit",
-    "python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json",
-    "python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit"
+    "See docs/developers/reference.md#core-validation-commands for the canonical CLI usage."
   ]
 }

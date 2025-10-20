@@ -1,6 +1,6 @@
 # Developer Reference
 
-This reference collects recurring facts that developers need while authoring or reviewing specs. It replaces ad-hoc snippets scattered across multiple documents.
+This reference collects recurring facts that developers need while authoring or reviewing specs. It replaces ad-hoc snippets scattered across multiple documents; other guides intentionally link here for the canonical commands and troubleshooting flow.
 
 ## Terminology
 | Term       | Definition                                              |

@@ -74,7 +74,7 @@ Automation-specific rules and escalation paths reside in `../agents/agents.md`; 
 ## 6. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
-Prefer a single command that chains those checks? Run `./devspec_toolkit/tests/run.sh` from your host repo root; it executes the same validation trio plus an invariants check and stores outputs under `tests/`.
+Prefer a single command that chains those checks? Run `./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit` from your host repo root; it executes the same validation trio plus an invariants check and stores outputs under `tests/`. Supply `--spec-dir` if your artifacts live outside `spec/`.
 
 ## 7. Where To Go Next
 - Need a conceptual model? See `workflows/discovery.md` and `workflows/spec_to_impl.md`.
