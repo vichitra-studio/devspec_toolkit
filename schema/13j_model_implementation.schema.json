@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/13j_model_implementation.schema.json",
+  "title": "Model Implementation Specification Schema",
+  "description": "Schema for the model implementation specification",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the specification"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owner or team responsible for this specification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this specification was created"
+    },
+    "model_integration": {
+      "type": "object",
+      "description": "Detailed specification for embedding and reranking model integration",
+      "properties": {
+        "description": {"type": "string"},
+        "embedding_models": {
+          "type": "object",
+          "properties": {
+            "primary_embedding_model": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "type": {"type": "string"},
+                "format": {"type": "string"},
+                "dimensions": {"type": "integer"},
+                "implementation_approach": {
+                  "type": "object",
+                  "properties": {
+                    "loading_method": {"type": "string"},
+                    "optimization": {"type": "string"},
+                    "deployment_target": {"type": "string"},
+                    "memory_usage_mb": {"type": "integer"},
+                    "inference_time_ms": {"type": "integer"}
+                  }
+                },
+                "model_file_structure": {
+                  "type": "object",
+                  "properties": {
+                    "onnx_model": {"type": "string"},
+                    "tokenizer": {"type": "string"},
+                    "config": {"type": "string"}
+                  }
+                },
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "max_length": {"type": "integer"},
+                    "normalize_embeddings": {"type": "boolean"}
+                  }
+                }
+              }
+            },
+            "reranker_model": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "type": {"type": "string"},
+                "format": {"type": "string"},
+                "implementation_approach": {
+                  "type": "object",
+                  "properties": {
+                    "loading_method": {"type": "string"},
+                    "optimization": {"type": "string"},
+                    "deployment_target": {"type": "string"},
+                    "memory_usage_mb": {"type": "integer"},
+                    "inference_time_ms": {"type": "integer"}
+                  }
+                },
+                "model_file_structure": {
+                  "type": "object",
+                  "properties": {
+                    "onnx_model": {"type": "string"},
+                    "tokenizer": {"type": "string"},
+                    "config": {"type": "string"}
+                  }
+                },
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "max_length": {"type": "integer"},
+                    "return_scores": {"type": "boolean"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "model_loading": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {"type": "integer"},
+                  "operation": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            },
+            "lazy_loading": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "description": {"type": "string"}
+              }
+            }
+          }
+        },
+        "embedding_generation": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {"type": "integer"},
+                  "operation": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            },
+            "batch_processing": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "max_batch_size": {"type": "integer"},
+                "batch_strategy": {"type": "string"}
+              }
+            }
+          }
+        },
+        "reranking": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "pipeline": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {"type": "integer"},
+                  "operation": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            },
+            "scoring_method": {"type": "string"},
+            "score_range": {
+              "type": "array",
+              "items": {"type": "number"}
+            },
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "minimum_relevance": {"type": "number"},
+                "top_k_reranked": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "model_performance": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "latency_targets": {
+          "type": "object",
+          "properties": {
+            "embedding_generation_ms": {"type": "integer"},
+            "reranking_ms": {"type": "integer"}
+          }
+        },
+        "memory_targets": {
+          "type": "object",
+          "properties": {
+            "embedding_model_memory_mb": {"type": "integer"},
+            "reranker_model_memory_mb": {"type": "integer"}
+          }
+        },
+        "throughput_targets": {
+          "type": "object",
+          "properties": {
+            "embedding_per_second": {"type": "integer"},
+            "reranking_per_second": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "model_monitoring": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "metrics_to_track": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "alerting_thresholds": {
+          "type": "object",
+          "properties": {
+            "embedding_inference_slow_ms": {"type": "integer"},
+            "reranking_inference_slow_ms": {"type": "integer"}
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at"]
+}

@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://specdev.local/schema/13i_hybrid_retrieval.schema.json",
+  "title": "Hybrid Retrieval Specification Schema",
+  "description": "Schema for the hybrid retrieval specification",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the specification"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owner or team responsible for this specification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this specification was created"
+    },
+    "hybrid_retrieval_system": {
+      "type": "object",
+      "description": "Detailed specification for the hybrid retrieval system",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "object",
+          "properties": {
+            "components": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            },
+            "data_flow": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {"type": "integer"},
+                  "operation": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "dense_retrieval": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "embedding_model": {"type": "string"},
+                "vector_dimension": {"type": "integer"},
+                "top_k_dense": {"type": "integer"},
+                "similarity_metric": {"type": "string"}
+              }
+            },
+            "implementation": {
+              "type": "object",
+              "properties": {
+                "query_encoding": {
+                  "type": "object",
+                  "properties": {
+                    "description": {"type": "string"},
+                    "method": {"type": "string"},
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "model_name": {"type": "string"},
+                        "max_length": {"type": "integer"}
+                      }
+                    }
+                  }
+                },
+                "indexing": {
+                  "type": "object",
+                  "properties": {
+                    "description": {"type": "string"},
+                    "database": {"type": "string"},
+                    "index_type": {"type": "string"},
+                    "index_parameters": {
+                      "type": "object",
+                      "properties": {
+                        "nlist": {"type": "integer"},
+                        "nprobe": {"type": "integer"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sparse_retrieval": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "bm25_k1": {"type": "number"},
+                "bm25_b": {"type": "number"},
+                "top_k_sparse": {"type": "integer"}
+              }
+            },
+            "implementation": {
+              "type": "object",
+              "properties": {
+                "indexing": {
+                  "type": "object",
+                  "properties": {
+                    "description": {"type": "string"},
+                    "database": {"type": "string"},
+                    "indexing_method": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "reciprocal_rank_fusion": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "rrf_k": {"type": "integer"},
+                "fusion_weight_dense": {"type": "number"},
+                "fusion_weight_sparse": {"type": "number"}
+              }
+            },
+            "implementation": {
+              "type": "object",
+              "properties": {
+                "method": {"type": "string"},
+                "formula": {"type": "string"},
+                "k": {"type": "integer"},
+                "normalization": {"type": "string"}
+              }
+            }
+          }
+        },
+        "maximal_marginal_relevance": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "mmr_lambda": {"type": "number"},
+                "top_k_final": {"type": "integer"}
+              }
+            },
+            "implementation": {
+              "type": "object",
+              "properties": {
+                "method": {"type": "string"},
+                "formula": {"type": "string"},
+                "lambda": {"type": "number"},
+                "similarity_metric": {"type": "string"}
+              }
+            }
+          }
+        },
+        "performance_parameters": {
+          "type": "object",
+          "properties": {
+            "latency_target_ms": {"type": "integer"},
+            "throughput_target_qps": {"type": "integer"},
+            "memory_usage_mb": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "retrieval_tracing": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "trace_fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at"]
+}

@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/13l_access_control.schema.json",
+  "title": "Access Control Specification Schema",
+  "description": "Schema for the access control specification",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the specification"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owner or team responsible for this specification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this specification was created"
+    },
+    "access_control_system": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "method": {"type": "string"},
+            "description": {"type": "string"},
+            "jwt_validation": {
+              "type": "object",
+              "properties": {
+                "issuer": {"type": "string"},
+                "audience": {"type": "string"},
+                "algorithm": {"type": "string"},
+                "jwks_endpoint": {"type": "string"},
+                "leeway_seconds": {"type": "integer"},
+                "required_claims": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "token_lifetime": {
+              "type": "object",
+              "properties": {
+                "access_token": {"type": "integer"},
+                "refresh_token": {"type": "integer"}
+              }
+            },
+            "mfa_requirement": {"type": "string"},
+            "breakglass": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "description": {"type": "string"},
+                "security_controls": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "authorization": {
+          "type": "object",
+          "properties": {
+            "policy": {"type": "string"},
+            "description": {"type": "string"},
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "description": {"type": "string"},
+                  "permissions": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "cloudflare_access_policy": {"type": "string"}
+                }
+              }
+            },
+            "access_control_rules": {
+              "type": "object",
+              "properties": {
+                "document_visibility": {
+                  "type": "object",
+                  "properties": {
+                    "description": {"type": "string"},
+                    "public_documents": {
+                      "type": "object",
+                      "properties": {
+                        "accessible_by": {
+                          "type": "array",
+                          "items": {"type": "string"}
+                        }
+                      }
+                    },
+                    "private_documents": {
+                      "type": "object",
+                      "properties": {
+                        "accessible_by": {
+                          "type": "array",
+                          "items": {"type": "string"}
+                        }
+                      }
+                    },
+                    "confidential_documents": {
+                      "type": "object",
+                      "properties": {
+                        "accessible_by": {
+                          "type": "array",
+                          "items": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "session_management": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "session_validation": {
+              "type": "object",
+              "properties": {
+                "authentication_required": {"type": "boolean"},
+                "session_id_validation": {
+                  "type": "object",
+                  "properties": {
+                    "method": {"type": "string"},
+                    "claims_required": {
+                      "type": "array",
+                      "items": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            "session_security": {
+              "type": "object",
+              "properties": {
+                "encryption": {"type": "boolean"},
+                "access_control": {"type": "string"}
+              }
+            }
+          }
+        },
+        "api_endpoint_protection": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "protected_endpoints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {"type": "string"},
+                  "authentication_required": {"type": "boolean"},
+                  "authorization_required": {"type": "boolean"},
+                  "role_required": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "data_privacy_controls": {
+          "type": "object",
+          "properties": {
+            "sensitivity_flags": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "levels": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": "string"},
+                      "description": {"type": "string"},
+                      "access_control": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            "data_redaction": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "fields_to_redact": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                },
+                "redaction_strategy": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "access_control_flow": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "authentication_flow": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": {"type": "integer"},
+              "operation": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        },
+        "authorization_flow": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": {"type": "integer"},
+              "operation": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "access_control_testing": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "test_cases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "expected_outcome": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at"]
+}

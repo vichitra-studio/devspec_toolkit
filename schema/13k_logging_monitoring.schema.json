@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/13k_logging_monitoring.schema.json",
+  "title": "Logging and Monitoring Specification Schema",
+  "description": "Schema for the logging and monitoring specification",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the specification"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owner or team responsible for this specification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this specification was created"
+    },
+    "logging_system": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "log_levels": {
+          "type": "object",
+          "properties": {
+            "debug": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "info": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "warn": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "error": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"}
+              }
+            },
+            "critical": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "enabled": {"type": "boolean"}
+              }
+            }
+          }
+        },
+        "log_format": {
+          "type": "object",
+          "properties": {
+            "format": {"type": "string"},
+            "fields": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "log_storage": {
+          "type": "object",
+          "properties": {
+            "destination": {"type": "string"},
+            "retention_days": {"type": "integer"},
+            "rotation_size_mb": {"type": "integer"},
+            "compression": {"type": "boolean"}
+          }
+        },
+        "log_filters": {
+          "type": "object",
+          "properties": {
+            "sensitive_data_redaction": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "fields_to_redact": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "monitoring_system": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "metrics_collection": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "collector": {"type": "string"},
+            "scrape_interval_seconds": {"type": "integer"}
+          }
+        },
+        "metrics_to_track": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "type": {"type": "string"}
+            }
+          }
+        },
+        "dashboard_configuration": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "dashboard_url": {"type": "string"},
+            "default_view": {"type": "string"}
+          }
+        }
+      }
+    },
+    "alerting_system": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "alert_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "condition": {"type": "string"},
+              "severity": {"type": "string"},
+              "notification_channels": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "notification_channels": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "recipients": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "slack": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "webhook_url": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "tracing_system": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "trace_id_generation": {
+          "type": "object",
+          "properties": {
+            "algorithm": {"type": "string"},
+            "format": {"type": "string"}
+          }
+        },
+        "span_attributes": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "trace_storage": {
+          "type": "object",
+          "properties": {
+            "destination": {"type": "string"},
+            "retention_days": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "observability_integration": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "correlation": {
+          "type": "object",
+          "properties": {
+            "request_id": {"type": "string"},
+            "trace_id": {"type": "string"},
+            "operation_id": {"type": "string"}
+          }
+        },
+        "data_flow": {
+          "type": "object",
+          "properties": {
+            "logging": {"type": "string"},
+            "monitoring": {"type": "string"},
+            "tracing": {"type": "string"}
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at"]
+}

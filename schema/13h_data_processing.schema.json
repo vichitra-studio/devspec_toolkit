@@ -1,0 +1,187 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://specdev.local/schema/13h_data_processing.schema.json",
+  "title": "Data Processing Specification Schema",
+  "description": "Schema for the data processing specification",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the specification"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Owner or team responsible for this specification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this specification was created"
+    },
+    "data_processing_pipeline": {
+      "type": "object",
+      "description": "Detailed specification for document ingestion, chunking, and preprocessing pipeline",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "chunking_strategies": {
+          "type": "object",
+          "properties": {
+            "text_documents": {
+              "type": "object",
+              "properties": {
+                "strategy": {"type": "string"},
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "chunk_size_tokens": {"type": "integer"},
+                    "chunk_overlap_tokens": {"type": "integer"},
+                    "max_chunk_size_chars": {"type": "integer"},
+                    "splitting_method": {"type": "string"},
+                    "overlap_strategy": {"type": "string"}
+                  }
+                },
+                "metadata_inclusion": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "code_documents": {
+              "type": "object",
+              "properties": {
+                "strategy": {"type": "string"},
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "chunk_size_tokens": {"type": "integer"},
+                    "chunk_overlap_tokens": {"type": "integer"},
+                    "max_chunk_size_chars": {"type": "integer"},
+                    "language_detection": {"type": "boolean"},
+                    "structure_preservation": {"type": "boolean"}
+                  }
+                },
+                "metadata_inclusion": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "image_documents": {
+              "type": "object",
+              "properties": {
+                "strategy": {"type": "string"},
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "chunk_size_tokens": {"type": "integer"},
+                    "chunk_overlap_tokens": {"type": "integer"},
+                    "ocr_enabled": {"type": "boolean"},
+                    "metadata_only": {"type": "boolean"}
+                  }
+                },
+                "metadata_inclusion": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "parent_child_expansion": {
+          "type": "object",
+          "properties": {
+            "description": {"type": "string"},
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "max_depth": {"type": "integer"},
+                "recursive_expansion": {"type": "boolean"},
+                "relationship_types": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "pipeline_steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {"type": "integer"},
+                  "operation": {"type": "string"},
+                  "description": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "preprocessing_steps": {
+          "type": "object",
+          "properties": {
+            "normalization": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "steps": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "cleaning": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "steps": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            },
+            "validation": {
+              "type": "object",
+              "properties": {
+                "description": {"type": "string"},
+                "checks": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "document_ingestion": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "pipeline": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": {"type": "integer"},
+              "name": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        },
+        "quality_guards": {
+          "type": "object",
+          "properties": {
+            "minimum_content_length": {"type": "integer"},
+            "maximum_chunk_size_tokens": {"type": "integer"},
+            "chunk_overlap_ratio": {"type": "number"}
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at"]
+}
