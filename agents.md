@@ -1,6 +1,6 @@
 # DevSpec Toolkit Overview
 
-The DevSpec toolkit provides a structured approach to specification-driven development for the Personal Knowledge RAG System.
+The DevSpec toolkit provides a structured approach to specification-driven software development.
 
 ## Purpose
 This toolkit enables specification-first development, ensuring that all aspects of the system are well-defined before implementation begins. It provides standardized schemas, guidelines, and tools for maintaining specification quality.
@@ -81,4 +81,4 @@ Standardized templates for:
 - **Governance enforcement** through CI/CD pipeline checks
 
 ## Implementation Status
-The toolkit is fully functional and ready for use in the Personal Knowledge RAG System development. It provides all necessary tools to maintain specification quality and ensure traceability from requirements through implementation.
+The toolkit is fully functional and ready for use in any software development project. It provides all necessary tools to maintain specification quality and ensure traceability from requirements through implementation.
