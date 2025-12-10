@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
+  "title": "13a_completeness_assessment",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "examples": [
+        "fr-user-login",
+        "api-login",
+        "cap-export-reports"
+      ]
+    },
+    "owner": {
+      "type": "string",
+      "enum": [
+        "api",
+        "ui",
+        "system",
+        "ops",
+        "data"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "examples": [
+        "2025-10-16T22:06:04.202593Z"
+      ]
+    },
+    "missing_elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "examples": [
+              "fr-user-login",
+              "api-login",
+              "cap-export-reports"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "impact_on_completeness": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "specification_source": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "element_id",
+          "category",
+          "description",
+          "priority",
+          "impact_on_completeness"
+        ]
+      }
+    },
+    "completeness_rating": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "target": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "confidence_level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "current",
+        "target",
+        "confidence_level"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "missing_elements",
+    "completeness_rating"
+  ]
+}

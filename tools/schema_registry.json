@@ -15,6 +15,7 @@
   "https://specdev.local/schema/10_governance.schema.json": "schema/10_governance.schema.json",
   "https://specdev.local/schema/11_redteam.schema.json": "schema/11_redteam.schema.json",
   "https://specdev.local/schema/12_ci_gates.schema.json": "schema/12_ci_gates.schema.json",
+  "https://specdev.local/schema/13a_completeness_assessment.schema.json": "schema/13a_completeness_assessment.schema.json",
   "https://specdev.local/schema/13_scaffold.schema.json": "schema/13_scaffold.schema.json",
   "https://specdev.local/schema/14_fixture_impl.schema.json": "schema/14_fixture_impl.schema.json",
   "https://specdev.local/schema/15_redteam_loop.schema.json": "schema/15_redteam_loop.schema.json",

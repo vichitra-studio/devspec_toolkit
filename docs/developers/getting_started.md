@@ -23,6 +23,25 @@ export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 python -m specdev_tools.cli --help
 ```
 
+> **Note:** A Python virtual environment `devspec_env` can be set up automatically using the toolkit's setup script:
+> ```bash
+> ./devspec_toolkit/setup_devspec_env.sh
+> ```
+> Then activate it using:
+> ```bash
+> source devspec_env/bin/activate
+> ```
+> And run the CLI commands with:
+> ```bash
+> PYTHONPATH="${PWD}/devspec_toolkit/tools" python -m specdev_tools.cli --help
+> ```
+> The toolkit is installed in development mode and dependencies are pre-installed.
+
+> **Alternative Setup:** You can also use the toolkit's setup script to configure everything automatically:
+> ```bash
+> ./devspec_toolkit/setup_devspec_env.sh
+> ```
+
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
 ## 2. Understand The Repository Layout

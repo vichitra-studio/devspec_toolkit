@@ -44,6 +44,11 @@ python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out sc
 python -m specdev_tools.cli ai-help --step 04
 ```
 
+For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
+```bash
+python -m specdev_tools.cli validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+```
+
 Invoke commands from the root of your host repository so relative paths to `spec/` and [./devspec_toolkit/](../../) resolve cleanly.
 
 ## Two-Phase AI Runner Mode

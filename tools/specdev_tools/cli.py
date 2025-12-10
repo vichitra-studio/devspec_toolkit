@@ -53,7 +53,6 @@ def main():
     sc.add_argument("--out", required=True)
     sc.add_argument("--repo-root", default=".")
 
-    # Add a new command for AI interaction help
     ai = sub.add_parser("ai-help")
     ai.add_argument("--step", help="Specific step to get help for")
 

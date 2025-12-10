@@ -24,6 +24,7 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 | 10 — Governance | Define change control policies | `spec/10_governance.json` |
 | 11 — Red Team | Enumerate threats and mitigations | `spec/11_redteam.json` |
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
+| 13a — Completeness Assessment | Evaluate specification completeness and identify gaps | `spec/13a_completeness_assessment.json` |
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 

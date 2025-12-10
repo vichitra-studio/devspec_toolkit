@@ -6,6 +6,25 @@ Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit
 
 Follow the environment setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment). Those instructions are the canonical source for creating the virtualenv, installing requirements, and exporting `PYTHONPATH`.
 
+> **Note:** A Python virtual environment `devspec_env` can be set up automatically using the toolkit's setup script:
+> ```bash
+> ./devspec_toolkit/setup_devspec_env.sh
+> ```
+> Then activate it using:
+> ```bash
+> source devspec_env/bin/activate
+> ```
+> And run the CLI commands with:
+> ```bash
+> PYTHONPATH="${PWD}/devspec_toolkit/tools" python -m specdev_tools.cli --help
+> ```
+> The toolkit is installed in development mode and dependencies are pre-installed.
+
+> **Alternative Setup:** You can also use the toolkit's setup script to configure everything automatically:
+> ```bash
+> ./devspec_toolkit/setup_devspec_env.sh
+> ```
+
 ---
 
 ## What is **toolkit root**?
@@ -43,6 +62,13 @@ python -m specdev_tools.cli --help
 ```
 
 Pass `--repo-root <toolkit-root>` whenever you execute commands from outside the toolkit directory so schema resolution goes through [tools/schema_registry.json](schema_registry.json).
+
+### Completeness assessment (Step 13a)
+After running `prompts/prompt_13a_completeness_assessment.md`, validate the resulting `spec/13a_completeness_assessment.json` the same way as any other artifact:
+
+```bash
+python -m specdev_tools.cli validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+```
 
 ---
 

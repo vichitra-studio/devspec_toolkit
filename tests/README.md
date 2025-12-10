@@ -38,3 +38,7 @@ From your host repo root (adjust `./devspec_toolkit` if the toolkit lives elsewh
 - When invariants fail, rerun the `invariants-check` command documented in the reference, pointing at the sample payload in [`tests/samples/invariants/password_ok.json`](samples/invariants/password_ok.json).
 - Execute the bundled smoke tests ([`tests/unit`](unit)) as described in [`../docs/developers/reference.md#bundled-scripts`](../docs/developers/reference.md#bundled-scripts).
 - Run the validation suite wrapper ([`tests/run.sh`](run.sh)) using the same reference section for flag details.
+- Validate the completeness-assessment artifact (Step 13a) after generating it via `prompts/prompt_13a_completeness_assessment.md`:
+  ```bash
+  python -m specdev_tools.cli validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
+  ```
