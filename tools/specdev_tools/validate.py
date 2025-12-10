@@ -4,17 +4,8 @@ import time
 from jsonschema import Draft202012Validator, RefResolver
 from .registry import SchemaRegistry
 
-def _resolver_for(repo_root: str, registry: SchemaRegistry):
-    store = {}
-    # Preload all schemas so $ref to core atoms/collections resolve
-    for uri, rel in registry.map.items():
-        try:
-            with open(os.path.join(repo_root, rel), "r", encoding="utf-8") as f:
-                store[uri] = json.load(f)
-        except Exception:
-            # ignore missing; will error when actually needed
-            pass
-    return RefResolver.from_schema({}, store=store)  # deprecated but works; jsonschema>=4 will handle via registry
+def _resolver_for(registry: SchemaRegistry):
+    return RefResolver.from_schema({}, store=registry.store)
 
 def _get_step_from_path(path: str) -> str:
     """Extract step number from file path"""
@@ -50,7 +41,7 @@ def validate_file(repo_root: str, path: str) -> list[str]:
         data_for_validation.pop("$schema", None)
 
         # Build a resolver store
-        resolver = _resolver_for(repo_root, registry)
+        resolver = _resolver_for(registry)
         v = Draft202012Validator(schema, resolver=resolver)
         errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
         

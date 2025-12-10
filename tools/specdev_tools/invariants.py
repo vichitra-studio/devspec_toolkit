@@ -26,6 +26,17 @@ def _tiny_eval(expr, ctx):
             if op == "==": return vals[0] == vals[1]
             if op == "and": return all(vals)
             if op == "or":  return any(vals)
+            if op == "not": return not bool(vals[0])
+            if op == "in":
+                item, container = vals
+                if isinstance(container, (list, tuple, set, str)):
+                    return item in container
+                return False
+            if op == "contains":
+                haystack, needle = vals
+                if isinstance(haystack, (list, tuple, set, str)):
+                    return needle in haystack
+                return False
     return None
 
 def run_invariants(spec_dir: str, sample: dict) -> list[dict]:

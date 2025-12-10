@@ -22,9 +22,13 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 | `17_spec_drift.json` | Drift checks | Backstop runtime verification jobs. |
 
 ## CI Integration
-Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically.
+Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically. Always run:
 
-Fail the pipeline if the matrix changes without an accompanying spec update or if required trace links are missing.
+```bash
+python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+```
+
+CI should fail if `tools/trace_matrix.json` differs from the committed expectation without matching spec changes or if required trace links are missing.
 
 ## Troubleshooting
 - **Missing FR trace**: ensure each FR in `04_fr_list.json` has at least one `traceRef` pointing to an API ID.

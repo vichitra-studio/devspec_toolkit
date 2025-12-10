@@ -31,6 +31,17 @@ def lint_fixtures(spec_dir: str) -> list[str]:
         for t in targets:
             if t.get("type") == "api" and t.get("id") not in apis:
                 errors.append(f"{fid}: targets unknown API '{t.get('id')}'")
-        if "input" not in fx or "expected" not in fx:
+        expected = fx.get("expected")
+        if "input" not in fx or expected is None:
             errors.append(f"{fid}: missing input/expected")
+            continue
+        status = expected.get("status")
+        if not isinstance(status, int) or status < 100 or status > 599:
+            errors.append(f"{fid}: expected.status must be an HTTP status (100-599)")
+        body = expected.get("body")
+        if body is not None and not isinstance(body, (dict, list, str, int, bool, float)):
+            errors.append(f"{fid}: expected.body must be JSON serializable")
+        headers = expected.get("headers")
+        if headers is not None and not isinstance(headers, dict):
+            errors.append(f"{fid}: expected.headers must be an object")
     return errors
