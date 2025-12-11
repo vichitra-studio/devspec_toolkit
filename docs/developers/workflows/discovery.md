@@ -26,8 +26,10 @@ Phase I turns fuzzy product ideas into falsifiable, machine-checkable artifacts.
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
 | 12 — CI Gates | Wire automated enforcement | `spec/12_ci_gates.json` |
 
-## Transition: Completeness Assessment
-Once Steps 00–12 are drafted, run **Step 13a** (`spec/13a_completeness_assessment.json`) to evaluate the specification's completeness and identify gaps before proceeding to the Roadmap phase. This acts as the final gate of the Discovery Phase.
+## Transition: Extensions & Completeness
+1.  **Step 13 (Extension Generator)**: Identify if you need specialized extensions (e.g., `13a_database.json`) for complex domains found in System Sketch.
+2.  **Step 13a (Completeness)**: Run `spec/13a_completeness_assessment.json` to identify unresolved tracing or definitions.
+3.  **Step 14 (Roadmap)**: Only once 13/13a are clear, proceed to the Roadmap phase.
 
 Consult the matching `spec/NN_name.guide.md` before running the prompt for each step.
 

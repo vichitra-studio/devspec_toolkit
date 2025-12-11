@@ -1,16 +1,16 @@
-# 17. Spec-Drift Audit
+# 19. Spec-Drift Audit
 
 ## Purpose
 Define the automated audits that continuously compare live systems against the spec and trigger remediation when they diverge. This keeps the spec authoritative long after launch by closing the loop between runtime evidence and documented intent.
 
 ## Template / Fields
-- Canonical artifact: **spec/17_spec_drift.json**
-- Schema reference: `schema/17_spec_drift.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
+- Canonical artifact: **spec/19_spec_drift.json**
+- Schema reference: `schema/19_spec_drift.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
 - Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
 - Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
-- Contract: `prompts/prompt_17_spec_drift.md`
+- Contract: `prompts/prompt_19_spec_drift.md`
 - Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
   - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
   - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
@@ -44,8 +44,8 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#fail
 
 ## Related Steps
 - Step 10: Governance - Defines how drift findings escalate into policy or spec updates.
-- Step 16: Delivery & Monitoring - Provides telemetry sources that drift checks consume.
-- Step 15: Red-Team Loop - Introduces new fixtures or mitigations that drift audits must cover.
+- Step 18: Delivery & Monitoring - Provides telemetry sources that drift checks consume.
+- Step 17: Red-Team Loop - Introduces new fixtures or mitigations that drift audits must cover.
 
 ## Quick Reference
 - **ID Format**: `spec_drift-<descriptor>`; check IDs use `drift-<target>-<suffix>`.

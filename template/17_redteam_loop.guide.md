@@ -1,16 +1,16 @@
-# 15. Continuous Red-Team / QA Loop
+# 17. Continuous Red-Team / QA Loop
 
 ## Purpose
 Capture the iterative security and QA learnings that emerge during implementation, making every new adversarial insight part of the spec before code changes land. This loop keeps fixtures, requirements, and mitigations evolving together.
 
 ## Template / Fields
-- Canonical artifact: **spec/15_redteam_loop.json**
-- Schema reference: `schema/15_redteam_loop.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
+- Canonical artifact: **spec/17_redteam_loop.json**
+- Schema reference: `schema/17_redteam_loop.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
 - Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
 - Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
-- Contract: `prompts/prompt_15_redteam_loop.md`
+- Contract: `prompts/prompt_17_redteam_loop.md`
 - Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
   - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
   - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.
@@ -44,8 +44,8 @@ See [Shared Template Expectations](../docs/templates/shared_expectations.md#fail
 
 ## Related Steps
 - Step 11: Red-Team - Seeds the initial threat model that this loop evolves.
-- Step 14: Fixture Implementation - Consumes new fixtures and ensures they pass before closure.
-- Step 17: Spec-Drift Audit - Uses the change log to verify production behavior still matches spec updates.
+- Step 16: Fixture Implementation - Consumes new fixtures and ensures they pass before closure.
+- Step 19: Spec-Drift Audit - Uses the change log to verify production behavior still matches spec updates.
 
 ## Quick Reference
 - **ID Format**: `redteam_loop-<descriptor>`.

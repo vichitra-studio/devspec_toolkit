@@ -1,0 +1,19 @@
+{
+    "$schema": "https://specdev.local/schema/13_extension_generator.schema.json",
+    "id": "13-test-manifest",
+    "owner": "system",
+    "created_at": "2023-10-27T10:00:00Z",
+    "extensions": [
+        {
+            "extension_id": "13a-db",
+            "title": "Database Spec",
+            "file_name": "13a_database.json",
+            "area_of_concern": "Persistence",
+            "justification": "Complex schema",
+            "required_schema_sections": [
+                "tables"
+            ],
+            "schema_design_guidelines": "SQL"
+        }
+    ]
+}

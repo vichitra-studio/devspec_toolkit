@@ -47,7 +47,7 @@ def generate_scaffold(spec_dir: str, out_dir: str) -> list[str]:
                 s = data.get("$schema","")
                 if s.endswith("/05_interface_contracts.schema.json"):
                     apis.extend(data.get("apis", []))
-                if s.endswith("/13_scaffold.schema.json"):
+                if s.endswith("/15_scaffold.schema.json"):
                     route_map.extend(data.get("route_map", []))
 
     # create simple Node scaffold

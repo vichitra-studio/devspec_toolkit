@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/14_fixture_impl.schema.json",
-  "title": "14_fixture_impl",
+  "$id": "https://specdev.local/schema/17_redteam_loop.schema.json",
+  "title": "17_redteam_loop",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -14,37 +14,32 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
-    "implemented_endpoints": {
+    "new_fixtures": {
       "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
     },
-    "test_results": {
+    "spec_updates": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "fixture_ref": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
           },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pass",
-              "fail",
-              "skip"
-            ]
+          "change": {
+            "type": "string"
           },
-          "notes": {
+          "reason": {
             "type": "string"
           }
         },
         "required": [
-          "fixture_ref",
-          "status"
+          "ref",
+          "change"
         ]
       }
     },
-    "ci_status": {
+    "redteam_status": {
       "type": "string",
       "enum": [
         "green",
@@ -55,8 +50,6 @@
   "required": [
     "id",
     "owner",
-    "created_at",
-    "implemented_endpoints",
-    "test_results"
+    "created_at"
   ]
 }

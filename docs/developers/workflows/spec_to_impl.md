@@ -13,12 +13,26 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 ## Step Progression
 | Step | Purpose | Key Activities |
 |------|---------|----------------|
-| 13 — Scaffold | Generate compile-clean skeleton aligned with API contracts and system sketch | Run `python -m specdev_tools.cli scaffold ...`; inspect generated routes and TODO markers for validation. |
-| 13a — Completeness Assessment | Evaluate specification completeness and identify gaps | Run `prompts/prompt_13a_completeness_assessment.md` (Clarify → Emit), paste the JSON into `spec/13a_completeness_assessment.json`, and validate with `python -m specdev_tools.cli validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit`. |
-| 14 — Fixture Implementation | Drive development with fixtures until they all pass | Implement handlers, update `14_fixture_impl.json`, rerun fixtures. |
-| 15 — Red-Team Loop | Add adversarial cases and capture mitigations | Extend `11_redteam.json`, feed new fixtures into `15_redteam_loop.json`. |
-| 16 — Delivery & Monitoring | Map NFRs to dashboards, alerts, and deployments | Keep `16_delivery_monitoring.json` synced with operations tooling. |
-| 17 — Spec-Drift Audit | Detect runtime vs spec divergence | Schedule checks defined in `17_spec_drift.json` and feed outputs back into governance. |
+| 13 — Extensions | Define domain-specific schemas | Identify missing domains (AI, DB) and generate `spec/13_extension_manifest.json`. |
+| 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
+| 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
+| 15 — Scaffold | Generate compile-clean skeleton | Run `python -m specdev_tools.cli scaffold ...`. |
+| 16 — Fixture Impl | Drive dev with fixtures | Implement handlers, update `16_fixture_impl.json`. |
+| 17 — Red-Team Loop | Add adversarial cases | Feed new threats into `17_redteam_loop.json`. |
+| 18 — Monitoring | Map NFRs to operations | Sync `18_delivery_monitoring.json`. |
+| 19 — Spec Drift | Detect divergence | Schedule checks in `19_spec_drift.json`. |
+
+## Why Two Planning Steps?
+Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (Roadmap)**.
+
+| Feature | Step 09 (Impl Plan) | Step 14 (Roadmap) |
+| :--- | :--- | :--- |
+| **Phase** | Discovery (Planning) | Execution (JIT) |
+| **Goal** | **Unlock Downstream Specs** | **Drive Daily Coding** |
+| **Key Output** | Tech Stack, Language, CI Cadence | Sprints, Integration Order |
+| **Why?** | You need to know the *Language* (e.g. Python) before you can write *CI Gates* (Step 12) or *Red Team* scripts (Step 11). | You need to know the *Extensions* (Step 13) before you can sequence the actual work. |
+
+**Rule of Thumb**: Step 09 is the "Architect's Baseline". Step 14 is the "Project Manager's Schedule".
 
 ## Command Cadence
 - Generate scaffolds with `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out`.

@@ -51,11 +51,14 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 07 | `spec/07_nfrs.json` | Ensure `16_delivery_monitoring.json` links remain valid |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |
-| 13 | `spec/13_scaffold.json` | Optionally run `scaffold` command |
-| 14 | `spec/14_fixture_impl.json` | Confirm fixture statuses align with test outputs |
-| 15 | `spec/15_redteam_loop.json` | Verify threats referenced by `spec/11_redteam.json` |
-| 16 | `spec/16_delivery_monitoring.json` | Spot-check URLs / identifiers provided by humans |
-| 17 | `spec/17_spec_drift.json` | Ensure schedules map to CI jobs |
+| 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
+| 13a | `spec/13a_completeness_assessment.json` | Check for gaps before Roadmap |
+| 14 | `spec/14_roadmap.json` | Initiate JIT implementation loop |
+| 15 | `spec/15_scaffold.json` | Optionally run `scaffold` command |
+| 16 | `spec/16_fixture_impl.json` | Confirm fixture statuses align with test outputs |
+| 17 | `spec/17_redteam_loop.json` | Verify threats referenced by `spec/11_redteam.json` |
+| 18 | `spec/18_delivery_monitoring.json` | Spot-check URLs / identifiers provided by humans |
+| 19 | `spec/19_spec_drift.json` | Ensure schedules map to CI jobs |
 
 ## 5. Escalation Triggers
 - Schema validation fails after two retries → request human clarification.

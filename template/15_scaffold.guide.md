@@ -1,16 +1,16 @@
-# 13. Scaffold Generation
+# 15. Scaffold Generation
 
 ## Purpose
 Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
 ## Template / Fields
-- Canonical artifact: **spec/13_scaffold.json**
-- Schema reference: `schema/13_scaffold.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
+- Canonical artifact: **spec/15_scaffold.json**
+- Schema reference: `schema/15_scaffold.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
 - Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
 - Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
-- Contract: `prompts/prompt_13_scaffold.md`
+- Contract: `prompts/prompt_15_scaffold.md`
 - Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
   - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
   - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.

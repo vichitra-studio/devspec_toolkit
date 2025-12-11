@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/13_extension_generator.schema.json",
+  "title": "13_extension_generator",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
+    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
+    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "extension_id": { "type": "string", "description": "Unique ID for the extension (e.g. '13a-database')" },
+          "title": { "type": "string" },
+          "file_name": { 
+            "type": "string", 
+            "pattern": "^13[a-z]_[a-z0-9_]+\\.json$",
+            "description": "Must follow pattern '13[a-z]_[topic].json'" 
+          },
+          "area_of_concern": { "type": "string", "description": "Domain (e.g. Data, Security, AI)" },
+          "justification": { "type": "string" },
+          "required_schema_sections": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "schema_design_guidelines": { "type": "string" }
+        },
+        "required": ["extension_id", "title", "file_name", "area_of_concern", "required_schema_sections"]
+      }
+    }
+  },
+  "required": ["id", "owner", "created_at", "extensions"]
+}

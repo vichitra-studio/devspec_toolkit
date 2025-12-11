@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_delivery_monitoring.schema.json",
-  "title": "16_delivery_monitoring",
+  "$id": "https://specdev.local/schema/18_delivery_monitoring.schema.json",
+  "title": "18_delivery_monitoring",
   "type": "object",
   "additionalProperties": false,
   "properties": {

@@ -1,16 +1,16 @@
-# 14. Fixture-Driven Implementation
+# 16. Fixture-Driven Implementation
 
 ## Purpose
 Track implementation progress against the fixture suite, recording which endpoints are live and how each automated test is behaving. This artifact keeps delivery honest by requiring fixture parity before declaring features done.
 
 ## Template / Fields
-- Canonical artifact: **spec/14_fixture_impl.json**
-- Schema reference: `schema/14_fixture_impl.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
+- Canonical artifact: **spec/16_fixture_impl.json**
+- Schema reference: `schema/16_fixture_impl.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
 - Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
 - Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
-- Contract: `prompts/prompt_14_fixture_impl.md`
+- Contract: `prompts/prompt_16_fixture_impl.md`
 - Prompts include context ingestion, operating flow, soft heuristics, and a self‑audit gate. Assistants follow a two‑phase flow:
   - Phase A — Clarify: ingest context and, if gating items are missing, output only a short bulleted list of questions.
   - Phase B — Emit: once clarified, output exactly one fenced ```json``` block that validates against the schema.

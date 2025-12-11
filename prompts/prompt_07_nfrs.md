@@ -45,7 +45,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Step-Specific Completeness Checklist
 - NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
-- Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 16 dashboards/alerts.
+- Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 18 dashboards/alerts.
 - Stage is set for when the target must be met (dev/staging/prod) and owner is named.
 - `trace` links to FRs, interfaces, or invariants where the NFR applies.
 
