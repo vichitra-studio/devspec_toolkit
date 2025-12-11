@@ -61,7 +61,7 @@
           "errors": {
             "type": "array",
             "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#errorState"
+              "$ref": "https://specdev.local/schema/core/errors/1#errorState"
             }
           },
           "example_refs": {

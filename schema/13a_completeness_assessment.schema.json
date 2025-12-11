@@ -1,35 +1,18 @@
 {
-  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
   "title": "13a_completeness_assessment",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "id": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-      "examples": [
-        "fr-user-login",
-        "api-login",
-        "cap-export-reports"
-      ]
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
     },
     "owner": {
-      "type": "string",
-      "enum": [
-        "api",
-        "ui",
-        "system",
-        "ops",
-        "data"
-      ]
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
     },
     "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "examples": [
-        "2025-10-16T22:06:04.202593Z"
-      ]
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
     "missing_elements": {
       "type": "array",
@@ -38,13 +21,7 @@
         "additionalProperties": false,
         "properties": {
           "element_id": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-            "examples": [
-              "fr-user-login",
-              "api-login",
-              "cap-export-reports"
-            ]
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
           },
           "category": {
             "type": "string"
@@ -54,7 +31,11 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["high", "medium", "low"]
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
           },
           "impact_on_completeness": {
             "type": "number",

@@ -76,11 +76,11 @@
   "links": [
     {
       "rel": "repo",
-      "href": "FR-TBD/specdev_kit"
+      "href": "https://github.com/vichitracollective/devspec_toolkit"
     },
     {
       "rel": "ci",
-      "href": "FR-TBD/actions/workflows/ci.yml"
+      "href": "https://github.com/vichitracollective/devspec_toolkit/actions/workflows/ci.yml"
     }
   ]
 }

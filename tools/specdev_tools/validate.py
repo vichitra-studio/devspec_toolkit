@@ -59,7 +59,7 @@ def validate_file(repo_root: str, path: str) -> list[str]:
             enhanced_errors.append(error_msg)
             
         return enhanced_errors
-    except Exception as e:
+    except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
         return [f"{path}: error during validation - {str(e)}"]
 
 def validate_dir(repo_root: str, spec_dir: str) -> list[str]:

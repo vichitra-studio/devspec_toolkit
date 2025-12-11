@@ -9,7 +9,7 @@ def load_governance(spec_dir: str) -> dict | None:
                 p = os.path.join(root, fn)
                 try:
                     data = json.load(open(p, "r", encoding="utf-8"))
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     continue
                 if data.get("$schema","").endswith("/10_governance.schema.json"):
                     return data

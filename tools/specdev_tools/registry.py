@@ -23,7 +23,7 @@ class SchemaRegistry:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     self.store[uri] = json.load(f)
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 pass
 
     def _resolve_path(self, rel: str) -> Optional[str]:

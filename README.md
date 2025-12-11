@@ -16,7 +16,7 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 - Onboard with [docs/developers/getting_started.md](docs/developers/getting_started.md).
 - Keep [docs/developers/reference.md#core-validation-commands](docs/developers/reference.md#core-validation-commands) handy for the canonical command list, troubleshooting flow, and naming conventions.
 - Use the workflow overviews in [docs/developers/workflows/](docs/developers/workflows/) as you progress through Steps 00–17.
-- Automation agents begin at [agents.md](agents.md) → [docs/agents/agents.md](docs/agents/agents.md).
+- Automation agents begin at [docs/agents/agents.md](docs/agents/agents.md).
 
 ---
 

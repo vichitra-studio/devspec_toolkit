@@ -9,7 +9,15 @@ from .scaffold import generate_scaffold
 from .ci_gen import generate_ci_yaml
 
 
+
+def check_venv():
+    # Helper to check if we are running in a virtual environment
+    # sys.prefix != sys.base_prefix is the standard check for venv/virtualenv
+    if sys.prefix == sys.base_prefix:
+        print("Warning: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
+
 def main():
+    check_venv()
     p = argparse.ArgumentParser(prog="specdev-tools")
     sub = p.add_subparsers(dest="cmd", required=True)
 

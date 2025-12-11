@@ -2,6 +2,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -z "${VIRTUAL_ENV:-}" ]]; then
+  echo "Error: This script must be run within an active virtual environment." >&2
+  echo "Please activate your environment (e.g., source devspec_env/bin/activate) and try again." >&2
+  exit 1
+fi
+
 usage() {
   cat <<'EOF'
 Usage: tests/run.sh [--repo-root <toolkit-root>] [--spec-dir <spec-dir>]

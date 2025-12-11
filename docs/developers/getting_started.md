@@ -10,37 +10,24 @@ This guide onboards developers to the end-to-end spec workflow and shows how to 
 
 ## 1. Set Up Your Environment
 All instructions assume you are at the root of your host repository and the toolkit is checked out at [./devspec_toolkit/](../../). Adjust the paths if you keep the toolkit elsewhere.
-```bash
-# adjust ./devspec_toolkit if the toolkit lives elsewhere
-python -m venv .venv
-. .venv/bin/activate
-pip install -r ./devspec_toolkit/tools/requirements.txt
 
-# Make the toolkit modules importable
+The standard setup uses the automated script to configure the environment and dependencies:
+
+```bash
+# Run the setup script (creates 'devspec_env' and installs dependencies)
+./devspec_toolkit/setup_devspec_env.sh
+
+# Activate the virtual environment
+source devspec_env/bin/activate
+
+# Configure PYTHONPATH
 export PYTHONPATH="${PWD}/devspec_toolkit/tools"
 
-# Verify the CLI is available
+# Verify CLI availability
 python -m specdev_tools.cli --help
 ```
 
-> **Note:** A Python virtual environment `devspec_env` can be set up automatically using the toolkit's setup script:
-> ```bash
-> ./devspec_toolkit/setup_devspec_env.sh
-> ```
-> Then activate it using:
-> ```bash
-> source devspec_env/bin/activate
-> ```
-> And run the CLI commands with:
-> ```bash
-> PYTHONPATH="${PWD}/devspec_toolkit/tools" python -m specdev_tools.cli --help
-> ```
-> The toolkit is installed in development mode and dependencies are pre-installed.
-
-> **Alternative Setup:** You can also use the toolkit's setup script to configure everything automatically:
-> ```bash
-> ./devspec_toolkit/setup_devspec_env.sh
-> ```
+> **Note:** If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
@@ -57,6 +44,18 @@ Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the can
 The [developer index](index.md) links to deeper explanations when you need them.
 
 ## 3. Run The Mandala Workflow
+
+### Phase 0 · Seed The Project (Input Zero)
+Before writing formal specs, you must define the "Seed" of your project using the Smart Prompts. This ensures you have a coherent vision before structured discovery.
+
+1. **Seed Overview** (`seed_templates/seed_overview.md`):
+   - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
+   - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
+2. **Seed Tech Stack** (`seed_templates/seed_tech_stack.md`):
+   - **Purpose**: acts as your "Senior Architect" to define the *How* and *Where* (Architecture, Constraints, Dependencies).
+   - **Expectation**: high technical rigor. Pinned versions (e.g. `Python 3.12`), justified choices, and explicit constraints.
+
+**Why?** These documents eliminate ambiguity before you start the AI workflow. Step 00-12 will hallucinate if these foundations are missing.
 
 ### Phase I · Spec Discovery (Steps 00–12)
 1. Copy the matching guide blueprint from [./devspec_toolkit/template/](../../template/) into `spec/NN_name.guide.md` if it does not exist yet, then tailor it for your product.

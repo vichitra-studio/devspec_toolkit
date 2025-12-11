@@ -6,8 +6,8 @@ Assess the completeness of Phase 1 specifications and identify gaps that prevent
 ## Template / Fields
 - Canonical artifact: **spec/13a_completeness_assessment.json**
 - Schema reference: `schema/13a_completeness_assessment.schema.json` (do not inline schema; rely on `$schema` in JSON artifacts)
-- Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms/1#atoms.schema.json`)
-- Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections/1#collections.schema.json`)
+- Core atoms: `kebabId`, `owner`, `timestamp`, `tag` (see `schema/core/atoms.schema.json`)
+- Core collections: `kebabIdArray`, `stringArray`, `link`, `traceRef`, `errorState`, `anyJson` (see `schema/core/collections.schema.json`)
 
 ## Prompt File
 - Contract: `prompts/prompt_13a_completeness_assessment.md`

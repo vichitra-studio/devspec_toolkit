@@ -12,7 +12,7 @@ def lint_fixtures(spec_dir: str) -> list[str]:
                 p = os.path.join(root, fn)
                 try:
                     data = json.load(open(p, "r", encoding="utf-8"))
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     continue
                 s = data.get("$schema","")
                 if s.endswith("/05_interface_contracts.schema.json"):

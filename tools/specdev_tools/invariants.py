@@ -48,14 +48,14 @@ def run_invariants(spec_dir: str, sample: dict) -> list[dict]:
                 p = os.path.join(root, fn)
                 try:
                     data = json.load(open(p, "r", encoding="utf-8"))
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     continue
                 if data.get("$schema","").endswith("/06_invariants.schema.json"):
                     for rule in data.get("rules", []):
                         expr = rule.get("expression")
                         try:
                             ok = _tiny_eval(json.loads(expr) if isinstance(expr, str) and expr.strip().startswith("{") else expr, sample)
-                        except Exception:
+                        except (TypeError, ValueError, IndexError, KeyError, AttributeError):
                             ok = None
                         out.append({
                             "inv_id": rule.get("inv_id"),

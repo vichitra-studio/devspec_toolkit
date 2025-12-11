@@ -16,7 +16,7 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
                 try:
                     data = load_json(p)
                     artifacts[data.get("id", p)] = data
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     pass
 
     # Index
