@@ -1,7 +1,0 @@
-[
-  {
-    "inv_id": "inv-no-pii-logs",
-    "description": "No passwords or tokens are written to logs.",
-    "result": true
-  }
-]
