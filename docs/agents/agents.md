@@ -54,7 +54,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 13 | `spec/13_extension_manifest.json` | Review proposed extension schemas |
 | 13a | `spec/13a_completeness_assessment.json` | Check for gaps before Roadmap |
 | 14 | `spec/14_roadmap.json` | Initiate JIT implementation loop |
-| 15 | `spec/15_scaffold.json` | Optionally run `scaffold` command |
+| 15 | `spec/15_scaffold.json` | Implement scaffold manually |
 | 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
 | 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
 | 16c | `spec/impl_context/{step_id}.json` | Trinity Review: Verification & closure |

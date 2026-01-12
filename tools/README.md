@@ -54,7 +54,7 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 
 ## CLI Overview
 
-The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `gen-ci`, and `scaffold`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
+The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, and `governance-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
 
 From any location, run:
 ```bash
@@ -82,7 +82,7 @@ python -m specdev_tools.cli validate spec/13a_completeness_assessment.json --rep
 
 ## CI Integration
 
-Generate a starter workflow with `python -m specdev_tools.cli gen-ci …` and extend it with your own jobs. For the authoritative list of validation commands enforced in CI, see [docs/developers/reference.md#validation-workflow](../docs/developers/reference.md#validation-workflow).
+Generate a starter workflow using the yaml template in prompts, or see [docs/developers/reference.md#validation-workflow](../docs/developers/reference.md#validation-workflow) for the authoritative list of validation commands enforced in CI.
 
 ---
 

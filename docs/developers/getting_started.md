@@ -68,12 +68,7 @@ Before writing formal specs, you must define the "Seed" of your project using th
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
 ### Phase II · Spec → Implementation (Steps 13–17)
-1. Generate scaffolds and validate contracts:
-   ```bash
-   python -m specdev_tools.cli scaffold spec \
-     --repo-root ./devspec_toolkit \
-     --out scaffold_out
-   ```
+1. Generate scaffolds manually or using your framework's CLI (e.g., `npm init`, `fastapi new`) based on `15_scaffold.json`.
 2. Implement against fixtures until `14_fixture_impl.json` reports green.
 3. Expand coverage via the red-team loop, monitoring, and drift audits.
 

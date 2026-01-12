@@ -3,6 +3,13 @@
 ## Purpose
 Set the policies that keep the spec authoritative by covering change control, versioning, reviewer expectations, and how code changes reference spec artifacts. Strong governance ensures every update flows through spec-first workflows and remains auditable.
 
+## Tool Execution
+To enforce the governance policies defined here (specifically commit messages), use:
+```bash
+python -m specdev_tools.cli governance-check <spec_dir> --message "commit message"
+```
+Failures here should block the merge.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 10 · Governance & Change Control** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 

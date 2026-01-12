@@ -3,6 +3,12 @@
 ## Purpose
 Translate the validated spec into an executable delivery roadmap that covers technology choices, sequencing, risks, and migration strategy. The implementation plan aligns teams on what will ship when, how dependencies are managed, and which experiments or spikes de-risk the path.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 9 · Implementation Plan** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 

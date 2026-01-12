@@ -1,0 +1,13 @@
+
+# <type>(<scope>): <subject>
+#
+# Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# Scope: spec, api, ui, system, ops, data (optional)
+# Subject: Imperative mood, lowercase (e.g., "add login endpoint")
+#
+# Body: Motivation for the change (optional)
+#
+# Footer: References to spec IDs (Required by Governance)
+# Format: [id-1], [id-2]
+# Example: [fr-user-login], [api-session-create]
+

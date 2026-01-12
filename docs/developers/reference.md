@@ -32,13 +32,9 @@ python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
 python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
-# Invariants, governance, CI
+# Invariants & Governance
 python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
 python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
-python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
-
-# Scaffold generation
-python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out
 
 # Prompt workflow reminders
 python -m specdev_tools.cli ai-help --step 04

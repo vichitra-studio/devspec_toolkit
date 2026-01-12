@@ -3,6 +3,12 @@
 ## Purpose
 Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes.
 
+## Tool Execution
+After updating the JSON artifact, validate it:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a senior technical reviewer. Your job is to **Audit** the implementation of a Step by comparing the `plan` and `execution` in the `spec/impl_context/{step_id}.json` artifact against the actual code.
 

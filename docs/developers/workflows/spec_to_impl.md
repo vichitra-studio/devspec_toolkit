@@ -16,7 +16,7 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 | 13 — Extensions | Define domain-specific schemas | Identify missing domains (AI, DB) and generate `spec/13_extension_manifest.json`. |
 | 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
 | 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
-| 15 — Scaffold | Generate compile-clean skeleton | Run `python -m specdev_tools.cli scaffold ...`. |
+| 15 — Scaffold | Generate compile-clean skeleton | Implement manually or via framework CLI. |
 | 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, and drift checks in `16_impl_context.json`. |
 | 16b — Build (Trinity) | Implement & Config | Write Code, Configs, and update Docs. |
 | 16c — Review (Trinity) | Audit & Gate | Verify Code/Sec/Ops, run full tests, emit Fixture Status default. |
@@ -34,22 +34,18 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 **Rule of Thumb**: Step 09 is the "Architect's Baseline". Step 14 is the "Project Manager's Schedule".
 
 ## Command Cadence
-- Generate scaffolds with `python -m specdev_tools.cli scaffold spec --repo-root ./devspec_toolkit --out scaffold_out`.
+- Generate scaffolds manually or using framework tools, ensuring alignment with `15_scaffold.json`.
 - Run the [core validation commands](../reference.md#core-validation-commands) to track fixture progress and trace coverage as implementation evolves.
 
 ## CI Integration
 - **validate** — schema + fixture lint
-- **scaffold** — ensures contracts remain compatible with generated stub
 - **test** — executes fixture suite and custom tests
 - **redteam** — runs adversarial inputs and adds regressions to fixtures
 - **deploy** — deploys via the plan in Step 09/16
 - **drift-audit** — compares runtime data to spec assertions as defined in Step 17
 
-Ensure [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) (generated via `gen-ci`) reflects these jobs and references the spec IDs they enforce. For example:
+Ensure [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) reflects these jobs and references the spec IDs they enforce.
 
-```bash
-python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-path ./devspec_toolkit --out .github/workflows/ci.yml
-```
 
 ## Outputs
 - Current artifacts under `spec/13*` through `spec/16*`

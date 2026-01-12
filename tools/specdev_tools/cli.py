@@ -2,12 +2,9 @@ from __future__ import annotations
 import argparse, os, json, sys
 from .validate import validate_file, validate_dir
 from .matrix import build_trace_matrix
-from .fixtures_runner import lint_fixtures
+from .fixtures_lint import lint_fixtures
 from .invariants import run_invariants
 from .governance import check_commit_message
-from .scaffold import generate_scaffold
-from .ci_gen import generate_ci_yaml
-
 
 
 def check_venv():
@@ -47,19 +44,6 @@ def main():
     gov.add_argument("spec_dir")
     gov.add_argument("--message", required=True)
     gov.add_argument("--repo-root", default=".")
-
-    ci = sub.add_parser("gen-ci")
-    ci.add_argument("spec_dir")
-    ci.add_argument("--out", default="-")
-    ci.add_argument("--repo-root", default=".",
-                    help="Toolkit root used when running generated commands (defaults to current directory)")
-    ci.add_argument("--toolkit-path", default="./devspec_toolkit",
-                    help="Relative path to the toolkit inside the host repository (defaults to ./devspec_toolkit)")
-
-    sc = sub.add_parser("scaffold")
-    sc.add_argument("spec_dir")
-    sc.add_argument("--out", required=True)
-    sc.add_argument("--repo-root", default=".")
 
     ai = sub.add_parser("ai-help")
     ai.add_argument("--step", help="Specific step to get help for")
@@ -114,17 +98,6 @@ def main():
             for e in errs: print(e, file=sys.stderr)
             sys.exit(1)
         print("OK")
-    elif args.cmd == "gen-ci":
-        yml = generate_ci_yaml(args.spec_dir, args.repo_root, args.toolkit_path)
-        if args.out == "-":
-            print(yml)
-        else:
-            with open(args.out, "w", encoding="utf-8") as f: f.write(yml)
-            print(args.out)
-    elif args.cmd == "scaffold":
-        spec_dir = os.path.abspath(args.spec_dir)
-        files = generate_scaffold(spec_dir, args.out)
-        print("\n".join(files))
     elif args.cmd == "ai-help":
         if args.step:
             print(f"AI help for step {args.step}:")

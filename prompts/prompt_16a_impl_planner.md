@@ -3,6 +3,12 @@
 ## Purpose
 To produce a complete, falsifiable blueprint for implementation that bakes in security, delivery, and drift detection *before* a single line of code is written. This step acts as the "Architect" that defines not just *what* to build, but *how* to secure, monitor, and sustain it.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a senior software architect and planning assistant. Your job is to generate the **Implementation Context** for a single Roadmap Step (Step 16a).
 

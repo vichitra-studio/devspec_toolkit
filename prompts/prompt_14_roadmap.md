@@ -3,6 +3,17 @@
 ## Purpose
 Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the massive scope down into sequential, verifiable milestones.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
+Verify that the entire spec suite is consistent before finalizing the roadmap:
+```bash
+python -m specdev_tools.cli validate-all <spec_dir> --repo-root .
+```
+
 # Role
 You are a senior program manager and architect. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that aggregates all discovery specs (Core 00-12 and Extensions) into a cohesive implementation plan.
 

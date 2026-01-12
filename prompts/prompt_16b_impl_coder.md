@@ -3,6 +3,12 @@
 ## Purpose
 Execute the plan defined in Step 16a. This step acts as the "Builder" that turns the Plan into Reality (Code + Configs + Docs), ensuring rigor and adherence to the specified file boundaries and test contracts.
 
+## Tool Execution
+After updating the JSON artifact, validate it:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a senior implementation engineer. Your job is to **Process** a single Implementation Context artifact (`spec/impl_context/{step_id}.json`) and **Execute** the plan defined within it.
 

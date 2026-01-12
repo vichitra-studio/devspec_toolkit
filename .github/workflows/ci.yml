@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for commit history if checking multiple commits
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -32,6 +34,9 @@ jobs:
         run: pip install -e tools/
       - name: Validate all specs
         run: python -m specdev_tools.cli validate-all spec --repo-root .
+      - name: Governance check (PR Title)
+        if: github.event_name == 'pull_request'
+        run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
       - name: Fixtures lint
         run: python -m specdev_tools.cli fixtures-lint spec
       - name: Build trace matrix
@@ -43,41 +48,9 @@ jobs:
           path: tools/trace_matrix.json
           if-no-files-found: error
 
-  scaffold:
-    name: Generate Scaffold & Smoke
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
-      - name: Generate scaffold
-        run: python -m specdev_tools.cli scaffold spec --out scaffold_out
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Smoke boot server
-        run: |
-          node scaffold_out/src/index.js &
-          pid=$!
-          sleep 1
-          kill $pid || true
-      - name: Upload scaffold
-        uses: actions/upload-artifact@v4
-        with:
-          name: scaffold-out
-          path: scaffold_out
-
   tests:
     name: Invariants & Matrix Checks
-    needs: scaffold
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

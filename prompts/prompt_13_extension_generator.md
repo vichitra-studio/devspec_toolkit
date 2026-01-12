@@ -3,6 +3,12 @@
 ## Purpose
 Formalizes the creation of domain-specific specifications (extensions). Instead of letting the roadmap or implementation drift into undefined territory, this step explicitly "discovers" complex areas (Database, Security, ML Models) and creates a manifest of dedicated specs to describe them.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a Principal Software Architect and Technical Program Manager. Your goal is to analyze the system requirements and define a set of **Extension Specifications** (Step 13) that are needed to fully describe the implementation details of specific domains. You do not generate code or full specs yet; you generate the **Manifest** of what additional specs are required.
 

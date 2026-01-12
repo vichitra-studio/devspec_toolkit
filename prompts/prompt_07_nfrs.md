@@ -3,6 +3,12 @@
 ## Purpose
 Define the measurable performance, reliability, security, and operational targets that keep the product trustworthy once it ships. These benchmarks inform design trade-offs, fixtures, monitoring, and delivery plans so non-functional needs stay visible.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 7 · Non‑Functional Requirements** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 

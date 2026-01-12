@@ -3,6 +3,17 @@
 ## Purpose
 Capture the non-negotiable truths, guardrails, and data relationships the system must uphold regardless of implementation. These invariants feed governance, contract validation, and monitoring so deviations trigger alerts before customers feel impact.
 
+## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
+To verify your invariants logic, verify against a sample data file:
+```bash
+python -m specdev_tools.cli invariants-check <spec_dir> --sample <path_to_sample_json> --repo-root .
+```
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 6 · Invariants & Rules** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
