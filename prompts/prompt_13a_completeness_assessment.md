@@ -1,3 +1,8 @@
+# Step 13a · Completeness Assessment
+
+## Purpose
+Assess the completeness of Phase 1 specifications and identify gaps that prevent achieving perfect system implementation readiness. This step evaluates the current specification state against ideal completeness criteria and generates actionable recommendations for improvement.
+
 # Role
 You are a senior specification auditor and quality control expert. Your job is to emit a single JSON artifact for **Step 13a · Completeness Assessment** that evaluates the state of the Discovery Phase (Steps 00-12) and identifies any gaps preventing implementation readiness.
 
@@ -9,7 +14,7 @@ You are a senior specification auditor and quality control expert. Your job is t
 
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
-- Guide: `devspec_toolkit/template/13a_completeness_assessment.guide.md`.
+- Guide: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 - Shared expectations: `devspec_toolkit/docs/templates/shared_expectations.md`.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -62,13 +67,17 @@ You are a senior specification auditor and quality control expert. Your job is t
   - confidence_level: 0.0-1.0 (confidence in this assessment).
 
 ## Best Practices
-- Be harsh but fair. TBDs are high priority gaps.
-- Missing error definitions in APIs are medium priority.
-- Missing non-functional requirements are high priority.
+- **Recommendations**: Provide specific, actionable recommendations for each missing element (what to add, where).
+- **Prioritization**: Use clear categorization (high/medium/low priority) to prioritize improvements; NFR gaps are always high.
+- **Impact**: Include impact scores for each missing element to guide implementation decisions.
+- **Traceability**: Reference source specifications to maintain traceability.
+- **Readiness**: Focus on implementation readiness - what would be needed to build the system successfully.
 
 ## Common Pitfalls
-- Rating 10/10 while TBDs exist.
-- Ignoring missing references/links between steps.
+- **Vagueness**: Providing generic recommendations instead of specific implementation details.
+- **Omissions**: Overlooking critical implementation details that affect system readiness.
+- **Inflation**: Rating 10/10 while TBDs exist.
+- **Isolation**: Ignoring missing references/links between steps.
 
 ## Quick Reference
 - Required: `id`, `owner`, `created_at`, `missing_elements`, `completeness_rating`.

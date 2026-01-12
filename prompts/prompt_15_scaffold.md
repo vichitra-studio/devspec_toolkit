@@ -1,9 +1,14 @@
+# Step 15 · Scaffold Generation
+
+## Purpose
+Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 15 · Scaffold Generation** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 13 · Scaffold Generation**.
+- **Objective:** produce a complete, falsifiable artifact for **Step 15 · Scaffold Generation**.
 - **Output type:** one JSON document conforming to the Embedded Schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
@@ -12,7 +17,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Interface Contracts `spec/05_interface_contracts.json` for route map; System Sketch `spec/02_system_sketch.json` for component context.
 - FRs `spec/04_fr_list.json` for behavior coverage.
-- Guides: `devspec_toolkit/template/13_scaffold.guide.md`, shared expectations, developer reference; any org boilerplate.
+- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference; any org boilerplate.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Scaffold Ledger: service_skeleton (language/framework/modules) and route_map mapping each public `api_ref` to path/method. Do not output it.
@@ -56,14 +61,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - build_status: `pending`, `green`, or `red`.
 
 ## Best Practices
-- Keep route_map in sync with Step 5 API definitions to ensure generated code is correct.
-- Prefer minimal viable modules to start; evolve with spec changes.
-- Add validators that prevent drift between specs and code (e.g., openapi/schema sync, trace checks).
+- **Sync**: Mirror Step 05 interface contracts when building the `route_map`, keeping `api_ref`, `path`, and `method` in sync.
+- **Reproducibility**: Document `service_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
+- **Validation**: Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
+- **Status**: Track `build_status` honestly (`green`, `red`, `pending`) to surface blockers before implementation accelerates.
 
 ## Common Pitfalls
-- Generating routes without linking to `api_ref`, breaking traceability.
-- Overly complex skeletons that slow initial delivery.
-- Missing validators leading to silent drift.
+- **Implicit Modules**: Leaving modules unspecified, forcing teams to rediscover scaffold layout.
+- **Drift**: Forgetting to include new or versioned APIs, leading to missing routes and broken fixtures.
+- **False Green**: Marking build status green without running validators, giving a false sense of readiness.
+- **Route Drift**: Creating route paths that differ from Step 05 definitions, breaking client compatibility.
 
 ## Quick Reference
 - Service Skeleton: `language` (required), optional `framework` and `modules`.

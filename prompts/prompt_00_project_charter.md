@@ -1,3 +1,8 @@
+# Step 00 · Project Charter
+
+## Purpose
+Establish the authoritative charter that captures the business problem, intended users, constraints, and measurable success criteria in falsifiable language. This artifact anchors downstream decisions by making scope boundaries, stakeholder needs, and success metrics explicit enough to trace through every later step.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 0 · Project Charter** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
@@ -12,7 +17,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
-- Guides: `devspec_toolkit/template/00_charter.guide.md`, shared expectations `devspec_toolkit/docs/templates/shared_expectations.md`, reference `devspec_toolkit/docs/developers/reference.md`.
+- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.
 - Examples: `example/devspec_kit/spec/00_charter.json`, `example/devspec_kit/spec/07_nfrs.json` for shape of success metrics.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -69,15 +74,19 @@ You are a senior specification author and validator. Your job is to emit a singl
 - links: trace to FRs/NFRs/governance ids when known; use temporary `*-tbd` anchors if not yet defined.
 
 ## Best Practices
-- Write a crisp problem statement grounded in user pain and measurable outcomes.
-- Define in/out of scope explicitly to prevent scope creep; tie to capabilities and FRs later.
-- Choose success metrics with clear baselines, targets, and measurement methods that feed Step 16 monitoring.
-- Identify real stakeholders and user segments to drive prioritization and acceptance criteria.
+- **Problem Statement**: Write a crisp statement grounded in user pain and measurable outcomes, avoiding solutioneering.
+- **Success Metrics**: Pair each `success_metric` with a realistic baseline, target, unit, and measurement method.
+- **Scope**: Define in/out of scope explicitly to prevent creep; capture at least 3 items each.
+- **Users**: Describe each `user_segment` with jobs-to-be-done, pains, and gains to map requirements to value.
+- **Risks**: Record critical `assumptions` and `risks` with enough context to inform governance.
+- **Stakeholders**: Identify real stakeholders (not just titles) to drive prioritization.
 
 ## Common Pitfalls
-- Vague goals without units or timelines, making success unverifiable.
-- Missing out-of-scope list, causing later ambiguity and churn.
-- Success metrics with no measurement path or undefined units.
+- **Solutioneering**: Writing solution statements instead of clear problem statements (hides falsifiable metrics).
+- **Vague Metrics**: Leaving metrics without units, baselines, or measurement methods (impossible to verify).
+- **Implicit Assumptions**: Treating assumptions as implicit (leaves governance blind).
+- **Missing Stakeholders**: Forgetting key segments or stakeholders (breaks downstream traceability).
+- **Scope Creep**: Missing an "out-of-scope" list, leading to ambiguity.
 
 ## Quick Reference
 - Required: `id`, `owner`, `created_at`, `problem_statement`, `success_metrics`.

@@ -1,3 +1,8 @@
+# Step 07 · Non‑Functional Requirements
+
+## Purpose
+Define the measurable performance, reliability, security, and operational targets that keep the product trustworthy once it ships. These benchmarks inform design trade-offs, fixtures, monitoring, and delivery plans so non-functional needs stay visible.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 7 · Non‑Functional Requirements** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
@@ -13,7 +18,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Success metrics in `spec/00_charter.json` to align business outcomes with technical targets.
 - Glossary `spec/03_glossary.json` for metric names and units; FRs `spec/04_fr_list.json` for performance-critical behaviors.
 - Monitoring `spec/16_delivery_monitoring.json` (if exists) to align measurement_method and dashboards.
-- Guides: `devspec_toolkit/template/07_nfrs.guide.md`, shared expectations, developer reference.
+- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of NFRs by category (latency/throughput/availability/etc.), with metric→target→unit→measurement_method, stage, owner, and traces to FRs/APIs/components. Do not output it.
@@ -61,14 +66,18 @@ You are a senior specification author and validator. Your job is to emit a singl
 - trace: references to FRs/APIs/components/invariants.
 
 ## Best Practices
-- Use targets that are realistic and aligned with baseline measurements and capacity planning.
-- Tie measurement_method to an actual query or dashboard to ensure observability.
-- Set stage expectations (dev/staging/prod) to phase in stricter targets appropriately.
+- **Metrics**: Assign each NFR to a schema `category` and describe the `metric` in precise, customer-facing terms.
+- **Targets**: Provide numeric `target` values with `unit` and `measurement_method` so monitoring and CI use the same test.
+- **Observability**: Tie `measurement_method` to an actual query or dashboard to ensure observability.
+- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, staging, prod) to guide rollout plans.
+- **Trace**: Use `trace` to connect NFRs to FRs, invariants, or delivery tasks that uphold the requirement.
 
 ## Common Pitfalls
-- Ambiguous metrics or missing units leading to misinterpretation.
-- Targets that cannot be measured with existing tooling.
-- No owner assigned, causing untracked regressions.
+- **Qualitative**: Writing qualitative statements (e.g., "fast") instead of measurable targets.
+- **Immeasurable**: Targets that cannot be measured with existing tooling or missing measurement methods.
+- **Prod-Only**: Using prod-only targets without staging or dev expectations, making regressions invisible until go-live.
+- **Orphans**: No owner assigned or missing traces, causing untracked regressions.
+- **Duplicates**: Duplicating NFR IDs across categories, which breaks coverage tooling.
 
 ## Quick Reference
 - Categories: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy.

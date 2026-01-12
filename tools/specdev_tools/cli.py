@@ -128,19 +128,18 @@ def main():
     elif args.cmd == "ai-help":
         if args.step:
             print(f"AI help for step {args.step}:")
-            print(f"1. Read the guide: spec/{args.step}_*.guide.md")
-            print(f"2. Run the prompt: prompts/prompt_{args.step}_*.md")
-            print(f"3. Paste output into spec/{args.step}_*.json")
+            print(f"1. Open the prompt file: prompts/prompt_{args.step}_*.md")
+            print(f"2. Copy the content into your AI assistant")
+            print(f"3. Paste the AI output into spec/{args.step}_*.json")
             print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root ./devspec_toolkit")
         else:
             print("AI Interaction Guide:")
-            print("1. Read the corresponding guide.md file")
-            print("2. Run the prompt from prompts/prompt_XX_stepname.md")
+            print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
+            print("2. Copy the full content into your AI assistant")
             print("3. Paste only the fenced JSON block into spec/NN_name.json")
             print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit")
-            print("5. Follow the DoR requirements from the guide")
-            print("6. Ensure all IDs use kebab-case format")
-            print("7. No examples should be included in the AI output")
+            print("5. Ensure all IDs use kebab-case format")
+            print("6. No examples should be included in the AI output")
     else:
         p.print_help()
 

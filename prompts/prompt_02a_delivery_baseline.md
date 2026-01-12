@@ -1,3 +1,8 @@
+# Step 02a · Delivery Baseline
+
+## Purpose
+Capture the minimum delivery infrastructure (environments, CI expectations, and compliance guardrails) needed to take the system sketch from spec to running code safely. This baseline makes deployment assumptions explicit early so fixture execution, governance, and implementation planning share the same operational picture.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 2.5 · Delivery Baseline** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
@@ -14,7 +19,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - NFRs `spec/07_nfrs.json` for coverage and monitoring expectations impacting CI.
 - Governance `spec/10_governance.json` for required checks.
 - Current CI configs (if present) and `devspec_toolkit/tests/run.sh` usage from the reference docs.
-- Guides: `devspec_toolkit/template/02a_delivery_baseline.guide.md`, shared expectations, developer reference.
+- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
@@ -59,14 +64,18 @@ You are a senior specification author and validator. Your job is to emit a singl
 - compliance: list of applicable labels/policies (e.g., `gdpr-data-exportable`).
 
 ## Best Practices
-- Define minimal environment descriptors to make CI/CD reproducible (runner type, region, base images).
-- Include gates for schema validation, fixtures, invariants, governance, and coverage early.
-- Track secrets by name only and ensure secure storage policies are in place.
+- **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.
+- **Reproducibility**: Define minimal environment descriptors to make CI/CD reproducible (runner type, region, base images).
+- **Gates**: Enumerate `ci_gates` as actionable job names (schema, fixtures, security scans) that map directly to Step 12 output.
+- **Secrets**: Track sensitive material in `secrets` by name only (no values), with ownership and rotation expectations.
+- **Compliance**: Capture regulatory or contractual obligations under `compliance` to feed governance.
 
 ## Common Pitfalls
-- Vague CI gates that do not map to concrete checks.
-- Missing staging environment parity causing late-stage surprises.
-- Embedding secret values instead of names.
+- **Empty Shells**: Leaving environment objects empty, forcing teams to guess runtime dependencies.
+- **Manual Gates**: Mixing manual review steps into `ci_gates`, which belong in governance policies instead.
+- **Secret Values**: Embedding secret values instead of names (security risk).
+- **Staging Drift**: Missing staging environment parity causing late-stage surprises.
+- **Optional Compliance**: Treating compliance requirements as optional notes instead of binding constraints.
 
 ## Quick Reference
 - Environments: objects for `dev`, `ci`, `staging`, `prod`.

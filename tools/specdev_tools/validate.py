@@ -16,12 +16,12 @@ def _get_step_from_path(path: str) -> str:
         return step
     return "unknown"
 
-def _get_guide_path(path: str) -> str:
-    """Get corresponding guide file path"""
+def _get_prompt_path(path: str) -> str:
+    """Get corresponding prompt file path"""
     step = _get_step_from_path(path)
     if step != "unknown":
-        return f"spec/{step}_*.guide.md"
-    return "spec/*.guide.md"
+        return f"prompts/prompt_{step}_*.md"
+    return "prompts/*.md"
 
 def validate_file(repo_root: str, path: str) -> list[str]:
     registry = SchemaRegistry(repo_root)
@@ -53,8 +53,8 @@ def validate_file(repo_root: str, path: str) -> list[str]:
             # Add context about what to do next
             step = _get_step_from_path(path)
             if step != "unknown":
-                guide_path = _get_guide_path(path)
-                error_msg += f"\n  See: {guide_path} for guidance on requirements"
+                prompt_path = _get_prompt_path(path)
+                error_msg += f"\n  See: {prompt_path} for guidance on requirements"
             
             enhanced_errors.append(error_msg)
             

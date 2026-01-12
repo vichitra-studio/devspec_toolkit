@@ -36,8 +36,8 @@ Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the can
 - `spec/` (in your host repo) — machine artifacts (`NN_step.json`) and human guides (`NN_step.guide.md`) you actively maintain.
 - [./devspec_toolkit/](../../) — the toolkit submodule providing schemas, prompts, docs, templates, and CLI code (substitute your path if different).
   - [schema/](../../schema/) — JSON Schemas for every spec step plus shared atoms/collections/errors
-  - [prompts/](../../prompts/) — deterministic prompts for AI assistants (one per step)
-  - [template/](../../template/) — guide blueprints you copy into your host repo before editing
+  - [schema/](../../schema/) — JSON Schemas for every spec step plus shared atoms/collections/errors
+  - [prompts/](../../prompts/) — deterministic prompts for AI assistants (contains the guide and requirements)
   - [tools/](../../tools/) — CLI package and schema registry used during validation
 - [example/devspec_kit/](../../example/devspec_kit/) — fully specced reference artifacts for the toolkit itself (read-only)
 
@@ -58,8 +58,8 @@ Before writing formal specs, you must define the "Seed" of your project using th
 **Why?** These documents eliminate ambiguity before you start the AI workflow. Step 00-12 will hallucinate if these foundations are missing.
 
 ### Phase I · Spec Discovery (Steps 00–12)
-1. Copy the matching guide blueprint from [./devspec_toolkit/template/](../../template/) into `spec/NN_name.guide.md` if it does not exist yet, then tailor it for your product.
-2. Read the guide to internalise the Definition of Ready and dependencies.
+1. Locate the matching prompt in [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
+2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
    - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
    - Phase B — Emit: after answering questions, rerun to emit exactly one fenced `json` block.
@@ -84,7 +84,7 @@ The workflow overviews in [workflows/discovery.md](workflows/discovery.md) and [
 Keep [reference.md](reference.md) handy for the complete command catalogue, flags, and troubleshooting tips. Every command in that file assumes the pattern `--repo-root ./devspec_toolkit` when you operate from your host repository.
 
 ## 5. Working With AI Assistants
-- Read the human guide before invoking an assistant so you know the Definition of Ready (DoR) and guardrails.
+- Read the prompt file before invoking an assistant so you know the Definition of Ready (DoR) and guardrails.
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.

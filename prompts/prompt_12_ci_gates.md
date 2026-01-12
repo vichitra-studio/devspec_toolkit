@@ -1,3 +1,8 @@
+# Step 12 · CI Gates
+
+## Purpose
+Translate governance rules and fixture expectations into enforceable CI automation. Well-specified gates keep the spec authoritative by blocking merges that violate schemas, fixtures, or coverage commitments.
+
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 12 · CI Gates** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
@@ -12,7 +17,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Delivery Baseline `spec/02a_delivery_baseline.json` for environments and required gates.
 - Governance `spec/10_governance.json` for policies; existing CI configs if present.
-- Guides: `devspec_toolkit/template/12_ci_gates.guide.md`, shared expectations, developer reference.
+- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private CI Ledger: list jobs (id/name), dependencies (`requires`), steps (validators/commands), and optional coverage thresholds. Do not output it.
@@ -54,14 +59,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - coverage_thresholds: set lines/branches numbers between 0 and 100.
 
 ## Best Practices
-- Include schema validation, fixtures-lint, trace matrix generation, invariants check, governance check, and coverage checks.
-- Build a clear DAG with `requires` to maximize parallelism while preserving correctness.
-- Keep job IDs stable so external systems and docs can reference them.
+- **Jobs**: Define each `job` with reproducible `steps` (CLI commands, scripts) and `requires` dependencies to express the pipeline graph.
+- **Naming**: Align job names with reality (e.g., `validate`, `fixtures`, `redteam`, `deploy`) to match tooling and dashboards.
+- **Coverage**: Set `coverage_thresholds` that reflect NFR commitments and update them when metric expectations change.
+- **Stability**: Keep job IDs in kebab-case and stable so generated CI configs and monitoring references remain valid.
 
 ## Common Pitfalls
-- Missing critical checks (governance, invariants), allowing drift or policy breaches.
-- Over-serializing jobs and slowing down feedback loops.
-- Setting unrealistic coverage thresholds that block delivery without value.
+- **Vague Steps**: Leaving steps as generic notes instead of exact commands, making automation impossible.
+- **Race Conditions**: Forgetting job dependencies, causing parallel runs that violate required ordering (e.g., fixtures before deploy).
+- **Perma-Red**: Setting aspirational coverage numbers with no plan to meet them, leading to perma-red pipelines.
+- **Drift**: Duplicating job IDs or renaming them without updating CI scripts and governance docs.
 
 ## Quick Reference
 - Jobs: `job_id`, `name`, `requires`, `steps`.

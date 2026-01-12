@@ -1,3 +1,8 @@
+# Step 14 · Roadmap
+
+## Purpose
+Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the massive scope down into sequential, verifiable milestones.
+
 # Role
 You are a senior program manager and architect. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that aggregates all discovery specs (Core 00-12 and Extensions) into a cohesive implementation plan.
 
@@ -13,7 +18,7 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Extension Specs: All `spec/13[a-z]_*.json` files defined in the manifest.
 - Charter: `spec/00_charter.json` for strategic goals.
 - Completeness: `spec/13a_completeness_assessment.json`.
-- Guide: `template/14_roadmap.guide.md`.
+- Guide: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - **Synthesize**: Scan all `spec/` artifacts. Identify every distinct feature, capability, and schema defined.
@@ -27,6 +32,17 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 ## Self-Audit Gate
 - Confirm that existing specs cover enough scope to justify a roadmap.
 - Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
+
+## Best Practices
+- **Reuse Tech Stack**: In most cases, copy the `tech_stack` from `spec/09_impl_plan.json`. Only update it if Step 13 Extensions introduced new mandated tools.
+- **Sequence Dependencies**: Ensure "Infrastructure" or "Base API" milestones precede "UI" or "Complex Logic" milestones.
+- **JIT Granularity**: Plan the immediate next 1-2 milestones in high detail (dates, deliverables) and leave later milestones fuzzier.
+- **Audit Trace**: Use the `milestones[].risks` field to note *why* a complex extension was deferred or split.
+
+## Common Pitfalls
+- **Ignoring Extensions**: Failing to schedule the work defined in `13a_database.json` or `13b_security.json`.
+- **Redoing Step 09**: Spending time debating "Python vs Go" (which was settled in Step 09) instead of planning "Sprint 1 vs Sprint 2".
+- **Skipping Completeness**: Creating a roadmap for a spec full of holes; the Roadmap step is the final quality gate before coding.
 
 # Output Rules
 1. Return exactly one fenced code block with language `json`.
