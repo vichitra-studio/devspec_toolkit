@@ -1,14 +1,14 @@
-# Shared Template Expectations
+# Shared Expectations
 
-Use this page as the canonical reference for guidance that applies across every `template/*.guide.md`. Individual guides can add extra requirements, but they should link back here for the shared baseline.
+Use this page as the canonical reference for guidance that applies across every prompt and generated guide. Individual prompts can add extra requirements, but they should link back here for the shared baseline.
 
 ## Definition of Ready (DoR) / Guardrails
 
-The shared guardrails live in [`definition_of_ready.md`](definition_of_ready.md). Treat those rules as non-negotiable; each step can only add narrower constraints.
+Each step's prompt defines its specific Definition of Ready (DoR) within the **Context To Ingest** and **Self-Audit Gate** sections. Treat those rules as non-negotiable.
 
 ## Working Increment
 
-- Store the generated JSON and guide under your host repo’s `spec/` directory using the matching filenames.
+- Store the generated JSON and guide under your host repo’s `spec/` directory using the matching filenames (`spec/NN_name.json` and `spec/NN_name.guide.md`).
 - CI runs: schema validation and step-specific checks (see below).
 
 ## Checks
