@@ -89,8 +89,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13_scaffold.schema.json",
-  "title": "13_scaffold",
+  "$id": "https://specdev.local/schema/15_scaffold.schema.json",
+  "title": "15_scaffold",
   "type": "object",
   "additionalProperties": false,
   "properties": {

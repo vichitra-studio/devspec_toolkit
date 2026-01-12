@@ -5,7 +5,7 @@ This reference collects recurring facts that developers need while authoring or 
 ## Terminology
 | Term       | Definition                                              |
 |------------|----------------------------------------------------------|
-| Step       | Numbered phase of the spec lifecycle (00–19, 02a, 13a)   |
+| Step       | Numbered phase of the spec lifecycle (00–16c, 02a, 13a)   |
 | Artifact   | Machine-checked JSON file for a step (`spec/NN_name.json`) |
 | Guide      | Human playbook describing a step (`spec/NN_name.guide.md`) |
 | Prompt     | AI instruction file (`prompts/prompt_NN_name.md`)         |

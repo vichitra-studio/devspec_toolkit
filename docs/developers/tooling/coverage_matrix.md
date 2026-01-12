@@ -14,7 +14,7 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 | Spec Step | Artifact | Downstream Target |
 |-----------|----------|-------------------|
 | `04_fr_list.json` | Functional requirements | Trace to API contracts (`05_interface_contracts.json`) via `traceRef`. |
-| `05_interface_contracts.json` | API contracts | Targets fixtures (`08_fixtures.json`) and scaffold routes (`13_scaffold.json`). |
+| `05_interface_contracts.json` | API contracts | Targets fixtures (`08_fixtures.json`) and scaffold routes (`15_scaffold.json`). |
 | `06_invariants.json` | Invariants | Referenced by fixtures and runtime validators. |
 | `07_nfrs.json` | NFRs | Linked to dashboards/alerts in `16_impl_context.json` (Plan/Review). |
 | `11_redteam.json` | Threat scenarios | Feed additional fixtures and updates in `16_impl_context.json` (Plan). |

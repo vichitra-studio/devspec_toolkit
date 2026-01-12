@@ -12,7 +12,7 @@ Use a Just-In-Time (JIT) approach to managing complexity. Instead of specifying 
     *   *Stop here. Do not detail Step 15+ for the whole project yet.*
 4.  **Phase 3: Implementation Loop (Per Milestone)**:
     *   **Select**: Pick the next milestone from the Roadmap.
-    *   **Expand (Step 15/16/17)**: Create detailed technical plans (e.g., scaffolds, fixtures, red-team attacks) *only for this milestone*.
+    *   **Expand (Step 15/16)**: Create detailed technical plans (e.g., scaffolds, implementation context) *only for this milestone*.
     *   **Implement**: Write the code.
     *   **Contract**: Validate that the code meets the Core Specs.
     *   **Repeat**: Move to the next milestone.
@@ -21,11 +21,10 @@ Use a Just-In-Time (JIT) approach to managing complexity. Instead of specifying 
 ### A. Select & Expand
 For a chosen milestone (e.g., "User Auth"):
 - Generate `15_scaffold.json`: Structural code generation.
-- Generate `16_fixture_impl.json`: Concrete test data for this feature.
-- Generate `17_redteam_loop.json`: Specific attack vectors relevant to this feature.
-- Generate `16_impl_context.json` (Plan): Defines tasks, security fixtures, and drift checks.
-- Build & Config (16b): Implements code and dashboards.
-- Review (16c): Gates specific attack vectors and NFR verification.
+- Execute **Trinity Loop** (16a-c):
+  - **Plan (16a)**: Generate `16_impl_context.json` defining tasks, fixtures, and verification strategy.
+  - **Code (16b)**: Implement feature code, fixtures, and tests.
+  - **Review (16c)**: Verify against NFRs and security controls.
 - `plan.drift` watches for code changing without spec updates.
 
 ## Why JIT?

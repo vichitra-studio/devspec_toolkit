@@ -67,10 +67,10 @@ Before writing formal specs, you must define the "Seed" of your project using th
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
-### Phase II · Spec → Implementation (Steps 13–17)
+### Phase II · Spec → Implementation (Steps 13–16c)
 1. Generate scaffolds manually or using your framework's CLI (e.g., `npm init`, `fastapi new`) based on `15_scaffold.json`.
-2. Implement against fixtures until `14_fixture_impl.json` reports green.
-3. Expand coverage via the red-team loop, monitoring, and drift audits.
+2. Execute the Trinity Loop (16a-c) to plan, code, and review features milestone-by-milestone.
+3. Validate implementation against `08_fixtures.json` and strict NFR gates.
 
 The workflow overviews in [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md) provide the rationale for each phase.
 

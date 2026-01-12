@@ -1,11 +1,11 @@
-# Spec → Implementation Workflow (Steps 13–17)
+# Spec → Implementation Workflow (Steps 13–16c)
 
 Phase II turns validated specs into a running system while keeping runtime behavior traceable back to the artifacts.
 
 All commands in this guide assume you run them from repo root with the toolkit available at [./devspec_toolkit/](../../../).
 
 ## AI Assist Flow
-Where prompts apply in this phase (e.g., Scaffold updates, Red‑Team Loop, Monitoring, Drift), use the two‑phase flow:
+Where prompts apply in this phase (e.g., Scaffold updates, Trinity Plan/Review, Drift), use the two‑phase flow:
 - Phase A — Clarify: ask targeted questions based on the prompt’s “Self‑Audit Gate”.
 - Phase B — Emit: output exactly one fenced `json` block for the step’s artifact.
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
@@ -42,7 +42,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 - **test** — executes fixture suite and custom tests
 - **redteam** — runs adversarial inputs and adds regressions to fixtures
 - **deploy** — deploys via the plan in Step 09/16
-- **drift-audit** — compares runtime data to spec assertions as defined in Step 17
+- **drift-audit** — compares runtime data to spec assertions as defined in `16_impl_context.json` (Step 16a)
 
 Ensure [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) reflects these jobs and references the spec IDs they enforce.
 
