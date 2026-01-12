@@ -3,7 +3,7 @@
 The coverage matrix ties every requirement to a verifying artifact so that the spec, fixtures, and implementation stay aligned.
 
 ## Command
-Use the `matrix` subcommand documented in the [command cheatsheet](../reference.md#command-cheatsheet). When invoked with `--out tools/trace_matrix.json`, it writes the canonical report alongside other toolkit outputs (see [example/tools/trace_matrix.json](../../../example/tools/trace_matrix.json)).
+Use the `matrix` subcommand documented in the [command cheatsheet](../reference.md#command-cheatsheet). When invoked with `--out tools/trace_matrix.json`, it writes the canonical report alongside other toolkit outputs.
 
 - `spec/` — root of the spec artifacts.
 - `--out` — optional path for the generated JSON report (`-` to print to stdout).

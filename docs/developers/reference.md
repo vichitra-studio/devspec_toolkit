@@ -33,7 +33,7 @@ python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tool
 python -m specdev_tools.cli fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Invariants & Governance
-python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./devspec_toolkit/tests/samples/invariants/password_ok.json
+python -m specdev_tools.cli invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
 python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
 
 # Prompt workflow reminders
@@ -58,17 +58,6 @@ Invoke commands from the root of your host repository so relative paths to `spec
 2. Run `validate`.
 3. If any traceability changed, regenerate the matrix and lint fixtures.
 4. Update governance-compliant commit messages per `spec/10_governance.json`.
-
-## Bundled Scripts
-- [tests/run.sh](../../tests/run.sh) — chains the validation workflow for any spec set. Run it from your host repository root, pointing `--repo-root` at the toolkit path (defaults to the script parent) and optionally `--spec-dir` at an alternate spec directory:
-  ```bash
-  ./devspec_toolkit/tests/run.sh --repo-root ./devspec_toolkit [--spec-dir ./path/to/spec]
-  ```
-  The script writes the trace matrix to `tools/trace_matrix.json` beside your spec directory (see [example/tools/trace_matrix.json](../../example/tools/trace_matrix.json)) and the invariants log to `tests/.invariants.out.json` (generated on demand).
-- [tests/unit](../../tests/unit) — smoke-tests the bundled example artifacts. Execute it from the toolkit root to confirm the reference set remains healthy:
-  ```bash
-  ./devspec_toolkit/tests/unit
-  ```
 
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).

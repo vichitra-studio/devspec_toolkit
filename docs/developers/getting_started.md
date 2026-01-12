@@ -39,7 +39,7 @@ Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the can
   - [schema/](../../schema/) — JSON Schemas for every spec step plus shared atoms/collections/errors
   - [prompts/](../../prompts/) — deterministic prompts for AI assistants (contains the guide and requirements)
   - [tools/](../../tools/) — CLI package and schema registry used during validation
-- [example/devspec_kit/](../../example/devspec_kit/) — fully specced reference artifacts for the toolkit itself (read-only)
+
 
 The [developer index](index.md) links to deeper explanations when you need them.
 
@@ -93,7 +93,7 @@ Automation protocol and runner tips live in [../agents/manifest.json](../agents/
 ## 6. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
-Prefer a single command that chains those checks? Consult [`reference.md#bundled-scripts`](reference.md#bundled-scripts) for the [tests/run.sh](../../tests/run.sh) wrapper and the example smoke test so the command details stay canonical.
+
 
 ## 7. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).
