@@ -55,10 +55,9 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 13a | `spec/13a_completeness_assessment.json` | Check for gaps before Roadmap |
 | 14 | `spec/14_roadmap.json` | Initiate JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Optionally run `scaffold` command |
-| 16 | `spec/16_fixture_impl.json` | Confirm fixture statuses align with test outputs |
-| 17 | `spec/17_redteam_loop.json` | Verify threats referenced by `spec/11_redteam.json` |
-| 18 | `spec/18_delivery_monitoring.json` | Spot-check URLs / identifiers provided by humans |
-| 19 | `spec/19_spec_drift.json` | Ensure schedules map to CI jobs |
+| 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
+| 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
+| 16c | `spec/impl_context/{step_id}.json` | Trinity Review: Verification & closure |
 
 ## 5. Escalation Triggers
 - Schema validation fails after two retries → request human clarification.

@@ -16,10 +16,9 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 | `04_fr_list.json` | Functional requirements | Trace to API contracts (`05_interface_contracts.json`) via `traceRef`. |
 | `05_interface_contracts.json` | API contracts | Targets fixtures (`08_fixtures.json`) and scaffold routes (`13_scaffold.json`). |
 | `06_invariants.json` | Invariants | Referenced by fixtures and runtime validators. |
-| `07_nfrs.json` | NFRs | Linked to dashboards/alerts in `16_delivery_monitoring.json`. |
-| `08_fixtures.json` | Test fixtures | Assert expectations against implementations catalogued in `14_fixture_impl.json`. |
-| `11_redteam.json` | Threat scenarios | Feed additional fixtures and updates in `15_redteam_loop.json`. |
-| `17_spec_drift.json` | Drift checks | Backstop runtime verification jobs. |
+| `07_nfrs.json` | NFRs | Linked to dashboards/alerts in `16_impl_context.json` (Plan/Review). |
+| `11_redteam.json` | Threat scenarios | Feed additional fixtures and updates in `16_impl_context.json` (Plan). |
+| `16c_review` | Drift | `plan.drift` checks defined in `16_impl_context.json`. |
 
 ## CI Integration
 Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically. Always run:

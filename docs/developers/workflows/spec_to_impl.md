@@ -17,10 +17,9 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 | 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
 | 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
 | 15 — Scaffold | Generate compile-clean skeleton | Run `python -m specdev_tools.cli scaffold ...`. |
-| 16 — Fixture Impl | Drive dev with fixtures | Implement handlers, update `16_fixture_impl.json`. |
-| 17 — Red-Team Loop | Add adversarial cases | Feed new threats into `17_redteam_loop.json`. |
-| 18 — Monitoring | Map NFRs to operations | Sync `18_delivery_monitoring.json`. |
-| 19 — Spec Drift | Detect divergence | Schedule checks in `19_spec_drift.json`. |
+| 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, and drift checks in `16_impl_context.json`. |
+| 16b — Build (Trinity) | Implement & Config | Write Code, Configs, and update Docs. |
+| 16c — Review (Trinity) | Audit & Gate | Verify Code/Sec/Ops, run full tests, emit Fixture Status default. |
 
 ## Why Two Planning Steps?
 Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (Roadmap)**.
@@ -53,6 +52,6 @@ python -m specdev_tools.cli gen-ci spec --repo-root ./devspec_toolkit --toolkit-
 ```
 
 ## Outputs
-- Current artifacts under `spec/13*` through `spec/17*`
+- Current artifacts under `spec/13*` through `spec/16*`
 - Implemented scaffold or runtime referencing Step 05 contracts
 - Updated monitoring bindings and drift schedules guaranteeing the spec remains the single source of truth

@@ -52,6 +52,16 @@
             "type": "string",
             "format": "date"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "done",
+              "deferred"
+            ],
+            "default": "pending"
+          },
           "risks": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
           },

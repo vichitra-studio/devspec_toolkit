@@ -23,16 +23,10 @@ For a chosen milestone (e.g., "User Auth"):
 - Generate `15_scaffold.json`: Structural code generation.
 - Generate `16_fixture_impl.json`: Concrete test data for this feature.
 - Generate `17_redteam_loop.json`: Specific attack vectors relevant to this feature.
-
-### B. Implement & Verify
-- Write code satisfying the `05_interface_contracts`.
-- Run tests using the `16_fixture_impl` data.
-- Run red-team checks from `17_redteam_loop`.
-
-### C. Contract & Monitor
-- Once passed, the milestone is "Done".
-- `18_delivery_monitoring` tracks the velocity.
-- `19_spec_drift` watches for code changing without spec updates.
+- Generate `16_impl_context.json` (Plan): Defines tasks, security fixtures, and drift checks.
+- Build & Config (16b): Implements code and dashboards.
+- Review (16c): Gates specific attack vectors and NFR verification.
+- `plan.drift` watches for code changing without spec updates.
 
 ## Why JIT?
 - **Reduces Waste**: distinct plans for late-stage features often expire before implementation starts.

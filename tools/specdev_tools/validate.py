@@ -10,7 +10,7 @@ def _resolver_for(registry: SchemaRegistry):
 def _get_step_from_path(path: str) -> str:
     """Extract step number from file path"""
     filename = os.path.basename(path)
-    if filename.startswith('00_') or filename.startswith('01_') or filename.startswith('02_') or filename.startswith('03_') or filename.startswith('04_') or filename.startswith('05_') or filename.startswith('06_') or filename.startswith('07_') or filename.startswith('08_') or filename.startswith('09_') or filename.startswith('10_') or filename.startswith('11_') or filename.startswith('12_') or filename.startswith('13_') or filename.startswith('14_') or filename.startswith('15_') or filename.startswith('16_') or filename.startswith('17_') or filename.startswith('18_') or filename.startswith('19_'):
+    if filename.startswith('00_') or filename.startswith('01_') or filename.startswith('02_') or filename.startswith('03_') or filename.startswith('04_') or filename.startswith('05_') or filename.startswith('06_') or filename.startswith('07_') or filename.startswith('08_') or filename.startswith('09_') or filename.startswith('10_') or filename.startswith('11_') or filename.startswith('12_') or filename.startswith('13_') or filename.startswith('14_') or filename.startswith('15_') or filename.startswith('16_'):
         # Extract first two characters for step number
         step = filename.split('_')[0]
         return step

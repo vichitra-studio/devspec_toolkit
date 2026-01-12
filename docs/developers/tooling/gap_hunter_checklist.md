@@ -16,8 +16,8 @@ Run this checklist after meaningful spec changes to catch missing or ambiguous e
 ### Manual Review Pass
 - Compare the generated `tools/trace_matrix.json` (see [example/tools/trace_matrix.json](../../../example/tools/trace_matrix.json)) with expectations under [./devspec_toolkit/tests/expectations/](../../../tests/expectations/).
 - Look for `traceRef` placeholders such as `*-tbd` and replace them with concrete IDs.
-- Confirm every NFR in `07_nfrs.json` maps to monitoring assets in `16_delivery_monitoring.json`.
-- Ensure threat IDs from `11_redteam.json` appear in `15_redteam_loop.json` updates.
+- Confirm every NFR in `07_nfrs.json` maps to monitoring assets in `16_impl_context.json` (Plan.Delivery).
+- Ensure threat IDs from `11_redteam.json` appear in `16_impl_context.json` (Plan.Security).
 - Spot language like “easy”, “fast”, or “user-friendly” and restate it with measurable criteria.
 
 ### Close The Loop

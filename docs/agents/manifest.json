@@ -1,62 +1,74 @@
 {
   "name": "specdev-agent-guide",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "entrypoint": "docs/agents/agents.md",
   "description": "Operational contract for AI agents working with the AI Spec Driven Development Toolkit",
   "interaction_mode": "two_phase",
   "modes": {
     "clarify": {
-      "purpose": "Collect missing, high-impact details before artifact emission using the prompts’ Context To Ingest, Operating Flow, Heuristics, and Self-Audit Gate sections.",
+      "purpose": "Collect missing, high-impact details before artifact emission.",
       "output_contract": {
         "type": "questions",
         "format": "markdown_bullets_only",
         "restrictions": [
-          "Do not emit JSON or code fences",
-          "Ask targeted questions grouped by field/impact",
-          "Prioritize gating items from the Self-Audit Gate"
+          "Do not emit JSON or code fences"
         ]
       }
     },
     "emit": {
-      "purpose": "Generate the canonical JSON artifact once clarifications resolve gating items.",
+      "purpose": "Generate the canonical JSON artifact.",
       "output_contract": {
         "type": "json_artifact",
         "fenced_code_block": true,
         "language": "json",
         "restrictions": [
-          "Exactly one fenced json block",
-          "No prose before or after",
-          "Must validate against the embedded schema"
+          "Exactly one fenced json block"
         ]
       }
     }
   },
-  "phase_triggers": {
-    "clarify": [
-      "self_audit_score < 0.9",
-      "any gating item missing"
-    ],
-    "emit": [
-      "self_audit_score >= 0.9",
-      "no gating item missing"
-    ]
+  "step_config": {
+    "16a": {
+      "mode": "one_shot",
+      "artifact": "spec/impl_context/{step_id}.json",
+      "schema": "16_impl_context"
+    },
+    "16b": {
+      "mode": "loop",
+      "artifact": "spec/impl_context/{step_id}.json",
+      "schema": "16_impl_context"
+    },
+    "16c": {
+      "mode": "one_shot",
+      "artifact": "spec/impl_context/{step_id}.json",
+      "schema": "16_impl_context"
+    }
   },
+  "phase_triggers": {},
   "commands": [
-    "See docs/developers/reference.md#core-validation-commands for the canonical CLI usage."
+    "See docs/developers/reference.md"
   ],
   "changelog": [
+    {
+      "version": "1.3.0",
+      "date": "2025-01-12",
+      "changes": [
+        "Consolidated Steps 16a-d into Trinity Loop (16a-c)",
+        "Retired Steps 17, 18, 19 (Merged into Trinity)"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2025-01-12",
+      "changes": [
+        "Added Steps 16a-d for Agentic Implementation Loop"
+      ]
+    },
     {
       "version": "1.1.0",
       "date": "2024-05-20",
       "changes": [
         "Added Heuristics For Completeness"
-      ]
-    },
-    {
-      "version": "1.0.0",
-      "date": "2024-01-01",
-      "changes": [
-        "Initial release"
       ]
     }
   ]

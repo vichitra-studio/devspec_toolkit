@@ -1,0 +1,735 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://specdev.local/schema/16_impl_context.schema.json",
+    "title": "16_impl_context",
+    "description": "Unified artifact for the implementation loop (Plan -> Code -> Review).",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "description": "The Step ID from the Roadmap (e.g., step-api-core)."
+        },
+        "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+        },
+        "created_at": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+        },
+        "step_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "description": "Redundant key for easier lookup, matches id."
+        },
+        "plan": {
+            "type": "object",
+            "description": "Populated by Step 16a (Planner).",
+            "additionalProperties": false,
+            "properties": {
+                "summary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "functional_summary": {
+                            "type": "string"
+                        },
+                        "scope_in": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "scope_out": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "target_file_patterns": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Explicit list of files/directories to modify or create."
+                        }
+                    },
+                    "required": [
+                        "functional_summary",
+                        "scope_in",
+                        "target_file_patterns"
+                    ]
+                },
+                "spec_alignment": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "requirements_summary": {
+                            "type": "object",
+                            "description": "Summary of requirements grouped by theme (Schema, Service, etc.)"
+                        },
+                        "checklist": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
+                                    },
+                                    "spec_ref": {
+                                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "layer": {
+                                        "type": "string"
+                                    },
+                                    "linked_test_expectation": {
+                                        "type": "string",
+                                        "description": "Exact test command or function that verifies this item."
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "spec_ref",
+                                    "description",
+                                    "linked_test_expectation"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "checklist"
+                    ]
+                },
+                "ambiguities": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                            },
+                            "severity": {
+                                "type": "string",
+                                "enum": [
+                                    "blocking",
+                                    "non_blocking"
+                                ]
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "mitigation": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "severity",
+                            "description"
+                        ]
+                    }
+                },
+                "solution": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "architecture_sketch": {
+                            "type": "string"
+                        },
+                        "sequence_of_concerns": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "risks": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": [
+                        "architecture_sketch"
+                    ]
+                },
+                "context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "existing_structures": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "coding_patterns": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "tasks": {
+                    "type": "array",
+                    "description": "Recursive tree of parent tasks and subtasks.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "task_id": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
+                            },
+                            "summary": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "planned",
+                                    "implemented",
+                                    "verified",
+                                    "deferred"
+                                ]
+                            },
+                            "origin": {
+                                "type": "string",
+                                "enum": [
+                                    "core",
+                                    "review"
+                                ]
+                            },
+                            "files_to_touch": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "checklist_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "sub_tasks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "task_id": {
+                                            "type": "string"
+                                        },
+                                        "summary": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "required": [
+                            "task_id",
+                            "summary",
+                            "status",
+                            "files_to_touch",
+                            "checklist_ids"
+                        ]
+                    }
+                },
+                "review_requirements": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "guidelines": {
+                            "type": "string"
+                        },
+                        "test_commands": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": [
+                        "test_commands"
+                    ]
+                },
+                "security": {
+                    "type": "object",
+                    "description": "Output from the 'Secure' phase (formerly Step 17).",
+                    "additionalProperties": false,
+                    "properties": {
+                        "new_fixtures": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                            "description": "List of new security fixtures added."
+                        },
+                        "spec_mutations": {
+                            "type": "array",
+                            "description": "Proposed hardening changes to specs.",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "ref": {
+                                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                                    },
+                                    "change": {
+                                        "type": "string"
+                                    },
+                                    "reason": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "ref",
+                                    "change"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "delivery": {
+                    "type": "object",
+                    "description": "Output from the 'Monitor' phase (formerly Step 18).",
+                    "additionalProperties": false,
+                    "properties": {
+                        "dashboards": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "dashboard_id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "nfr_refs": {
+                                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                                    },
+                                    "url": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "dashboard_id"
+                                ]
+                            }
+                        },
+                        "alerts": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "alert_id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "nfr_ref": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "rule": {
+                                        "type": "string"
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "low",
+                                            "medium",
+                                            "high",
+                                            "critical"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "alert_id",
+                                    "rule"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "drift": {
+                    "type": "object",
+                    "description": "Output from the 'Sustain' phase (formerly Step 19).",
+                    "additionalProperties": false,
+                    "properties": {
+                        "checks": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "check_id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "target": {
+                                        "type": "string",
+                                        "enum": [
+                                            "api",
+                                            "schema",
+                                            "nfr",
+                                            "invariant",
+                                            "fixture",
+                                            "config"
+                                        ]
+                                    },
+                                    "method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "runtime-sample",
+                                            "log-diff",
+                                            "schema-diff",
+                                            "trace-replay"
+                                        ]
+                                    },
+                                    "schedule": {
+                                        "type": "string"
+                                    },
+                                    "severity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "low",
+                                            "medium",
+                                            "high",
+                                            "critical"
+                                        ]
+                                    },
+                                    "remediation_policy": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "check_id",
+                                    "target",
+                                    "method"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "docs": {
+                    "type": "object",
+                    "description": "Explicit plan for documentation updates.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "required_updates": {
+                            "type": "array",
+                            "description": "List of docs that must be updated.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "doc_id": {
+                                        "type": "string"
+                                    },
+                                    "path": {
+                                        "type": "string"
+                                    },
+                                    "update_summary": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "path",
+                                    "update_summary"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "required": [
+                "summary",
+                "spec_alignment",
+                "tasks",
+                "review_requirements"
+            ]
+        },
+        "execution": {
+            "type": "object",
+            "description": "Populated by Step 16b (Coder).",
+            "additionalProperties": false,
+            "properties": {
+                "files_touched": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "execution_results": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "passed",
+                                    "failed",
+                                    "partial"
+                                ]
+                            },
+                            "outcome_description": {
+                                "type": "string"
+                            },
+                            "reasoning": {
+                                "type": "string"
+                            },
+                            "evidence": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "outcome_description",
+                            "reasoning"
+                        ]
+                    }
+                },
+                "critical_evidence": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "satisfied_checklist_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "passed_test_commands": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "emergent_ambiguities": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
+                }
+            }
+        },
+        "review": {
+            "type": "object",
+            "description": "Populated by Step 16c (Reviewer).",
+            "additionalProperties": false,
+            "properties": {
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "bug",
+                                    "gap",
+                                    "scope_creep",
+                                    "style",
+                                    "design",
+                                    "tests",
+                                    "docs"
+                                ]
+                            },
+                            "severity": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "related_checklist_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "remediation_task": {
+                                "type": "object",
+                                "description": "Optional nested task to fix the finding.",
+                                "properties": {
+                                    "task_id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "summary": {
+                                        "type": "string"
+                                    },
+                                    "files_to_modify": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "checklist_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "task_id",
+                                    "summary"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "type",
+                            "description"
+                        ]
+                    }
+                },
+                "ratings": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "spec_completeness": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
+                        },
+                        "code_quality": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
+                        },
+                        "tests_completeness": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
+                        },
+                        "docs_completeness": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
+                        }
+                    }
+                },
+                "verdict": {
+                    "type": "string",
+                    "enum": [
+                        "verified",
+                        "deferred",
+                        "rejected"
+                    ]
+                },
+                "next_actions": {
+                    "type": "string"
+                },
+                "fixture_status": {
+                    "type": "object",
+                    "description": "The Final Scoreboard (formerly Step 16d).",
+                    "additionalProperties": false,
+                    "properties": {
+                        "implemented_endpoints": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "https://specdev.local/schema/core/collections/1#traceId"
+                            }
+                        },
+                        "test_results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "fixture_ref": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pass",
+                                            "fail",
+                                            "skip"
+                                        ]
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "fixture_ref",
+                                    "status"
+                                ]
+                            }
+                        },
+                        "ci_status": {
+                            "type": "string",
+                            "enum": [
+                                "green",
+                                "red"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "implemented_endpoints",
+                        "test_results"
+                    ]
+                },
+                "security_status": {
+                    "type": "string",
+                    "enum": [
+                        "green",
+                        "red"
+                    ],
+                    "description": "Verdict from the Security/RedTeam audit."
+                },
+                "delivery_status": {
+                    "type": "object",
+                    "description": "Verdict from the Delivery/Monitoring audit.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "deployments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "env": {
+                                        "type": "string",
+                                        "enum": [
+                                            "dev",
+                                            "staging",
+                                            "prod"
+                                        ]
+                                    },
+                                    "build_id": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "pending",
+                                            "success",
+                                            "failed"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "env",
+                                    "build_id"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "id",
+        "owner",
+        "created_at",
+        "plan"
+    ]
+}
