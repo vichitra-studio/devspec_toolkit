@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "specdev_tools"
+version = "0.1.0"
+description = "Internal tooling for DevSpec Toolkit"
+authors = [{name = "Vichitra Collective"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jsonschema>=4.21.1",
+    "pyyaml>=6.0.1",
+    "jsonschema-specifications>=2023.12.1",
+]
+
+[project.scripts]
+specdev = "specdev_tools.cli:main"
