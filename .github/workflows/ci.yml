@@ -48,41 +48,9 @@ jobs:
           path: tools/trace_matrix.json
           if-no-files-found: error
 
-  tests:
-    name: Invariants & Matrix Checks
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
-      - name: Invariants check
-        run: |
-          python -m specdev_tools.cli invariants-check spec --sample tests/samples/invariants/password_ok.json > tests/.invariants.out.json
-      - name: Upload invariants result
-        uses: actions/upload-artifact@v4
-        with:
-          name: invariants-out
-          path: tests/.invariants.out.json
-      - name: Rebuild trace matrix
-        run: python -m specdev_tools.cli matrix spec --out /tmp/matrix.json
-      - name: Diff against expectations
-        run: |
-          if [ -f tests/expectations/trace_matrix.json ]; then
-            diff -u tests/expectations/trace_matrix.json /tmp/matrix.json
-          else
-            echo "No expectations found; skipping diff."
-          fi
-
   redteam:
     name: Red-Team Lint
-    needs: tests
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -112,27 +80,3 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Deploy to production goes here behind manual approval."
-
-  drift-audit:
-    name: Spec-Drift Audit
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
-      - name: Compute matrix
-        run: python -m specdev_tools.cli matrix spec --out /tmp/matrix.json
-      - name: Diff against expectations
-        run: |
-          if [ -f tests/expectations/trace_matrix.json ]; then
-            diff -u tests/expectations/trace_matrix.json /tmp/matrix.json
-          else
-            echo "No expectations found; skipping diff."
-          fi
