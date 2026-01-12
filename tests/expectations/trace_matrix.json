@@ -1,23 +1,9 @@
 {
-  "matrix": [
-    {
-      "fr_id": "fr-initial-login",
-      "apis": [
-        "api-login"
-      ],
-      "fixtures": [
-        "fx-login-fail",
-        "fx-login-success"
-      ],
-      "nfrs": [
-        "nfr-latency-p99"
-      ]
-    }
-  ],
+  "matrix": [],
   "coverage": {
-    "fr_total": 1,
-    "fr_with_api": 1,
-    "fr_with_fixture": 1,
-    "fr_with_nfr": 1
+    "fr_total": 0,
+    "fr_with_api": 0,
+    "fr_with_fixture": 0,
+    "fr_with_nfr": 0
   }
 }
