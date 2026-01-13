@@ -21,6 +21,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 
 ## Context To Ingest
+- **Primary Source:** `docs/seed/seed_overview.md` (if present) for high-level scoping, problem definitions, and stakeholders.
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.

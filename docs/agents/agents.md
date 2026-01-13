@@ -47,7 +47,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 00–03 | `spec/0*_*.json` | Validate-only |
 | 04 | `spec/04_fr_list.json` | Recompute trace matrix |
 | 05 | `spec/05_interface_contracts.json` | Recompute trace matrix + fixtures lint |
-| 06 | `spec/06_invariants.json` | Re-run invariants check if [tests/samples/](../../tests/samples/) updated |
+| 06 | `spec/06_invariants.json` | Re-run invariants check |
 | 07 | `spec/07_nfrs.json` | Ensure `16_delivery_monitoring.json` links remain valid |
 | 08 | `spec/08_fixtures.json` | Run `fixtures-lint` |
 | 09–12 | `spec/09*_*.json` | Validate-only unless trace references change |

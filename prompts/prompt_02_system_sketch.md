@@ -21,6 +21,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 
 ## Context To Ingest
+- **Primary Source:** `docs/seed/seed_tech_stack.md` (if present) for architecture decisions, patterns, and constraints.
 - Capabilities and owners from `spec/01_capabilities.json` to inform components.
 - Any existing `spec/05_interface_contracts.json` to align external interfaces and protocols.
 - Glossary terms `spec/03_glossary.json` to name components and connections consistently.

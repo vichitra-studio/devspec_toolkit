@@ -44,7 +44,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 - **deploy** — deploys via the plan in Step 09/16
 - **drift-audit** — compares runtime data to spec assertions as defined in `16_impl_context.json` (Step 16a)
 
-Ensure [.github/workflows/ci.yml](../../../.github/workflows/ci.yml) reflects these jobs and references the spec IDs they enforce.
+Ensure the generated [.github/workflows/spec_validation.yml](../../../.github/workflows/spec_validation.yml) reflects these jobs and references the spec IDs they enforce.
 
 
 ## Outputs

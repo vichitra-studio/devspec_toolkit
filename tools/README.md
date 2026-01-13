@@ -3,27 +3,31 @@
 Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit.
 
 ## Install
+The recommended way to install is via the **Project Initialization** script (see below), which handles virtualenv creation and dependency installation automatically.
 
-Follow the environment setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment). Those instructions are the canonical source for creating the virtualenv, installing requirements, and exporting `PYTHONPATH`.
+If you are setting up manually or restoring an existing environment:
 
-> **Note:** A Python virtual environment `devspec_env` can be set up automatically using the toolkit's setup script:
-> ```bash
-> ./devspec_toolkit/setup_devspec_env.sh
-> ```
-> Then activate it using:
-> ```bash
-> source devspec_env/bin/activate
-> ```
-> And run the CLI commands with:
-> ```bash
-> PYTHONPATH="${PWD}/devspec_toolkit/tools" python -m specdev_tools.cli --help
-> ```
-> The toolkit is installed in development mode and dependencies are pre-installed.
+1. Follow the canonical setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment).
+2. Or use the helper script locally:
+   ```bash
+   ./devspec_toolkit/setup_devspec_env.sh
+   source dev_env/bin/activate
+   ```
 
-> **Alternative Setup:** You can also use the toolkit's setup script to configure everything automatically:
-> ```bash
-> ./devspec_toolkit/setup_devspec_env.sh
-> ```
+
+## Project Initialization
+To bootstrap a new project with the toolkit, use the initialization utility:
+
+```bash
+python3 tools/init_project.py --target /path/to/project --strict
+```
+
+### Arguments
+- `--target`: Directory to initialize (defaults to current directory).
+- `--strict`: Enable strict governance mode (installs `commit-msg` hooks and enforces message format).
+- `--toolkit-url`: Custom URL for the submodule (defaults to `vichitracollective/devspec_toolkit`).
+
+This utility standardizes directory creation (`spec/`, `docs/seed/`), submodule addition, and environment setup (`dev_env` with pre-commit hooks).
 
 ---
 

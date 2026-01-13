@@ -21,6 +21,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 
 ## Context To Ingest
+- **Primary Source:** `docs/seed/seed_overview.md` (if present) for scope and user persona definitions.
 - Charter scope and success metrics from `spec/00_charter.json` to anchor what’s “in” now vs “future”.
 - Glossary `spec/03_glossary.json` for canonical nouns/verbs and definitions.
 - Early sketches `spec/02_system_sketch.json` (if any) to understand component boundaries and natural ownership.

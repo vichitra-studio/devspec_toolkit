@@ -67,10 +67,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - spec_first_policy: boolean indicating spec-before-impl requirement.
 - commit_message_rules.require_spec_ids: true if commits must include spec IDs.
 - commit_message_rules.pattern: regex enforcing prefix and ID inclusion.
+- commit_message_rules.error_message: helpful text like "Format: type(scope): msg [id]. Allowed types: feat, fix, chore."
 - reviewers: stable names/roles accountable for approvals.
 
 ## Best Practices
 - **Versioning**: Document the `versioning` strategy (calendar, semver, spec revision) so downstream tooling can bump versions consistently.
+- **Friendly Errors**: In `error_message`, explicitly list the valid `type` enums (e.g. `feat, fix, chore`) so the user knows what to type without reading regex.
 - **Gates**: Encode `pr_rules` that require spec diffs before implementation merges, including checklist items for validation commands.
 - **Spec-First**: Flip `spec_first_policy` to true and describe when, if ever, exceptions are granted.
 - **Traceability**: Configure `commit_message_rules` with regex patterns and spec ID requirements to maintain traceability.
@@ -130,6 +132,10 @@ You are a senior specification author and validator. Your job is to emit a singl
         },
         "pattern": {
           "type": "string"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Human readable guidance. MUST list allowed types/values if a specific set is required."
         }
       },
       "required": [

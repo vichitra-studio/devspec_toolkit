@@ -22,6 +22,12 @@ This reference collects recurring facts that developers need while authoring or 
 ## Command Cheatsheet
 Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-your-environment) before running these commands. Every other document links back here so this serves as the canonical command reference.
 
+### Project Initialization
+```bash
+# Initialize a new project (creates dirs, submodule, venv, hooks, CI)
+python3 tools/init_project.py --target . --strict
+```
+
 ### Core validation commands
 ```bash
 # Validation

@@ -21,7 +21,11 @@ def check_commit_message(spec_dir: str, message: str) -> list[str]:
     errs = []
     require_ids = rules.get("require_spec_ids")
     pattern = rules.get("pattern")
+    custom_msg = rules.get("error_message")
     if require_ids and pattern:
         if not re.match(pattern, message or ""):
-            errs.append("commit message does not match governance pattern")
+            if custom_msg:
+                errs.append(f"Commit message mismatch. {custom_msg}")
+            else:
+                errs.append(f"Commit message mismatch. Must match regex: '{pattern}' (defined in spec/10_governance.json)")
     return errs

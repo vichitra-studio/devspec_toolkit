@@ -18,7 +18,8 @@ To reverse-engineer a **100% Complete Spec Suite (Steps 00-12)** using a **Prose
 
 ### Step 1.1: Project Overview (The "Why")
 *Target: `docs/project_overview.md` -> `spec/00_charter.json`*
-*Seed: `devspec_toolkit/seed_templates/seed_overview.md`*
+*Target: `docs/project_overview.md` -> `spec/00_charter.json`*
+*Seed: `docs/seed/seed_overview.md` (created by init utility)*
 
 We start by capturing the pure business intent in prose.
 
@@ -27,7 +28,7 @@ We start by capturing the pure business intent in prose.
 > Act as the **Project Lead**.
 > 
 > **Context**:
-> - Read `devspec_toolkit/seed_templates/seed_overview.md`.
+> - Read `docs/seed/seed_overview.md`.
 > 
 > **Task**:
 > 1. Interview me to fill out the `seed_overview.md` template.
@@ -43,7 +44,8 @@ We start by capturing the pure business intent in prose.
 
 ### Step 1.2: The Tech Stack (The "How")
 *Target: `docs/tech_stack.md` -> `spec/01_capabilities.json`*
-*Seed: `devspec_toolkit/seed_templates/seed_tech_stack.md`*
+*Target: `docs/tech_stack.md` -> `spec/01_capabilities.json`*
+*Seed: `docs/seed/seed_tech_stack.md` (created by init utility)*
 
 We define the stack by verifying the code reality against the template.
 
@@ -52,7 +54,7 @@ We define the stack by verifying the code reality against the template.
 > Act as the **Software Archaeologist**.
 > 
 > **Context**:
-> - Read `devspec_toolkit/seed_templates/seed_tech_stack.md`.
+> - Read `docs/seed/seed_tech_stack.md`.
 > - **Deep Scan**: Read `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-code files.
 > 
 > **Task**:

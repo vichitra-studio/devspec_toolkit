@@ -8,23 +8,30 @@ This guide onboards developers to the end-to-end spec workflow and shows how to 
 - Access to an AI assistant that can emit valid JSON
 - Familiarity with Git and basic JSON editing
 
-## 1. Set Up Your Environment
-All instructions assume you are at the root of your host repository and the toolkit is checked out at [./devspec_toolkit/](../../). Adjust the paths if you keep the toolkit elsewhere.
-
-The standard setup uses the automated script to configure the environment and dependencies:
+## 0. Initialize the Project
+Before setting up your environment, initialize your project using the toolkit's automated utility. This sets up the directory structure, adds the toolkit as a submodule, seeds context documents, and generates a CI workflow.
 
 ```bash
-# Run the setup script (creates 'devspec_env' and installs dependencies)
-./devspec_toolkit/setup_devspec_env.sh
+# From within the toolkit checkout (or if you curl the script):
+python3 devspec_toolkit/tools/init_project.py --target /path/to/my/project --strict
+```
 
-# Activate the virtual environment
-source devspec_env/bin/activate
+The script performs the following actions:
+1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
+2.  **Directory Structure**: Creates `spec/`, `docs/seed/`, and `.github/workflows/`.
+3.  **Seed Templates**: Copies `seed_overview.md` and `seed_tech_stack.md`.
+4.  **Environment**: Creates `dev_env` and installs dependencies + hooks.
+5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
-# Configure PYTHONPATH
-export PYTHONPATH="${PWD}/devspec_toolkit/tools"
+## 1. Set Up Your Environment
+The initialization utility has already created and configured your virtual environment.
 
-# Verify CLI availability
-python -m specdev_tools.cli --help
+Simply activate it to start working:
+```bash
+source dev_env/bin/activate
+
+# Verify everything is working
+python3 -m specdev_tools.cli --help
 ```
 
 > **Note:** If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
@@ -48,10 +55,10 @@ The [developer index](index.md) links to deeper explanations when you need them.
 ### Phase 0 · Seed The Project (Input Zero)
 Before writing formal specs, you must define the "Seed" of your project using the Smart Prompts. This ensures you have a coherent vision before structured discovery.
 
-1. **Seed Overview** (`seed_templates/seed_overview.md`):
+1. **Seed Overview** (`docs/seed/seed_overview.md`):
    - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
    - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
-2. **Seed Tech Stack** (`seed_templates/seed_tech_stack.md`):
+2. **Seed Tech Stack** (`docs/seed/seed_tech_stack.md`):
    - **Purpose**: acts as your "Senior Architect" to define the *How* and *Where* (Architecture, Constraints, Dependencies).
    - **Expectation**: high technical rigor. Pinned versions (e.g. `Python 3.12`), justified choices, and explicit constraints.
 

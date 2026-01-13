@@ -32,6 +32,10 @@
         },
         "pattern": {
           "type": "string"
+        },
+        "error_message": {
+          "type": "string",
+          "description": "Human readable guidance. MUST list allowed types/values if a specific set is required."
         }
       },
       "required": [

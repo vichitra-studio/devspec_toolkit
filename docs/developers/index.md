@@ -23,9 +23,7 @@ Refer directly to those guides when authoring or reviewing a given step.
 
 ## Related Resources
 - CLI and schema registry: [../tools/README.md](../tools/README.md), [../tools/schema_registry.json](../tools/schema_registry.json)
-- Example specs: [../example/](../example/)
-- Validation scripts & fixtures: [`../tests/README.md`](../tests/README.md)
-- Test data: [../tests/fixtures/](../tests/fixtures/), [../tests/samples/](../tests/samples/)
+
 
 ## Contributing Improvements
 1. Review open issues for existing documentation requests.
