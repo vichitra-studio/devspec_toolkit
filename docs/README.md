@@ -1,22 +1,38 @@
-# Documentation Overview
+# Documentation Index
 
-The AI Spec Driven Development Toolkit separates documentation by audience to keep guidance predictable and easy to maintain.
+This directory contains the authoritative guides for the AI Spec Driven Development Toolkit.
 
-## Sections
-- [developers/](developers/) — human-focused onboarding, reference material, workflow overviews, and diagnostics.
-- [agents/](agents/) — operational contract and manifest for AI or automated contributors.
-- [prompts/](prompts/) — deterministic prompts (the source of truth for guidelines).
+## 👩‍💻 For Developers
 
-## Start Here
-1. Developers: open [developers/index.md](developers/index.md) and follow the links to [getting_started.md](developers/getting_started.md), [reference.md](developers/reference.md), or the workflow guides.
-2. Agents: consume [agents/manifest.json](agents/manifest.json) (machine hints) and [agents/agents.md](agents/agents.md) (two‑phase protocol: Clarify → Emit).
+| Guide | Purpose |
+| :--- | :--- |
+| **[Getting Started](developers/getting_started.md)** | **Start here.** End-to-end setup, environment config, and workflow walkthrough. |
+| **[Reference](developers/reference.md)** | **Daily use.** Cheatsheet for CLI commands, schema IDs, and naming conventions. |
+| **[Extension Schemas](developers/extension_schemas.md)** | How to write domain-specific schemas (e.g., for AI models or database tables). |
 
-## Related Assets
-- Toolkit overview: [../README.md](../README.md)
-- CLI details: [../tools/README.md](../tools/README.md)
-- Examples: [../example/](../example/)
-- Tests and fixtures: [../tests/](../tests/)
+### Workflows
+Detailed breakdowns of the spec lifecycle phases:
+- **[Discovery (Steps 00-12)](developers/workflows/discovery.md)**: From charter to locked specs.
+- **[Implementation (Steps 13-16c)](developers/workflows/implementation.md)**: JIT planning, coding, and review loop.
+- **[Spec → Impl Bridge](developers/workflows/spec_to_impl.md)**: Connecting the two phases.
 
-## Contributing Improvements
-1. Align updates with the structure above (developers vs. agents).
-2. Open a PR summarizing the gap addressed and include validation steps.
+### Tooling & Deep Dives
+- **[Coverage Matrix](developers/tooling/coverage_matrix.md)**: Understanding valid links between artifacts.
+- **[Gap Hunter Checklist](developers/tooling/gap_hunter_checklist.md)**: How to manually audit specs for quality.
+
+---
+
+## 🤖 For AI Agents
+
+| Resource | Purpose |
+| :--- | :--- |
+| **[Agent Protocol](agents/agents.md)** | Operational specificaton for AI agents (Two-Phase Flow, Self-Audit). |
+| **[Manifest](agents/manifest.json)** | Machine-readable capabilities and hints. |
+
+---
+
+## 📄 Prompt Contracts
+
+The single source of truth for every step's requirements lives in the **[prompts/](../prompts/)** directory.
+- `prompt_00_charter.md` through `prompt_16c_review.md`.
+- Shared expectations: **[prompts/shared_expectations.md](prompts/shared_expectations.md)**.
