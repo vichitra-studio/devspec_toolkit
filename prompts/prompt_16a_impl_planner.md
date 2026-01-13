@@ -1,7 +1,7 @@
 # Step 16a · Implementation Planner
 
 ## Purpose
-To produce a complete, falsifiable blueprint for implementation that bakes in security, delivery, and drift detection *before* a single line of code is written. This step acts as the "Architect" that defines not just *what* to build, but *how* to secure, monitor, and sustain it.
+To produce a complete, falsifiable blueprint for implementation that bakes in security, delivery, and drift detection *before* a single line of code is written. This step acts as the "Architect" that defines not just *what* to build, but *how* to secure, monitor, and sustain it, ensuring **Correctness**, **Completeness**, **Anti-Hallucination**, and **Atomic Rigor**.
 
 ## Tool Execution
 Validate the generated JSON:
@@ -43,7 +43,10 @@ You must populate the JSON fields according to these specific definitions and ex
     *   `id`: Uppercase snake-case ID (stable, e.g. `CHK_AUTH_01`).
     *   `spec_ref`: Exact spec lines or `(inferred)`.
         *   *Rule*: You **MUST** capture the Spec Version/Commit (e.g. `@a1b2c`) if available.
-    *   `description`: Exactly ONE requirement. No multi-part obligations.
+    *   `description`: **Verbose, Atomic, and Self-Explanatory**.
+        *   *Rule*: Use "Subject-Action-Constraint" format.
+        *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
+        *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
     *   `type`: `behavior`, `constraint`, `validation`, `metadata`, `perf`, `logging`, `docs`.
     *   `layer`: `db`, `model`, `service`, `api`, `tests`, `docs`.
     *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
@@ -74,8 +77,10 @@ You must populate the JSON fields according to these specific definitions and ex
     *   `summary`: One-line summary.
     *   `files_to_touch`: Subset of `target_file_patterns`.
     *   `checklist_ids`: Explicitly list which requirements this task satisfies.
-    *   `sub_tasks`: Atomic steps for the coder (implementable in 1-2 file edits).
-        *   *Rule*: Sub-tasks must be < 2-3 files each.
+    *   `sub_tasks`: **Atomic Code Instructions** for the coder.
+        *   *Rule*: **Hierarchy is Mandatory**. Parent Task = Logical Feature/Concern. Sub-Task = Specific Code Action (e.g. "Add field to User model").
+        *   *Rule*: Each sub-task must be implementable in 1-2 file edits.
+        *   *Rule*: **Atomic Sub-task**. Do not group actions. "Create Model" and "Create Migration" are TWO sub-tasks.
 
 ## 7. `plan.review_requirements` (Verification Plan)
 *   `test_commands`: Precision commands to run tests.
@@ -114,6 +119,8 @@ You must populate the JSON fields according to these specific definitions and ex
 *   **Checklist Fatigue**: Generating 50+ trivial items. *Fix*: Group related checks (but keep them atomic) or focus on high-risk areas.
 *   **Security Blindness**: Ignoring Step 11 threats. *Fix*: Use **Threat Binding** to force coverage.
 *   **Implementation Drift**: Plan ignores `target_file_patterns` constraints. *Fix*: Planner must strictly define file boundaries.
+*   **Vagueness**: Relying on "common sense" or "standard implementation" in checklist descriptions. *Fix*: Be explicitly verbose and exhaustive.
+*   **Verification Gap**: Emitting a plan without explicitly verifying that it covers *all* requirements. *Fix*: **Verify-First** heuristic.
 
 # Output Rules
 1.  Return exactly one fenced code block with language `json`.

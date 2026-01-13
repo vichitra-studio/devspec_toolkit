@@ -90,6 +90,8 @@ Only NOW do we schedule the work.
 > The specs (00-13) are updated.
 > Add a new item to `spec/14_roadmap.json`.
 > ID: `step-[feature-name]`.
+> Title: One User Story.
+> Tasks: Atomic sub-tasks.
 > Status: `planned`.
 
 ---

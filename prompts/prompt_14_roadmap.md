@@ -1,7 +1,7 @@
 # Step 14 · Roadmap
 
 ## Purpose
-Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the massive scope down into sequential, verifiable milestones.
+Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the scope down into sequential, verifiable milestones, where **Each Milestone** corresponds to exactly **One User Story** decomposed into atomic sub-tasks.
 
 ## Tool Execution
 Validate the generated JSON:
@@ -45,6 +45,8 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
 
 ## Best Practices
+- **One Milestone = One User Story**: Every milestone must map individually to a specific user story. Do not bundle multiple stories into one vague milestone.
+- **Atomic Decomposition**: Each User Story must be broken down into specific, unambiguous, atomic sub-tasks.
 - **Reuse Tech Stack**: In most cases, copy the `tech_stack` from `spec/09_impl_plan.json`. Only update it if Step 13 Extensions introduced new mandated tools.
 - **Sequence Dependencies**: Ensure "Infrastructure" or "Base API" milestones precede "UI" or "Complex Logic" milestones.
 - **JIT Granularity**: Plan the immediate next 1-2 milestones in high detail (dates, deliverables) and leave later milestones fuzzier.
@@ -57,15 +59,14 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 
 # Output Rules
 1. Return exactly one fenced code block with language `json`.
-2. The JSON must validate against the Embedded Schema (reuse 09_impl_plan schema or a dedicated roadmap schema if available—defaulting to 09 format for compatibility).
+2. The JSON must validate against the Embedded Schema (specifically `schema/14_roadmap.schema.json`).
 3. All milestones must have `target_date` and `deliverables` list.
 
 # Embedded Schema
-(Note: This step reuses `09_impl_plan.schema.json` because the Roadmap is structurally identical to the Implementation Plan. There is no separate `14_roadmap.schema.json`.)
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/09_impl_plan.schema.json",
+  "$id": "https://specdev.local/schema/14_roadmap.schema.json",
   "title": "14_roadmap",
   "type": "object",
   "additionalProperties": false,
@@ -99,10 +100,18 @@ You are a senior program manager and architect. Your job is to emit a single JSO
           "milestone_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
           "name": { "type": "string" },
           "target_date": { "type": "string", "format": "date" },
+          "user_story": { "type": "string", "description": "The specific user story this milestone addresses." },
+          "tasks": { 
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Atomic sub-tasks required to complete the user story."
+          },
+          "deliverables": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" },
           "risks": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" },
           "spikes": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" }
+
         },
-        "required": ["milestone_id", "name"]
+        "required": ["milestone_id", "name", "user_story", "tasks", "deliverables"]
       }
     },
     "migration_plan": { "type": "string" },
@@ -128,6 +137,13 @@ You are a senior program manager and architect. Your job is to emit a single JSO
     {
       "milestone_id": "m1-core-foundation",
       "name": "Core Foundation",
+      "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
+      "tasks": [
+          "Initialize FastAPI project structure",
+          "Configure Docker compose for DB and App",
+          "Implement health check endpoint"
+      ],
+      "deliverables": ["Working /health endpoint", "Docker composition"],
       "target_date": "2025-02-01",
       "risks": [],
       "spikes": []

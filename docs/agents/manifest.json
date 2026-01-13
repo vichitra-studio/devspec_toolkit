@@ -28,6 +28,11 @@
     }
   },
   "step_config": {
+    "14": {
+      "mode": "one_shot",
+      "artifact": "spec/14_roadmap.json",
+      "schema": "14_roadmap"
+    },
     "16a": {
       "mode": "one_shot",
       "artifact": "spec/impl_context/{step_id}.json",

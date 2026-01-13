@@ -1,0 +1,119 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://specdev.local/schema/14_roadmap.schema.json",
+    "title": "14_roadmap",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        },
+        "owner": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+        },
+        "created_at": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+        },
+        "tech_stack": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "languages": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                },
+                "frameworks": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                },
+                "infrastructure": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                },
+                "tools": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                }
+            },
+            "required": [
+                "languages",
+                "frameworks"
+            ]
+        },
+        "milestones": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "milestone_id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "target_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "in_progress",
+                            "done",
+                            "deferred"
+                        ],
+                        "default": "pending"
+                    },
+                    "risk_status": {
+                        "type": "string",
+                        "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "critical"
+                        ],
+                        "default": "low"
+                    },
+                    "user_story": {
+                        "type": "string",
+                        "description": "The specific user story this milestone addresses."
+                    },
+                    "tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Atomic sub-tasks required to complete the user story."
+                    },
+                    "deliverables": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    },
+                    "risks": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    },
+                    "spikes": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    }
+                },
+                "required": [
+                    "milestone_id",
+                    "name",
+                    "user_story",
+                    "tasks",
+                    "deliverables"
+                ]
+            }
+        },
+        "migration_plan": {
+            "type": "string"
+        },
+        "dependencies": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        }
+    },
+    "required": [
+        "id",
+        "owner",
+        "created_at",
+        "tech_stack",
+        "milestones"
+    ]
+}

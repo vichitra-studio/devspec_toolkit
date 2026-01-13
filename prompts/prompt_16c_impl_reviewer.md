@@ -32,16 +32,16 @@ You must populate the `review` JSON object according to these specific definitio
 
 ## 2. `review.ratings` (The Rubric)
 *   Provide a 0-5 score for:
-    *   `spec_completeness`: Are all specs met?
+    *   `spec_completeness`: Are all specs met? **Are spec items verbose and atomic?**
     *   `code_quality`: Is the code clean/safe?
     *   `tests_completeness`: Are all paths tested?
     *   `docs_completeness`: Are docs updated?
 *   **Scale**:
-    *   **5**: Exemplary. Verified.
+    *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
     *   **4**: Good (minor nits). Verified.
-    *   **3**: Acceptable (missing edges).
-    *   **2**: Needs Improvement (critical tests fail). Deferred.
-    *   **1**: Poor (major bugs). Rejected.
+    *   **3**: Acceptable (missing edges, or spec was slightly vague but code works).
+    *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous). Deferred.
+    *   **1**: Poor (major bugs OR "magic" implementation vs spec). Rejected.
     *   **0**: Blocked.
 
 ## 3. `review.findings` (Gaps / Bugs / Scope Creep)
