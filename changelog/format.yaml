@@ -1,0 +1,33 @@
+# Changelog Format Schema
+# All changelog/vX.Y.Z.yaml files must follow this structure
+
+format_version: "1.0"
+
+required_fields:
+  - version        # Semantic version string (e.g., "0.2.0")
+  - release_date   # ISO 8601 date (e.g., "2026-01-14")
+  - breaking       # boolean - true if any breaking changes
+
+optional_fields:
+  - description    # Multi-line summary of the release
+  - steps          # List of steps included in this version
+  - changes        # List of changes from previous version
+
+change_types:
+  - add_step        # New step added to toolkit
+  - remove_step     # Step removed from toolkit
+  - rename_step     # Step renumbered/renamed
+  - merge_steps     # Multiple steps consolidated into one
+  - split_step      # One step decomposed into multiple
+  - add_field       # New field added to schema
+  - remove_field    # Field removed from schema
+  - rename_field    # Field renamed in schema
+  - change_type     # Field type changed
+  - add_constraint  # New validation constraint
+  - paradigm_shift  # Format change (prose→JSON)
+
+migration_actions:
+  - auto           # Mechanical fix, applied automatically
+  - ai_assisted    # Requires AI prompt generation
+  - merge          # Step consolidation
+  - archive        # Move to archive

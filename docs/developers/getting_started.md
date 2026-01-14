@@ -38,7 +38,32 @@ python3 -m specdev_tools.cli --help
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
-## 2. Understand The Repository Layout
+## 2. Check Toolkit Version and Alignment
+
+The toolkit uses semantic versioning. Check the current version in [tools/pyproject.toml](../../tools/pyproject.toml):
+
+```bash
+grep 'version' devspec_toolkit/tools/pyproject.toml
+```
+
+When you initialize a project, a `spec/specdev_version` file is created. This file is critical—it tells the toolkit which version your specs were written for.
+
+**Check if you are up to date:**
+```bash
+specdev align status
+```
+
+*   **Aligned**: You are good to go.
+*   **Mismatch**: You need to run the [Migration Workflow](workflows/workflow_align.md).
+
+```yaml
+# Example spec/specdev_version
+toolkit_version: "0.1.0"
+created_at: "2026-01-14T00:00:00Z"
+last_migration: null
+```
+
+## 3. Understand The Repository Layout
 Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the canonical directory map, then keep these working pointers in mind:
 - `spec/` (in your host repo) — machine artifacts (`NN_step.json`) and human guides (`NN_step.guide.md`) you actively maintain.
 - [./devspec_toolkit/](../../) — the toolkit submodule providing schemas, prompts, docs, templates, and CLI code (substitute your path if different).
@@ -50,7 +75,7 @@ Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the can
 
 The [developer index](index.md) links to deeper explanations when you need them.
 
-## 3. Run The Mandala Workflow
+## 4. Run The Mandala Workflow
 
 ### Phase 0 · Seed The Project (Input Zero)
 Before writing formal specs, you must define the "Seed" of your project using the Smart Prompts. This ensures you have a coherent vision before structured discovery.
@@ -81,11 +106,11 @@ Before writing formal specs, you must define the "Seed" of your project using th
 
 The workflow overviews in [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md) provide the rationale for each phase.
 
-## 4. Essential CLI Commands
+## 5. Essential CLI Commands
 
 Keep [reference.md](reference.md) handy for the complete command catalogue, flags, and troubleshooting tips. Every command in that file assumes the pattern `--repo-root ./devspec_toolkit` when you operate from your host repository.
 
-## 5. Working With AI Assistants
+## 6. Working With AI Assistants
 - Read the prompt file before invoking an assistant so you know the Definition of Ready (DoR) and guardrails.
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
@@ -97,12 +122,12 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 
 Automation protocol and runner tips live in [../agents/manifest.json](../agents/manifest.json) and [../agents/agents.md](../agents/agents.md).
 
-## 6. Validation Rituals
+## 7. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
 
 
-## 7. Where To Go Next
+## 8. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).
 - Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md) and [tooling/coverage_matrix.md](tooling/coverage_matrix.md).
 

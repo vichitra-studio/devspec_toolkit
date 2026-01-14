@@ -44,6 +44,11 @@ python -m specdev_tools.cli governance-check spec --repo-root ./devspec_toolkit 
 
 # Prompt workflow reminders
 python -m specdev_tools.cli ai-help --step 04
+
+# Changelog utilities (migration system)
+python -m specdev_tools.cli changelog --list --repo-root ./devspec_toolkit
+python -m specdev_tools.cli changelog --version 0.1.0 --repo-root ./devspec_toolkit
+python -m specdev_tools.cli changelog --validate 0.1.0 --repo-root ./devspec_toolkit
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:

@@ -36,6 +36,21 @@ Most teams vendor the toolkit as a git submodule at `<product-repo>/devspec_tool
 
 ---
 
+## Versioning & Migration
+
+This toolkit uses [Semantic Versioning](https://semver.org/):
+- **MAJOR**: Breaking changes that require spec migration
+- **MINOR**: New features, backward compatible
+- **PATCH**: Bug fixes and documentation
+
+Current version is defined in [tools/pyproject.toml](tools/pyproject.toml). See [CHANGELOG.md](CHANGELOG.md) for release history and [changelog/](changelog/) for machine-readable version details.
+
+Projects track their toolkit version in `spec/specdev_version` to enable migration tooling. When versions mismatch, use the `specdev align` CLI to upgrade.
+
+👉 **[Migration Guide](docs/developers/workflows/workflow_align.md)**
+
+---
+
 ## Working With The Toolkit
 - Follow the environment setup in [docs/developers/getting_started.md#1-set-up-your-environment](docs/developers/getting_started.md#1-set-up-your-environment) (virtualenv + `PYTHONPATH`).
 - Run validations with `python -m specdev_tools.cli … --repo-root <toolkit-root>`.

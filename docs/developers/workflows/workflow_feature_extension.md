@@ -15,6 +15,13 @@ We never skip steps. If a feature is too small for a step, we explicitly explici
 ## Phase 1: The Intent (Define)
 *Files: Docs -> 00 -> 01 -> 02 -> 03 -> 04*
 
+### Pre-Flight Check
+Before starting, ensure your current specs are clean and valid.
+```bash
+specdev align status
+# Should report "Aligned"
+```
+
 1.  **Step 00: Seed Docs & Charter**:
     *   **Check**: Does this feature change the `docs/project_overview.md` (Success Metrics/Users)?
     *   **Action**: Update the Markdown first, then update `spec/00_charter.json`.
@@ -131,4 +138,10 @@ Now we run the machine.
 ---
 
 ## Completion
-Update `spec/19_spec_drift.json` to monitor the new feature.
+
+1.  **Update Step 19**: Update `spec/19_spec_drift.json` to monitor the new feature.
+2.  **Final Validation**:
+    ```bash
+    specdev align validate
+    ```
+    This confirms that your new feature didn't break any existing traces or schema rules.

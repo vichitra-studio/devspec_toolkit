@@ -14,10 +14,27 @@ To reverse-engineer a **100% Complete Spec Suite (Steps 00-12)** using a **Prose
 
 ---
 
+## Phase 0: Gap Analysis (Pre-Bootstrap)
+
+Before writing any new content, check if the toolkit detects any existing artifacts or structure.
+
+```bash
+# Check if project is already partially aligned
+specdev align status
+
+# Verify which steps are missing (expect "ALL MISSING" for new projects)
+specdev align diff
+```
+
+**Why?**
+*   The `align` tool will list every required step (00-16) as "MISSING", giving you a precise checklist to work against.
+*   If you have existing markdown files (e.g., `README.md` or `roadmap.md`), the tool may detect them as "Paradigm Shift Candidates" and offer to auto-convert them.
+
+---
+
 ## Phase 1: The Foundation (Prose & Stack)
 
 ### Step 1.1: Project Overview (The "Why")
-*Target: `docs/project_overview.md` -> `spec/00_charter.json`*
 *Target: `docs/project_overview.md` -> `spec/00_charter.json`*
 *Seed: `docs/seed/seed_overview.md` (created by init utility)*
 
@@ -38,12 +55,18 @@ We start by capturing the pure business intent in prose.
 > **Output**: The markdown content.
 
 **User Action (Convert to Spec):**
+> **Generating the Prompt:**
+> ```bash
+> # Generate all missing prompts for the project
+> specdev align prompts --mode bootstrap --output devspec_prompts/
+> ```
+> Use `devspec_prompts/prompt_bootstrap_00_charter.md`. It will be pre-filled with context if you point it to your `docs/`.
+
 > **PROMPT:**
-> Now convert `docs/project_overview.md` into `spec/00_charter.json`.
-> Use the schema defined in `devspec_toolkit/prompts/prompt_00_project_charter.md`.
+> Convert `docs/project_overview.md` into `spec/00_charter.json`.
+> Use the schema defined in `devspec_toolkit/prompts/prompt_00_charter.md`.
 
 ### Step 1.2: The Tech Stack (The "How")
-*Target: `docs/tech_stack.md` -> `spec/01_capabilities.json`*
 *Target: `docs/tech_stack.md` -> `spec/01_capabilities.json`*
 *Seed: `docs/seed/seed_tech_stack.md` (created by init utility)*
 
