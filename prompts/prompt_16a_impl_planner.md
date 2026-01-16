@@ -60,6 +60,7 @@ You must populate the JSON fields according to these specific definitions and ex
     *   `mitigation`: How should the coder handle this? (e.g., "Assume X specifically").
     *   *Rule*: If `blocking`, you must still plan the rest of the step but flag the blocker.
     *   *Rule*: For `non_blocking`, you MUST provide a `mitigation` or `assumption`.
+    *   *Rule*: Use `metadata` to capture `source` and `impact` if available.
 
 ## 4. `plan.solution` (Architecture)
 *   `architecture_sketch`: Explain data flow, component interactions, and how this fits into the lifecycle.
@@ -70,6 +71,7 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `existing_structures`: List relevant structures (tables, models, services) and how they are used.
 *   `coding_patterns`: Extract concrete patterns with **Short Code Samples**.
     *   *Expectation*: Show, don't just tell. E.g., "Use `TransactionContext`... like this: `with TransactionContext(): ...`".
+    *   *Rule*: Use `coding_examples` array for complex snippets. `coding_patterns` is deprecated.
 
 ## 6. `plan.tasks` (Execution Plan)
 *   Treat each "thread" of work as a Parent Task.
@@ -77,6 +79,7 @@ You must populate the JSON fields according to these specific definitions and ex
     *   `summary`: One-line summary.
     *   `files_to_touch`: Subset of `target_file_patterns`.
     *   `checklist_ids`: Explicitly list which requirements this task satisfies.
+    *   `metadata`: Use `completeness_criteria` and `dependencies` here.
     *   `sub_tasks`: **Atomic Code Instructions** for the coder.
         *   *Rule*: **Hierarchy is Mandatory**. Parent Task = Logical Feature/Concern. Sub-Task = Specific Code Action (e.g. "Add field to User model").
         *   *Rule*: Each sub-task must be implementable in 1-2 file edits.
@@ -86,6 +89,7 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `test_commands`: Precision commands to run tests.
     *   *Rule*: must match `linked_test_expectation` commands.
     *   *Expectation*: Include DB migration commands if needed (`alembic upgrade head`).
+    *   *Rule*: Use `metadata` to capture `legacy_test_output` or specific success criteria.
 
 ## 8. `plan.security` (Red Team & Hardening)
 *   `new_fixtures`: List new security fixtures to cover threats.
@@ -113,6 +117,20 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `required_updates`: List of docs to update.
     *   `path`: File path (e.g. `docs/user_guide.md`, `README.md`).
     *   *Rule*: Always check if `docs/api/openapi.json` needs generic updates.
+
+## 12. Advanced Schema Fields
+Use these fields to capture high-fidelity context that doesn't fit into standard columns.
+*   **`metadata`**: A generic key-value map. You **MUST** use this to preserve lost context from legacy specs.
+    *   **Standard Keys**:
+        *   `source`: The origin of a requirement/ambiguity (e.g. "Slack thread").
+        *   `impact`: The consequence of an issue (e.g. "Data loss risk").
+        *   `proposed_assumption`: For non-blocking ambiguities.
+        *   `completeness_criteria`: Critical "Definition of Done".
+        *   `dependencies`: Blocking parent tasks.
+        *   `legacy_test_output`: Expected output string for regression tests.
+*   **`coding_examples`**: Structured multi-file snippets.
+    *   Use this instead of `coding_patterns`.
+    *   Format: `{ "title": "...", "description": "...", "code": "..." }`.
 
 # Failure Modes (Pitfalls)
 *   **Ambiguity Paralysis**: Planner finds a gap and stops. *Fix*: Raise a "Clarification" task or flag `blocking` ambiguity in `plan.ambiguities`.
@@ -156,7 +174,8 @@ You must populate the JSON fields according to these specific definitions and ex
             "functional_summary": { "type": "string" },
             "scope_in": { "type": "array", "items": { "type": "string" } },
             "scope_out": { "type": "array", "items": { "type": "string" } },
-            "target_file_patterns": { "type": "array", "items": { "type": "string" } }
+            "target_file_patterns": { "type": "array", "items": { "type": "string" } },
+            "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
           }
         },
         "spec_alignment": {
@@ -174,7 +193,8 @@ You must populate the JSON fields according to these specific definitions and ex
                   "description": { "type": "string" },
                   "type": { "type": "string" },
                   "layer": { "type": "string" },
-                  "linked_test_expectation": { "type": "string" }
+                  "linked_test_expectation": { "type": "string" },
+                  "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
                 }
               }
             }
@@ -188,7 +208,8 @@ You must populate the JSON fields according to these specific definitions and ex
                "id": { "type": "string" },
                "severity": { "type": "string" },
                "description": { "type": "string" },
-               "mitigation": { "type": "string" }
+               "mitigation": { "type": "string" },
+               "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
             }
           }
         },
@@ -204,7 +225,11 @@ You must populate the JSON fields according to these specific definitions and ex
           "type": "object",
           "properties": {
              "existing_structures": { "type": "array", "items": { "type": "string" } },
-             "coding_patterns": { "type": "string" }
+             "coding_patterns": { "type": "string", "deprecated": true },
+             "coding_examples": {
+                 "type": "array",
+                 "items": { "type": "object", "properties": { "title": {"type": "string"}, "code": {"type": "string"} } }
+             }
           }
         },
         "tasks": {
@@ -221,7 +246,8 @@ You must populate the JSON fields according to these specific definitions and ex
               "sub_tasks": {
                   "type": "array",
                   "items": { "type": "object", "properties": { "task_id": {"type": "string"}, "summary": {"type": "string"} } }
-              }
+              },
+              "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
             }
           }
         },
@@ -229,7 +255,8 @@ You must populate the JSON fields according to these specific definitions and ex
            "type": "object",
            "required": ["test_commands"],
            "properties": {
-              "test_commands": { "type": "array", "items": { "type": "string" } }
+              "test_commands": { "type": "array", "items": { "type": "string" } },
+              "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
            }
         }
       }

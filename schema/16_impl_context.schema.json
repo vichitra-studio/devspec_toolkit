@@ -50,6 +50,9 @@
                                 "type": "string"
                             },
                             "description": "Explicit list of files/directories to modify or create."
+                        },
+                        "metadata": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                         }
                     },
                     "required": [
@@ -76,7 +79,37 @@
                                         "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
                                     },
                                     "spec_ref": {
-                                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "fr",
+                                                    "api",
+                                                    "nfr",
+                                                    "inv",
+                                                    "fixture",
+                                                    "doc",
+                                                    "code"
+                                                ]
+                                            },
+                                            "id": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "note": {
+                                                "type": "string"
+                                            },
+                                            "commit_hash": {
+                                                "type": "string",
+                                                "pattern": "^[0-9a-f]{40}$",
+                                                "description": "Git commit/blob hash for version traceability"
+                                            }
+                                        },
+                                        "required": [
+                                            "type",
+                                            "id"
+                                        ]
                                     },
                                     "description": {
                                         "type": "string"
@@ -88,8 +121,22 @@
                                         "type": "string"
                                     },
                                     "linked_test_expectation": {
-                                        "type": "string",
-                                        "description": "Exact test command or function that verifies this item."
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "description": "Single test command"
+                                            },
+                                            {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "description": "Multiple test commands for this requirement"
+                                            }
+                                        ]
+                                    },
+                                    "metadata": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                                     }
                                 },
                                 "required": [
@@ -114,18 +161,59 @@
                             "id": {
                                 "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                             },
+                            "description": {
+                                "type": "string"
+                            },
+                            "source": {
+                                "type": "string",
+                                "enum": [
+                                    "spec",
+                                    "code",
+                                    "plan",
+                                    "mixed",
+                                    "review"
+                                ],
+                                "description": "Origin of the ambiguity"
+                            },
+                            "spec_ref": {
+                                "type": "string",
+                                "description": "Spec file reference with line numbers"
+                            },
                             "severity": {
                                 "type": "string",
                                 "enum": [
                                     "blocking",
-                                    "non_blocking"
+                                    "non_blocking",
+                                    "major"
                                 ]
                             },
-                            "description": {
-                                "type": "string"
+                            "impact": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "List of affected checklist_ids"
+                            },
+                            "proposed_assumption": {
+                                "type": "string",
+                                "description": "Detailed assumption to resolve ambiguity"
                             },
                             "mitigation": {
-                                "type": "string"
+                                "type": "string",
+                                "description": "Mitigation strategy"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "resolved",
+                                    "tracking",
+                                    "deferred",
+                                    "blocked"
+                                ],
+                                "description": "Current resolution status"
+                            },
+                            "metadata": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                             }
                         },
                         "required": [
@@ -170,7 +258,30 @@
                             }
                         },
                         "coding_patterns": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Legacy field. Use coding_examples for new steps."
+                        },
+                        "coding_examples": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "code": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "title",
+                                    "code"
+                                ]
+                            }
                         }
                     }
                 },
@@ -228,6 +339,9 @@
                                         }
                                     }
                                 }
+                            },
+                            "metadata": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                             }
                         },
                         "required": [
@@ -251,6 +365,9 @@
                             "items": {
                                 "type": "string"
                             }
+                        },
+                        "metadata": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                         }
                     },
                     "required": [
@@ -479,6 +596,9 @@
                             },
                             "evidence": {
                                 "type": "string"
+                            },
+                            "metadata": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                             }
                         },
                         "required": [
@@ -579,6 +699,9 @@
                                     "task_id",
                                     "summary"
                                 ]
+                            },
+                            "metadata": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                             }
                         },
                         "required": [
@@ -719,6 +842,64 @@
                                     "env",
                                     "build_id"
                                 ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "verification": {
+            "type": "object",
+            "description": "Implementation verification evidence",
+            "additionalProperties": false,
+            "properties": {
+                "test_executions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "command": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "enum": [
+                                    "passed",
+                                    "failed",
+                                    "skipped"
+                                ]
+                            },
+                            "output": {
+                                "type": "string"
+                            },
+                            "notes": {
+                                "type": "string"
+                            },
+                            "checklist_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "command",
+                            "status"
+                        ]
+                    }
+                },
+                "review_findings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "finding": {
+                                "type": "string"
+                            },
+                            "task_id": {
+                                "type": "string"
+                            },
+                            "resolution": {
+                                "type": "string"
                             }
                         }
                     }

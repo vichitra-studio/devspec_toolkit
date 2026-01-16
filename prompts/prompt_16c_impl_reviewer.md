@@ -36,11 +36,12 @@ You must populate the `review` JSON object according to these specific definitio
     *   `code_quality`: Is the code clean/safe?
     *   `tests_completeness`: Are all paths tested?
     *   `docs_completeness`: Are docs updated?
+    *   `metadata_usage`: Are `metadata` fields used to capture lost context (Source, Impact)?
 *   **Scale**:
     *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
     *   **4**: Good (minor nits). Verified.
     *   **3**: Acceptable (missing edges, or spec was slightly vague but code works).
-    *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous). Deferred.
+    *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous/missing metadata). Deferred.
     *   **1**: Poor (major bugs OR "magic" implementation vs spec). Rejected.
     *   **0**: Blocked.
 
@@ -51,6 +52,7 @@ You must populate the `review` JSON object according to these specific definitio
     *   `spec_ref`: **MANDATORY**. Cite the spec/plan line violated.
         *   *Check*: Does the code match the Spec Version/Commit hash? If mismatch, flag as `gap`.
     *   `description`: Concrete description of the issue.
+    *   `metadata`: Optional map for `source` (e.g. "User Feedback") or `impact` (e.g. "Data Loss").
     *   `remediation_task`: **REQUIRED for Blocking/Major items**.
         *   See Section 3 below.
 
@@ -77,6 +79,18 @@ You must populate the `review` JSON object according to these specific definitio
     *   *Check*: Are `dashboards` linked to NFRs? Do links work?
     *   *Check*: Do `alerts` exist for all Critical NFRs?
     *   *Verdict*: `red` if any Critical NFR is unmonitored.
+
+## 7. Advanced Schema Fields (Verification Rules)
+You must **VERIFY** that the Coder respected these high-fidelity fields.
+*   **`metadata` Usage**:
+    *   `completeness_criteria`: Did the Coder actually meet the specific criteria listed in `plan.tasks[].metadata`?
+    *   `legacy_test_output`: Did the `execution.evidence` match the expected output format?
+*   **`plan.context.coding_examples`**:
+    *   *Check*: Did the implementation follow the provided `code` structure?
+*   **Populating Metadata**:
+    *   When creating `review.findings`, you **MUST** populate `metadata` with:
+        *   `source`: Where did you find this issue? (e.g. "Manual Audit", "CI Log").
+        *   `impact`: What is the risk? (e.g. "Data Loss", "Security Bypass").
 
 # Operating Flow
 1.  **Analyze**: Audit Code, Docs, Security, and Ops artifacts.

@@ -40,6 +40,7 @@ You must populate the `execution` JSON object according to these specific defini
     *   `evidence`: **Verbatim** stdout/stderr snippet (max 20 lines).
 *   *Rule*: You **MUST** run every command listed in `plan.review_requirements.test_commands`.
 *   *Rule*: Do NOT say "not run" without a concrete blocker explanation.
+*   *Rule*: Use `metadata` to log "legacy_test_output" if verifying against a specific output format.
 
 ## 3. `execution.critical_evidence` (Traceability)
 *   `satisfied_checklist_ids`: List of IDs that are now fully implemented and verified.
@@ -60,8 +61,23 @@ You must populate the `execution` JSON object according to these specific defini
 *   *Rule*: **Alert Logic**: Alert rules must be syntactically valid for the monitoring system.
 *   *Rule*: **Drift Schedules**: Schedules must be valid cron strings or ISO 8601 intervals.
 
+## 6. Advanced Schema Fields (Consumption Rules)
+You must **READ** and **ACT** on these fields to ensure high-fidelity implementation.
+*   **`plan.tasks[].metadata`**:
+    *   `completeness_criteria`: **MANDATORY**. This is the strict "Definition of Done". Do not stop until this logic is implemented and verified.
+    *   `dependencies`: **MANDATORY**. Respect the sequence.
+*   **`plan.context.coding_examples`**:
+    *   **Ground Truth**: Use these structured snippets over generic knowledge.
+    *   *Usage*: Match the `code` pattern exactly.
+*   **`execution.execution_results[].metadata`**:
+    *   `legacy_test_output`: **MANDATORY**. If present in the plan, your `evidence` must match this format or string closely to prevent regression.
+*   **Contextual Metadata**:
+    *   `source` / `impact`: Use this to understand the *why* and *risk* profile of the task.
+
 # Operating Flow: Synthesize → Code → Emit
 1.  **Read Plan**: Understand `plan.tasks` and `plan.spec_alignment.checklist`.
+    *   *Check*: `plan.tasks[].metadata.completeness_criteria`. This is the strict Definition of Done.
+    *   *Check*: `plan.tasks[].metadata.dependencies`. Ensure sequence.
 2.  **Ambiguity Check (CRITICAL)**:
     *   Check `plan.ambiguities`. if ANY `blocking` ambiguity exists, **STOP**.
     *   Check instructions. Do you have to "guess" a variable name? If yes, **STOP**.
@@ -71,6 +87,7 @@ You must populate the `execution` JSON object according to these specific defini
 3.  **Implement**:
     *   Implement `tasks` atomically.
     *   **Configs**: Create/Update JSON configs for Dashboards, Drift, and Alerts defined in `plan.delivery` / `plan.drift`.
+    *   **Coding Standards**: Read `plan.context.coding_examples` as the "Ground Truth" for implementation patterns.
     *   **Docs**: Implement tasks in `plan.docs`.
 4.  **Verify**:
     *   Run every `linked_test_expectation`.

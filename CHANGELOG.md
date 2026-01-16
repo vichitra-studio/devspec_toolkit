@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-01-16
+
+### Added
+- **Schema Extensions**:
+    - Added generic `metadata` store to `atoms.schema.json`.
+    - Integrated `metadata` into `16_impl_context.schema.json` (Plan, Tasks, Execution, Review) to capture "lost" context like Ambiguity Source and Definition of Done.
+    - Added structured `coding_examples` array to replace legacy `coding_patterns`.
+- **Prompts**: Updated Steps 16a, 16b, 16c to utilize new schema fields.
+
 ## [0.1.0] - 2026-01-14
 
 ### Added
