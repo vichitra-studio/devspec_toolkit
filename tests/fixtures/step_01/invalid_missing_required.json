@@ -1,0 +1,12 @@
+{
+    "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+    "id": "capabilities-catalog",
+    "owner": "product",
+    "created_at": "2025-01-01T00:00:00Z",
+    "capabilities": [
+        {
+            "capability_id": "capability-search-products",
+            "description": "Missing verb and scope"
+        }
+    ]
+}

@@ -1,0 +1,88 @@
+{
+  "id": "system-sketch-invalid-missing-rate-limit",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate users",
+        "Manage sessions",
+        "Handle password resets"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    },
+    {
+      "component_id": "profile-service",
+      "type": "service",
+      "responsibilities": [
+        "Manage profile updates",
+        "Validate profile data",
+        "Serve profile lookups"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        }
+      ]
+    },
+    {
+      "component_id": "payment-service",
+      "type": "service",
+      "responsibilities": [
+        "Create payment intents",
+        "Confirm payment status",
+        "Handle payment failures"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    },
+    {
+      "component_id": "stripe-api",
+      "type": "external",
+      "responsibilities": [
+        "Tokenize payment details",
+        "Authorize card payments",
+        "Return payment confirmations"
+      ],
+      "owner": "business",
+      "tags": ["external-dependency", "critical-path"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "payment-service",
+      "to": "stripe-api",
+      "protocol": "http",
+      "trust_boundary": "partner",
+      "schema_ref": "https://stripe.com/docs/api",
+      "auth": "oauth2",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ]
+}

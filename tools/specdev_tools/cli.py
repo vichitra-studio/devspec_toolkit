@@ -1,34 +1,8 @@
 from __future__ import annotations
 import argparse, os, json, sys
 from pathlib import Path
-from .validate import validate_file, validate_dir
-from .matrix import build_trace_matrix
-from .fixtures_lint import lint_fixtures
-from .invariants import run_invariants
-from .governance import check_commit_message
-from .changelog_parser import (
-    list_versions,
-    load_version,
-    get_toolkit_version,
-    validate_changelog,
-)
-from .schema_differ import (
-    diff_spec_directory,
-    format_status_report,
-    format_diff_report,
-    format_plan_report,
-    apply_auto_fixes,
-    format_apply_report,
-    list_backups,
-    restore_backup,
-    validate_pre_migration,
-    log_operation,
-)
-from .prompt_generator import (
-    generate_prompts,
-    write_prompts,
-    format_prompts_report,
-)
+# Lazy imports handled inside main/command blocks to improve CLI responsiveness
+
 
 
 def check_venv():
@@ -45,6 +19,7 @@ def main():
     v = sub.add_parser("validate")
     v.add_argument("file")
     v.add_argument("--repo-root", default=".")
+    v.add_argument("--json", action="store_true", help="Output results as JSON")
 
     va = sub.add_parser("validate-all")
     va.add_argument("spec_dir")
@@ -94,20 +69,37 @@ def main():
     args = p.parse_args()
 
     if args.repo_root == ".":
-        # Auto-detect toolkit root if running from project root
-        potential_submodule = Path("devspec_toolkit")
-        if potential_submodule.exists() and (potential_submodule / "tools" / "pyproject.toml").exists():
-             args.repo_root = str(potential_submodule)
+        # Auto-detect toolkit root by scanning immediate subdirectories
+        current_dir = Path(".")
+        found = False
+        for child in current_dir.iterdir():
+            if child.is_dir():
+                 potential_marker = child / "tools" / "specdev_tools" / "__init__.py"
+                 if potential_marker.exists():
+                     args.repo_root = str(child)
+                     found = True
+                     break
              
     if args.cmd == "validate":
+        from .validate import validate_file
         repo_root = os.path.abspath(args.repo_root)
         file_path = os.path.abspath(args.file)
         errs = validate_file(repo_root, file_path)
-        if errs:
-            for e in errs: print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        if args.json:
+            output = []
+            if errs:
+                for e in errs:
+                    output.append({"file": file_path, "error": e, "status": "FAIL"})
+            else:
+                output.append({"file": file_path, "status": "PASS"})
+            print(json.dumps(output, indent=2))
+        else:
+            if errs:
+                for e in errs: print(e, file=sys.stderr)
+                sys.exit(1)
+            print("OK")
     elif args.cmd == "validate-all":
+        from .validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = validate_dir(repo_root, spec_dir)
@@ -116,6 +108,7 @@ def main():
             sys.exit(1)
         print("OK")
     elif args.cmd == "matrix":
+        from .matrix import build_trace_matrix
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         res = build_trace_matrix(repo_root, spec_dir)
@@ -129,6 +122,7 @@ def main():
                 f.write(out)
             print(args.out)
     elif args.cmd == "fixtures-lint":
+        from .fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_fixtures(spec_dir)
         if errs:
@@ -136,11 +130,13 @@ def main():
             sys.exit(1)
         print("OK")
     elif args.cmd == "invariants-check":
+        from .invariants import run_invariants
         spec_dir = os.path.abspath(args.spec_dir)
         sample = json.load(open(args.sample, "r", encoding="utf-8"))
         res = run_invariants(spec_dir, sample)
         print(json.dumps(res, indent=2))
     elif args.cmd == "governance-check":
+        from .governance import check_commit_message
         spec_dir = os.path.abspath(args.spec_dir)
         errs = check_commit_message(spec_dir, args.message)
         if errs:
@@ -153,16 +149,22 @@ def main():
             print(f"1. Open the prompt file: prompts/prompt_{args.step}_*.md")
             print(f"2. Copy the content into your AI assistant")
             print(f"3. Paste the AI output into spec/{args.step}_*.json")
-            print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root ./devspec_toolkit")
+            print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>")
         else:
             print("AI Interaction Guide:")
             print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
             print("2. Copy the full content into your AI assistant")
             print("3. Paste only the fenced JSON block into spec/NN_name.json")
-            print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root ./devspec_toolkit")
+            print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>")
             print("5. Ensure all IDs use kebab-case format")
             print("6. No examples should be included in the AI output")
     elif args.cmd == "changelog":
+        from .changelog_parser import (
+            list_versions,
+            load_version,
+            get_toolkit_version,
+            validate_changelog,
+        )
         repo_root = Path(os.path.abspath(args.repo_root))
         changelog_dir = repo_root / "changelog"
         
@@ -210,6 +212,23 @@ def main():
             print("  --version    Show details for a specific version")
             print("  --validate   Validate a version's changelog against format.yaml")
     elif args.cmd == "align":
+        from .schema_differ import (
+            diff_spec_directory,
+            format_status_report,
+            format_diff_report,
+            format_plan_report,
+            apply_auto_fixes,
+            format_apply_report,
+            list_backups,
+            restore_backup,
+            validate_pre_migration,
+            log_operation,
+        )
+        from .prompt_generator import (
+            generate_prompts,
+            write_prompts,
+            format_prompts_report,
+        )
         repo_root = Path(os.path.abspath(args.repo_root))
         spec_dir = Path(os.path.abspath(args.spec_dir))
         

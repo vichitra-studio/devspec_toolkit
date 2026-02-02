@@ -13,7 +13,6 @@ This directory contains the authoritative guides for the AI Spec Driven Developm
 ### Workflows
 Detailed breakdowns of the spec lifecycle phases:
 - **[Discovery (Steps 00-12)](developers/workflows/discovery.md)**: From charter to locked specs.
-- **[Implementation (Steps 13-16c)](developers/workflows/implementation.md)**: JIT planning, coding, and review loop.
 - **[Spec → Impl Bridge](developers/workflows/spec_to_impl.md)**: Connecting the two phases.
 
 ### Tooling & Deep Dives

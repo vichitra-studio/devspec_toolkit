@@ -19,21 +19,99 @@
       "additionalProperties": false,
       "properties": {
         "languages": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version"
+            ]
+          }
         },
         "frameworks": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version"
+            ]
+          }
         },
         "infrastructure": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version"
+            ]
+          }
         },
         "tools": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version"
+            ]
+          }
         }
       },
       "required": [
         "languages",
-        "frameworks"
+        "frameworks",
+        "infrastructure",
+        "tools"
       ]
     },
     "milestones": {
@@ -67,6 +145,12 @@
           },
           "spikes": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
           }
         },
         "required": [
@@ -80,12 +164,19 @@
     },
     "dependencies": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
     }
   },
   "required": [
     "id",
     "owner",
     "created_at",
-    "tech_stack"
+    "tech_stack",
+    "trace"
   ]
 }

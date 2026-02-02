@@ -11,7 +11,13 @@ def load_governance(spec_dir: str) -> dict | None:
                     data = json.load(open(p, "r", encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     continue
-                if data.get("$schema","").endswith("/10_governance.schema.json"):
+                
+                # Check by filename pattern (standard)
+                if fn.startswith("10_"):
+                    return data
+                
+                # Fallback: check by ID pattern
+                if isinstance(data, dict) and data.get("id", "").startswith("governance-"):
                     return data
     return None
 

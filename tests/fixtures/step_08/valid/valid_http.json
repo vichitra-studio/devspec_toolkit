@@ -1,0 +1,32 @@
+{
+  "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+  "id": "fixtures-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fixture-http-success",
+      "description": "Successful HTTP request to user endpoint",
+      "targets": [
+        {
+          "type": "api",
+          "id": "api-user-get"
+        }
+      ],
+      "mode": "contract",
+      "input": {
+        "user_id": "123"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": "123",
+          "name": "John Doe"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      }
+    }
+  ]
+}

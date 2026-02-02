@@ -27,7 +27,7 @@ Each spec step ships with two authoritative files in `spec/`:
 Refer directly to those guides when authoring or reviewing a given step.
 
 ## Related Resources
-- CLI and schema registry: [../tools/README.md](../tools/README.md), [../tools/schema_registry.json](../tools/schema_registry.json)
+- CLI and schema registry: [../../tools/README.md](../../tools/README.md), [../../tools/schema_registry.json](../../tools/schema_registry.json)
 
 
 ## Contributing Improvements

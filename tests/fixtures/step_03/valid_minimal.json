@@ -1,0 +1,15 @@
+{
+  "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+  "id": "glossary-minimal",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-billing-amount",
+      "term": "amount",
+      "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
+      "domain": "billing",
+      "units": "USD"
+    }
+  ]
+}

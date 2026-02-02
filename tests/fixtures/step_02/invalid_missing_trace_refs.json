@@ -1,0 +1,18 @@
+{
+  "id": "system-sketch-invalid-missing-trace-refs",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Create user accounts",
+        "Update profiles",
+        "Serve account queries"
+      ],
+      "owner": "api"
+    }
+  ],
+  "connections": []
+}

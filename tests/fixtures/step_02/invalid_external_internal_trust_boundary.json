@@ -1,0 +1,70 @@
+{
+  "id": "system-sketch-invalid-external-trust-boundary",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "core-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate users",
+        "Manage user profiles",
+        "Process payment intents"
+      ],
+      "owner": "api",
+      "tags": [
+        "critical-path",
+        "stateless"
+      ],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        },
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        },
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    },
+    {
+      "component_id": "stripe-api",
+      "type": "external",
+      "responsibilities": [
+        "Tokenize payment details",
+        "Authorize card payments",
+        "Return payment confirmations"
+      ],
+      "owner": "business",
+      "tags": [
+        "external-dependency",
+        "critical-path"
+      ],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "core-service",
+      "to": "stripe-api",
+      "protocol": "http",
+      "trust_boundary": "internal",
+      "schema_ref": "https://stripe.com/docs/api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ]
+}

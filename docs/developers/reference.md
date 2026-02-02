@@ -25,7 +25,7 @@ Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-y
 ### Project Initialization
 ```bash
 # Initialize a new project (creates dirs, submodule, venv, hooks, CI)
-python3 tools/init_project.py --target . --strict
+python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ```
 
 ### Core validation commands
@@ -49,6 +49,34 @@ python -m specdev_tools.cli ai-help --step 04
 python -m specdev_tools.cli changelog --list --repo-root ./devspec_toolkit
 python -m specdev_tools.cli changelog --version 0.1.0 --repo-root ./devspec_toolkit
 python -m specdev_tools.cli changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+
+### Alignment & Migration
+```bash
+# Check status of spec vs toolkit version
+specdev align status --spec-dir spec
+
+# Show diff of what needs to change
+specdev align diff --spec-dir spec
+
+# Generate an execution plan
+specdev align plan --spec-dir spec
+
+# Apply mechanical fixes (auto-mode)
+specdev align apply --spec-dir spec --auto
+
+# Generate prompts for AI-assisted migration
+specdev align prompts --spec-dir spec --output prompts/migration/ --mode upgrade
+```
+
+
+
+### Step-Specific Verification
+For deep validation of specific steps (DAGs, cycles, logic), use the dedicated scripts:
+```bash
+python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.json
+python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
+python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
+```
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
@@ -72,9 +100,24 @@ Invoke commands from the root of your host repository so relative paths to `spec
 
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).
-- **Unknown API in fixtures**: ensure the target exists in `05_interface_contracts.json`.
+- **Unknown Target in fixtures**: ensure the target ID (`fr-*`, `api-*`, `nfr-*`, `inv-*`) exists in the respective spec file.
 - **Invariant evaluation null**: check referenced keys in fixtures or adjust the invariant expression.
-- **Governance rejection**: match the commit pattern defined in Step 10.
+- **Governance rejection**: match the commit pattern defined in Step 10; ensure `pr_rules` use allowed enum values.
+- **Glossary failures**:
+  - `minItems` error: Ensure `terms` array has at least one item.
+  - `minLength` error: Definitions must be >20 chars.
+  - `pattern` error: Check `domain` (kebab-case) and `units` (alphanumeric/slash) formats. no empty strings allowed.
+- **Implementation Plan failures**:
+  - `tech_stack` error: Ensure it is an object, not an array.
+  - `milestones` error: Ensure every milestone has a `deliverables` array linkage.
+- **Red Team (Step 11) failures**:
+  - `target_ids` error: Threats must target an API or Component.
+  - `mitigations` error: Must be structured objects, not strings.
+- **Scaffold (Step 15) failures**:
+  - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
+  - `duplicate api_ref`: Each API Contract can only be mapped once.
+
+
 
 ## Related Resources
 - [index.md](index.md) — Navigational overview of every document set.

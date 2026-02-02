@@ -14,6 +14,12 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
     "jobs": {
       "type": "array",
       "items": {
@@ -30,7 +36,27 @@
             "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
           },
           "steps": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "command"
+              ]
+            }
           }
         },
         "required": [

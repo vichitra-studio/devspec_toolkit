@@ -1,0 +1,14 @@
+{
+  "id": "glossary-invalid-term-id",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "invalid_term_id_with_spaces",
+      "term": "amount",
+      "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
+      "domain": "billing",
+      "units": "USD"
+    }
+  ]
+}

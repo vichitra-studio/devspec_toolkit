@@ -1,0 +1,29 @@
+{
+    "id": "delivery-baseline-catalog",
+    "owner": "api",
+    "created_at": "2025-01-01T00:00:00Z",
+    "environments": {
+        "dev": {
+            "region": "us-east-1"
+        },
+        "ci": {
+            "runner": "ubuntu-latest"
+        },
+        "staging": {
+            "region": "us-east-1"
+        },
+        "prod": {
+            "region": "us-east-1"
+        }
+    },
+    "ci_gates": [
+        "schema-validate",
+        "Invalid Gate Name"
+    ],
+    "trace": [
+        {
+            "type": "capability",
+            "id": "cap-system"
+        }
+    ]
+}

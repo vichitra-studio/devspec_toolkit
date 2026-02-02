@@ -1,0 +1,26 @@
+{
+    "id": "project-fail",
+    "title": "Project Fail Charter",
+    "owner": "system",
+    "created_at": "2023-10-27T10:00:00Z",
+    "problem_statement": "This is a problem statement.",
+    "in_scope": [
+        "Just one thing"
+    ],
+    "out_of_scope": [
+        "Just one thing"
+    ],
+    "stakeholders": [
+        {
+            "role": "CTO"
+        }
+    ],
+    "success_metrics": [
+        {
+            "metric_id": "latency",
+            "name": "API Latency",
+            "target": 200,
+            "unit": "ms"
+        }
+    ]
+}

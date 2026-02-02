@@ -40,7 +40,10 @@
         "ui",
         "system",
         "ops",
-        "data"
+        "data",
+        "product",
+        "business",
+        "engineering"
       ]
     },
     "tag": {

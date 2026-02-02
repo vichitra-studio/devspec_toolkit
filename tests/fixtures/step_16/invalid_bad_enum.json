@@ -1,0 +1,42 @@
+{
+    "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+    "id": "step-impl-bad-enum",
+    "owner": "api",
+    "created_at": "2024-01-01T00:00:00Z",
+    "plan": {
+        "status": "active",
+        "summary": {
+            "functional_summary": "Bad enum test",
+            "scope_in": [
+                "core"
+            ],
+            "scope_out": [],
+            "target_file_patterns": [
+                "foo.py"
+            ]
+        },
+        "spec_alignment": {
+            "requirements_summary": [
+                {
+                    "theme": "Core",
+                    "summary": "Core stuff"
+                }
+            ],
+            "checklist": [
+                {
+                    "id": "REQ_001",
+                    "spec_ref": {
+                        "type": "fr",
+                        "id": "fr-01",
+                        "line_range": "L1-L2",
+                        "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                    },
+                    "description": "Do the thing",
+                    "type": "behavior",
+                    "layer": "super_layer",
+                    "linked_test_expectation": "it works"
+                }
+            ]
+        }
+    }
+}

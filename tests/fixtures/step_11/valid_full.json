@@ -1,0 +1,70 @@
+{
+  "$schema": "https://specdev.local/schema/11_redteam.schema.json",
+  "id": "redteam-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "trace": {
+    "type": "doc",
+    "id": "spec-11-redteam"
+  },
+  "threats": [
+    {
+      "threat_id": "threat-input-injection",
+      "description": "Malicious input in queries or document content can lead to injection attacks that bypass validation and potentially affect system behavior",
+      "vector": "input-injection",
+      "target_ids": [
+        {
+          "type": "api",
+          "id": "api-ask"
+        },
+        {
+          "type": "api",
+          "id": "api-search"
+        }
+      ],
+      "category": "business_logic",
+      "mitigations": [
+        {
+          "type": "inv",
+          "id": "invariant-payload-validation"
+        },
+        {
+          "type": "nfr",
+          "id": "nfr-availability-api"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "threat_id": "threat-authz-bypass",
+      "description": "Authorization bypass in admin endpoints can allow unauthorized access to sensitive operations and data",
+      "vector": "authz-bypass",
+      "target_ids": [
+        {
+          "type": "api",
+          "id": "api-trace-retrieval"
+        }
+      ],
+      "category": "authz",
+      "mitigations": [
+        {
+          "type": "fr",
+          "id": "fr-read-document"
+        }
+      ],
+      "severity": "critical"
+    }
+  ],
+  "edge_cases": [
+    {
+      "id": "ec-query-timeout",
+      "description": "Query timeouts during complex retrieval operations",
+      "trigger": "Latency > 5s"
+    },
+    {
+      "id": "ec-session-expiration",
+      "description": "Session expiration during long-running conversation",
+      "trigger": "Inactivity > 30m"
+    }
+  ]
+}

@@ -102,6 +102,6 @@ class ChangelogEntry:
 
 ## See Also
 
-- [Migration System Spec](../workflows/migration_system_spec.md)
+- [Migration System Spec](../design/migration_system_spec_v0.1.0.md)
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [changelog/format.yaml](../../../changelog/format.yaml)

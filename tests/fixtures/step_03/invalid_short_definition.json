@@ -1,0 +1,14 @@
+{
+  "id": "glossary-short-def",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-billing-amount",
+      "term": "amount",
+      "definition": "The value of a transaction.",
+      "domain": "billing",
+      "units": "USD"
+    }
+  ]
+}

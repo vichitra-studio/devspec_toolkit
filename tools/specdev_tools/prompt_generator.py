@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import re
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -413,7 +414,11 @@ def gather_paradigm_context(
         if schema_path.exists():
             try:
                 context.target_schema = schema_path.read_text(encoding="utf-8")
-                context.schema_ref = f"../devspec_toolkit/schema/{schema_name}"
+                try:
+                    rel_path = os.path.relpath(schema_path, spec_dir)
+                    context.schema_ref = str(rel_path)
+                except ValueError:
+                    context.schema_ref = f"../devspec_toolkit/schema/{schema_name}"
                 
                 schema_data = json.loads(context.target_schema)
                 context.required_fields = _extract_required_fields(schema_data)

@@ -1,0 +1,20 @@
+version: "0.1.1"
+release_date: "2026-01-13"
+breaking: false
+
+description: |
+  Patch release fixing CI configuration, documentation references, and dependency refactoring.
+
+changes:
+  - type: change_type
+    step_id: "ci"
+    path: "config"
+    description: "CI configuration updates"
+    migration:
+      action: auto
+  - type: change_type
+    step_id: "docs"
+    path: "references"
+    description: "Documentation and step reference corrections"
+    migration:
+      action: auto

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "id": "interface-contracts-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "apis": [
+    {
+      "api_id": "api-invalid-protocol",
+      "name": "Invalid Protocol Test",
+      "version": "v1",
+      "protocol": "invalid-protocol",
+      "route": "/test",
+      "method": "GET",
+      "request_schema_ref": "-tbd",
+      "response_schema_ref": "-tbd",
+      "errors": [],
+      "security": "none",
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-test"
+        }
+      ]
+    }
+  ]
+}

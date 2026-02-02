@@ -1,0 +1,72 @@
+{
+    "$schema": "https://specdev.local/schema/12_ci_gates.schema.json",
+    "id": "valid-ci-pipeline",
+    "owner": "api",
+    "created_at": "2026-01-01T00:00:00Z",
+    "trace": [
+        {
+            "type": "doc",
+            "id": "10-governance-policy"
+        }
+    ],
+    "jobs": [
+        {
+            "job_id": "setup",
+            "name": "Setup Environment",
+            "steps": [
+                {
+                    "id": "install-deps",
+                    "name": "Install Dependencies",
+                    "command": "npm install"
+                }
+            ]
+        },
+        {
+            "job_id": "lint",
+            "name": "Lint Code",
+            "requires": [
+                "setup"
+            ],
+            "steps": [
+                {
+                    "id": "run-linter",
+                    "name": "Run Linter",
+                    "command": "npm run lint"
+                }
+            ]
+        },
+        {
+            "job_id": "test",
+            "name": "Run Tests",
+            "requires": [
+                "setup"
+            ],
+            "steps": [
+                {
+                    "id": "run-tests",
+                    "name": "Execute Test Suite",
+                    "command": "npm test"
+                }
+            ]
+        },
+        {
+            "job_id": "deploy",
+            "name": "Deploy to Staging",
+            "requires": [
+                "lint",
+                "test"
+            ],
+            "steps": [
+                {
+                    "id": "deploy-script",
+                    "name": "Deploy",
+                    "command": "bash ./scripts/deploy.sh"
+                }
+            ]
+        }
+    ],
+    "coverage_thresholds": {
+        "lines": 80,
+        "branches": 70
+    }
+}

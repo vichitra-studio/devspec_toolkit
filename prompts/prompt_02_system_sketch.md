@@ -17,7 +17,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Objective:** produce a complete, falsifiable artifact for **Step 2 · System Sketch**.
 - **Output type:** one JSON document conforming to the Embedded Schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+- **Traceability:** include `trace` that connect components and connections to upstream or downstream artifacts.
 
 
 ## Context To Ingest
@@ -29,14 +29,21 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, auth, rate_limit, reliability, schema_ref). Do not output it.
-- Map external dependencies explicitly; align connection security and reliability with NFRs and interface contracts.
+
+## Dependency Order
+- Step 01 (Capabilities) is required input.
+- Step 05 (Interface Contracts) and Step 07 (NFRs) are optional context only if already drafted.
+- DO NOT hallucinate Step 05/07 content when missing; use `-tbd` or ask Gap Questions.
+- Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, trust_boundary, auth, rate_limit, reliability, schema_ref). Do not output it.
+- **Cross-Check**: If NFRs (`spec/07_nfrs.json`) or Interface Contracts (`spec/05_interface_contracts.json`) are present, align connection security and reliability with them. Do not assume constraints if these files are missing or empty.
 - Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
 - Rewrite responsibilities into 3–6 crisp bullets per component; complete connection details based on protocols and policy; ensure IDs are stable.
 - Emit JSON once reconciled.
 
 ## Heuristics For Completeness
-- Optional→expected: set `auth` and `reliability` for any connection crossing trust boundaries; include `rate_limit` for public/partner interfaces.
+- Optional→expected: set `trust_boundary` on every connection; require `auth` and `rate_limit` for `partner` and `public` boundaries.
+- Trust-boundary auth rules are authoritative; do not infer auth from protocol alone.
+- External integrations: connections touching `type: external` components must use `trust_boundary` of `partner` or `public`.
 - Implicit mapping: responsibilities should cover all in-scope capabilities; if not, propose a missing component.
 - Ambiguity scrub: avoid generic “owns data”; specify data domains and SLAs.
 
@@ -44,6 +51,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - If completeness < 0.9, ask questions.
 - Gating items:
   - Each in-scope capability maps to at least one component.
+  - Every Step 01 capability appears in at least one component `trace` entry.
   - All cross-component integrations appear as connections with protocol/auth; event connections include reliability.
   - External systems are identified with clear boundaries and owners.
 
@@ -52,28 +60,33 @@ You are a senior specification author and validator. Your job is to emit a singl
 2. The JSON must validate against the Embedded Schema below.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
+5. Include explicit preconditions, postconditions, and error states only if the schema defines them (Step 02 does not).
+6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
+7. Include `trace` as required by the schema (Step 02 requires them on components and connections).
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
 ## Step-Specific Completeness Checklist
 - Components enumerate services, data stores, queues, jobs, caches, UIs, libs, and external systems; each has a type and clear responsibilities.
-- Connections cover all cross-component interactions; ensure `from` and `to` component IDs exist.
+- Connections cover all cross-component interactions; ensure `from` and `to` component IDs exist and `trust_boundary` is set.
+- Connections that touch external components use `trust_boundary` of `partner` or `public`.
 - Protocols/auth match real integration constraints (e.g., gRPC with mTLS, events with exactly-once semantics where needed).
 - Include reliability semantics on event/async paths; specify rate limits where known.
-- Tag external dependencies and their owners.
+- Tag external dependencies and their owners; `type: external` must include the `external-dependency` tag.
 
 ## Field-by-Field Guidance
 - components[*].component_id: kebab-case; map to ownership later in scaffolding.
 - components[*].type: one of service, db, queue, cache, job, ui, lib, external.
 - components[*].responsibilities: top 3–6 duties with clear boundaries; avoid overlap across components.
+- components[*].tags: allowed values only: `critical-path`, `supporting`, `external-dependency`, `shared-platform`, `stateful`, `stateless`, `realtime`, `batch`, `latency-sensitive`, `throughput-sensitive`, `pii`, `phi`, `pci`, `confidential`, `public-data`, `multi-tenant`, `single-tenant`, `experimental`, `legacy`, `deprecated`. Include `external-dependency` when `type: external`.
+- components[*].trace: required; include capability references that this component fulfills (use `type: doc` for capability IDs).
 - connections[*].from/to: existing component IDs.
 - connections[*].protocol: `http`, `grpc`, `event`, `rpc`, `db`, or `file` matching the interface.
+- connections[*].trust_boundary: `internal`, `partner`, or `public` (required).
 - connections[*].schema_ref: pointer to schema used on the wire (if known) or `-tbd`.
-- connections[*].auth: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, or `key`.
-- connections[*].rate_limit: numeric rule or policy string (e.g., `100 rps burst 200`).
+- connections[*].auth: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, or `key` (required for `partner`/`public`).
+- connections[*].rate_limit: required for `partner`/`public` trust boundaries; object `{ "rps": int, "burst": int, "window_s": int, "scope": "ip"|"client"|"token"|"global" }`; bounds: `rps` 1..100000, `burst` 1..200000 and >= `rps` when present, `window_s` 1..3600, `scope` required.
 - connections[*].reliability: `best-effort`, `at-least-once`, `exactly-once` aligned with business risk.
+- connections[*].trace: required; link each integration to the capabilities it supports (use `type: doc` for capability IDs, `nfr` for NFRs).
 
 ## Best Practices
 - **Components**: Assign deterministic `component_id` values and tag each component with the correct `type` and owning team.
@@ -93,6 +106,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Component Types: `service`, `db`, `queue`, `cache`, `job`, `ui`, `lib`, `external`.
 - Connection Protocols: `http`, `grpc`, `event`, `rpc`, `db`, `file`.
 - Auth Methods: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, `key`.
+- Trust Boundaries: `internal`, `partner`, `public`.
+- Rate Limit Shape: `{ rps, burst?, window_s?, scope }`.
+- Tag Vocabulary: `critical-path`, `supporting`, `external-dependency`, `shared-platform`, `stateful`, `stateless`, `realtime`, `batch`, `latency-sensitive`, `throughput-sensitive`, `pii`, `phi`, `pci`, `confidential`, `public-data`, `multi-tenant`, `single-tenant`, `experimental`, `legacy`, `deprecated`.
+
+## External Definition
+Define `type: external` as a component that represents third-party services or systems that are not owned or controlled by the organization. Examples include cloud APIs (AWS, GCP), payment processors (Stripe), identity providers (Auth0), or analytics services (Google Analytics). Internal partner services should be marked as `type: service` with appropriate `trust_boundary` and authentication. External components must include the `external-dependency` tag.
+
+## Schema Ref and Rate Limit Formats
+Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`, `api:`, or `-tbd`. For `rate_limit` (required on `partner`/`public` connections), use the structured object with required fields `rps` (1-100000) and `scope` (ip, client, token, or global), with optional `burst` (1-200000) and `window_s` (1-3600). `burst` must be >= `rps` when present.
 
 # Clarification Questions
 - What components exist (or must be created) to deliver the in-scope capabilities? Who owns each?
@@ -100,6 +122,17 @@ You are a senior specification author and validator. Your job is to emit a singl
 - For each connection, what protocol, auth method, and reliability semantics are required?
 - What data schemas or message contracts exist for each integration? Where are they tracked?
 - What rate limits and backpressure expectations apply? Any multi-region or data-residency constraints?
+
+## Negative Constraints
+DO NOT:
+- Include out-of-scope capabilities in components or responsibilities
+- Use non-enum protocols (must be one of: http, grpc, event, rpc, db, file)
+- Use generic responsibilities (must be specific and measurable)
+- Reuse component IDs from other steps or artifacts
+- Create dangling connections (from/to must reference existing components)
+- Omit auth or rate_limit requirements for partner or public trust boundaries
+- Mark `type: external` without the `external-dependency` tag
+- Use `trust_boundary: internal` on connections that touch `type: external` components
 
 # Embedded Schema
 ```json
@@ -121,6 +154,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     },
     "components": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -142,7 +176,9 @@ You are a senior specification author and validator. Your job is to emit a singl
             ]
           },
           "responsibilities": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+            "minItems": 3,
+            "maxItems": 6
           },
           "owner": {
             "$ref": "https://specdev.local/schema/core/atoms/1#owner"
@@ -150,13 +186,45 @@ You are a senior specification author and validator. Your job is to emit a singl
           "tags": {
             "type": "array",
             "items": {
-              "$ref": "https://specdev.local/schema/core/atoms/1#tag"
+              "type": "string",
+              "enum": [
+                "critical-path",
+                "supporting",
+                "external-dependency",
+                "shared-platform",
+                "stateful",
+                "stateless",
+                "realtime",
+                "batch",
+                "latency-sensitive",
+                "throughput-sensitive",
+                "pii",
+                "phi",
+                "pci",
+                "confidential",
+                "public-data",
+                "multi-tenant",
+                "single-tenant",
+                "experimental",
+                "legacy",
+                "deprecated"
+              ]
             }
+          },
+          "trace_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            },
+            "minItems": 1
           }
         },
         "required": [
           "component_id",
-          "type"
+          "type",
+          "responsibilities",
+          "owner",
+          "trace_refs"
         ]
       }
     },
@@ -183,8 +251,17 @@ You are a senior specification author and validator. Your job is to emit a singl
               "file"
             ]
           },
+          "trust_boundary": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "partner",
+              "public"
+            ]
+          },
           "schema_ref": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
           },
           "auth": {
             "type": "string",
@@ -198,7 +275,38 @@ You are a senior specification author and validator. Your job is to emit a singl
             ]
           },
           "rate_limit": {
-            "type": "string"
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rps": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              "burst": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200000
+              },
+              "window_s": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "ip",
+                  "client",
+                  "token",
+                  "global"
+                ]
+              }
+            },
+            "required": [
+              "rps",
+              "scope"
+            ]
           },
           "reliability": {
             "type": "string",
@@ -207,12 +315,57 @@ You are a senior specification author and validator. Your job is to emit a singl
               "at-least-once",
               "exactly-once"
             ]
+          },
+          "trace_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            },
+            "minItems": 1
           }
         },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "trust_boundary": {
+                  "enum": [
+                    "partner",
+                    "public"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "auth",
+                "rate_limit"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "protocol": {
+                  "enum": [
+                    "event"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reliability"
+              ]
+            }
+          }
+        ],
         "required": [
           "from",
           "to",
-          "protocol"
+          "protocol",
+          "trust_boundary",
+          "trace_refs"
         ]
       }
     }
@@ -222,6 +375,76 @@ You are a senior specification author and validator. Your job is to emit a singl
     "owner",
     "created_at",
     "components"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "components": {
+            "minItems": 2
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "connections"
+        ],
+        "properties": {
+          "connections": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "connections": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "connections": {
+            "items": {
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "from"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "to": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "to"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
   ]
 }
 ```
@@ -232,7 +455,24 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "system_sketch-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "components": [],
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Create user accounts",
+        "Validate credentials",
+        "Persist user preferences"
+      ],
+      "owner": "api",
+      "trace_refs": [
+        {
+          "type": "doc",
+          "id": "capability-user-management"
+        }
+      ]
+    }
+  ],
   "connections": []
 }
 ```

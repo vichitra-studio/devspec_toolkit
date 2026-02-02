@@ -35,6 +35,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 
 ## Command Cadence
 - Generate scaffolds manually or using framework tools, ensuring alignment with `15_scaffold.json`.
+- **Verify**: Use `python devspec_toolkit/tests/integration/test_step_15.py <path_to_scaffold>` to check schema compliance, strict method enums, and traceability.
 - Run the [core validation commands](../reference.md#core-validation-commands) to track fixture progress and trace coverage as implementation evolves.
 
 ## CI Integration
@@ -44,7 +45,7 @@ Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (
 - **deploy** — deploys via the plan in Step 09/16
 - **drift-audit** — compares runtime data to spec assertions as defined in `16_impl_context.json` (Step 16a)
 
-Ensure the generated [.github/workflows/spec_validation.yml](../../../.github/workflows/spec_validation.yml) reflects these jobs and references the spec IDs they enforce.
+Ensure the generated `.github/workflows/spec_validation.yml` reflects these jobs and references the spec IDs they enforce.
 
 
 ## Outputs

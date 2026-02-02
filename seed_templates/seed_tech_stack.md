@@ -44,17 +44,17 @@
 ## 2. High-Level Stack Overview
 
 ### 2.1 Pinned Core Versions
-- **Expectation**: Specific versions for OS, Runtime, and Language. Must include the "Source" (where it comes from) and "Rationale" (Why this specific version?).
+- **Expectation**: Specific versions for OS, Runtime, and Language. Must include the "Source" (where it comes from) and "Rationale" (Why this specific version?). **NO "LATEST" TAGS.**
 <!-- 
 DEEP DIVE QUESTIONS:
-- "What exact version of the runtime? (e.g. Node 20 LTS)"
+- "What exact version of the runtime? (e.g. Node 20.10.0)"
 - "Why that version? (Legacy support? New feature?)"
 - "Source? (Docker Hub? Apt? Official Installer?)"
 -->
 | Component | Version | Source | Rationale |
 | :--- | :--- | :--- | :--- |
-| **OS** | [Version] | [Source] | [Why?] |
-| **Runtime** | [Version] | [Source] | [Why?] |
+| **OS** | [Version (e.g. Ubuntu 22.04)] | [Source] | [Why?] |
+| **Runtime** | [Version (e.g. Python 3.11)] | [Source] | [Why?] |
 | **Language** | [Version] | [Source] | [Why?] |
 
 ### 2.2 Layer Summary
@@ -156,6 +156,7 @@ INSTRUCTION: Generate this YAML block automatically based on the components iden
 
 ```yaml
 stack_index:
+  # IDs must be kebab-case (e.g. aws-rds-postgres)
   - id: [component_id]
     name: [Component Name]
     category: [hardware|runtime|database|service]

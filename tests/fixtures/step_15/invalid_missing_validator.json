@@ -1,0 +1,10 @@
+{
+    "id": "invalid-missing-validator",
+    "owner": "api",
+    "created_at": "2025-01-01T12:00:00Z",
+    "service_skeleton": {
+        "language": "python"
+    },
+    "route_map": [],
+    "build_status": "pending"
+}

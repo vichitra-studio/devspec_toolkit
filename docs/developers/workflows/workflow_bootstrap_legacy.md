@@ -1,7 +1,6 @@
 # Workflow: Bootstrapping Legacy Projects (The Hybrid Approach)
 
-> [!NOTE]
-> **Work In Progress**: This document is a **preliminary draft** for rough guidance and is still a work in progress.
+
 
 
 This guide describes the rigorous operating procedure for onboarding an existing **Legacy (Brownfield) Codebase** into the DevSpec Toolkit.

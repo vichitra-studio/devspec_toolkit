@@ -1,0 +1,88 @@
+{
+  "$schema": "https://specdev.local/schema/07_nfrs.schema.json",
+  "id": "nfrs-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "nfrs": [
+    {
+      "nfr_id": "nfr-latency-p95-response-time",
+      "category": "latency",
+      "metric": "p95 response time",
+      "target": 200,
+      "unit": "ms",
+      "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
+      "stage": "prod",
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-login"
+        }
+      ]
+    },
+    {
+      "nfr_id": "nfr-throughput-rps",
+      "category": "throughput",
+      "metric": "requests per second",
+      "target": 1000,
+      "unit": "rps",
+      "measurement_method": "PromQL: rate(http_requests_total{job=\"api-server\"}[5m])",
+      "stage": "prod",
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-login"
+        }
+      ]
+    },
+    {
+      "nfr_id": "nfr-availability-99-9",
+      "category": "availability",
+      "metric": "uptime percentage",
+      "target": "99.9%",
+      "unit": "%",
+      "measurement_method": "PromQL: (1 - sum(rate(http_request_duration_seconds_bucket{job=\"api-server\", status!~\"2..\"}[5m])) / sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m]))) * 100",
+      "stage": "prod",
+      "owner": "system",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-login"
+        }
+      ]
+    },
+    {
+      "nfr_id": "nfr-cost-monthly",
+      "category": "cost",
+      "metric": "monthly operational cost",
+      "target": "<= $10k",
+      "unit": "USD",
+      "measurement_method": "Cloud billing dashboard with cost allocation tags",
+      "stage": "prod",
+      "owner": "business",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "cost-analysis-report"
+        }
+      ]
+    },
+    {
+      "nfr_id": "nfr-security-encryption",
+      "category": "security",
+      "metric": "data encryption at rest",
+      "target": "AES-256",
+      "unit": "",
+      "measurement_method": "Configuration review of storage systems",
+      "stage": "prod",
+      "owner": "system",
+      "trace": [
+        {
+          "type": "inv",
+          "id": "inv-data-encryption"
+        }
+      ]
+    }
+  ]
+}

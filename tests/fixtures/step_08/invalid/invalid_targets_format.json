@@ -1,0 +1,26 @@
+{
+  "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+  "id": "fixtures-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fixture-invalid-targets",
+      "description": "Fixture with invalid string targets instead of traceRef objects",
+      "targets": [
+        "fr-user-login",
+        "api-auth"
+      ],
+      "mode": "contract",
+      "input": {
+        "username": "testuser"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "token": "abc123"
+        }
+      }
+    }
+  ]
+}

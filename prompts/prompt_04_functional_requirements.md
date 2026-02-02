@@ -52,7 +52,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
+6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
@@ -72,6 +72,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - acceptance_criteria[*].text: exact observable outcome; include inputs and expected outputs/state changes.
 - acceptance_criteria[*].fixture_ref: reference `fixture-*` to drive automation; use `fixture-*-tbd` if not yet created.
 - trace: link to `capability-*`, `api-*`, `nfr-*`, or `invariant-*` as known.
+- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}`. Do not use simple strings or arrays of strings.
 
 ## Best Practices
 - **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
@@ -84,6 +85,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
 - **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
 - **Implementation**: Embedding implementation details (e.g., method names) instead of outcomes, limiting design options.
+
+## Negative Constraints
+- **DO NOT** use implementation details (function names, DB tables) in statements.
+- **DO NOT** bundle multiple behaviors into one FR.
+- **DO NOT** leave acceptance criteria vague ('it works').
+- **DO NOT** trace to non-existent IDs.
+- **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
 
 ## Quick Reference
 - ID Format: `fr-<descriptor>` with stable suffixes for traceability.
@@ -128,7 +136,7 @@ You are a senior specification author and validator. Your job is to emit a singl
           },
           "statement": {
             "type": "string",
-            "minLength": 10
+            "minLength": 20
           },
           "rationale": {
             "type": "string"
@@ -150,7 +158,8 @@ You are a senior specification author and validator. Your job is to emit a singl
                   "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                 },
                 "text": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 15
                 },
                 "fixture_ref": {
                   "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"

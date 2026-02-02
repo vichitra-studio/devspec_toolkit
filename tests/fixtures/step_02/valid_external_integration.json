@@ -1,0 +1,97 @@
+{
+  "id": "system-sketch-external",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate users",
+        "Manage user profiles",
+        "Serve account lookups"
+      ],
+      "owner": "api",
+      "tags": ["critical-path", "stateless"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        },
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        }
+      ]
+    },
+    {
+      "component_id": "payment-service",
+      "type": "service",
+      "responsibilities": [
+        "Create payment intents",
+        "Confirm payment status",
+        "Handle payment failures"
+      ],
+      "owner": "api",
+      "tags": ["critical-path", "stateful"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    },
+    {
+      "component_id": "stripe-api",
+      "type": "external",
+      "responsibilities": [
+        "Tokenize payment details",
+        "Authorize card payments",
+        "Return payment confirmations"
+      ],
+      "owner": "business",
+      "tags": ["external-dependency", "critical-path"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "user-service",
+      "to": "payment-service",
+      "protocol": "http",
+      "trust_boundary": "internal",
+      "schema_ref": "file://schemas/payments.json",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    },
+    {
+      "from": "payment-service",
+      "to": "stripe-api",
+      "protocol": "http",
+      "trust_boundary": "partner",
+      "schema_ref": "https://stripe.com/docs/api",
+      "auth": "jwt",
+      "rate_limit": {
+        "rps": 50,
+        "burst": 100,
+        "window_s": 60,
+        "scope": "client"
+      },
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ]
+}

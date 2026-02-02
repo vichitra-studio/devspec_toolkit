@@ -5,7 +5,7 @@ This document defines how automated agents should work with the AI Spec Driven D
 ## 1. Locating Agent Guidance
 - Prefer machine-readable metadata in [docs/agents/manifest.json](manifest.json).
 - If the manifest is missing, fall back to this file ([docs/agents/agents.md](agents.md)).
-- A root-level pointer ([agents.md](../../agents.md)) also links here; use it to discover agent docs when scanning the repository top-down.
+- A root-level pointer ([README.md](../../README.md)) also links here; use it to discover agent docs when scanning the repository top-down.
 
 ## 2. Repository Expectations
 - The toolkit is checked out at repo root as [./devspec_toolkit/](../../); adjust if your checkout differs.

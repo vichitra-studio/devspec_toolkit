@@ -22,13 +22,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` (goals/risks), System Sketch `spec/02_system_sketch.json` (components/dependencies).
+- Capabilities `spec/01_capabilities.json` (approved languages/frameworks) - **CRITICAL**: You must strictly adhere to this allowed stack.
 - FRs/APIs `spec/04_fr_list.json`/`spec/05_interface_contracts.json` for scope; NFRs `spec/07_nfrs.json` for performance/reliability constraints.
 - Governance `spec/10_governance.json` and CI `spec/12_ci_gates.json` expectations.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Plan Ledger: tech_stack (language/framework/db/tooling + versions), milestones (id/name/date/risks/spikes), migration plan (if replacing), dependencies (teams/vendors/apis). Do not output it.
-- Align milestones with governance/CI cadence; add spikes for unknowns.
+- **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless explicitly justified as a Spike.
+- Align milestones with governance/CI cadence (as defined in `spec/10_governance.json` or provided docs); add spikes for unknowns.
 - Self-audit; if risks/spikes/dependencies are vague, ask Gap Questions.
 - Rewrite milestones for outcomes and acceptance signals; finalize plan.
 - Emit JSON when the plan is actionable.
@@ -40,7 +42,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Self-Audit Gate
 - If completeness < 0.9, ask.
 - Gating items:
-  - Tech choices include versions; milestones have names and acceptance signals; known risks/spikes captured.
+  - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
+  - `tech_stack` aligns with `01_capabilities.json`.
   - Dependencies listed for external teams/systems; plan aligns with governance/CI expectations.
 
 # Output Rules
@@ -49,9 +52,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
+6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
+7. **Traceability**: You MUST include a top-level `trace` array linking to the Charter (`00_charter.json`) or System Sketch (`02_system_sketch.json`).
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+
+## Negative Constraints
+- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/01_capabilities.json` without a clear "Spike" justification.
+- **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
+- **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
+- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It MUST be an object with `languages`, `frameworks`, `infrastructure`, and `tools` arrays.
+- **NO Missing Rationale**: Do not omit `rationale` for `tech_stack` items. Explain WHY a technology was chosen.
 
 ## Step-Specific Completeness Checklist
 - `tech_stack` declares languages, frameworks, data stores, and major infra choices with rationale where contentious.
@@ -60,16 +70,21 @@ You are a senior specification author and validator. Your job is to emit a singl
 - `dependencies` enumerate external systems, teams, or contracts that impact delivery.
 
 ## Field-by-Field Guidance
-- tech_stack: structured object; include versions if known.
+- tech_stack: structured object with arrays for `languages`, `frameworks`, `infrastructure`, `tools`. Each item must have `name`, `version`, and `rationale`.
+    - `name`: exact library/tool name (e.g., "pydantic", "postgresql").
+    - `version`: semantic version constraint (e.g., "^2.0.0").
+    - `rationale`: brief reason for selection (e.g., "Standard backend language per capabilities").
 - milestones[*].milestone_id/name: kebab-case ID and descriptive name.
 - milestones[*].target_date: ISO date for planning; can be tentative.
+- milestones[*].status: `pending`, `in_progress`, `done`, `deferred`.
 - milestones[*].risks/spikes: concrete bullets (e.g., perf unknowns, vendor limits, schema evolution).
+- milestones[*].deliverables: array of trace references linking to FRs/APIs.
 - migration_plan: narrative plan for cutover/backfill/rollback.
 - dependencies: list of external dependencies and agreements.
 
 ## Best Practices
 - **Stack**: Capture `tech_stack` decisions with rationale, version constraints, and ownership so scaffold generation is predictable.
-- **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`.
+- **Milestones**: Organize `milestones` by value increments tied to charter metrics or capability unlocks, using `target_date`. Link deliverables to FRs/APIs.
 - **Adaptability**: Document `risks` and `spikes` with clear mitigation steps to keep delivery adaptable.
 - **Migration**: Detail the `migration_plan` when replacing legacy systems, calling out cutover criteria and rollback triggers.
 - **Dependencies**: Enumerate `dependencies` across teams or vendors to schedule integration work early.
@@ -127,11 +142,27 @@ You are a senior specification author and validator. Your job is to emit a singl
             "type": "string",
             "format": "date"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "done",
+              "deferred"
+            ],
+            "default": "pending"
+          },
           "risks": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
           },
           "spikes": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
           }
         },
         "required": [
@@ -162,7 +193,66 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "impl_plan-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "tech_stack": {},
-  "milestones": []
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "^3.9",
+        "rationale": "Required for ONNX Runtime compatibility"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "FastAPI",
+        "version": "^0.110.0",
+        "rationale": "High-performance web framework"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "Raspberry Pi 4",
+        "version": "Model B 4GB",
+        "rationale": "Primary deployment target"
+      }
+    ],
+    "tools": [
+      {
+        "name": "structlog",
+        "version": "^24.1.0",
+        "rationale": "Structured logging implementation"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "milestone-setup-core-infrastructure",
+      "name": "Setup Core Infrastructure and Environment",
+      "target_date": "2025-11-15",
+      "status": "pending",
+      "risks": [
+        "Raspberry Pi 4 setup and performance profiling may reveal unexpected constraints"
+      ],
+      "spikes": [
+        "Performance testing with small dataset on Raspberry Pi 4 to validate target latency"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        }
+      ]
+    }
+  ],
+  "migration_plan": "No migration required as this is a new implementation of the personal knowledge RAG system.",
+  "dependencies": [
+    "Raspberry Pi 4 hardware (for deployment)",
+    "Cloudflare Access for admin authentication"
+  ],
+  "trace": [
+    {
+      "type": "doc",
+      "id": "personal-knowledge-rag-system"
+    }
+  ]
 }
 ```

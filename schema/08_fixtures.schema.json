@@ -29,6 +29,7 @@
           },
           "targets": {
             "type": "array",
+            "minItems": 1,
             "items": {
               "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
             }
@@ -59,7 +60,8 @@
           "fixture_id",
           "mode",
           "input",
-          "expected"
+          "expected",
+          "targets"
         ]
       }
     }

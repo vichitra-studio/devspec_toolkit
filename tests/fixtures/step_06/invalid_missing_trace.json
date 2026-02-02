@@ -1,0 +1,19 @@
+{
+  "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+  "id": "invariants-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "rules": [
+    {
+      "inv_id": "invariant-user-authentication",
+      "description": "All user authentication requests must include a valid JWT token",
+      "language": "jsonlogic",
+      "expression": "{ \"and\": [ { \"in\": [ \"auth-token\", { \"var\": \"headers\" } ] }, { \"not\": { \"empty\": { \"var\": \"auth-token\" } } } ] }",
+      "scope": {
+        "components": ["auth-service"],
+        "apis": ["api-login", "api-secure-endpoint"]
+      },
+      "severity": "error"
+    }
+  ]
+}

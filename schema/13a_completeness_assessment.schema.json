@@ -45,7 +45,8 @@
           "specification_source": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
             }
           }
         },

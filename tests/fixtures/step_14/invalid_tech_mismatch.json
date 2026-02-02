@@ -1,0 +1,65 @@
+{
+  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "id": "roadmap-invalid-tech",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "tech_stack": {
+    "languages": [
+      "python"
+    ],
+    "frameworks": [
+      "fastapi"
+    ],
+    "infrastructure": [
+      {
+        "name": "docker",
+        "version": "20.10.0",
+        "rationale": "Containerization platform"
+      }
+    ],
+    "tools": [
+      {
+        "name": "poetry",
+        "version": "1.4.0",
+        "rationale": "Dependency management"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "status": "done",
+      "risk_status": "low",
+      "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
+      "tasks": [
+        {
+          "task_id": "init-fastapi-project",
+          "description": "Initialize FastAPI project structure"
+        },
+        {
+          "task_id": "configure-docker-compose",
+          "description": "Configure Docker compose for DB and App"
+        },
+        {
+          "task_id": "implement-health-check",
+          "description": "Implement health check endpoint"
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "health-endpoint"
+        }
+      ],
+      "risks": [],
+      "spikes": []
+    }
+  ],
+  "dependencies": [],
+  "trace": []
+}

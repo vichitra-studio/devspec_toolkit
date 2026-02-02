@@ -1,0 +1,255 @@
+{
+  "$schema": "https://specdev.local/schema/09_impl_plan.schema.json",
+  "id": "impl-plan-personal-knowledge-rag",
+  "owner": "api",
+  "created_at": "2025-10-22T00:00:00Z",
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "^3.9",
+        "rationale": "Required for ONNX Runtime compatibility and system stability on Raspberry Pi 4"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "FastAPI",
+        "version": "^0.110.0",
+        "rationale": "High-performance web framework for building APIs with automatic OpenAPI documentation"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "Raspberry Pi 4",
+        "version": "Model B 4GB",
+        "rationale": "Primary deployment target with sufficient compute for ONNX models"
+      },
+      {
+        "name": "Docker",
+        "version": "^24.0.0",
+        "rationale": "Optional containerization for development and staging environments"
+      },
+      {
+        "name": "LanceDB",
+        "version": "^0.15.0",
+        "rationale": "Vector database optimized for local development and small datasets"
+      },
+      {
+        "name": "BM25 index",
+        "version": "Built-in",
+        "rationale": "Keyword search for hybrid retrieval system"
+      },
+      {
+        "name": "SQLite",
+        "version": "^3.45.0",
+        "rationale": "Relational database for document metadata and document store"
+      },
+      {
+        "name": "Redis",
+        "version": "^7.2.0",
+        "rationale": "In-memory cache for session management and performance optimization"
+      }
+    ],
+    "tools": [
+      {
+        "name": "Prometheus",
+        "version": "^2.49.0",
+        "rationale": "Monitoring and metrics collection for system performance"
+      },
+      {
+        "name": "metrics-collector service",
+        "version": "v1.0.0",
+        "rationale": "Service for collecting and aggregating system metrics"
+      },
+      {
+        "name": "structlog",
+        "version": "^24.1.0",
+        "rationale": "Structured logging implementation for debugging and observability"
+      },
+      {
+        "name": "Logging: structured JSON",
+        "version": "v1.0.0",
+        "rationale": "Standardized logging format for system monitoring"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "milestone-setup-core-infrastructure",
+      "name": "Setup Core Infrastructure and Environment",
+      "target_date": "2025-11-15",
+      "status": "pending",
+      "risks": [
+        "Raspberry Pi 4 setup and performance profiling may reveal unexpected constraints"
+      ],
+      "spikes": [
+        "Performance testing with small dataset on Raspberry Pi 4 to validate target latency"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        },
+        {
+          "type": "fr",
+          "id": "fr-manage-conversation-session"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-implement-document-storage",
+      "name": "Implement Document Storage and CRUD Operations",
+      "target_date": "2025-11-30",
+      "status": "pending",
+      "risks": [
+        "SQLite performance under concurrent writes may impact throughput targets"
+      ],
+      "spikes": [
+        "Test SQLite performance with concurrent document operations under load simulation"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-ingest-upsert-document"
+        },
+        {
+          "type": "fr",
+          "id": "fr-read-document"
+        },
+        {
+          "type": "fr",
+          "id": "fr-update-document"
+        },
+        {
+          "type": "fr",
+          "id": "fr-delete-document"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-setup-hybrid-retrieval",
+      "name": "Setup Hybrid Retrieval System (Dense + Sparse)",
+      "target_date": "2025-12-15",
+      "status": "pending",
+      "risks": [
+        "Integration of LanceDB and BM25 may require custom fusion logic for optimal results"
+      ],
+      "spikes": [
+        "Evaluate and implement RRF fusion algorithm for combining dense and sparse scores"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-add-session-management",
+      "name": "Add Session Management for Multi-turn Conversations",
+      "target_date": "2026-01-15",
+      "status": "pending",
+      "risks": [
+        "Session cache performance may not meet 95% hit rate target under load"
+      ],
+      "spikes": [
+        "Implement and test session TTL and cache eviction strategies"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-manage-conversation-session"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-implement-admin-features",
+      "name": "Implement Admin Features (Tracing, Analytics, Logging)",
+      "target_date": "2026-01-30",
+      "status": "pending",
+      "risks": [
+        "JWT validation complexity may introduce security vulnerabilities if not properly implemented"
+      ],
+      "spikes": [
+        "Implement and test Cloudflare Access JWT validation with proper error handling"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        },
+        {
+          "type": "fr",
+          "id": "fr-generate-cited-response"
+        },
+        {
+          "type": "fr",
+          "id": "fr-manage-conversation-session"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-integration-testing",
+      "name": "Integration Testing and Performance Tuning",
+      "target_date": "2026-02-15",
+      "status": "pending",
+      "risks": [
+        "Overall system performance may not meet P95 latency target of 2000ms"
+      ],
+      "spikes": [
+        "Full end-to-end performance testing with simulated user load"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        },
+        {
+          "type": "fr",
+          "id": "fr-generate-cited-response"
+        },
+        {
+          "type": "fr",
+          "id": "fr-manage-conversation-session"
+        }
+      ]
+    },
+    {
+      "milestone_id": "milestone-final-optimization",
+      "name": "Final Optimization and Documentation",
+      "target_date": "2026-02-28",
+      "status": "pending",
+      "risks": [
+        "Final performance tuning may introduce regressions in other components"
+      ],
+      "spikes": [
+        "Comprehensive testing of all documented edge cases and error conditions"
+      ],
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-search-hybrid-retrieval"
+        },
+        {
+          "type": "fr",
+          "id": "fr-generate-cited-response"
+        },
+        {
+          "type": "fr",
+          "id": "fr-manage-conversation-session"
+        }
+      ]
+    }
+  ],
+  "migration_plan": "No migration required as this is a new implementation of the personal knowledge RAG system.",
+  "dependencies": [
+    "Raspberry Pi 4 hardware (for deployment)",
+    "Cloudflare Access for admin authentication"
+  ],
+  "trace": [
+    {
+      "type": "doc",
+      "id": "personal-knowledge-rag-system"
+    }
+  ]
+}

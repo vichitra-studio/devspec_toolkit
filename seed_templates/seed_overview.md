@@ -28,7 +28,7 @@
 | Key | Value |
 | :--- | :--- |
 | **Project Name** | [Name] |
-| **Version** | 0.1 (Draft) |
+| **Version** | 0.2 (Draft) |
 | **Status** | [Draft/Review/Approved] |
 | **Date** | [YYYY-MM-DD] |
 
@@ -63,9 +63,10 @@ DEEP DIVE QUESTIONS:
   - [Scenario 2: The Edge Case]
 
 ### 2.4 Success Metrics (KPIs)
-- **Expectation**: Quantifiable or clearly observable outcomes.
+- **Expectation**: Quantifiable outcomes. You MUST adhere to this format: `[Metric Name] | Target: [Value] [Unit] | Baseline: [Value]`.
 - **Content**:
-  - [Metric 1]
+  - [Metric 1] | Target: [Value] [Unit] | Baseline: [Unknown/Value]
+  - (e.g. API Latency | Target: 200 ms | Baseline: Unknown)
 
 ## 3. Scope (MVP Definition)
 <!-- 
@@ -77,6 +78,7 @@ DEEP DIVE QUESTIONS:
 ### 3.1 In-Scope Goals (Must-Haves)
 - **Expectation**: The absolute minimum feature set to ship value Day 1.
 - **Content**:
+  <!-- Must list at least 3 specific features -->
   - [Goal 1]
 
 ### 3.2 Out-of-Scope (Non-Goals)
@@ -192,8 +194,10 @@ DEEP DIVE QUESTIONS:
 - "How do we approve changes?"
 -->
 ### 9.1 Owners
-- **Expectation**: Who is responsible?
-- **Content**: [Name]
+- **Expectation**: Who is responsible? Also list key stakeholders. Format check: `[Role]: [Need]`.
+- **Content**:
+  - Owner: [Name] (Team: api/ui/system/ops/data/product/business)
+  - Stakeholder: [Role] needs [Requirement] (e.g. Security: Audits required)
 
 ### 9.2 Process
 - **Expectation**: Git workflow, review process, release cadence.

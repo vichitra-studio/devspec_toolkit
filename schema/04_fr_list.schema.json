@@ -26,7 +26,7 @@
           },
           "statement": {
             "type": "string",
-            "minLength": 10
+            "minLength": 20
           },
           "rationale": {
             "type": "string"
@@ -48,7 +48,8 @@
                   "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                 },
                 "text": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 15
                 },
                 "fixture_ref": {
                   "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"

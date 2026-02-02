@@ -1,0 +1,14 @@
+{
+    "$schema": "https://specdev.local/schema/04_fr_list.schema.json",
+    "id": "fr-unit-test",
+    "owner": "system",
+    "created_at": "2025-01-01T00:00:00Z",
+    "functional_requirements": [
+        {
+            "fr_id": "fr-data-processing",
+            "statement": "The system shall process data.",
+            "acceptance_criteria": [],
+            "trace": []
+        }
+    ]
+}

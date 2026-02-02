@@ -1,0 +1,121 @@
+{
+  "id": "system-sketch-standard",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Create user accounts",
+        "Update user profiles",
+        "Serve account queries"
+      ],
+      "owner": "api",
+      "tags": ["critical-path", "stateless"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        }
+      ]
+    },
+    {
+      "component_id": "auth-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate credentials",
+        "Issue access tokens",
+        "Revoke active sessions"
+      ],
+      "owner": "api",
+      "tags": ["supporting", "stateless"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    },
+    {
+      "component_id": "billing-service",
+      "type": "service",
+      "responsibilities": [
+        "Create payment intents",
+        "Capture authorized payments",
+        "Record payment receipts"
+      ],
+      "owner": "api",
+      "tags": ["critical-path", "stateful"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    },
+    {
+      "component_id": "user-db",
+      "type": "db",
+      "responsibilities": [
+        "Persist user records",
+        "Store profile attributes",
+        "Index account lookup keys"
+      ],
+      "owner": "data",
+      "tags": ["critical-path", "stateful"],
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "user-service",
+      "to": "auth-service",
+      "protocol": "http",
+      "trust_boundary": "internal",
+      "schema_ref": "file://schemas/auth.json",
+      "rate_limit": {
+        "rps": 100,
+        "scope": "client"
+      },
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    },
+    {
+      "from": "user-service",
+      "to": "user-db",
+      "protocol": "db",
+      "trust_boundary": "internal",
+      "schema_ref": "file://schemas/user.json",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        }
+      ]
+    },
+    {
+      "from": "user-service",
+      "to": "billing-service",
+      "protocol": "event",
+      "trust_boundary": "internal",
+      "schema_ref": "file://schemas/payments.json",
+      "reliability": "at-least-once",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ]
+}

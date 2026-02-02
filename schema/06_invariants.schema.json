@@ -68,7 +68,9 @@
           "inv_id",
           "description",
           "language",
-          "expression"
+          "expression",
+          "scope",
+          "trace"
         ]
       }
     }

@@ -34,7 +34,8 @@ source dev_env/bin/activate
 python3 -m specdev_tools.cli --help
 ```
 
-> **Note:** If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
+> [!NOTE]
+> If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
@@ -68,7 +69,7 @@ Consult the [Toolkit Layout](../../README.md#toolkit-layout) diagram for the can
 - `spec/` (in your host repo) — machine artifacts (`NN_step.json`) and human guides (`NN_step.guide.md`) you actively maintain.
 - [./devspec_toolkit/](../../) — the toolkit submodule providing schemas, prompts, docs, templates, and CLI code (substitute your path if different).
   - [schema/](../../schema/) — JSON Schemas for every spec step plus shared atoms/collections/errors
-  - [schema/](../../schema/) — JSON Schemas for every spec step plus shared atoms/collections/errors
+
   - [prompts/](../../prompts/) — deterministic prompts for AI assistants (contains the guide and requirements)
   - [tools/](../../tools/) — CLI package and schema registry used during validation
 

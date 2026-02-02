@@ -10,7 +10,7 @@ If you are setting up manually or restoring an existing environment:
 1. Follow the canonical setup in [`docs/developers/getting_started.md`](../docs/developers/getting_started.md#1-set-up-your-environment).
 2. Or use the helper script locally:
    ```bash
-   ./devspec_toolkit/setup_devspec_env.sh
+   ./devspec_toolkit/scripts/setup_devspec_env.sh
    source dev_env/bin/activate
    ```
 
@@ -19,7 +19,7 @@ If you are setting up manually or restoring an existing environment:
 To bootstrap a new project with the toolkit, use the initialization utility:
 
 ```bash
-python3 tools/init_project.py --target /path/to/project --strict
+python3 devspec_toolkit/scripts/init_project.py --target /path/to/project --strict
 ```
 
 ### Arguments

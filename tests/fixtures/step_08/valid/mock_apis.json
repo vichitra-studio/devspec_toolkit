@@ -1,0 +1,16 @@
+{
+    "$schema": "https://specdev.local/schema/05_interface_contracts.schema.json",
+    "id": "api-unit-test",
+    "owner": "api",
+    "created_at": "2025-01-01T00:00:00Z",
+    "apis": [
+        {
+            "api_id": "api-user-get",
+            "name": "Get User",
+            "method": "GET",
+            "path": "/users/{id}",
+            "description": "Get user details",
+            "trace": []
+        }
+    ]
+}

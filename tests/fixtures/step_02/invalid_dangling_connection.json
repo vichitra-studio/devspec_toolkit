@@ -1,0 +1,46 @@
+{
+  "id": "system-sketch-invalid-dangling-connection",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Create user accounts",
+        "Authenticate credentials",
+        "Serve account queries"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        },
+        {
+          "type": "doc",
+          "id": "capability-user-profile"
+        },
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "billing-service",
+      "to": "user-service",
+      "protocol": "http",
+      "trust_boundary": "internal",
+      "schema_ref": "-tbd",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-payment-processing"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "id": "roadmap-invalid-dependency-missing-note",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "3.9",
+        "rationale": "Primary language for backend services"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": "0.95.0",
+        "rationale": "High performance web framework"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "docker",
+        "version": "20.10.0",
+        "rationale": "Containerization platform"
+      }
+    ],
+    "tools": [
+      {
+        "name": "poetry",
+        "version": "1.4.0",
+        "rationale": "Dependency management"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "status": "done",
+      "risk_status": "low",
+      "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
+      "tasks": [
+        {
+          "task_id": "init-fastapi-project",
+          "description": "Initialize FastAPI project structure"
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "health-endpoint"
+        }
+      ],
+      "risks": [],
+      "spikes": []
+    }
+  ],
+  "dependencies": [
+    {
+      "type": "external",
+      "id": "security-review",
+      "owner": "platform-team"
+    }
+  ],
+  "trace": []
+}

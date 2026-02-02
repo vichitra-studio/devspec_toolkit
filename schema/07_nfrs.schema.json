@@ -22,7 +22,8 @@
         "additionalProperties": false,
         "properties": {
           "nfr_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+            "type": "string",
+            "pattern": "^nfr-[a-z0-9]+-[a-z0-9-]+$"
           },
           "category": {
             "type": "string",
@@ -49,7 +50,8 @@
                 "type": "number"
               },
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^.*\\d+.*$"
               }
             ]
           },

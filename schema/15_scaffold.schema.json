@@ -19,10 +19,12 @@
       "additionalProperties": false,
       "properties": {
         "language": {
-          "type": "string"
+          "type": "string",
+          "description": "Programming language (e.g., python, typescript, go). Use lowercase/kebab-case."
         },
         "framework": {
-          "type": "string"
+          "type": "string",
+          "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
         },
         "modules": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
@@ -45,7 +47,16 @@
             "type": "string"
           },
           "method": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE",
+              "PATCH",
+              "OPTIONS",
+              "HEAD"
+            ]
           }
         },
         "required": [
@@ -65,6 +76,18 @@
         "green",
         "red"
       ]
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#link"
+      }
     }
   },
   "required": [
@@ -72,6 +95,29 @@
     "owner",
     "created_at",
     "service_skeleton",
-    "route_map"
+    "route_map",
+    "validators",
+    "build_status"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "build_status": {
+            "const": "green"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "validators": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "validators"
+        ]
+      }
+    }
   ]
 }

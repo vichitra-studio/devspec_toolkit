@@ -21,7 +21,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 
 ## Context To Ingest
-- **Primary Source:** `docs/seed/seed_overview.md` (if present) for high-level scoping, problem definitions, and stakeholders.
+- **Primary Source:** `docs/seed/seed_overview.md` (if present) for high-level scoping.
+- **Constraints Source:** `docs/seed/seed_tech_stack.md` (if present) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.
@@ -55,7 +56,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
+6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
@@ -68,9 +69,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
 - Owner is set based on who will maintain the charter and is not just a default.
 
+## Negative Constraints
+- **DO NOT** use vague "business speak" (e.g. "optimize", "improve") without measurable metrics.
+- **DO NOT** omit the `owner` field; accountability is required.
+- **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
+- **DO NOT** list stakeholders without defining their specific `needs`.
+
 ## Field-by-Field Guidance
 - id: stable kebab-case; prefer `project_charter-<initiative>`.
-- owner: `api`, `ui`, `system`, `ops`, or `data`; pick the accountable group for charter updates.
+- owner: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, or `engineering`; pick the accountable group for charter updates.
 - problem_statement: 1–3 sentences, explicit on users, pain, outcome, and constraints.
 - in_scope/out_of_scope: concrete bullets; include integrations, data domains, and delivery boundaries.
 - assumptions: facts taken for granted (e.g., existing identity provider, data retention rules).
@@ -97,6 +104,10 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Quick Reference
 - Required: `id`, `owner`, `created_at`, `problem_statement`, `success_metrics`.
+- **Validation Gates**: 
+  - `stakeholders` MUST have `needs`.
+  - `success_metrics` MUST have `measurement_method`.
+  - `in_scope` MUST have at least 3 items.
 - Stakeholders: list roles and needs; must inform later FRs and NFRs.
 
 # Clarification Questions
@@ -108,7 +119,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What baselines exist today for each success metric, and how will we measure them (tool, dashboard, query)?
 - Which upstream systems, dependencies, or programs does this charter rely on, and what risks do they introduce?
 
-# Embedded Schema
+## Embedded Schema
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -134,10 +145,12 @@ You are a senior specification author and validator. Your job is to emit a singl
       "minLength": 20
     },
     "in_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 3
     },
     "out_of_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 3
     },
     "assumptions": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
@@ -159,7 +172,8 @@ You are a senior specification author and validator. Your job is to emit a singl
           }
         },
         "required": [
-          "role"
+          "role",
+          "needs"
         ]
       }
     },
@@ -187,7 +201,10 @@ You are a senior specification author and validator. Your job is to emit a singl
         },
         "required": [
           "segment_id",
-          "description"
+          "description",
+          "jobs_to_be_done",
+          "pains",
+          "gains"
         ]
       }
     },
@@ -234,7 +251,8 @@ You are a senior specification author and validator. Your job is to emit a singl
           "metric_id",
           "name",
           "target",
-          "unit"
+          "unit",
+          "measurement_method"
         ]
       }
     },

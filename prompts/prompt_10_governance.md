@@ -4,6 +4,11 @@
 Set the policies that keep the spec authoritative by covering change control, versioning, reviewer expectations, and how code changes reference spec artifacts. Strong governance ensures every update flows through spec-first workflows and remains auditable.
 
 ## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 To enforce the governance policies defined here (specifically commit messages), use:
 ```bash
 python -m specdev_tools.cli governance-check <spec_dir> --message "commit message"
@@ -54,6 +59,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
+## Negative Constraints
+- Do not output text-only logic where regex patterns could be used (e.g., "must include spec IDs" instead of "require spec IDs").
+- Do not omit spec IDs in commit message patterns when `require_spec_ids` is true.
+- Do not use lazy policies (e.g., `spec_first_policy: false` without justification).
+- Do not create invalid regex patterns in `commit_message_rules.pattern`.
+- Do not omit required fields that are present in the schema.
+
 ## Step-Specific Completeness Checklist
 - Governance defines a clear versioning strategy for spec and artifacts.
 - `pr_rules` encode spec-first expectations and validation commands to run.
@@ -63,12 +75,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Field-by-Field Guidance
 - versioning: e.g., calendar-based, semver, or spec rev; state how bumps occur.
-- pr_rules: list of checks or requirements (e.g., "run matrix", "fixtures-lint", "invariants-check").
+- pr_rules: list of required checks. Allowed values: `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `test`, `build`, `lint`, `format`, `audit`, `security`.
 - spec_first_policy: boolean indicating spec-before-impl requirement.
 - commit_message_rules.require_spec_ids: true if commits must include spec IDs.
 - commit_message_rules.pattern: regex enforcing prefix and ID inclusion.
 - commit_message_rules.error_message: helpful text like "Format: type(scope): msg [id]. Allowed types: feat, fix, chore."
-- reviewers: stable names/roles accountable for approvals.
+- reviewers: stable names/roles accountable for approvals. Use generic roles (e.g., 'API Owner') if specific names are not provided in Context.
 
 ## Best Practices
 - **Versioning**: Document the `versioning` strategy (calendar, semver, spec revision) so downstream tooling can bump versions consistently.
@@ -118,7 +130,25 @@ You are a senior specification author and validator. Your job is to emit a singl
       "type": "string"
     },
     "pr_rules": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "validate",
+          "validate-all",
+          "matrix",
+          "fixtures-lint",
+          "invariants-check",
+          "governance-check",
+          "test",
+          "build",
+          "lint",
+          "format",
+          "audit",
+          "security"
+        ]
+      },
+      "uniqueItems": true
     },
     "spec_first_policy": {
       "type": "boolean"
@@ -144,6 +174,18 @@ You are a senior specification author and validator. Your job is to emit a singl
     },
     "reviewers": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#link"
+      }
     }
   },
   "required": [

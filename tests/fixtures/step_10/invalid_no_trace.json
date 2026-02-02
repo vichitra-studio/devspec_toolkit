@@ -1,0 +1,18 @@
+{
+  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "id": "governance-test-missing-trace",
+  "owner": "api",
+  "created_at": "2025-10-22T00:00:00Z",
+  "versioning": "calendar-based",
+  "pr_rules": [
+    "validate-all"
+  ],
+  "spec_first_policy": true,
+  "commit_message_rules": {
+    "require_spec_ids": true,
+    "pattern": "^\\w+\\(([^)]+)\\): .+"
+  },
+  "reviewers": [
+    "system-owner"
+  ]
+}

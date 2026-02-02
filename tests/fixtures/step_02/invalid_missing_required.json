@@ -1,0 +1,11 @@
+{
+  "id": "system-sketch-invalid-missing-required",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service"
+    }
+  ]
+}

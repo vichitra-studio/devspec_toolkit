@@ -22,16 +22,20 @@
       "minLength": 20
     },
     "in_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 3
     },
     "out_of_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 3
     },
     "assumptions": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 1
     },
     "risks": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+      "minItems": 1
     },
     "stakeholders": {
       "type": "array",
@@ -47,7 +51,8 @@
           }
         },
         "required": [
-          "role"
+          "role",
+          "needs"
         ]
       }
     },
@@ -75,7 +80,10 @@
         },
         "required": [
           "segment_id",
-          "description"
+          "description",
+          "jobs_to_be_done",
+          "pains",
+          "gains"
         ]
       }
     },
@@ -122,7 +130,8 @@
           "metric_id",
           "name",
           "target",
-          "unit"
+          "unit",
+          "measurement_method"
         ]
       }
     },

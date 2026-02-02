@@ -1,0 +1,85 @@
+{
+  "$schema": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "id": "interface-contracts-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "apis": [
+    {
+      "api_id": "api-user-login",
+      "name": "User Login",
+      "version": "v1",
+      "protocol": "http",
+      "route": "/login",
+      "method": "POST",
+      "request_schema_ref": "schemas/payloads/login-request.json",
+      "response_schema_ref": "schemas/payloads/login-response.json",
+      "errors": [
+        {
+          "code": "invalid-credentials",
+          "message": "The provided username or password is invalid",
+          "severity": "error"
+        },
+        {
+          "code": "account-disabled",
+          "message": "The account has been disabled",
+          "severity": "error"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "username",
+          "in": "query",
+          "required": true,
+          "schema": "string"
+        },
+        {
+          "name": "password",
+          "in": "query",
+          "required": true,
+          "schema": "string"
+        }
+      ],
+      "security": "none",
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-login"
+        }
+      ]
+    },
+    {
+      "api_id": "api-user-profile",
+      "name": "User Profile",
+      "version": "v1",
+      "protocol": "http",
+      "route": "/users/{id}",
+      "method": "GET",
+      "request_schema_ref": "-tbd",
+      "response_schema_ref": "schemas/payloads/user-profile.json",
+      "errors": [
+        {
+          "code": "user-not-found",
+          "message": "The requested user was not found",
+          "severity": "error"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": "string"
+        }
+      ],
+      "security": "jwt",
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-profile"
+        }
+      ]
+    }
+  ]
+}

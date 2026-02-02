@@ -1,0 +1,27 @@
+{
+    "id": "broken-ci-pipeline",
+    "owner": "api",
+    "created_at": "2026-01-01T00:00:00Z",
+    "trace": [
+        {
+            "type": "doc",
+            "id": "10-governance-policy"
+        }
+    ],
+    "jobs": [
+        {
+            "job_id": "job-a",
+            "name": "Job A",
+            "requires": [
+                "non-existent-job"
+            ],
+            "steps": [
+                {
+                    "id": "step-a",
+                    "name": "Step A",
+                    "command": "echo A"
+                }
+            ]
+        }
+    ]
+}

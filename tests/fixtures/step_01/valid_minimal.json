@@ -1,0 +1,48 @@
+{
+    "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+    "id": "capabilities-catalog",
+    "owner": "product",
+    "created_at": "2025-01-01T00:00:00Z",
+    "capabilities": [
+        {
+            "capability_id": "capability-search-products",
+            "verb": "search",
+            "description": "Allows users to search for products by keyword.",
+            "scope": "in",
+            "owner": "api",
+            "inputs": [
+                "query_string",
+                "page_number"
+            ],
+            "outputs": [
+                "product_list",
+                "pagination_metadata"
+            ],
+            "preconditions": [
+                "database_online"
+            ],
+            "postconditions": [
+                "audit_log_updated"
+            ],
+            "error_states": [
+                {
+                    "code": "invalid-query",
+                    "message": "Query string too short"
+                }
+            ],
+            "trace": [
+                {
+                    "type": "fr",
+                    "id": "fr-search-01"
+                }
+            ]
+        },
+        {
+            "capability_id": "capability-archive-user",
+            "verb": "archive",
+            "description": "Archive a user account.",
+            "scope": "out",
+            "owner": "ops"
+        }
+    ]
+}

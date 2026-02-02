@@ -1,7 +1,17 @@
 # Step 16a · Implementation Planner
 
 ## Purpose
-To produce a complete, falsifiable blueprint for implementation that bakes in security, delivery, and drift detection *before* a single line of code is written. This step acts as the "Architect" that defines not just *what* to build, but *how* to secure, monitor, and sustain it, ensuring **Correctness**, **Completeness**, **Anti-Hallucination**, and **Atomic Rigor**.
+Produce a **machine-checkable blueprint** for implementation using the **Checklist-Driven Architecture**. Every piece of work must be:
+1. **Traceable**: Linked to a specific spec requirement with commit hash
+2. **Atomic**: One checklist item = one testable behavior
+3. **Explicit**: Zero "common sense" or "standard implementation" references
+4. **Evidence-Bound**: Every checklist item has a concrete `linked_test_expectation`
+
+## Critical Changes from v1
+- `plan.tasks` is **DELETED** — implementation now lives under `checklist[].implementation`
+- `metadata` is **DELETED** — use `extensions` for structured data
+- `spec_ref` is now a **structured object**, not a string
+- `commit_hash` and `line_range` are **REQUIRED** for all spec references
 
 ## Tool Execution
 Validate the generated JSON:
@@ -23,8 +33,34 @@ Instead of prose, you emit a machine-checkable **JSON artifact** that defines th
 1.  **Scope**: Identify the exact functional scope (Themes: Schema, Logic, API).
 2.  **Files**: List exactly which files need modification.
 3.  **Checklist**: Convert spec requirements into atomic checklist items.
-4.  **Tasks**: Break the work into Parent Tasks and Sub-tasks.
+4.  **Implementation Slots**: Define execution slots (`checklist[].implementation`) for each item.
 5.  **Emit**: Generate the JSON.
+
+## FORBIDDEN ACTIONS (Immediate Rejection)
+
+### Structural Violations
+1. **NEVER** create `plan.tasks` — this field no longer exists
+2. **NEVER** use untyped `metadata` — use structured `extensions` only
+3. **NEVER** emit `step_id` — use only `id`
+4. **NEVER** use `coding_patterns` — use `coding_examples` array
+
+### Content Violations
+1. **NEVER** create checklist item without `spec_ref.commit_hash`
+2. **NEVER** use placeholder commit hashes (40 zeros)
+3. **NEVER** leave `target_file_patterns` empty for active steps
+4. **NEVER** write "standard implementation" or "as per common practice"
+5. **NEVER** emit `linked_test_expectation` without corresponding `test_commands` entry
+
+### Inference Violations
+1. **NEVER** hallucinate `existing_structures` — cite actual source file
+2. **NEVER** invent variable/class/function names not in spec
+3. **NEVER** assume dependency installation — verify with `pip freeze`/`npm list`
+4. **NEVER** create ambiguity without `severity` and `mitigation`
+
+### Atomicity Violations
+1. **NEVER** group multiple behaviors in one checklist item
+2. **NEVER** create checklist item that spans multiple files
+3. **NEVER** create implementation action that requires >2 file edits
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -41,16 +77,24 @@ You must populate the JSON fields according to these specific definitions and ex
 ## 2. `plan.spec_alignment.checklist` (The Contract)
 *   `checklist`: A list of **Atomic Requirements**.
     *   `id`: Uppercase snake-case ID (stable, e.g. `CHK_AUTH_01`).
-    *   `spec_ref`: Exact spec lines or `(inferred)`.
-        *   *Rule*: You **MUST** capture the Spec Version/Commit (e.g. `@a1b2c`) if available.
+    *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
+        *   *Rule*: `commit_hash` is MANDATORY. Do not use placeholders.
     *   `description`: **Verbose, Atomic, and Self-Explanatory**.
         *   *Rule*: Use "Subject-Action-Constraint" format.
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
     *   `type`: `behavior`, `constraint`, `validation`, `metadata`, `perf`, `logging`, `docs`.
     *   `layer`: `db`, `model`, `service`, `api`, `tests`, `docs`.
+    *   `checklist_status`: `active` or `deferred`.
     *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
         *   *Expectation*: This serves as the "contract" for verification. Use specific test names, not just file paths.
+    *   `implementation`: **Execution Slots** (Replaces `plan.tasks`).
+        *   `status`: `pending`, `in_progress`, `verified`, `deferred`.
+        *   `files_touched`: Files explicitly modified.
+        *   `actions`: Atomic implementation steps.
+            *   `type`: `file_create`, `file_edit`, `run_command`, `manual_verification`.
+            *   `description`: Verbose action description.
+            *   `target` / `command`: File or Command to run.
 
 ## 3. `plan.ambiguities` (Risk Management)
 *   List ANY ambiguity that would affect implementation.
@@ -68,10 +112,12 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `risks`: Identify tricky algorithms, migration safety, cascade deletes, or infinite recursion risks.
 
 ## 5. `plan.context` (Codebase awareness)
-*   `existing_structures`: List relevant structures (tables, models, services) and how they are used.
-*   `coding_patterns`: Extract concrete patterns with **Short Code Samples**.
-    *   *Expectation*: Show, don't just tell. E.g., "Use `TransactionContext`... like this: `with TransactionContext(): ...`".
-    *   *Rule*: Use `coding_examples` array for complex snippets. `coding_patterns` is deprecated.
+    *   `signature`: Precise signature (e.g. `class User(BaseModel)`).
+    *   `source_file`: **Required**. Absolute path to file.
+    *   *Rule*: Do NOT hallucinate. If you can't see the file, do not list it.
+
+## 6. `plan.tasks` (DELETED)
+*   **NOTE**: This section is removed. All implementation logic must reside in `checklist[].implementation`.
 
 ## 6. `plan.tasks` (Execution Plan)
 *   Treat each "thread" of work as a Parent Task.
@@ -151,6 +197,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 - Do we have existing tests we can extend, or must we create new ones?
 
 # Embedded Schema
+# Embedded Schema
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -158,14 +205,26 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "title": "16_impl_context",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "specRef": {
+      "type": "object",
+      "required": ["type", "id", "line_range", "commit_hash"],
+      "properties": {
+        "type": { "enum": ["fr", "api", "nfr", "inv", "fixture", "doc", "code"] },
+        "id": { "type": "string" },
+        "line_range": { "type": "string" },
+        "commit_hash": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    }
+  },
   "properties": {
-    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
-    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
-    "step_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
+    "id": { "type": "string" },
+    "owner": { "type": "string" },
+    "created_at": { "type": "string" },
+    "extensions": { "type": "object" },
     "plan": {
       "type": "object",
-      "required": ["summary", "spec_alignment", "tasks", "review_requirements"],
+      "required": ["summary", "spec_alignment", "review_requirements"],
       "properties": {
         "summary": {
           "type": "object",
@@ -174,14 +233,17 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
             "functional_summary": { "type": "string" },
             "scope_in": { "type": "array", "items": { "type": "string" } },
             "scope_out": { "type": "array", "items": { "type": "string" } },
-            "target_file_patterns": { "type": "array", "items": { "type": "string" } },
-            "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
+            "target_file_patterns": { "type": "array", "items": { "type": "string" } }
           }
         },
         "spec_alignment": {
           "type": "object",
           "required": ["checklist"],
           "properties": {
+            "requirements_summary": {
+                "type": "array",
+                "items": { "type": "object", "required": ["theme", "summary"], "properties": { "theme": { "type": "string" }, "summary": { "type": "string" } } }
+            },
             "checklist": {
               "type": "array",
               "items": {
@@ -189,65 +251,41 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
                 "required": ["id", "spec_ref", "description", "linked_test_expectation"],
                 "properties": {
                   "id": { "type": "string" },
-                  "spec_ref": { "type": "string" },
+                  "spec_ref": { "$ref": "#/$defs/specRef" },
                   "description": { "type": "string" },
-                  "type": { "type": "string" },
-                  "layer": { "type": "string" },
                   "linked_test_expectation": { "type": "string" },
-                  "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
+                  "checklist_status": { "enum": ["active", "deferred"] },
+                  "implementation": {
+                    "type": "object",
+                    "required": ["status", "actions"],
+                    "properties": {
+                      "status": { "enum": ["pending", "in_progress", "verified", "deferred"] },
+                      "files_touched": { "type": "array", "items": { "type": "string" } },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["type", "description"],
+                          "properties": {
+                            "type": { "enum": ["file_create", "file_edit", "run_command", "manual_verification"] },
+                            "description": { "type": "string" },
+                            "target": { "type": "string" },
+                            "command": { "type": "string" },
+                            "evidence": {
+                                "type": "object",
+                                "required": ["type", "content"],
+                                "properties": {
+                                    "type": { "enum": ["log", "snippet", "screenshot"] },
+                                    "content": { "type": "string" }
+                                }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
-            }
-          }
-        },
-        "ambiguities": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-               "id": { "type": "string" },
-               "severity": { "type": "string" },
-               "description": { "type": "string" },
-               "mitigation": { "type": "string" },
-               "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
-            }
-          }
-        },
-        "solution": {
-          "type": "object",
-          "properties": {
-             "architecture_sketch": { "type": "string" },
-             "sequence_of_concerns": { "type": "array", "items": { "type": "string" } },
-             "risks": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-        "context": {
-          "type": "object",
-          "properties": {
-             "existing_structures": { "type": "array", "items": { "type": "string" } },
-             "coding_patterns": { "type": "string", "deprecated": true },
-             "coding_examples": {
-                 "type": "array",
-                 "items": { "type": "object", "properties": { "title": {"type": "string"}, "code": {"type": "string"} } }
-             }
-          }
-        },
-        "tasks": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["task_id", "summary", "status", "files_to_touch", "checklist_ids"],
-            "properties": {
-              "task_id": { "type": "string" },
-              "summary": { "type": "string" },
-              "status": { "type": "string", "enum": ["planned"] },
-              "files_to_touch": { "type": "array", "items": { "type": "string" } },
-              "checklist_ids": { "type": "array", "items": { "type": "string" } },
-              "sub_tasks": {
-                  "type": "array",
-                  "items": { "type": "object", "properties": { "task_id": {"type": "string"}, "summary": {"type": "string"} } }
-              },
-              "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
             }
           }
         },
@@ -255,8 +293,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
            "type": "object",
            "required": ["test_commands"],
            "properties": {
-              "test_commands": { "type": "array", "items": { "type": "string" } },
-              "metadata": { "$ref": "https://specdev.local/schema/core/atoms/1#metadata" }
+              "test_commands": { "type": "array", "items": { "type": "string" } }
            }
         }
       }
@@ -272,7 +309,6 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "step_id": "step-api-core",
   "plan": {
     "summary": {
        "functional_summary": "Implement core API login",
@@ -280,50 +316,40 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
        "target_file_patterns": ["src/auth/*.py"]
     },
     "spec_alignment": {
+      "requirements_summary": [
+          { "theme": "Auth", "summary": "Implement JWT-based Login/Logout" }
+      ],
       "checklist": [
         {
           "id": "CHK_AUTH_01",
-          "spec_ref": "spec/05_api.json@3a4b9:12",
+          "spec_ref": {
+             "type": "api",
+             "id": "api-auth-login",
+             "line_range": "L12-L15",
+             "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
+          },
           "description": "POST /login returns JWT",
-          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt"
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
+          "checklist_status": "active",
+          "implementation": {
+             "status": "pending",
+             "actions": [
+                 {
+                    "type": "file_create",
+                    "target": "src/auth/routes.py",
+                    "description": "Create login endpoint"
+                 }
+             ]
+          }
         }
       ]
     },
     "context": {
-       "existing_structures": ["src/db/models.py:User"],
-       "coding_patterns": "Use `db.session.commit()` inside try/except blocks."
+       "existing_structures": [{ "signature": "class User", "source_file": "src/models.py" }]
     },
-    "tasks": [
-      {
-        "task_id": "TASK_01_LOGIN",
-        "summary": "Implement login handler",
-        "status": "planned",
-        "files_to_touch": ["src/auth/routes.py"],
-        "checklist_ids": ["CHK_AUTH_01"]
-      }
-    ],
+    // plan.tasks REMOVED
     "review_requirements": {
       "test_commands": ["pytest tests/auth/"]
-    },
-    "security": {
-      "new_fixtures": ["fixture-auth-brute-force"],
-      "spec_mutations": []
-    },
-    "delivery": {
-      "dashboards": [
-        { "dashboard_id": "dash-auth-latency", "nfr_refs": ["nfr-latency-p99"], "url": "http://grafana/auth" }
-      ],
-      "alerts": []
-    },
-    "drift": {
-      "checks": [
-        { "check_id": "drift-auth-schema", "target": "schema", "method": "schema-diff", "schedule": "daily" }
-      ]
-    },
-    "docs": {
-        "required_updates": [
-            { "doc_id": "doc-user-guide", "path": "docs/user_guide.md", "update_summary": "Add login instructions" }
-        ]
     }
   }
 }

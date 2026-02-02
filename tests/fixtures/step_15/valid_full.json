@@ -1,0 +1,40 @@
+{
+    "id": "valid-full-scaffold",
+    "owner": "api",
+    "created_at": "2025-01-01T12:00:00Z",
+    "service_skeleton": {
+        "language": "python",
+        "framework": "fastapi",
+        "modules": [
+            "pydantic",
+            "uvicorn"
+        ]
+    },
+    "route_map": [
+        {
+            "api_ref": "api-get-users",
+            "path": "/users",
+            "method": "GET"
+        },
+        {
+            "api_ref": "api-create-user",
+            "path": "/users",
+            "method": "POST"
+        }
+    ],
+    "validators": [
+        "spec-validate",
+        "lint"
+    ],
+    "build_status": "green",
+    "trace": [
+        {
+            "target": "req-001"
+        }
+    ],
+    "links": [
+        {
+            "target": "https://example.com/docs"
+        }
+    ]
+}

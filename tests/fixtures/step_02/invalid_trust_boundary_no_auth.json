@@ -1,0 +1,54 @@
+{
+  "id": "system-sketch-invalid-trust-boundary-no-auth",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "public-api",
+      "type": "service",
+      "responsibilities": [
+        "Receive public requests",
+        "Validate request payloads",
+        "Dispatch to internal services"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    },
+    {
+      "component_id": "auth-service",
+      "type": "service",
+      "responsibilities": [
+        "Authenticate credentials",
+        "Issue access tokens",
+        "Revoke sessions"
+      ],
+      "owner": "api",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "public-api",
+      "to": "auth-service",
+      "protocol": "http",
+      "trust_boundary": "public",
+      "schema_ref": "file://schemas/auth.json",
+      "trace": [
+        {
+          "type": "doc",
+          "id": "capability-user-auth"
+        }
+      ]
+    }
+  ]
+}

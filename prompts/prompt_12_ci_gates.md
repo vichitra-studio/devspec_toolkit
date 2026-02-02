@@ -4,27 +4,15 @@
 Translate governance rules and fixture expectations into enforceable CI automation. Well-specified gates keep the spec authoritative by blocking merges that violate schemas, fixtures, or coverage commitments.
 
 ## Tool Execution
-Create `.github/workflows/ci.yml` (or equivalent) with the following content to enforce gates:
-
-```yaml
-name: Spec Validation
-on: [push, pull_request]
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-      - run: pip install -e ./devspec_toolkit/tools
-      - run: python -m specdev_tools.cli validate-all spec --repo-root .
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
 ```
 
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 12 · CI Gates** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
-# Task
+## Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 12 · CI Gates**.
 - **Output type:** one JSON document conforming to the Embedded Schema.
@@ -54,7 +42,28 @@ You are a senior specification author and validator. Your job is to emit a singl
   - All core validations present; dependencies declared; steps named clearly.
   - Coverage thresholds stated or explicitly deferred with rationale.
 
-# Output Rules
+## Negative Constraints
+- Do not output YAML, Markdown prose, or any text outside the JSON schema.
+- Do not use placeholders like TBD or TODO.
+- Do not invent CI steps that do not map to actual tools in `specdev_tools` or standard shell commands.
+- Do not output unstructured strings for steps; use structured objects with `id`, `name`, and `command`.
+- Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+
+## Hallucination Vectors
+- Do not invent new tools or commands that do not exist in the repository.
+- Do not reference non-existent job IDs in `requires` fields.
+- Do not use commands that do not start with allowed prefixes (e.g., `python -m`, `bash`, `npm`).
+- Do not create circular dependencies in job requirements.
+
+## Tooling Context
+Available CLI tools include:
+- `python -m specdev_tools.cli validate` - Validate spec artifacts against schemas
+- `python -m specdev_tools.cli fixtures-lint` - Lint fixture files for compliance
+- `python -m specdev_tools.cli check-invariants` - Check spec invariants
+- `python -m specdev_tools.cli check-governance` - Validate governance policies
+- `python -m specdev_tools.cli generate-coverage` - Generate coverage reports
+
+## Output Rules
 1. Return exactly one fenced code block with language `json`. No prose before or after.
 2. The JSON must validate against the Embedded Schema below.
 3. All IDs must be unique kebab-case strings.
@@ -73,7 +82,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Field-by-Field Guidance
 - jobs[*].job_id/name: stable identifiers; names are human-readable.
 - jobs[*].requires: upstream job IDs to create a DAG; omit or empty for roots.
-- jobs[*].steps: shellable or conceptual step names (e.g., `validate-all`, `fixtures-lint`, `matrix`).
+- jobs[*].steps: structured objects with `id`, `name`, and `command` fields.
 - coverage_thresholds: set lines/branches numbers between 0 and 100.
 
 ## Best Practices
@@ -116,6 +125,12 @@ You are a senior specification author and validator. Your job is to emit a singl
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
     "jobs": {
       "type": "array",
       "items": {
@@ -132,7 +147,26 @@ You are a senior specification author and validator. Your job is to emit a singl
             "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
           },
           "steps": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "command"
+              ]
+            }
           }
         },
         "required": [

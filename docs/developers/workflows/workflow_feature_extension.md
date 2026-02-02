@@ -1,7 +1,6 @@
 # Workflow: Feature Extension (The Sequential Cycle)
 
-> [!NOTE]
-> **Work In Progress**: This document is a **preliminary draft** for rough guidance and is still a work in progress.
+
 
 
 This guide describes the **Standard Operating Procedure (SOP)** for adding new capabilities to a specced project.
@@ -139,7 +138,7 @@ Now we run the machine.
 
 ## Completion
 
-1.  **Update Step 19**: Update `spec/19_spec_drift.json` to monitor the new feature.
+1.  **Update Traceability**: Ensure new artifacts are linked in `spec/05_interface_contracts.json` or `spec/16_impl_context.json` so drift detection works.
 2.  **Final Validation**:
     ```bash
     specdev align validate

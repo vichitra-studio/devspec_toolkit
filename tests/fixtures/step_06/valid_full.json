@@ -1,0 +1,46 @@
+{
+  "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+  "id": "invariants-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "rules": [
+    {
+      "inv_id": "invariant-user-authentication",
+      "description": "All user authentication requests must include a valid JWT token",
+      "language": "jsonlogic",
+      "expression": "{ \"and\": [ { \"in\": [ \"auth-token\", { \"var\": \"headers\" } ] }, { \"not\": { \"empty\": { \"var\": \"auth-token\" } } } ] }",
+      "scope": {
+        "components": ["auth-service"],
+        "apis": ["api-login", "api-secure-endpoint"]
+      },
+      "severity": "error",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-user-authentication"
+        },
+        {
+          "type": "nfr",
+          "id": "nfr-security-1"
+        }
+      ]
+    },
+    {
+      "inv_id": "invariant-data-consistency",
+      "description": "All financial transactions must have matching debit and credit amounts",
+      "language": "cel",
+      "expression": "transaction.debit_amount == transaction.credit_amount",
+      "scope": {
+        "components": ["financial-service", "database"],
+        "apis": ["api-transaction-create"]
+      },
+      "severity": "error",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-financial-data"
+        }
+      ]
+    }
+  ]
+}

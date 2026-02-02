@@ -1,0 +1,28 @@
+{
+  "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+  "id": "glossary-standard",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-auth-login",
+      "term": "login",
+      "definition": "The process of authenticating a user by verifying their credentials against stored identifiers and access permissions within the authentication system.",
+      "domain": "auth",
+      "units": "req/s"
+    },
+    {
+      "term_id": "term-billing-amount",
+      "term": "amount",
+      "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
+      "domain": "billing",
+      "units": "USD"
+    },
+    {
+      "term_id": "term-analytics-session",
+      "term": "session",
+      "definition": "A period of user activity within an application, tracked from initial interaction until the user stops interacting or times out.",
+      "domain": "analytics"
+    }
+  ]
+}

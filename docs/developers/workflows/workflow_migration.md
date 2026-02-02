@@ -2,7 +2,8 @@
 
 The DevSpec Toolkit evolves rapidly. When you update the toolkit submodule (e.g., `git submodule update --remote`), schemas may become stricter, steps might be renumbered, or paradigms might shift.
 
-> **🆕 New in v0.2.0**: The `specdev align` CLI now automates most of this process.
+> [!TIP]
+> **New in v0.2.0**: The `specdev align` CLI now automates most of this process.
 
 This guide explains how to use the automated alignment system. For the legacy manual approach, see [Manual Fallback](#manual-fallback-legacy).
 
@@ -33,7 +34,8 @@ Since updates can be breaking, updating the toolkit is a strategic decision.
 | **Tooling Issues** | You are hitting bugs in the CLI or unexpected validation failures that are fixed in newer versions. |
 | **Prompt Decay** | Your AI agents are struggling. Newer toolkit versions often carry significantly verified Prompts that degrade less. |
 
-> **⚠️ CAUTION**: Avoid updating **mid-sprint** or days before a **deadline**. Migration requires time to "re-align" your specs.
+> [!CAUTION]
+> Avoid updating **mid-sprint** or days before a **deadline**. Migration requires time to "re-align" your specs.
 
 ---
 

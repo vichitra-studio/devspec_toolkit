@@ -102,21 +102,8 @@ specdev align rollback
 - Restores the selected state.
 
 ## Examples
-
-**Full Migration Flow**:
-```bash
-specdev align status
-specdev align diff
-specdev align apply --auto
-specdev align prompts --output prompts_v0.2.0/
-# ... manual AI work ...
-specdev align validate
-```
-
-**Bootstrapping**:
-```bash
-specdev align status # "No version found"
-specdev align prompts --mode bootstrap --output devspec_prompts/
-# ... run prompts ...
-specdev align validate
-```
+ 
+ See the **[Alignment Workflow Guide](../workflows/workflow_align.md)** for detailed usage scenarios, including:
+ - Full Version Migration
+ - Bootstrapping Legacy Projects
+ - Handling Semantic Conflicts

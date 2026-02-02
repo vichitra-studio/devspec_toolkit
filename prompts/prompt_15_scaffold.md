@@ -4,6 +4,11 @@
 Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
 ## Tool Execution
+Validate the generated JSON:
+```bash
+python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+```
+
 After generating the JSON artifact, implement the scaffold manually or using your preferred generator/framework CLI. Ensure the generated routes match `05_interface_contracts.json`.
 
 # Role
@@ -34,7 +39,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: minimal module set, clear names; avoid framework‑specific jargon where not needed.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask.
+- If the route map does not strictly match Step 05 APIs, ask.
 - Gating items:
   - Route map includes all public APIs; paths/methods consistent with contracts.
   - Service skeleton sufficient to run a minimal service; validators listed.
@@ -44,16 +49,24 @@ You are a senior specification author and validator. Your job is to emit a singl
 2. The JSON must validate against the Embedded Schema below.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
+5. DO NOT invent preconditions, postconditions, or error states as they are not supported by the schema.
 6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+7. Populate `trace` and `links` to connect to Step 05 or other artifacts if applicable.
+8. DO NOT guess `build_status`; default to `pending` if not known.
+9. DO NOT duplicate `api_ref` values in the route map.
+10. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+
+## Negative Constraints
+- **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
+- **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
+- **DO NOT** mark build status as `green` if validators have not been executed.
+- **DO NOT** include logic or implementation code; this is a scaffold only.
 
 ## Step-Specific Completeness Checklist
 - `service_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
 - `route_map` covers all in-scope APIs (Step 5) with path/method and `api_ref` links.
 - `validators` list includes code or config checks needed to keep generated code aligned with specs.
-- `build_status` reflects current build health based on CI outcomes.
+- `build_status` reflects build health; default to `pending` until CI succeeds.
 
 ## Field-by-Field Guidance
 - service_skeleton.language/framework: e.g., `python` + `fastapi`, `node` + `express`.
@@ -108,10 +121,12 @@ You are a senior specification author and validator. Your job is to emit a singl
       "additionalProperties": false,
       "properties": {
         "language": {
-          "type": "string"
+          "type": "string",
+          "description": "Programming language (e.g., python, typescript, go). Use lowercase/kebab-case."
         },
         "framework": {
-          "type": "string"
+          "type": "string",
+          "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
         },
         "modules": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
@@ -134,7 +149,16 @@ You are a senior specification author and validator. Your job is to emit a singl
             "type": "string"
           },
           "method": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE",
+              "PATCH",
+              "OPTIONS",
+              "HEAD"
+            ]
           }
         },
         "required": [
@@ -154,6 +178,18 @@ You are a senior specification author and validator. Your job is to emit a singl
         "green",
         "red"
       ]
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#link"
+      }
     }
   },
   "required": [
@@ -161,7 +197,9 @@ You are a senior specification author and validator. Your job is to emit a singl
     "owner",
     "created_at",
     "service_skeleton",
-    "route_map"
+    "route_map",
+    "validators",
+    "build_status"
   ]
 }
 ```

@@ -64,6 +64,37 @@
               "$ref": "https://specdev.local/schema/core/errors/1#errorState"
             }
           },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "in": {
+                  "type": "string",
+                  "enum": [
+                    "query",
+                    "path",
+                    "header"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "schema": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                }
+              },
+              "required": [
+                "name",
+                "in",
+                "required"
+              ]
+            }
+          },
           "example_refs": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
           },

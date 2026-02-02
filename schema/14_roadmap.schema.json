@@ -19,16 +19,92 @@
             "additionalProperties": false,
             "properties": {
                 "languages": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "rationale": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "version"
+                        ]
+                    }
                 },
                 "frameworks": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "rationale": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "version"
+                        ]
+                    }
                 },
                 "infrastructure": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "rationale": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "version"
+                        ]
+                    }
                 },
                 "tools": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "rationale": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "version"
+                        ]
+                    }
                 }
             },
             "required": [
@@ -76,15 +152,68 @@
                         "type": "string",
                         "description": "The specific user story this milestone addresses."
                     },
+                    "source_milestones": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                        "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
+                    },
                     "tasks": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "task_id": {
+                                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "pattern": "^\\S+\\s+\\S+.*$"
+                                },
+                                "acceptance_criteria": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "criterion_id": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "text": {
+                                                "type": "string",
+                                                "minLength": 15
+                                            },
+                                            "fixture_ref": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            }
+                                        },
+                                        "required": [
+                                            "criterion_id",
+                                            "text"
+                                        ]
+                                    }
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "pending",
+                                        "in_progress",
+                                        "done"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "task_id",
+                                "description"
+                            ]
                         },
                         "description": "Atomic sub-tasks required to complete the user story."
                     },
                     "deliverables": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                        "type": "array",
+                        "items": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                        }
                     },
                     "risks": {
                         "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
@@ -96,17 +225,73 @@
                 "required": [
                     "milestone_id",
                     "name",
+                    "target_date",
                     "user_story",
+                    "source_milestones",
                     "tasks",
                     "deliverables"
                 ]
             }
         },
         "migration_plan": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
         },
         "dependencies": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "milestone",
+                            "external"
+                        ]
+                    },
+                    "id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    },
+                    "owner": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": "string",
+                        "pattern": "^\\S+\\s+\\S+.*$"
+                    }
+                },
+                "required": [
+                    "type",
+                    "id"
+                ],
+                "allOf": [
+                    {
+                        "if": {
+                            "properties": {
+                                "type": {
+                                    "const": "external"
+                                }
+                            },
+                            "required": [
+                                "type"
+                            ]
+                        },
+                        "then": {
+                            "required": [
+                                "owner",
+                                "note"
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "trace": {
+            "type": "array",
+            "items": {
+                "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
         }
     },
     "required": [

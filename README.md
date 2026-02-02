@@ -13,7 +13,7 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 ---
 
 ## Start Here
-- **Start a new project** using the [init utility](tools/init_project.py): `python tools/init_project.py --target <path> --strict`.
+- **Start a new project** using the [init utility](scripts/init_project.py): `python devspec_toolkit/scripts/init_project.py --target <path> --strict`.
 - Onboard as a developer with [docs/developers/getting_started.md](docs/developers/getting_started.md).
 - Keep [docs/developers/reference.md#core-validation-commands](docs/developers/reference.md#core-validation-commands) handy for the canonical command list, troubleshooting flow, and naming conventions.
 - Use the workflow overviews in [docs/developers/workflows/](docs/developers/workflows/) as you progress through Steps 00–16c.

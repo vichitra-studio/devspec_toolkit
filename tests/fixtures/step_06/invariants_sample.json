@@ -1,0 +1,27 @@
+{
+    "doc_id": "doc-123",
+    "session_id": "sess-inv-sample",
+    "cf_access_jwt": "valid-jwt",
+    "user_roles": [
+        "admin"
+    ],
+    "document": {
+        "title": "Sample Title",
+        "content": "Sample content that is reasonably short."
+    },
+    "idempotency_key": "unique-key-123",
+    "session_ttl_seconds": 600,
+    "response_time_ms": 100,
+    "audit_log": [
+        "entry1"
+    ],
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "jwt_signature_valid": true,
+    "log_retention_days": 180,
+    "config_valid": true,
+    "config_version": "1.0",
+    "operation_timeout_seconds": 5,
+    "breakglass_key": "some-key",
+    "key_ttl_seconds": 600,
+    "config_value": 500
+}

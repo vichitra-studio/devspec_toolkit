@@ -1,0 +1,32 @@
+{
+  "$schema": "https://specdev.local/schema/13_extension_generator.schema.json",
+  "id": "extension-generator-manifest",
+  "owner": "system",
+  "created_at": "2026-01-15T00:00:00Z",
+  "extensions": [
+    {
+      "extension_id": "ext-01-database-schema",
+      "title": "Database Schema",
+      "file_name": "ext_01_database_schema.json",
+      "area_of_concern": "Data",
+      "required_schema_sections": [
+        "tables",
+        "relationships",
+        "database_config"
+      ]
+    },
+    {
+      "extension_id": "ext-02-session-management",
+      "title": "Session Management",
+      "file_name": "ext_02_session_management.json",
+      "area_of_concern": "API",
+      "required_schema_sections": [
+        "session_config",
+        "session_fields",
+        "session_operations",
+        "session_validation",
+        "session_security"
+      ]
+    }
+  ]
+}

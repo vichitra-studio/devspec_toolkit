@@ -2,9 +2,96 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://specdev.local/schema/16_impl_context.schema.json",
     "title": "16_impl_context",
-    "description": "Unified artifact for the implementation loop (Plan -> Code -> Review).",
+    "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
     "type": "object",
     "additionalProperties": false,
+    "$defs": {
+        "specRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "fr",
+                        "api",
+                        "nfr",
+                        "inv",
+                        "fixture",
+                        "doc",
+                        "code"
+                    ]
+                },
+                "id": {
+                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "line_range": {
+                    "type": "string",
+                    "pattern": "^L\\d+-L\\d+$"
+                },
+                "commit_hash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$",
+                    "not": {
+                        "pattern": "^0{40}$"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "id",
+                "line_range",
+                "commit_hash"
+            ]
+        },
+        "severityLevel": {
+            "type": "string",
+            "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+            ]
+        },
+        "executionStatus": {
+            "type": "string",
+            "enum": [
+                "passed",
+                "failed",
+                "blocked",
+                "partial"
+            ]
+        },
+        "evidenceObject": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "log",
+                        "snippet",
+                        "screenshot"
+                    ]
+                },
+                "content": {
+                    "type": "string",
+                    "minLength": 20,
+                    "pattern": "\\S"
+                },
+                "evidence_ref": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "content"
+            ]
+        }
+    },
     "properties": {
         "id": {
             "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
@@ -16,15 +103,54 @@
         "created_at": {
             "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
         },
-        "step_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
-            "description": "Redundant key for easier lookup, matches id."
+        "extensions": {
+            "type": "object",
+            "description": "Structured extensions for domain-specific data.",
+            "additionalProperties": false,
+            "properties": {
+                "review_state": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "outcome": {
+                            "type": "string"
+                        },
+                        "verified_by": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "outcome"
+                    ]
+                },
+                "execution_context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "command_overrides": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         },
         "plan": {
             "type": "object",
-            "description": "Populated by Step 16a (Planner).",
             "additionalProperties": false,
             "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "deferred"
+                    ]
+                },
+                "deferred_reason": {
+                    "type": "string"
+                },
                 "summary": {
                     "type": "object",
                     "additionalProperties": false,
@@ -50,14 +176,12 @@
                                 "type": "string"
                             },
                             "description": "Explicit list of files/directories to modify or create."
-                        },
-                        "metadata": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                         }
                     },
                     "required": [
                         "functional_summary",
                         "scope_in",
+                        "scope_out",
                         "target_file_patterns"
                     ]
                 },
@@ -66,8 +190,30 @@
                     "additionalProperties": false,
                     "properties": {
                         "requirements_summary": {
-                            "type": "object",
-                            "description": "Summary of requirements grouped by theme (Schema, Service, etc.)"
+                            "type": "array",
+                            "description": "Thematic grouping of requirements.",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "theme": {
+                                        "type": "string"
+                                    },
+                                    "summary": {
+                                        "type": "string"
+                                    },
+                                    "spec_refs": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/$defs/specRef"
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "theme",
+                                    "summary"
+                                ]
+                            }
                         },
                         "checklist": {
                             "type": "array",
@@ -79,64 +225,185 @@
                                         "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
                                     },
                                     "spec_ref": {
-                                        "type": "object",
-                                        "additionalProperties": false,
-                                        "properties": {
-                                            "type": {
-                                                "type": "string",
-                                                "enum": [
-                                                    "fr",
-                                                    "api",
-                                                    "nfr",
-                                                    "inv",
-                                                    "fixture",
-                                                    "doc",
-                                                    "code"
-                                                ]
-                                            },
-                                            "id": {
-                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                                            },
-                                            "note": {
-                                                "type": "string"
-                                            },
-                                            "commit_hash": {
-                                                "type": "string",
-                                                "pattern": "^[0-9a-f]{40}$",
-                                                "description": "Git commit/blob hash for version traceability"
-                                            }
-                                        },
-                                        "required": [
-                                            "type",
-                                            "id"
-                                        ]
+                                        "$ref": "#/$defs/specRef"
                                     },
                                     "description": {
                                         "type": "string"
                                     },
                                     "type": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "behavior",
+                                            "constraint",
+                                            "validation",
+                                            "metadata",
+                                            "perf",
+                                            "logging",
+                                            "docs"
+                                        ]
                                     },
                                     "layer": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "enum": [
+                                            "db",
+                                            "model",
+                                            "service",
+                                            "api",
+                                            "integration",
+                                            "tests",
+                                            "docs",
+                                            "config"
+                                        ]
+                                    },
+                                    "checklist_status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "active",
+                                            "deferred"
+                                        ],
+                                        "default": "active"
                                     },
                                     "linked_test_expectation": {
                                         "oneOf": [
                                             {
                                                 "type": "string",
-                                                "description": "Single test command"
+                                                "minLength": 1
                                             },
                                             {
                                                 "type": "array",
+                                                "minItems": 1,
                                                 "items": {
-                                                    "type": "string"
-                                                },
-                                                "description": "Multiple test commands for this requirement"
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                }
                                             }
                                         ]
                                     },
-                                    "metadata": {
-                                        "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
+                                    "implementation": {
+                                        "type": "object",
+                                        "description": "Atomic work definition for this specific requirement.",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "status": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "pending",
+                                                    "in_progress",
+                                                    "verified",
+                                                    "deferred"
+                                                ]
+                                            },
+                                            "files_touched": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "actions": {
+                                                "type": "array",
+                                                "minItems": 1,
+                                                "items": {
+                                                    "type": "object",
+                                                    "additionalProperties": false,
+                                                    "properties": {
+                                                        "type": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "file_create",
+                                                                "file_edit",
+                                                                "run_command",
+                                                                "manual_verification"
+                                                            ]
+                                                        },
+                                                        "description": {
+                                                            "type": "string"
+                                                        },
+                                                        "target": {
+                                                            "type": "string"
+                                                        },
+                                                        "command": {
+                                                            "type": "string"
+                                                        },
+                                                        "evidence": {
+                                                            "$ref": "#/$defs/evidenceObject"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "type",
+                                                        "description"
+                                                    ],
+                                                    "allOf": [
+                                                        {
+                                                            "if": {
+                                                                "properties": {
+                                                                    "type": {
+                                                                        "enum": [
+                                                                            "file_create",
+                                                                            "file_edit"
+                                                                        ]
+                                                                    }
+                                                                }
+                                                            },
+                                                            "then": {
+                                                                "required": [
+                                                                    "target"
+                                                                ],
+                                                                "properties": {
+                                                                    "target": {
+                                                                        "minLength": 1
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        {
+                                                            "if": {
+                                                                "properties": {
+                                                                    "type": {
+                                                                        "const": "run_command"
+                                                                    }
+                                                                }
+                                                            },
+                                                            "then": {
+                                                                "required": [
+                                                                    "command"
+                                                                ],
+                                                                "properties": {
+                                                                    "command": {
+                                                                        "minLength": 1
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        "required": [
+                                            "status",
+                                            "actions"
+                                        ],
+                                        "allOf": [
+                                            {
+                                                "if": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "const": "verified"
+                                                        }
+                                                    }
+                                                },
+                                                "then": {
+                                                    "properties": {
+                                                        "actions": {
+                                                            "items": {
+                                                                "required": [
+                                                                    "evidence"
+                                                                ]
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        ]
                                     }
                                 },
                                 "required": [
@@ -144,6 +411,24 @@
                                     "spec_ref",
                                     "description",
                                     "linked_test_expectation"
+                                ],
+                                "allOf": [
+                                    {
+                                        "if": {
+                                            "not": {
+                                                "properties": {
+                                                    "checklist_status": {
+                                                        "const": "deferred"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "then": {
+                                            "required": [
+                                                "implementation"
+                                            ]
+                                        }
+                                    }
                                 ]
                             }
                         }
@@ -172,35 +457,27 @@
                                     "plan",
                                     "mixed",
                                     "review"
-                                ],
-                                "description": "Origin of the ambiguity"
-                            },
-                            "spec_ref": {
-                                "type": "string",
-                                "description": "Spec file reference with line numbers"
+                                ]
                             },
                             "severity": {
                                 "type": "string",
                                 "enum": [
                                     "blocking",
-                                    "non_blocking",
-                                    "major"
+                                    "non_blocking"
                                 ]
                             },
                             "impact": {
                                 "type": "array",
                                 "items": {
                                     "type": "string"
-                                },
-                                "description": "List of affected checklist_ids"
+                                }
                             },
                             "proposed_assumption": {
-                                "type": "string",
-                                "description": "Detailed assumption to resolve ambiguity"
+                                "type": "string"
                             },
                             "mitigation": {
                                 "type": "string",
-                                "description": "Mitigation strategy"
+                                "minLength": 10
                             },
                             "status": {
                                 "type": "string",
@@ -209,17 +486,29 @@
                                     "tracking",
                                     "deferred",
                                     "blocked"
-                                ],
-                                "description": "Current resolution status"
-                            },
-                            "metadata": {
-                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
+                                ]
                             }
                         },
                         "required": [
                             "id",
-                            "severity",
-                            "description"
+                            "description",
+                            "severity"
+                        ],
+                        "allOf": [
+                            {
+                                "if": {
+                                    "properties": {
+                                        "severity": {
+                                            "const": "non_blocking"
+                                        }
+                                    }
+                                },
+                                "then": {
+                                    "required": [
+                                        "mitigation"
+                                    ]
+                                }
+                            }
                         ]
                     }
                 },
@@ -254,12 +543,33 @@
                         "existing_structures": {
                             "type": "array",
                             "items": {
-                                "type": "string"
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "signature": {
+                                                "type": "string"
+                                            },
+                                            "source_file": {
+                                                "type": "string",
+                                                "pattern": "^[^/].*\\.(py|ts|js|go|rs)$"
+                                            },
+                                            "line_range": {
+                                                "type": "string",
+                                                "pattern": "^L\\d+-L\\d+$"
+                                            }
+                                        },
+                                        "required": [
+                                            "signature",
+                                            "source_file"
+                                        ]
+                                    }
+                                ]
                             }
-                        },
-                        "coding_patterns": {
-                            "type": "string",
-                            "description": "Legacy field. Use coding_examples for new steps."
                         },
                         "coding_examples": {
                             "type": "array",
@@ -285,74 +595,6 @@
                         }
                     }
                 },
-                "tasks": {
-                    "type": "array",
-                    "description": "Recursive tree of parent tasks and subtasks.",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "properties": {
-                            "task_id": {
-                                "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
-                            },
-                            "summary": {
-                                "type": "string"
-                            },
-                            "status": {
-                                "type": "string",
-                                "enum": [
-                                    "planned",
-                                    "implemented",
-                                    "verified",
-                                    "deferred"
-                                ]
-                            },
-                            "origin": {
-                                "type": "string",
-                                "enum": [
-                                    "core",
-                                    "review"
-                                ]
-                            },
-                            "files_to_touch": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
-                            "checklist_ids": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
-                            "sub_tasks": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "task_id": {
-                                            "type": "string"
-                                        },
-                                        "summary": {
-                                            "type": "string"
-                                        }
-                                    }
-                                }
-                            },
-                            "metadata": {
-                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
-                            }
-                        },
-                        "required": [
-                            "task_id",
-                            "summary",
-                            "status",
-                            "files_to_touch",
-                            "checklist_ids"
-                        ]
-                    }
-                },
                 "review_requirements": {
                     "type": "object",
                     "additionalProperties": false,
@@ -363,209 +605,437 @@
                         "test_commands": {
                             "type": "array",
                             "items": {
-                                "type": "string"
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "command": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "expected_exit_code": {
+                                                "type": "integer",
+                                                "default": 0
+                                            },
+                                            "timeout_seconds": {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 3600
+                                            },
+                                            "description": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "command"
+                                        ]
+                                    }
+                                ]
                             }
-                        },
-                        "metadata": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
                         }
                     },
                     "required": [
                         "test_commands"
                     ]
                 },
-                "security": {
-                    "type": "object",
-                    "description": "Output from the 'Secure' phase (formerly Step 17).",
-                    "additionalProperties": false,
-                    "properties": {
-                        "new_fixtures": {
-                            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
-                            "description": "List of new security fixtures added."
-                        },
-                        "spec_mutations": {
-                            "type": "array",
-                            "description": "Proposed hardening changes to specs.",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "properties": {
-                                    "ref": {
-                                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-                                    },
-                                    "change": {
-                                        "type": "string"
-                                    },
-                                    "reason": {
-                                        "type": "string"
-                                    }
+                "docs": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "not_applicable"
                                 },
-                                "required": [
-                                    "ref",
-                                    "change"
-                                ]
-                            }
+                                "reason": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "status",
+                                "reason"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "planned"
+                                },
+                                "required_updates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "path": {
+                                                "type": "string"
+                                            },
+                                            "update_summary": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "path",
+                                            "update_summary"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "status",
+                                "required_updates"
+                            ]
                         }
-                    }
+                    ]
+                },
+                "security": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "not_applicable"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "status",
+                                "reason"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "planned"
+                                },
+                                "new_fixtures": {
+                                    "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                                },
+                                "spec_mutations": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "ref": {
+                                                "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                                            },
+                                            "change": {
+                                                "type": "string"
+                                            },
+                                            "reason": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "ref",
+                                            "change",
+                                            "reason"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "status"
+                            ]
+                        }
+                    ]
                 },
                 "delivery": {
-                    "type": "object",
-                    "description": "Output from the 'Monitor' phase (formerly Step 18).",
-                    "additionalProperties": false,
-                    "properties": {
-                        "dashboards": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "properties": {
-                                    "dashboard_id": {
-                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                                    },
-                                    "nfr_refs": {
-                                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-                                    },
-                                    "url": {
-                                        "type": "string"
-                                    }
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "not_applicable"
                                 },
-                                "required": [
-                                    "dashboard_id"
-                                ]
-                            }
+                                "reason": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "status",
+                                "reason"
+                            ]
                         },
-                        "alerts": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "properties": {
-                                    "alert_id": {
-                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                                    },
-                                    "nfr_ref": {
-                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                                    },
-                                    "rule": {
-                                        "type": "string"
-                                    },
-                                    "severity": {
-                                        "type": "string",
-                                        "enum": [
-                                            "low",
-                                            "medium",
-                                            "high",
-                                            "critical"
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "planned"
+                                },
+                                "dashboards": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "dashboard_id": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "nfr_refs": {
+                                                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                                            },
+                                            "url": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "dashboard_id"
                                         ]
                                     }
                                 },
-                                "required": [
-                                    "alert_id",
-                                    "rule"
-                                ]
-                            }
+                                "alerts": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "alert_id": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "nfr_ref": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "rule": {
+                                                "type": "string"
+                                            },
+                                            "severity": {
+                                                "$ref": "#/$defs/severityLevel"
+                                            }
+                                        },
+                                        "required": [
+                                            "alert_id",
+                                            "rule"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "status"
+                            ]
                         }
-                    }
+                    ]
                 },
                 "drift": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "not_applicable"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "status",
+                                "reason"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "status": {
+                                    "const": "planned"
+                                },
+                                "checks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "check_id": {
+                                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                                            },
+                                            "target": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "api",
+                                                    "schema",
+                                                    "nfr",
+                                                    "invariant",
+                                                    "fixture",
+                                                    "config"
+                                                ]
+                                            },
+                                            "method": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "runtime-sample",
+                                                    "log-diff",
+                                                    "schema-diff",
+                                                    "trace-replay"
+                                                ]
+                                            },
+                                            "schedule": {
+                                                "type": "string",
+                                                "pattern": "^(hourly|daily|weekly|monthly|@(annually|monthly|weekly|daily|hourly)|([0-9*/,-]+ ){4}[0-9*/,-]+)$",
+                                                "description": "Named interval (hourly/daily/weekly/monthly) or cron expression"
+                                            },
+                                            "severity": {
+                                                "$ref": "#/$defs/severityLevel"
+                                            },
+                                            "remediation_policy": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "check_id",
+                                            "target",
+                                            "method"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "status"
+                            ]
+                        }
+                    ]
+                },
+                "coverage_status": {
                     "type": "object",
-                    "description": "Output from the 'Sustain' phase (formerly Step 19).",
                     "additionalProperties": false,
                     "properties": {
-                        "checks": {
+                        "total": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "verified": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "deferred": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "pending": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "total",
+                        "verified",
+                        "deferred",
+                        "pending"
+                    ]
+                },
+                "scope_validation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "in_scope": {
                             "type": "array",
                             "items": {
-                                "type": "object",
-                                "additionalProperties": false,
+                                "type": "string"
+                            }
+                        },
+                        "out_of_scope": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "acknowledged": {
+                            "type": "boolean"
+                        }
+                    },
+                    "allOf": [
+                        {
+                            "if": {
                                 "properties": {
-                                    "check_id": {
-                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                                    },
-                                    "target": {
-                                        "type": "string",
-                                        "enum": [
-                                            "api",
-                                            "schema",
-                                            "nfr",
-                                            "invariant",
-                                            "fixture",
-                                            "config"
-                                        ]
-                                    },
-                                    "method": {
-                                        "type": "string",
-                                        "enum": [
-                                            "runtime-sample",
-                                            "log-diff",
-                                            "schema-diff",
-                                            "trace-replay"
-                                        ]
-                                    },
-                                    "schedule": {
-                                        "type": "string"
-                                    },
-                                    "severity": {
-                                        "type": "string",
-                                        "enum": [
-                                            "low",
-                                            "medium",
-                                            "high",
-                                            "critical"
-                                        ]
-                                    },
-                                    "remediation_policy": {
-                                        "type": "string"
+                                    "out_of_scope": {
+                                        "minItems": 1
                                     }
-                                },
+                                }
+                            },
+                            "then": {
                                 "required": [
-                                    "check_id",
-                                    "target",
-                                    "method"
-                                ]
+                                    "acknowledged"
+                                ],
+                                "properties": {
+                                    "acknowledged": {
+                                        "const": true
+                                    }
+                                }
                             }
                         }
-                    }
-                },
-                "docs": {
-                    "type": "object",
-                    "description": "Explicit plan for documentation updates.",
-                    "additionalProperties": false,
-                    "properties": {
-                        "required_updates": {
-                            "type": "array",
-                            "description": "List of docs that must be updated.",
-                            "items": {
-                                "type": "object",
+                    ]
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "status": {
+                                "const": "deferred"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": [
+                            "deferred_reason"
+                        ],
+                        "properties": {
+                            "summary": {
                                 "properties": {
-                                    "doc_id": {
-                                        "type": "string"
-                                    },
-                                    "path": {
-                                        "type": "string"
-                                    },
-                                    "update_summary": {
-                                        "type": "string"
+                                    "target_file_patterns": {
+                                        "maxItems": 0
                                     }
-                                },
-                                "required": [
-                                    "path",
-                                    "update_summary"
-                                ]
+                                }
+                            },
+                            "review_requirements": {
+                                "properties": {
+                                    "test_commands": {
+                                        "maxItems": 0
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "else": {
+                        "properties": {
+                            "summary": {
+                                "properties": {
+                                    "target_file_patterns": {
+                                        "minItems": 1
+                                    }
+                                }
+                            },
+                            "review_requirements": {
+                                "properties": {
+                                    "test_commands": {
+                                        "minItems": 1
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            },
-            "required": [
-                "summary",
-                "spec_alignment",
-                "tasks",
-                "review_requirements"
             ]
         },
         "execution": {
             "type": "object",
-            "description": "Populated by Step 16b (Coder).",
+            "description": "Global execution summary.",
             "additionalProperties": false,
             "properties": {
                 "files_touched": {
@@ -581,12 +1051,7 @@
                         "additionalProperties": false,
                         "properties": {
                             "status": {
-                                "type": "string",
-                                "enum": [
-                                    "passed",
-                                    "failed",
-                                    "partial"
-                                ]
+                                "$ref": "#/$defs/executionStatus"
                             },
                             "outcome_description": {
                                 "type": "string"
@@ -594,17 +1059,72 @@
                             "reasoning": {
                                 "type": "string"
                             },
-                            "evidence": {
+                            "command": {
                                 "type": "string"
                             },
-                            "metadata": {
-                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
+                            "evidence": {
+                                "type": "string",
+                                "minLength": 20
+                            },
+                            "evidence_ref": {
+                                "type": "string"
+                            },
+                            "evidence_binding": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "timestamp": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "sha256": {
+                                        "type": "string",
+                                        "pattern": "^[a-f0-9]{64}$"
+                                    },
+                                    "exit_code": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "timestamp",
+                                    "sha256",
+                                    "exit_code"
+                                ]
                             }
                         },
                         "required": [
                             "status",
                             "outcome_description",
-                            "reasoning"
+                            "reasoning",
+                            "command",
+                            "evidence"
+                        ],
+                        "allOf": [
+                            {
+                                "if": {
+                                    "properties": {
+                                        "status": {
+                                            "const": "passed"
+                                        }
+                                    }
+                                },
+                                "then": {
+                                    "required": [
+                                        "evidence_ref",
+                                        "evidence_binding"
+                                    ],
+                                    "properties": {
+                                        "evidence": {
+                                            "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
+                                        }
+                                    }
+                                }
+                            }
                         ]
                     }
                 },
@@ -626,17 +1146,79 @@
                         }
                     }
                 },
+                "config_validation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "dashboard_links_valid": {
+                            "type": "boolean"
+                        },
+                        "alert_rules_valid": {
+                            "type": "boolean"
+                        },
+                        "drift_schedules_valid": {
+                            "type": "boolean"
+                        },
+                        "notes": {
+                            "type": "string"
+                        }
+                    }
+                },
                 "emergent_ambiguities": {
                     "type": "array",
                     "items": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "severity": {
+                                "type": "string"
+                            },
+                            "impact": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "description",
+                            "severity"
+                        ]
+                    }
+                },
+                "final_status": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "test_results": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        },
+                        "ci_status": {
+                            "type": "string",
+                            "enum": [
+                                "green",
+                                "red"
+                            ]
+                        }
                     }
                 }
             }
         },
         "review": {
             "type": "object",
-            "description": "Populated by Step 16c (Reviewer).",
             "additionalProperties": false,
             "properties": {
                 "findings": {
@@ -661,7 +1243,16 @@
                                 ]
                             },
                             "severity": {
-                                "type": "string"
+                                "type": "string",
+                                "enum": [
+                                    "blocking",
+                                    "major",
+                                    "minor",
+                                    "nit"
+                                ]
+                            },
+                            "spec_ref": {
+                                "$ref": "#/$defs/specRef"
                             },
                             "description": {
                                 "type": "string"
@@ -674,7 +1265,7 @@
                             },
                             "remediation_task": {
                                 "type": "object",
-                                "description": "Optional nested task to fix the finding.",
+                                "additionalProperties": false,
                                 "properties": {
                                     "task_id": {
                                         "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
@@ -682,7 +1273,7 @@
                                     "summary": {
                                         "type": "string"
                                     },
-                                    "files_to_modify": {
+                                    "files_to_touch": {
                                         "type": "array",
                                         "items": {
                                             "type": "string"
@@ -697,17 +1288,54 @@
                                 },
                                 "required": [
                                     "task_id",
-                                    "summary"
+                                    "summary",
+                                    "files_to_touch",
+                                    "checklist_ids"
                                 ]
                             },
                             "metadata": {
-                                "$ref": "https://specdev.local/schema/core/atoms/1#metadata"
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "source": {
+                                        "type": "string"
+                                    },
+                                    "impact": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "source",
+                                    "impact"
+                                ]
                             }
                         },
                         "required": [
                             "id",
                             "type",
-                            "description"
+                            "severity",
+                            "spec_ref",
+                            "description",
+                            "metadata"
+                        ],
+                        "allOf": [
+                            {
+                                "if": {
+                                    "properties": {
+                                        "severity": {
+                                            "enum": [
+                                                "blocking",
+                                                "major"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "then": {
+                                    "required": [
+                                        "remediation_task"
+                                    ]
+                                }
+                            }
                         ]
                     }
                 },
@@ -734,8 +1362,20 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 5
+                        },
+                        "metadata_usage": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
                         }
-                    }
+                    },
+                    "required": [
+                        "spec_completeness",
+                        "code_quality",
+                        "tests_completeness",
+                        "docs_completeness",
+                        "metadata_usage"
+                    ]
                 },
                 "verdict": {
                     "type": "string",
@@ -750,7 +1390,6 @@
                 },
                 "fixture_status": {
                     "type": "object",
-                    "description": "The Final Scoreboard (formerly Step 16d).",
                     "additionalProperties": false,
                     "properties": {
                         "implemented_endpoints": {
@@ -796,7 +1435,8 @@
                     },
                     "required": [
                         "implemented_endpoints",
-                        "test_results"
+                        "test_results",
+                        "ci_status"
                     ]
                 },
                 "security_status": {
@@ -804,12 +1444,10 @@
                     "enum": [
                         "green",
                         "red"
-                    ],
-                    "description": "Verdict from the Security/RedTeam audit."
+                    ]
                 },
                 "delivery_status": {
                     "type": "object",
-                    "description": "Verdict from the Delivery/Monitoring audit.",
                     "additionalProperties": false,
                     "properties": {
                         "deployments": {
@@ -846,65 +1484,35 @@
                         }
                     }
                 }
-            }
-        },
-        "verification": {
-            "type": "object",
-            "description": "Implementation verification evidence",
-            "additionalProperties": false,
-            "properties": {
-                "test_executions": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
+            },
+            "allOf": [
+                {
+                    "if": {
                         "properties": {
-                            "command": {
-                                "type": "string"
-                            },
-                            "status": {
-                                "enum": [
-                                    "passed",
-                                    "failed",
-                                    "skipped"
-                                ]
-                            },
-                            "output": {
-                                "type": "string"
-                            },
-                            "notes": {
-                                "type": "string"
-                            },
-                            "checklist_ids": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
+                            "verdict": {
+                                "const": "verified"
                             }
-                        },
+                        }
+                    },
+                    "then": {
                         "required": [
-                            "command",
-                            "status"
-                        ]
-                    }
-                },
-                "review_findings": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
+                            "fixture_status"
+                        ],
                         "properties": {
-                            "finding": {
-                                "type": "string"
-                            },
-                            "task_id": {
-                                "type": "string"
-                            },
-                            "resolution": {
-                                "type": "string"
+                            "fixture_status": {
+                                "properties": {
+                                    "ci_status": {
+                                        "const": "green"
+                                    }
+                                },
+                                "required": [
+                                    "ci_status"
+                                ]
                             }
                         }
                     }
                 }
-            }
+            ]
         }
     },
     "required": [

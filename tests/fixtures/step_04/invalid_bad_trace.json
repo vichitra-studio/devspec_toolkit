@@ -1,0 +1,64 @@
+{
+  "$schema": "https://specdev.local/schema/04_fr_list.schema.json",
+  "id": "functional-requirements-catalog",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "functional_requirements": [
+    {
+      "fr_id": "fr-user-login",
+      "statement": "The system shall allow authenticated users to log in with valid credentials",
+      "rationale": "Enables user access to the application functionality",
+      "preconditions": [
+        "User has valid account credentials",
+        "System is accessible"
+      ],
+      "postconditions": [
+        "User session is established",
+        "User is redirected to dashboard"
+      ],
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-login-success",
+          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard",
+          "fixture_ref": "fixture-user-login-success"
+        }
+      ],
+      "trace": [
+        {
+          "type": "random",
+          "id": "some-id",
+          "note": "Invalid trace type"
+        }
+      ]
+    },
+    {
+      "fr_id": "fr-user-logout",
+      "statement": "The system shall allow authenticated users to log out securely",
+      "rationale": "Ensures session security and proper cleanup",
+      "preconditions": [
+        "User is authenticated"
+      ],
+      "postconditions": [
+        "User session is terminated",
+        "User is redirected to login page"
+      ],
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-logout-success",
+          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page",
+          "fixture_ref": "fixture-user-logout-success"
+        }
+      ],
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-login"
+        },
+        {
+          "type": "capability",
+          "id": "cap-user-auth"
+        }
+      ]
+    }
+  ]
+}

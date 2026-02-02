@@ -14,6 +14,12 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
     "threats": {
       "type": "array",
       "items": {
@@ -29,8 +35,52 @@
           "vector": {
             "type": "string"
           },
+          "target_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "authn",
+              "authz",
+              "business_logic",
+              "transport",
+              "data_privacy"
+            ]
+          },
           "mitigations": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "fr",
+                    "api",
+                    "nfr",
+                    "inv",
+                    "fixture",
+                    "doc",
+                    "capability"
+                  ]
+                },
+                "id": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "id"
+              ]
+            }
           },
           "severity": {
             "type": "string",
@@ -45,12 +95,34 @@
         "required": [
           "threat_id",
           "description",
-          "severity"
+          "severity",
+          "category",
+          "target_ids",
+          "mitigations"
         ]
       }
     },
     "edge_cases": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "description": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "description"
+        ]
+      }
     }
   },
   "required": [

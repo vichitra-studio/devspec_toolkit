@@ -18,7 +18,25 @@
       "type": "string"
     },
     "pr_rules": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "validate",
+          "validate-all",
+          "matrix",
+          "fixtures-lint",
+          "invariants-check",
+          "governance-check",
+          "test",
+          "build",
+          "lint",
+          "format",
+          "audit",
+          "security"
+        ]
+      },
+      "uniqueItems": true
     },
     "spec_first_policy": {
       "type": "boolean"
@@ -44,12 +62,25 @@
     },
     "reviewers": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#link"
+      }
     }
   },
   "required": [
     "id",
     "owner",
     "created_at",
-    "spec_first_policy"
+    "spec_first_policy",
+    "commit_message_rules"
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "id": "capabilities-fixture",
+  "owner": "product",
+  "created_at": "2025-01-01T00:00:00Z",
+  "capabilities": [
+    {
+      "capability_id": "capability-user-auth",
+      "verb": "authenticate",
+      "scope": "in"
+    },
+    {
+      "capability_id": "capability-user-profile",
+      "verb": "manage",
+      "scope": "in"
+    },
+    {
+      "capability_id": "capability-payment-processing",
+      "verb": "process",
+      "scope": "in"
+    }
+  ]
+}
