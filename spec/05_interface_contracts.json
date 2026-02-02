@@ -6,21 +6,30 @@
     "apis": [
         {
             "api_id": "api-ask",
+            "name": "Ask",
+            "version": "v1",
+            "protocol": "http",
+            "route": "/ask",
             "method": "POST",
-            "path": "/ask",
-            "description": "Ask"
+            "owner": "api"
         },
         {
             "api_id": "api-search",
+            "name": "Search",
+            "version": "v1",
+            "protocol": "http",
+            "route": "/search",
             "method": "GET",
-            "path": "/search",
-            "description": "Search"
+            "owner": "api"
         },
         {
             "api_id": "api-trace-retrieval",
+            "name": "Trace Retrieval",
+            "version": "v1",
+            "protocol": "http",
+            "route": "/trace",
             "method": "GET",
-            "path": "/trace",
-            "description": "Trace"
+            "owner": "api"
         }
     ]
 }
