@@ -32,7 +32,7 @@ def lint_fixtures(spec_dir: str) -> list[str]:
                         if item.get("inv_id"): invariants.add(item["inv_id"])
                 if s.endswith("/07_nfrs.schema.json"):
                     for item in data.get("nfrs", []):
-                        if item.get("id"): nfrs.add(item["id"])
+                        if item.get("nfr_id"): nfrs.add(item["nfr_id"])
 
     for fx in fixtures:
         fid = fx.get("fixture_id","<unknown>")
