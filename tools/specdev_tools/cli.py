@@ -138,7 +138,13 @@ def main():
     elif args.cmd == "governance-check":
         from .governance import check_commit_message
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = check_commit_message(spec_dir, args.message)
+        msg = args.message
+        if os.path.exists(msg) and os.path.isfile(msg):
+            try:
+                msg = open(msg, "r", encoding="utf-8").read().strip()
+            except Exception:
+                pass
+        errs = check_commit_message(spec_dir, msg)
         if errs:
             for e in errs: print(e, file=sys.stderr)
             sys.exit(1)
