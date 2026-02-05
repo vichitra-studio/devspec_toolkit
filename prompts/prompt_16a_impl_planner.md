@@ -98,7 +98,7 @@ You must populate the JSON fields according to these specific definitions and ex
 
 ## 3. `plan.ambiguities` (Risk Management)
 *   List ANY ambiguity that would affect implementation.
-    *   `id`: `AMB-<short-id>`.
+    *   `id`: kebab-case identifier (e.g. `amb-storage-device`).
     *   `description`: What is unclear?
     *   `severity`: `blocking` or `non_blocking`.
     *   `mitigation`: How should the coder handle this? (e.g., "Assume X specifically").
@@ -112,8 +112,10 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `risks`: Identify tricky algorithms, migration safety, cascade deletes, or infinite recursion risks.
 
 ## 5. `plan.context` (Codebase awareness)
-    *   `signature`: Precise signature (e.g. `class User(BaseModel)`).
-    *   `source_file`: **Required**. Absolute path to file.
+    *   `existing_structures` supports two valid forms:
+        1) **String form** for non-code or mixed structures (e.g., shell/nginx/workflow context) including a concrete file path in the text.
+        2) **Object form** for code signatures only: `{ "signature": "...", "source_file": "...", "line_range": "Lx-Ly" }`.
+    *   For object form, `source_file` must be a repo-relative path ending in `.py`, `.ts`, `.js`, `.go`, or `.rs`.
     *   *Rule*: Do NOT hallucinate. If you can't see the file, do not list it.
 
 ## 6. `plan.tasks` (DELETED)

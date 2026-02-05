@@ -39,6 +39,10 @@
         "href"
       ]
     },
+    "traceId": {
+      "$anchor": "traceId",
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
     "traceRef": {
       "$anchor": "traceRef",
       "type": "object",

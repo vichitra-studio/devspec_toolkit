@@ -1488,6 +1488,9 @@
             "allOf": [
                 {
                     "if": {
+                        "required": [
+                            "verdict"
+                        ],
                         "properties": {
                             "verdict": {
                                 "const": "verified"
