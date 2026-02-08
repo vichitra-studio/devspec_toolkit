@@ -10,9 +10,10 @@ This document defines how automated agents should work with the AI Spec Driven D
 ## 2. Repository Expectations
 - The toolkit is checked out at repo root as [./devspec_toolkit/](../../); adjust if your checkout differs.
 - Live spec artifacts reside in the host repository under `spec/` (sibling to the toolkit submodule).
+- Mandatory seed manifest lives at `spec/common/seed_manifest.json` and defines seed order + step requirements.
 - Prompts required to generate artifacts live under [./devspec_toolkit/prompts/](../../prompts/) (adjust the path if you store the toolkit elsewhere).
 - Schemas are referenced from [./devspec_toolkit/schema/](../../schema/) and resolved using [./devspec_toolkit/tools/schema_registry.json](../../tools/schema_registry.json).
-- Validation commands are executed via `python -m specdev_tools.cli ... --repo-root <toolkit-path>` with `PYTHONPATH` including `<toolkit-path>/tools`.
+- Validation commands are executed via `./tools/run_specdev.sh ... --repo-root <toolkit-path>` (venv enforced). Avoid calling internal modules directly.
 
 ## 3. Operating Protocol (Two‑Phase)
 This toolkit uses a two‑phase interaction to maximize completeness without hard‑coding schemas.
@@ -22,6 +23,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
    - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
    - In prompts, use the new sections: `Context To Ingest`, `Operating Flow`, `Heuristics For Completeness`, and `Self‑Audit Gate`.
 2. **Prepare Context**
+   - Read `spec/common/seed_manifest.json` first and ingest required seeds in order.
    - Ingest the paths listed in `Context To Ingest` for the step.
    - Build a private ledger per step (e.g., FR ledger, API ledger) as described in `Operating Flow` (do not output it).
 3. **Phase A — Clarify**
@@ -32,6 +34,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
    - Output exactly one fenced `json` code block that validates against the embedded schema; no extra prose.
+   - Populate `seed_refs` with the seeds actually used.
 5. **Persist Artifact**
    - Replace the contents of `spec/NN_name.json` with the generated block.
    - Preserve the `$schema` field already present in the file.

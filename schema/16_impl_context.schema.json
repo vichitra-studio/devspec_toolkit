@@ -103,6 +103,9 @@
         "created_at": {
             "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
         },
+        "seed_refs": {
+            "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+        },
         "extensions": {
             "type": "object",
             "description": "Structured extensions for domain-specific data.",
@@ -140,6 +143,7 @@
         "plan": {
             "type": "object",
             "additionalProperties": false,
+            "description": "Trinity loop plan (scope, checklist, review requirements, and documentation impact).",
             "properties": {
                 "status": {
                     "type": "string",
@@ -183,6 +187,55 @@
                         "scope_in",
                         "scope_out",
                         "target_file_patterns"
+                    ]
+                },
+                "docs_impact": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "Documentation impact assessment. Required when any non-doc file is modified.",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "required",
+                                "not_required"
+                            ]
+                        },
+                        "rationale": {
+                            "type": "string",
+                            "minLength": 10
+                        },
+                        "docs_touched": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": [
+                        "status",
+                        "rationale"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "status": {
+                                        "const": "required"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "required": [
+                                    "docs_touched"
+                                ],
+                                "properties": {
+                                    "docs_touched": {
+                                        "minItems": 1
+                                    }
+                                }
+                            }
+                        }
                     ]
                 },
                 "spec_alignment": {
@@ -542,6 +595,7 @@
                     "properties": {
                         "existing_structures": {
                             "type": "array",
+                            "description": "Known code or non-code structures. Strings may reference non-code artifacts; objects must cite real code signatures.",
                             "items": {
                                 "oneOf": [
                                     {
@@ -1522,6 +1576,7 @@
         "id",
         "owner",
         "created_at",
+        "seed_refs",
         "plan"
     ]
 }

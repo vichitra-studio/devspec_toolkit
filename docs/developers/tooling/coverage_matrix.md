@@ -24,7 +24,7 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically. Always run:
 
 ```bash
-python -m specdev_tools.cli matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ```
 
 CI should fail if `tools/trace_matrix.json` differs from the committed expectation without matching spec changes or if required trace links are missing.

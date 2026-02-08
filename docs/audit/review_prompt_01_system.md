@@ -63,6 +63,7 @@ The following files have been identified for review.
 | `prompt_13a_completeness_assessment.md` | PASS |
 | `prompt_14_roadmap.md` | PASS |
 | `prompt_15_scaffold.md` | PASS |
+| `prompt_16_impl_context.md` | PENDING |
 | `prompt_16a_impl_planner.md` | PASS |
 | `prompt_16b_impl_coder.md` | PASS |
 | `prompt_16c_impl_reviewer.md` | PASS |
@@ -89,6 +90,7 @@ The following files have been identified for review.
 | `14_roadmap.schema.json` | PASS |
 | `15_scaffold.schema.json` | PASS |
 | `16_impl_context.schema.json` | PASS |
+| `seed_manifest.schema.json` | PASS |
 | `core/atoms.schema.json` | PASS |
 | `core/collections.schema.json` | PASS |
 | `core/errors.schema.json` | PASS |

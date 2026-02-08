@@ -6,12 +6,12 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 Verify that the entire spec suite is consistent before finalizing the roadmap:
 ```bash
-python -m specdev_tools.cli validate-all <spec_dir> --repo-root .
+./tools/run_specdev.sh validate-all <spec_dir> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -22,6 +22,12 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - **Objective:** Produce a high-level roadmap that sequences the work defined in both phases.
 - **Output type:** One JSON document conforming to the Embedded Schema.
 - **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
+
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["14"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 - Core Specs: `spec/00_charter.json` through `spec/12_ci_gates.json`.

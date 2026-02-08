@@ -51,7 +51,7 @@ First, update the toolkit and run the full validation suite to see what broke.
 git submodule update --remote devspec_toolkit
 
 # Run validation across the entire spec
-python3 -m specdev_tools.cli validate --all --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 ```
 
 ### 2. Triage The Breaks
@@ -94,4 +94,3 @@ git checkout <stable_commit_hash>
 ```
 
 We **strongly recommend** keeping up to date. "Breaking" changes usually fix logical holes in your specs.
-

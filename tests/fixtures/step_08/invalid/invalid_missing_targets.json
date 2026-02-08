@@ -1,15 +1,23 @@
 {
-    "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
-    "id": "fixtures-invalid",
-    "owner": "api",
-    "created_at": "2025-01-01T00:00:00Z",
-    "fixtures": [
-        {
-            "fixture_id": "fixture-fail-missing-targets",
-            "description": "This fixture missing targets and should fail validation",
-            "mode": "unit",
-            "input": {},
-            "expected": {}
-        }
-    ]
+  "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+  "id": "fixtures-invalid",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "fixture-fail-missing-targets",
+      "description": "This fixture missing targets and should fail validation",
+      "mode": "unit",
+      "input": {},
+      "expected": {}
+    }
+  ]
 }

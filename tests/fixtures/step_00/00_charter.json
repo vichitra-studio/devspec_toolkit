@@ -1,1 +1,12 @@
-{"$schema": "../../schema/00_charter.schema.json", "vision": "Test"}
+{
+  "$schema": "../../schema/00_charter.schema.json",
+  "vision": "Test",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ]
+}

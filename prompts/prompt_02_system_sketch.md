@@ -6,7 +6,7 @@ Build a lightweight architecture map that shows the components required to deliv
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -20,8 +20,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** include `trace` that connect components and connections to upstream or downstream artifacts.
 
 
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["02"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
+
 ## Context To Ingest
-- **Primary Source:** `docs/seed/seed_tech_stack.md` (if present) for architecture decisions, patterns, and constraints.
+- **Primary Source:** `docs/seed/seed_tech_stack.md` (required) for architecture decisions, patterns, and constraints.
 - Capabilities and owners from `spec/01_capabilities.json` to inform components.
 - Any existing `spec/05_interface_contracts.json` to align external interfaces and protocols.
 - Glossary terms `spec/03_glossary.json` to name components and connections consistently.

@@ -1,5 +1,13 @@
 {
-    "extension_id": "ext-01-database",
-    "title": "Database Schema",
-    "file_name": "ext_01_database_schema.json"
+  "extension_id": "ext-01-database",
+  "title": "Database Schema",
+  "file_name": "ext_01_database_schema.json",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ]
 }

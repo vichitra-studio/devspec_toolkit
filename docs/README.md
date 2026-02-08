@@ -9,6 +9,7 @@ This directory contains the authoritative guides for the AI Spec Driven Developm
 | **[Getting Started](developers/getting_started.md)** | **Start here.** End-to-end setup, environment config, and workflow walkthrough. |
 | **[Reference](developers/reference.md)** | **Daily use.** Cheatsheet for CLI commands, schema IDs, and naming conventions. |
 | **[Extension Schemas](developers/extension_schemas.md)** | How to write domain-specific schemas (e.g., for AI models or database tables). |
+| **Seed Manifest** (`spec/common/seed_manifest.json`) | Mandatory seed order, step requirements, and docs policy. |
 
 ### Workflows
 Detailed breakdowns of the spec lifecycle phases:
@@ -33,5 +34,6 @@ Detailed breakdowns of the spec lifecycle phases:
 ## 📄 Prompt Contracts
 
 The single source of truth for every step's requirements lives in the **[prompts/](../prompts/)** directory.
-- `prompt_00_charter.md` through `prompt_16c_review.md`.
+- `prompt_00_charter.md` through `prompt_16c_impl_reviewer.md`.
+- `prompt_16_impl_context.md` for the Step 16 Trinity Anchor.
 - Shared expectations: **[prompts/shared_expectations.md](prompts/shared_expectations.md)**.

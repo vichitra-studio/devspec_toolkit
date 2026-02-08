@@ -6,7 +6,7 @@ Proactively identify security threats, failure modes, and edge cases. Ensure eve
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -32,6 +32,12 @@ Use the `category` field to classify threats precisely:
 3.  **`business_logic`**: Flaws in the workflow itself (e.g., Buying 0 items for $0, skipping payment step).
 4.  **`transport`**: Data in motion (e.g., MitM, Cleartext logging, weak TLS).
 5.  **`data_privacy`**: Data at rest/leakage (e.g., PII exposure in logs, GDPR violation, unnecessary data collection).
+
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["11"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 1.  **Attack Surface**: `spec/05_interface_contracts.json` (APIs) and `spec/02_system_sketch.json` (Components).

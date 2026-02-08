@@ -1,27 +1,35 @@
 {
-    "id": "broken-ci-pipeline",
-    "owner": "api",
-    "created_at": "2026-01-01T00:00:00Z",
-    "trace": [
+  "id": "broken-ci-pipeline",
+  "owner": "api",
+  "created_at": "2026-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "trace": [
+    {
+      "type": "doc",
+      "id": "10-governance-policy"
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": "job-a",
+      "name": "Job A",
+      "requires": [
+        "non-existent-job"
+      ],
+      "steps": [
         {
-            "type": "doc",
-            "id": "10-governance-policy"
+          "id": "step-a",
+          "name": "Step A",
+          "command": "echo A"
         }
-    ],
-    "jobs": [
-        {
-            "job_id": "job-a",
-            "name": "Job A",
-            "requires": [
-                "non-existent-job"
-            ],
-            "steps": [
-                {
-                    "id": "step-a",
-                    "name": "Step A",
-                    "command": "echo A"
-                }
-            ]
-        }
-    ]
+      ]
+    }
+  ]
 }

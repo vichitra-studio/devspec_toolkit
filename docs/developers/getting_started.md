@@ -13,13 +13,13 @@ Before setting up your environment, initialize your project using the toolkit's 
 
 ```bash
 # From within the toolkit checkout (or if you curl the script):
-python3 devspec_toolkit/tools/init_project.py --target /path/to/my/project --strict
+python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --strict
 ```
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `docs/seed/`, and `.github/workflows/`.
-3.  **Seed Templates**: Copies `seed_overview.md` and `seed_tech_stack.md`.
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `docs/seed/`, and `.github/workflows/`.
+3.  **Seed Templates**: Copies `seed_overview.md`, `seed_tech_stack.md`, and `spec/common/seed_manifest.json`.
 4.  **Environment**: Creates `dev_env` and installs dependencies + hooks.
 5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
@@ -31,11 +31,14 @@ Simply activate it to start working:
 source dev_env/bin/activate
 
 # Verify everything is working
-python3 -m specdev_tools.cli --help
+./tools/run_specdev.sh --help
 ```
 
 > [!NOTE]
 > If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
+
+All validation and linting commands must run through `./tools/run_specdev.sh ...`; do not call internal modules directly. This is the only supported entrypoint and ensures the virtualenv guard and schema registry behavior are applied consistently.
+The wrapper invokes the `dev_env` Python directly, so it works even if you have not activated the environment in your current shell.
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
@@ -81,6 +84,9 @@ The [developer index](index.md) links to deeper explanations when you need them.
 ### Phase 0 · Seed The Project (Input Zero)
 Before writing formal specs, you must define the "Seed" of your project using the Smart Prompts. This ensures you have a coherent vision before structured discovery.
 
+0. **Seed Manifest** (`spec/common/seed_manifest.json`):
+   - **Purpose**: defines the mandatory seed order and step-specific requirements.
+   - **Expectation**: treat it as the authoritative source for seed ingestion order and `seed_refs` population.
 1. **Seed Overview** (`docs/seed/seed_overview.md`):
    - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
    - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
@@ -119,12 +125,15 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
   - Phase B — Emit: the assistant then emits **exactly one** fenced `json` block that validates against the embedded schema.
 - Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
 - If validation fails, consult the guide, address errors, and re-run the emission.
-- Need a quick reminder of the workflow for a given step? Run `python -m specdev_tools.cli ai-help --step NN`.
+- Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.
 
 Automation protocol and runner tips live in [../agents/manifest.json](../agents/manifest.json) and [../agents/agents.md](../agents/agents.md).
 
 ## 7. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
+
+## 7a. Documentation Policy
+Documentation coverage is controlled by `spec/common/seed_manifest.json`. Use `docs-lint` to validate coverage and keep docs updated when code changes occur. The planner decides when new directories require README coverage and records that in `docs_policy.readme_depth_by_scope`.
 
 
 

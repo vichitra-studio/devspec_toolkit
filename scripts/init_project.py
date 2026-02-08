@@ -12,7 +12,7 @@ PRE_COMMIT_TEMPLATE = """repos:
     hooks:
       - id: devspec-validate
         name: DevSpec Validate
-        entry: python3 -m specdev_tools.cli validate-all spec
+        entry: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
         language: system
         types: [json]
         files: ^spec/
@@ -21,7 +21,7 @@ PRE_COMMIT_TEMPLATE = """repos:
 
       - id: devspec-fixtures
         name: DevSpec Fixtures Lint
-        entry: python3 -m specdev_tools.cli fixtures-lint spec
+        entry: ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
         language: system
         types: [json]
         files: ^spec/
@@ -30,7 +30,7 @@ PRE_COMMIT_TEMPLATE = """repos:
 
 #  - id: devspec-governance
 #    name: DevSpec Governance Check
-#    entry: python3 -m specdev_tools.cli governance-check spec --message
+#    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message
 #    language: python
 #    stages: [commit-msg]
 #    # Note: commit-msg hooks require 'pre-commit install --hook-type commit-msg'
@@ -66,17 +66,22 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
+      - name: Create virtualenv
+        run: python -m venv dev_env
       - name: Install tooling
-        run: pip install -e devspec_toolkit/tools/
+        run: |
+          dev_env/bin/pip install --upgrade pip
+          dev_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
+          dev_env/bin/pip install -e devspec_toolkit/tools/
       - name: Validate all specs
-        run: python -m specdev_tools.cli validate-all spec --repo-root devspec_toolkit
+        run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
-        run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root devspec_toolkit
+        run: ./tools/run_specdev.sh governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root ./devspec_toolkit
       - name: Fixtures lint
-        run: python -m specdev_tools.cli fixtures-lint spec --repo-root devspec_toolkit
+        run: ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
       - name: Build trace matrix
-        run: python -m specdev_tools.cli matrix spec --out trace_matrix.json --repo-root devspec_toolkit
+        run: ./tools/run_specdev.sh matrix spec --out trace_matrix.json --repo-root ./devspec_toolkit
       - name: Upload matrix
         uses: actions/upload-artifact@v4
         with:
@@ -145,6 +150,32 @@ def main():
     else:
         print("spec/ directory already exists.")
 
+    # 3a. Init spec/common/ directory and seed manifest
+    spec_common_dir = os.path.join(spec_dir, "common")
+    if not os.path.exists(spec_common_dir):
+        print("Creating spec/common/ directory...")
+        os.makedirs(spec_common_dir)
+    else:
+        print("spec/common/ directory already exists.")
+
+    seed_manifest_target = os.path.join(spec_common_dir, "seed_manifest.json")
+    if not os.path.exists(seed_manifest_target):
+        # Try to copy the seed manifest from toolkit source
+        manifest_candidates = [
+            os.path.join(toolkit_path, "spec", "common", "seed_manifest.json"),
+            os.path.join(toolkit_path, "devspec_toolkit", "spec", "common", "seed_manifest.json"),
+        ]
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        manifest_candidates.append(os.path.abspath(os.path.join(script_dir, "..", "spec", "common", "seed_manifest.json")))
+        manifest_src = next((p for p in manifest_candidates if os.path.exists(p)), None)
+        if manifest_src:
+            print("Copying seed_manifest.json to spec/common/...")
+            shutil.copy2(manifest_src, seed_manifest_target)
+        else:
+            print("Warning: seed_manifest.json template not found. Please add it manually to spec/common/.")
+    else:
+        print("spec/common/seed_manifest.json already exists.")
+
     # 3b. Init spec/impl_context/ directory
     impl_context_dir = os.path.join(spec_dir, "impl_context")
     if not os.path.exists(impl_context_dir):
@@ -161,6 +192,37 @@ def main():
     if not os.path.exists(docs_seed_dir):
         print("Creating docs/seed/ directory...")
         os.makedirs(docs_seed_dir)
+
+    # 4a. Emit wrapper scripts for venv-enforced CLI usage
+    tools_dir = os.path.join(target_dir, "tools")
+    if not os.path.exists(tools_dir):
+        print("Creating tools/ directory...")
+        os.makedirs(tools_dir)
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    wrapper_templates_dir = os.path.join(script_dir, "templates")
+    run_specdev_src = os.path.join(wrapper_templates_dir, "run_specdev.sh")
+    ensure_venv_src = os.path.join(wrapper_templates_dir, "ensure_venv.py")
+
+    run_specdev_target = os.path.join(tools_dir, "run_specdev.sh")
+    ensure_venv_target = os.path.join(tools_dir, "ensure_venv.py")
+
+    if os.path.exists(run_specdev_src) and not os.path.exists(run_specdev_target):
+        print("Creating tools/run_specdev.sh...")
+        shutil.copy2(run_specdev_src, run_specdev_target)
+        os.chmod(run_specdev_target, 0o755)
+    elif os.path.exists(run_specdev_target):
+        print("tools/run_specdev.sh already exists.")
+    else:
+        print("Warning: run_specdev.sh template not found; skipping.")
+
+    if os.path.exists(ensure_venv_src) and not os.path.exists(ensure_venv_target):
+        print("Creating tools/ensure_venv.py...")
+        shutil.copy2(ensure_venv_src, ensure_venv_target)
+    elif os.path.exists(ensure_venv_target):
+        print("tools/ensure_venv.py already exists.")
+    else:
+        print("Warning: ensure_venv.py template not found; skipping.")
     
     # Check for seed templates in the *toolkit* inside the target, or assume we are running *from* a toolkit source?
     # Strategy: We assume the script is valid, but where are the templates?
@@ -276,7 +338,7 @@ def main():
                     print("Enabling governance check in pre-commit config...")
                     new_content = config_content.replace("#  - id: devspec-governance", "  - id: devspec-governance")
                     new_content = new_content.replace("#    name: DevSpec Governance Check", "    name: DevSpec Governance Check")
-                    new_content = new_content.replace("#    entry: python3 -m specdev_tools.cli governance-check spec --message", "    entry: python3 -m specdev_tools.cli governance-check spec --message")
+                    new_content = new_content.replace("#    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message", "    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message")
                     new_content = new_content.replace("#    language: python", "    language: system") # Ensure system language here too
                     new_content = new_content.replace("#    stages: [commit-msg]", "    stages: [commit-msg]")
                     with open(config_path, "w") as f:
@@ -322,6 +384,10 @@ This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/de
    ```bash
    source dev_env/bin/activate
    ```
+2. **Run Toolkit Commands**:
+   ```bash
+   ./tools/run_specdev.sh --help
+   ```
 """
     if not os.path.exists(readme_path):
         print("Creating README.md...")
@@ -341,7 +407,7 @@ This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/de
     print("Next steps:")
     print("1. Fill out docs/seed/seed_overview.md and seed_tech_stack.md")
     print("2. Activate your environment: source dev_env/bin/activate")
-    print("3. Start your first spec or run `python3 -m specdev_tools.cli --help`")
+    print("3. Start your first spec or run `./tools/run_specdev.sh --help`")
 
 if __name__ == "__main__":
     main()

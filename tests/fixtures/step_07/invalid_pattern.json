@@ -3,9 +3,17 @@
   "id": "nfrs-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "nfrs": [
     {
-      "nfr_id": "invalid-id-format", 
+      "nfr_id": "invalid-id-format",
       "category": "latency",
       "metric": "response time",
       "target": 200,

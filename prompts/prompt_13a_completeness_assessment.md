@@ -6,13 +6,13 @@ Assess the completeness of Phase 1 specifications and identify gaps that prevent
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 To ensure full suite consistency and generate a traceability matrix for analysis:
 ```bash
-python -m specdev_tools.cli validate-all <spec_dir> --repo-root .
-python -m specdev_tools.cli matrix <spec_dir> --out <spec_dir>/trace_matrix.json --repo-root .
+./tools/run_specdev.sh validate-all <spec_dir> --repo-root ./devspec_toolkit
+./tools/run_specdev.sh matrix <spec_dir> --out <spec_dir>/trace_matrix.json --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -73,6 +73,12 @@ You are a senior specification auditor and quality control expert. Your job is t
   - current: 0-10 score.
   - target: 10.
   - confidence_level: 0.0-1.0 (confidence in this assessment).
+
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["13a"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.

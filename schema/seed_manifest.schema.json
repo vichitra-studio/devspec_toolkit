@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/seed_manifest.schema.json",
+  "title": "seed_manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "seed_manifest_id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "last_updated": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "global_seed_order": {
+      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+    },
+    "nested_order": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "level_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "description": {
+            "type": "string"
+          },
+          "seed_ids": {
+            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+          }
+        },
+        "required": [
+          "level_id",
+          "seed_ids"
+        ]
+      }
+    },
+    "seeds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "seed_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "spec",
+              "config",
+              "other"
+            ]
+          }
+        },
+        "required": [
+          "seed_id",
+          "path",
+          "description",
+          "required",
+          "source_type"
+        ]
+      }
+    },
+    "step_requirements": {
+      "type": "object",
+      "patternProperties": {
+        "^(\\d{2}[a-z]?)$": {
+          "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+        }
+      },
+      "additionalProperties": false
+    },
+    "docs_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readme_required": {
+          "type": "boolean"
+        },
+        "root_readme_required": {
+          "type": "boolean"
+        },
+        "readme_depth_default": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "readme_depth_by_scope": {
+          "type": "object",
+          "patternProperties": {
+            "^.+/$": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "scope": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "minItems": 1
+        },
+        "exclusions": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "doc_paths": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "minItems": 1
+        }
+      },
+      "required": [
+        "readme_required",
+        "root_readme_required",
+        "readme_depth_default",
+        "readme_depth_by_scope",
+        "scope",
+        "exclusions",
+        "doc_paths"
+      ]
+    }
+  },
+  "required": [
+    "seed_manifest_id",
+    "version",
+    "created_at",
+    "last_updated",
+    "global_seed_order",
+    "nested_order",
+    "seeds",
+    "step_requirements",
+    "docs_policy"
+  ]
+}

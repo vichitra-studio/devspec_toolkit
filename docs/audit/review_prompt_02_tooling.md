@@ -60,6 +60,8 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/scripts/generate_fixtures_02a.py`
     *   `devspec_toolkit/scripts/init_project.py`
     *   `devspec_toolkit/scripts/setup_devspec_env.sh`
+    *   `devspec_toolkit/scripts/templates/run_specdev.sh`
+    *   `devspec_toolkit/scripts/templates/ensure_venv.py`
 
     #### Tests (`devspec_toolkit/tests/integration/`)
     *   `devspec_toolkit/tests/integration/test_step_00.py`
@@ -79,6 +81,8 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/tests/integration/test_step_13.py`
     *   `devspec_toolkit/tests/integration/test_step_14.py`
     *   `devspec_toolkit/tests/integration/test_step_15.py`
+    *   `devspec_toolkit/tests/integration/test_step_16.py`
+    *   `devspec_toolkit/tests/integration/test_seed_manifest.py`
     *   `devspec_toolkit/tests/integration/test_v2_migration.py`
 
     #### Tools (`devspec_toolkit/tools/`)
@@ -90,6 +94,7 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/tools/specdev_tools/__init__.py`
     *   `devspec_toolkit/tools/specdev_tools/changelog_parser.py`
     *   `devspec_toolkit/tools/specdev_tools/cli.py`
+    *   `devspec_toolkit/tools/specdev_tools/docs_lint.py`
     *   `devspec_toolkit/tools/specdev_tools/fixtures_lint.py`
     *   `devspec_toolkit/tools/specdev_tools/governance.py`
     *   `devspec_toolkit/tools/specdev_tools/invariants.py`
@@ -97,6 +102,7 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/tools/specdev_tools/prompt_generator.py`
     *   `devspec_toolkit/tools/specdev_tools/registry.py`
     *   `devspec_toolkit/tools/specdev_tools/schema_differ.py`
+    *   `devspec_toolkit/tools/specdev_tools/seed_lint.py`
     *   `devspec_toolkit/tools/specdev_tools/validate.py`
     *   `devspec_toolkit/tools/specdev_tools/validators/step_01.py`
     *   `devspec_toolkit/tools/specdev_tools/validators/step_02.py`
@@ -250,6 +256,10 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/tests/fixtures/step_16/valid_minimal.json` [REVIEWED]
     *   `devspec_toolkit/tests/fixtures/step_16/invalid_missing_evidence.json` [REVIEWED]
     *   `devspec_toolkit/tests/fixtures/step_16/invalid_bad_enum.json` [REVIEWED]
+
+    **Seed Manifest**
+    *   `devspec_toolkit/tests/fixtures/seed_manifest/invalid_missing_required.json`
+    *   `devspec_toolkit/tests/fixtures/seed_manifest/valid_minimal.json`
 
     #### Migration Prompts (`devspec_toolkit/migration_prompts/`)
     *   `devspec_toolkit/migration_prompts/template_add_field.md`

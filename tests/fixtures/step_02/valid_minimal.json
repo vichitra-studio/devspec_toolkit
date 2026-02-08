@@ -2,6 +2,14 @@
   "id": "system-sketch-minimal",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "components": [
     {
       "component_id": "user-platform",

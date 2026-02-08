@@ -1,10 +1,18 @@
 {
-    "$schema": "https://specdev.local/schema/10_governance.schema.json",
-    "id": "governance-invalid-enum",
-    "owner": "api",
-    "created_at": "2025-01-01T00:00:00Z",
-    "spec_first_policy": true,
-    "pr_rules": [
-        "random-check-that-does-not-exist"
-    ]
+  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "id": "governance-invalid-enum",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "spec_first_policy": true,
+  "pr_rules": [
+    "random-check-that-does-not-exist"
+  ]
 }

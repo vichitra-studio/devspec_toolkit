@@ -2,6 +2,14 @@
   "id": "system-sketch-invalid-missing-rate-limit",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "components": [
     {
       "component_id": "user-service",
@@ -60,7 +68,10 @@
         "Return payment confirmations"
       ],
       "owner": "business",
-      "tags": ["external-dependency", "critical-path"],
+      "tags": [
+        "external-dependency",
+        "critical-path"
+      ],
       "trace": [
         {
           "type": "doc",

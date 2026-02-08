@@ -1,28 +1,36 @@
 {
-    "$schema": "https://specdev.local/schema/10_governance.schema.json",
-    "id": "governance-core",
-    "owner": "system",
-    "created_at": "2025-01-01T00:00:00Z",
-    "spec_first_policy": true,
-    "versioning": "semver",
-    "pr_rules": [
-        "lint",
-        "test",
-        "audit"
-    ],
-    "commit_message_rules": {
-        "require_spec_ids": true,
-        "pattern": "^(feat|fix|chore|docs)\\(.+\\): .+( \\[([a-z0-9-]+)\\])?$",
-        "error_message": "Must follow conventional commits."
+  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "id": "governance-core",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
     },
-    "reviewers": [
-        "alice",
-        "bob"
-    ],
-    "trace": [
-        {
-            "type": "doc",
-            "id": "charter"
-        }
-    ]
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "spec_first_policy": true,
+  "versioning": "semver",
+  "pr_rules": [
+    "lint",
+    "test",
+    "audit"
+  ],
+  "commit_message_rules": {
+    "require_spec_ids": true,
+    "pattern": "^(feat|fix|chore|docs)\\(.+\\): .+( \\[([a-z0-9-]+)\\])?$",
+    "error_message": "Must follow conventional commits."
+  },
+  "reviewers": [
+    "alice",
+    "bob"
+  ],
+  "trace": [
+    {
+      "type": "doc",
+      "id": "charter"
+    }
+  ]
 }

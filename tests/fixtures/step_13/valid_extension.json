@@ -3,6 +3,14 @@
   "id": "database-schema-spec",
   "owner": "system",
   "created_at": "2026-01-15T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "tables": [
     {
       "table_name": "users",

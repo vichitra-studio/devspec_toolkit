@@ -6,7 +6,7 @@ Execute the plan defined in Step 16a. This step acts as the "Builder" that turns
 ## Tool Execution
 After updating the JSON artifact, validate it:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -14,9 +14,19 @@ You are a senior implementation engineer. Your job is to **Process** a single Im
 
 **CRITICAL**: You are the "Ambiguity Gatekeeper". If the plan contains vagueness, missing variable names, or "implementation details tbd", you MUST **REJECT** the plan by returning an artifact with `emergent_ambiguities` and NO code changes.
 
+**CRITICAL**: The implementer must not update specs/seed files unless they are explicitly listed in `plan.summary.target_file_patterns` **and** required by `checklist[].implementation`. If spec/seed drift or missing context is discovered, log an ambiguity and STOP.
+
 Instead of outputting code directly to the user, you:
 1.  **Write Code Files** (using tool calls).
 2.  **Update the Artifact** (`spec/impl_context/{step_id}.json`) to record your execution results.
+
+# Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["16b"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
+- You must evaluate whether additional context (README maps, tooling docs, architecture guides, ops runbooks) is required for this step. If so, add new seeds to the manifest and update `step_requirements["16b"]` before proceeding.
+  - If the plan does not include required seed changes in `plan.summary.target_file_patterns`, log an `emergent_ambiguity` and STOP.
 
 # Task
 - **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
@@ -31,6 +41,12 @@ You must populate the `execution` JSON object according to these specific defini
 *   List **EVERY** file you modified.
 *   *Rule*: This list must be a subset of `plan.summary.target_file_patterns`.
 *   *Expectation*: If you need to touch a file not in the plan, you are blocked. Log an `emergent_ambiguity`.
+
+## 1b. `plan.docs_impact` (Documentation Updates)
+*   If any code change is performed (non-doc file edit), `plan.docs_impact.status` MUST be `required`.
+    *   *Rule*: Spec changes (including `spec/common/seed_manifest.json` and any `spec/*.json`) are non-doc changes and REQUIRE docs updates.
+*   When `status: required`, update the listed docs in `plan.docs_impact.docs_touched` and include them in `execution.files_touched`.
+*   If `plan.docs_impact` is missing or `status: not_required` while code changes are made, STOP and log an `emergent_ambiguity`.
 
 ## 2. `execution.execution_results` (The Log)
 *   You must add a result entry for **every** command you run.
@@ -86,8 +102,8 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 *   **`plan.context.coding_examples`**:
     *   **Ground Truth**: Use these structured snippets over generic knowledge.
     *   *Usage*: Match the `code` pattern exactly.
-*   **`execution.execution_results[].metadata`**:
-    *   `legacy_test_output`: **MANDATORY**. If present in the plan, your `evidence` must match this format or string closely to prevent regression.
+*   **`execution.execution_results[].evidence_binding`**:
+    *   Use this object to attach structured evidence metadata (timestamp, sha256, exit_code).
 *   **Contextual Metadata**:
     *   `source` / `impact`: Use this to understand the *why* and *risk* profile of the task.
 
@@ -106,6 +122,7 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
     c. Capture evidence for each action
     d. **CRITICAL**: Update `implementation.actions[].evidence` with `{ type, content }` object
     e. Update `implementation.status` to `in_progress` then `verified`
+    f. **REVIEW LOOP**: Review the item implementation for gaps/bugs. If findings exist, fix them and re-review until no findings remain, then proceed to the next checklist item.
 3.  **STOP Conditions**:
     a. Any action fails → Set `status: blocked`, log `emergent_ambiguity`
     b. Plan contains `blocking` ambiguity → STOP immediately
@@ -142,12 +159,12 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 1. **NEVER** skip test commands in `review_requirements.test_commands`
 2. **NEVER** verify action without populating `evidence` object
 3. **NEVER** mark action complete without running verification
-4. **NEVER** modify `plan` section — it's read-only
+4. **NEVER** modify `plan` outside `checklist[].implementation` evidence/status updates
 
 # Output Rules
 1.  Return exactly one fenced code block with language `json`.
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
-3.  Do NOT modify `plan` or `review`.
+3.  Do NOT modify `plan` outside `checklist[].implementation` evidence/status updates. Update `review` only when a checklist action explicitly targets review fields.
 
 # Output Contract (Update Logic)
 *Input*:

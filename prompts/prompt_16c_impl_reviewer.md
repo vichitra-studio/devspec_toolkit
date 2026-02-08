@@ -6,7 +6,7 @@ Audit the implementation for completeness, quality, and rigorous adherence to th
 ## Tool Execution
 After updating the JSON artifact, validate it:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -14,10 +14,23 @@ You are a senior technical reviewer. Your job is to **Audit** the implementation
 
 You output the final version of the JSON, populating the `review` section.
 
+# Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["16c"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
+- You must evaluate whether additional context (README maps, tooling docs, architecture guides, ops runbooks) is required for this step. If so, add new seeds to the manifest and update `step_requirements["16c"]` before proceeding.
+
 # Task
 - **Input context:** `spec/impl_context/{step_id}.json` (Plan + Exec), plus the actual Codebase.
 - **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
 - **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{step_id}.json`.
+
+## Crucial Side Effect (Roadmap Sync)
+- If your `verdict` is `verified`, you **MUST** also update:
+    - `spec/14_roadmap.json`: Set the corresponding milestone's status to `done`.
+    - `spec/09_impl_plan.json`: Set the corresponding milestone's status to `done`.
+- This ensures the high-level roadmap and implementation plan stay in sync with implementation reality.
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -45,6 +58,12 @@ You must populate the `review` JSON object according to these specific definitio
     *   **2**: Needs Improvement (critical tests fail OR spec was ambiguous/missing metadata). Deferred.
     *   **1**: Poor (major bugs OR "magic" implementation vs spec). Rejected.
     *   **0**: Blocked.
+
+## 2b. `plan.docs_impact` (Docs Gate)
+*   If code changes are present, `plan.docs_impact.status` MUST be `required` and `docs_touched` MUST be non-empty.
+    *   *Rule*: Spec changes (including `spec/common/seed_manifest.json` and any `spec/*.json`) are code changes and REQUIRE docs updates.
+*   Verify that every doc in `plan.docs_impact.docs_touched` was updated and appears in `execution.files_touched`.
+*   If docs are missing or status is `not_required` despite code changes, add a `docs` finding with `major` severity.
 
 ## 3. `review.findings` (Gaps / Bugs / Scope Creep)
 *   List every issue as a structured object:
@@ -91,8 +110,8 @@ You must populate the `review` JSON object according to these specific definitio
 
 ## 7. Advanced Schema Fields (Verification Rules)
 You must **VERIFY** that the Coder respected these high-fidelity fields.
-*   **`metadata` Usage**:
-    *   `completeness_criteria`: Did the Coder actually meet the specific criteria listed in `plan.tasks[].metadata`?
+*   **`checklist` Coverage**:
+    *   Verify checklist item implementation evidence and alignment with `plan.spec_alignment.checklist[]`.
     *   `legacy_test_output`: Did the `execution.evidence` match the expected output format?
 *   **`plan.context.coding_examples`**:
     *   *Check*: Did the implementation follow the provided `code` structure?
@@ -110,6 +129,7 @@ For each `checklist[]` item:
 3. ☐ Is `spec_ref.commit_hash` valid in git?
 4. ☐ Are files in `implementation.files_touched` within `target_file_patterns`?
 5. ☐ Does `linked_test_expectation` appear in `execution.critical_evidence.passed_test_commands`?
+6. ☐ If code changes exist, do `plan.docs_impact` and updated docs match the execution?
 
 ## Red Flags (Immediate Rejection)
 - Empty `evidence.content` on verified action

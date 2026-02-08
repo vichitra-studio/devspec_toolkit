@@ -1,19 +1,27 @@
 {
-    "id": "invalid-method-scaffold",
-    "owner": "api",
-    "created_at": "2025-01-01T12:00:00Z",
-    "service_skeleton": {
-        "language": "python"
+  "id": "invalid-method-scaffold",
+  "owner": "api",
+  "created_at": "2025-01-01T12:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
     },
-    "route_map": [
-        {
-            "api_ref": "api-bad-method",
-            "path": "/bad",
-            "method": "GETTER"
-        }
-    ],
-    "validators": [
-        "spec-validate"
-    ],
-    "build_status": "pending"
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "service_skeleton": {
+    "language": "python"
+  },
+  "route_map": [
+    {
+      "api_ref": "api-bad-method",
+      "path": "/bad",
+      "method": "GETTER"
+    }
+  ],
+  "validators": [
+    "spec-validate"
+  ],
+  "build_status": "pending"
 }

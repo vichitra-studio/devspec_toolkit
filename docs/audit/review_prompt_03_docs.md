@@ -38,6 +38,8 @@ The changes you are reviewing must ensure:
         - `README.md`
         - `devspec_toolkit/README.md`
         - `devspec_toolkit/CHANGELOG.md`
+        - `devspec_toolkit/changelog/unreleased.md`
+        - `devspec_toolkit/changelog/unreleased.yaml`
         - `devspec_toolkit/changelog/v0.2.0.md`
         - `devspec_toolkit/changelog/v0.2.0.yaml`
         - `devspec_toolkit/changelog/v0.1.1.md`
@@ -51,12 +53,10 @@ The changes you are reviewing must ensure:
             - `agents/agents.md`
             - `agents/manifest.json`
         - **Audit**:
-        - **Audit**:
-            - `audit/archive/2026_01_audit/audit_plan.md`
-            - `audit/archive/2026_01_audit/review_prompt_01_system.md`
-            - `audit/archive/2026_01_audit/review_prompt_02_tooling.md`
-            - `audit/archive/2026_01_audit/review_prompt_03_docs.md`
-            - `audit/archive/2026_01_audit/audit_report_docs_phase_1.md`
+            - `audit/audit_plan.md`
+            - `audit/review_prompt_01_system.md`
+            - `audit/review_prompt_02_tooling.md`
+            - `audit/review_prompt_03_docs.md`
         - **Developers**:
             - `developers/index.md`
             - `developers/getting_started.md`
@@ -70,8 +70,7 @@ The changes you are reviewing must ensure:
                 - `developers/tools/schema_differ.md`
             - **Workflows**:
                 - `developers/workflows/discovery.md`
-
-                - `developers/design/migration_system_spec_v0.1.0.md`
+                - `developers/design/migration_system_spec.md`
                 - `developers/workflows/spec_to_impl.md`
                 - `developers/workflows/workflow_align.md`
                 - `developers/workflows/workflow_bootstrap_legacy.md`

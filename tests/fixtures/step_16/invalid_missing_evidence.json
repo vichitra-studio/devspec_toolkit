@@ -1,46 +1,61 @@
 {
-    "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
-    "id": "step-impl-invalid-evidence",
-    "owner": "api",
-    "created_at": "2024-01-15T10:00:00Z",
-    "plan": {
-        "status": "active",
-        "summary": {
-            "functional_summary": "Invalid implementation plan.",
-            "target_file_patterns": [
-                "src/api/profile.py"
-            ]
-        },
-        "spec_alignment": {
-            "requirements_summary": [],
-            "checklist": [
-                {
-                    "id": "REQ_API_ENDPOINT",
-                    "spec_ref": {
-                        "type": "api",
-                        "id": "api-get-profile",
-                        "line_range": "L20-L40",
-                        "commit_hash": "3333333333333333333333333333333333333333"
-                    },
-                    "description": "Implement GET /profile endpoint",
-                    "type": "behavior",
-                    "layer": "api",
-                    "linked_test_expectation": "returns 200 OK",
-                    "implementation": {
-                        "status": "verified",
-                        "files_touched": [
-                            "src/api/profile.py"
-                        ],
-                        "actions": [
-                            {
-                                "type": "file_edit",
-                                "target": "src/api/profile.py",
-                                "description": "Add route handler"
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
+  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "id": "step-impl-invalid-evidence",
+  "owner": "api",
+  "created_at": "2024-01-15T10:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
     }
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Invalid implementation plan.",
+      "target_file_patterns": [
+        "src/api/profile.py"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [],
+      "checklist": [
+        {
+          "id": "REQ_API_ENDPOINT",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-get-profile",
+            "line_range": "L20-L40",
+            "commit_hash": "3333333333333333333333333333333333333333"
+          },
+          "description": "Implement GET /profile endpoint",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "returns 200 OK",
+          "implementation": {
+            "status": "verified",
+            "files_touched": [
+              "src/api/profile.py"
+            ],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/api/profile.py",
+                "description": "Add route handler"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": [
+        "README.md"
+      ]
+    }
+  }
 }

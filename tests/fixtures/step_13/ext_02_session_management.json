@@ -1,5 +1,13 @@
 {
-    "extension_id": "ext-02-session",
-    "title": "Session Mgmt",
-    "file_name": "ext_02_session_management.json"
+  "extension_id": "ext-02-session",
+  "title": "Session Mgmt",
+  "file_name": "ext_02_session_management.json",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ]
 }

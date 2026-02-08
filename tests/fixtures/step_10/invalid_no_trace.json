@@ -3,6 +3,14 @@
   "id": "governance-test-missing-trace",
   "owner": "api",
   "created_at": "2025-10-22T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "versioning": "calendar-based",
   "pr_rules": [
     "validate-all"

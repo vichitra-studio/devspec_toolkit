@@ -72,6 +72,36 @@
         "id"
       ]
     },
+    "seedRef": {
+      "$anchor": "seedRef",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed_id": {
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        },
+        "path": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "seed_id"
+      ]
+    },
+    "seedRefArray": {
+      "$anchor": "seedRefArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#seedRef"
+      },
+      "minItems": 1
+    },
     "anyJson": {
       "$anchor": "anyJson",
       "oneOf": [

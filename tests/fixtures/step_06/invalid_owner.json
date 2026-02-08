@@ -3,6 +3,14 @@
   "id": "invariants-catalog",
   "owner": "invalid-owner",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "rules": [
     {
       "inv_id": "invariant-user-authentication",
@@ -10,8 +18,13 @@
       "language": "jsonlogic",
       "expression": "{ \"and\": [ { \"in\": [ \"auth-token\", { \"var\": \"headers\" } ] }, { \"not\": { \"empty\": { \"var\": \"auth-token\" } } } ] }",
       "scope": {
-        "components": ["auth-service"],
-        "apis": ["api-login", "api-secure-endpoint"]
+        "components": [
+          "auth-service"
+        ],
+        "apis": [
+          "api-login",
+          "api-secure-endpoint"
+        ]
       },
       "severity": "error",
       "trace": [

@@ -6,7 +6,7 @@ Establish the authoritative charter that captures the business problem, intended
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -20,9 +20,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["00"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
+
 ## Context To Ingest
-- **Primary Source:** `docs/seed/seed_overview.md` (if present) for high-level scoping.
-- **Constraints Source:** `docs/seed/seed_tech_stack.md` (if present) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
+- **Primary Source:** `docs/seed/seed_overview.md` (required) for high-level scoping.
+- **Constraints Source:** `docs/seed/seed_tech_stack.md` (required) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.

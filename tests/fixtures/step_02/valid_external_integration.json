@@ -2,6 +2,14 @@
   "id": "system-sketch-external",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "components": [
     {
       "component_id": "user-service",
@@ -12,7 +20,10 @@
         "Serve account lookups"
       ],
       "owner": "api",
-      "tags": ["critical-path", "stateless"],
+      "tags": [
+        "critical-path",
+        "stateless"
+      ],
       "trace": [
         {
           "type": "doc",
@@ -33,7 +44,10 @@
         "Handle payment failures"
       ],
       "owner": "api",
-      "tags": ["critical-path", "stateful"],
+      "tags": [
+        "critical-path",
+        "stateful"
+      ],
       "trace": [
         {
           "type": "doc",
@@ -50,7 +64,10 @@
         "Return payment confirmations"
       ],
       "owner": "business",
-      "tags": ["external-dependency", "critical-path"],
+      "tags": [
+        "external-dependency",
+        "critical-path"
+      ],
       "trace": [
         {
           "type": "doc",

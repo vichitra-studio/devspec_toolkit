@@ -9,7 +9,8 @@ def check_venv():
     # Helper to check if we are running in a virtual environment
     # sys.prefix != sys.base_prefix is the standard check for venv/virtualenv
     if sys.prefix == sys.base_prefix:
-        print("Warning: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
+        print("Error: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
+        sys.exit(1)
 
 def main():
     check_venv()
@@ -38,6 +39,14 @@ def main():
     inv.add_argument("spec_dir")
     inv.add_argument("--sample", required=True)
     inv.add_argument("--repo-root", default=".")
+
+    sl = sub.add_parser("seed-lint")
+    sl.add_argument("spec_dir")
+    sl.add_argument("--repo-root", default=".")
+
+    dl = sub.add_parser("docs-lint")
+    dl.add_argument("spec_dir")
+    dl.add_argument("--repo-root", default=".")
 
     gov = sub.add_parser("governance-check")
     gov.add_argument("spec_dir")
@@ -135,6 +144,25 @@ def main():
         sample = json.load(open(args.sample, "r", encoding="utf-8"))
         res = run_invariants(spec_dir, sample)
         print(json.dumps(res, indent=2))
+    elif args.cmd == "seed-lint":
+        from .seed_lint import lint_seeds
+        repo_root = os.path.abspath(args.repo_root)
+        spec_dir = os.path.abspath(args.spec_dir)
+        errs = lint_seeds(repo_root, spec_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "docs-lint":
+        from .docs_lint import lint_docs
+        spec_dir = os.path.abspath(args.spec_dir)
+        errs = lint_docs(spec_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
     elif args.cmd == "governance-check":
         from .governance import check_commit_message
         spec_dir = os.path.abspath(args.spec_dir)

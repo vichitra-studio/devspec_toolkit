@@ -1,12 +1,14 @@
 from __future__ import annotations
 import json, os, sys
 import time
-from jsonschema import Draft202012Validator, RefResolver
+from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 from .registry import SchemaRegistry
 from .validators import step_01, step_02, step_03, step_04, step_10, step_15, step_16
 
-def _resolver_for(registry: SchemaRegistry):
-    return RefResolver.from_schema({}, store=registry.store)
+def _registry_for(registry: SchemaRegistry) -> Registry:
+    store = {uri: Resource.from_contents(schema) for uri, schema in registry.store.items()}
+    return Registry().with_resources(store.items())
 
 def _get_step_from_path(path: str) -> str:
     """Extract step number from file path"""
@@ -42,10 +44,10 @@ def validate_file(repo_root: str, path: str) -> list[str]:
         data_for_validation.pop("$schema", None)
 
         # Build a resolver store
-        resolver = _resolver_for(registry)
+        reg = _registry_for(registry)
         v = Draft202012Validator(
-            schema, 
-            resolver=resolver,
+            schema,
+            registry=reg,
             format_checker=Draft202012Validator.FORMAT_CHECKER
         )
         errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
@@ -108,7 +110,7 @@ def validate_file(repo_root: str, path: str) -> list[str]:
                     deep_errors = step_15.validate_step_15(data, repo_root)
 
                 elif step == "16":
-                    deep_errors = step_16.validate_step_16(data, repo_root)
+                    deep_errors = step_16.validate_step_16(data, repo_root, path)
             
             except Exception as e:
                 deep_errors = [f"Deep Validation Critical Error: {str(e)}"]

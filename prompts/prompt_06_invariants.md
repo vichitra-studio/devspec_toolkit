@@ -6,12 +6,12 @@ Capture the non-negotiable truths, guardrails, and data relationships the system
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 To verify your invariants logic, verify against a sample data file:
 ```bash
-python -m specdev_tools.cli invariants-check <spec_dir> --sample <path_to_sample_json> --repo-root .
+./tools/run_specdev.sh invariants-check <spec_dir> --sample <path_to_sample_json> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -24,6 +24,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
+
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["06"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 - FRs `spec/04_fr_list.json` and NFRs `spec/07_nfrs.json` to motivate rules.

@@ -18,6 +18,7 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 - Keep [docs/developers/reference.md#core-validation-commands](docs/developers/reference.md#core-validation-commands) handy for the canonical command list, troubleshooting flow, and naming conventions.
 - Use the workflow overviews in [docs/developers/workflows/](docs/developers/workflows/) as you progress through Steps 00–16c.
 - Automation agents begin at [docs/agents/agents.md](docs/agents/agents.md).
+- Maintain `spec/common/seed_manifest.json` to define mandatory seed order and docs policy.
 
 ---
 
@@ -28,6 +29,7 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 ├─ docs/                     # audience-specific guidance
 ├─ prompts/                  # deterministic prompt contracts
 ├─ schema/                   # JSON Schemas per step + shared atoms/collections/errors
+├─ spec/common/              # shared seed manifest (toolkit baseline)
 └─ tools/                    # CLI package + schema registry
 
 ```
@@ -52,8 +54,8 @@ Projects track their toolkit version in `spec/specdev_version` to enable migrati
 ---
 
 ## Working With The Toolkit
-- Follow the environment setup in [docs/developers/getting_started.md#1-set-up-your-environment](docs/developers/getting_started.md#1-set-up-your-environment) (virtualenv + `PYTHONPATH`).
-- Run validations with `python -m specdev_tools.cli … --repo-root <toolkit-root>`.
+- Follow the environment setup in [docs/developers/getting_started.md#1-set-up-your-environment](docs/developers/getting_started.md#1-set-up-your-environment) (virtualenv + wrapper).
+- Run validations with `./tools/run_specdev.sh … --repo-root <toolkit-root>` (wrapper created by init).
 
 
 - AI runners follow a two-phase flow (Clarify → Emit). See [docs/agents/manifest.json](docs/agents/manifest.json) and [docs/agents/agents.md](docs/agents/agents.md) for the operating protocol. Clarify responses are short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items.

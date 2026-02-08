@@ -15,6 +15,7 @@ All detailed version records are stored in the [`changelog/`](./changelog/) dire
 
 | Version | Release Date | Documentation | Migration Spec | Status |
 | :--- | :--- | :--- | :--- | :--- |
+| **[0.2.1]** | 2026-02-07 | [v0.2.1.md](changelog/v0.2.1.md) | [v0.2.1.yaml](changelog/v0.2.1.yaml) | ⚠️ **Breaking** |
 | **[0.2.0]** | 2026-01-17 | [v0.2.0.md](changelog/v0.2.0.md) | [v0.2.0.yaml](changelog/v0.2.0.yaml) | ⚠️ **Breaking** (Schema Hardening) |
 | **[0.1.1]** | 2026-01-13 | [v0.1.1.md](changelog/v0.1.1.md) | [v0.1.1.yaml](changelog/v0.1.1.yaml) | ✅ Patch (Fixes) |
 | **[0.1.0]** | 2026-01-01 | [v0.1.0.md](changelog/v0.1.0.md) | [v0.1.0.yaml](changelog/v0.1.0.yaml) | 🏁 Baseline |
@@ -36,7 +37,7 @@ When making changes to the toolkit, you must determine if the change affects the
 ### 2. How to create an entry?
 
 #### Step A: Draft the Human Note
-Edit (or create) the `Unreleased` section in `changelog/unreleased.md`. use the standard groupings: `Required`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
+Edit (or create) the `Unreleased` section in `changelog/unreleased.md`. Use the standard groupings: `Required`, `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.
 
 ```markdown
 ## [Unreleased]
@@ -68,13 +69,13 @@ changes:
     description: "minItems: 1"
     migration:
       action: ai_assisted
-      prompt: template_fix_empty_components.md # Points to migration_prompts/
+      prompt: template_infer_missing.md # Points to migration_prompts/
 ```
 
 ### 3. Release Process
-When cutting a new release (e.g., `v0.2.1`):
-1. Rename `changelog/unreleased.md` to `changelog/v0.2.1.md`.
-2. Rename `changelog/unreleased.yaml` to `changelog/v0.2.1.yaml`.
+When cutting a new release (e.g., `vX.Y.Z`):
+1. Rename `changelog/unreleased.md` to `changelog/vX.Y.Z.md`.
+2. Rename `changelog/unreleased.yaml` to `changelog/vX.Y.Z.yaml`.
 3. Update the `version` and `release_date` fields in the YAML.
 4. Add the new version to the [Version Index](#-version-index) table in this file.
 5. Commit and tag.

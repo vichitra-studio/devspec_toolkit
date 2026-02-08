@@ -14,6 +14,9 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "seed_refs": {
+      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+    },
     "missing_elements": {
       "type": "array",
       "items": {
@@ -90,6 +93,7 @@
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "missing_elements",
     "completeness_rating"
   ]

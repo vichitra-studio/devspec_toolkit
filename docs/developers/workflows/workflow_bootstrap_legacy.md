@@ -177,6 +177,6 @@ We define the stack by verifying the code reality against the template.
 > Generate default governance files (`10`, `11`, `12`).
 
 ## Completion & Next Steps
-1.  Run `python -m specdev_tools.cli validate-all --repo-root .` to confirm coverage.
+1.  Run `./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit` to confirm coverage.
 2.  **You are now Bootstrapped.**
 3.  To add a new feature, proceed to the **[Feature Extension Workflow](./workflow_feature_extension.md)**.

@@ -6,7 +6,7 @@ Formalizes the creation of domain-specific specifications (extensions). Instead 
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-python -m specdev_tools.cli validate <path_to_artifact> --repo-root .
+./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -17,6 +17,12 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - **Objective**: Identify distinct architectural components or domains that require their own dedicated specification file (Extension) to avoid monolithic complexity.
 - **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the Embedded Schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
+
+## Seed Order & Mandatory Sources
+- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["13"]`.
+- Ingest required seeds in order before any other context.
+- Populate `seed_refs` with the seeds actually used.
+- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 - **System Sketch** (`spec/02_system_sketch.json`): Look for "Database", "AI Engine", "Third Party", or "Infrastructure" bubbles.

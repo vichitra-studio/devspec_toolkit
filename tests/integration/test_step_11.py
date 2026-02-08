@@ -10,8 +10,8 @@ import sys
 import os
 from pathlib import Path
 
-# Add the devspec_toolkit to path so we can import specdev_tools
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools".parent.parent))
+# Add the devspec_toolkit/tools package to path so we can import specdev_tools
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 def load_json_file(filepath):
     """Load and parse JSON file."""

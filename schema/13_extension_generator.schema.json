@@ -8,6 +8,7 @@
     "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
     "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
     "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
+    "seed_refs": { "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray" },
     "extensions": {
       "type": "array",
       "items": {
@@ -37,5 +38,5 @@
       }
     }
   },
-  "required": ["id", "owner", "created_at", "extensions"]
+  "required": ["id", "owner", "created_at", "seed_refs", "extensions"]
 }

@@ -12,30 +12,44 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
     
     Definition Heuristic:
     - Any field ending in '_id' (e.g., fr_id, api_id) is a definition.
+    - Field 'id' is a definition UNLESS it appears in a reference list context.
     - Value must be a non-empty string.
     
     Reference Heuristic:
-    - Lists named 'trace', 'targets', 'dependencies' containing objects with 'container'/'id'
+    - Lists named 'trace', 'targets', 'dependencies', 'deliverables', 'links', 'spec_refs' containing objects with 'id'
     - Fields ending in '_ref' or '_refs'
     """
     known_ids = set()
     references = [] # list of (source_file, target_id)
 
-    def scan_obj(obj, source_file, path=""):
+    # Contexts where 'id' is a REFERENCE, not a definition
+    REFERENCE_CONTEXTS = {
+        "trace", "targets", "deliverables", "links", "spec_refs", "seed_refs", "ref", "refs"
+    }
+
+    def scan_obj(obj, source_file, path="", parent_key=None):
         if isinstance(obj, dict):
             # Check for definitions
             for k, v in obj.items():
+                # 1. Standard definition pattern (*_id)
                 if k.endswith("_id") and isinstance(v, str) and v:
                     known_ids.add(v)
                 
-                # Check for explicit references (trace/targets/deliverables lists of objects with id)
-                if k in ("trace", "targets", "dependencies", "deliverables") and isinstance(v, list):
+                # 2. 'id' field is a definition unless parent is a reference list
+                elif k == "id" and isinstance(v, str) and v:
+                    # Check if parent key implies this is a reference container
+                    if parent_key not in REFERENCE_CONTEXTS:
+                        known_ids.add(v)
+                
+                # Check for explicit references (lists of objects with id)
+                if k in REFERENCE_CONTEXTS and isinstance(v, list):
                     for item in v:
                         if isinstance(item, dict) and "id" in item:
                              references.append((source_file, item["id"]))
                 
                 # Check for direct references (field_ref: "target-id" or field_refs: ["id1", "id2"])
-                if k.endswith("_ref") and isinstance(v, str):
+                # Exclude evidence_ref - it's for evidence binding metadata, not spec traceability
+                if k.endswith("_ref") and k != "evidence_ref" and isinstance(v, str):
                     references.append((source_file, v))
                 elif k.endswith("_refs") and isinstance(v, list):
                     for ref_id in v:
@@ -50,11 +64,13 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
 
             # Recurse
             for k, v in obj.items():
-                scan_obj(v, source_file, path=f"{path}.{k}")
+                # Pass 'k' as parent_key for the children
+                scan_obj(v, source_file, path=f"{path}.{k}", parent_key=k)
 
         elif isinstance(obj, list):
             for i, item in enumerate(obj):
-                scan_obj(item, source_file, path=f"{path}[{i}]")
+                # Keep the same parent_key for items in a list (e.g. parent is "trace", items are trace objects)
+                scan_obj(item, source_file, path=f"{path}[{i}]", parent_key=parent_key)
 
     for path, data in artifacts.items():
         scan_obj(data, path)
@@ -80,7 +96,13 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
     # Validation
     errors = []
     for src, tgt in references:
-        if tgt and tgt not in known_ids and not tgt.startswith("external:"): # Allow external refs hack
+        # Validate target existence
+        # Allow external refs, file paths, and git refs hacks
+        if tgt and tgt not in known_ids and not (
+            tgt.startswith("external:") or 
+            tgt.startswith("file:") or 
+            tgt.startswith("refs/")
+        ):
              errors.append(f"Broken Trace in {os.path.basename(src)}: Reference to '{tgt}' not found.")
 
     # Step 02 system sketch checks
@@ -89,7 +111,7 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
         schema = data.get("$schema", "")
         if "01_capabilities" in schema:
             for cap in data.get("capabilities", []):
-                if cap.get("scope") == "in" and cap.get("capability_id"):
+                if cap.get("capability_id"):
                     capability_ids.add(cap["capability_id"])
 
     schema_ref_re = re.compile(r"^(?:-tbd|(file://|https://|glossary:|api:).+)$")
@@ -149,16 +171,18 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
         if capability_ids:
             traced = set()
             for comp in components:
-                for trace in comp.get("trace_refs", []) or []:
+                # Check both trace (standard) and trace_refs (legacy/alt)
+                traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])
+                for trace in traces:
                     trace_id = trace.get("id")
                     trace_type = trace.get("type")
                     if not trace_id:
                         continue
-                    if trace_type == "doc":
+                    if trace_type in ("doc", "capability"):
                         traced.add(trace_id)
                     elif trace_id in capability_ids:
                         errors.append(
-                            f"Step 02 Integrity in {os.path.basename(path)}: Capability trace_refs must use type 'doc' for '{trace_id}'."
+                            f"Step 02 Integrity in {os.path.basename(path)}: Capability trace_refs must use type 'doc' or 'capability' for '{trace_id}'."
                         )
             missing = sorted(capability_ids - traced)
             if missing:

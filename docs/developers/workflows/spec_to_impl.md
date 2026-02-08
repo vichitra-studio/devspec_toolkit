@@ -17,9 +17,14 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 | 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
 | 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
 | 15 — Scaffold | Generate compile-clean skeleton | Implement manually or via framework CLI. |
-| 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, and drift checks in `16_impl_context.json`. |
+| 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, docs impact, and drift checks in `spec/impl_context/{step_id}.json`. |
 | 16b — Build (Trinity) | Implement & Config | Write Code, Configs, and update Docs. |
 | 16c — Review (Trinity) | Audit & Gate | Verify Code/Sec/Ops, run full tests, emit Fixture Status default. |
+
+## Step 16 Artifact Layout
+Step 16 uses **two levels** of artifacts:
+1. **Trinity Anchor**: `spec/16_impl_context.json` (one file) — a root summary for the active cycle.
+2. **Milestone Contexts**: `spec/impl_context/{step_id}.json` — detailed per‑milestone execution files produced by 16a/16b/16c.
 
 ## Why Two Planning Steps?
 Confusion often arises between **Step 09 (Implementation Plan)** and **Step 14 (Roadmap)**.

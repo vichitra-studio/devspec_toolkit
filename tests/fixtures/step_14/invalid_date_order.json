@@ -3,6 +3,14 @@
   "id": "roadmap-invalid-date-order",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "tech_stack": {
     "languages": [
       {

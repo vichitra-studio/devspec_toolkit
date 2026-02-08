@@ -2,6 +2,14 @@
   "id": "system-sketch-standard",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
   "components": [
     {
       "component_id": "user-service",
@@ -12,7 +20,10 @@
         "Serve account queries"
       ],
       "owner": "api",
-      "tags": ["critical-path", "stateless"],
+      "tags": [
+        "critical-path",
+        "stateless"
+      ],
       "trace": [
         {
           "type": "doc",
@@ -29,7 +40,10 @@
         "Revoke active sessions"
       ],
       "owner": "api",
-      "tags": ["supporting", "stateless"],
+      "tags": [
+        "supporting",
+        "stateless"
+      ],
       "trace": [
         {
           "type": "doc",
@@ -46,7 +60,10 @@
         "Record payment receipts"
       ],
       "owner": "api",
-      "tags": ["critical-path", "stateful"],
+      "tags": [
+        "critical-path",
+        "stateful"
+      ],
       "trace": [
         {
           "type": "doc",
@@ -63,7 +80,10 @@
         "Index account lookup keys"
       ],
       "owner": "data",
-      "tags": ["critical-path", "stateful"],
+      "tags": [
+        "critical-path",
+        "stateful"
+      ],
       "trace": [
         {
           "type": "doc",
