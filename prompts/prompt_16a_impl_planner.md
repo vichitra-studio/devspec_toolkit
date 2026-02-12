@@ -95,11 +95,13 @@ You must populate the JSON fields according to these specific definitions and ex
         *   *Rule*: Use "Subject-Action-Constraint" format.
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
-    *   `type`: `behavior`, `constraint`, `validation`, `metadata`, `perf`, `logging`, `docs`.
-    *   `layer`: `db`, `model`, `service`, `api`, `tests`, `docs`.
+    *   `type`: `behavior`, `constraint`, `validation`, `metadata`, `perf`, `logging`, `docs`, `security`.
+    *   `layer`: `db`, `model`, `service`, `api`, `integration`, `tests`, `docs`, `config`, `security`.
     *   `checklist_status`: `active` or `deferred`.
     *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
         *   *Expectation*: This serves as the "contract" for verification. Use specific test names, not just file paths.
+    *   `nfr_refs`: Array of NFR IDs this checklist item relates to.
+    *   `fixture_ref`: Reference to the test fixture for this checklist item.
     *   `implementation`: **Execution Slots** (Replaces `plan.tasks`).
         *   `status`: `pending`, `in_progress`, `verified`, `deferred`.
         *   `files_touched`: Files explicitly modified.
@@ -114,6 +116,8 @@ You must populate the JSON fields according to these specific definitions and ex
     *   `description`: What is unclear?
     *   `severity`: `blocking` or `non_blocking`.
     *   `mitigation`: How should the coder handle this? (e.g., "Assume X specifically").
+    *   `decision`: The decision made to resolve the ambiguity.
+    *   `resolved`: The resolution status or outcome.
     *   *Rule*: If `blocking`, you must still plan the rest of the step but flag the blocker.
     *   *Rule*: For `non_blocking`, you MUST provide a `mitigation` or `assumption`.
     *   *Rule*: Use the `source` and `impact` fields to capture provenance and risk.
@@ -138,6 +142,14 @@ You must populate the JSON fields according to these specific definitions and ex
     *   *Rule*: must match `linked_test_expectation` commands.
     *   *Expectation*: Include DB migration commands if needed (`alembic upgrade head`).
     *   *Rule*: Use `guidelines` to capture `legacy_test_output` or specific success criteria.
+*   `nfr_measurement_methods`: Define how NFRs will be measured.
+    *   `methodology`: The measurement approach (e.g., "load testing", "profiling").
+    *   `frequency`: How often measurements will be taken.
+    *   `thresholds`: Thresholds for acceptable values.
+*   `timeout_constants`: Define timeout configurations for tests.
+    *   `default_timeout`: Default timeout in seconds.
+    *   `max_timeout`: Maximum allowed timeout.
+    *   `per_operation`: Per-operation timeout configurations.
 
 ## 8. `plan.security` (Red Team & Hardening)
 *   `new_fixtures`: List new security fixtures to cover threats.

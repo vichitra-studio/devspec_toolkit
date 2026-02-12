@@ -44,6 +44,42 @@ class TestStep16(unittest.TestCase):
         path = os.path.join(self.fixtures_dir, "invalid_bad_enum.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (bad enum) should fail validation")
+    
+    def test_invalid_missing_nfr_refs(self):
+        # Expect failure because non-deferred item has no nfr_refs
+        path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(len(errors) > 0, "Invalid fixture (missing nfr_refs) should fail validation")
+    
+    def test_invalid_missing_fixture_ref(self):
+        # Expect failure because non-deferred item has no fixture_ref
+        path = os.path.join(self.fixtures_dir, "invalid_missing_fixture_ref.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(len(errors) > 0, "Invalid fixture (missing fixture_ref) should fail validation")
+    
+    def test_invalid_invalid_type(self):
+        # Expect failure due to invalid type
+        path = os.path.join(self.fixtures_dir, "invalid_invalid_type.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(len(errors) > 0, "Invalid fixture (invalid type) should fail validation")
+    
+    def test_invalid_invalid_layer(self):
+        # Expect failure due to invalid layer
+        path = os.path.join(self.fixtures_dir, "invalid_invalid_layer.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(len(errors) > 0, "Invalid fixture (invalid layer) should fail validation")
+    
+    def test_valid_with_new_fields(self):
+        # Test that valid fixtures with new fields pass validation
+        path = os.path.join(self.fixtures_dir, "valid_minimal.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"Valid minimal fixture with new fields should pass. Errors: {errors}")
+    
+    def test_valid_full_with_new_fields(self):
+        # Test that valid_full fixture with new fields passes validation
+        path = os.path.join(self.fixtures_dir, "valid_full.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"Valid full fixture with new fields should pass. Errors: {errors}")
         
 if __name__ == '__main__':
     unittest.main()

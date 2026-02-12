@@ -62,6 +62,8 @@
           "type": "metadata",
           "layer": "db",
           "linked_test_expectation": "migration applies successfully",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-database-migration",
           "checklist_status": "deferred"
         },
         {
@@ -76,6 +78,8 @@
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "returns 200 OK",
+          "nfr_refs": ["nfr-availability-uptime", "nfr-latency-page-load"],
+          "fixture_ref": "fixture-api-profile-get",
           "implementation": {
             "status": "verified",
             "files_touched": [

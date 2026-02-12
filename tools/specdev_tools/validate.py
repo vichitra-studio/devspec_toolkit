@@ -13,10 +13,22 @@ def _registry_for(registry: SchemaRegistry) -> Registry:
 def _get_step_from_path(path: str) -> str:
     """Extract step number from file path"""
     filename = os.path.basename(path)
+    
+    # Check if filename starts with step number prefix (e.g., 16_invalid_missing_nfr_refs.json)
     if filename.startswith('00_') or filename.startswith('01_') or filename.startswith('02_') or filename.startswith('03_') or filename.startswith('04_') or filename.startswith('05_') or filename.startswith('06_') or filename.startswith('07_') or filename.startswith('08_') or filename.startswith('09_') or filename.startswith('10_') or filename.startswith('11_') or filename.startswith('12_') or filename.startswith('13_') or filename.startswith('14_') or filename.startswith('15_') or filename.startswith('16_'):
         # Extract first two characters for step number
         step = filename.split('_')[0]
         return step
+    
+    # Check if file is in a step directory (e.g., tests/fixtures/step_16/invalid_missing_nfr_refs.json)
+    dirname = os.path.dirname(path)
+    if dirname:
+        dirname = os.path.basename(dirname)
+        if dirname.startswith('step_') and len(dirname) > 5:
+            step = dirname[5:]  # Extract the number after 'step_'
+            if step.isdigit():
+                return step
+    
     return "unknown"
 
 def _get_prompt_path(path: str) -> str:
@@ -65,9 +77,57 @@ def validate_file(repo_root: str, path: str) -> list[str]:
             
             enhanced_errors.append(error_msg)
             
-        # If schema validation passed (or failed but we want to report everything), run deep logic checks
-        # Only run deep checks if schema validation passed to avoid noise
-        if not enhanced_errors:
+        # Run deep logic checks for all steps
+        # Deep checks are important for validating optional fields that are required by business logic
+        step = _get_step_from_path(path)
+        
+        deep_errors = []
+        try:
+            if step == "01":
+                 # For Step 01, we need component IDs from step 02 if available
+                 # For now, we pass None and let the validator handle it or just rely on schema
+                 # In a real CLI run, we might want to load dependencies.
+                 # However, the validator signature is (instance, toolkit_root, component_ids)
+                 # We can try to load 02 if it exists relative to repo_root
+                 # Try to find sketch relative to the file being validated (User Project)
+                 sketch_path = os.path.join(os.path.dirname(path), "02_system_sketch.json")
+                 if not os.path.exists(sketch_path):
+                     # Fallback to toolkit root (Internal Testing)
+                     sketch_path = os.path.join(repo_root, "spec", "02_system_sketch.json")
+                 component_ids = None
+                 if os.path.exists(sketch_path):
+                     try:
+                         with open(sketch_path) as f:
+                             cid_data = json.load(f)
+                             component_ids = {c.get("component_id") for c in cid_data.get("components", []) if c.get("component_id")}
+                     except:
+                         pass
+                 deep_errors = step_01.validate_step_01(data, repo_root, component_ids)
+            
+            elif step == "02":
+                deep_errors = step_02.validate_step_02(data, repo_root)
+            
+            elif step == "03":
+                # Step 03 might need NFRs or Monitoring
+                deep_errors = step_03.validate_step_03(data, repo_root)
+
+            elif step == "04":
+                deep_errors = step_04.validate_step_04(data, repo_root)
+            
+            elif step == "10":
+                deep_errors = step_10.validate_step_10(data, repo_root)
+            
+            elif step == "15":
+                deep_errors = step_15.validate_step_15(data, repo_root)
+
+            elif step == "16":
+                deep_errors = step_16.validate_step_16(data, repo_root, path)
+            
+        except Exception as e:
+            deep_errors = [f"Deep Validation Critical Error: {str(e)}"]
+
+        if deep_errors:
+            enhanced_errors.extend([f"{path}: {e}" for e in deep_errors])
             step = _get_step_from_path(path)
             
             deep_errors = []

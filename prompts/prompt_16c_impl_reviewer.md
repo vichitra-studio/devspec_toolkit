@@ -42,6 +42,13 @@ You must populate the `review` JSON object according to these specific definitio
 *   `test_results`: List status for critical fixtures (`pass`, `fail`, `skip`).
 *   `ci_status`: Overall health (`green` or `red`).
 *   *Heuristic*: If `ci_status` is red, you CANNOT have a `verified` verdict.
+*   *Example*:
+    ```json
+    "test_results": [
+        { "fixture_ref": "fixture-draft-not-public", "status": "pass" },
+        { "fixture_ref": "fixture-admin-api-unauthorized", "status": "pass" }
+    ]
+    ```
 
 ## 2. `review.ratings` (The Rubric)
 *   Provide a 0-5 score for:
@@ -107,6 +114,30 @@ You must populate the `review` JSON object according to these specific definitio
     *   *Check*: Are `dashboards` linked to NFRs? Do links work?
     *   *Check*: Do `alerts` exist for all Critical NFRs?
     *   *Verdict*: `red` if any Critical NFR is unmonitored.
+*   *Example*:
+    ```json
+    "delivery_status": {
+        "deployments": [
+            { "env": "dev", "build_id": "b123", "status": "success" },
+            { "env": "staging", "build_id": "b456", "status": "success" }
+        ],
+        "dashboards": [
+            {
+                "dashboard_id": "dashboard-availability",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "url": "https://monitoring.example.com/dashboards/availability"
+            }
+        ],
+        "alerts": [
+            {
+                "alert_id": "alert-latency-high",
+                "nfr_ref": "nfr-latency-page-load",
+                "rule": "p99 > 200ms",
+                "severity": "critical"
+            }
+        ]
+    }
+    ```
 
 ## 7. Advanced Schema Fields (Verification Rules)
 You must **VERIFY** that the Coder respected these high-fidelity fields.

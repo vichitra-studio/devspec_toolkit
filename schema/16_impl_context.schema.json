@@ -74,7 +74,8 @@
                     "enum": [
                         "log",
                         "snippet",
-                        "screenshot"
+                        "screenshot",
+                        "reference"
                     ]
                 },
                 "content": {
@@ -83,6 +84,12 @@
                     "pattern": "\\S"
                 },
                 "evidence_ref": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "section": {
                     "type": "string"
                 }
             },
@@ -292,7 +299,8 @@
                                             "metadata",
                                             "perf",
                                             "logging",
-                                            "docs"
+                                            "docs",
+                                            "security"
                                         ]
                                     },
                                     "layer": {
@@ -305,7 +313,8 @@
                                             "integration",
                                             "tests",
                                             "docs",
-                                            "config"
+                                            "config",
+                                            "security"
                                         ]
                                     },
                                     "checklist_status": {
@@ -331,6 +340,12 @@
                                                 }
                                             }
                                         ]
+                                    },
+                                    "nfr_refs": {
+                                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                                    },
+                                    "fixture_ref": {
+                                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                                     },
                                     "implementation": {
                                         "type": "object",
@@ -540,6 +555,19 @@
                                     "deferred",
                                     "blocked"
                                 ]
+                            },
+                            "decision": {
+                                "type": "string"
+                            },
+                            "resolved": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "boolean"
+                                    }
+                                ]
                             }
                         },
                         "required": [
@@ -690,6 +718,57 @@
                                         ]
                                     }
                                 ]
+                            }
+                        },
+                        "nfr_measurement_methods": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "nfr-availability-uptime": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "command": {
+                                            "type": "string"
+                                        },
+                                        "expected": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "nfr-privacy-cookie-free": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "command": {
+                                            "type": "string"
+                                        },
+                                        "expected": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "timeout_constants": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "EMAIL_DELIVERY_TIMEOUT": {
+                                    "type": "integer"
+                                },
+                                "DNS_VERIFICATION_TIMEOUT": {
+                                    "type": "integer"
+                                },
+                                "ANALYTICS_BEACON_TIMEOUT": {
+                                    "type": "integer"
+                                }
                             }
                         }
                     },

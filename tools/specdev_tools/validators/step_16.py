@@ -41,6 +41,27 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         impl = item.get("implementation", {})
         status = impl.get("status")
         item_id = item.get("id", "unknown")
+        checklist_status = item.get("checklist_status", "active")
+        
+        # Logic Check: New checklist types and layers
+        item_type = item.get("type", "")
+        item_layer = item.get("layer", "")
+        
+        if item_type not in ["behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security"]:
+            errors.append(f"Checklist item '{item_id}' has invalid type '{item_type}'. Must be one of: behavior, constraint, validation, metadata, perf, logging, docs, security")
+        
+        if item_layer not in ["db", "model", "service", "api", "integration", "tests", "docs", "config", "security"]:
+            errors.append(f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: db, model, service, api, integration, tests, docs, config, security")
+        
+        # Logic Check: New checklist fields (nfr_refs, fixture_ref) required for non-deferred items
+        if checklist_status != "deferred":
+            nfr_refs = item.get("nfr_refs", [])
+            if not nfr_refs:
+                errors.append(f"Checklist item '{item_id}' is not deferred but has no nfr_refs")
+            
+            fixture_ref = item.get("fixture_ref")
+            if not fixture_ref:
+                errors.append(f"Checklist item '{item_id}' is not deferred but has no fixture_ref")
         
         # Logic Check: Verified/In-Progress items must have actions
         if status in ["verified", "in_progress"]:
@@ -48,7 +69,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             if not actions and status == "verified":
                  # Strict check: Verified items must have actions documenting what was done
                  errors.append(f"Checklist item '{item_id}' is 'verified' but has no actions.")
-            
+             
             # Logic Check: Verified items must have evidence for at least one action if actions exist
             if status == "verified" and actions:
                 has_evidence = False

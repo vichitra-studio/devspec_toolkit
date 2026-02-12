@@ -22,7 +22,8 @@
         "extras"
       ],
       "target_file_patterns": [
-        "src/main.py"
+        "src/main.py",
+        "src/auth.py"
       ]
     },
     "spec_alignment": {
@@ -45,6 +46,8 @@
           "type": "behavior",
           "layer": "service",
           "linked_test_expectation": "login success",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-login-success",
           "implementation": {
             "status": "in_progress",
             "files_touched": [

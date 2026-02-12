@@ -73,6 +73,14 @@ You must populate the `execution` JSON object according to these specific defini
       "content": "pytest tests/auth/test_login.py ... [100%] PASSED" 
     }
     ```
+    ```json
+    "evidence": {
+      "type": "reference",
+      "content": "See docs/ops/environment_data_and_secrets.md for environment variables",
+      "path": "docs/ops/environment_data_and_secrets.md",
+      "section": "email-config"
+    }
+    ```
 *   *Rule*: The `content` must be a verbatim copy of the output captured in `execution_results`.
 
 ## 3. `execution.critical_evidence` (Traceability)

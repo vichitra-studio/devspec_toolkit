@@ -22,8 +22,7 @@
         "extras"
       ],
       "target_file_patterns": [
-        "src/main.py",
-        "src/auth.py"
+        "src/main.py"
       ]
     },
     "spec_alignment": {
@@ -44,7 +43,7 @@
           },
           "description": "Implement login function",
           "type": "behavior",
-          "layer": "service",
+          "layer": "invalid_layer",
           "linked_test_expectation": "login success",
           "nfr_refs": ["nfr-availability-uptime"],
           "fixture_ref": "fixture-login-success",
