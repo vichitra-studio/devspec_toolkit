@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/log_capture_policy.schema.json",
+  "title": "Trinity Log Capture Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "default_capture_level": {
+      "type": "string",
+      "enum": [
+        "none",
+        "summary",
+        "full"
+      ]
+    },
+    "always_full_on_event_types": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "SPAWN",
+          "MESSAGE",
+          "TOOL_CALL",
+          "TOOL_RESULT",
+          "VALIDATION",
+          "TERMINATE",
+          "ERROR"
+        ]
+      }
+    },
+    "sample_rate_by_event_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "SPAWN": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "MESSAGE": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "TOOL_CALL": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "TOOL_RESULT": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "VALIDATION": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "TERMINATE": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ERROR": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "max_full_events_per_run": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "context_window_token_target": {
+      "type": "integer",
+      "minimum": 1024
+    },
+    "max_full_capture_context_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "full_capture_token_budget_per_run": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_full_prompt_tokens_per_event": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_full_completion_tokens_per_event": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "oversize_fallback": {
+      "type": "string",
+      "enum": [
+        "summary",
+        "none"
+      ]
+    },
+    "full_capture_allowlist_roles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "Orchestrator",
+          "Planner",
+          "Builder",
+          "Verifier",
+          "Worker",
+          "Researcher",
+          "Auditor",
+          "Summarizer",
+          "ToolUser"
+        ]
+      }
+    },
+    "require_redaction_before_full": {
+      "type": "boolean"
+    },
+    "sampling_salt": {
+      "type": "string",
+      "default": "default"
+    },
+    "operating_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "eval_default",
+            "eval_extended",
+            "cost_guarded"
+          ]
+        },
+        "tier": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "balanced",
+            "comprehensive"
+          ]
+        },
+        "budget_tier": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "required": [
+        "profile",
+        "tier",
+        "budget_tier"
+      ]
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context_window_token_target": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "full_capture_token_budget_per_run": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_full_prompt_tokens_per_event": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_full_completion_tokens_per_event": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "context_window_token_target",
+        "full_capture_token_budget_per_run",
+        "max_full_prompt_tokens_per_event",
+        "max_full_completion_tokens_per_event"
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "session_log_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "capture_artifact_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "eval_export_days": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "session_log_days",
+        "capture_artifact_days",
+        "eval_export_days"
+      ]
+    }
+  },
+  "required": [
+    "policy_id",
+    "version",
+    "default_capture_level",
+    "always_full_on_event_types",
+    "sample_rate_by_event_type",
+    "max_full_events_per_run",
+    "oversize_fallback",
+    "full_capture_allowlist_roles",
+    "require_redaction_before_full"
+  ]
+}

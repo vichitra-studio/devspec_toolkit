@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/spawn_log.schema.json",
+  "title": "Trinity Spawn Log",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "spawn_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "child_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "16a",
+              "16b",
+              "16c",
+              "utility"
+            ]
+          },
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "checklist_scope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "spawned",
+              "completed",
+              "blocked",
+              "failed",
+              "aborted"
+            ]
+          },
+          "task_input_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task_result_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "spawn_id",
+          "parent_id",
+          "child_id",
+          "purpose",
+          "phase",
+          "step_id",
+          "attempt",
+          "status",
+          "created_at",
+          "updated_at"
+        ]
+      }
+    }
+  },
+  "required": [
+    "protocol_version",
+    "run_id",
+    "entries"
+  ]
+}

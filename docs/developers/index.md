@@ -18,6 +18,7 @@ Use this index to locate the developer-facing material while working through the
 - [`tooling/coverage_matrix.md`](tooling/coverage_matrix.md) — traceability mechanics and enforcement.
 - [`tooling/gap_hunter_checklist.md`](tooling/gap_hunter_checklist.md) — repeatable gap-hunting process.
 - [`tools/changelog_parser.md`](tools/changelog_parser.md) — changelog YAML parser for migration system.
+- [`tools/trinity_observability.md`](tools/trinity_observability.md) — replay/export/remediation workflows and CI dashboard integration.
 
 ## Step Guides
 Each spec step ships with two authoritative files in `spec/`:

@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/eval_export_row.schema.json",
+  "title": "Trinity Eval Export Row",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "SPAWN",
+        "MESSAGE",
+        "TOOL_CALL",
+        "TOOL_RESULT",
+        "VALIDATION",
+        "TERMINATE",
+        "ERROR"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Orchestrator",
+        "Planner",
+        "Builder",
+        "Verifier",
+        "Worker",
+        "Researcher",
+        "Auditor",
+        "Summarizer",
+        "ToolUser"
+      ]
+    },
+    "phase_id": {
+      "type": "string"
+    },
+    "step_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "capture_level": {
+      "type": "string",
+      "enum": [
+        "none",
+        "summary",
+        "full"
+      ]
+    },
+    "prompt_artifact_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "prompt_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "response_artifact_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "response_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "artifact_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(sha256:)?[a-f0-9]{64}$"
+    },
+    "diff_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "task_result_artifact_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "apply_patch",
+        "move_file",
+        "remove_file",
+        "list_dir",
+        "glob_match",
+        "search_text",
+        "git_head",
+        "git_show",
+        "git_diff",
+        "exec_cmd",
+        "validate_json",
+        "checkpoint_branch",
+        "checkpoint_commit",
+        null
+      ]
+    },
+    "tool_command": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 255
+    },
+    "validation_schema": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "pass",
+        "fail",
+        "n/a",
+        null
+      ]
+    },
+    "validation_deep_validator": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "pass",
+        "fail",
+        "n/a",
+        null
+      ]
+    },
+    "validation_governance": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "pass",
+        "fail",
+        "n/a",
+        null
+      ]
+    },
+    "phase_outcome": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "success",
+        "blocked",
+        "failed",
+        "questions",
+        null
+      ]
+    },
+    "review_verdict": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "verified",
+        "deferred",
+        "rejected",
+        null
+      ]
+    },
+    "checklist_ids": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "finding_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "max_finding_severity": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "blocking",
+        "major",
+        "minor",
+        "nit",
+        null
+      ]
+    },
+    "remediation_required": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "redaction_applied": {
+      "type": "boolean"
+    },
+    "redaction_total_replacements": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "redaction_classes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "token_prompt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "token_completion": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "token_total": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prev_event_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "run_id",
+    "event_id",
+    "event_sequence",
+    "timestamp",
+    "event_type",
+    "role",
+    "capture_level",
+    "redaction_applied",
+    "redaction_total_replacements",
+    "token_prompt",
+    "token_completion",
+    "token_total",
+    "event_sha256"
+  ]
+}

@@ -5,7 +5,7 @@ This guide onboards developers to the end-to-end spec workflow and shows how to 
 ## Prerequisites
 - Python 3.10+ for running the CLI and validation commands
 - (Optional) Node.js for exercising generated scaffolds
-- Access to an AI assistant that can emit valid JSON
+- Access to an AI assistant that can follow disk-first artifact updates
 - Familiarity with Git and basic JSON editing
 
 ## 0. Initialize the Project
@@ -101,9 +101,9 @@ Before writing formal specs, you must define the "Seed" of your project using th
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
    - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
-   - Phase B — Emit: after answering questions, rerun to emit exactly one fenced `json` block.
-4. Paste the single fenced `json` block into `spec/NN_name.json` in your host repo.
-5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
+   - Phase B — Write: after answering questions, rerun and have the assistant write/update `spec/NN_name.json` on disk, then return concise status (artifact path + validation result).
+4. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
+5. Confirm traceability and required fields before moving to the next step.
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
 ### Phase II · Spec → Implementation (Steps 13–16c)
@@ -122,9 +122,9 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
-  - Phase B — Emit: the assistant then emits **exactly one** fenced `json` block that validates against the embedded schema.
+  - Phase B — Write: the assistant writes/updates the target artifact on disk and returns concise status (artifact path + validation result).
 - Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
-- If validation fails, consult the guide, address errors, and re-run the emission.
+- If validation fails, consult the guide, address errors, and re-run the write/validate cycle.
 - Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.
 
 Automation protocol and runner tips live in [../agents/manifest.json](../agents/manifest.json) and [../agents/agents.md](../agents/agents.md).

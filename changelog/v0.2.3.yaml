@@ -1,0 +1,56 @@
+version: "0.2.3"
+release_date: "2026-02-12"
+breaking: true
+description: |
+  Hardens Step 16 plan requirements, adds structured delivery verification fields
+  for reviewer artifacts, and aligns validator/test/prompt behavior with the new contract.
+
+changes:
+  - type: add_constraint
+    step_id: "16_impl_context"
+    path: "plan.required"
+    description: "Step 16 plan now requires summary, docs_impact, spec_alignment, and review_requirements."
+    migration:
+      action: ai_assisted
+      prompt: template_add_required_fields.md
+
+  - type: add_field
+    step_id: "16_impl_context"
+    path: "review.delivery_status.dashboards_verified[]"
+    required: false
+    migration:
+      action: auto
+      operations:
+        - add_field
+
+  - type: add_field
+    step_id: "16_impl_context"
+    path: "review.delivery_status.alerts_verified[]"
+    required: false
+    migration:
+      action: auto
+      operations:
+        - add_field
+
+  - type: add_constraint
+    step_id: "16_impl_context"
+    path: "plan.delivery.status=planned -> review.delivery_status"
+    description: "If plan.delivery.status is planned, review.delivery_status must include at least one verification entry."
+    migration:
+      action: ai_assisted
+      prompt: template_add_field.md
+
+  - type: add_constraint
+    step_id: "16_impl_context"
+    path: "plan.delivery.(dashboards|alerts) -> review.delivery_status.(dashboards_verified|alerts_verified)"
+    description: "Planned dashboard/alert items must have matching verified entries in reviewer output."
+    migration:
+      action: ai_assisted
+      prompt: template_add_field.md
+
+  - type: add_constraint
+    step_id: "16_impl_context"
+    path: "prompts/16a,16c + validators/step_16 + tests/fixtures/step_16"
+    description: "Prompts, deep validator, and integration fixtures/tests are aligned with the new schema constraints."
+    migration:
+      action: auto

@@ -56,7 +56,7 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
 
 # Output Rules
-1. Returns exactly one fenced code block with language `json`.
+1. Do not output the JSON in the chat. Write the final JSON artifact to `spec/13_extension_manifest.json` using the file creation tool.
 2. The JSON must validate against the Embedded Schema below.
 3. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
 

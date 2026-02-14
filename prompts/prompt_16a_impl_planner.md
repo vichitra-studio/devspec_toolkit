@@ -22,7 +22,27 @@ Validate the generated JSON:
 # Role
 You are a senior software architect and planning assistant. Your job is to generate the **Implementation Context** for a single Roadmap Step (Step 16a).
 
-Instead of prose, you must **create or update the artifact file on disk** (`spec/impl_context/{step_id}.json`) with a machine-checkable **JSON artifact** that defines the plan, checklist, and tasks for the coding agent.
+You must write a machine-checkable **JSON artifact** to the file system for `spec/impl_context/{step_id}.json` that defines the plan and checklist contract for implementation.
+
+## Output Mode (Compatibility)
+- **Trinity harness mode (canonical):**
+  - Phase A: questions only (if blocked).
+  - Phase B: write/update artifact file on disk and return concise status (artifact path + validation result).
+- **Manual coding-agent mode (Codex-style default):**
+  - Write/update `spec/impl_context/{step_id}.json` directly.
+  - Return a short confirmation with validation outcome.
+  - Do not emit fenced JSON in chat.
+
+## Zero-Assumption Protocol (Mandatory)
+Planning output must be completely grounded and reproducible.
+
+1. Every checklist item must map to an observed governed requirement. If you cannot locate source lines, do not emit the item.
+2. Every implementation action must reference a real file path from repository inspection; never infer filenames.
+3. Every test expectation must be executable and explicit; never use placeholders or umbrella commands unless they are exactly what the step requires.
+4. If step requirements are incomplete, emit `plan.ambiguities` + questions and stop; never silently patch gaps with guessed tasks.
+5. If commit hashes cannot be resolved from git, stop and report blocker; never fabricate hashes.
+6. For each emitted identifier (`checklist.id`, `spec_ref.id`, fixture refs), verify existence in source artifacts before finalizing.
+7. If any statement cannot be traced to evidence, remove it or convert it into a blocking ambiguity.
 
 # Seed Order & Mandatory Sources
 - Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["16a"]`.
@@ -31,6 +51,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - If a required seed is missing or stale, stop and request it before proceeding.
 - You must evaluate whether additional context (README maps, tooling docs, architecture guides, ops runbooks) is required for this step. If so, add new seeds to the manifest and update `step_requirements["16a"]` before proceeding.
   - When you add or change seeds, you MUST also plan documentation updates (see `plan.docs_impact`).
+  - **Seed expansion cap**: Limit to a maximum of **5 new seeds** per planning cycle. Additions beyond this require explicit user approval via Phase A questions.
 
 # Context To Ingest
 - **Roadmap**: Use the Step ID and description from `spec/14_roadmap.json` to scope the work.
@@ -71,10 +92,12 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 
 ### Atomicity Violations
 1. **NEVER** group multiple behaviors in one checklist item
-2. **NEVER** create checklist item that spans multiple files
-3. **NEVER** create implementation action that requires >2 file edits
+2. **PREFER** checklist items that can be validated with minimal file surface; multi-file items are allowed when the requirement is inherently cross-cutting.
+3. **PREFER** small implementation actions, but do not impose hard file-count limits that conflict with real requirement boundaries.
 
 # Field Definitions & Rules (MANDATORY)
+
+> **Schema Authority**: The schema (`schema/16_impl_context.schema.json`) is the single source of truth for field types, ranges, and required properties. The rules below are behavioral guidelines for how to populate them. When in conflict, the schema wins.
 
 You must populate the JSON fields according to these specific definitions and expectations, derived from the rigorous DevSpec standard.
 
@@ -132,6 +155,7 @@ You must populate the JSON fields according to these specific definitions and ex
         1) **String form** for non-code or mixed structures (e.g., shell/nginx/workflow context) including a concrete file path in the text.
         2) **Object form** for code signatures only: `{ "signature": "...", "source_file": "...", "line_range": "Lx-Ly" }`.
     *   For object form, `source_file` must be a repo-relative path ending in `.py`, `.ts`, `.js`, `.go`, or `.rs`.
+    *   `line_range` is strongly recommended for traceability but optional per schema.
     *   *Rule*: Do NOT hallucinate. If you can't see the file, do not list it.
 
 ## 6. `plan.tasks` (DELETED)
@@ -199,171 +223,87 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 *   **Verification Gap**: Emitting a plan without explicitly verifying that it covers *all* requirements. *Fix*: **Verify-First** heuristic.
 
 # Output Rules
-1.  **Write/update** the artifact file at `spec/impl_context/{step_id}.json` with the full JSON output.
-2.  **Do not dump the JSON in the chat thread.** Instead, respond with a short confirmation that the file was updated and validation succeeded (or failed).
-3.  The JSON must validate against `schema/16_impl_context.schema.json`.
-4.  Populate the `plan` object fully. Leave `execution` and `review` objects empty.
-5.  If spec/seed drift was detected, update the relevant files under `spec/` (and `docs/seed` if applicable) as part of the same operation, and include those files in `plan.summary.target_file_patterns` and `plan.docs_impact.docs_touched`.
+1.  Canonical contract is disk-first two-phase: Phase A questions-only, Phase B writes artifact on disk and returns concise status.
+2.  The JSON must validate against `schema/16_impl_context.schema.json`.
+3.  Populate the `plan` object fully. `execution` and `review` may be omitted or left as empty objects.
+4.  In manual coding-agent mode, direct file write plus concise confirmation is the default behavior.
+5.  If spec/seed drift was detected, update relevant `spec/` files in-scope and include them in `plan.summary.target_file_patterns` and `plan.docs_impact.docs_touched`.
 
 # Clarification Questions
 - Which spec version covers this step?
 - Are there any ambiguous requirements that need resolution before coding?
 - Do we have existing tests we can extend, or must we create new ones?
 
-# Embedded Schema
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_impl_context.schema.json",
-  "title": "16_impl_context",
-  "type": "object",
-  "additionalProperties": false,
-  "$defs": {
-    "specRef": {
-      "type": "object",
-      "required": ["type", "id", "line_range", "commit_hash"],
-      "properties": {
-        "type": { "enum": ["fr", "api", "nfr", "inv", "fixture", "doc", "code"] },
-        "id": { "type": "string" },
-        "line_range": { "type": "string" },
-        "commit_hash": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
-      }
-    }
-  },
-  "properties": {
-    "id": { "type": "string" },
-    "owner": { "type": "string" },
-    "created_at": { "type": "string" },
-    "extensions": { "type": "object" },
-    "plan": {
-      "type": "object",
-      "required": ["summary", "spec_alignment", "review_requirements"],
-      "properties": {
-        "summary": {
-          "type": "object",
-          "required": ["functional_summary", "scope_in", "target_file_patterns"],
-          "properties": {
-            "functional_summary": { "type": "string" },
-            "scope_in": { "type": "array", "items": { "type": "string" } },
-            "scope_out": { "type": "array", "items": { "type": "string" } },
-            "target_file_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-        "spec_alignment": {
-          "type": "object",
-          "required": ["checklist"],
-          "properties": {
-            "requirements_summary": {
-                "type": "array",
-                "items": { "type": "object", "required": ["theme", "summary"], "properties": { "theme": { "type": "string" }, "summary": { "type": "string" } } }
-            },
-            "checklist": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": ["id", "spec_ref", "description", "linked_test_expectation"],
-                "properties": {
-                  "id": { "type": "string" },
-                  "spec_ref": { "$ref": "#/$defs/specRef" },
-                  "description": { "type": "string" },
-                  "linked_test_expectation": { "type": "string" },
-                  "checklist_status": { "enum": ["active", "deferred"] },
-                  "implementation": {
-                    "type": "object",
-                    "required": ["status", "actions"],
-                    "properties": {
-                      "status": { "enum": ["pending", "in_progress", "verified", "deferred"] },
-                      "files_touched": { "type": "array", "items": { "type": "string" } },
-                      "actions": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "required": ["type", "description"],
-                          "properties": {
-                            "type": { "enum": ["file_create", "file_edit", "run_command", "manual_verification"] },
-                            "description": { "type": "string" },
-                            "target": { "type": "string" },
-                            "command": { "type": "string" },
-                            "evidence": {
-                                "type": "object",
-                                "required": ["type", "content"],
-                                "properties": {
-                                    "type": { "enum": ["log", "snippet", "screenshot"] },
-                                    "content": { "type": "string" }
-                                }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "review_requirements": {
-           "type": "object",
-           "required": ["test_commands"],
-           "properties": {
-              "test_commands": { "type": "array", "items": { "type": "string" } }
-           }
-        }
-      }
-    }
-  },
-  "required": ["id", "plan"]
-}
-```
+# Canonical Schema Reference
+- Use `devspec_toolkit/schema/16_impl_context.schema.json` as the only schema source of truth.
+- Do not rely on copied or embedded schema fragments in prompts.
+- Validate generated artifacts with `./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit`.
 
-# Output Contract
+# Output Contract (Schema-Valid Example)
+Manual mode note:
+- In manual coding-agent workflow, writing the file directly plus concise confirmation is valid.
+- This JSON block is reference-only; do not emit it in chat.
+- For richer schema-valid examples, reuse fixtures under `tests/fixtures/step_16/`.
+
 ```json
 {
-  "id": "step-api-core",
+  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "id": "step-impl-minimal",
   "owner": "api",
-  "created_at": "2025-01-01T00:00:00Z",
+  "created_at": "2024-01-01T00:00:00Z",
+  "seed_refs": [
+    { "seed_id": "seed-overview" },
+    { "seed_id": "seed-tech-stack" }
+  ],
   "plan": {
+    "status": "active",
     "summary": {
-       "functional_summary": "Implement core API login",
-       "scope_in": ["Login", "Logout"],
-       "target_file_patterns": ["src/auth/*.py"]
+      "functional_summary": "Minimal implementation.",
+      "scope_in": ["core"],
+      "scope_out": ["extras"],
+      "target_file_patterns": ["src/main.py", "src/auth.py"]
     },
     "spec_alignment": {
       "requirements_summary": [
-          { "theme": "Auth", "summary": "Implement JWT-based Login/Logout" }
+        { "theme": "Core Logic", "summary": "Implement core business logic" }
       ],
       "checklist": [
         {
-          "id": "CHK_AUTH_01",
+          "id": "REQ_CORE_001",
           "spec_ref": {
-             "type": "api",
-             "id": "api-auth-login",
-             "line_range": "L12-L15",
-             "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
+            "type": "fr",
+            "id": "fr-core-login",
+            "line_range": "L10-L20",
+            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
           },
-          "description": "POST /login returns JWT",
-          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
-          "checklist_status": "active",
+          "description": "Implement login function",
+          "type": "behavior",
+          "layer": "service",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_login_success -q",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-login-success",
           "implementation": {
-             "status": "pending",
-             "actions": [
-                 {
-                    "type": "file_create",
-                    "target": "src/auth/routes.py",
-                    "description": "Create login endpoint"
-                 }
-             ]
+            "status": "in_progress",
+            "files_touched": ["src/auth.py"],
+            "actions": [
+              {
+                "type": "file_create",
+                "target": "src/auth.py",
+                "description": "Create auth module"
+              }
+            ]
           }
         }
       ]
     },
-    "context": {
-       "existing_structures": [{ "signature": "class User", "source_file": "src/models.py" }]
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
     },
-    // plan.tasks REMOVED
     "review_requirements": {
-      "test_commands": ["pytest tests/auth/"]
+      "guidelines": "Run focused unit checks for checklist scope.",
+      "test_commands": ["pytest tests/auth/test_login.py::test_login_success -q"]
     }
   }
 }

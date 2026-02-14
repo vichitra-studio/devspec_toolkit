@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/session_state.schema.json",
+  "title": "Trinity Session State",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "active_phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "step_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+        "status": {
+          "type": "string",
+          "enum": [
+            "idle",
+            "waiting_child",
+            "awaiting_input",
+            "resuming",
+            "blocked",
+            "done"
+          ]
+        },
+    "pending_child_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+        "pending_spawn_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pending_questions": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+    "session_log_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "spawn_log_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scratchpad_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "retry_counters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "planner": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "builder": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verifier": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "milestone": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "planner",
+        "builder",
+        "verifier",
+        "milestone"
+      ]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "run_id",
+    "parent_id",
+    "active_phase",
+    "step_id",
+    "status",
+    "retry_counters",
+    "updated_at"
+  ]
+}

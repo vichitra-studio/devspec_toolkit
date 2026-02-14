@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "specdev_tools"
-version = "0.2.2"
+version = "0.2.3"
 description = "Internal tooling for DevSpec Toolkit"
 authors = [{name = "Vichitra Collective"}]
 license = {text = "MIT"}

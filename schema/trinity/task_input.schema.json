@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/task_input.schema.json",
+  "title": "Trinity Task Input",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "specRefPointer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "fr",
+            "api",
+            "nfr",
+            "inv",
+            "fixture"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_range": {
+          "type": "string",
+          "pattern": "^L\\d+-L\\d+$"
+        },
+        "commit_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    }
+  },
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "child_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Orchestrator",
+        "Planner",
+        "Builder",
+        "Verifier",
+        "Worker",
+        "Auditor",
+        "Researcher",
+        "Summarizer",
+        "ToolUser"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "step_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "task_description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_output_schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context_pack_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "spec_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/specRefPointer"
+      }
+    },
+    "role_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "persona_goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stop_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "prompt_source",
+        "persona_goal",
+        "stop_conditions"
+      ]
+    }
+  },
+  "required": [
+    "protocol_version",
+    "child_id",
+    "parent_id",
+    "role",
+    "phase",
+    "step_id",
+    "task_description",
+    "expected_output_schema",
+    "context_pack_ref",
+    "target_files",
+    "spec_refs",
+    "role_metadata"
+  ]
+}

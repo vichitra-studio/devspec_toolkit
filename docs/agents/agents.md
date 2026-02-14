@@ -33,10 +33,11 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
      - Stop and wait for human answers.
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
-   - Output exactly one fenced `json` code block that validates against the embedded schema; no extra prose.
+   - Write or update the artifact JSON file at the expected `spec/...` path.
+   - Return only a concise confirmation with artifact path and validation status (no fenced JSON).
    - Populate `seed_refs` with the seeds actually used.
 5. **Persist Artifact**
-   - Replace the contents of `spec/NN_name.json` with the generated block.
+   - Ensure `spec/NN_name.json` was written with the generated content.
    - Preserve the `$schema` field already present in the file.
 6. **Validate**
    - Run the [core validation commands](../developers/reference.md#core-validation-commands) and inspect results.
@@ -58,7 +59,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 | 13a | `spec/13a_completeness_assessment.json` | Check for gaps before Roadmap |
 | 14 | `spec/14_roadmap.json` | Initiate JIT implementation loop |
 | 15 | `spec/15_scaffold.json` | Implement scaffold manually |
-| 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Tasks, Security, Delivery, Drift |
+| 16a | `spec/impl_context/{step_id}.json` | Trinity Plan: Checklist, Security, Delivery, Drift |
 | 16b | `spec/impl_context/{step_id}.json` | Trinity Build: Code, Configs, Docs |
 | 16c | `spec/impl_context/{step_id}.json` | Trinity Review: Verification & closure |
 
@@ -79,7 +80,7 @@ When reporting back to humans, include:
 2. Commands executed and whether they succeeded.
 3. Outstanding issues or reasons for escalation.
 
-During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), output only the single fenced `json` block.
+During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), write the artifact to disk and output only a concise confirmation (no fenced JSON).
 
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.
@@ -87,6 +88,7 @@ During Phase A (Clarify), output only a bulleted list of questions grouped by to
 - Read only the paths listed in the prompt’s “Context To Ingest” for that step; avoid external sources.
 - Build private ledgers in memory only; never persist them or include them in outputs.
 - In Phase A, emit only grouped, concise questions; never include JSON, code fences, or speculative answers.
+- In Phase B, treat the filesystem artifact as the source of truth and return concise status text only; do not paste artifact JSON in chat.
 - Stop generation when the self‑audit gate is not met; wait for human input rather than guessing.
 - Prefer deterministic decoding to keep outputs stable across retries.
 - De‑duplicate questions and prioritize gating items that block emission.

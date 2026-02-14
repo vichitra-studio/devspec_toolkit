@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/context_pack.schema.json",
+  "title": "Trinity Context Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "specRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "fr",
+            "api",
+            "nfr",
+            "inv",
+            "fixture"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_range": {
+          "type": "string",
+          "pattern": "^L\\d+-L\\d+$"
+        },
+        "commit_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "path",
+        "line_range",
+        "commit_hash"
+      ]
+    },
+    "bootstrapRefTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spec_type": {
+          "type": "string",
+          "enum": [
+            "fr",
+            "api",
+            "nfr",
+            "inv",
+            "fixture"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_from": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection_mode": {
+          "type": "string",
+          "enum": [
+            "structured",
+            "tokenized",
+            "authority_fallback"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_range": {
+          "type": "string",
+          "pattern": "^L\\d+-L\\d+$"
+        }
+      },
+      "required": [
+        "spec_type",
+        "id",
+        "selected_from",
+        "selection_mode",
+        "path",
+        "line_range"
+      ]
+    }
+  },
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "step_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "seed_manifest_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed_files_ordered": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "required_spec_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/specRef"
+      }
+    },
+    "bootstrap_ref_trace": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/bootstrapRefTrace"
+      }
+    },
+    "artifact_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "milestone_context_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "milestone_context_path"
+      ]
+    },
+    "allowed_read_paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "allowed_write_paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "target_file_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "docs_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "doc_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "readme_required": {
+          "type": "boolean"
+        },
+        "root_readme_required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "doc_paths"
+      ]
+    },
+    "test_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "test_commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "expected_exit_code": {
+                    "type": "integer"
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              }
+            ]
+          }
+        },
+        "success_markers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "test_commands",
+        "success_markers"
+      ]
+    }
+  },
+  "required": [
+    "protocol_version",
+    "phase",
+    "step_id",
+    "seed_manifest_path",
+    "seed_files_ordered",
+    "required_spec_refs",
+    "artifact_refs",
+    "allowed_read_paths",
+    "allowed_write_paths"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "16a",
+              "16b",
+              "16c"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_file_patterns",
+          "docs_policy"
+        ],
+        "properties": {
+          "required_spec_refs": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "16b",
+              "16c"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "test_contract"
+        ]
+      }
+    }
+  ]
+}

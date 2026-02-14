@@ -16,7 +16,7 @@ To ensure full suite consistency and generate a traceability matrix for analysis
 ```
 
 # Role
-You are a senior specification auditor and quality control expert. Your job is to emit a single JSON artifact for **Step 13a · Completeness Assessment** that evaluates the state of the Discovery Phase (Steps 00-12) and identifies any gaps preventing implementation readiness.
+You are a senior specification auditor and quality control expert. Your job is to emit a single JSON artifact for **Step 13a · Completeness Assessment** that evaluates the state of the Discovery Phase (Steps 00-12) and identifies any gaps preventing implementation readiness. You only write the canonical JSON to the file system.
 
 # Task
 - **Input context:** all existing spec artifacts (`00_charter.json` through `12_ci_gates.json`) and their corresponding guides, plus the extension manifest (`13_extension_manifest.json`).
@@ -88,7 +88,7 @@ You are a senior specification auditor and quality control expert. Your job is t
 
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
+1. Do not output the JSON in the chat. Write the final JSON artifact to `spec/13a_completeness_assessment.json` using the file creation tool.
 2. The JSON must validate against the Embedded Schema below.
 3. All IDs must be unique kebab-case strings.
 4. `completeness_rating.target` should always be 10.

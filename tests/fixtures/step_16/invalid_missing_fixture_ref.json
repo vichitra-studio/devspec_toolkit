@@ -68,6 +68,12 @@
       "docs_touched": [
         "README.md"
       ]
+    },
+    "review_requirements": {
+      "guidelines": "Run focused unit checks for checklist scope.",
+      "test_commands": [
+        "pytest -q"
+      ]
     }
   }
 }

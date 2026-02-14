@@ -38,6 +38,29 @@ def _get_prompt_path(path: str) -> str:
         return f"prompts/prompt_{step}*.md"
     return "prompts/*.md"
 
+
+def _get_step_from_schema(schema_uri: str | None) -> str:
+    """Extract step number from known schema URIs."""
+    if not isinstance(schema_uri, str) or not schema_uri:
+        return "unknown"
+
+    if schema_uri.endswith("/16_impl_context.schema.json"):
+        return "16"
+    if schema_uri.endswith("/15_scaffold.schema.json"):
+        return "15"
+    if schema_uri.endswith("/10_governance.schema.json"):
+        return "10"
+    if schema_uri.endswith("/04_fr_list.schema.json"):
+        return "04"
+    if schema_uri.endswith("/03_glossary.schema.json"):
+        return "03"
+    if schema_uri.endswith("/02_system_sketch.schema.json"):
+        return "02"
+    if schema_uri.endswith("/01_capabilities.schema.json"):
+        return "01"
+
+    return "unknown"
+
 def validate_file(repo_root: str, path: str) -> list[str]:
     registry = SchemaRegistry(repo_root)
     
@@ -47,6 +70,14 @@ def validate_file(repo_root: str, path: str) -> list[str]:
 
         schema_uri = data.get("$schema")
         if not schema_uri:
+            # Trinity runtime protocol artifacts intentionally omit "$schema".
+            # When a known runtime artifact path is detected, validate against
+            # the dedicated trinity runtime schemas instead of failing early.
+            from .trinity_runtime_validate import maybe_validate_runtime_artifact
+
+            runtime_errors = maybe_validate_runtime_artifact(repo_root, path)
+            if runtime_errors is not None:
+                return runtime_errors
             return [f"{path}: missing $schema. Please add schema reference to the top of the file"]
         
         schema = registry.load(schema_uri)
@@ -64,13 +95,18 @@ def validate_file(repo_root: str, path: str) -> list[str]:
         )
         errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
         
+        # Prefer schema-driven step detection to avoid path-based bypasses for
+        # runtime milestone artifacts such as spec/impl_context/{step_id}.json.
+        step = _get_step_from_schema(schema_uri)
+        if step == "unknown":
+            step = _get_step_from_path(path)
+
         # Enhance error messages with context
         enhanced_errors = []
         for e in errors:
             error_msg = f"{path}:{'/'.join(map(str, e.path))}: {e.message}"
             
             # Add context about what to do next
-            step = _get_step_from_path(path)
             if step != "unknown":
                 prompt_path = _get_prompt_path(path)
                 error_msg += f"\n  See: {prompt_path} for guidance on requirements"
@@ -79,8 +115,6 @@ def validate_file(repo_root: str, path: str) -> list[str]:
             
         # Run deep logic checks for all steps
         # Deep checks are important for validating optional fields that are required by business logic
-        step = _get_step_from_path(path)
-        
         deep_errors = []
         try:
             if step == "01":
@@ -128,55 +162,6 @@ def validate_file(repo_root: str, path: str) -> list[str]:
 
         if deep_errors:
             enhanced_errors.extend([f"{path}: {e}" for e in deep_errors])
-            step = _get_step_from_path(path)
-            
-            deep_errors = []
-            try:
-                if step == "01":
-                     # For Step 01, we need component IDs from step 02 if available
-                     # For now, we pass None and let the validator handle it or just rely on schema
-                     # In a real CLI run, we might want to load dependencies.
-                     # However, the validator signature is (instance, toolkit_root, component_ids)
-                     # We can try to load 02 if it exists relative to repo_root
-                     # Try to find sketch relative to the file being validated (User Project)
-                     sketch_path = os.path.join(os.path.dirname(path), "02_system_sketch.json")
-                     if not os.path.exists(sketch_path):
-                         # Fallback to toolkit root (Internal Testing)
-                         sketch_path = os.path.join(repo_root, "spec", "02_system_sketch.json")
-                     component_ids = None
-                     if os.path.exists(sketch_path):
-                         try:
-                             with open(sketch_path) as f:
-                                 cid_data = json.load(f)
-                                 component_ids = {c.get("component_id") for c in cid_data.get("components", []) if c.get("component_id")}
-                         except:
-                             pass
-                     deep_errors = step_01.validate_step_01(data, repo_root, component_ids)
-                
-                elif step == "02":
-                    deep_errors = step_02.validate_step_02(data, repo_root)
-                
-                elif step == "03":
-                    # Step 03 might need NFRs or Monitoring
-                    deep_errors = step_03.validate_step_03(data, repo_root)
-
-                elif step == "04":
-                    deep_errors = step_04.validate_step_04(data, repo_root)
-                
-                elif step == "10":
-                    deep_errors = step_10.validate_step_10(data, repo_root)
-                
-                elif step == "15":
-                    deep_errors = step_15.validate_step_15(data, repo_root)
-
-                elif step == "16":
-                    deep_errors = step_16.validate_step_16(data, repo_root, path)
-            
-            except Exception as e:
-                deep_errors = [f"Deep Validation Critical Error: {str(e)}"]
-
-            if deep_errors:
-                enhanced_errors.extend([f"{path}: {e}" for e in deep_errors])
 
         return enhanced_errors
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:

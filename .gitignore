@@ -37,3 +37,6 @@ devspec_env/
 .vscode/
 .idea/
 .DS_Store
+
+# Trinity runtime
+.trinity/

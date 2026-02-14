@@ -31,7 +31,8 @@
       ],
       "target_file_patterns": [
         "src/api/profile.py",
-        "migrations/001_users.sql"
+        "migrations/001_users.sql",
+        "README.md"
       ]
     },
     "spec_alignment": {
@@ -41,8 +42,8 @@
           "summary": "Persist user data securely",
           "spec_refs": [
             {
-              "type": "doc",
-              "id": "doc-security-policy",
+              "type": "nfr",
+              "id": "nfr-availability-uptime",
               "line_range": "L50-L60",
               "commit_hash": "1111111111111111111111111111111111111111"
             }
@@ -53,15 +54,15 @@
         {
           "id": "REQ_DB_SCHEMA",
           "spec_ref": {
-            "type": "code",
-            "id": "schema-user-table",
+            "type": "fixture",
+            "id": "fixture-database-migration",
             "line_range": "L1-L100",
             "commit_hash": "2222222222222222222222222222222222222222"
           },
           "description": "Create user table migration",
           "type": "metadata",
           "layer": "db",
-          "linked_test_expectation": "migration applies successfully",
+          "linked_test_expectation": "pytest -q",
           "nfr_refs": ["nfr-availability-uptime"],
           "fixture_ref": "fixture-database-migration",
           "checklist_status": "deferred"
@@ -77,7 +78,7 @@
           "description": "Implement GET /profile endpoint",
           "type": "behavior",
           "layer": "api",
-          "linked_test_expectation": "returns 200 OK",
+          "linked_test_expectation": "pytest -q",
           "nfr_refs": ["nfr-availability-uptime", "nfr-latency-page-load"],
           "fixture_ref": "fixture-api-profile-get",
           "implementation": {
@@ -113,6 +114,12 @@
       "rationale": "Code changes require documentation updates for traceability.",
       "docs_touched": [
         "README.md"
+      ]
+    },
+    "review_requirements": {
+      "guidelines": "Run checklist-linked tests and verify CI parity.",
+      "test_commands": [
+        "pytest -q"
       ]
     }
   }

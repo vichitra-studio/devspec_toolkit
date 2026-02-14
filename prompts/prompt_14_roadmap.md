@@ -15,7 +15,7 @@ Verify that the entire spec suite is consistent before finalizing the roadmap:
 ```
 
 # Role
-You are a senior program manager and architect. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that aggregates all discovery specs (Core 00-12 and Extensions) into a cohesive implementation plan.
+You are a senior program manager and architect. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that aggregates all discovery specs (Core 00-12 and Extensions) into a cohesive implementation plan to the file system.
 
 # Task
 - **Input context:** Completed Phase 1 specs (`00_charter.json` through `12_ci_gates.json`) AND any Phase 2 Custom Extensions.
@@ -124,7 +124,7 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Use traceRef objects to cite upstream specs that shape the roadmap.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`.
+1. Do not output the JSON in the chat. Write the final JSON artifact to `spec/14_roadmap.json` using the file creation tool.
 2. The JSON (excluding `$schema`) must validate against the Embedded Schema (specifically `schema/14_roadmap.schema.json`).
 3. Include a top-level `$schema` field that matches the schema URI.
 4. All milestones must have `target_date`, `deliverables`, and `source_milestones`.

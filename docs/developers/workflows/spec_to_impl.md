@@ -7,7 +7,7 @@ All commands in this guide assume you run them from repo root with the toolkit a
 ## AI Assist Flow
 Where prompts apply in this phase (e.g., Scaffold updates, Trinity Plan/Review, Drift), use the two‑phase flow:
 - Phase A — Clarify: ask targeted questions based on the prompt’s “Self‑Audit Gate”.
-- Phase B — Emit: output exactly one fenced `json` block for the step’s artifact.
+- Phase B — Emit: write/update the artifact file at the step path and return concise status (path + validation result).
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
 
 ## Step Progression
@@ -17,9 +17,9 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 | 13a — Completeness | Gate implementation on quality | Verify all specs are complete and actionable via `spec/13a_completeness_assessment.json`. |
 | 14 — Roadmap | Sequence the work (Core + Extensions) | Merge Step 09 baseline + Step 13 extensions into a tactical JIT execution plan. |
 | 15 — Scaffold | Generate compile-clean skeleton | Implement manually or via framework CLI. |
-| 16a — Plan (Trinity) | Detailed Task & Sec/Ops Planning | Define tasks, security fixtures, dashboards, docs impact, and drift checks in `spec/impl_context/{step_id}.json`. |
+| 16a — Plan (Trinity) | Checklist & Sec/Ops Planning | Define `summary`, `docs_impact`, `spec_alignment`, `review_requirements`, security fixtures, dashboards, alerts, and drift checks in `spec/impl_context/{step_id}.json`. |
 | 16b — Build (Trinity) | Implement & Config | Write Code, Configs, and update Docs. |
-| 16c — Review (Trinity) | Audit & Gate | Verify Code/Sec/Ops, run full tests, emit Fixture Status default. |
+| 16c — Review (Trinity) | Audit & Gate | Verify Code/Sec/Ops, run full tests, and emit structured `delivery_status` evidence (`deployments`, `dashboards_verified`, `alerts_verified`) when delivery is planned. |
 
 ## Step 16 Artifact Layout
 Step 16 uses **two levels** of artifacts:
@@ -57,3 +57,4 @@ Ensure the generated `.github/workflows/spec_validation.yml` reflects these jobs
 - Current artifacts under `spec/13*` through `spec/16*`
 - Implemented scaffold or runtime referencing Step 05 contracts
 - Updated monitoring bindings and drift schedules guaranteeing the spec remains the single source of truth
+- Review artifacts that include verifiable delivery evidence when `plan.delivery.status == planned`

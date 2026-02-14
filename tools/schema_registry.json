@@ -21,5 +21,18 @@
   "https://specdev.local/schema/15_scaffold.schema.json": "schema/15_scaffold.schema.json",
   "https://specdev.local/schema/16_impl_context.schema.json": "schema/16_impl_context.schema.json",
   "https://specdev.local/schema/02a_delivery_baseline.schema.json": "schema/02a_delivery_baseline.schema.json",
-  "https://specdev.local/schema/seed_manifest.schema.json": "schema/seed_manifest.schema.json"
+  "https://specdev.local/schema/seed_manifest.schema.json": "schema/seed_manifest.schema.json",
+  "https://specdev.local/schema/trinity/task_input.schema.json": "schema/trinity/task_input.schema.json",
+  "https://specdev.local/schema/trinity/context_pack.schema.json": "schema/trinity/context_pack.schema.json",
+  "https://specdev.local/schema/trinity/task_result.schema.json": "schema/trinity/task_result.schema.json",
+  "https://specdev.local/schema/trinity/tool_call_request.schema.json": "schema/trinity/tool_call_request.schema.json",
+  "https://specdev.local/schema/trinity/tool_call_result.schema.json": "schema/trinity/tool_call_result.schema.json",
+  "https://specdev.local/schema/trinity/utility_call.schema.json": "schema/trinity/utility_call.schema.json",
+  "https://specdev.local/schema/trinity/utility_result.schema.json": "schema/trinity/utility_result.schema.json",
+  "https://specdev.local/schema/trinity/session_event.schema.json": "schema/trinity/session_event.schema.json",
+  "https://specdev.local/schema/trinity/log_capture_policy.schema.json": "schema/trinity/log_capture_policy.schema.json",
+  "https://specdev.local/schema/trinity/eval_export_row.schema.json": "schema/trinity/eval_export_row.schema.json",
+  "https://specdev.local/schema/trinity/scratchpad_state.schema.json": "schema/trinity/scratchpad_state.schema.json",
+  "https://specdev.local/schema/trinity/session_state.schema.json": "schema/trinity/session_state.schema.json",
+  "https://specdev.local/schema/trinity/spawn_log.schema.json": "schema/trinity/spawn_log.schema.json"
 }

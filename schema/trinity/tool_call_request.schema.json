@@ -1,0 +1,727 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/tool_call_request.schema.json",
+  "title": "Trinity Tool Call Request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Orchestrator",
+        "Planner",
+        "Builder",
+        "Verifier",
+        "Worker",
+        "Researcher",
+        "Auditor",
+        "Summarizer",
+        "ToolUser"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "step_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      ]
+    },
+    "tool_name": {
+      "type": "string",
+      "enum": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "apply_patch",
+        "move_file",
+        "remove_file",
+        "list_dir",
+        "glob_match",
+        "search_text",
+        "git_head",
+        "git_show",
+        "git_diff",
+        "exec_cmd",
+        "validate_json",
+        "checkpoint_branch",
+        "checkpoint_commit"
+      ]
+    },
+    "args": {
+      "type": "object"
+    },
+    "working_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "run_id",
+    "call_id",
+    "agent_id",
+    "role",
+    "phase",
+    "step_id",
+    "tool_name",
+    "args",
+    "created_at"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "16a",
+              "16b",
+              "16c"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "read_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "start_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "end_line": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_chars": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "write_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "encoding": {
+                "type": "string",
+                "enum": [
+                  "utf-8",
+                  "ascii"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "overwrite",
+                  "append",
+                  "create_new"
+                ]
+              },
+              "create_parents": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "content"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "edit_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "edits": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "search": {
+                      "type": "string"
+                    },
+                    "replace": {
+                      "type": "string"
+                    },
+                    "occurrence": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "regex": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "search",
+                    "replace"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "path",
+              "edits"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "apply_patch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "patch": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "patch"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "list_dir"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "recursive": {
+                "type": "boolean"
+              },
+              "include_hidden": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "move_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "src_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dst_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "overwrite": {
+                "type": "boolean"
+              },
+              "create_parents": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "src_path",
+              "dst_path"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "remove_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "missing_ok": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "glob_match"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "patterns": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "path",
+              "patterns"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "search_text"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "minLength": 1
+              },
+              "paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "case_sensitive": {
+                "type": "boolean"
+              },
+              "use_regex": {
+                "type": "boolean"
+              },
+              "max_matches": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "pattern",
+              "paths"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_head"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "maxProperties": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_show"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rev": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "rev"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_diff"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "base_rev": {
+                "type": "string",
+                "minLength": 1
+              },
+              "head_rev": {
+                "type": "string",
+                "minLength": 1
+              },
+              "paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "context_lines": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "anyOf": [
+              {
+                "required": [
+                  "base_rev"
+                ]
+              },
+              {
+                "required": [
+                  "head_rev"
+                ]
+              },
+              {
+                "required": [
+                  "paths"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "exec_cmd"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "working_dir"
+        ],
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "summarized"
+                ]
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "working_dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "command",
+              "mode"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "validate_json"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "schema_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "path"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "checkpoint_branch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "branch_name": {
+                "type": "string",
+                "pattern": "^trinity\\/[a-z0-9._\\/-]+$"
+              },
+              "base_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "branch_name"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "checkpoint_commit"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "files": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "message"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

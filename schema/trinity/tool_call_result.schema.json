@@ -1,0 +1,944 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/tool_call_result.schema.json",
+  "title": "Trinity Tool Call Result",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": "trinity-runtime-v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Orchestrator",
+        "Planner",
+        "Builder",
+        "Verifier",
+        "Worker",
+        "Researcher",
+        "Auditor",
+        "Summarizer",
+        "ToolUser"
+      ]
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "step_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      ]
+    },
+    "tool_name": {
+      "type": "string",
+      "enum": [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "apply_patch",
+        "move_file",
+        "remove_file",
+        "list_dir",
+        "glob_match",
+        "search_text",
+        "git_head",
+        "git_show",
+        "git_diff",
+        "exec_cmd",
+        "validate_json",
+        "checkpoint_branch",
+        "checkpoint_commit"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error",
+        "blocked",
+        "timeout"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "type": "object"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 255
+    },
+    "working_dir": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stdout_excerpt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stderr_excerpt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "artifact_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "artifact_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(sha256:)?[a-f0-9]{64}$"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ]
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "run_id",
+    "call_id",
+    "result_id",
+    "agent_id",
+    "role",
+    "phase",
+    "step_id",
+    "tool_name",
+    "status",
+    "summary",
+    "result",
+    "duration_ms",
+    "truncated",
+    "finished_at"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "phase": {
+            "enum": [
+              "16a",
+              "16b",
+              "16c"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "error",
+              "blocked",
+              "timeout"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "error"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_ref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_ref"
+        ]
+      },
+      "then": {
+        "required": [
+          "artifact_sha256"
+        ],
+        "properties": {
+          "artifact_sha256": {
+            "type": "string",
+            "pattern": "^(sha256:)?[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_sha256": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_sha256"
+        ]
+      },
+      "then": {
+        "required": [
+          "artifact_ref"
+        ],
+        "properties": {
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "read_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "line_start": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "line_end": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "bytes_read": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "content": {
+                "type": "string"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "line_start",
+              "line_end",
+              "bytes_read",
+              "content",
+              "truncated"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "write_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bytes_written": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "content_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^(sha256:)?[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "bytes_written",
+              "content_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "edit_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "edits_applied": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "content_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^(sha256:)?[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "edits_applied",
+              "content_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "apply_patch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "files_changed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "hunks_applied": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "files_changed",
+              "hunks_applied"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "list_dir"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "entries": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "path",
+              "entries"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "move_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "src_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dst_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^(sha256:)?[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "src_path",
+              "dst_path",
+              "content_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "remove_file"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "removed": {
+                "type": "boolean"
+              },
+              "previously_missing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "removed",
+              "previously_missing"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "glob_match"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "required": [
+              "path",
+              "patterns",
+              "matches"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "search_text"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "minLength": 1
+              },
+              "paths_scanned": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "line": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "text_excerpt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "line",
+                    "text_excerpt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "pattern",
+              "paths_scanned",
+              "matches"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_head"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "head": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            },
+            "required": [
+              "head"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_show"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rev": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_excerpt": {
+                "type": "string"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rev",
+              "content_excerpt",
+              "truncated"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "git_diff"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "base_rev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "head_rev": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "diff_excerpt": {
+                "type": "string"
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "base_rev",
+              "head_rev",
+              "diff_excerpt",
+              "truncated"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "exec_cmd"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "exit_code",
+          "working_dir"
+        ],
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "summarized"
+                ]
+              }
+            },
+            "required": [
+              "command",
+              "mode"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "validate_json"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "valid": {
+                "type": "boolean"
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "path",
+              "valid",
+              "errors"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "checkpoint_branch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "branch_name": {
+                "type": "string",
+                "pattern": "^trinity\\/[a-z0-9._\\/-]+$"
+              },
+              "head": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            },
+            "required": [
+              "branch_name",
+              "head"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_name": {
+            "const": "checkpoint_commit"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "commit_sha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "commit_sha",
+              "message"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "success"
+          },
+          "tool_name": {
+            "enum": [
+              "write_file",
+              "edit_file",
+              "move_file",
+              "remove_file"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "tool_name"
+        ]
+      },
+      "then": {
+        "required": [
+          "artifact_ref",
+          "artifact_sha256"
+        ],
+        "properties": {
+          "artifact_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "artifact_sha256": {
+            "type": "string",
+            "pattern": "^(sha256:)?[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "success"
+          },
+          "tool_name": {
+            "const": "exec_cmd"
+          }
+        },
+        "required": [
+          "status",
+          "tool_name"
+        ]
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "working_dir": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

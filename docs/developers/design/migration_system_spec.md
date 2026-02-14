@@ -597,9 +597,11 @@ Before returning your output, you MUST verify:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `json`.
-Do NOT include explanatory text outside the code block.
-The JSON must be valid and complete.
+Use a disk-first contract:
+- Write/update the target artifact file at `{{TARGET_FILE}}` on disk.
+- Return concise status only (updated path + validation result).
+- Do not emit full JSON payloads in chat.
+- The artifact content must be valid and complete.
 ```
 
 ### Full Template Example: `template_prose_to_json.md`
@@ -757,17 +759,20 @@ Before returning your output, you MUST verify each item:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `json`.
+Use a disk-first contract:
+- Write/update the target artifact file at `{{TARGET_FILE}}` on disk.
+- Return concise status only (updated path + validation result).
+- Do not emit full JSON payloads in chat.
 
 The JSON must:
 1. Be valid, parseable JSON
 2. Conform to the target schema
-3. Contain NO content outside the code block
+3. Be persisted to `{{TARGET_FILE}}` without truncation
 4. Include `_migration_notes` object if any data couldn't be mapped
 
 ```json
 {
-  // Your complete output here
+  // Reference structure only; write complete output to disk
 }
 ```
 ```
