@@ -15,6 +15,7 @@ All detailed version records are stored in the [`changelog/`](./changelog/) dire
 
 | Version | Release Date | Documentation | Migration Spec | Status |
 | :--- | :--- | :--- | :--- | :--- |
+| **[0.3.0]** | 2026-02-14 | [v0.3.0.md](changelog/v0.3.0.md) | [v0.3.0.yaml](changelog/v0.3.0.yaml) | ⚠️ **Breaking** (Spec Optimization + Prompt Refactor) |
 | **[0.2.3]** | 2026-02-12 | [v0.2.3.md](changelog/v0.2.3.md) | [v0.2.3.yaml](changelog/v0.2.3.yaml) | ⚠️ **Breaking** |
 | **[0.2.2]** | 2026-02-12 | [v0.2.2.md](changelog/v0.2.2.md) | [v0.2.2.yaml](changelog/v0.2.2.yaml) | ✅ Patch |
 | **[0.2.1]** | 2026-02-07 | [v0.2.1.md](changelog/v0.2.1.md) | [v0.2.1.yaml](changelog/v0.2.1.yaml) | ⚠️ **Breaking** |
