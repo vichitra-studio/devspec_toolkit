@@ -14,6 +14,7 @@ Toolkit: `/Users/vichitracollective/vc-code/vc_wesbite/devspec_toolkit`
 
 ## Baseline Command Results
 All commands executed from `/Users/vichitracollective/vc-code/vc_wesbite`.
+Baseline failures: none.
 
 1. CLI availability
 ```bash
@@ -50,6 +51,9 @@ Result: PASS (`OK`)
 ./tools/run_specdev.sh docs-lint devspec_toolkit/spec --repo-root ./devspec_toolkit
 ```
 Result: PASS (`OK`)
+
+## Post-Check Cleanup
+- Removed generated artifact `devspec_toolkit/tools/trace_matrix.json` after baseline capture to keep B0 documentation-only and avoid unrelated working-tree noise.
 
 ## B0 Exit Criteria
 - [x] baseline command log captured
