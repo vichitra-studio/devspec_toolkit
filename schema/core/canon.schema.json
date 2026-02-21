@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/core/canon/1",
+  "title": "Canonical Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "registry_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      },
+      "minItems": 1
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/alias"
+      }
+    }
+  },
+  "required": [
+    "registry_version",
+    "entries",
+    "aliases"
+  ],
+  "$defs": {
+    "canonicalId": {
+      "$anchor": "canonicalId",
+      "type": "string",
+      "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
+    },
+    "semver": {
+      "$anchor": "semver",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "owner": {
+      "$anchor": "owner",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "entryStatus": {
+      "$anchor": "entryStatus",
+      "type": "string",
+      "enum": [
+        "active",
+        "deprecated",
+        "sunset",
+        "retired"
+      ]
+    },
+    "lifecycle": {
+      "$anchor": "lifecycle",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "introduced_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deprecated_since": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sunset_after": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "retired_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "replaced_by": {
+          "$ref": "#/$defs/canonicalId"
+        },
+        "deprecation_note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "introduced_at"
+      ]
+    },
+    "entry": {
+      "$anchor": "entry",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/canonicalId"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "preferred_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "status": {
+          "$ref": "#/$defs/entryStatus"
+        },
+        "owners": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/owner"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#tag"
+          },
+          "uniqueItems": true
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "source_refs": {
+          "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "preferred_label",
+        "definition",
+        "version",
+        "status",
+        "owners",
+        "lifecycle"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "deprecated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "lifecycle": {
+                "required": [
+                  "deprecated_since"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "sunset"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "lifecycle": {
+                "required": [
+                  "deprecated_since",
+                  "sunset_after"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "retired"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "lifecycle": {
+                "required": [
+                  "retired_at"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aliasStatus": {
+      "$anchor": "aliasStatus",
+      "type": "string",
+      "enum": [
+        "active",
+        "deprecated"
+      ]
+    },
+    "alias": {
+      "$anchor": "alias",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "normalized": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_id": {
+          "$ref": "#/$defs/canonicalId"
+        },
+        "status": {
+          "$ref": "#/$defs/aliasStatus"
+        },
+        "deprecated_since": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "kind",
+        "normalized",
+        "target_id",
+        "status"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "deprecated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "deprecated_since"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
