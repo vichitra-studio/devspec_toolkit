@@ -23,7 +23,8 @@
       ],
       "target_file_patterns": [
         "src/main.py",
-        "src/auth.py"
+        "src/auth.py",
+        "README.md"
       ]
     },
     "spec_alignment": {
@@ -45,7 +46,7 @@
           "description": "Implement login function",
           "type": "behavior",
           "layer": "service",
-          "linked_test_expectation": "login success",
+          "linked_test_expectation": "pytest -q",
           "nfr_refs": ["nfr-availability-uptime"],
           "fixture_ref": "fixture-login-success",
           "implementation": {
@@ -69,6 +70,12 @@
       "rationale": "Code changes require documentation updates for traceability.",
       "docs_touched": [
         "README.md"
+      ]
+    },
+    "review_requirements": {
+      "guidelines": "Run focused unit checks for checklist scope.",
+      "test_commands": [
+        "pytest -q"
       ]
     }
   },

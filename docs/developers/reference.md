@@ -54,6 +54,7 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --version 0.1.0 --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+```
 
 ### Alignment & Migration
 ```bash
@@ -73,7 +74,31 @@ specdev align apply --spec-dir spec --auto
 specdev align prompts --spec-dir spec --output prompts/migration/ --mode upgrade
 ```
 
+### Trinity Observability Commands
+```bash
+# Validate runtime artifacts
+./tools/run_specdev.sh validate-runtime .trinity/sessions/<session>.jsonl --type session_event --repo-root ./devspec_toolkit
 
+# Export eval rows from a session log
+./tools/run_specdev.sh trinity-export-eval .trinity/sessions/<session>.jsonl --repo-root ./devspec_toolkit --out .trinity/eval/<session>_rows.jsonl
+
+# Replay and verify artifact/hash lineage
+./tools/run_specdev.sh trinity-replay .trinity/sessions/<session>.jsonl --repo-root ./devspec_toolkit --out .trinity/eval/<session>_replay.json
+
+# Aggregate dashboard summary from exported rows + replay reports
+./tools/run_specdev.sh trinity-dashboard --rows-glob ".trinity/eval/*_rows.jsonl" --replay-glob ".trinity/eval/*_replay.json" --out-json .trinity/eval/dashboard.json --out-md .trinity/eval/dashboard.md
+
+# Generate remediation/resume action plan from replay findings
+./tools/run_specdev.sh trinity-remediate .trinity/eval/<session>_replay.json --repo-root ./devspec_toolkit --out .trinity/eval/<session>_remediation.json
+
+# Strict mode for missing resume source artifacts
+./tools/run_specdev.sh trinity-remediate .trinity/eval/<session>_replay.json --repo-root ./devspec_toolkit --session-log .trinity/sessions/<session>.jsonl --emit-session-state .trinity/runtime/session_state_resume.json --emit-task-input .trinity/runtime/task_input_resume.json --missing-resume-source-policy hard --out .trinity/eval/<session>_remediation.json
+
+# Bundle and publish eval artifacts to external dashboard endpoint (optional)
+./tools/run_specdev.sh trinity-publish-eval --rows-glob ".trinity/eval/*_rows.jsonl" --replay-glob ".trinity/eval/*_replay.json" --dashboard-json .trinity/eval/dashboard.json --out .trinity/eval/export_bundle.json --endpoint-env TRINITY_EVAL_EXPORT_ENDPOINT --auth-token-env TRINITY_EVAL_EXPORT_TOKEN
+```
+
+See [`tools/trinity_observability.md`](tools/trinity_observability.md) for CI wiring and resume-output examples.
 
 ### Step-Specific Verification
 For deep validation of specific steps (DAGs, cycles, logic), use the dedicated scripts:
@@ -81,7 +106,6 @@ For deep validation of specific steps (DAGs, cycles, logic), use the dedicated s
 python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.json
 python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
 python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
-```
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
@@ -92,7 +116,7 @@ For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prom
 Invoke commands from the root of your host repository so relative paths to `spec/` and [./devspec_toolkit/](../../) resolve cleanly.
 
 ## Two-Phase AI Runner Mode
-- Prompts support a two-phase flow: Clarify (questions only) → Emit (single fenced `json`).
+- Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first artifact write + concise status).
 - Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
 - Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
 - Operational guidance for agents and runner tips: `docs/agents/agents.md`.

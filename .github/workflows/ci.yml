@@ -6,6 +6,22 @@ on:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      require_trinity_logs:
+        description: "Fail observability job when no Trinity session logs are discovered."
+        required: false
+        type: boolean
+        default: false
+      trinity_logs_glob:
+        description: "Optional additional recursive glob for Trinity session logs."
+        required: false
+        type: string
+        default: ""
+      require_eval_publish:
+        description: "Require external eval publish to succeed."
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "0 2 * * *"  # daily drift audit (UTC)
 
@@ -65,10 +81,105 @@ jobs:
       - name: Lint adversarial fixtures (same mechanism as fixtures)
         run: python -m specdev_tools.cli fixtures-lint spec
 
+  trinity-observability:
+    name: Trinity Replay & Eval Dashboard
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install tooling
+        run: pip install -e tools/
+      - name: Discover Trinity session logs
+        id: discover
+        env:
+          TRINITY_LOGS_GLOB: ${{ inputs.trinity_logs_glob }}
+        run: |
+          python - <<'PY'
+          import glob
+          import os
+          paths = set(glob.glob(".trinity/sessions/*.jsonl"))
+          paths.update(glob.glob("**/.trinity/sessions/*.jsonl", recursive=True))
+          extra = os.getenv("TRINITY_LOGS_GLOB", "").strip()
+          if extra:
+              paths.update(glob.glob(extra, recursive=True))
+          paths = sorted(paths)
+          os.makedirs(".trinity/eval", exist_ok=True)
+          with open(".trinity/eval/session_logs.txt", "w", encoding="utf-8") as f:
+              for p in paths:
+                  f.write(p + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"count={len(paths)}\n")
+          print(f"Discovered {len(paths)} session logs")
+          PY
+      - name: Enforce logs for verification run
+        if: github.event_name == 'workflow_dispatch' && inputs.require_trinity_logs == true && steps.discover.outputs.count == '0'
+        run: |
+          echo "require_trinity_logs=true but no session logs were found." >&2
+          exit 1
+      - name: Build replay/export artifacts
+        if: steps.discover.outputs.count != '0'
+        run: |
+          while IFS= read -r log; do
+            [ -z "$log" ] && continue
+            base="$(basename "$log" .jsonl)"
+            rows_out=".trinity/eval/${base}_rows.jsonl"
+            replay_out=".trinity/eval/${base}_replay.json"
+            remediation_out=".trinity/eval/${base}_remediation.json"
+            python -m specdev_tools.cli trinity-export-eval "$log" --repo-root . --out "$rows_out"
+            python -m specdev_tools.cli trinity-replay "$log" --repo-root . --out "$replay_out"
+            python -m specdev_tools.cli trinity-remediate "$replay_out" --repo-root . --session-log "$log" --out "$remediation_out" --json > /dev/null
+          done < .trinity/eval/session_logs.txt
+      - name: Build dashboard summary
+        if: steps.discover.outputs.count != '0'
+        run: |
+          python -m specdev_tools.cli trinity-dashboard \
+            --rows-glob ".trinity/eval/*_rows.jsonl" \
+            --replay-glob ".trinity/eval/*_replay.json" \
+            --out-json ".trinity/eval/dashboard.json" \
+            --out-md ".trinity/eval/dashboard.md"
+          cat .trinity/eval/dashboard.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish eval bundle (optional external sink)
+        if: steps.discover.outputs.count != '0'
+        env:
+          TRINITY_EVAL_EXPORT_ENDPOINT: ${{ secrets.TRINITY_EVAL_EXPORT_ENDPOINT }}
+          TRINITY_EVAL_EXPORT_TOKEN: ${{ secrets.TRINITY_EVAL_EXPORT_TOKEN }}
+        run: |
+          REQUIRE_PUBLISH=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.require_eval_publish }}" = "true" ]; then
+            REQUIRE_PUBLISH="--require-publish"
+          fi
+          python -m specdev_tools.cli trinity-publish-eval \
+            --rows-glob ".trinity/eval/*_rows.jsonl" \
+            --replay-glob ".trinity/eval/*_replay.json" \
+            --dashboard-json ".trinity/eval/dashboard.json" \
+            --out ".trinity/eval/export_bundle.json" \
+            --endpoint-env "TRINITY_EVAL_EXPORT_ENDPOINT" \
+            --auth-token-env "TRINITY_EVAL_EXPORT_TOKEN" \
+            --source "github-actions:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}" \
+            ${REQUIRE_PUBLISH}
+      - name: No logs summary
+        if: steps.discover.outputs.count == '0'
+        run: |
+          echo "## Trinity Eval Dashboard" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- No session logs found in this run." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Trinity observability artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trinity-observability
+          path: .trinity/eval/
+          if-no-files-found: warn
+
   deploy-staging:
     name: Deploy Staging (placeholder)
     if: ${{ github.ref == 'refs/heads/main' }}
-    needs: redteam
+    needs: [redteam, trinity-observability]
     runs-on: ubuntu-latest
     steps:
       - run: echo "Deploy to staging goes here (wire your real deploy step)."

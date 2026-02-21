@@ -1,0 +1,174 @@
+{
+    "$schema": "https://specdev.local/schema/seed_manifest.schema.json",
+    "seed_manifest_id": "seed-manifest-common",
+    "version": "0.2.0",
+    "created_at": "2026-02-14T00:00:00Z",
+    "last_updated": "2026-02-14T17:30:00Z",
+    "global_seed_order": [
+        "seed-charter",
+        "seed-capabilities",
+        "seed-system-sketch",
+        "seed-glossary",
+        "seed-fr-list",
+        "seed-docs",
+        "seed-tools",
+        "seed-tests"
+    ],
+    "nested_order": [
+        {
+            "level_id": "docs",
+            "description": "Documentation and reference materials for developers and users.",
+            "seed_ids": [
+                "seed-docs"
+            ]
+        },
+        {
+            "level_id": "tools",
+            "description": "Tooling and utilities documentation.",
+            "seed_ids": [
+                "seed-tools"
+            ]
+        },
+        {
+            "level_id": "tests",
+            "description": "Test fixtures and integration test documentation.",
+            "seed_ids": [
+                "seed-tests"
+            ]
+        }
+    ],
+    "seeds": [
+        {
+            "seed_id": "seed-docs",
+            "path": "docs/README.md",
+            "description": "Main documentation index and entry point for developers.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-reference",
+            "path": "docs/developers/reference.md",
+            "description": "Developer reference and API documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-designs",
+            "path": "docs/designs/trinity_spec.md",
+            "description": "Trinity specification design document.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-migration",
+            "path": "docs/developers/workflows/workflow_migration.md",
+            "description": "Migration workflow documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-bootstrap",
+            "path": "docs/developers/workflows/workflow_bootstrap_legacy.md",
+            "description": "Legacy bootstrap workflow documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-tooling",
+            "path": "docs/developers/tools/schema_differ.md",
+            "description": "Schema differ tool documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-observability",
+            "path": "docs/developers/tools/trinity_observability.md",
+            "description": "Trinity observability documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-gap",
+            "path": "docs/developers/tooling/gap_hunter_checklist.md",
+            "description": "Gap hunter checklist for requirements coverage.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-coverage",
+            "path": "docs/developers/tooling/coverage_matrix.md",
+            "description": "Coverage matrix for specification testing.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-changelog",
+            "path": "docs/developers/tools/changelog_parser.md",
+            "description": "Changelog parser tool documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-align",
+            "path": "docs/developers/tools/align.md",
+            "description": "Alignment tool documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-docs-system",
+            "path": "docs/audit/review_report_03_docs.md",
+            "description": "System review report documentation.",
+            "required": true,
+            "source_type": "doc"
+        },
+        {
+            "seed_id": "seed-tools",
+            "path": "tools/README.md",
+            "description": "CLI tools and utilities documentation.",
+            "required": true,
+            "source_type": "doc"
+        }
+    ],
+    "step_requirements": {
+        
+    },
+    "docs_policy": {
+        "readme_required": true,
+        "root_readme_required": true,
+        "readme_depth_default": 0,
+        "readme_depth_by_scope": {
+            "toolkit_agent/": 1,
+            "spec/": 0,
+            "docs/": 1,
+            "tools/": 1,
+            "tests/": 0,
+            "schema/": 0
+        },
+        "scope": [
+            "toolkit_agent/",
+            "spec/",
+            "docs/",
+            "tools/",
+            "schema/",
+            "seed_templates/",
+            "tests/"
+        ],
+        "exclusions": [
+            "node_modules/",
+            ".git/",
+            ".venv/",
+            "__pycache__/",
+            "dist/",
+            "build/",
+            "coverage/",
+            ".pytest_cache/",
+            "*.egg-info/"
+        ],
+        "doc_paths": [
+            "docs/**",
+            "README.md",
+            "CHANGELOG.md"
+        ]
+    }
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "id": "step-impl-missing-plan-spec-alignment",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Minimal implementation.",
+      "scope_in": [
+        "core"
+      ],
+      "scope_out": [
+        "extras"
+      ],
+      "target_file_patterns": [
+        "src/auth.py"
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "guidelines": "Run focused unit checks for checklist scope.",
+      "test_commands": [
+        "pytest -q"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+version: "0.3.0"
+release_date: "2026-02-14"
+changes:
+  - type: usage_update
+    step_id: "all"
+    description: "Prompts now enforce disk-only artifact creation. Agents should not expect or generate fenced code blocks for artifacts."
+    migration:
+      action: manual
+      details: "Ensure any custom agent workflows are updated to look for files on disk instead of parsing chat output."
+  - type: optimization
+    step_id: "trinity_spec"
+    description: "Trinity Spec refactored for token efficiency (approx 30% reduction)."
+    migration:
+      action: auto

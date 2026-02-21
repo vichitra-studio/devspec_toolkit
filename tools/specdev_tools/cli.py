@@ -8,6 +8,8 @@ from pathlib import Path
 def check_venv():
     # Helper to check if we are running in a virtual environment
     # sys.prefix != sys.base_prefix is the standard check for venv/virtualenv
+    if os.environ.get("SPECDEV_SKIP_VENV_CHECK") == "1":
+        return
     if sys.prefix == sys.base_prefix:
         print("Error: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
         sys.exit(1)
@@ -21,6 +23,120 @@ def main():
     v.add_argument("file")
     v.add_argument("--repo-root", default=".")
     v.add_argument("--json", action="store_true", help="Output results as JSON")
+
+    vr = sub.add_parser("validate-runtime", help="Validate Trinity runtime protocol artifacts")
+    vr.add_argument("file")
+    vr.add_argument(
+        "--type",
+        dest="artifact_type",
+        choices=[
+            "task_input",
+            "context_pack",
+            "task_result",
+            "tool_call_request",
+            "tool_call_result",
+            "session_event",
+            "log_capture_policy",
+            "eval_export_row",
+            "scratchpad_state",
+            "session_state",
+            "spawn_log",
+        ],
+        help="Optional explicit runtime artifact type",
+    )
+    vr.add_argument("--repo-root", default=".")
+    vr.add_argument("--json", action="store_true", help="Output results as JSON")
+
+    tr = sub.add_parser("trinity", help="Run Trinity runtime orchestration for one milestone")
+    tr.add_argument("--step-id", help="Explicit roadmap milestone id to execute")
+    tr.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from a matching session_state under .trinity/runtime (requires disambiguation if multiple)",
+    )
+    tr.add_argument("--resume-run-id", help="Explicit run_id to resume (disambiguates multiple session states)")
+    tr.add_argument(
+        "--answer",
+        action="append",
+        default=[],
+        help="Answer to pending Trinity clarification questions (repeatable)",
+    )
+    tr.add_argument("--mode", choices=["llm", "deterministic"], help="Override runtime.execution_mode for this run")
+    tr.add_argument("--repo-root", default=".")
+    tr.add_argument("--json", action="store_true", help="Output run summary as JSON")
+
+    tc = sub.add_parser("trinity-child", help=argparse.SUPPRESS)
+    tc.add_argument("--repo-root", required=True)
+    tc.add_argument("--step-id", required=True)
+    tc.add_argument("--phase", required=True, choices=["16a", "16b", "16c", "utility"])
+    tc.add_argument("--role", required=True)
+    tc.add_argument("--child-id", required=True)
+    tc.add_argument("--milestone-path", required=True)
+    tc.add_argument("--task-input", required=True)
+    tc.add_argument("--context-pack", required=True)
+    tc.add_argument("--task-result", required=True)
+    tc.add_argument("--session-log", required=True)
+    tc.add_argument("--run-id", required=True)
+    tc.add_argument("--parent-id", required=True)
+    tc.add_argument("--mode", choices=["llm", "deterministic"])
+
+    ee = sub.add_parser("trinity-export-eval", help="Export eval rows from a Trinity session log")
+    ee.add_argument("session_log")
+    ee.add_argument("--out", help="Optional output JSONL path for exported rows")
+    ee.add_argument("--repo-root", default=".")
+    ee.add_argument("--json", action="store_true", help="Output rows/results as JSON")
+
+    rp = sub.add_parser("trinity-replay", help="Replay and verify a Trinity session log")
+    rp.add_argument("session_log")
+    rp.add_argument("--repo-root", default=".")
+    replay_mode = rp.add_mutually_exclusive_group()
+    replay_mode.add_argument("--strict", dest="strict", action="store_true", help="Treat replay warnings as failure")
+    replay_mode.add_argument(
+        "--allow-warnings",
+        dest="strict",
+        action="store_false",
+        help="Allow replay warnings without failing the replay report",
+    )
+    rp.set_defaults(strict=True)
+    rp.add_argument("--out", help="Optional output path for replay report JSON")
+    rp.add_argument("--json", action="store_true", help="Output replay report as JSON")
+
+    db = sub.add_parser("trinity-dashboard", help="Build aggregated Trinity eval/replay dashboard")
+    db.add_argument("--rows-glob", required=True, help="Glob for eval row JSONL files")
+    db.add_argument("--replay-glob", required=True, help="Glob for replay report JSON files")
+    db.add_argument("--out-json", help="Optional output JSON path")
+    db.add_argument("--out-md", help="Optional output markdown path")
+    db.add_argument("--json", action="store_true", help="Output dashboard summary as JSON")
+
+    pb = sub.add_parser("trinity-publish-eval", help="Bundle and optionally publish Trinity eval artifacts")
+    pb.add_argument("--rows-glob", required=True, help="Glob for eval row JSONL files")
+    pb.add_argument("--replay-glob", required=True, help="Glob for replay report JSON files")
+    pb.add_argument("--dashboard-json", help="Optional dashboard JSON path to embed")
+    pb.add_argument("--out", help="Optional output path for bundled payload JSON")
+    pb.add_argument("--source", help="Optional source label, e.g. github-actions:<repo>:<run_id>")
+    pb.add_argument("--max-rows", type=int, default=50000, help="Maximum rows to include in the payload")
+    pb.add_argument("--endpoint", help="Optional explicit HTTP endpoint for publish")
+    pb.add_argument("--endpoint-env", default="TRINITY_EVAL_EXPORT_ENDPOINT", help="Environment variable to resolve endpoint from")
+    pb.add_argument("--auth-token", help="Optional explicit bearer token for publish")
+    pb.add_argument("--auth-token-env", default="TRINITY_EVAL_EXPORT_TOKEN", help="Environment variable to resolve bearer token from")
+    pb.add_argument("--timeout-seconds", type=int, default=20, help="Publish HTTP timeout in seconds")
+    pb.add_argument("--require-publish", action="store_true", help="Fail if endpoint is not configured or publish fails")
+    pb.add_argument("--json", action="store_true", help="Output bundle/publish result as JSON")
+
+    rm = sub.add_parser("trinity-remediate", help="Generate remediation/resume actions from replay findings")
+    rm.add_argument("replay_report")
+    rm.add_argument("--session-log", help="Optional source session log for resume task-input generation")
+    rm.add_argument("--emit-session-state", help="Optional output path for generated session_state JSON")
+    rm.add_argument("--emit-task-input", help="Optional output path for generated resume task_input JSON")
+    rm.add_argument(
+        "--missing-resume-source-policy",
+        choices=["soft", "hard"],
+        default="hard",
+        help="How to treat missing source task_input when generating resume artifacts",
+    )
+    rm.add_argument("--out", help="Optional output path for remediation plan JSON")
+    rm.add_argument("--repo-root", default=".")
+    rm.add_argument("--json", action="store_true", help="Output remediation plan as JSON")
 
     va = sub.add_parser("validate-all")
     va.add_argument("spec_dir")
@@ -77,7 +193,7 @@ def main():
 
     args = p.parse_args()
 
-    if args.repo_root == ".":
+    if hasattr(args, "repo_root") and args.repo_root == ".":
         # Auto-detect toolkit root by scanning immediate subdirectories
         current_dir = Path(".")
         found = False
@@ -107,6 +223,194 @@ def main():
                 for e in errs: print(e, file=sys.stderr)
                 sys.exit(1)
             print("OK")
+    elif args.cmd == "validate-runtime":
+        from .trinity_runtime_validate import validate_runtime_file
+        repo_root = os.path.abspath(args.repo_root)
+        file_path = os.path.abspath(args.file)
+        errs = validate_runtime_file(repo_root, file_path, args.artifact_type)
+        if args.json:
+            output = []
+            if errs:
+                for e in errs:
+                    output.append({"file": file_path, "error": e, "status": "FAIL"})
+            else:
+                output.append({"file": file_path, "status": "PASS"})
+            print(json.dumps(output, indent=2))
+        else:
+            if errs:
+                for e in errs:
+                    print(e, file=sys.stderr)
+                sys.exit(1)
+            print("OK")
+    elif args.cmd == "trinity":
+        from .trinity_runtime import run_trinity
+        repo_root = os.path.abspath(args.repo_root)
+        result = run_trinity(
+            repo_root=repo_root,
+            step_id=args.step_id,
+            resume=bool(args.resume),
+            mode_override=args.mode,
+            answers=args.answer,
+            resume_run_id=args.resume_run_id,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            status = str(result.get("status", "unknown")).upper()
+            print(f"{status} - step_id={result.get('step_id')} run_id={result.get('run_id')}")
+            if result.get("milestone_artifact"):
+                print(f"Milestone: {result['milestone_artifact']}")
+            if result.get("anchor_artifact"):
+                print(f"Anchor: {result['anchor_artifact']}")
+            if result.get("session_log"):
+                print(f"Session Log: {result['session_log']}")
+            if result.get("errors"):
+                for err in result["errors"]:
+                    print(err, file=sys.stderr)
+        if result.get("status") not in {"completed", "questions"}:
+            sys.exit(1)
+    elif args.cmd == "trinity-child":
+        from .trinity_runtime import run_trinity_child
+        repo_root = os.path.abspath(args.repo_root)
+        result = run_trinity_child(
+            repo_root=repo_root,
+            step_id=args.step_id,
+            phase=args.phase,
+            role=args.role,
+            child_id=args.child_id,
+            milestone_path=args.milestone_path,
+            task_input_path=args.task_input,
+            context_pack_path=args.context_pack,
+            task_result_path=args.task_result,
+            session_log_path=args.session_log,
+            run_id=args.run_id,
+            parent_id=args.parent_id,
+            mode_override=args.mode,
+        )
+        print(json.dumps(result, indent=2))
+    elif args.cmd == "trinity-export-eval":
+        from .trinity_eval_export import export_eval_rows
+        repo_root = os.path.abspath(args.repo_root)
+        session_log = os.path.abspath(args.session_log)
+        out_path = os.path.abspath(args.out) if args.out else None
+        rows, errs = export_eval_rows(repo_root, session_log, out_path=out_path)
+        if args.json:
+            print(json.dumps({"rows": rows, "errors": errs}, indent=2))
+        else:
+            if errs:
+                for e in errs:
+                    print(e, file=sys.stderr)
+                sys.exit(1)
+            if out_path:
+                print(f"OK - exported {len(rows)} rows to {out_path}")
+            else:
+                print(f"OK - exported {len(rows)} rows")
+    elif args.cmd == "trinity-replay":
+        from .trinity_replay import replay_session
+        repo_root = os.path.abspath(args.repo_root)
+        session_log = os.path.abspath(args.session_log)
+        report = replay_session(repo_root, session_log, strict=args.strict)
+        out_path = os.path.abspath(args.out) if args.out else None
+        if out_path:
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2)
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            print(
+                f"{report.get('status', 'unknown').upper()} - "
+                f"events={report.get('summary', {}).get('total_events', 0)} "
+                f"warnings={len(report.get('warnings', []))} "
+                f"errors={len(report.get('errors', []))}"
+            )
+            if out_path:
+                print(f"Report: {out_path}")
+        if report.get("status") == "failed":
+            sys.exit(1)
+    elif args.cmd == "trinity-dashboard":
+        from .trinity_dashboard import write_dashboard
+        summary, markdown = write_dashboard(
+            eval_rows_glob=args.rows_glob,
+            replay_reports_glob=args.replay_glob,
+            out_json=args.out_json,
+            out_md=args.out_md,
+        )
+        if args.json:
+            print(json.dumps(summary, indent=2))
+        else:
+            print(markdown)
+    elif args.cmd == "trinity-publish-eval":
+        from .trinity_eval_publish import publish_eval_bundle
+
+        bundle, publish_result, errs = publish_eval_bundle(
+            rows_glob=args.rows_glob,
+            replay_glob=args.replay_glob,
+            dashboard_json=args.dashboard_json,
+            out_path=args.out,
+            source=args.source,
+            max_rows=args.max_rows,
+            endpoint=args.endpoint,
+            endpoint_env=args.endpoint_env,
+            auth_token=args.auth_token,
+            auth_token_env=args.auth_token_env,
+            require_publish=args.require_publish,
+            timeout_seconds=args.timeout_seconds,
+        )
+        if args.json:
+            print(json.dumps({"bundle": bundle, "publish_result": publish_result, "errors": errs}, indent=2))
+        else:
+            print(
+                f"{publish_result.get('status', 'unknown').upper()} - "
+                f"rows={bundle.get('row_count_exported', 0)} "
+                f"endpoint={publish_result.get('endpoint') or 'none'} "
+                f"http_status={publish_result.get('http_status')}"
+            )
+            if args.out:
+                print(f"Bundle: {os.path.abspath(args.out)}")
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+    elif args.cmd == "trinity-remediate":
+        from .trinity_remediation import build_remediation_plan
+        repo_root = os.path.abspath(args.repo_root)
+        replay_report = os.path.abspath(args.replay_report)
+        session_log = os.path.abspath(args.session_log) if args.session_log else None
+        emit_session_state = os.path.abspath(args.emit_session_state) if args.emit_session_state else None
+        emit_task_input = os.path.abspath(args.emit_task_input) if args.emit_task_input else None
+        plan, errs = build_remediation_plan(
+            repo_root=repo_root,
+            replay_report_path=replay_report,
+            session_log_path=session_log,
+            emit_session_state_path=emit_session_state,
+            emit_task_input_path=emit_task_input,
+            missing_resume_source_policy=args.missing_resume_source_policy,
+        )
+        out_path = os.path.abspath(args.out) if args.out else None
+        if out_path:
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(plan, f, indent=2)
+        if args.json:
+            print(json.dumps({"plan": plan, "errors": errs}, indent=2))
+        else:
+            print(
+                f"{plan.get('status', 'unknown').upper()} - "
+                f"actions={len(plan.get('actions', []))} "
+                f"warnings={len(plan.get('warnings', []))} "
+                f"errors={len(errs)}"
+            )
+            if out_path:
+                print(f"Plan: {out_path}")
+            if emit_session_state:
+                print(f"Session state: {emit_session_state}")
+            if emit_task_input:
+                print(f"Task input: {emit_task_input}")
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
     elif args.cmd == "validate-all":
         from .validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
@@ -188,7 +492,7 @@ def main():
             print("AI Interaction Guide:")
             print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")
             print("2. Copy the full content into your AI assistant")
-            print("3. Paste only the fenced JSON block into spec/NN_name.json")
+            print("3. Write or update spec/NN_name.json directly (disk-first); do not rely on fenced JSON chat output")
             print("4. Validate with: python -m specdev_tools.cli validate spec/NN_name.json --repo-root <toolkit_dir>")
             print("5. Ensure all IDs use kebab-case format")
             print("6. No examples should be included in the AI output")

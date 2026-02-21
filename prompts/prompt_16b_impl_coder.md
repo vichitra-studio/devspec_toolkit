@@ -20,13 +20,33 @@ Instead of outputting code directly to the user, you:
 1.  **Write Code Files** (using tool calls).
 2.  **Update the Artifact** (`spec/impl_context/{step_id}.json`) to record your execution results.
 
+## Output Mode (Compatibility)
+- **Trinity harness mode (canonical):**
+  - Phase A: questions only (if blocked).
+  - Phase B: write/update artifact file on disk and return concise status (artifact path + validation result).
+- **Manual coding-agent mode (Codex-style default):**
+  - Edit files and artifact directly.
+  - Return a short confirmation with validation outcome.
+  - Do not emit fenced JSON in chat.
+
+## Zero-Assumption Protocol (Mandatory)
+Implementation is execution-only against explicit plan contracts.
+
+1. Do not implement any behavior without a corresponding checklist action.
+2. Do not create new files/functions/classes unless explicitly required by checklist actions.
+3. Do not infer command outcomes; command status must come from real execution output.
+4. Do not infer pass/fail from partial logs; if output is incomplete, mark blocked and capture ambiguity.
+5. Do not infer dependency presence; verify with concrete inspection commands.
+6. If any required input is missing (spec ref, target path, test command), stop and record `execution.emergent_ambiguities`.
+7. If an edit conflicts with scope constraints, abort immediately and return blocked status.
+
 # Seed Order & Mandatory Sources
 - Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["16b"]`.
 - Ingest required seeds in order before any other context.
 - Populate `seed_refs` with the seeds actually used.
 - If a required seed is missing or stale, stop and request it before proceeding.
-- You must evaluate whether additional context (README maps, tooling docs, architecture guides, ops runbooks) is required for this step. If so, add new seeds to the manifest and update `step_requirements["16b"]` before proceeding.
-  - If the plan does not include required seed changes in `plan.summary.target_file_patterns`, log an `emergent_ambiguity` and STOP.
+- In Step 16b, you must **not** mutate `seed_manifest` or `step_requirements`.
+- If context is missing, log `execution.emergent_ambiguities` and stop; escalation is handled by Planner/Orchestrator.
 
 # Task
 - **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
@@ -34,6 +54,8 @@ Instead of outputting code directly to the user, you:
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
 
 # Field Definitions & Rules (MANDATORY)
+
+> **Schema Authority**: The schema (`schema/16_impl_context.schema.json`) is the single source of truth for field types, ranges, and required properties. The rules below are behavioral guidelines for how to populate them. When in conflict, the schema wins.
 
 You must populate the `execution` JSON object according to these specific definitions and expectations.
 
@@ -53,7 +75,8 @@ You must populate the `execution` JSON object according to these specific defini
     *   `status`: `passed`, `failed`, `blocked`, or `partial`.
     *   `outcome_description`: Brief summary of what ran (e.g. "Ran Auth Tests").
     *   `reasoning`: Why did it pass/fail? (e.g., "All 5 tests passed").
-    *   `evidence`: **Verbatim** stdout/stderr snippet (max 20 lines) OR structured object.
+    *   `evidence`: **Verbatim** stdout/stderr snippet as a string (schema-min length applies).
+    *   `command`: Required command string.
 *   **CRITICAL: EVIDENCE BINDING**
     *   For `run_command` actions, you MUST emit `evidence` as a **String**:
         ```json
@@ -63,6 +86,7 @@ You must populate the `execution` JSON object according to these specific defini
 *   *Rule*: Do NOT say "not run" without a concrete blocker explanation.
 *   *Rule*: **Verbatim Output**: Copy exact stdout/stderr. Do NOT paraphrase.
 *   *Rule*: **Success Markers**: Output MUST contain `PASSED`, `OK`, `SUCCESS`, or exit code 0.
+*   *Rule*: When `status == "passed"`, both `evidence_ref` and `evidence_binding` are mandatory.
 
 ## 3. `checklist[].implementation.actions[].evidence` (Object Binding)
 *   **MANDATORY**: Before marking an action as `verified`, you **MUST** populate its `evidence` field.
@@ -70,39 +94,31 @@ You must populate the `execution` JSON object according to these specific defini
     ```json
     "evidence": {
       "type": "log", 
-      "content": "pytest tests/auth/test_login.py ... [100%] PASSED" 
-    }
-    ```
-    ```json
-    "evidence": {
-      "type": "reference",
-      "content": "See docs/ops/environment_data_and_secrets.md for environment variables",
-      "path": "docs/ops/environment_data_and_secrets.md",
-      "section": "email-config"
+      "content": "pytest tests/auth/test_login.py::test_login_success ... [100%] PASSED" 
     }
     ```
 *   *Rule*: The `content` must be a verbatim copy of the output captured in `execution_results`.
 
-## 3. `execution.critical_evidence` (Traceability)
+## 4. `execution.critical_evidence` (Traceability)
 *   `satisfied_checklist_ids`: List of IDs that are now fully implemented and verified.
     *   *Rule*: Only include an ID here if its `linked_test_expectation` command passed.
 *   `passed_test_commands`: List of the specific test commands that passed.
     *   *Expectation*: This allows the reviewer to trace each requirement to a passed test.
 
-## 4. `execution.emergent_ambiguities` (Blockers)
+## 5. `execution.emergent_ambiguities` (Blockers)
 *   Log any blockers or spec issues you discovered.
-    *   `id`: `AMB-NEW-X`.
+    *   `id`: kebab-case (e.g., `amb-missing-seed-readme-map`).
     *   `description`: The issue.
     *   `severity`: `blocking` or `non_blocking`.
     *   `impact`: Which checklist IDs are affected?
 
-## 5. `execution.config_validation` (Ops Rigor)
+## 6. `execution.config_validation` (Ops Rigor)
 *   Applies when implementing `plan.delivery`, `plan.drift`, or `plan.security`.
 *   *Rule*: **Dashboard Links**: Dashboard URLs must be valid/reachable or follow the known URI pattern.
 *   *Rule*: **Alert Logic**: Alert rules must be syntactically valid for the monitoring system.
 *   *Rule*: **Drift Schedules**: Schedules must be valid cron strings or ISO 8601 intervals.
 
-## 6. Advanced Schema Fields (Consumption Rules)
+## 7. Advanced Schema Fields (Consumption Rules)
 You must **READ** and **ACT** on these fields to ensure high-fidelity implementation.
 *   **`checklist[].implementation`**:
     *   **Requirement-First**: You are strictly implementing the actions defined in `checklist[].implementation`.
@@ -135,6 +151,7 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
     a. Any action fails → Set `status: blocked`, log `emergent_ambiguity`
     b. Plan contains `blocking` ambiguity → STOP immediately
     c. Required file outside `target_file_patterns` → STOP, log scope violation
+    d. On any blocked outcome, hand off to Orchestrator for **Planner-first** remediation; do not self-replan.
 4.  **Log**: Populate `execution` fields as defined above.
 5.  **Emit**: Save the updated JSON.
 
@@ -170,35 +187,17 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 4. **NEVER** modify `plan` outside `checklist[].implementation` evidence/status updates
 
 # Output Rules
-1.  Return exactly one fenced code block with language `json`.
+1.  Canonical contract is disk-first two-phase: Phase A questions-only, Phase B writes artifact on disk and returns concise status.
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
 3.  Do NOT modify `plan` outside `checklist[].implementation` evidence/status updates. Update `review` only when a checklist action explicitly targets review fields.
+4.  In manual coding-agent mode, direct file updates plus concise confirmation is the default behavior.
 
-# Output Contract (Update Logic)
-*Input*:
-```json
-{ "plan": { ... }, "execution": {} }
-```
+# Canonical Schema Reference
+- Use `devspec_toolkit/schema/16_impl_context.schema.json` as the only schema source of truth.
+- Do not rely on copied or embedded schema fragments in prompts.
+- Validate generated artifacts with `./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit`.
 
-*Output*:
-```json
-{
-  "plan": { ... }, 
-  "execution": {
-    "files_touched": ["src/auth/routes.py"],
-    "execution_results": [
-      {
-        "status": "passed",
-        "outcome_description": "Executed Auth Tests",
-        "reasoning": "All 5 tests passed, verifying JWT generation.",
-        "evidence": "pytest tests/auth/test_login.py ... [100%] PASSED"
-      }
-    ],
-    "critical_evidence": {
-      "satisfied_checklist_ids": ["CHK_AUTH_01"],
-      "passed_test_commands": ["pytest tests/auth/test_login.py"]
-    },
-    "emergent_ambiguities": []
-  }
-}
-```
+# Output Contract (Disk-First)
+- In manual coding-agent workflow, writing files/artifacts directly plus concise confirmation is valid.
+- Do not emit full artifact JSON in chat.
+- For schema-valid examples, reuse fixtures under `tests/fixtures/step_16/`.

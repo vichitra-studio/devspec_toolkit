@@ -1,0 +1,301 @@
+{
+  "version": "1.1.0",
+  "id": "trinity-l1-state-machine",
+  "description": "Normative L1 orchestrator lifecycle for one milestone run.",
+  "states": [
+    {
+      "id": "INIT",
+      "terminal": false,
+      "description": "Config and milestone selection complete; no child has started."
+    },
+    {
+      "id": "PLAN_16A",
+      "terminal": false,
+      "description": "Planner child is active; plan artifact/gates are in progress."
+    },
+    {
+      "id": "BUILD_16B",
+      "terminal": false,
+      "description": "Builder child is active; checklist execution is in progress."
+    },
+    {
+      "id": "REVIEW_16C",
+      "terminal": false,
+      "description": "Verifier child is active; review findings and verdict are in progress."
+    },
+    {
+      "id": "REMEDIATE_16A",
+      "terminal": false,
+      "description": "Planner-first remediation state after non-verified review outcomes."
+    },
+    {
+      "id": "BLOCKED",
+      "terminal": true,
+      "description": "Run is stopped due to blocking contract violations or unresolved ambiguity."
+    },
+    {
+      "id": "COMPLETED",
+      "terminal": true,
+      "description": "Milestone verified and closure sync completed."
+    },
+    {
+      "id": "QUESTIONS_PENDING",
+      "terminal": false,
+      "description": "Autonomous execution paused; waiting for user response to Phase A questions or escalation.",
+      "resume_key": "originating_phase"
+    },
+    {
+      "id": "ERROR",
+      "terminal": true,
+      "description": "Run stopped due to infrastructure failure (LLM unreachable, disk full, timeout). Distinct from BLOCKED (contract violations)."
+    }
+  ],
+  "phase_gate_requirements": {
+    "16a": [
+      "step16_schema_valid",
+      "step16_deep_valid",
+      "checklist_non_empty",
+      "required_spec_refs_grounded",
+      "docs_impact_present"
+    ],
+    "16b": [
+      "step16_schema_valid",
+      "step16_deep_valid",
+      "execution_results_present",
+      "scope_guard_pass",
+      "evidence_binding_present"
+    ],
+    "16c": [
+      "step16_schema_valid",
+      "step16_deep_valid",
+      "review_section_present",
+      "review_verdict_enum_valid",
+      "findings_contract_valid"
+    ]
+  },
+  "transaction_boundary_contract": {
+    "description": "Every child handoff must be transaction-closed in session logs.",
+    "required_sequence": [
+      "SPAWN(task_input_artifact_ref canonical)",
+      "VALIDATION(task_input_artifact_ref schema=pass deep_validator=pass)",
+      "VALIDATION(task_result_artifact_ref schema=pass deep_validator=pass)",
+      "TERMINATE(task_result_artifact_ref canonical)"
+    ],
+    "pairing_key": "child_id extracted from canonical spawn/task_result refs",
+    "failure_mode": "branch_blocked"
+  },
+  "transitions": [
+    {
+      "id": "t-init-to-16a",
+      "from": "INIT",
+      "to": "PLAN_16A",
+      "event": "spawn_planner",
+      "guards": [],
+      "actions": [
+        "emit_task_input",
+        "emit_context_pack",
+        "append_spawn_event"
+      ]
+    },
+    {
+      "id": "t-16a-pass-to-16b",
+      "from": "PLAN_16A",
+      "to": "BUILD_16B",
+      "event": "phase_gate_pass",
+      "guards": [
+        "phase=16a",
+        "all phase_gate_requirements.16a pass"
+      ],
+      "actions": [
+        "ingest_child_result",
+        "checkpoint_commit",
+        "regenerate_anchor"
+      ]
+    },
+    {
+      "id": "t-16a-fail-to-blocked",
+      "from": "PLAN_16A",
+      "to": "BLOCKED",
+      "event": "phase_gate_fail",
+      "guards": [
+        "phase=16a"
+      ],
+      "actions": [
+        "record_blocking_finding",
+        "stop_branch"
+      ]
+    },
+    {
+      "id": "t-16b-pass-to-16c",
+      "from": "BUILD_16B",
+      "to": "REVIEW_16C",
+      "event": "phase_gate_pass",
+      "guards": [
+        "phase=16b",
+        "all phase_gate_requirements.16b pass"
+      ],
+      "actions": [
+        "ingest_child_result",
+        "checkpoint_commit",
+        "regenerate_anchor"
+      ]
+    },
+    {
+      "id": "t-16b-fail-to-remediate",
+      "from": "BUILD_16B",
+      "to": "REMEDIATE_16A",
+      "event": "phase_gate_fail",
+      "guards": [
+        "phase=16b"
+      ],
+      "actions": [
+        "record_findings",
+        "enqueue_planner_first_remediation"
+      ]
+    },
+    {
+      "id": "t-16c-verified-to-completed",
+      "from": "REVIEW_16C",
+      "to": "COMPLETED",
+      "event": "review_verdict",
+      "guards": [
+        "verdict=verified",
+        "all phase_gate_requirements.16c pass"
+      ],
+      "actions": [
+        "sync_roadmap_progress",
+        "checkpoint_commit",
+        "close_session"
+      ]
+    },
+    {
+      "id": "t-16c-nonverified-to-remediate",
+      "from": "REVIEW_16C",
+      "to": "REMEDIATE_16A",
+      "event": "review_verdict",
+      "guards": [
+        "verdict in {deferred,rejected}"
+      ],
+      "actions": [
+        "record_findings",
+        "enqueue_planner_first_remediation"
+      ]
+    },
+    {
+      "id": "t-remediate-to-16b",
+      "from": "REMEDIATE_16A",
+      "to": "BUILD_16B",
+      "event": "phase_gate_pass",
+      "guards": [
+        "phase=16a",
+        "all phase_gate_requirements.16a pass"
+      ],
+      "actions": [
+        "ingest_replan",
+        "checkpoint_commit"
+      ]
+    },
+    {
+      "id": "t-remediate-fail-to-blocked",
+      "from": "REMEDIATE_16A",
+      "to": "BLOCKED",
+      "event": "phase_gate_fail",
+      "guards": [
+        "phase=16a"
+      ],
+      "actions": [
+        "record_blocking_finding",
+        "stop_branch"
+      ]
+    },
+    {
+      "id": "t-16a-retry",
+      "from": "PLAN_16A",
+      "to": "PLAN_16A",
+      "event": "phase_retry",
+      "guards": [
+        "retry_count < retry_caps.planner"
+      ],
+      "actions": [
+        "increment_retry_count",
+        "log_retry_reason"
+      ]
+    },
+    {
+      "id": "t-16b-retry",
+      "from": "BUILD_16B",
+      "to": "BUILD_16B",
+      "event": "phase_retry",
+      "guards": [
+        "retry_count < retry_caps.builder"
+      ],
+      "actions": [
+        "increment_retry_count",
+        "log_retry_reason"
+      ]
+    },
+    {
+      "id": "t-16c-retry",
+      "from": "REVIEW_16C",
+      "to": "REVIEW_16C",
+      "event": "phase_retry",
+      "guards": [
+        "retry_count < retry_caps.verifier"
+      ],
+      "actions": [
+        "increment_retry_count",
+        "log_retry_reason"
+      ]
+    },
+    {
+      "id": "t-phase-to-questions",
+      "from": [
+        "PLAN_16A",
+        "BUILD_16B",
+        "REVIEW_16C"
+      ],
+      "to": "QUESTIONS_PENDING",
+      "event": "questions_emitted",
+      "guards": [
+        "child_result.status == 'questions'"
+      ],
+      "actions": [
+        "persist_originating_phase",
+        "write_escalation_artifact",
+        "pause_autonomous_execution"
+      ]
+    },
+    {
+      "id": "t-questions-to-phase",
+      "from": "QUESTIONS_PENDING",
+      "to": "$originating_phase",
+      "event": "user_response_received",
+      "guards": [
+        "originating_phase is valid"
+      ],
+      "actions": [
+        "inject_user_answers",
+        "resume_phase_with_context"
+      ]
+    },
+    {
+      "id": "t-any-to-error",
+      "from": [
+        "INIT",
+        "PLAN_16A",
+        "BUILD_16B",
+        "REVIEW_16C",
+        "REMEDIATE_16A",
+        "QUESTIONS_PENDING"
+      ],
+      "to": "ERROR",
+      "event": "infrastructure_failure",
+      "guards": [],
+      "actions": [
+        "save_session_state",
+        "record_error_details",
+        "stop_branch"
+      ]
+    }
+  ]
+}

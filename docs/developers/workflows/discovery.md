@@ -35,7 +35,7 @@ Consult the matching `spec/NN_name.guide.md` before running the prompt for each 
 ## AI Assist Flow
 Prompts are designed for a two‑phase interaction to reduce rework:
 - Phase A — Clarify: the assistant ingests the step’s context and asks targeted Gap Questions when the “Self‑Audit Gate” is not satisfied.
-- Phase B — Emit: once answers are provided, the assistant emits a single fenced `json` block that validates against the schema.
+- Phase B — Write: once answers are provided, the assistant writes/updates the target `spec/NN_*.json` artifact on disk and returns concise status (artifact path + validation result).
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; the assistant stops until answers are provided.
 
 ## Validation Cadence

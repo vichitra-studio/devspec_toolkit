@@ -42,9 +42,13 @@ def _collect_required_seeds(manifest: Dict, step_id: str) -> Set[str]:
     global_required = set(manifest.get("global_seed_order", []))
     step_requirements = manifest.get("step_requirements", {})
     if step_id == "16":
-        required = set()
-        for key in ("16a", "16b", "16c"):
-            required.update(step_requirements.get(key, []))
+        explicit_step_16 = step_requirements.get("16")
+        if isinstance(explicit_step_16, list):
+            required = set(explicit_step_16)
+        else:
+            required = set()
+            for key in ("16a", "16b", "16c"):
+                required.update(step_requirements.get(key, []))
         required.update(global_required)
         return required
     required = set(step_requirements.get(step_id, []))

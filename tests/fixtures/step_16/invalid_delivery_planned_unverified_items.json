@@ -1,0 +1,97 @@
+{
+  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "id": "step-impl-delivery-planned-unverified-items",
+  "owner": "api",
+  "created_at": "2024-01-20T10:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implementation with unverified planned delivery items.",
+      "scope_in": [
+        "monitoring"
+      ],
+      "scope_out": [
+        "frontend-ui"
+      ],
+      "target_file_patterns": [
+        "src/monitoring.py"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Observability",
+          "summary": "Provide monitoring coverage for critical NFRs."
+        }
+      ],
+      "checklist": [
+        {
+          "id": "REQ_MONITORING_001",
+          "spec_ref": {
+            "type": "nfr",
+            "id": "nfr-availability-uptime",
+            "line_range": "L5-L20",
+            "commit_hash": "1234567890abcdef1234567890abcdef12345678"
+          },
+          "description": "Ensure dashboard and alert coverage exists.",
+          "type": "logging",
+          "layer": "integration",
+          "linked_test_expectation": "monitoring checks pass",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-monitoring-check"
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Monitoring coverage must be documented.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "guidelines": "Verify delivery status and evidence links.",
+      "test_commands": [
+        "pytest -q"
+      ]
+    },
+    "delivery": {
+      "status": "planned",
+      "dashboards": [
+        {
+          "dashboard_id": "dashboard-availability",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "url": "https://monitoring.example.com/dashboards/availability"
+        }
+      ],
+      "alerts": [
+        {
+          "alert_id": "alert-availability-drop",
+          "nfr_ref": "nfr-availability-uptime",
+          "rule": "availability < 99.9%",
+          "severity": "critical"
+        }
+      ]
+    }
+  },
+  "review": {
+    "delivery_status": {
+      "deployments": [
+        {
+          "env": "dev",
+          "build_id": "build-123",
+          "status": "success"
+        }
+      ]
+    }
+  }
+}

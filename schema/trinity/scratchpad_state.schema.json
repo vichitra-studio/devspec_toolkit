@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/trinity/scratchpad_state.schema.json",
+  "title": "Trinity Scratchpad State",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": [
+        "16a",
+        "16b",
+        "16c",
+        "utility"
+      ]
+    },
+    "checklist_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "last_validation_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "n/a"
+          ]
+        },
+        "deep_validator": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "n/a"
+          ]
+        },
+        "governance": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "n/a"
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "deep_validator",
+        "governance"
+      ]
+    },
+    "next_action_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variables": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of retries attempted for the current phase action"
+    },
+    "error_context": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "last_error_type": {
+          "type": "string",
+          "description": "Category of last error (schema_fail, deep_validation_fail, tool_error, timeout, infrastructure)"
+        },
+        "last_error_message": {
+          "type": "string"
+        },
+        "last_error_timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "last_error_type",
+        "last_error_message",
+        "last_error_timestamp"
+      ],
+      "default": null,
+      "description": "Context about the last error for crash recovery diagnostics"
+    },
+    "milestone_step_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Active milestone step ID for cross-referencing with roadmap"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this scratchpad was first created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last scratchpad update"
+    },
+    "parent_task_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Task ID of the parent that spawned this context, null for L1",
+      "default": null
+    }
+  },
+  "required": [
+    "phase",
+    "checklist_scope",
+    "last_validation_gate",
+    "next_action_ref",
+    "state_summary",
+    "milestone_step_id",
+    "created_at",
+    "updated_at"
+  ]
+}
