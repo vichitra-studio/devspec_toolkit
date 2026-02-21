@@ -30,13 +30,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Charter `spec/00_charter.json` (goals/risks), System Sketch `spec/02_system_sketch.json` (components/dependencies).
 - Capabilities `spec/01_capabilities.json` (approved languages/frameworks) - **CRITICAL**: You must strictly adhere to this allowed stack.
 - FRs/APIs `spec/04_fr_list.json`/`spec/05_interface_contracts.json` for scope; NFRs `spec/07_nfrs.json` for performance/reliability constraints.
-- Governance `spec/10_governance.json` and CI `spec/12_ci_gates.json` expectations.
+- Use governance/CI expectations from required seeds and project policy docs; do not depend on downstream specs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Plan Ledger: tech_stack (language/framework/db/tooling + versions), milestones (id/name/date/risks/spikes), migration plan (if replacing), dependencies (teams/vendors/apis). Do not output it.
 - **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless explicitly justified as a Spike.
-- Align milestones with governance/CI cadence (as defined in `spec/10_governance.json` or provided docs); add spikes for unknowns.
+- Align milestones with governance/CI cadence from seeds/project policy docs; add spikes for unknowns.
 - Self-audit; if risks/spikes/dependencies are vague, ask Gap Questions.
 - Rewrite milestones for outcomes and acceptance signals; finalize plan.
 - Emit JSON when the plan is actionable.
@@ -188,7 +188,9 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
-    "tech_stack"
+    "seed_refs",
+    "tech_stack",
+    "trace"
   ]
 }
 ```

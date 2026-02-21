@@ -28,14 +28,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - System Sketch `spec/02_system_sketch.json` for components and external dependencies that affect env setup.
-- NFRs `spec/07_nfrs.json` for coverage and monitoring expectations impacting CI.
-- Governance `spec/10_governance.json` for required checks.
+- Do not depend on downstream NFR/governance specs; use charter constraints and required seeds for baseline coverage.
 - Current CI configs (if present) and `devspec_toolkit/tests/run.sh` usage from the reference docs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
-- Cross-check gates against governance and reference command list; add missing core checks.
+- Cross-check gates against required command list and seed constraints; add missing core checks.
 - Self-audit; if any environment or critical gate is unclear, ask Gap Questions.
 - Rewrite gate names to match CLI commands; ensure secrets are names only and compliance labels reflect actual obligations.
 - Emit JSON once consistent.
@@ -181,6 +180,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "environments",
     "ci_gates"
   ]

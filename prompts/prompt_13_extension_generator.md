@@ -101,7 +101,7 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
       }
     }
   },
-  "required": ["id", "owner", "created_at", "extensions"]
+  "required": ["id", "owner", "created_at", "seed_refs", "extensions"]
 }
 ```
 

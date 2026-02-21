@@ -29,14 +29,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - **Primary Source:** `docs/seed/seed_overview.md` (required) for scope and user persona definitions.
 - Charter scope and success metrics from `spec/00_charter.json` to anchor what’s “in” now vs “future”.
-- Glossary `spec/03_glossary.json` for canonical nouns/verbs and definitions.
-- Early sketches `spec/02_system_sketch.json` (if any) to understand component boundaries and natural ownership.
-- Example FRs (if present) `spec/04_fr_list.json` or `example/devspec_kit/spec/04_fr_list.json` to calibrate granularity.
+- Use canonical nouns/verbs from required seeds and charter language; do not depend on downstream glossary/FR artifacts.
+- Draft capability boundaries from charter scope and seed constraints; do not depend on system sketch artifacts.
+- Use provided examples only from `example/devspec_kit` for format calibration, never as source truth.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
-- **Cross-Check**: Verify capability feasibility against the System Sketch (`spec/02_system_sketch.json`). Ensure each capability maps to components defined in the System Sketch. If a capability requires a missing component, ask a Gap Question.s.
+- **Cross-Check**: Verify capability feasibility against charter scope, constraints, and seed constraints. If feasibility is unclear, ask a Gap Question.
 - Rewrite to single, testable behaviors with explicit boundaries and error states; propose `trace` hooks to FRs (if any exist) or leave `*-tbd` anchors.
 - Emit JSON after alignment.
 
@@ -199,6 +199,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "capabilities"
   ]
 }

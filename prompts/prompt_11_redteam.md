@@ -263,6 +263,7 @@ Use the `category` field to classify threats precisely:
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "threats"
   ]
 }

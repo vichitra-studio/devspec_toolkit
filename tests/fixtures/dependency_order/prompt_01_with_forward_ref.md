@@ -1,0 +1,4 @@
+Input specs:
+- spec/00_project_charter.json
+- spec/01_capabilities.json
+- spec/02_system_sketch.json

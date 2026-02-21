@@ -32,9 +32,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
-- FRs `spec/04_fr_list.json` and NFRs `spec/07_nfrs.json` to motivate rules.
+- FRs `spec/04_fr_list.json` to motivate rules.
 - Interface Contracts `spec/05_interface_contracts.json` for request/response constraints.
-- Governance expectations from `spec/10_governance.json` if rules reflect policies (e.g., commit references, versioning).
+- Governance expectations from project policy docs/seeds if rules reflect policies (e.g., commit references, versioning).
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -193,6 +193,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "rules"
   ]
 }

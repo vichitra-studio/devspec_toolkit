@@ -1,0 +1,14 @@
+{
+  "registry_version": "1.0.0",
+  "entries": [
+    {
+      "id": "cn:core:metric:error-rate",
+      "kind": "metric",
+      "status": "deprecated",
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ],
+  "aliases": []
+}

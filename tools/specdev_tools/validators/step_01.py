@@ -3,6 +3,7 @@ import os
 from typing import Optional, Set
 from jsonschema import Draft202012Validator
 from ..registry import SchemaRegistry
+from ..trace_types import normalize_trace_type
 
 def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) -> list:
     """
@@ -14,7 +15,7 @@ def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) 
 
     for cap in instance.get("capabilities", []):
         for trace in cap.get("trace", []):
-            if trace.get("type") == "component":
+            if normalize_trace_type(trace.get("type", "")) == "component":
                 target_id = trace.get("id")
                 if target_id not in component_ids:
                     errors.append(f"Capability '{cap.get('capability_id')}' traces to unknown component '{target_id}'")

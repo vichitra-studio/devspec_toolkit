@@ -202,6 +202,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "service_skeleton",
     "route_map",
     "validators",

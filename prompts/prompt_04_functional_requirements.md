@@ -28,9 +28,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` (goals/constraints) and Capabilities `spec/01_capabilities.json` as the source of behaviors.
-- Glossary `spec/03_glossary.json` to anchor terms; Interface Contracts `spec/05_interface_contracts.json` and NFRs `spec/07_nfrs.json` to inform criteria and traces.
+- Glossary `spec/03_glossary.json` to anchor terms; do not depend on downstream interface/NFR artifacts in this step.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Example fixtures `spec/08_fixtures.json` (if any) or `example/devspec_kit/spec/08_fixtures.json` for criterion shape.
+- Use examples from `example/devspec_kit` for criterion shape only; do not depend on downstream fixture artifacts.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate FRs (one behavior each) mapped from capabilities; include rationale, pre/postconditions, and ≥2 acceptance criteria candidates with measurable outcomes. Do not output it.
@@ -196,6 +196,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "functional_requirements"
   ]
 }

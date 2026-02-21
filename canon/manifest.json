@@ -1,0 +1,26 @@
+{
+  "registry_version": "1.0.0",
+  "entries": [
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit",
+      "version": "1.0.0",
+      "status": "active",
+      "aliases": ["percent", "%"],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit",
+      "version": "1.0.0",
+      "status": "active",
+      "aliases": ["ms", "milliseconds"],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ],
+  "aliases": []
+}

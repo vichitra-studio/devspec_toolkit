@@ -1,0 +1,24 @@
+{
+  "allowed_prefixes": [
+    "python",
+    "python3",
+    "bash",
+    "sh",
+    "npm",
+    "pnpm",
+    "yarn",
+    "npx",
+    "make",
+    "pytest",
+    "uv",
+    "node",
+    "go",
+    "cargo",
+    "bun",
+    "vitest",
+    "jest",
+    "tsx",
+    "ruff",
+    "poetry"
+  ]
+}

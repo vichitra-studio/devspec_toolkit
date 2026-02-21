@@ -34,7 +34,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` for organizational goals/constraints; Implementation Plan `spec/09_impl_plan.json` for cadence.
-- CI Gates `spec/12_ci_gates.json` to ensure governance aligns with automation.
+- Use CI expectations from required seeds and current repo automation docs; do not depend on downstream CI-gates spec.
 - Current commit conventions (if any) found in repo history or CONTRIBUTING docs.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
@@ -198,7 +198,9 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
-    "spec_first_policy"
+    "seed_refs",
+    "spec_first_policy",
+    "commit_message_rules"
   ]
 }
 ```

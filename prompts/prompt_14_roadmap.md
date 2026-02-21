@@ -346,7 +346,7 @@ The `$schema` field is required in the output and is stripped before validation,
       }
     }
   },
-  "required": ["id", "owner", "created_at", "tech_stack", "milestones"]
+  "required": ["id", "owner", "created_at", "seed_refs", "tech_stack", "milestones"]
 }
 ```
 

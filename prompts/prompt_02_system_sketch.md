@@ -29,19 +29,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - **Primary Source:** `docs/seed/seed_tech_stack.md` (required) for architecture decisions, patterns, and constraints.
 - Capabilities and owners from `spec/01_capabilities.json` to inform components.
-- Any existing `spec/05_interface_contracts.json` to align external interfaces and protocols.
-- Glossary terms `spec/03_glossary.json` to name components and connections consistently.
-- NFRs `spec/07_nfrs.json` that imply reliability and rate limits.
+- Use only upstream artifacts; do not ingest downstream interface, glossary, or NFR specs in this step.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 
 ## Dependency Order
 - Step 01 (Capabilities) is required input.
-- Step 05 (Interface Contracts) and Step 07 (NFRs) are optional context only if already drafted.
-- DO NOT hallucinate Step 05/07 content when missing; use `-tbd` or ask Gap Questions.
+- Do not depend on downstream specs; when interface/security/perf details are unknown, use `-tbd` or ask Gap Questions.
 - Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, trust_boundary, auth, rate_limit, reliability, schema_ref). Do not output it.
-- **Cross-Check**: If NFRs (`spec/07_nfrs.json`) or Interface Contracts (`spec/05_interface_contracts.json`) are present, align connection security and reliability with them. Do not assume constraints if these files are missing or empty.
+- **Cross-Check**: Align connection security and reliability with upstream charter constraints and required seeds only. Do not assume missing constraints.
 - Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
 - Rewrite responsibilities into 3–6 crisp bullets per component; complete connection details based on protocols and policy; ensure IDs are stable.
 - Emit JSON once reconciled.
@@ -380,6 +377,7 @@ DO NOT:
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "components"
   ],
   "allOf": [

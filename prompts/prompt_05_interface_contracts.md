@@ -29,9 +29,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - FRs `spec/04_fr_list.json` to derive behaviors and acceptance evidence.
 - System Sketch `spec/02_system_sketch.json` for owners and integration points.
-- Glossary `spec/03_glossary.json` for resource/action naming; NFRs `spec/07_nfrs.json` for latency/throughput/security constraints.
+- Glossary `spec/03_glossary.json` for resource/action naming.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Fixtures `spec/08_fixtures.json` (if any) and example fixtures for payload shapes and error cases.
+- Use example fixtures for payload shapes and error cases; do not depend on downstream fixture artifacts.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of APIs (id, name, version, protocol, route/method, request/response schemas, security, errors, owner, traces). Do not output it.
@@ -255,6 +255,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "apis"
   ]
 }

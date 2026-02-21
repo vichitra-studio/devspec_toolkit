@@ -206,6 +206,7 @@ Available CLI tools include:
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "jobs"
   ]
 }

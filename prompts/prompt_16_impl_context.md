@@ -1,7 +1,7 @@
 # Step 16 · Implementation Context (Trinity Anchor)
 
 ## Purpose
-Create or update the **canonical Step 16 anchor** at `spec/16_impl_context.json`.
+Create or update the **canonical Step 16 anchor** at the Step 16 anchor artifact in the `spec` root.
 This file is the **root reference** for the Trinity Loop and exists alongside per‑milestone execution files in `spec/impl_context/`. It must:
 1. Summarize the current execution scope.
 2. Declare traceable checklist items for the active implementation cycle.
@@ -11,12 +11,12 @@ This file is the **root reference** for the Trinity Loop and exists alongside pe
 ## When To Use This Prompt
 - You need a **single, canonical Step 16** artifact in `spec/`.
 - You want a root view of the current Trinity cycle that references active milestone contexts.
-- You are aligning a repo to the toolkit version that expects `spec/16_impl_context.json`.
+- You are aligning a repo to the toolkit version that expects a Step 16 anchor artifact.
 
 ## Tool Execution
 Validate the generated JSON:
 ```bash
-./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate <step-16-anchor-file> --repo-root ./devspec_toolkit
 ```
 
 # Role
@@ -48,7 +48,7 @@ implementation checklist, and review expectations for the *current* execution cy
 7. **Roadmap Sync**: If you identify that milestones are fully completed based on the ingested context, you MUST update:
     - `spec/14_roadmap.json`: Statuses to `done`.
     - `spec/09_impl_plan.json`: Statuses to `done`.
-8. **Emit**: Write `spec/16_impl_context.json`.
+8. **Emit**: Write the Step 16 anchor artifact in the `spec` root.
 
 # FORBIDDEN ACTIONS (Immediate Rejection)
 1. **NEVER** hallucinate `step_id` or use loose references.
@@ -153,7 +153,7 @@ implementation checklist, and review expectations for the *current* execution cy
 5. **Anchor (Step 16) does not conflict with Milestone contexts (16a/b/c)** (check for drift).
 
 # Self-Audit Gate
-Before emitting `spec/16_impl_context.json`, verify:
+Before emitting the Step 16 anchor artifact, verify:
 - [ ] All `spec_ref.commit_hash` values are valid 40-char SHAs (not `0000...`).
 - [ ] Every checklist item with `checklist_status: active` has an `implementation` block.
 - [ ] `target_file_patterns` are explicit (no `**/*` unless deferred).
@@ -1778,6 +1778,7 @@ Before emitting `spec/16_impl_context.json`, verify:
         "id",
         "owner",
         "created_at",
+        "seed_refs",
         "seed_refs",
         "plan"
     ]

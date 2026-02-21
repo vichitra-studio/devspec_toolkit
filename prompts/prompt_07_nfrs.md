@@ -29,7 +29,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Success metrics in `spec/00_charter.json` to align business outcomes with technical targets.
 - Glossary `spec/03_glossary.json` for metric names and units; FRs `spec/04_fr_list.json` for performance-critical behaviors.
-- Monitoring `spec/16_delivery_monitoring.json` (if exists) to align measurement_method and dashboards.
+- Do not depend on downstream monitoring specs; derive measurement_method from available upstream artifacts and seed guidance.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -202,6 +202,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "nfrs"
   ]
 }

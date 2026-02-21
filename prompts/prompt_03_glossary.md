@@ -28,28 +28,28 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` for business terms and metrics.
-- FRs `spec/04_fr_list.json` for recurring nouns and actions.
-- NFRs `spec/07_nfrs.json` and Monitoring `spec/16_delivery_monitoring.json` for metric names and units (if available).
+- Derive recurring nouns/actions from upstream charter and capability artifacts only.
+- Derive metric names/units from upstream charter and seed sources; do not depend on downstream NFR/monitoring artifacts.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate terms grouped by domain (billing, auth, analytics, operations), including aliases and units for metrics. Do not output it.
 - Normalize to a canonical term per concept; track aliases in the definition text.
-- Self-audit; if any term driving FRs/NFRs is ambiguous, ask Gap Questions.
-- Rewrite definitions to include boundaries and units where applicable; ensure terms match usage in FRs/NFRs.
+- Self-audit; if any term driving upstream artifacts is ambiguous, ask Gap Questions.
+- Rewrite definitions to include boundaries and units where applicable; ensure terms match upstream artifact usage.
 - Emit JSON once reconciled.
 
 ## Heuristics For Completeness
 - Optional→expected: include `units` for any metric-like term; include `domain` to aid grouping.
-- Coverage hint: ensure every metric used in NFRs appears here with unit definitions.
-- Completeness formula: % of key nouns from FR statements and NFR metrics covered in the glossary.
+- Coverage hint: ensure every upstream metric appears here with unit definitions.
+- Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.
 - Ambiguity scrub: avoid circular or marketing language; specify inclusions/exclusions.
 
 ## Self-Audit Gate
 - If completeness < 0.9, ask questions.
 - Gating items:
-  - All key nouns in FR statements are present with clear definitions.
-  - All NFR metric names exist here with explicit units.
+  - All key nouns in upstream artifacts are present with clear definitions.
+  - All upstream metric names exist here with explicit units.
   - No duplicates/synonyms remain unresolved.
 
 # Output Rules
@@ -162,6 +162,7 @@ You are a senior specification author and validator. Your job is to emit a singl
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "terms"
   ]
 }

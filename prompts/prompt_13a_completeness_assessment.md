@@ -220,6 +220,7 @@ You are a senior specification auditor and quality control expert. Your job is t
     "id",
     "owner",
     "created_at",
+    "seed_refs",
     "missing_elements",
     "completeness_rating"
   ]

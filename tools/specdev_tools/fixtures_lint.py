@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 import os, json
+from .trace_types import normalize_trace_type
 
 def lint_fixtures(spec_dir: str) -> list[str]:
     errors = []
@@ -14,7 +15,8 @@ def lint_fixtures(spec_dir: str) -> list[str]:
             if fn.endswith(".json"):
                 p = os.path.join(root, fn)
                 try:
-                    data = json.load(open(p, "r", encoding="utf-8"))
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
                 except (OSError, json.JSONDecodeError):
                     continue
                 s = data.get("$schema","")
@@ -50,7 +52,7 @@ def lint_fixtures(spec_dir: str) -> list[str]:
                     errors.append(f"{fid}: targets unknown API '{tid}'")
                 elif ttype == "fr" and tid not in frs:
                     errors.append(f"{fid}: targets unknown FR '{tid}'")
-                elif ttype == "invariant" and tid not in invariants:
+                elif normalize_trace_type(ttype) == "invariant" and tid not in invariants:
                     errors.append(f"{fid}: targets unknown Invariant '{tid}'")
                 elif ttype == "nfr" and tid not in nfrs:
                     errors.append(f"{fid}: targets unknown NFR '{tid}'")
@@ -59,9 +61,11 @@ def lint_fixtures(spec_dir: str) -> list[str]:
             errors.append(f"{fid}: missing input/expected")
             continue
         if isinstance(expected, dict):
+            mode = fx.get("mode")
             status = expected.get("status")
-            if not isinstance(status, int) or status < 100 or status > 599:
-                errors.append(f"{fid}: expected.status must be an HTTP status (100-599)")
+            if mode == "contract":
+                if not isinstance(status, int) or status < 100 or status > 599:
+                    errors.append(f"{fid}: expected.status must be an HTTP status (100-599) for mode 'contract'")
             body = expected.get("body")
             if body is not None and not isinstance(body, (dict, list, str, int, bool, float)):
                 errors.append(f"{fid}: expected.body must be JSON serializable")

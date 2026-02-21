@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 import re
+from ..trace_types import is_valid_trace_type
 
 def validate_step_10(instance: Dict[str, Any], toolkit_root: str) -> List[str]:
     """
@@ -27,7 +28,7 @@ def validate_step_10(instance: Dict[str, Any], toolkit_root: str) -> List[str]:
     if "pr_rules" in instance:
         allowed_rules = {
             "validate", "validate-all", "matrix", "fixtures-lint", 
-            "invariants-check", "governance-check", "test", "build", 
+            "invariants-check", "governance-check", "seed-lint", "docs-lint", "test", "build",
             "lint", "format", "audit", "security"
         }
         for i, rule in enumerate(instance["pr_rules"]):
@@ -36,10 +37,9 @@ def validate_step_10(instance: Dict[str, Any], toolkit_root: str) -> List[str]:
 
     # Validate trace types
     if "trace" in instance:
-        allowed_types = {"fr", "api", "nfr", "inv", "fixture", "doc", "capability"}
         for i, item in enumerate(instance["trace"]):
             t_type = item.get("type")
-            if t_type and t_type not in allowed_types:
-                errors.append(f"Invalid trace type '{t_type}' at index {i}. Must be one of {sorted(allowed_types)}")
+            if t_type and not is_valid_trace_type(t_type):
+                errors.append(f"Invalid trace type '{t_type}' at index {i}.")
 
     return errors

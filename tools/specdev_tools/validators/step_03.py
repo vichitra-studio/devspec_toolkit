@@ -1,6 +1,11 @@
 from typing import List, Dict, Any, Optional
 
-def validate_step_03(instance: Dict[str, Any], toolkit_root: str, nfrs_data: Optional[Dict[str, Any]] = None, monitoring_data: Optional[Dict[str, Any]] = None) -> List[str]:
+def validate_step_03(
+    instance: Dict[str, Any],
+    toolkit_root: str,
+    nfrs_data: Optional[Dict[str, Any]] = None,
+    monitoring_data: Optional[Dict[str, Any]] = None
+) -> List[str]:
     """
     Validate Step 03 (Glossary) artifacts against deep logical constraints.
     
@@ -82,5 +87,25 @@ def validate_step_03(instance: Dict[str, Any], toolkit_root: str, nfrs_data: Opt
                     actual_units = term.get('units')
                     if actual_units and actual_units != expected_units:
                         errors.append(f"Unit mismatch for '{metric_name}': expected '{expected_units}', got '{actual_units}'")
+
+    # Optional dataset coverage: stage-specific NFR lists.
+    if nfrs_data and "stage_nfrs" in nfrs_data:
+        for stage_data in nfrs_data.get("stage_nfrs", []):
+            for nfr in stage_data.get("nfrs", []):
+                metric_name = nfr.get("metric")
+                if metric_name and metric_name.lower() not in term_lookup:
+                    errors.append(
+                        f"Stage metric '{metric_name}' not found in glossary (stage={stage_data.get('stage', 'unknown')})"
+                    )
+
+    # Optional monitoring dataset coverage: dashboard widgets / alerts.
+    if monitoring_data and "dashboards" in monitoring_data:
+        for dashboard in monitoring_data.get("dashboards", []):
+            for widget in dashboard.get("widgets", []):
+                metric_name = widget.get("metric")
+                if metric_name and metric_name.lower() not in term_lookup:
+                    errors.append(
+                        f"Dashboard metric '{metric_name}' not found in glossary (dashboard={dashboard.get('name', 'unknown')})"
+                    )
 
     return errors
