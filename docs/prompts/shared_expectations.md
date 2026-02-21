@@ -25,6 +25,26 @@ Each step's prompt defines its specific Definition of Ready (DoR) within the **C
 - Keep generation evidence explicit in `generation_quality`: record sources (`seed_ref`, `canonical_ref`, `upstream_ref`) and list unresolved inputs/assumptions.
 - Any value with both `<field>` and `<field>_ref` must remain semantically consistent; CI may fail on mismatches.
 
+## Canonical Resolution Protocol
+
+- Resolve in deterministic order: exact canonical ID match, then active alias match, then canonical proposal.
+- If multiple active canonicals match the same input, do not pick one implicitly; emit `canonical_conflicts`.
+- If no active canonical matches, emit `canonical_proposals` with enough definition context for registry approval.
+- Never emit schema fields that invent a new semantic label without either a canonical reference or a proposal.
+
+## one-go Quality Protocol (fail-closed)
+
+- Preflight: before writing output JSON, verify required inputs, allowed enums, and all referenced artifact IDs.
+- Evidence Ledger: every non-trivial decision must be traceable to seed input, upstream artifact evidence, or canonical registry evidence in `generation_quality`.
+- Completeness Closure: run an explicit final pass that checks required sections, reference closure, and semantic consistency between `<field>` and `<field>_ref`.
+- fail-closed blockers: if any required evidence is missing, any ambiguity is unresolved, or any downstream dependency is unknown, stop and emit a blocker report instead of guessing.
+
+## Step-Order Policy
+
+- Use a forward-only execution model.
+- Use no refinement mode.
+- Any accepted change at step `N` requires full replay through all downstream steps (`N+1...end`) before merge.
+
 ## Failure Modes
 
 - Over-broad scope or vague statements that cannot be falsified.

@@ -5,8 +5,10 @@ Repo: `/Users/vichitracollective/vc-code/vc_wesbite`
 Toolkit: `/Users/vichitracollective/vc-code/vc_wesbite/devspec_toolkit`
 
 ## Scope Lock
+- Scope lock policy: `spec_dir` must be explicitly declared per repository and reused by all automation and CI commands.
 - Active spec directory: `/Users/vichitracollective/vc-code/vc_wesbite/devspec_toolkit/spec`
 - Repository root spec directory `/Users/vichitracollective/vc-code/vc_wesbite/spec` is absent in this workspace.
+- Effective `spec_dir` for this repository: `devspec_toolkit/spec`.
 
 ## Runtime Lock
 - Canonical execution entrypoint in host repo: `./tools/run_specdev.sh ... --repo-root ./devspec_toolkit`
