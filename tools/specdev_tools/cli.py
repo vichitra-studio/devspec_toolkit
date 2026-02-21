@@ -48,6 +48,44 @@ def main():
     dl.add_argument("spec_dir")
     dl.add_argument("--repo-root", default=".")
 
+    ps = sub.add_parser("prompt-sync")
+    ps.add_argument("spec_dir", nargs="?")
+    ps.add_argument("--repo-root", default=".")
+
+    cl = sub.add_parser("canonical-lint")
+    cl.add_argument("canon_dir", nargs="?", default="canon")
+    cl.add_argument("--repo-root", default=".")
+
+    ci = sub.add_parser("canonical-integrity")
+    ci.add_argument("spec_dir")
+    ci.add_argument("--repo-root", default=".")
+    ci.add_argument("--canon-dir", default="canon")
+
+    ca = sub.add_parser("canonical-autofix")
+    ca.add_argument("spec_dir")
+    ca.add_argument("--repo-root", default=".")
+    ca.add_argument("--canon-dir", default="canon")
+    ca_mode = ca.add_mutually_exclusive_group()
+    ca_mode.add_argument("--write", action="store_true", help="Write changes to files")
+    ca_mode.add_argument("--dry-run", action="store_true", help="Report changes without writing files")
+
+    sql = sub.add_parser("spec-quality-lint")
+    sql.add_argument("spec_dir")
+    sql.add_argument("--repo-root", default=".")
+
+    hl = sub.add_parser("hallucination-lint")
+    hl.add_argument("spec_dir")
+    hl.add_argument("--repo-root", default=".")
+    hl.add_argument("--canon-dir", default="canon")
+
+    dol = sub.add_parser("dependency-order-lint")
+    dol.add_argument("--repo-root", default=".")
+
+    frc = sub.add_parser("forward-replay-check")
+    frc.add_argument("--repo-root", default=".")
+    frc.add_argument("--base-ref", help="Diff base ref (default: auto-resolved in validate-all)")
+    frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error")
+
     gov = sub.add_parser("governance-check")
     gov.add_argument("spec_dir")
     gov.add_argument("--message", required=True)
@@ -158,6 +196,109 @@ def main():
         from .docs_lint import lint_docs
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_docs(spec_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "prompt-sync":
+        from .prompt_schema_sync import run_prompt_schema_sync
+        repo_root = os.path.abspath(args.repo_root)
+        expected_spec_dir = os.path.abspath(os.path.join(repo_root, "spec"))
+        if args.spec_dir:
+            spec_dir = os.path.abspath(args.spec_dir)
+            if spec_dir != expected_spec_dir:
+                print(
+                    f"E520 UNRESOLVED_INPUT prompt_sync_spec_dir_must_equal_repo_spec "
+                    f"provided={spec_dir} expected={expected_spec_dir}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            spec_dir = expected_spec_dir
+        if not os.path.isdir(spec_dir):
+            print(f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}", file=sys.stderr)
+            sys.exit(1)
+        errs = run_prompt_schema_sync(repo_root)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "canonical-lint":
+        from .canonical_lint import lint_canon_dir
+        repo_root = os.path.abspath(args.repo_root)
+        errs = lint_canon_dir(repo_root, canon_dir=args.canon_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "canonical-integrity":
+        from .canonical_integrity import validate_canonical_integrity
+        repo_root = os.path.abspath(args.repo_root)
+        spec_dir = os.path.abspath(args.spec_dir)
+        errs = validate_canonical_integrity(repo_root, spec_dir, canon_dir=args.canon_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "canonical-autofix":
+        from .canonical_autofix import canonical_autofix
+        repo_root = os.path.abspath(args.repo_root)
+        spec_dir = os.path.abspath(args.spec_dir)
+        write = bool(args.write and not args.dry_run)
+        changes = canonical_autofix(repo_root, spec_dir, write=write, canon_dir=args.canon_dir)
+        if not changes:
+            print("OK (no changes)")
+            return
+        for file_path, file_changes in sorted(changes.items()):
+            print(file_path)
+            for change in file_changes:
+                print(f"  - {change}")
+        if write:
+            print("OK (changes written)")
+        else:
+            print("OK (dry-run)")
+    elif args.cmd == "spec-quality-lint":
+        from .spec_quality_lint import lint_spec_quality
+        spec_dir = os.path.abspath(args.spec_dir)
+        errs = lint_spec_quality(spec_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "hallucination-lint":
+        from .hallucination_lint import lint_hallucinations
+        spec_dir = os.path.abspath(args.spec_dir)
+        repo_root = os.path.abspath(args.repo_root)
+        errs = lint_hallucinations(spec_dir, repo_root=repo_root, canon_dir=args.canon_dir)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "dependency-order-lint":
+        from .dependency_order_lint import lint_dependency_order
+        repo_root = os.path.abspath(args.repo_root)
+        errs = lint_dependency_order(repo_root)
+        if errs:
+            for e in errs:
+                print(e, file=sys.stderr)
+            sys.exit(1)
+        print("OK")
+    elif args.cmd == "forward-replay-check":
+        from .forward_replay_check import check_forward_replay
+        from .validate import _resolve_replay_base_ref
+        repo_root = os.path.abspath(args.repo_root)
+        base_ref = args.base_ref or _resolve_replay_base_ref(repo_root)
+        errs = check_forward_replay(
+            repo_root,
+            base_ref=base_ref,
+            diff_error_mode=args.diff_error_mode,
+        )
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
