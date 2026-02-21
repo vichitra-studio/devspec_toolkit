@@ -20,6 +20,7 @@ class ErrorCodeCoverageB2Tests(unittest.TestCase):
             "E420",
             "E510",
             "E520",
+            "E521",
             "E530",
             "E540",
             "E550",

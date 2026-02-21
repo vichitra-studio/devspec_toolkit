@@ -37,6 +37,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - **Specs**: Ingest relevant Feature Specs (`04_fr_list`), Interfaces (`05`), and Invariants (`06`).
 - **Codebase**: Scan existing files to populate `context.existing_structures` and `coding_examples`.
 - **Documentation Map**: Read `README.md` and `docs/README.md` to locate relevant structure/tooling/runbook docs; include any required docs by adding them to the seed manifest and `seed_refs`.
+- **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 # Operating Flow: Context Review → Synthesize → Clarify → Drift Check → Emit
 1.  **Context Review**: Determine which docs are required (root README map, tooling docs, architecture notes, ops runbooks). If any are required and not yet seeded, update `spec/common/seed_manifest.json` (add to `seeds` + `global_seed_order` + `nested_order` as needed) and include them in `step_requirements["16a"]`. Then ingest them and list in `seed_refs`.
@@ -222,76 +223,207 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "$defs": {
     "specRef": {
       "type": "object",
-      "required": ["type", "id", "line_range", "commit_hash"],
+      "required": [
+        "type",
+        "id",
+        "line_range",
+        "commit_hash"
+      ],
       "properties": {
-        "type": { "enum": ["fr", "api", "nfr", "inv", "fixture", "doc", "code"] },
-        "id": { "type": "string" },
-        "line_range": { "type": "string" },
-        "commit_hash": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        "type": {
+          "enum": [
+            "fr",
+            "api",
+            "nfr",
+            "inv",
+            "fixture",
+            "doc",
+            "code"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "line_range": {
+          "type": "string"
+        },
+        "commit_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
       }
     }
   },
   "properties": {
-    "id": { "type": "string" },
-    "owner": { "type": "string" },
-    "created_at": { "type": "string" },
-    "extensions": { "type": "object" },
+    "id": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "extensions": {
+      "type": "object"
+    },
     "plan": {
       "type": "object",
-      "required": ["summary", "spec_alignment", "review_requirements"],
+      "required": [
+        "summary",
+        "spec_alignment",
+        "review_requirements"
+      ],
       "properties": {
         "summary": {
           "type": "object",
-          "required": ["functional_summary", "scope_in", "target_file_patterns"],
+          "required": [
+            "functional_summary",
+            "scope_in",
+            "target_file_patterns"
+          ],
           "properties": {
-            "functional_summary": { "type": "string" },
-            "scope_in": { "type": "array", "items": { "type": "string" } },
-            "scope_out": { "type": "array", "items": { "type": "string" } },
-            "target_file_patterns": { "type": "array", "items": { "type": "string" } }
+            "functional_summary": {
+              "type": "string"
+            },
+            "scope_in": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope_out": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "target_file_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         },
         "spec_alignment": {
           "type": "object",
-          "required": ["checklist"],
+          "required": [
+            "checklist"
+          ],
           "properties": {
             "requirements_summary": {
-                "type": "array",
-                "items": { "type": "object", "required": ["theme", "summary"], "properties": { "theme": { "type": "string" }, "summary": { "type": "string" } } }
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "theme",
+                  "summary"
+                ],
+                "properties": {
+                  "theme": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                }
+              }
             },
             "checklist": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["id", "spec_ref", "description", "linked_test_expectation"],
+                "required": [
+                  "id",
+                  "spec_ref",
+                  "description",
+                  "linked_test_expectation"
+                ],
                 "properties": {
-                  "id": { "type": "string" },
-                  "spec_ref": { "$ref": "#/$defs/specRef" },
-                  "description": { "type": "string" },
-                  "linked_test_expectation": { "type": "string" },
-                  "checklist_status": { "enum": ["active", "deferred"] },
+                  "id": {
+                    "type": "string"
+                  },
+                  "spec_ref": {
+                    "$ref": "#/$defs/specRef"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "linked_test_expectation": {
+                    "type": "string"
+                  },
+                  "checklist_status": {
+                    "enum": [
+                      "active",
+                      "deferred"
+                    ]
+                  },
                   "implementation": {
                     "type": "object",
-                    "required": ["status", "actions"],
+                    "required": [
+                      "status",
+                      "actions"
+                    ],
                     "properties": {
-                      "status": { "enum": ["pending", "in_progress", "verified", "deferred"] },
-                      "files_touched": { "type": "array", "items": { "type": "string" } },
+                      "status": {
+                        "enum": [
+                          "pending",
+                          "in_progress",
+                          "verified",
+                          "deferred"
+                        ]
+                      },
+                      "files_touched": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "actions": {
                         "type": "array",
                         "items": {
                           "type": "object",
-                          "required": ["type", "description"],
+                          "required": [
+                            "type",
+                            "description"
+                          ],
                           "properties": {
-                            "type": { "enum": ["file_create", "file_edit", "run_command", "manual_verification"] },
-                            "description": { "type": "string" },
-                            "target": { "type": "string" },
-                            "command": { "type": "string" },
+                            "type": {
+                              "enum": [
+                                "file_create",
+                                "file_edit",
+                                "run_command",
+                                "manual_verification"
+                              ]
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "target": {
+                              "type": "string"
+                            },
+                            "command": {
+                              "type": "string"
+                            },
                             "evidence": {
-                                "type": "object",
-                                "required": ["type", "content"],
-                                "properties": {
-                                    "type": { "enum": ["log", "snippet", "screenshot"] },
-                                    "content": { "type": "string" }
+                              "type": "object",
+                              "required": [
+                                "type",
+                                "content"
+                              ],
+                              "properties": {
+                                "type": {
+                                  "enum": [
+                                    "log",
+                                    "snippet",
+                                    "screenshot"
+                                  ]
+                                },
+                                "content": {
+                                  "type": "string"
                                 }
+                              }
                             }
                           }
                         }
@@ -304,16 +436,46 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
           }
         },
         "review_requirements": {
-           "type": "object",
-           "required": ["test_commands"],
-           "properties": {
-              "test_commands": { "type": "array", "items": { "type": "string" } }
-           }
+          "type": "object",
+          "required": [
+            "test_commands"
+          ],
+          "properties": {
+            "test_commands": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
-  "required": ["id", "plan"]
+  "required": [
+    "id",
+    "plan"
+  ]
 }
 ```
 
@@ -323,10 +485,15 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "plan": {
+    "status": "active",
     "summary": {
        "functional_summary": "Implement core API login",
        "scope_in": ["Login", "Logout"],
+       "scope_out": ["OAuth login"],
        "target_file_patterns": ["src/auth/*.py"]
     },
     "spec_alignment": {
@@ -361,10 +528,29 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
     "context": {
        "existing_structures": [{ "signature": "class User", "source_file": "src/models.py" }]
     },
-    // plan.tasks REMOVED
     "review_requirements": {
       "test_commands": ["pytest tests/auth/"]
     }
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

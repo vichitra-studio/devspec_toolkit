@@ -47,7 +47,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: remove “improve/optimize/user-friendly/fast”; replace with quantifiable targets and timeframes.
 
 ## Self-Audit Gate (do not output)
-- Compute a private completeness score in [0, 1]. If < 0.9, stop and ask.
+- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
 - Gating items to check before emitting:
   - Problem statement names users, pain, measurable business impact, and hard constraints.
   - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
@@ -267,6 +267,26 @@ You are a senior specification author and validator. Your job is to emit a singl
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#link"
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -283,11 +303,34 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Output Contract
 ```json
 {
-  "id": "project_charter-catalog",
+  "id": "project-charter-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "title": "Project Charter",
-  "problem_statement": "\u2026",
-  "success_metrics": []
+  "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
+  "success_metrics": [],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

@@ -69,6 +69,18 @@
             "items": {
               "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
             }
+          },
+          "capability_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "action_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "entity_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "status_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -77,6 +89,26 @@
           "acceptance_criteria"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [

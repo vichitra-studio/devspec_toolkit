@@ -28,12 +28,12 @@
           "validate",
           "validate-all",
           "matrix",
-        "fixtures-lint",
-        "invariants-check",
-        "governance-check",
-        "seed-lint",
-        "docs-lint",
-        "test",
+          "fixtures-lint",
+          "invariants-check",
+          "governance-check",
+          "seed-lint",
+          "docs-lint",
+          "test",
           "build",
           "lint",
           "format",
@@ -55,6 +55,9 @@
         },
         "pattern": {
           "type": "string"
+        },
+        "id_pattern_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
         },
         "error_message": {
           "type": "string",
@@ -120,6 +123,32 @@
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#link"
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
+    },
+    "policy_ref": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+    },
+    "command_ref": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
     }
   },
   "required": [

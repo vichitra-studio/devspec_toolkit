@@ -45,7 +45,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: map gates to `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask and stop.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - All four environments listed; each has enough detail to differentiate.
   - CI gates include core validations; governance and coverage accounted for where relevant.
@@ -174,6 +174,26 @@ You are a senior specification author and validator. Your job is to emit a singl
     },
     "compliance": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -190,14 +210,37 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Output Contract
 ```json
 {
-  "id": "delivery_baseline-catalog",
+  "id": "delivery-baseline-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:01:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "environments": {
-    "dev": {},
-    "ci": {},
-    "staging": {},
-    "prod": {}
+    "dev": {"runtime": "python3.11"},
+    "ci": {"runner": "ubuntu-latest"},
+    "staging": {"region": "us-east-1"},
+    "prod": {"region": "us-east-1"}
   },
-  "ci_gates": ["schema-validate"]
+  "ci_gates": ["schema-validate"],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
+```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

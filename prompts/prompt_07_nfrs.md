@@ -45,7 +45,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask first.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Every NFR includes metric, target, unit, and measurement_method; prod-stage NFRs also have owner.
   - Names/units align with glossary; traces connect to relevant FRs/APIs/components.
@@ -63,7 +63,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Step-Specific Completeness Checklist
 - NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
 - Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 18 dashboards/alerts.
-- Stage is set for when the target must be met (dev/staging/prod) and owner is named.
+- Stage is set for when the target must be met (dev/ci/staging/prod) and owner is named.
 - `trace` links to FRs, interfaces, or invariants where the NFR applies.
 
 ## Field-by-Field Guidance
@@ -81,7 +81,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Metrics**: Assign each NFR to a schema `category` and describe the `metric` in precise, customer-facing terms.
 - **Targets**: Provide numeric `target` values with `unit` and `measurement_method` so monitoring and CI use the same test.
 - **Observability**: Tie `measurement_method` to an actual query or dashboard to ensure observability.
-- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, staging, prod) to guide rollout plans.
+- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, ci, staging, prod) to guide rollout plans.
 - **Trace**: Use `trace` to connect NFRs to FRs, invariants, or delivery tasks that uphold the requirement. For component-level NFRs, trace to relevant API, doc, or capability references.
 - **Measurement Verification**: Ensure `measurement_method` is a verifiable query or URL (e.g., "PromQL: ...", "Grafana dashboard: ...").
 
@@ -99,12 +99,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Quick Reference
 - Categories: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy.
-- Stage: `dev`, `staging`, `prod`.
+- Stage: `dev`, `ci`, `staging`, `prod`.
 
 # Clarification Questions
 - Which performance, reliability, cost, security/privacy, and energy targets are non-negotiable? Which are stretch?
 - What are the exact units and where will each metric be measured (tool/query/url)?
-- At what stage must each target be met (dev/staging/prod)? Who owns it?
+- At what stage must each target be met (dev/ci/staging/prod)? Who owns it?
 - Which FRs, APIs, or components does each NFR apply to? Any invariants required to enforce it?
 
 # Embedded Schema
@@ -174,6 +174,7 @@ You are a senior specification author and validator. Your job is to emit a singl
             "type": "string",
             "enum": [
               "dev",
+              "ci",
               "staging",
               "prod"
             ]
@@ -186,6 +187,18 @@ You are a senior specification author and validator. Your job is to emit a singl
             "items": {
               "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
             }
+          },
+          "metric_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "unit_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "stage_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "environment_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -193,9 +206,32 @@ You are a senior specification author and validator. Your job is to emit a singl
           "category",
           "metric",
           "target",
-          "unit"
+          "unit",
+          "metric_ref",
+          "unit_ref",
+          "environment_ref"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -214,6 +250,44 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "nfrs-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "nfrs": []
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "nfrs": [
+    {
+      "nfr_id": "nfr-latency-auth-login",
+      "category": "latency",
+      "metric": "p95 login latency",
+      "target": 200,
+      "unit": "ms",
+      "metric_ref": {"id": "cn:core:metric:error-rate", "kind": "metric"},
+      "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit"},
+      "environment_ref": {"id": "cn:core:environment:prod", "kind": "environment"}
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {"id": "cn:core:metric:error-rate", "kind": "metric"},
+    {"id": "cn:core:unit:ms", "kind": "unit"},
+    {"id": "cn:core:environment:prod", "kind": "environment"}
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

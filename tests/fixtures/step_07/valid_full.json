@@ -18,6 +18,18 @@
       "metric": "p95 response time",
       "target": 200,
       "unit": "ms",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
       "stage": "prod",
       "owner": "api",
@@ -34,6 +46,18 @@
       "metric": "requests per second",
       "target": 1000,
       "unit": "rps",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "PromQL: rate(http_requests_total{job=\"api-server\"}[5m])",
       "stage": "prod",
       "owner": "api",
@@ -50,6 +74,18 @@
       "metric": "uptime percentage",
       "target": "99.9%",
       "unit": "%",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "PromQL: (1 - sum(rate(http_request_duration_seconds_bucket{job=\"api-server\", status!~\"2..\"}[5m])) / sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m]))) * 100",
       "stage": "prod",
       "owner": "system",
@@ -66,6 +102,18 @@
       "metric": "monthly operational cost",
       "target": "<= $10k",
       "unit": "USD",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "Cloud billing dashboard with cost allocation tags",
       "stage": "prod",
       "owner": "business",
@@ -82,6 +130,18 @@
       "metric": "data encryption at rest",
       "target": "AES-256",
       "unit": "",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "Configuration review of storage systems",
       "stage": "prod",
       "owner": "system",

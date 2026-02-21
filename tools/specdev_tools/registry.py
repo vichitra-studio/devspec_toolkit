@@ -11,7 +11,8 @@ class SchemaRegistry:
             # fallback: allow running tools package standalone if copied elsewhere
             registry_path = os.path.join(self.repo_root, "schema_registry.json")
         with open(registry_path, "r", encoding="utf-8") as f:
-            self.map = json.load(f)
+            loaded = json.load(f)
+        self.map = _validate_registry_map(loaded)
         self.store: dict[str, dict] = {}
         self._preload_store()
 
@@ -45,3 +46,19 @@ class SchemaRegistry:
             raise FileNotFoundError(f"Schema not found for {uri}: expected {path!r}")
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+
+def _validate_registry_map(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"schema_registry.json must be a JSON object mapping schema URI -> relative path; got {type(raw).__name__}"
+        )
+    validated: dict[str, str] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise ValueError(
+                "schema_registry.json contains non-string key/value; "
+                f"got key={type(key).__name__}, value={type(value).__name__}"
+            )
+        validated[key] = value
+    return validated

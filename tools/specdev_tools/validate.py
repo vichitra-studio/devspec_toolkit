@@ -7,16 +7,17 @@ import subprocess
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import _WrappedReferencingError
 from referencing import Registry, Resource
 
-from .canonical_integrity import validate_canonical_integrity
+from .canonical_integrity import validate_canonical_integrity, validate_canonical_integrity_file
 from .canonical_lint import lint_canon_dir
 from .dependency_order_lint import lint_dependency_order
 from .forward_replay_check import check_forward_replay
 from .hallucination_lint import lint_hallucinations
 from .prompt_schema_sync import run_prompt_schema_sync
 from .registry import SchemaRegistry
-from .spec_quality_lint import lint_spec_quality
+from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
     step_01,
     step_02,
@@ -69,17 +70,43 @@ def _get_prompt_path(path: str) -> str:
         return f"prompts/prompt_{step}*.md"
     return "prompts/*.md"
 
-def validate_file(repo_root: str, path: str) -> list[str]:
+def validate_file(
+    repo_root: str,
+    path: str,
+    include_quality_lint: bool = True,
+    include_canonical_integrity: bool = True,
+) -> list[str]:
     try:
         registry = SchemaRegistry(repo_root)
+    except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
+        return [f"E520 UNRESOLVED_INPUT {path}: schema_registry_bootstrap_failed detail={str(e)}"]
+    try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            return [
+                f"E520 UNRESOLVED_INPUT {path}: invalid_document_root_type "
+                f"expected=object got={type(data).__name__}"
+            ]
 
         schema_uri = data.get("$schema")
+        if schema_uri is None:
+            return [f"E520 UNRESOLVED_INPUT {path}: missing_schema_uri"]
+        if not isinstance(schema_uri, str):
+            return [
+                f"E520 UNRESOLVED_INPUT {path}: invalid_schema_uri_type "
+                f"expected=str got={type(schema_uri).__name__}"
+            ]
+        schema_uri = schema_uri.strip()
         if not schema_uri:
-            return [f"{path}: missing $schema. Please add schema reference to the top of the file"]
-        
-        schema = registry.load(schema_uri)
+            return [f"E520 UNRESOLVED_INPUT {path}: missing_schema_uri"]
+
+        try:
+            schema = registry.load(schema_uri)
+        except FileNotFoundError as e:
+            return [f"E520 UNRESOLVED_INPUT {path}: schema_not_found uri={schema_uri} detail={str(e)}"]
+        except json.JSONDecodeError as e:
+            return [f"E520 UNRESOLVED_INPUT {path}: schema_json_decode_failed uri={schema_uri} detail={str(e)}"]
 
         # Exclude $schema from validation payload because many step schemas disallow unknown keys
         data_for_validation = dict(data)
@@ -92,7 +119,12 @@ def validate_file(repo_root: str, path: str) -> list[str]:
             registry=reg,
             format_checker=Draft202012Validator.FORMAT_CHECKER
         )
-        errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
+        try:
+            errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
+        except _WrappedReferencingError as e:
+            return [f"E520 UNRESOLVED_INPUT {path}: schema_reference_resolution_failed {str(e)}"]
+        except Exception as e:
+            return [f"E521 VALIDATOR_RUNTIME {path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}"]
         
         # Enhance error messages with context
         enhanced_errors = []
@@ -112,9 +144,20 @@ def validate_file(repo_root: str, path: str) -> list[str]:
         if deep_errors:
             enhanced_errors.extend([f"{path}: {e}" for e in deep_errors])
 
+        if include_quality_lint:
+            quality_errors = lint_spec_quality_file(path, spec_dir=os.path.dirname(path))
+            if quality_errors:
+                enhanced_errors.extend(quality_errors)
+        if include_canonical_integrity:
+            canonical_errors = validate_canonical_integrity_file(repo_root, path)
+            if canonical_errors:
+                enhanced_errors.extend(canonical_errors)
+
         return enhanced_errors
+    except FileNotFoundError as e:
+        return [f"E520 UNRESOLVED_INPUT {path}: input_file_not_found detail={str(e)}"]
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
-        return [f"{path}: error during validation - {str(e)}"]
+        return [f"E520 UNRESOLVED_INPUT {path}: validation_input_error {type(e).__name__}: {str(e)}"]
 
 def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
     failures = []
@@ -123,7 +166,14 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
         for fn in files:
             if fn.endswith(".json"):
                 file_path = os.path.join(root, fn)
-                failures.extend(validate_file(repo_root, file_path))
+                failures.extend(
+                    validate_file(
+                        repo_root,
+                        file_path,
+                        include_quality_lint=False,
+                        include_canonical_integrity=False,
+                    )
+                )
 
     failures.extend(lint_spec_quality(spec_dir))
     failures.extend(lint_hallucinations(spec_dir, repo_root=repo_root))
@@ -196,7 +246,7 @@ def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> li
         if step == "13a":
             return step_13a.validate_step_13a(data, repo_root)
         if step == "14":
-            return step_14.validate_step_14(data, repo_root)
+            return step_14.validate_step_14(data, repo_root, path)
         if step == "15":
             return step_15.validate_step_15(data, repo_root)
         if step == "16":
@@ -231,15 +281,13 @@ def _resolve_replay_base_ref(root: Path) -> str:
     explicit = os.getenv("SPECDEV_REPLAY_BASE_REF", "").strip()
     if explicit:
         return explicit
-    current = _git_current_branch(root)
-    if current:
-        return current
     upstream = _git_upstream_branch(root)
     if upstream:
         return upstream
     for candidate in ("origin/main", "origin/master", "main", "master"):
         if _git_ref_exists(root, candidate):
             return candidate
+    current = _git_current_branch(root)
     if current:
         return current
     return "origin/main"

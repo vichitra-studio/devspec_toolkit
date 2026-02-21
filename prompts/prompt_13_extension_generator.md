@@ -69,39 +69,88 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
-    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
     "extensions": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "extension_id": { 
-            "type": "string", 
+          "extension_id": {
+            "type": "string",
             "pattern": "^ext-[0-9]{2}-[a-z0-9-]+$",
-            "description": "Unique ID for the extension (e.g. 'ext-01-database')" 
+            "description": "Unique ID for the extension (e.g. 'ext-01-database')"
           },
-          "title": { "type": "string" },
-          "file_name": { 
-            "type": "string", 
+          "title": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string",
             "pattern": "^ext_[0-9]{2}_[a-z0-9_]+\\.json$",
-            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'" 
+            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'"
           },
-          "area_of_concern": { "type": "string", "description": "Domain (e.g. Data, Security, AI)" },
-          "justification": { "type": "string" },
+          "area_of_concern": {
+            "type": "string",
+            "description": "Domain (e.g. Data, Security, AI)"
+          },
+          "justification": {
+            "type": "string"
+          },
           "required_schema_sections": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "schema_design_guidelines": { "type": "string" }
+          "schema_design_guidelines": {
+            "type": "string"
+          }
         },
-        "required": ["extension_id", "title", "file_name", "area_of_concern", "required_schema_sections"]
+        "required": [
+          "extension_id",
+          "title",
+          "file_name",
+          "area_of_concern",
+          "required_schema_sections"
+        ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
-  "required": ["id", "owner", "created_at", "seed_refs", "extensions"]
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "seed_refs",
+    "extensions"
+  ]
 }
 ```
 
@@ -111,6 +160,9 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
   "id": "13-extension-manifest",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "extensions": [
     {
       "extension_id": "ext-01-database",
@@ -121,6 +173,27 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
       "required_schema_sections": ["tables", "indexes", "relationships", "vector_config"],
       "schema_design_guidelines": "Must implement SQL schema for users/docs and Vector schema for embeddings."
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.
+

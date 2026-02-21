@@ -63,7 +63,62 @@ class ValidateB2IntegrationTests(unittest.TestCase):
             spec_file.write_text(json.dumps({"$schema": "https://specdev.local/schema/00_charter.schema.json"}), encoding="utf-8")
             errs = validate_file(str(missing_repo), str(spec_file))
             self.assertTrue(errs)
-            self.assertTrue(any("error during validation" in e for e in errs))
+            self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
+
+    def test_validate_file_missing_path_returns_coded_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "tools" / "schema_registry.json").write_text("{}", encoding="utf-8")
+            missing = root / "spec" / "missing.json"
+            errs = validate_file(str(root), str(missing))
+            self.assertTrue(errs)
+            self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
+            self.assertTrue(any("input_file_not_found" in e for e in errs))
+
+    def test_validate_file_rejects_non_string_schema_uri(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "schema_registry.json").write_text("{}", encoding="utf-8")
+            spec_file = root / "spec" / "bad_schema_type.json"
+            spec_file.write_text(json.dumps({"$schema": ["not-a-string"]}), encoding="utf-8")
+            errs = validate_file(str(root), str(spec_file))
+            self.assertTrue(errs)
+            self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
+            self.assertTrue(any("invalid_schema_uri_type" in e for e in errs))
+
+    def test_validate_file_rejects_non_object_document_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "schema_registry.json").write_text("{}", encoding="utf-8")
+            spec_file = root / "spec" / "bad_root.json"
+            spec_file.write_text(json.dumps(["not-an-object"]), encoding="utf-8")
+            errs = validate_file(str(root), str(spec_file))
+            self.assertTrue(errs)
+            self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
+            self.assertTrue(any("invalid_document_root_type" in e for e in errs))
+
+    def test_validate_file_handles_malformed_registry_map_shape(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "schema_registry.json").write_text("[]", encoding="utf-8")
+            spec_file = root / "spec" / "artifact.json"
+            spec_file.write_text(
+                json.dumps({"$schema": "https://specdev.local/schema/00_charter.schema.json"}),
+                encoding="utf-8",
+            )
+            errs = validate_file(str(root), str(spec_file))
+            self.assertTrue(errs)
+            self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
+            self.assertTrue(any("schema_registry_bootstrap_failed" in e for e in errs))
 
     def test_validate_dir_reports_missing_canon_manifest(self):
         with tempfile.TemporaryDirectory() as td:
@@ -273,7 +328,7 @@ class ValidateB2IntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validate._git_current_branch", return_value="feature/x"):
                 self.assertEqual("feature/x", _resolve_replay_base_ref(root))
 
-    def test_resolve_replay_base_ref_prefers_current_branch_over_defaults(self):
+    def test_resolve_replay_base_ref_prefers_default_branch_over_current_branch(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
 
@@ -283,7 +338,7 @@ class ValidateB2IntegrationTests(unittest.TestCase):
             with patch("specdev_tools.validate._git_current_branch", return_value="feature/x"), \
                  patch("specdev_tools.validate._git_ref_exists", side_effect=has_ref), \
                  patch("specdev_tools.validate._git_upstream_branch", return_value=None):
-                self.assertEqual("feature/x", _resolve_replay_base_ref(root))
+                self.assertEqual("main", _resolve_replay_base_ref(root))
 
 
 if __name__ == "__main__":

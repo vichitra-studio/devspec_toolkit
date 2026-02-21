@@ -1,7 +1,23 @@
 from __future__ import annotations
-import argparse, os, json, sys
+import argparse, os, json, re, sys
 from pathlib import Path
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
+
+WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
+
+
+def _is_warning_message(message: str) -> bool:
+    return bool(WARNING_CODE_RE.match(message or ""))
+
+
+def _warnings_as_errors() -> bool:
+    return os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _has_error_messages(messages: list[str]) -> bool:
+    if _warnings_as_errors():
+        return bool(messages)
+    return any(not _is_warning_message(message) for message in messages)
 
 
 
@@ -136,15 +152,27 @@ def main():
             output = []
             if errs:
                 for e in errs:
-                    output.append({"file": file_path, "error": e, "status": "FAIL"})
+                    output.append(
+                        {
+                            "file": file_path,
+                            "error": e,
+                            "status": "WARN" if _is_warning_message(e) else "FAIL",
+                        }
+                    )
             else:
                 output.append({"file": file_path, "status": "PASS"})
             print(json.dumps(output, indent=2))
+            if _has_error_messages(errs):
+                sys.exit(1)
         else:
             if errs:
                 for e in errs: print(e, file=sys.stderr)
+            if _has_error_messages(errs):
                 sys.exit(1)
-            print("OK")
+            if errs:
+                print("OK (warnings)")
+            else:
+                print("OK")
     elif args.cmd == "validate-all":
         from .validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
@@ -152,8 +180,12 @@ def main():
         errs = validate_dir(repo_root, spec_dir)
         if errs:
             for e in errs: print(e, file=sys.stderr)
+        if _has_error_messages(errs):
             sys.exit(1)
-        print("OK")
+        if errs:
+            print("OK (warnings)")
+        else:
+            print("OK")
     elif args.cmd == "matrix":
         from .matrix import build_trace_matrix
         repo_root = os.path.abspath(args.repo_root)
@@ -242,8 +274,12 @@ def main():
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
+        if _has_error_messages(errs):
             sys.exit(1)
-        print("OK")
+        if errs:
+            print("OK (warnings)")
+        else:
+            print("OK")
     elif args.cmd == "canonical-autofix":
         from .canonical_autofix import canonical_autofix
         repo_root = os.path.abspath(args.repo_root)
@@ -253,10 +289,30 @@ def main():
         if not changes:
             print("OK (no changes)")
             return
+        has_errors = False
+        error_lines: list[str] = []
+        non_error_by_file: list[tuple[str, list[str]]] = []
         for file_path, file_changes in sorted(changes.items()):
-            print(file_path)
+            non_error_changes = []
             for change in file_changes:
-                print(f"  - {change}")
+                if change.startswith("E"):
+                    error_lines.append(change)
+                    has_errors = True
+                else:
+                    non_error_changes.append(change)
+            if non_error_changes:
+                non_error_by_file.append((file_path, non_error_changes))
+        for line in error_lines:
+            print(line, file=sys.stderr)
+        if has_errors and write:
+            sys.exit(1)
+        for file_path, non_error_changes in non_error_by_file:
+            if non_error_changes:
+                print(file_path)
+                for change in non_error_changes:
+                    print(f"  - {change}")
+        if has_errors:
+            sys.exit(1)
         if write:
             print("OK (changes written)")
         else:

@@ -45,7 +45,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Every in-scope capability maps to ≥1 FR; each FR covers one behavior.
   - Each FR has ≥1 acceptance criterion with measurable outcome; top FRs include ≥2.
@@ -190,6 +190,26 @@ You are a senior specification author and validator. Your job is to emit a singl
           "acceptance_criteria"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -205,9 +225,43 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Output Contract
 ```json
 {
-  "id": "functional_requirements-catalog",
+  "id": "functional-requirements-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "functional_requirements": []
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "functional_requirements": [
+    {
+      "fr_id": "fr-auth-login",
+      "statement": "The system shall authenticate a user and issue a session token.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-auth-login-success",
+          "text": "Valid credentials return a signed token and user id."
+        }
+      ]
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

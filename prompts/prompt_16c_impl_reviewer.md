@@ -25,6 +25,7 @@ You output the final version of the JSON, populating the `review` section.
 - **Input context:** `spec/impl_context/{step_id}.json` (Plan + Exec), plus the actual Codebase.
 - **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
 - **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{step_id}.json`.
+- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 ## Crucial Side Effect (Roadmap Sync)
 - If your `verdict` is `verified`, you **MUST** also update:
@@ -203,45 +204,219 @@ For each `checklist[]` item:
 # Output Contract (Update Logic)
 *Input*:
 ```json
-{ "plan": { ... }, "execution": { ... }, "review": {} }
+{
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {
+    "files_touched": ["src/auth/routes.py"],
+    "execution_results": [
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
+    ],
+    "critical_evidence": {
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
+    },
+    "emergent_ambiguities": []
+  },
+  "review": {},
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}
 ```
 
 *Output*:
 ```json
 {
-  "plan": { ... }, 
-  "execution": { ... },
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {
+    "files_touched": ["src/auth/routes.py"],
+    "execution_results": [
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
+    ],
+    "critical_evidence": {
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
+    },
+    "emergent_ambiguities": []
+  },
   "review": {
     "ratings": {
-       "spec_completeness": 5,
-       "code_quality": 4,
-       "tests_completeness": 5,
-       "docs_completeness": 3
+      "spec_completeness": 3,
+      "code_quality": 3,
+      "tests_completeness": 2,
+      "docs_completeness": 3,
+      "metadata_usage": 4
     },
     "verdict": "deferred",
     "findings": [
       {
         "id": "finding-auth-01",
         "type": "bug",
-        "description": "Login fails on empty password",
+        "spec_ref": {
+          "type": "api",
+          "id": "api-auth-login",
+          "line_range": "L12-L15",
+          "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "description": "Login response omits token field required by contract.",
         "severity": "major",
         "remediation_task": {
-           "task_id": "rev-auth-01-fix",
-           "summary": "Add partial implementation for empty password check",
-           "checklist_ids": ["CHK_AUTH_01"],
-           "files_to_touch": ["src/auth/routes.py"]
+          "task_id": "fix-auth-token-response",
+          "summary": "Return JWT token in login response body.",
+          "checklist_ids": ["CHK_AUTH_01"],
+          "files_to_touch": ["src/auth/routes.py"]
+        },
+        "metadata": {
+          "source": "execution_results",
+          "impact": "blocks authentication acceptance criteria"
         }
       }
     ],
-    "fixture_status": {
-        "implemented_endpoints": ["api-auth-login"],
-        "test_results": [{ "fixture_ref": "fixture-auth-success", "status": "pass" }],
-        "ci_status": "green"
+    "next_actions": "Implement remediation task and rerun targeted auth tests."
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
     },
-    "security_status": "green",
-    "delivery_status": {
-        "deployments": [{ "env": "dev", "build_id": "b123", "status": "success" }]
-    }
-  }
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

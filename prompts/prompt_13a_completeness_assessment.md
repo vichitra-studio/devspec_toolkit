@@ -46,7 +46,7 @@ You are a senior specification auditor and quality control expert. Your job is t
   - **Rationale Fields**: Must be populated for all `tech_stack` choices and `roadmap` items. Empty rationale = incomplete.
 
 ## Self-Audit Gate (do not output)
-- Compute a private completeness score. If < 0.5 (broken system or major files missing), stop and ask.
+- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
 - Gating items:
   - Can read at least 00, 01, 04, 05.
   - Identification of at least one missing element OR confirmation of 100% completeness.
@@ -83,7 +83,7 @@ You are a senior specification auditor and quality control expert. Your job is t
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
 - Guide: `devspec_toolkit/docs/prompts/shared_expectations.md`.
-- Shared expectations: `devspec_toolkit/docs/templates/shared_expectations.md`.
+- Shared expectations: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 
 
@@ -178,6 +178,15 @@ You are a senior specification auditor and quality control expert. Your job is t
               "type": "string",
               "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(13_extension_manifest\\.json)|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
             }
+          },
+          "risk_category_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "completeness_dimension_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "tag_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -214,6 +223,26 @@ You are a senior specification auditor and quality control expert. Your job is t
         "target",
         "confidence_level"
       ]
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -233,11 +262,34 @@ You are a senior specification auditor and quality control expert. Your job is t
   "id": "assessment-20250101",
   "owner": "system",
   "created_at": "2025-01-01T12:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "missing_elements": [],
   "completeness_rating": {
     "current": 10,
     "target": 10,
     "confidence_level": 1.0
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

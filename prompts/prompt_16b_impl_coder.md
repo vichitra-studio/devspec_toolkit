@@ -32,6 +32,7 @@ Instead of outputting code directly to the user, you:
 - **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
 - **Objective:** Implement the `plan.spec_alignment.checklist` by filling `implementation` slots.
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
+- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -177,28 +178,169 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 # Output Contract (Update Logic)
 *Input*:
 ```json
-{ "plan": { ... }, "execution": {} }
+{
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "in_progress",
+            "files_touched": ["src/auth/routes.py"],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {},
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}
 ```
 
 *Output*:
 ```json
 {
-  "plan": { ... }, 
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "files_touched": ["src/auth/routes.py"],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
     "execution_results": [
       {
-        "status": "passed",
-        "outcome_description": "Executed Auth Tests",
-        "reasoning": "All 5 tests passed, verifying JWT generation.",
-        "evidence": "pytest tests/auth/test_login.py ... [100%] PASSED"
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
       }
     ],
     "critical_evidence": {
-      "satisfied_checklist_ids": ["CHK_AUTH_01"],
-      "passed_test_commands": ["pytest tests/auth/test_login.py"]
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
     },
     "emergent_ambiguities": []
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

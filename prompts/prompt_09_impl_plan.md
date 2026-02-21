@@ -46,7 +46,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: milestones should map to delivered FRs/APIs and passing CI gates.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
   - `tech_stack` aligns with `01_capabilities.json`.
@@ -129,6 +129,9 @@ You are a senior specification author and validator. Your job is to emit a singl
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "seed_refs": {
+      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+    },
     "tech_stack": {
       "type": "object"
     },
@@ -181,7 +184,33 @@ You are a senior specification author and validator. Your job is to emit a singl
       "type": "string"
     },
     "dependencies": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyList"
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+      }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -198,9 +227,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Output Contract
 ```json
 {
-  "id": "impl_plan-catalog",
+  "id": "impl-plan-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "tech_stack": {
     "languages": [
       {
@@ -261,6 +293,26 @@ You are a senior specification author and validator. Your job is to emit a singl
       "type": "doc",
       "id": "personal-knowledge-rag-system"
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

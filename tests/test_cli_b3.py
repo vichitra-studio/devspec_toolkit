@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -82,6 +83,44 @@ class CliB3Tests(unittest.TestCase):
             self.assertIn("OK", out)
             run_sync.assert_called_once_with(os.path.abspath(str(repo_root)))
 
+    def test_prompt_sync_reports_malformed_registry_map_shape(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            (repo_root / "spec").mkdir()
+            (repo_root / "tools").mkdir()
+            (repo_root / "schema").mkdir()
+            (repo_root / "prompts").mkdir()
+            (repo_root / "tools" / "schema_registry.json").write_text("[]", encoding="utf-8")
+            (repo_root / "schema" / "00_charter.schema.json").write_text(
+                json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (repo_root / "prompts" / "prompt_00_project_charter.md").write_text(
+                (
+                    "## Embedded Schema\n"
+                    "```json\n"
+                    "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}\n"
+                    "```\n\n"
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"id\":\"charter\"}\n"
+                    "```\n\n"
+                    "## B4 Metadata Contract\n"
+                ),
+                encoding="utf-8",
+            )
+            code, out, err = self._run_cli(["prompt-sync", "--repo-root", str(repo_root)])
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("E520 UNRESOLVED_INPUT", err)
+            self.assertIn("schema_registry_bootstrap_failed", err)
+
     def test_canonical_autofix_rejects_conflicting_flags(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
@@ -92,6 +131,903 @@ class CliB3Tests(unittest.TestCase):
             )
             self.assertEqual(2, code)
             self.assertIn("not allowed with argument", err)
+
+    def test_validate_does_not_fail_on_warning_only_output(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            sample = repo_root / "sample.json"
+            sample.write_text("{}", encoding="utf-8")
+            with patch("specdev_tools.validate.validate_file", return_value=["W130 CANONICAL_REF_VERSION_OMITTED cn:core:unit:ms"]):
+                code, out, err = self._run_cli(["validate", str(sample), "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (warnings)", out)
+            self.assertIn("W130", err)
+
+    def test_validate_fails_when_error_is_present_with_warning(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            sample = repo_root / "sample.json"
+            sample.write_text("{}", encoding="utf-8")
+            with patch(
+                "specdev_tools.validate.validate_file",
+                return_value=[
+                    "W130 CANONICAL_REF_VERSION_OMITTED cn:core:unit:ms",
+                    "E110 UNKNOWN_CANONICAL_ID cn:core:status:unknown",
+                ],
+            ):
+                code, _, err = self._run_cli(["validate", str(sample), "--repo-root", str(repo_root)])
+            self.assertEqual(1, code)
+            self.assertIn("E110", err)
+
+    def test_validate_all_does_not_fail_on_warning_only_output(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            with patch("specdev_tools.validate.validate_dir", return_value=["W130 CANONICAL_REF_VERSION_OMITTED cn:core:unit:ms"]):
+                code, out, err = self._run_cli(["validate-all", str(spec_dir), "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (warnings)", out)
+            self.assertIn("W130", err)
+
+    def test_canonical_integrity_does_not_fail_on_warning_only_output(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            with patch(
+                "specdev_tools.canonical_integrity.validate_canonical_integrity",
+                return_value=["W130 CANONICAL_REF_VERSION_OMITTED cn:core:unit:ms"],
+            ):
+                code, out, err = self._run_cli(["canonical-integrity", str(spec_dir), "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (warnings)", out)
+            self.assertIn("W130", err)
+
+    def test_canonical_autofix_infers_refs_and_skips_unknown_aliases(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "canonical_refs_used": {"type": "array"},
+                            "threats": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "category": {"type": "string"},
+                                        "risk_category_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "interface": {"type": "string"},
+                            "interface_ref": {"type": "object"},
+                            "event": {"type": "string"},
+                            "event_ref": {"type": "object"},
+                            "commit_message_rules": {
+                                "type": "object",
+                                "additionalProperties": True,
+                                "properties": {
+                                    "pattern": {"type": "string"},
+                                    "id_pattern_ref": {"type": "object"},
+                                },
+                            },
+                            "extensions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "area_of_concern": {"type": "string"},
+                                        "governance_label_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "tech_stack": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "tech_stack_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "type": {"type": "string"},
+                                        "id": {"type": "string"},
+                                        "dependency_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:stage:prod",
+                                "kind": "stage",
+                                "preferred_label": "prod",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:status:active",
+                                "kind": "status",
+                                "preferred_label": "active",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:role:reviewer",
+                                "kind": "role",
+                                "preferred_label": "reviewer",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:policy:spec-first",
+                                "kind": "policy",
+                                "preferred_label": "spec_first",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:action:authenticate",
+                                "kind": "action",
+                                "preferred_label": "authenticate",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:term:jwt",
+                                "kind": "term",
+                                "preferred_label": "JWT",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:risk_category:authz",
+                                "kind": "risk_category",
+                                "preferred_label": "authz",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:interface:http-json",
+                                "kind": "interface",
+                                "preferred_label": "http_json",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:event:login-succeeded",
+                                "kind": "event",
+                                "preferred_label": "login_succeeded",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:id_pattern:conventional-commit",
+                                "kind": "id_pattern",
+                                "preferred_label": "conventional-commit",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:governance_label:security",
+                                "kind": "governance_label",
+                                "preferred_label": "security",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:tech_stack:python",
+                                "kind": "tech_stack",
+                                "preferred_label": "python",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:dependency:auth-service",
+                                "kind": "dependency",
+                                "preferred_label": "auth-service",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            artifact = spec_dir / "artifact.json"
+            artifact.write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "stage": "prod",
+                        "status": "active",
+                        "role": "reviewer",
+                        "policy": "spec-first",
+                        "action": "authenticate",
+                        "term": "JWT",
+                        "interface": "http_json",
+                        "event": "login_succeeded",
+                        "commit_message_rules": {"pattern": "conventional-commit"},
+                        "extensions": [
+                            {"area_of_concern": "security"},
+                            {"area_of_concern": "unknown-area"},
+                        ],
+                        "tech_stack": [
+                            {"name": "python"},
+                            {"name": "unknown-tech"},
+                        ],
+                        "dependencies": [
+                            {"type": "external", "id": "auth-service"},
+                            {"type": "external", "id": "unknown-dependency"},
+                        ],
+                        "canonical_refs_used": [],
+                        "items": [{"action": "unknown-action"}],
+                        "threats": [{"category": "authz"}, {"category": "unknown-category"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (changes written)", out)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"id": "cn:core:stage:prod", "kind": "stage"},
+                payload.get("stage_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:status:active", "kind": "status"},
+                payload.get("status_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:role:reviewer", "kind": "role"},
+                payload.get("role_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:policy:spec-first", "kind": "policy"},
+                payload.get("policy_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:action:authenticate", "kind": "action"},
+                payload.get("action_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:term:jwt", "kind": "term"},
+                payload.get("term_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:interface:http-json", "kind": "interface"},
+                payload.get("interface_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:event:login-succeeded", "kind": "event"},
+                payload.get("event_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:id_pattern:conventional-commit", "kind": "id_pattern"},
+                payload["commit_message_rules"].get("id_pattern_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:governance_label:security", "kind": "governance_label"},
+                payload["extensions"][0].get("governance_label_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:tech_stack:python", "kind": "tech_stack"},
+                payload["tech_stack"][0].get("tech_stack_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:dependency:auth-service", "kind": "dependency"},
+                payload["dependencies"][0].get("dependency_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
+                payload["threats"][0].get("risk_category_ref"),
+            )
+            self.assertNotIn("action_ref", payload["items"][0])
+            self.assertNotIn("governance_label_ref", payload["extensions"][1])
+            self.assertNotIn("tech_stack_ref", payload["tech_stack"][1])
+            self.assertNotIn("dependency_ref", payload["dependencies"][1])
+            self.assertNotIn("risk_category_ref", payload["threats"][1])
+
+    def test_canonical_autofix_infers_term_and_risk_category_with_negative_cases(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "canonical_refs_used": {"type": "array"},
+                            "terms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "term": {"type": "string"},
+                                        "term_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "threats": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "category": {"type": "string"},
+                                        "risk_category_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:term:jwt",
+                                "kind": "term",
+                                "preferred_label": "JWT",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:risk_category:authz",
+                                "kind": "risk_category",
+                                "preferred_label": "authz",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            artifact = spec_dir / "artifact.json"
+            artifact.write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "terms": [
+                            {"term": "JWT"},
+                            {"term": "unknown-term"},
+                        ],
+                        "threats": [
+                            {"category": "authz"},
+                            {"category": "unknown-category"},
+                        ],
+                        "canonical_refs_used": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (changes written)", out)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"id": "cn:core:term:jwt", "kind": "term"},
+                payload["terms"][0].get("term_ref"),
+            )
+            self.assertNotIn("term_ref", payload["terms"][1])
+            self.assertEqual(
+                {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
+                payload["threats"][0].get("risk_category_ref"),
+            )
+            self.assertNotIn("risk_category_ref", payload["threats"][1])
+
+    def test_canonical_autofix_prefers_environment_field_over_stage_for_environment_ref(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "stage": {"type": "string"},
+                            "environment": {"type": "string"},
+                            "stage_ref": {"type": "object"},
+                            "environment_ref": {"type": "object"},
+                            "canonical_refs_used": {"type": "array"},
+                        },
+                        "required": ["stage", "environment", "canonical_refs_used"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:stage:ci",
+                                "kind": "stage",
+                                "preferred_label": "ci",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:environment:ci",
+                                "kind": "environment",
+                                "preferred_label": "ci",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:environment:prod",
+                                "kind": "environment",
+                                "preferred_label": "prod",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            artifact = spec_dir / "artifact.json"
+            artifact.write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "stage": "ci",
+                        "environment": "prod",
+                        "canonical_refs_used": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (changes written)", out)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"id": "cn:core:stage:ci", "kind": "stage"},
+                payload.get("stage_ref"),
+            )
+            self.assertEqual(
+                {"id": "cn:core:environment:prod", "kind": "environment"},
+                payload.get("environment_ref"),
+            )
+
+    def test_canonical_autofix_does_not_infer_dependency_ref_from_top_level_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "id": {"type": "string"},
+                            "dependency_ref": {"type": "object"},
+                            "canonical_refs_used": {"type": "array"},
+                        },
+                        "required": ["id", "canonical_refs_used"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:dependency:artifact-id",
+                                "kind": "dependency",
+                                "preferred_label": "artifact-id",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            artifact = spec_dir / "artifact.json"
+            artifact.write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "id": "artifact-id",
+                        "canonical_refs_used": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK", out)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertNotIn("dependency_ref", payload)
+
+    def test_canonical_autofix_infers_acronym_and_completeness_dimension_refs(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "canonical_refs_used": {"type": "array"},
+                            "terms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "acronym": {"type": "string"},
+                                        "acronym_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "missing_elements": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "category": {"type": "string"},
+                                        "completeness_dimension_ref": {"type": "object"},
+                                    },
+                                },
+                            },
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:acronym:jwt",
+                                "kind": "acronym",
+                                "preferred_label": "JWT",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                            {
+                                "id": "cn:core:completeness_dimension:traceability",
+                                "kind": "completeness_dimension",
+                                "preferred_label": "traceability",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            },
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            artifact = spec_dir / "artifact.json"
+            artifact.write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "terms": [{"acronym": "JWT"}, {"acronym": "XYZ"}],
+                        "missing_elements": [
+                            {"category": "traceability"},
+                            {"category": "unknown-dimension"},
+                        ],
+                        "canonical_refs_used": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("OK (changes written)", out)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            self.assertEqual(
+                {"id": "cn:core:acronym:jwt", "kind": "acronym"},
+                payload["terms"][0].get("acronym_ref"),
+            )
+            self.assertNotIn("acronym_ref", payload["terms"][1])
+            self.assertEqual(
+                {"id": "cn:core:completeness_dimension:traceability", "kind": "completeness_dimension"},
+                payload["missing_elements"][0].get("completeness_dimension_ref"),
+            )
+            self.assertNotIn("completeness_dimension_ref", payload["missing_elements"][1])
+
+    def test_canonical_autofix_reports_invalid_json_deterministically(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text("{}", encoding="utf-8")
+            (canon_dir / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            (spec_dir / "bad.json").write_text("{bad", encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("E520 UNRESOLVED_INPUT", err)
+            self.assertIn("invalid_json", err)
+
+    def test_canonical_autofix_write_is_atomic_when_any_error_exists(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "$schema": {"type": "string"},
+                            "stage": {"type": "string"},
+                            "stage_ref": {"type": "object"},
+                            "canonical_refs_used": {"type": "array"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:stage:prod",
+                                "kind": "stage",
+                                "preferred_label": "prod",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            }
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            bad_file = spec_dir / "a_bad.json"
+            bad_file.write_text("{bad", encoding="utf-8")
+            good_file = spec_dir / "b_good.json"
+            original_good = {
+                "$schema": "https://specdev.local/schema/test.schema.json",
+                "stage": "prod",
+                "canonical_refs_used": [],
+            }
+            good_file.write_text(json.dumps(original_good, indent=2), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--write"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("invalid_json", err)
+            self.assertIn("write_aborted_due_to_errors", err)
+            self.assertEqual(json.loads(good_file.read_text(encoding="utf-8")), original_good)
+
+    def test_canonical_autofix_handles_malformed_registry_map_shape(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text("[]", encoding="utf-8")
+            (canon_dir / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "canonical_refs_used": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("E520 UNRESOLVED_INPUT", err)
+            self.assertIn("schema_registry_bootstrap_failed", err)
 
     def test_new_b3_command_dispatch_paths(self):
         with tempfile.TemporaryDirectory() as td:

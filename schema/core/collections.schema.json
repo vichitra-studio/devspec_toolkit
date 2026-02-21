@@ -72,6 +72,26 @@
       "required": [
         "type",
         "id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "owner",
+              "note"
+            ]
+          }
+        }
       ]
     },
     "canonicalRef": {
@@ -204,6 +224,40 @@
         "prod"
       ]
     },
+    "environmentConfig": {
+      "$anchor": "environmentConfig",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "techStackItem": {
       "$anchor": "techStackItem",
       "type": "object",
@@ -217,6 +271,12 @@
         },
         "notes": {
           "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "tech_stack_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
         }
       },
       "required": [
@@ -273,12 +333,36 @@
           "type": "string"
         },
         "note": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^\\S+\\s+\\S+.*$"
+        },
+        "dependency_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
         }
       },
       "required": [
         "type",
         "id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "owner",
+              "note"
+            ]
+          }
+        }
       ]
     },
     "dependencyList": {
@@ -293,6 +377,13 @@
             "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
           }
         ]
+      }
+    },
+    "dependencyObjectList": {
+      "$anchor": "dependencyObjectList",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
       }
     },
     "generationQuality": {

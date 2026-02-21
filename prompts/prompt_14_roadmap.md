@@ -243,7 +243,10 @@ The `$schema` field is required in the output and is stripped before validation,
           }
         }
       },
-      "required": ["languages", "frameworks"]
+      "required": [
+        "languages",
+        "frameworks"
+      ]
     },
     "milestones": {
       "type": "array",
@@ -251,9 +254,16 @@ The `$schema` field is required in the output and is stripped before validation,
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "milestone_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-          "name": { "type": "string" },
-          "target_date": { "type": "string", "format": "date" },
+          "milestone_id": {
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "target_date": {
+            "type": "string",
+            "format": "date"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -274,79 +284,133 @@ The `$schema` field is required in the output and is stripped before validation,
             ],
             "default": "low"
           },
-          "user_story": { "type": "string", "description": "The specific user story this milestone addresses." },
+          "user_story": {
+            "type": "string",
+            "description": "The specific user story this milestone addresses."
+          },
           "source_milestones": {
             "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
             "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
           },
-          "tasks": { 
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "task_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-                  "description": { "type": "string", "pattern": "^\\S+\\s+\\S+.*$" },
-                  "acceptance_criteria": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "criterion_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-                        "text": { "type": "string", "minLength": 15 },
-                        "fixture_ref": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" }
-                      },
-                      "required": ["criterion_id", "text"]
-                    }
-                  },
-                  "status": { "type": "string", "enum": ["pending", "in_progress", "done"] }
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "task_id": {
+                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                 },
-                "required": ["task_id", "description"]
+                "description": {
+                  "type": "string",
+                  "pattern": "^\\S+\\s+\\S+.*$"
+                },
+                "acceptance_criteria": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "criterion_id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 15
+                      },
+                      "fixture_ref": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                      }
+                    },
+                    "required": [
+                      "criterion_id",
+                      "text"
+                    ]
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "done"
+                  ]
+                }
               },
-              "description": "Atomic sub-tasks required to complete the user story."
+              "required": [
+                "task_id",
+                "description"
+              ]
+            },
+            "description": "Atomic sub-tasks required to complete the user story."
           },
           "deliverables": {
             "type": "array",
-            "items": { "$ref": "https://specdev.local/schema/core/collections/1#traceRef" }
+            "items": {
+              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            }
           },
-          "risks": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" },
-          "spikes": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" }
-
-        },
-        "required": ["milestone_id", "name", "target_date", "user_story", "source_milestones", "tasks", "deliverables"]
-      }
-    },
-    "migration_plan": { "type": "string", "minLength": 1 },
-    "dependencies": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "type": { "type": "string", "enum": ["milestone", "external"] },
-          "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-          "owner": { "type": "string" },
-          "note": { "type": "string", "pattern": "^\\S+\\s+\\S+.*$" }
-        },
-        "required": ["type", "id"],
-        "allOf": [
-          {
-            "if": { "properties": { "type": { "const": "external" } }, "required": ["type"] },
-            "then": { "required": ["owner", "note"] }
+          "risks": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "spikes": {
+            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
           }
+        },
+        "required": [
+          "milestone_id",
+          "name",
+          "target_date",
+          "user_story",
+          "source_milestones",
+          "tasks",
+          "deliverables"
         ]
       }
+    },
+    "migration_plan": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dependencies": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyObjectList"
     },
     "trace": {
       "type": "array",
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
-  "required": ["id", "owner", "created_at", "seed_refs", "tech_stack", "milestones"]
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "seed_refs",
+    "tech_stack",
+    "milestones"
+  ]
 }
 ```
 
@@ -357,6 +421,9 @@ The `$schema` field is required in the output and is stripped before validation,
   "id": "roadmap-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "migration_plan": "none",
   "tech_stack": {
     "languages": [
@@ -397,6 +464,27 @@ The `$schema` field is required in the output and is stripped before validation,
       "risks": [],
       "spikes": []
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.
+

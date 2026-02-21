@@ -9,8 +9,8 @@ import sys
 import os
 from pathlib import Path
 
-# Add the devspec_toolkit to path so we can import specdev_tools
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools" / "devspec_toolkit"))
+# Add the toolkit tools dir to path so we can import specdev_tools
+sys.path.insert(0, str(Path(__file__).parents[2] / "tools"))
 
 from specdev_tools.validate import validate_file
 

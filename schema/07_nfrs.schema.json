@@ -65,12 +65,7 @@
             "type": "string"
           },
           "stage": {
-            "type": "string",
-            "enum": [
-              "dev",
-              "staging",
-              "prod"
-            ]
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/stageName"
           },
           "owner": {
             "$ref": "https://specdev.local/schema/core/atoms/1#owner"
@@ -80,6 +75,18 @@
             "items": {
               "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
             }
+          },
+          "metric_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "unit_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "stage_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "environment_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -87,9 +94,32 @@
           "category",
           "metric",
           "target",
-          "unit"
+          "unit",
+          "metric_ref",
+          "unit_ref",
+          "environment_ref"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [

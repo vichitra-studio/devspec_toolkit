@@ -18,6 +18,18 @@
       "metric": "p95 response time",
       "target": 200,
       "unit": "ms",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
       "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
       "stage": "prod",
       "owner": "api",

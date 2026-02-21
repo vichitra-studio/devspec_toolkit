@@ -15,7 +15,20 @@ class SpecQualityLintTests(unittest.TestCase):
             root = Path(td)
             (root / "spec").mkdir()
             (root / "spec" / "00_charter.json").write_text(
-                json.dumps({"id": "charter", "owner": "system", "created_at": "2026-01-01T00:00:00Z", "seed_refs": [], "terms": [], "notes": "TODO"}),
+                json.dumps(
+                    {
+                        "id": "charter",
+                        "owner": "system",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "seed_refs": [],
+                        "generation_quality": {"completeness": 1, "correctness": 1, "consistency": 1},
+                        "canonical_refs_used": [],
+                        "canonical_proposals": [],
+                        "canonical_conflicts": [],
+                        "terms": [],
+                        "notes": "TODO",
+                    }
+                ),
                 encoding="utf-8",
             )
             errs = lint_spec_quality(str(root / "spec"))
@@ -40,6 +53,48 @@ class SpecQualityLintTests(unittest.TestCase):
             )
             errs = lint_spec_quality(str(root / "spec"))
             self.assertFalse(any("seed_manifest.json missing top-level" in e for e in errs))
+
+    def test_detects_missing_b4_top_level_fields(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "01_capabilities.json").write_text(
+                json.dumps(
+                    {
+                        "id": "capabilities-test",
+                        "owner": "system",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "seed_refs": [],
+                        "capabilities": [{"capability_id": "cap-one"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errs = lint_spec_quality(str(root / "spec"))
+            self.assertTrue(any("missing top-level 'generation_quality'" in e for e in errs))
+            self.assertTrue(any("missing top-level 'canonical_refs_used'" in e for e in errs))
+            self.assertTrue(any("missing top-level 'canonical_proposals'" in e for e in errs))
+            self.assertTrue(any("missing top-level 'canonical_conflicts'" in e for e in errs))
+
+    def test_schema_uri_drives_step_detection_for_nonstandard_filename(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "artifact.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+                        "id": "capabilities-test",
+                        "owner": "system",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "seed_refs": [],
+                        "capabilities": [{"capability_id": "cap-one"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errs = lint_spec_quality(str(root / "spec"))
+            self.assertTrue(any("artifact.json missing top-level 'generation_quality'" in e for e in errs))
 
 
 if __name__ == "__main__":

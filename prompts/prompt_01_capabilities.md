@@ -46,7 +46,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Naming: prefer `capability-<verb>-<noun>` from glossary; avoid UI- or table-centric names.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions and stop.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - All in-scope charter goals map to at least one capability.
   - Each capability contains a clear verb, scope, owner (if not external), and minimal inputs/outputs.
@@ -193,6 +193,26 @@ You are a senior specification author and validator. Your job is to emit a singl
           "scope"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -211,6 +231,35 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "capabilities-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "capabilities": []
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "capabilities": [
+    {
+      "capability_id": "capability-authentication",
+      "verb": "authenticate",
+      "scope": "in"
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## B4 Metadata Contract
+- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
+- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
+- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

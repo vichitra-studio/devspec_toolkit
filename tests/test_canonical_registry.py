@@ -109,6 +109,44 @@ class CanonicalRegistryTests(unittest.TestCase):
         self.assertTrue(any("W110" in e for e in errs))
         self.assertTrue(any("W130" in e for e in errs))
 
+    def test_preferred_label_is_resolvable_alias(self):
+        reg = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {
+                        "id": "cn:core:role:reviewer",
+                        "kind": "role",
+                        "preferred_label": "reviewer",
+                        "version": "1.0.0",
+                        "status": "active",
+                        "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                    }
+                ],
+                "aliases": [],
+            }
+        )
+        self.assertEqual("cn:core:role:reviewer", reg.resolve_alias("role", "reviewer"))
+
+    def test_alias_normalization_treats_hyphen_and_underscore_equivalently(self):
+        reg = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {
+                        "id": "cn:core:policy:spec-first",
+                        "kind": "policy",
+                        "preferred_label": "spec_first",
+                        "version": "1.0.0",
+                        "status": "active",
+                        "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                    }
+                ],
+                "aliases": [],
+            }
+        )
+        self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec_first"))
+        self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec-first"))
+        self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec first"))
+
     def test_load_ignores_malformed_manifest_alias(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

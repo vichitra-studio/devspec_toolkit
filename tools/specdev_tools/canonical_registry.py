@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,19 @@ class CanonicalRegistry:
         entries: dict[str, CanonicalEntry] = {}
         aliases: dict[tuple[str, str], set[str]] = {}
         alias_status: dict[tuple[str, str], str] = {}
+
+        def register_alias(kind: str, alias_value: str, target_id: str, status: str = "active") -> None:
+            if not isinstance(kind, str) or not isinstance(alias_value, str) or not isinstance(target_id, str):
+                return
+            normalized = _norm(alias_value)
+            if not normalized:
+                return
+            key = (kind, normalized)
+            aliases.setdefault(key, set()).add(target_id)
+            current = alias_status.get(key)
+            if current is None or status == "active":
+                alias_status[key] = status
+
         for raw in manifest.get("entries", []):
             if not isinstance(raw, dict):
                 continue
@@ -57,12 +71,13 @@ class CanonicalRegistry:
                 payload=raw,
             )
             entries[entry.id] = entry
+            preferred_label = raw.get("preferred_label")
+            if isinstance(preferred_label, str):
+                register_alias(entry.kind, preferred_label, entry.id, status="active")
             for alias in (raw.get("aliases", []) or []):
                 if not isinstance(alias, str):
                     continue
-                key = (entry.kind, _norm(alias))
-                aliases.setdefault(key, set()).add(entry.id)
-                alias_status.setdefault(key, "active")
+                register_alias(entry.kind, alias, entry.id, status="active")
 
         for alias in manifest.get("aliases", []):
             if not isinstance(alias, dict):
@@ -72,9 +87,7 @@ class CanonicalRegistry:
             target_id = alias.get("target_id")
             if not isinstance(kind, str) or not isinstance(normalized, str) or not isinstance(target_id, str):
                 continue
-            key = (kind, _norm(normalized))
-            aliases.setdefault(key, set()).add(target_id)
-            alias_status[key] = alias.get("status", "active")
+            register_alias(kind, normalized, target_id, status=alias.get("status", "active"))
 
         return cls(entries=entries, aliases=aliases, alias_status=alias_status)
 
@@ -124,7 +137,9 @@ class CanonicalRegistry:
 
 
 def _norm(value: str) -> str:
-    return " ".join((value or "").lower().strip().split())
+    # Treat whitespace, underscores, and hyphens as equivalent separators.
+    tokens = [part for part in re.split(r"[\s_-]+", (value or "").lower().strip()) if part]
+    return " ".join(tokens)
 
 
 def _version_matches(actual: str, expected: str) -> bool:

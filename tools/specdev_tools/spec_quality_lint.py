@@ -8,6 +8,7 @@ from typing import Any
 
 PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|placeholder|<[^>]+>)\b", re.IGNORECASE)
 STEP_ARTIFACT_RE = re.compile(r"^\d{2}[a-z]?_[a-z0-9_]+\.json$")
+STEP_SCHEMA_URI_RE = re.compile(r"^https://specdev\.local/schema/\d{2}[a-z]?_[a-z0-9_]+\.schema\.json$")
 CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfrs", "fixtures", "milestones", "jobs", "threats"}
 
 
@@ -24,7 +25,7 @@ def lint_spec_quality(spec_dir: str) -> list[str]:
             rel = os.path.relpath(path, spec_dir)
             errors.append(f"E520 UNRESOLVED_INPUT {rel} invalid_json {exc}")
             continue
-        if not _is_step_artifact(path):
+        if not _is_step_artifact(path, data):
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_check_required_top_level(rel, data))
@@ -41,9 +42,43 @@ def lint_spec_quality(spec_dir: str) -> list[str]:
     return errors
 
 
+def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[str]:
+    """Run per-artifact quality checks used by single-file validation.
+
+    This enforces deterministic top-level and placeholder/array checks without
+    requiring full-directory reference closure.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        rel = os.path.relpath(path, spec_dir or os.path.dirname(path) or ".")
+        return [f"E520 UNRESOLVED_INPUT {rel} invalid_json {exc}"]
+
+    if not _is_step_artifact(path, data):
+        return []
+
+    base = spec_dir or os.path.dirname(path) or "."
+    rel = os.path.relpath(path, base)
+    errs: list[str] = []
+    errs.extend(_check_required_top_level(rel, data))
+    errs.extend(_check_placeholders(rel, data))
+    errs.extend(_check_critical_arrays(rel, data))
+    return errs
+
+
 def _check_required_top_level(rel: str, data: dict[str, Any]) -> list[str]:
     errs: list[str] = []
-    for key in ("id", "owner", "created_at", "seed_refs"):
+    for key in (
+        "id",
+        "owner",
+        "created_at",
+        "seed_refs",
+        "generation_quality",
+        "canonical_refs_used",
+        "canonical_proposals",
+        "canonical_conflicts",
+    ):
         if key not in data:
             errs.append(f"E520 UNRESOLVED_INPUT {rel} missing top-level '{key}'")
     return errs
@@ -108,5 +143,11 @@ def _iter_json(spec_dir: str):
                 yield os.path.join(root, fn)
 
 
-def _is_step_artifact(path: str) -> bool:
-    return bool(STEP_ARTIFACT_RE.match(os.path.basename(path)))
+def _is_step_artifact(path: str, data: dict[str, Any] | None = None) -> bool:
+    if STEP_ARTIFACT_RE.match(os.path.basename(path)):
+        return True
+    if isinstance(data, dict):
+        schema_uri = data.get("$schema")
+        if isinstance(schema_uri, str) and STEP_SCHEMA_URI_RE.match(schema_uri):
+            return True
+    return False
