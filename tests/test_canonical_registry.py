@@ -160,6 +160,125 @@ class CanonicalRegistryTests(unittest.TestCase):
             reg = CanonicalRegistry.load(str(root))
             self.assertEqual({}, reg.entries)
 
+    def test_load_supports_modular_registry_without_manifest(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            (canon_root / "kinds").mkdir(parents=True)
+            (canon_root / "kinds" / "unit.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "kind": "unit",
+                        "entries": [
+                            {
+                                "id": "cn:core:unit:ms",
+                                "kind": "unit",
+                                "preferred_label": "milliseconds",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "aliases": ["ms"],
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_root / "aliases.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "aliases": [
+                            {
+                                "kind": "unit",
+                                "normalized": "milliseconds",
+                                "target_id": "cn:core:unit:ms",
+                                "status": "active",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            reg = CanonicalRegistry.load(str(root))
+            self.assertEqual("cn:core:unit:ms", reg.resolve_alias("unit", "milliseconds"))
+            self.assertIsNotNone(reg.get("cn:core:unit:ms"))
+
+    def test_load_merges_modular_entries_with_manifest(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            (canon_root / "kinds").mkdir(parents=True)
+            (canon_root / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_root / "kinds" / "stage.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "kind": "stage",
+                        "entries": [
+                            {
+                                "id": "cn:core:stage:ci",
+                                "kind": "stage",
+                                "preferred_label": "ci",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "aliases": ["continuous integration"],
+                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            reg = CanonicalRegistry.load(str(root))
+            self.assertIsNotNone(reg.get("cn:core:stage:ci"))
+            self.assertEqual("cn:core:stage:ci", reg.resolve_alias("stage", "continuous integration"))
+
+    def test_load_reports_malformed_modular_registry_file_without_raising(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            canon_root.mkdir(parents=True)
+            (canon_root / "aliases.json").write_text("{bad", encoding="utf-8")
+
+            reg = CanonicalRegistry.load(str(root))
+            self.assertEqual({}, reg.entries)
+            self.assertTrue(any("invalid_aliases" in e for e in reg.load_errors))
+
+    def test_load_reports_structurally_invalid_kind_file_without_raising(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            kinds_root = canon_root / "kinds"
+            kinds_root.mkdir(parents=True)
+            (kinds_root / "term.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "term",
+                        "registry_version": "1.0.0",
+                        "entries": {"id": "cn:core:term:jwt", "preferred_label": "jwt"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            reg = CanonicalRegistry.load(str(root))
+            self.assertEqual({}, reg.entries)
+            self.assertTrue(any("invalid_kind_file" in e for e in reg.load_errors))
+            self.assertTrue(any("entries must be an array" in e for e in reg.load_errors))
+
 
 if __name__ == "__main__":
     unittest.main()

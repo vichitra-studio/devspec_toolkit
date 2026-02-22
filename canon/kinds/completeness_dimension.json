@@ -1,0 +1,66 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "completeness_dimension",
+  "entries": [
+    {
+      "id": "cn:core:completeness_dimension:ambiguity",
+      "kind": "completeness_dimension",
+      "preferred_label": "ambiguity",
+      "definition": "Completeness dimension covering unresolved ambiguity and interpretation risk.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:completeness_dimension:completeness",
+      "kind": "completeness_dimension",
+      "preferred_label": "completeness",
+      "definition": "Completeness dimension covering missing required specification content.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:completeness_dimension:quality",
+      "kind": "completeness_dimension",
+      "preferred_label": "quality",
+      "definition": "Completeness dimension covering specification quality and rigor gaps.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:completeness_dimension:traceability",
+      "kind": "completeness_dimension",
+      "preferred_label": "traceability",
+      "definition": "Completeness dimension covering cross-artifact trace linkage coverage.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

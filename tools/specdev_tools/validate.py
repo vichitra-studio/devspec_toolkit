@@ -149,7 +149,12 @@ def validate_file(
             if quality_errors:
                 enhanced_errors.extend(quality_errors)
         if include_canonical_integrity:
-            canonical_errors = validate_canonical_integrity_file(repo_root, path)
+            canonical_errors = validate_canonical_integrity_file(
+                repo_root,
+                path,
+                enforce_unresolved_semantics=False,
+                require_manifest_schema_registration=True,
+            )
             if canonical_errors:
                 enhanced_errors.extend(canonical_errors)
 
@@ -161,6 +166,16 @@ def validate_file(
 
 def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
     failures = []
+    canonical_preflight_errors = list(
+        dict.fromkeys(
+            lint_canon_dir(
+                repo_root,
+                require_manifest_schema_registration=True,
+            )
+        )
+    )
+    if _has_canonical_bootstrap_failure(canonical_preflight_errors):
+        return canonical_preflight_errors
 
     for root, _, files in os.walk(spec_dir):
         for fn in files:
@@ -176,11 +191,26 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
                 )
 
     failures.extend(lint_spec_quality(spec_dir))
-    failures.extend(lint_hallucinations(spec_dir, repo_root=repo_root))
-    failures.extend(validate_canonical_integrity(repo_root, spec_dir))
+    if canonical_preflight_errors:
+        failures.extend(canonical_preflight_errors)
+    else:
+        failures.extend(
+            lint_hallucinations(
+                spec_dir,
+                repo_root=repo_root,
+                require_canon_dir=True,
+                require_manifest_schema_registration=True,
+            )
+        )
+        failures.extend(
+            validate_canonical_integrity(
+                repo_root,
+                spec_dir,
+                require_manifest_schema_registration=True,
+            )
+        )
 
     root = Path(os.path.abspath(repo_root))
-    failures.extend(lint_canon_dir(repo_root))
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
         step_order = _load_step_order(root / "tools" / "step_order.json")
         dep_errors = lint_dependency_order(repo_root)
@@ -197,6 +227,15 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
         failures.extend(run_prompt_schema_sync(repo_root))
 
     return failures
+
+
+def _has_canonical_bootstrap_failure(errors: list[str]) -> bool:
+    bootstrap_tokens = (
+        "missing_schema_registry",
+        "schema_uri_not_registered",
+        "schema_registry_bootstrap_failed",
+    )
+    return any(any(token in err for token in bootstrap_tokens) for err in errors)
 
 
 def _load_component_ids(repo_root: str, file_path: str) -> set[str] | None:

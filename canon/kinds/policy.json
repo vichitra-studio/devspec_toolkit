@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "policy",
+  "entries": [
+    {
+      "id": "cn:core:policy:spec-first",
+      "kind": "policy",
+      "preferred_label": "spec_first",
+      "definition": "Policy requiring spec updates to land before or with implementation changes.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "spec-driven-development"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

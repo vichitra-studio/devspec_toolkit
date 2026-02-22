@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from typing import Optional
 from unittest.mock import patch
 import sys
 
@@ -27,6 +28,35 @@ class CliB3Tests(unittest.TestCase):
             except SystemExit as exc:
                 code = int(exc.code) if isinstance(exc.code, int) else 1
         return code, stdout.getvalue(), stderr.getvalue()
+
+    def _write_schema_registry_with_canon(self, repo_root: Path, extra_map: Optional[dict[str, str]] = None) -> None:
+        tools_dir = repo_root / "tools"
+        schema_core_dir = repo_root / "schema" / "core"
+        tools_dir.mkdir(exist_ok=True)
+        schema_core_dir.mkdir(parents=True, exist_ok=True)
+        (schema_core_dir / "canon.schema.json").write_text(
+            json.dumps(
+                {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://specdev.local/schema/core/canon/1",
+                    "type": "object",
+                    "properties": {
+                        "registry_version": {"type": "string"},
+                        "entries": {"type": "array", "items": {"type": "object"}},
+                        "aliases": {"type": "array", "items": {"type": "object"}},
+                    },
+                    "required": ["registry_version", "entries", "aliases"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        registry_map = {
+            "https://specdev.local/schema/core/canon/1": "schema/core/canon.schema.json",
+        }
+        if extra_map:
+            registry_map.update(extra_map)
+        (tools_dir / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
 
     def test_help_lists_b3_subcommands(self):
         code, out, _ = self._run_cli(["--help"])
@@ -184,6 +214,34 @@ class CliB3Tests(unittest.TestCase):
             self.assertIn("OK (warnings)", out)
             self.assertIn("W130", err)
 
+    def test_canonical_integrity_fails_when_spec_dir_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            missing = repo_root / "missing-spec"
+            code, out, err = self._run_cli(["canonical-integrity", str(missing), "--repo-root", str(repo_root)])
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing_spec_dir", err)
+
+    def test_canonical_autofix_fails_when_spec_dir_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            missing = repo_root / "missing-spec"
+            code, out, err = self._run_cli(["canonical-autofix", str(missing), "--repo-root", str(repo_root), "--dry-run"])
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing_spec_dir", err)
+
+    def test_canonical_autofix_fails_when_spec_dir_is_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            not_dir = repo_root / "not-a-dir.json"
+            not_dir.write_text("{}", encoding="utf-8")
+            code, out, err = self._run_cli(["canonical-autofix", str(not_dir), "--repo-root", str(repo_root), "--dry-run"])
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing_spec_dir", err)
+
     def test_canonical_autofix_infers_refs_and_skips_unknown_aliases(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
@@ -195,13 +253,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -501,13 +555,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -621,13 +671,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -723,13 +769,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -799,13 +841,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -913,7 +951,7 @@ class CliB3Tests(unittest.TestCase):
             spec_dir.mkdir()
             canon_dir.mkdir()
             tools_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text("{}", encoding="utf-8")
+            self._write_schema_registry_with_canon(repo_root, {})
             (canon_dir / "manifest.json").write_text(
                 json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
                 encoding="utf-8",
@@ -939,13 +977,9 @@ class CliB3Tests(unittest.TestCase):
             canon_dir.mkdir()
             tools_dir.mkdir()
             schema_dir.mkdir()
-            (tools_dir / "schema_registry.json").write_text(
-                json.dumps(
-                    {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
-                    }
-                ),
-                encoding="utf-8",
+            self._write_schema_registry_with_canon(
+                repo_root,
+                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
@@ -1029,6 +1063,208 @@ class CliB3Tests(unittest.TestCase):
             self.assertIn("E520 UNRESOLVED_INPUT", err)
             self.assertIn("schema_registry_bootstrap_failed", err)
 
+    def test_canonical_autofix_fails_when_canon_registry_load_has_errors(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "$schema": {"type": "string"},
+                            "term": {"type": "string"},
+                            "canonical_refs_used": {"type": "array"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # Malformed modular registry artifact should fail autofix preflight.
+            (canon_dir / "aliases.json").write_text("{bad", encoding="utf-8")
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "term": "jwt", "canonical_refs_used": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("invalid_aliases", err)
+
+    def test_canonical_autofix_fails_when_kind_file_shape_is_invalid(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            tools_dir = repo_root / "tools"
+            schema_dir = repo_root / "schema"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            tools_dir.mkdir()
+            schema_dir.mkdir()
+            (canon_dir / "kinds").mkdir()
+            (tools_dir / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (schema_dir / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {
+                            "$schema": {"type": "string"},
+                            "term": {"type": "string"},
+                            "canonical_refs_used": {"type": "array"},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (canon_dir / "kinds" / "term.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "term",
+                        "registry_version": "1.0.0",
+                        "entries": {"id": "cn:core:term:jwt", "preferred_label": "jwt"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "term": "jwt", "canonical_refs_used": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("invalid_kind_file", err)
+            self.assertIn("entries must be an array", err)
+
+    def test_canonical_integrity_fails_when_alias_missing_required_target_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            (canon_dir / "aliases.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "aliases": [{"kind": "term", "normalized": "jwt"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"canonical_refs_used": [], "canonical_proposals": [], "canonical_conflicts": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(["canonical-integrity", str(spec_dir), "--repo-root", str(repo_root)])
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("manifest.aliases[0] missing target_id", err)
+
+    def test_canonical_autofix_fails_when_alias_missing_required_target_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            (canon_dir / "aliases.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "aliases": [{"kind": "term", "normalized": "jwt"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"canonical_refs_used": [], "canonical_proposals": [], "canonical_conflicts": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("manifest.aliases[0] missing target_id", err)
+
+    def test_canonical_autofix_fails_when_entry_lifecycle_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            canon_dir = repo_root / "canon"
+            spec_dir.mkdir()
+            canon_dir.mkdir()
+            (canon_dir / "kinds").mkdir()
+            (canon_dir / "kinds" / "term.json").write_text(
+                json.dumps(
+                    {
+                        "kind": "term",
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {
+                                "id": "cn:core:term:jwt",
+                                "kind": "term",
+                                "preferred_label": "jwt",
+                                "definition": "token",
+                                "version": "1.0.0",
+                                "status": "active",
+                                "owners": ["team"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({"canonical_refs_used": [], "canonical_proposals": [], "canonical_conflicts": []}),
+                encoding="utf-8",
+            )
+
+            code, out, err = self._run_cli(
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing introduced_at", err)
+
     def test_new_b3_command_dispatch_paths(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
@@ -1044,6 +1280,7 @@ class CliB3Tests(unittest.TestCase):
                 p_canon_lint.assert_called_once_with(
                     os.path.abspath(str(repo_root)),
                     canon_dir=os.path.abspath(str(canon_dir)),
+                    require_manifest_schema_registration=True,
                 )
 
             with patch("specdev_tools.canonical_integrity.validate_canonical_integrity", return_value=[]) as p_integrity:
@@ -1054,6 +1291,7 @@ class CliB3Tests(unittest.TestCase):
                     os.path.abspath(str(repo_root)),
                     os.path.abspath(str(spec_dir)),
                     canon_dir="canon",
+                    require_manifest_schema_registration=True,
                 )
 
             with patch("specdev_tools.canonical_autofix.canonical_autofix", return_value={}) as p_autofix:
@@ -1065,6 +1303,7 @@ class CliB3Tests(unittest.TestCase):
                     os.path.abspath(str(spec_dir)),
                     write=False,
                     canon_dir="canon",
+                    require_manifest_schema_registration=True,
                 )
 
             with patch("specdev_tools.spec_quality_lint.lint_spec_quality", return_value=[]) as p_quality:
@@ -1081,6 +1320,8 @@ class CliB3Tests(unittest.TestCase):
                     os.path.abspath(str(spec_dir)),
                     repo_root=os.path.abspath(str(repo_root)),
                     canon_dir="canon",
+                    require_canon_dir=True,
+                    require_manifest_schema_registration=True,
                 )
 
             with patch("specdev_tools.dependency_order_lint.lint_dependency_order", return_value=[]) as p_dep:
@@ -1100,6 +1341,130 @@ class CliB3Tests(unittest.TestCase):
                     base_ref="feature/x",
                     diff_error_mode="error",
                 )
+
+    def test_hallucination_lint_fails_when_canon_dir_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            (spec_dir / "artifact.json").write_text(json.dumps({"id": "a1"}), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                [
+                    "hallucination-lint",
+                    str(spec_dir),
+                    "--repo-root",
+                    str(repo_root),
+                    "--canon-dir",
+                    "does_not_exist",
+                ]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing_canon_dir", err)
+
+    def test_hallucination_lint_fails_when_spec_dir_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            missing_spec = repo_root / "does-not-exist"
+
+            code, out, err = self._run_cli(
+                [
+                    "hallucination-lint",
+                    str(missing_spec),
+                    "--repo-root",
+                    str(repo_root),
+                ]
+            )
+            self.assertEqual(1, code)
+            self.assertEqual("", out.strip())
+            self.assertIn("missing_spec_dir", err)
+
+    def test_strict_canonical_manifest_schema_registration_is_enforced_across_commands(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            (repo_root / "tools").mkdir()
+            (repo_root / "canon").mkdir()
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+
+            (repo_root / "tools" / "schema_registry.json").write_text(
+                json.dumps({}),
+                encoding="utf-8",
+            )
+            (repo_root / "canon" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({}),
+                encoding="utf-8",
+            )
+
+            commands = [
+                ["canonical-integrity", str(spec_dir), "--repo-root", str(repo_root)],
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"],
+                ["hallucination-lint", str(spec_dir), "--repo-root", str(repo_root)],
+                ["validate-all", str(spec_dir), "--repo-root", str(repo_root)],
+            ]
+            for command in commands:
+                code, out, err = self._run_cli(command)
+                self.assertEqual(1, code, msg=f"command={command} out={out} err={err}")
+                self.assertEqual("", out.strip(), msg=f"command={command} unexpected stdout={out}")
+                self.assertIn("schema_uri_not_registered", err, msg=f"command={command} err={err}")
+                if command[0] == "validate-all":
+                    self.assertEqual(
+                        1,
+                        len([line for line in err.splitlines() if line.strip()]),
+                        msg=f"command={command} err={err}",
+                    )
+
+    def test_strict_canonical_manifest_schema_registration_fails_when_registry_file_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            (repo_root / "canon").mkdir()
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+
+            (repo_root / "canon" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (spec_dir / "artifact.json").write_text(
+                json.dumps({}),
+                encoding="utf-8",
+            )
+
+            commands = [
+                ["canonical-lint", str(repo_root / "canon"), "--repo-root", str(repo_root)],
+                ["canonical-integrity", str(spec_dir), "--repo-root", str(repo_root)],
+                ["canonical-autofix", str(spec_dir), "--repo-root", str(repo_root), "--dry-run"],
+                ["hallucination-lint", str(spec_dir), "--repo-root", str(repo_root)],
+                ["validate-all", str(spec_dir), "--repo-root", str(repo_root)],
+            ]
+            for command in commands:
+                code, out, err = self._run_cli(command)
+                self.assertEqual(1, code, msg=f"command={command} out={out} err={err}")
+                self.assertEqual("", out.strip(), msg=f"command={command} unexpected stdout={out}")
+                self.assertIn("missing_schema_registry", err, msg=f"command={command} err={err}")
+                if command[0] == "validate-all":
+                    self.assertEqual(
+                        1,
+                        len([line for line in err.splitlines() if line.strip()]),
+                        msg=f"command={command} err={err}",
+                    )
 
 
 if __name__ == "__main__":

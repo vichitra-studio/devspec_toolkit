@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "dependency",
+  "entries": [
+    {
+      "id": "cn:core:dependency:auth-service",
+      "kind": "dependency",
+      "preferred_label": "auth-service",
+      "definition": "External authentication service dependency used by roadmap and implementation planning artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "auth-service"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

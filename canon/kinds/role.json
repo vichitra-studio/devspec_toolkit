@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "role",
+  "entries": [
+    {
+      "id": "cn:core:role:reviewer",
+      "kind": "role",
+      "preferred_label": "reviewer",
+      "definition": "Actor responsible for validating implementation quality and spec alignment.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "code-reviewer"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

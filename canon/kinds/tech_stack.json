@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "tech_stack",
+  "entries": [
+    {
+      "id": "cn:core:tech_stack:python",
+      "kind": "tech_stack",
+      "preferred_label": "python",
+      "definition": "Python language/runtime component in the implementation technology stack.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "py"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

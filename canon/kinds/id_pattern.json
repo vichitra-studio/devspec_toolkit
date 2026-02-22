@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "id_pattern",
+  "entries": [
+    {
+      "id": "cn:core:id_pattern:conventional-commit",
+      "kind": "id_pattern",
+      "preferred_label": "conventional-commit",
+      "definition": "Commit message pattern enforcing type(scope): summary semantics for governance checks.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "commit-pattern"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

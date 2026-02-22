@@ -17,6 +17,12 @@
             "name": "Ask",
             "version": "v1",
             "protocol": "http",
+            "interface_ref": {
+                "id": "cn:core:interface:ask",
+                "kind": "interface",
+                "version": "^1.0.0",
+                "label": "ask"
+            },
             "route": "/ask",
             "method": "POST",
             "owner": "api"
@@ -26,6 +32,12 @@
             "name": "Search",
             "version": "v1",
             "protocol": "http",
+            "interface_ref": {
+                "id": "cn:core:interface:search",
+                "kind": "interface",
+                "version": "^1.0.0",
+                "label": "search"
+            },
             "route": "/search",
             "method": "GET",
             "owner": "api"
@@ -35,6 +47,12 @@
             "name": "Trace Retrieval",
             "version": "v1",
             "protocol": "http",
+            "interface_ref": {
+                "id": "cn:core:interface:trace-retrieval",
+                "kind": "interface",
+                "version": "^1.0.0",
+                "label": "trace retrieval"
+            },
             "route": "/trace",
             "method": "GET",
             "owner": "api"
@@ -51,7 +69,26 @@
         },
         "self_check_results": []
     },
-    "canonical_refs_used": [],
+    "canonical_refs_used": [
+        {
+            "id": "cn:core:interface:ask",
+            "kind": "interface",
+            "version": "^1.0.0",
+            "label": "ask"
+        },
+        {
+            "id": "cn:core:interface:search",
+            "kind": "interface",
+            "version": "^1.0.0",
+            "label": "search"
+        },
+        {
+            "id": "cn:core:interface:trace-retrieval",
+            "kind": "interface",
+            "version": "^1.0.0",
+            "label": "trace retrieval"
+        }
+    ],
     "canonical_proposals": [],
     "canonical_conflicts": []
 }

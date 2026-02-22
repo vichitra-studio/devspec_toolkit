@@ -1,0 +1,57 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "risk_category",
+  "entries": [
+    {
+      "id": "cn:core:risk_category:authn",
+      "kind": "risk_category",
+      "preferred_label": "authn",
+      "definition": "Risk related to user authentication mechanisms.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "authentication"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:authz",
+      "kind": "risk_category",
+      "preferred_label": "authz",
+      "definition": "Risk related to authorization and access control.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "authorization"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-privacy",
+      "kind": "risk_category",
+      "preferred_label": "data_privacy",
+      "definition": "Risk related to misuse or exposure of sensitive data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "privacy"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

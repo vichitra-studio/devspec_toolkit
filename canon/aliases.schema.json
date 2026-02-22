@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specdev.local/schema/canon/aliases/1",
+  "title": "Canonical Alias Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "registry_version": {
+      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver"
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/canon/1#/$defs/alias"
+      }
+    }
+  },
+  "required": [
+    "registry_version",
+    "aliases"
+  ]
+}

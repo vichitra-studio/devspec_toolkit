@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "governance_label",
+  "entries": [
+    {
+      "id": "cn:core:governance_label:security",
+      "kind": "governance_label",
+      "preferred_label": "security",
+      "definition": "Governance label for extensions and controls that directly affect security posture.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "sec"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

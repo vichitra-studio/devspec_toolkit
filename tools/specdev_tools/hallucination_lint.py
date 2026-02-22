@@ -4,6 +4,7 @@ import json
 import os
 from typing import Any
 
+from .canonical_lint import lint_canon_dir
 from .canonical_registry import CanonicalRegistry
 from .trace_types import is_valid_trace_type
 
@@ -21,12 +22,31 @@ KNOWN_UNITS = {
 }
 
 
-def lint_hallucinations(spec_dir: str, repo_root: str | None = None, canon_dir: str = "canon") -> list[str]:
+def lint_hallucinations(
+    spec_dir: str,
+    repo_root: str | None = None,
+    canon_dir: str = "canon",
+    require_canon_dir: bool = False,
+    require_manifest_schema_registration: bool = False,
+) -> list[str]:
     errors: list[str] = []
     known_ids: set[str] = set()
     refs: list[tuple[str, str, str]] = []
     root = repo_root or spec_dir
+    canon_root = os.path.join(root, canon_dir)
+    if require_canon_dir and not os.path.isdir(canon_root):
+        return [f"E520 UNRESOLVED_INPUT missing_canon_dir {canon_root}"]
+    if os.path.isdir(canon_root):
+        preflight_errors = lint_canon_dir(
+            root,
+            canon_dir=canon_dir,
+            require_manifest_schema_registration=require_manifest_schema_registration,
+        )
+        if preflight_errors:
+            return list(dict.fromkeys(preflight_errors))
     canon = CanonicalRegistry.load(root, canon_dir=canon_dir)
+    if canon.load_errors:
+        return list(dict.fromkeys(canon.load_errors))
     known_command_prefixes = _load_command_prefixes(root)
     for path in _iter_json(spec_dir):
         try:

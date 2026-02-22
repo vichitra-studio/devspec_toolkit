@@ -260,7 +260,11 @@ def main():
     elif args.cmd == "canonical-lint":
         from .canonical_lint import lint_canon_dir
         repo_root = os.path.abspath(args.repo_root)
-        errs = lint_canon_dir(repo_root, canon_dir=args.canon_dir)
+        errs = lint_canon_dir(
+            repo_root,
+            canon_dir=args.canon_dir,
+            require_manifest_schema_registration=True,
+        )
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
@@ -270,7 +274,12 @@ def main():
         from .canonical_integrity import validate_canonical_integrity
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = validate_canonical_integrity(repo_root, spec_dir, canon_dir=args.canon_dir)
+        errs = validate_canonical_integrity(
+            repo_root,
+            spec_dir,
+            canon_dir=args.canon_dir,
+            require_manifest_schema_registration=True,
+        )
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
@@ -284,8 +293,17 @@ def main():
         from .canonical_autofix import canonical_autofix
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
+        if not os.path.isdir(spec_dir):
+            print(f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}", file=sys.stderr)
+            sys.exit(1)
         write = bool(args.write and not args.dry_run)
-        changes = canonical_autofix(repo_root, spec_dir, write=write, canon_dir=args.canon_dir)
+        changes = canonical_autofix(
+            repo_root,
+            spec_dir,
+            write=write,
+            canon_dir=args.canon_dir,
+            require_manifest_schema_registration=True,
+        )
         if not changes:
             print("OK (no changes)")
             return
@@ -330,7 +348,16 @@ def main():
         from .hallucination_lint import lint_hallucinations
         spec_dir = os.path.abspath(args.spec_dir)
         repo_root = os.path.abspath(args.repo_root)
-        errs = lint_hallucinations(spec_dir, repo_root=repo_root, canon_dir=args.canon_dir)
+        if not os.path.isdir(spec_dir):
+            print(f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}", file=sys.stderr)
+            sys.exit(1)
+        errs = lint_hallucinations(
+            spec_dir,
+            repo_root=repo_root,
+            canon_dir=args.canon_dir,
+            require_canon_dir=True,
+            require_manifest_schema_registration=True,
+        )
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)

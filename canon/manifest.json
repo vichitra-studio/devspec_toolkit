@@ -428,6 +428,40 @@
       }
     },
     {
+      "id": "cn:core:interface:ask",
+      "kind": "interface",
+      "preferred_label": "ask",
+      "definition": "Ask API interface contract.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "ask-api"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-22T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:interface:http",
+      "kind": "interface",
+      "preferred_label": "http",
+      "definition": "HTTP interface contract.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "hypertext-transfer-protocol"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-22T00:00:00Z"
+      }
+    },
+    {
       "id": "cn:core:interface:http-json",
       "kind": "interface",
       "preferred_label": "http_json",
@@ -442,6 +476,40 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:interface:search",
+      "kind": "interface",
+      "preferred_label": "search",
+      "definition": "Search API interface contract.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "search-api"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-22T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:interface:trace-retrieval",
+      "kind": "interface",
+      "preferred_label": "trace_retrieval",
+      "definition": "Trace Retrieval API interface contract.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "trace-retrieval-api"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-22T00:00:00Z"
       }
     },
     {

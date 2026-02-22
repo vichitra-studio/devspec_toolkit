@@ -152,6 +152,85 @@ class HallucinationLintTests(unittest.TestCase):
             errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
             self.assertFalse(any("command=npm" in e for e in errs))
 
+    def test_canonical_load_errors_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "canon").mkdir()
+            (root / "canon" / "aliases.json").write_text("{bad", encoding="utf-8")
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"nfr_id": "n1", "unit": "ms"}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("invalid_aliases" in e for e in errs))
+
+    def test_canonical_preflight_errors_fail_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "canon").mkdir()
+            (root / "canon" / "aliases.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "aliases": [{"kind": "term", "normalized": "jwt", "status": "active"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"nfr_id": "n1", "unit": "ms"}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("missing target_id" in e for e in errs))
+
+    def test_missing_canon_dir_is_reported_when_required(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"nfr_id": "n1", "unit": "ms"}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                canon_dir="does_not_exist",
+                require_canon_dir=True,
+            )
+            self.assertTrue(any("missing_canon_dir" in e for e in errs))
+
+    def test_can_require_manifest_schema_registration(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "canon").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "schema_registry.json").write_text(json.dumps({}), encoding="utf-8")
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"nfr_id": "n1", "unit": "ms"}]}),
+                encoding="utf-8",
+            )
+            strict = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                require_manifest_schema_registration=True,
+            )
+            self.assertTrue(any("schema_uri_not_registered" in e for e in strict))
+
+            relaxed = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                require_manifest_schema_registration=False,
+            )
+            self.assertFalse(any("schema_uri_not_registered" in e for e in relaxed))
+
 
 if __name__ == "__main__":
     unittest.main()

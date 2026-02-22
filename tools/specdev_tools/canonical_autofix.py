@@ -9,16 +9,38 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
+from .canonical_lint import lint_canon_dir
 from .canonical_registry import CanonicalRegistry
 from .registry import SchemaRegistry
 
 
-def canonical_autofix(repo_root: str, spec_dir: str, write: bool = False, canon_dir: str = "canon") -> dict[str, list[str]]:
+def canonical_autofix(
+    repo_root: str,
+    spec_dir: str,
+    write: bool = False,
+    canon_dir: str = "canon",
+    require_manifest_schema_registration: bool = False,
+) -> dict[str, list[str]]:
+    spec_dir_abs = os.path.abspath(spec_dir)
+    if not os.path.isdir(spec_dir_abs):
+        return {spec_dir_abs: [f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}"]}
+    preflight_errors = lint_canon_dir(
+        repo_root,
+        canon_dir=canon_dir,
+        require_manifest_schema_registration=require_manifest_schema_registration,
+    )
+    if preflight_errors:
+        canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
+        return {canon_root: _uniq(preflight_errors)}
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
     schema_registry, schema_registry_error = _load_schema_registry(repo_root)
     changes: dict[str, list[str]] = {}
+    if registry.load_errors:
+        canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
+        changes[canon_root] = sorted(set(registry.load_errors))
+        return changes
     pending_writes: dict[str, Any] = {}
-    for path in _iter_json(spec_dir):
+    for path in _iter_json(spec_dir_abs):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -190,6 +212,10 @@ def _apply_if_schema_valid(
 
 def _has_errors(changes: dict[str, list[str]]) -> bool:
     return any(item.startswith("E") for entries in changes.values() for item in entries)
+
+
+def _uniq(messages: list[str]) -> list[str]:
+    return list(dict.fromkeys(messages))
 
 
 def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, list[str]]) -> None:

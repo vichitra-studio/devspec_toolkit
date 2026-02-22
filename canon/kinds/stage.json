@@ -1,0 +1,75 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "stage",
+  "entries": [
+    {
+      "id": "cn:core:stage:ci",
+      "kind": "stage",
+      "preferred_label": "ci",
+      "definition": "Continuous integration stage for automated verification.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "continuous integration"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:dev",
+      "kind": "stage",
+      "preferred_label": "dev",
+      "definition": "Development stage for local or shared dev workflows.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "development"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:prod",
+      "kind": "stage",
+      "preferred_label": "prod",
+      "definition": "Production stage serving real user traffic.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "production"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:staging",
+      "kind": "stage",
+      "preferred_label": "staging",
+      "definition": "Pre-production stage for release validation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "pre-prod",
+        "preproduction"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

@@ -138,6 +138,28 @@ class ValidateB2IntegrationTests(unittest.TestCase):
                 errs = validate_dir(str(root), str(root / "spec"))
             self.assertTrue(any("missing" in e and "manifest.json" in e for e in errs))
 
+    def test_validate_dir_short_circuits_on_canonical_bootstrap_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "canon").mkdir()
+            (root / "spec" / "00_charter.json").write_text(json.dumps({"$schema": "x"}), encoding="utf-8")
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            with patch("specdev_tools.validate.validate_file", return_value=[]) as p_validate_file, \
+                 patch("specdev_tools.validate.lint_spec_quality", return_value=[]) as p_quality, \
+                 patch("specdev_tools.validate.lint_hallucinations", return_value=[]) as p_hall, \
+                 patch("specdev_tools.validate.validate_canonical_integrity", return_value=[]) as p_integrity:
+                errs = validate_dir(str(root), str(root / "spec"))
+            self.assertEqual(1, len(errs))
+            self.assertIn("missing_schema_registry", errs[0])
+            self.assertFalse(p_validate_file.called)
+            self.assertFalse(p_quality.called)
+            self.assertFalse(p_hall.called)
+            self.assertFalse(p_integrity.called)
+
     def test_validate_dir_handles_invalid_json_without_crash(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -206,6 +228,7 @@ class ValidateB2IntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validate.lint_spec_quality", return_value=[]), \
                  patch("specdev_tools.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validate.validate_canonical_integrity", return_value=[]), \
+                 patch("specdev_tools.validate.lint_canon_dir", return_value=[]), \
                  patch("specdev_tools.validate.check_forward_replay", return_value=[]) as p_replay, \
                  patch("specdev_tools.validate.run_prompt_schema_sync", return_value=[]):
                 errs = validate_dir(str(root), str(root / "spec"))
