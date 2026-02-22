@@ -98,7 +98,7 @@ Before returning your output, you MUST verify each item:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `json`.
+Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 
 The JSON must:
 1. Be valid, parseable JSON

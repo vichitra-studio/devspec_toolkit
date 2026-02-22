@@ -113,7 +113,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - In strict mode, CI runs quality, hallucination, dependency-order, and replay checks as blocking gates.
 
 ## Two-Phase AI Runner Mode
-- Prompts support a two-phase flow: Clarify (questions only) → Emit (single fenced `json`).
+- Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
 - Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
 - Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
 - Operational guidance for agents and runner tips: `docs/agents/agents.md`.

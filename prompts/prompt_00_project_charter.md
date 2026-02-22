@@ -15,7 +15,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 0 · Project Charter**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -57,8 +57,8 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Owner reflects accountability for charter maintenance.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
@@ -125,180 +125,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What baselines exist today for each success metric, and how will we measure them (tool, dashboard, query)?
 - Which upstream systems, dependencies, or programs does this charter rely on, and what risks do they introduce?
 
-## Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/00_charter.schema.json",
-  "title": "00_charter",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "title": {
-      "type": "string"
-    },
-    "problem_statement": {
-      "type": "string",
-      "minLength": 20
-    },
-    "in_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 3
-    },
-    "out_of_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 3
-    },
-    "assumptions": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "risks": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "stakeholders": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "role": {
-            "type": "string"
-          },
-          "needs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          }
-        },
-        "required": [
-          "role",
-          "needs"
-        ]
-      }
-    },
-    "user_segments": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "segment_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "jobs_to_be_done": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "pains": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "gains": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          }
-        },
-        "required": [
-          "segment_id",
-          "description",
-          "jobs_to_be_done",
-          "pains",
-          "gains"
-        ]
-      }
-    },
-    "success_metrics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "metric_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "baseline": {
-            "oneOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "target": {
-            "oneOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "unit": {
-            "type": "string"
-          },
-          "measurement_method": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "metric_id",
-          "name",
-          "target",
-          "unit",
-          "measurement_method"
-        ]
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "problem_statement",
-    "success_metrics"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/00_charter.schema.json
+- Schema File: schema/00_charter.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

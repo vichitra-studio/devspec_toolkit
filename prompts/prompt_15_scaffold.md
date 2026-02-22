@@ -17,7 +17,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 15 · Scaffold Generation**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -51,12 +51,12 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Service skeleton sufficient to run a minimal service; validators listed.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. DO NOT invent preconditions, postconditions, or error states as they are not supported by the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
+6. Set owner to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
 7. Populate `trace` and `links` to connect to Step 05 or other artifacts if applicable.
 8. DO NOT guess `build_status`; default to `pending` if not known.
 9. DO NOT duplicate `api_ref` values in the route map.
@@ -104,132 +104,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What validators or code checks should run to keep generated code aligned with the spec?
 - What is the current build status and criteria for moving to `green`?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/15_scaffold.schema.json",
-  "title": "15_scaffold",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "service_skeleton": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "language": {
-          "type": "string",
-          "description": "Programming language (e.g., python, typescript, go). Use lowercase/kebab-case."
-        },
-        "framework": {
-          "type": "string",
-          "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
-        },
-        "modules": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-        }
-      },
-      "required": [
-        "language"
-      ]
-    },
-    "route_map": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "api_ref": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "path": {
-            "type": "string"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "GET",
-              "POST",
-              "PUT",
-              "DELETE",
-              "PATCH",
-              "OPTIONS",
-              "HEAD"
-            ]
-          }
-        },
-        "required": [
-          "api_ref",
-          "path",
-          "method"
-        ]
-      }
-    },
-    "validators": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "build_status": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "green",
-        "red"
-      ]
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "service_skeleton",
-    "route_map",
-    "validators",
-    "build_status"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/15_scaffold.schema.json
+- Schema File: schema/15_scaffold.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

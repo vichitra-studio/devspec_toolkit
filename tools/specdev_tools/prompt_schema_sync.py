@@ -18,6 +18,8 @@ FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 EMBEDDED_SCHEMA_RE = re.compile(r"#+\s*Embedded Schema\s*```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 OUTPUT_CONTRACT_HEADING_RE = re.compile(r"(?im)^#\s*Output Contract\b.*$")
 SUBHEADING_RE = re.compile(r"(?im)^##\s+")
+SCHEMA_URI_RE = re.compile(r"(?im)^\s*-\s*Schema URI:\s*(\S+)\s*$")
+SCHEMA_FILE_RE = re.compile(r"(?im)^\s*-\s*Schema File:\s*(\S+)\s*$")
 DRIFT_SENSITIVE_FIELDS = (
     "dependencies",
     "trace",
@@ -34,6 +36,7 @@ def run_prompt_schema_sync(repo_root: str) -> list[str]:
     prompt_dir = root / "prompts"
     errors: list[str] = []
     schema_contracts: dict[str, tuple[str, dict[str, Any], list[str], dict[str, Any]]] = {}
+    registry_map, registry_map_error = _schema_registry_map(root)
 
     schema_files = sorted(glob.glob(str(schema_dir / "*.schema.json")))
     for schema_file in schema_files:
@@ -50,9 +53,26 @@ def run_prompt_schema_sync(repo_root: str) -> list[str]:
         if not prompt_candidates:
             continue
         for prompt_path in prompt_candidates:
+            schema_ref, schema_ref_line = _extract_schema_reference(prompt_path)
+            errors.extend(
+                _schema_reference_errors(
+                    prompt_path=prompt_path,
+                    line_no=schema_ref_line,
+                    schema_file=schema_file,
+                    schema=schema,
+                    schema_ref=schema_ref,
+                    registry_map=registry_map,
+                    registry_map_error=registry_map_error,
+                    repo_root=root,
+                )
+            )
             prompt_required, prompt_props, prompt_schema, line_no = _extract_prompt_contract(prompt_path)
             if prompt_required is None:
-                errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing JSON contract block")
+                if schema_ref is None:
+                    errors.append(
+                        f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+                        "missing JSON contract block and schema reference"
+                    )
                 continue
             missing = sorted(set(schema_required) - set(prompt_required))
             extra = sorted(set(prompt_required) - set(schema_required))
@@ -120,6 +140,96 @@ def _extract_prompt_contract(prompt_path: str) -> tuple[list[str] | None, dict[s
                     props = {}
                 return req, props, parsed, line_no
     return None, {}, {}, 1
+
+
+def _extract_schema_reference(prompt_path: str) -> tuple[dict[str, str] | None, int]:
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        text = f.read()
+    uri_match = SCHEMA_URI_RE.search(text)
+    file_match = SCHEMA_FILE_RE.search(text)
+    if not uri_match and not file_match:
+        return None, 1
+    line_numbers = []
+    if uri_match:
+        line_numbers.append(text[:uri_match.start(1)].count("\n") + 1)
+    if file_match:
+        line_numbers.append(text[:file_match.start(1)].count("\n") + 1)
+    line_no = min(line_numbers) if line_numbers else 1
+    return {
+        "uri": uri_match.group(1).strip() if uri_match else "",
+        "file": file_match.group(1).strip() if file_match else "",
+    }, line_no
+
+
+def _schema_registry_map(repo_root: Path) -> tuple[dict[str, str] | None, str | None]:
+    try:
+        schema_registry = SchemaRegistry(str(repo_root))
+    except (OSError, ValueError, json.JSONDecodeError, TypeError) as exc:
+        return None, str(exc)
+    return schema_registry.map, None
+
+
+def _schema_reference_errors(
+    prompt_path: str,
+    line_no: int,
+    schema_file: str,
+    schema: dict[str, Any],
+    schema_ref: dict[str, str] | None,
+    registry_map: dict[str, str] | None,
+    registry_map_error: str | None,
+    repo_root: Path,
+) -> list[str]:
+    errors: list[str] = []
+    if schema_ref is None:
+        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema reference section")
+        return errors
+
+    uri = schema_ref.get("uri", "").strip()
+    rel_file = schema_ref.get("file", "").strip()
+    expected_uri = schema.get("$id")
+    expected_rel_file = Path(
+        os.path.relpath(os.path.abspath(schema_file), os.path.abspath(str(repo_root)))
+    ).as_posix()
+
+    if not uri:
+        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema URI reference")
+    elif isinstance(expected_uri, str) and expected_uri.strip() and uri != expected_uri:
+        errors.append(
+            f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            f"schema_uri_mismatch expected='{expected_uri}' got='{uri}'"
+        )
+
+    if not rel_file:
+        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema file reference")
+    elif Path(rel_file).as_posix() != expected_rel_file:
+        errors.append(
+            f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            f"schema_file_mismatch expected='{expected_rel_file}' got='{Path(rel_file).as_posix()}'"
+        )
+
+    if registry_map is None:
+        detail = registry_map_error or "unknown"
+        errors.append(
+            f"E520 UNRESOLVED_INPUT {prompt_path}:{line_no} "
+            f"schema_registry_bootstrap_failed detail={detail}"
+        )
+        return errors
+
+    if uri:
+        mapped = registry_map.get(uri)
+        if not mapped:
+            errors.append(
+                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+                f"schema_uri_not_registered uri='{uri}'"
+            )
+        elif rel_file and Path(mapped).as_posix() != Path(rel_file).as_posix():
+            errors.append(
+                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+                f"schema_registry_path_mismatch uri='{uri}' registry='{Path(mapped).as_posix()}' "
+                f"prompt='{Path(rel_file).as_posix()}'"
+            )
+
+    return errors
 
 
 def _drift_sensitive_property_errors(

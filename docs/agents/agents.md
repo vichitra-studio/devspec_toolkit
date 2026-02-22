@@ -33,7 +33,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
      - Stop and wait for human answers.
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
-   - Output exactly one fenced `json` code block that validates against the embedded schema; no extra prose.
+   - Write the JSON artifact directly to disk and validate against the referenced step schema; do not return fenced JSON as primary output.
    - Populate `seed_refs` with the seeds actually used.
 5. **Persist Artifact**
    - Replace the contents of `spec/NN_name.json` with the generated block.
@@ -79,7 +79,7 @@ When reporting back to humans, include:
 2. Commands executed and whether they succeeded.
 3. Outstanding issues or reasons for escalation.
 
-During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), output only the single fenced `json` block.
+During Phase A (Clarify), output only a bulleted list of questions grouped by topic. During Phase B (Emit), write the JSON artifact to disk and return only a concise status/path confirmation.
 
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.

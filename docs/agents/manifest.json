@@ -19,11 +19,12 @@
       "purpose": "Generate the canonical JSON artifact.",
       "output_contract": {
         "type": "json_artifact",
-        "fenced_code_block": true,
-        "language": "json",
         "restrictions": [
-          "Exactly one fenced json block"
-        ]
+          "Write the JSON artifact to disk at the configured step artifact path",
+          "Do not return fenced JSON as primary output"
+        ],
+        "write_to_disk": true,
+        "artifact_path_required": true
       }
     }
   },

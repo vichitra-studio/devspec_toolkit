@@ -21,7 +21,7 @@ You are a senior specification auditor and quality control expert. Your job is t
 # Task
 - **Input context:** all existing spec artifacts (`00_charter.json` through `12_ci_gates.json`) and their corresponding guides, plus the extension manifest (`13_extension_manifest.json`).
 - **Objective:** produce a complete, falsifiable completeness report for **Step 13a · Completeness Assessment**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Traceability:** connect findings to specific spec files and elements.
 
 ## Logic Update
@@ -88,8 +88,8 @@ You are a senior specification auditor and quality control expert. Your job is t
 
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. `completeness_rating.target` should always be 10.
 5. `missing_elements` must list specific gaps, not general complaints.
@@ -126,135 +126,16 @@ You are a senior specification auditor and quality control expert. Your job is t
 - Is there a known reason for missing headers/sections (e.g. omitted by design)?
 - Who is the primary audience for this assessment?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
-  "title": "13a_completeness_assessment",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "missing_elements": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "element_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "category": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "high",
-              "medium",
-              "low"
-            ]
-          },
-          "impact_on_completeness": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "specification_source": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(13_extension_manifest\\.json)|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
-            }
-          },
-          "risk_category_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "completeness_dimension_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "tag_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          }
-        },
-        "required": [
-          "element_id",
-          "category",
-          "description",
-          "priority",
-          "impact_on_completeness"
-        ]
-      }
-    },
-    "completeness_rating": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "current": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "target": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "confidence_level": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        }
-      },
-      "required": [
-        "current",
-        "target",
-        "confidence_level"
-      ]
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "missing_elements",
-    "completeness_rating"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/13a_completeness_assessment.schema.json
+- Schema File: schema/13a_completeness_assessment.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

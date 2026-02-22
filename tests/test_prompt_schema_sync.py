@@ -450,6 +450,86 @@ class PromptSchemaSyncTests(unittest.TestCase):
             self.assertTrue(any("E520 UNRESOLVED_INPUT" in e for e in errs))
             self.assertTrue(any("schema_registry_bootstrap_failed" in e for e in errs))
 
+    def test_accepts_schema_reference_without_embedded_schema_block(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps({schema_uri: "schema/00_charter.schema.json"}),
+                encoding="utf-8",
+            )
+            (root / "schema" / "00_charter.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": schema_uri,
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "prompts" / "prompt_00_project_charter.md").write_text(
+                (
+                    "# Schema Reference\n"
+                    "- Schema URI: https://specdev.local/schema/00_charter.schema.json\n"
+                    "- Schema File: schema/00_charter.schema.json\n"
+                    "- Schema Registry: tools/schema_registry.json\n\n"
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
+                    "```\n\n"
+                    "## B4 Metadata Contract\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            self.assertEqual([], errs, msg=f"unexpected errors: {errs}")
+
+    def test_detects_schema_reference_uri_mismatch_without_embedded_schema(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps({schema_uri: "schema/00_charter.schema.json"}),
+                encoding="utf-8",
+            )
+            (root / "schema" / "00_charter.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": schema_uri,
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "prompts" / "prompt_00_project_charter.md").write_text(
+                (
+                    "# Schema Reference\n"
+                    "- Schema URI: https://specdev.local/schema/wrong.schema.json\n"
+                    "- Schema File: schema/00_charter.schema.json\n"
+                    "- Schema Registry: tools/schema_registry.json\n\n"
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
+                    "```\n\n"
+                    "## B4 Metadata Contract\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            self.assertTrue(any("schema_uri_mismatch" in e for e in errs))
+
 
 if __name__ == "__main__":
     unittest.main()

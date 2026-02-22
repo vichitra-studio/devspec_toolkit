@@ -109,7 +109,7 @@ Before returning your output, you MUST verify each item:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `markdown`.
+Write the final Markdown artifact directly to disk at the target path(s) requested by the template.
 
 The markdown must:
 1. Be valid markdown syntax

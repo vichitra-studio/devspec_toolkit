@@ -101,8 +101,8 @@ Before writing formal specs, you must define the "Seed" of your project using th
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
    - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
-   - Phase B — Emit: after answering questions, rerun to emit exactly one fenced `json` block.
-4. Paste the single fenced `json` block into `spec/NN_name.json` in your host repo.
+   - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
+4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
 6. Keep traceability up to date; run the same command set after each change with the `--repo-root` flag.
 
@@ -122,7 +122,7 @@ Keep [reference.md](reference.md) handy for the complete command catalogue, flag
 - Copy the prompt exactly as stored under [./devspec_toolkit/prompts/](../../prompts/).
 - Use the two‑phase flow:
   - Phase A — Clarify: if the prompt’s “Self‑Audit Gate” is not satisfied, the assistant should output only a concise, grouped list of Gap Questions. Answer them.
-  - Phase B — Emit: the assistant then emits **exactly one** fenced `json` block that validates against the embedded schema.
+  - Phase B — Emit: the assistant writes the artifact JSON directly to disk and validates against the referenced step schema.
 - Clarify responses: short, bulleted questions grouped by topic; no JSON, no code fences, no speculative answers; prioritize gating items (trace/owners/units/methods/security) and stop after asking until you respond.
 - If validation fails, consult the guide, address errors, and re-run the emission.
 - Need a quick reminder of the workflow for a given step? Run `./tools/run_specdev.sh ai-help --step NN`.

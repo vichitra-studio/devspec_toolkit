@@ -21,7 +21,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 10 · Governance & Change Control**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -56,12 +56,12 @@ You are a senior specification author and validator. Your job is to emit a singl
   - PR rules list core validations; reviewers cover necessary disciplines.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`.
+6. Set owner to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
 7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
@@ -114,116 +114,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Must commit messages include spec IDs? Provide the exact regex/pattern to enforce.
 - Who are the required reviewers by change type (spec vs code)? Any escalation paths?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/10_governance.schema.json",
-  "title": "10_governance",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "versioning": {
-      "type": "string"
-    },
-    "pr_rules": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "validate",
-          "validate-all",
-          "matrix",
-          "fixtures-lint",
-          "invariants-check",
-          "governance-check",
-          "test",
-          "build",
-          "lint",
-          "format",
-          "audit",
-          "security"
-        ]
-      },
-      "uniqueItems": true
-    },
-    "spec_first_policy": {
-      "type": "boolean"
-    },
-    "commit_message_rules": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "require_spec_ids": {
-          "type": "boolean"
-        },
-        "pattern": {
-          "type": "string"
-        },
-        "error_message": {
-          "type": "string",
-          "description": "Human readable guidance. MUST list allowed types/values if a specific set is required."
-        }
-      },
-      "required": [
-        "require_spec_ids"
-      ]
-    },
-    "reviewers": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_first_policy",
-    "commit_message_rules"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/10_governance.schema.json
+- Schema File: schema/10_governance.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

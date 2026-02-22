@@ -15,7 +15,7 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 # Task
 - **Input Context**: Step 01 (Capabilities), Step 02 (System Sketch), Step 04 (Requirements), Step 05 (Interfaces), Step 07 (NFRs).
 - **Objective**: Identify distinct architectural components or domains that require their own dedicated specification file (Extension) to avoid monolithic complexity.
-- **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the Embedded Schema.
+- **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the referenced step schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
 
 ## Seed Order & Mandatory Sources
@@ -56,103 +56,20 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
 
 # Output Rules
-1. Returns exactly one fenced code block with language `json`.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13_extension_generator.schema.json",
-  "title": "13_extension_generator",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "extensions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "extension_id": {
-            "type": "string",
-            "pattern": "^ext-[0-9]{2}-[a-z0-9-]+$",
-            "description": "Unique ID for the extension (e.g. 'ext-01-database')"
-          },
-          "title": {
-            "type": "string"
-          },
-          "file_name": {
-            "type": "string",
-            "pattern": "^ext_[0-9]{2}_[a-z0-9_]+\\.json$",
-            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'"
-          },
-          "area_of_concern": {
-            "type": "string",
-            "description": "Domain (e.g. Data, Security, AI)"
-          },
-          "justification": {
-            "type": "string"
-          },
-          "required_schema_sections": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "schema_design_guidelines": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "extension_id",
-          "title",
-          "file_name",
-          "area_of_concern",
-          "required_schema_sections"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "extensions"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/13_extension_generator.schema.json
+- Schema File: schema/13_extension_generator.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

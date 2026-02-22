@@ -211,273 +211,16 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 - Are there any ambiguous requirements that need resolution before coding?
 - Do we have existing tests we can extend, or must we create new ones?
 
-# Embedded Schema
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_impl_context.schema.json",
-  "title": "16_impl_context",
-  "type": "object",
-  "additionalProperties": false,
-  "$defs": {
-    "specRef": {
-      "type": "object",
-      "required": [
-        "type",
-        "id",
-        "line_range",
-        "commit_hash"
-      ],
-      "properties": {
-        "type": {
-          "enum": [
-            "fr",
-            "api",
-            "nfr",
-            "inv",
-            "fixture",
-            "doc",
-            "code"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "line_range": {
-          "type": "string"
-        },
-        "commit_hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{40}$"
-        }
-      }
-    }
-  },
-  "properties": {
-    "id": {
-      "type": "string"
-    },
-    "owner": {
-      "type": "string"
-    },
-    "created_at": {
-      "type": "string"
-    },
-    "extensions": {
-      "type": "object"
-    },
-    "plan": {
-      "type": "object",
-      "required": [
-        "summary",
-        "spec_alignment",
-        "review_requirements"
-      ],
-      "properties": {
-        "summary": {
-          "type": "object",
-          "required": [
-            "functional_summary",
-            "scope_in",
-            "target_file_patterns"
-          ],
-          "properties": {
-            "functional_summary": {
-              "type": "string"
-            },
-            "scope_in": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "scope_out": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "target_file_patterns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "spec_alignment": {
-          "type": "object",
-          "required": [
-            "checklist"
-          ],
-          "properties": {
-            "requirements_summary": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "theme",
-                  "summary"
-                ],
-                "properties": {
-                  "theme": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  }
-                }
-              }
-            },
-            "checklist": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": [
-                  "id",
-                  "spec_ref",
-                  "description",
-                  "linked_test_expectation"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "spec_ref": {
-                    "$ref": "#/$defs/specRef"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "linked_test_expectation": {
-                    "type": "string"
-                  },
-                  "checklist_status": {
-                    "enum": [
-                      "active",
-                      "deferred"
-                    ]
-                  },
-                  "implementation": {
-                    "type": "object",
-                    "required": [
-                      "status",
-                      "actions"
-                    ],
-                    "properties": {
-                      "status": {
-                        "enum": [
-                          "pending",
-                          "in_progress",
-                          "verified",
-                          "deferred"
-                        ]
-                      },
-                      "files_touched": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "actions": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "required": [
-                            "type",
-                            "description"
-                          ],
-                          "properties": {
-                            "type": {
-                              "enum": [
-                                "file_create",
-                                "file_edit",
-                                "run_command",
-                                "manual_verification"
-                              ]
-                            },
-                            "description": {
-                              "type": "string"
-                            },
-                            "target": {
-                              "type": "string"
-                            },
-                            "command": {
-                              "type": "string"
-                            },
-                            "evidence": {
-                              "type": "object",
-                              "required": [
-                                "type",
-                                "content"
-                              ],
-                              "properties": {
-                                "type": {
-                                  "enum": [
-                                    "log",
-                                    "snippet",
-                                    "screenshot"
-                                  ]
-                                },
-                                "content": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "review_requirements": {
-          "type": "object",
-          "required": [
-            "test_commands"
-          ],
-          "properties": {
-            "test_commands": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "plan"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema File: schema/16_impl_context.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -543,7 +286,12 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
     },
     "self_check_results": []
   },
-  "canonical_refs_used": [],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
   "canonical_proposals": [],
   "canonical_conflicts": []
 
@@ -551,6 +299,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 ```
 
 ## B4 Metadata Contract
+- Carry-forward canonical bindings from Step 16: preserve existing `*_ref` bindings and `canonical_refs_used` entries unless replaced by validated evidence in this step.
 - Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
 - `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
 - Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.

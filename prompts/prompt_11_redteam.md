@@ -21,7 +21,7 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 # Task
 - **Input context:** Interface Contracts (`spec/05_interface_contracts.json`), System Sketch (`spec/02_system_sketch.json`), Invariants (`spec/06_invariants.json`), and NFRs (`spec/07_nfrs.json`).
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
-- **Output type:** One JSON document conforming to the Embedded Schema.
+- **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
 - **Constraint:** EVERY mitigation must link to a requirement (NFR, Inv, FR) or be a clear directive.
 
@@ -73,9 +73,9 @@ Use the `category` field to classify threats precisely:
 - [ ] Are `edge_cases` structured with IDs?
 
 # Output Rules
-1.  Return exactly one fenced code block with language `json`.
-2.  **NO** prose before or after the JSON.
-3.  Follow the **Embedded Schema** exactly.
+1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2.  Do not dump JSON in the chat thread; respond with a short confirmation that the artifact path was written and validation status.
+3.  Follow the referenced step schema exactly.
 4.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
 5.  `target_ids`: MUST be populated for every threat.
 6.  `mitigations`: MUST use `traceRef` structure (type + id).
@@ -137,161 +137,16 @@ Use the `category` field to classify threats precisely:
 - Are there specific legacy components known to be fragile?
 - What is the expected throughput (NFRs) to define "Resource Exhaustion" thresholds?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/11_redteam.schema.json",
-  "title": "11_redteam",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "threats": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "threat_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "vector": {
-            "type": "string"
-          },
-          "target_ids": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "authn",
-              "authz",
-              "business_logic",
-              "transport",
-              "data_privacy"
-            ]
-          },
-          "mitigations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "fr",
-                    "api",
-                    "nfr",
-                    "inv",
-                    "fixture",
-                    "doc",
-                    "capability"
-                  ]
-                },
-                "id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "note": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "id"
-              ]
-            }
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ]
-          }
-        },
-        "required": [
-          "threat_id",
-          "description",
-          "severity"
-        ]
-      }
-    },
-    "edge_cases": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "trigger": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "description"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "threats"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/11_redteam.schema.json
+- Schema File: schema/11_redteam.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json

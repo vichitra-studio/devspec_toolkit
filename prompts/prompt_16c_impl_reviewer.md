@@ -198,8 +198,13 @@ For each `checklist[]` item:
 3. **NEVER** skip `metadata_usage` rating
 
 # Output Rule
-1.  Return exactly one fenced code block with language `json`.
+1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
+
+# Schema Reference
+- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema File: schema/16_impl_context.schema.json
+- Schema Registry: tools/schema_registry.json
 
 # Output Contract (Update Logic)
 *Input*:
@@ -286,7 +291,12 @@ For each `checklist[]` item:
     },
     "self_check_results": []
   },
-  "canonical_refs_used": [],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
   "canonical_proposals": [],
   "canonical_conflicts": []
 }
@@ -410,13 +420,25 @@ For each `checklist[]` item:
     },
     "self_check_results": []
   },
-  "canonical_refs_used": [],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
   "canonical_proposals": [],
   "canonical_conflicts": []
 }
 ```
 
 ## B4 Metadata Contract
+- Carry-forward canonical bindings from Step 16: preserve existing `*_ref` bindings and `canonical_refs_used` entries unless replaced by validated evidence in this step.
 - Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
 - `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
 - Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.

@@ -597,7 +597,7 @@ Before returning your output, you MUST verify:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `json`.
+Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 Do NOT include explanatory text outside the code block.
 The JSON must be valid and complete.
 ```
@@ -757,7 +757,7 @@ Before returning your output, you MUST verify each item:
 
 ## Output Contract
 
-Return exactly one fenced code block with language `json`.
+Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 
 The JSON must:
 1. Be valid, parseable JSON
