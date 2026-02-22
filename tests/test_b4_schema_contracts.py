@@ -661,7 +661,7 @@ class B4SchemaContractsTests(unittest.TestCase):
             canonical_autofix(str(root), str(root / "spec"), write=True)
             payload = json.loads(sample.read_text(encoding="utf-8"))
             self.assertEqual(
-                {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
+                {"id": "cn:core:risk_category:authz", "kind": "risk_category", "version": "1.0.0"},
                 payload["threats"][0].get("risk_category_ref"),
             )
             declared_ids = {item["id"] for item in payload["canonical_refs_used"]}

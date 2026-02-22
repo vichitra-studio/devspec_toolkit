@@ -134,9 +134,9 @@ You are a senior specification author and validator. Your job is to emit a singl
       "metric": "p95 login latency",
       "target": 200,
       "unit": "ms",
-      "metric_ref": {"id": "cn:core:metric:error-rate", "kind": "metric"},
-      "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit"},
-      "environment_ref": {"id": "cn:core:environment:prod", "kind": "environment"}
+      "metric_ref": {"id": "cn:core:metric:error-rate", "kind": "metric", "version": "1.0.0"},
+      "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0"},
+      "environment_ref": {"id": "cn:core:environment:prod", "kind": "environment", "version": "1.0.0"}
     }
   ],
   "generation_quality": {
@@ -151,9 +151,9 @@ You are a senior specification author and validator. Your job is to emit a singl
     "self_check_results": []
   },
   "canonical_refs_used": [
-    {"id": "cn:core:metric:error-rate", "kind": "metric"},
-    {"id": "cn:core:unit:ms", "kind": "unit"},
-    {"id": "cn:core:environment:prod", "kind": "environment"}
+    {"id": "cn:core:metric:error-rate", "kind": "metric", "version": "1.0.0"},
+    {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0"},
+    {"id": "cn:core:environment:prod", "kind": "environment", "version": "1.0.0"}
   ],
   "canonical_proposals": [],
   "canonical_conflicts": []

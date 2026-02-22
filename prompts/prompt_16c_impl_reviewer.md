@@ -294,7 +294,8 @@ For each `checklist[]` item:
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit"
+      "kind": "unit",
+      "version": "1.0.0"
     }
   ],
   "canonical_proposals": [],
@@ -423,7 +424,8 @@ For each `checklist[]` item:
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit"
+      "kind": "unit",
+      "version": "1.0.0"
     }
   ],
   "canonical_proposals": [],

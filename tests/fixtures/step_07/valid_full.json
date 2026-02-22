@@ -20,15 +20,18 @@
       "unit": "ms",
       "metric_ref": {
         "id": "cn:core:metric:error-rate",
-        "kind": "metric"
+        "kind": "metric",
+        "version": "1.0.0"
       },
       "unit_ref": {
         "id": "cn:core:unit:ms",
-        "kind": "unit"
+        "kind": "unit",
+        "version": "1.0.0"
       },
       "environment_ref": {
         "id": "cn:core:environment:prod",
-        "kind": "environment"
+        "kind": "environment",
+        "version": "1.0.0"
       },
       "measurement_method": "PromQL: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m])) by (le))",
       "stage": "prod",
@@ -48,15 +51,18 @@
       "unit": "rps",
       "metric_ref": {
         "id": "cn:core:metric:error-rate",
-        "kind": "metric"
+        "kind": "metric",
+        "version": "1.0.0"
       },
       "unit_ref": {
         "id": "cn:core:unit:ms",
-        "kind": "unit"
+        "kind": "unit",
+        "version": "1.0.0"
       },
       "environment_ref": {
         "id": "cn:core:environment:prod",
-        "kind": "environment"
+        "kind": "environment",
+        "version": "1.0.0"
       },
       "measurement_method": "PromQL: rate(http_requests_total{job=\"api-server\"}[5m])",
       "stage": "prod",
@@ -76,15 +82,18 @@
       "unit": "%",
       "metric_ref": {
         "id": "cn:core:metric:error-rate",
-        "kind": "metric"
+        "kind": "metric",
+        "version": "1.0.0"
       },
       "unit_ref": {
         "id": "cn:core:unit:percent",
-        "kind": "unit"
+        "kind": "unit",
+        "version": "1.0.0"
       },
       "environment_ref": {
         "id": "cn:core:environment:prod",
-        "kind": "environment"
+        "kind": "environment",
+        "version": "1.0.0"
       },
       "measurement_method": "PromQL: (1 - sum(rate(http_request_duration_seconds_bucket{job=\"api-server\", status!~\"2..\"}[5m])) / sum(rate(http_request_duration_seconds_bucket{job=\"api-server\"}[5m]))) * 100",
       "stage": "prod",
@@ -104,15 +113,18 @@
       "unit": "USD",
       "metric_ref": {
         "id": "cn:core:metric:error-rate",
-        "kind": "metric"
+        "kind": "metric",
+        "version": "1.0.0"
       },
       "unit_ref": {
         "id": "cn:core:unit:percent",
-        "kind": "unit"
+        "kind": "unit",
+        "version": "1.0.0"
       },
       "environment_ref": {
         "id": "cn:core:environment:prod",
-        "kind": "environment"
+        "kind": "environment",
+        "version": "1.0.0"
       },
       "measurement_method": "Cloud billing dashboard with cost allocation tags",
       "stage": "prod",
@@ -132,15 +144,18 @@
       "unit": "",
       "metric_ref": {
         "id": "cn:core:metric:error-rate",
-        "kind": "metric"
+        "kind": "metric",
+        "version": "1.0.0"
       },
       "unit_ref": {
         "id": "cn:core:unit:percent",
-        "kind": "unit"
+        "kind": "unit",
+        "version": "1.0.0"
       },
       "environment_ref": {
         "id": "cn:core:environment:prod",
-        "kind": "environment"
+        "kind": "environment",
+        "version": "1.0.0"
       },
       "measurement_method": "Configuration review of storage systems",
       "stage": "prod",

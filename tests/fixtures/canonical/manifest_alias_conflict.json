@@ -4,6 +4,7 @@
     {
       "id": "cn:core:metric:error-rate",
       "kind": "metric",
+      "version": "1.0.0",
       "status": "active",
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
@@ -12,6 +13,7 @@
     {
       "id": "cn:core:metric:failure-rate",
       "kind": "metric",
+      "version": "1.0.0",
       "status": "active",
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"

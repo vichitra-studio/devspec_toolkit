@@ -108,7 +108,8 @@
           "pattern": "^[a-z_][a-z0-9_]*$"
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
         },
         "label": {
           "type": "string"
@@ -122,7 +123,506 @@
       },
       "required": [
         "id",
+        "kind",
+        "version"
+      ]
+    },
+    "canonicalRefOfMetric": {
+      "$anchor": "canonicalRefOfMetric",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:metric:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "metric"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfUnit": {
+      "$anchor": "canonicalRefOfUnit",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:unit:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "unit"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfStatus": {
+      "$anchor": "canonicalRefOfStatus",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:status:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "status"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfEnvironment": {
+      "$anchor": "canonicalRefOfEnvironment",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:environment:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "environment"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfStage": {
+      "$anchor": "canonicalRefOfStage",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:stage:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "stage"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfTerm": {
+      "$anchor": "canonicalRefOfTerm",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:term:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "term"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfAcronym": {
+      "$anchor": "canonicalRefOfAcronym",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:acronym:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "acronym"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfCapability": {
+      "$anchor": "canonicalRefOfCapability",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:capability:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "capability"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfAction": {
+      "$anchor": "canonicalRefOfAction",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:action:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "action"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfEntity": {
+      "$anchor": "canonicalRefOfEntity",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:entity:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "entity"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfRole": {
+      "$anchor": "canonicalRefOfRole",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:role:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "role"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfPolicy": {
+      "$anchor": "canonicalRefOfPolicy",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:policy:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "policy"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfTag": {
+      "$anchor": "canonicalRefOfTag",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:tag:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "tag"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfRiskCategory": {
+      "$anchor": "canonicalRefOfRiskCategory",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:risk_category:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "risk_category"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfGovernanceLabel": {
+      "$anchor": "canonicalRefOfGovernanceLabel",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:governance_label:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "governance_label"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfIdPattern": {
+      "$anchor": "canonicalRefOfIdPattern",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:id_pattern:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "id_pattern"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfInterface": {
+      "$anchor": "canonicalRefOfInterface",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:interface:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "interface"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfEvent": {
+      "$anchor": "canonicalRefOfEvent",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:event:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "event"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfCommand": {
+      "$anchor": "canonicalRefOfCommand",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:command:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "command"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfTechStack": {
+      "$anchor": "canonicalRefOfTechStack",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:tech_stack:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "tech_stack"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfDependency": {
+      "$anchor": "canonicalRefOfDependency",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:dependency:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "dependency"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalRefOfCompletenessDimension": {
+      "$anchor": "canonicalRefOfCompletenessDimension",
+      "allOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "pattern": "^cn:[a-z0-9.]+:completeness_dimension:[a-z0-9-]+$"
+            },
+            "kind": {
+              "const": "completeness_dimension"
+            }
+          }
+        }
+      ]
+    },
+    "canonicalFieldBinding": {
+      "$anchor": "canonicalFieldBinding",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_field": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_\\[\\].-]+$"
+        },
+        "ref_field": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*_ref$"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "required_mode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "lenient"
+          ],
+          "default": "lenient"
+        },
+        "allow_plural_alias": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "source_field",
+        "ref_field",
         "kind"
+      ]
+    },
+    "canonicalFieldBindingArray": {
+      "$anchor": "canonicalFieldBindingArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalFieldBinding"
+      }
+    },
+    "canonicalBindingMap": {
+      "$anchor": "canonicalBindingMap",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalFieldBinding"
+      }
+    },
+    "xCanonicalBinding": {
+      "$anchor": "xCanonicalBinding",
+      "oneOf": [
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalFieldBinding"
+        },
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalFieldBindingArray"
+        },
+        {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalBindingMap"
+        }
+      ]
+    },
+    "xCanonicalBindingExtension": {
+      "$anchor": "xCanonicalBindingExtension",
+      "type": "object",
+      "properties": {
+        "x-canonical-binding": {
+          "$ref": "https://specdev.local/schema/core/collections/1#xCanonicalBinding"
+        }
+      },
+      "required": [
+        "x-canonical-binding"
       ]
     },
     "canonicalRefArray": {
@@ -137,6 +637,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "proposal_id": {
+          "type": "string",
+          "pattern": "^cp:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
+        },
         "temp_id": {
           "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
         },
@@ -158,11 +662,26 @@
         }
       },
       "required": [
-        "temp_id",
         "kind",
         "proposed_label",
         "definition",
         "source_field"
+      ],
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "proposal_id"
+              ]
+            },
+            {
+              "required": [
+                "temp_id"
+              ]
+            }
+          ]
+        }
       ]
     },
     "canonicalProposalArray": {

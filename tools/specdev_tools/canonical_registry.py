@@ -47,6 +47,8 @@ class CanonicalRegistry:
         def register_alias(kind: str, alias_value: str, target_id: str, status: str = "active") -> None:
             if not isinstance(kind, str) or not isinstance(alias_value, str) or not isinstance(target_id, str):
                 return
+            if _is_proposal_id(target_id):
+                return
             normalized = _norm(alias_value)
             if not normalized:
                 return
@@ -143,12 +145,11 @@ def _norm(value: str) -> str:
 
 
 def _version_matches(actual: str, expected: str) -> bool:
-    if expected == actual:
-        return True
-    if expected.startswith("^"):
-        prefix = expected[1:].split(".", 1)[0]
-        return actual.startswith(prefix + ".")
-    return False
+    return expected == actual
+
+
+def _is_proposal_id(value: str) -> bool:
+    return isinstance(value, str) and value.startswith("cp:")
 
 
 def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | None, list[str]]:

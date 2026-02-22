@@ -129,7 +129,10 @@ def _try_infer_ref(
     resolved = registry.resolve_alias(kind, value)
     if not resolved:
         return
-    candidate_ref = {"id": resolved, "kind": kind}
+    entry = registry.get(resolved)
+    if entry is None:
+        return
+    candidate_ref = {"id": resolved, "kind": kind, "version": entry.version}
     if not _apply_if_schema_valid(obj, target_ref_field, candidate_ref, root_data, schema_validator):
         return
     file_changes.append(f"{path or '$'} add {target_ref_field} from {source_field}")
@@ -330,9 +333,9 @@ def _sync_canonical_refs_used(data: Any, registry: CanonicalRegistry, file_chang
             continue
         ref_obj = used_refs[cid]
         entry = registry.get(cid)
-        new_declared_ref = {"id": cid, "kind": ref_obj["kind"]}
-        if entry is not None:
-            new_declared_ref["version"] = entry.version
+        if entry is None:
+            continue
+        new_declared_ref = {"id": cid, "kind": ref_obj["kind"], "version": entry.version}
         declared.append(new_declared_ref)
         declared_ids.add(cid)
         file_changes.append(f"$ add canonical_refs_used id={cid}")
