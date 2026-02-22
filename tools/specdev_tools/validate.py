@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Any, Callable
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError
@@ -238,61 +239,115 @@ def _has_canonical_bootstrap_failure(errors: list[str]) -> bool:
     return any(any(token in err for token in bootstrap_tokens) for err in errors)
 
 
+def _load_json_artifact(repo_root: str, file_path: str, filename: str) -> dict[str, Any] | None:
+    candidates: list[str] = []
+    if file_path:
+        candidates.append(os.path.join(os.path.dirname(file_path), filename))
+    candidates.append(os.path.join(repo_root, "spec", filename))
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        candidate = os.path.abspath(candidate)
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if not os.path.exists(candidate):
+            continue
+        try:
+            with open(candidate, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            continue
+        if isinstance(loaded, dict):
+            return loaded
+    return None
+
+
 def _load_component_ids(repo_root: str, file_path: str) -> set[str] | None:
-    sketch_path = os.path.join(os.path.dirname(file_path), "02_system_sketch.json")
-    if not os.path.exists(sketch_path):
-        sketch_path = os.path.join(repo_root, "spec", "02_system_sketch.json")
-    if not os.path.exists(sketch_path):
+    sketch = _load_json_artifact(repo_root, file_path, "02_system_sketch.json")
+    if not isinstance(sketch, dict):
         return None
-    try:
-        with open(sketch_path, "r", encoding="utf-8") as f:
-            cid_data = json.load(f)
-        return {c.get("component_id") for c in cid_data.get("components", []) if c.get("component_id")}
-    except (OSError, json.JSONDecodeError, ValueError, TypeError, AttributeError):
+    components = sketch.get("components", [])
+    if not isinstance(components, list):
         return None
+    return {c.get("component_id") for c in components if isinstance(c, dict) and c.get("component_id")}
+
+
+def _load_capability_ids(repo_root: str, file_path: str) -> set[str] | None:
+    caps = _load_json_artifact(repo_root, file_path, "01_capabilities.json")
+    if not isinstance(caps, dict):
+        return None
+    capability_items = caps.get("capabilities", [])
+    if not isinstance(capability_items, list):
+        return None
+    return {
+        cap.get("capability_id")
+        for cap in capability_items
+        if isinstance(cap, dict) and cap.get("capability_id")
+    }
+
+
+def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
+    return _load_json_artifact(repo_root, file_path, "07_nfrs.json")
+
+
+def _load_monitoring_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
+    for filename in ("16_impl_context.json", "16_delivery_monitoring.json"):
+        loaded = _load_json_artifact(repo_root, file_path, filename)
+        if isinstance(loaded, dict):
+            return loaded
+    return None
+
+
+def _build_validation_context(repo_root: str, path: str) -> dict[str, Any]:
+    return {
+        "artifact_path": path,
+        "component_ids": _load_component_ids(repo_root, path),
+        "capability_ids": _load_capability_ids(repo_root, path),
+        "nfrs_data": _load_nfrs_data(repo_root, path),
+        "monitoring_data": _load_monitoring_data(repo_root, path),
+    }
+
+
+DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[str]]
+
+
+DEEP_VALIDATORS: dict[str, DeepValidator] = {
+    "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root, ctx.get("component_ids")),
+    "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("capability_ids")),
+    "02a": lambda instance, root, ctx: step_02a.validate_step_02a(instance, root),
+    "03": lambda instance, root, ctx: step_03.validate_step_03(
+        instance,
+        root,
+        ctx.get("nfrs_data"),
+        ctx.get("monitoring_data"),
+    ),
+    "04": lambda instance, root, ctx: step_04.validate_step_04(instance, root),
+    "05": lambda instance, root, ctx: step_05.validate_step_05(instance, root),
+    "06": lambda instance, root, ctx: step_06.validate_step_06(instance, root),
+    "07": lambda instance, root, ctx: step_07.validate_step_07(instance, root),
+    "08": lambda instance, root, ctx: step_08.validate_step_08(instance, root),
+    "09": lambda instance, root, ctx: step_09.validate_step_09(instance, root),
+    "10": lambda instance, root, ctx: step_10.validate_step_10(instance, root),
+    "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root),
+    "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root),
+    "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root),
+    "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root),
+    "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
+    "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root),
+    "16": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
+}
 
 
 def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> list[str]:
+    validator = DEEP_VALIDATORS.get(step)
+    if validator is None:
+        return []
+    context = _build_validation_context(repo_root, path)
     try:
-        if step == "01":
-            return step_01.validate_step_01(data, repo_root, _load_component_ids(repo_root, path))
-        if step == "02":
-            return step_02.validate_step_02(data, repo_root)
-        if step == "02a":
-            return step_02a.validate_step_02a(data, repo_root)
-        if step == "03":
-            return step_03.validate_step_03(data, repo_root)
-        if step == "04":
-            return step_04.validate_step_04(data, repo_root)
-        if step == "05":
-            return step_05.validate_step_05(data, repo_root)
-        if step == "06":
-            return step_06.validate_step_06(data, repo_root)
-        if step == "07":
-            return step_07.validate_step_07(data, repo_root)
-        if step == "08":
-            return step_08.validate_step_08(data, repo_root)
-        if step == "09":
-            return step_09.validate_step_09(data, repo_root)
-        if step == "10":
-            return step_10.validate_step_10(data, repo_root)
-        if step == "11":
-            return step_11.validate_step_11(data, repo_root)
-        if step == "12":
-            return step_12.validate_step_12(data, repo_root)
-        if step == "13":
-            return step_13.validate_step_13(data, repo_root)
-        if step == "13a":
-            return step_13a.validate_step_13a(data, repo_root)
-        if step == "14":
-            return step_14.validate_step_14(data, repo_root, path)
-        if step == "15":
-            return step_15.validate_step_15(data, repo_root)
-        if step == "16":
-            return step_16.validate_step_16(data, repo_root, path)
+        return validator(data, repo_root, context)
     except Exception as e:
         return [f"Deep Validation Critical Error: {str(e)}"]
-    return []
 
 
 def _load_step_order(path: Path) -> dict[str, object]:

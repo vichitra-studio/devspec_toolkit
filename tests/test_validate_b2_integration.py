@@ -8,7 +8,14 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from specdev_tools.validate import _get_step_from_path, validate_dir, validate_file, _resolve_replay_base_ref
+from specdev_tools.validate import (
+    DEEP_VALIDATORS,
+    _get_step_from_path,
+    _resolve_replay_base_ref,
+    _run_deep_validation,
+    validate_dir,
+    validate_file,
+)
 
 
 class ValidateB2IntegrationTests(unittest.TestCase):
@@ -362,6 +369,50 @@ class ValidateB2IntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validate._git_ref_exists", side_effect=has_ref), \
                  patch("specdev_tools.validate._git_upstream_branch", return_value=None):
                 self.assertEqual("main", _resolve_replay_base_ref(root))
+
+    def test_deep_validators_dispatch_covers_all_step_modules(self):
+        expected = {
+            "01",
+            "02",
+            "02a",
+            "03",
+            "04",
+            "05",
+            "06",
+            "07",
+            "08",
+            "09",
+            "10",
+            "11",
+            "12",
+            "13",
+            "13a",
+            "14",
+            "15",
+            "16",
+        }
+        self.assertEqual(expected, set(DEEP_VALIDATORS.keys()))
+
+    def test_run_deep_validation_passes_context_payload_to_step_dispatch(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            instance = {"id": "probe"}
+            artifact_path = str(root / "spec" / "02_system_sketch.json")
+            context = {
+                "artifact_path": artifact_path,
+                "component_ids": {"component-a"},
+                "capability_ids": {"cap-a"},
+                "nfrs_data": {"nfrs": []},
+                "monitoring_data": {"metrics": []},
+            }
+            with patch("specdev_tools.validate._build_validation_context", return_value=context) as p_ctx, patch(
+                "specdev_tools.validate.step_02.validate_step_02",
+                return_value=[],
+            ) as p_step:
+                errs = _run_deep_validation("02", instance, str(root), artifact_path)
+            self.assertEqual([], errs)
+            p_ctx.assert_called_once_with(str(root), artifact_path)
+            p_step.assert_called_once_with(instance, str(root), {"cap-a"})
 
 
 if __name__ == "__main__":

@@ -323,6 +323,17 @@ class CliB3Tests(unittest.TestCase):
                                     },
                                 },
                             },
+                            "terms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "term": {"type": "string"},
+                                        "term_ref": {"type": "object"},
+                                    },
+                                },
+                            },
                         },
                     }
                 ),
@@ -471,6 +482,10 @@ class CliB3Tests(unittest.TestCase):
                             {"type": "external", "id": "auth-service"},
                             {"type": "external", "id": "unknown-dependency"},
                         ],
+                        "terms": [
+                            {"term": "JWT"},
+                            {"term": "unknown-term"},
+                        ],
                         "canonical_refs_used": [],
                         "items": [{"action": "unknown-action"}],
                         "threats": [{"category": "authz"}, {"category": "unknown-category"}],
@@ -510,6 +525,11 @@ class CliB3Tests(unittest.TestCase):
                 {"id": "cn:core:term:jwt", "kind": "term"},
                 payload.get("term_ref"),
             )
+            self.assertEqual(
+                {"id": "cn:core:term:jwt", "kind": "term"},
+                payload["terms"][0].get("term_ref"),
+            )
+            self.assertNotIn("term_ref", payload["terms"][1])
             self.assertEqual(
                 {"id": "cn:core:interface:http-json", "kind": "interface"},
                 payload.get("interface_ref"),
@@ -1379,6 +1399,65 @@ class CliB3Tests(unittest.TestCase):
             self.assertEqual(1, code)
             self.assertEqual("", out.strip())
             self.assertIn("missing_spec_dir", err)
+
+    def test_matrix_non_strict_writes_output_with_integrity_errors(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            out_file = repo_root / "matrix.json"
+
+            payload = {
+                "matrix": [],
+                "coverage": {"fr_total": 0},
+                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
+            }
+            with patch("specdev_tools.matrix.build_trace_matrix", return_value=payload), patch.dict(
+                os.environ,
+                {"SPECDEV_MATRIX_STRICT": "0"},
+                clear=False,
+            ):
+                code, out, err = self._run_cli(
+                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
+                )
+
+            self.assertEqual(0, code, msg=err)
+            self.assertIn(str(out_file), out)
+            self.assertEqual("", err.strip())
+            self.assertTrue(out_file.exists())
+            written = json.loads(out_file.read_text(encoding="utf-8"))
+            self.assertIn("integrity_errors", written)
+            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
+
+    def test_matrix_strict_writes_output_and_fails_on_integrity_errors(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            out_file = repo_root / "matrix.json"
+
+            payload = {
+                "matrix": [],
+                "coverage": {"fr_total": 0},
+                "integrity_errors": ["Broken Trace in probe.json: Reference to 'fr-missing' not found."],
+            }
+            with patch("specdev_tools.matrix.build_trace_matrix", return_value=payload), patch.dict(
+                os.environ,
+                {"SPECDEV_MATRIX_STRICT": "1"},
+                clear=False,
+            ):
+                code, out, err = self._run_cli(
+                    ["matrix", str(spec_dir), "--out", str(out_file), "--repo-root", str(repo_root)]
+                )
+
+            self.assertEqual(1, code)
+            self.assertIn(str(out_file), out)
+            self.assertIn("E210 TRACE_INTEGRITY matrix_failed count=1", err)
+            self.assertIn(payload["integrity_errors"][0], err)
+            self.assertTrue(out_file.exists())
+            written = json.loads(out_file.read_text(encoding="utf-8"))
+            self.assertIn("integrity_errors", written)
+            self.assertEqual(payload["integrity_errors"], written["integrity_errors"])
 
     def test_strict_canonical_manifest_schema_registration_is_enforced_across_commands(self):
         with tempfile.TemporaryDirectory() as td:

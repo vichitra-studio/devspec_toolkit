@@ -329,6 +329,7 @@ class B4SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/07_nfrs.schema.json": "schema/07_nfrs.schema.json",
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "07_nfrs.schema.json").write_text(
@@ -343,36 +344,12 @@ class B4SchemaContractsTests(unittest.TestCase):
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
+            (root / "schema" / "canon.schema.json").write_text(
+                (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             (root / "canon" / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "registry_version": "1.0.0",
-                        "entries": [
-                            {
-                                "id": "cn:core:metric:error-rate",
-                                "kind": "metric",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                            {
-                                "id": "cn:core:unit:ms",
-                                "kind": "unit",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            },
-                            {
-                                "id": "cn:core:environment:prod",
-                                "kind": "environment",
-                                "version": "1.0.0",
-                                "status": "active",
-                                "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
-                            }
-                        ],
-                        "aliases": [],
-                    }
-                ),
+                (self.repo_root / "canon" / "manifest.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
 
@@ -458,6 +435,7 @@ class B4SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/03_glossary.schema.json": "schema/03_glossary.schema.json",
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "03_glossary.schema.json").write_text(
@@ -470,6 +448,10 @@ class B4SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "canon.schema.json").write_text(
+                (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(
@@ -531,6 +513,7 @@ class B4SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/07_nfrs.schema.json": "schema/07_nfrs.schema.json",
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "07_nfrs.schema.json").write_text(
@@ -543,6 +526,10 @@ class B4SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "canon.schema.json").write_text(
+                (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(
@@ -615,6 +602,7 @@ class B4SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/11_redteam.schema.json": "schema/11_redteam.schema.json",
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "11_redteam.schema.json").write_text(
@@ -627,6 +615,10 @@ class B4SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "canon.schema.json").write_text(
+                (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(

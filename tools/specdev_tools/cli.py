@@ -200,6 +200,13 @@ def main():
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(out)
             print(args.out)
+        matrix_strict = os.getenv("SPECDEV_MATRIX_STRICT", "").strip().lower() in {"1", "true", "yes"}
+        integrity_errors = res.get("integrity_errors")
+        if matrix_strict and isinstance(integrity_errors, list) and integrity_errors:
+            print(f"E210 TRACE_INTEGRITY matrix_failed count={len(integrity_errors)}", file=sys.stderr)
+            for error in integrity_errors:
+                print(error, file=sys.stderr)
+            sys.exit(1)
     elif args.cmd == "fixtures-lint":
         from .fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
