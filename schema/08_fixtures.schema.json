@@ -67,7 +67,8 @@
           "mode",
           "input",
           "expected",
-          "targets"
+          "targets",
+          "tag_ref"
         ]
       }
     },
@@ -97,6 +98,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "fixtures"
+    "fixtures",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

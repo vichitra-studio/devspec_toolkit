@@ -50,17 +50,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "fr",
-            "api",
-            "nfr",
-            "inv",
-            "invariant",
-            "fixture",
-            "doc",
-            "capability",
-            "component"
-          ]
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Trace type \u2014 validated against canon/kinds/trace_type.json entries."
         },
         "id": {
           "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"

@@ -107,7 +107,8 @@
           "severity",
           "category",
           "target_ids",
-          "mitigations"
+          "mitigations",
+          "risk_category_ref"
         ]
       }
     },
@@ -159,6 +160,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "threats"
+    "threats",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

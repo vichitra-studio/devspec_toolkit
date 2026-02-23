@@ -1,0 +1,169 @@
+{
+  "$schema": "https://specdev.local/schema/canon/kind/1",
+  "registry_version": "1.0.0",
+  "kind": "trace_type",
+  "entries": [
+    {
+      "id": "cn:core:trace_type:fr",
+      "kind": "trace_type",
+      "preferred_label": "fr",
+      "definition": "Trace reference type for fr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:api",
+      "kind": "trace_type",
+      "preferred_label": "api",
+      "definition": "Trace reference type for api artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:nfr",
+      "kind": "trace_type",
+      "preferred_label": "nfr",
+      "definition": "Trace reference type for nfr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:inv",
+      "kind": "trace_type",
+      "preferred_label": "inv",
+      "definition": "Trace reference type for inv artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:invariant",
+      "kind": "trace_type",
+      "preferred_label": "invariant",
+      "definition": "Trace reference type for invariant artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:fixture",
+      "kind": "trace_type",
+      "preferred_label": "fixture",
+      "definition": "Trace reference type for fixture artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:doc",
+      "kind": "trace_type",
+      "preferred_label": "doc",
+      "definition": "Trace reference type for doc artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:capability",
+      "kind": "trace_type",
+      "preferred_label": "capability",
+      "definition": "Trace reference type for capability artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:component",
+      "kind": "trace_type",
+      "preferred_label": "component",
+      "definition": "Trace reference type for component artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    }
+  ]
+}

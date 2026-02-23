@@ -97,7 +97,10 @@
           "unit",
           "metric_ref",
           "unit_ref",
-          "environment_ref"
+          "environment_ref",
+          "measurement_method",
+          "stage",
+          "owner"
         ]
       }
     },
@@ -127,6 +130,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "nfrs"
+    "nfrs",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

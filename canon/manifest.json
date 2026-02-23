@@ -1,4 +1,5 @@
 {
+  "$schema": "https://specdev.local/schema/core/canon/1",
   "registry_version": "1.0.0",
   "entries": [
     {
@@ -654,7 +655,7 @@
       "preferred_label": "JWT",
       "definition": "Acronym for JSON Web Token.",
       "version": "1.0.0",
-      "status": "active",
+      "status": "deprecated",
       "owners": [
         "spec-platform"
       ],
@@ -662,7 +663,9 @@
         "jwt"
       ],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-02-21T00:00:00Z",
+        "deprecated_since": "2026-02-23T00:00:00Z",
+        "replaced_by": "cn:core:term:jwt"
       }
     },
     {
@@ -740,6 +743,525 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:latency",
+      "kind": "nfr_category",
+      "preferred_label": "latency",
+      "definition": "Time taken to respond to a request or complete an operation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "response-time"
+      ],
+      "tags": [
+        "performance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:throughput",
+      "kind": "nfr_category",
+      "preferred_label": "throughput",
+      "definition": "Number of requests or operations handled per unit time.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "rps",
+        "requests-per-second"
+      ],
+      "tags": [
+        "performance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:availability",
+      "kind": "nfr_category",
+      "preferred_label": "availability",
+      "definition": "Percentage of time the system is operational and accessible.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "uptime"
+      ],
+      "tags": [
+        "reliability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:durability",
+      "kind": "nfr_category",
+      "preferred_label": "durability",
+      "definition": "Guarantee that stored data persists without loss.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "data-persistence"
+      ],
+      "tags": [
+        "reliability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:cost",
+      "kind": "nfr_category",
+      "preferred_label": "cost",
+      "definition": "Financial cost constraints for infrastructure, operations, or services.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "business"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:security",
+      "kind": "nfr_category",
+      "preferred_label": "security",
+      "definition": "Protection against unauthorized access, data breaches, and threats.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "compliance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:privacy",
+      "kind": "nfr_category",
+      "preferred_label": "privacy",
+      "definition": "Protection of user data and compliance with privacy regulations.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "data-privacy"
+      ],
+      "tags": [
+        "compliance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:maintainability",
+      "kind": "nfr_category",
+      "preferred_label": "maintainability",
+      "definition": "Ease of modifying, extending, and debugging the system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "engineering"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:usability",
+      "kind": "nfr_category",
+      "preferred_label": "usability",
+      "definition": "Ease of use and quality of user experience.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "ux"
+      ],
+      "tags": [
+        "product"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:portability",
+      "kind": "nfr_category",
+      "preferred_label": "portability",
+      "definition": "Ability to run the system across different environments or platforms.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "engineering"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:energy",
+      "kind": "nfr_category",
+      "preferred_label": "energy",
+      "definition": "Energy consumption and efficiency constraints.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "power"
+      ],
+      "tags": [
+        "sustainability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:fr",
+      "kind": "trace_type",
+      "preferred_label": "fr",
+      "definition": "Trace reference type for fr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:api",
+      "kind": "trace_type",
+      "preferred_label": "api",
+      "definition": "Trace reference type for api artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:nfr",
+      "kind": "trace_type",
+      "preferred_label": "nfr",
+      "definition": "Trace reference type for nfr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:inv",
+      "kind": "trace_type",
+      "preferred_label": "inv",
+      "definition": "Trace reference type for inv artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:invariant",
+      "kind": "trace_type",
+      "preferred_label": "invariant",
+      "definition": "Trace reference type for invariant artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:fixture",
+      "kind": "trace_type",
+      "preferred_label": "fixture",
+      "definition": "Trace reference type for fixture artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:doc",
+      "kind": "trace_type",
+      "preferred_label": "doc",
+      "definition": "Trace reference type for doc artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:capability",
+      "kind": "trace_type",
+      "preferred_label": "capability",
+      "definition": "Trace reference type for capability artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:component",
+      "kind": "trace_type",
+      "preferred_label": "component",
+      "definition": "Trace reference type for component artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:api",
+      "kind": "owner",
+      "preferred_label": "api",
+      "definition": "Artifact ownership domain: api.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:ui",
+      "kind": "owner",
+      "preferred_label": "ui",
+      "definition": "Artifact ownership domain: ui.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:system",
+      "kind": "owner",
+      "preferred_label": "system",
+      "definition": "Artifact ownership domain: system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:ops",
+      "kind": "owner",
+      "preferred_label": "ops",
+      "definition": "Artifact ownership domain: ops.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:data",
+      "kind": "owner",
+      "preferred_label": "data",
+      "definition": "Artifact ownership domain: data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:product",
+      "kind": "owner",
+      "preferred_label": "product",
+      "definition": "Artifact ownership domain: product.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:business",
+      "kind": "owner",
+      "preferred_label": "business",
+      "definition": "Artifact ownership domain: business.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:engineering",
+      "kind": "owner",
+      "preferred_label": "engineering",
+      "definition": "Artifact ownership domain: engineering.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
       }
     }
   ],

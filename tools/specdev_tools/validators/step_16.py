@@ -163,4 +163,65 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                     if not is_doc_path(doc_path):
                         errors.append(f"plan.docs_impact.docs_touched contains non-doc path: {doc_path}")
 
+    # D22: Command-to-proof linkage — active plans must prove test commands passed
+    plan_status = plan.get("status")
+    review_reqs = plan.get("review_requirements", {})
+    test_commands = review_reqs.get("test_commands", []) if isinstance(review_reqs, dict) else []
+    execution = data.get("execution", {})
+    execution_results = execution.get("execution_results", []) if isinstance(execution, dict) else []
+
+    passed_commands: set[str] = set()
+    for result in execution_results:
+        if isinstance(result, dict) and result.get("status") == "passed":
+            cmd = result.get("command")
+            if isinstance(cmd, str):
+                passed_commands.add(cmd.strip())
+
+    if plan_status == "active" and test_commands:
+        for cmd in test_commands:
+            if isinstance(cmd, str) and cmd.strip() not in passed_commands:
+                errors.append(
+                    f"E301 MISSING_PROOF_CLOSURE test command '{cmd}' required "
+                    f"by review_requirements but not found in execution_results with status=passed"
+                )
+
+    # D23: Verified review without proof closure
+    review = data.get("review", {})
+    verdict = review.get("verdict") if isinstance(review, dict) else None
+    if verdict == "verified":
+        if not execution or not isinstance(execution, dict):
+            errors.append(
+                "E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                "but no execution section exists"
+            )
+        elif not execution_results:
+            errors.append(
+                "E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                "but execution_results is empty"
+            )
+
+        # All test commands must be proven
+        if test_commands:
+            unproven = [
+                cmd for cmd in test_commands
+                if isinstance(cmd, str) and cmd.strip() not in passed_commands
+            ]
+            if unproven:
+                errors.append(
+                    f"E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                    f"but {len(unproven)} test command(s) lack proof: {unproven}"
+                )
+
+        # Check critical_evidence consistency
+        critical_evidence = execution.get("critical_evidence", {}) if isinstance(execution, dict) else {}
+        declared_passed = critical_evidence.get("passed_test_commands", []) if isinstance(critical_evidence, dict) else []
+        if isinstance(declared_passed, list) and test_commands:
+            declared_set = {c.strip() for c in declared_passed if isinstance(c, str)}
+            for cmd in test_commands:
+                if isinstance(cmd, str) and cmd.strip() not in declared_set:
+                    errors.append(
+                        f"E302 UNPROVEN_VERIFIED_REVIEW test command '{cmd}' "
+                        f"not listed in critical_evidence.passed_test_commands"
+                    )
+
     return errors

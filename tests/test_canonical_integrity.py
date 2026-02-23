@@ -13,7 +13,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
     def test_missing_spec_dir_is_reported(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("missing_spec_dir" in e for e in errs))
 
     def test_unknown_id_detected(self):
@@ -47,7 +47,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("E110" in e for e in errs))
 
     def test_invalid_json_is_reported_not_raised(self):
@@ -60,7 +60,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
             )
             (root / "spec").mkdir()
             (root / "spec" / "bad.json").write_text("{bad", encoding="utf-8")
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("invalid_json" in e for e in errs))
 
     def test_malformed_modular_canon_file_is_reported_not_traceback(self):
@@ -70,7 +70,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
             (root / "spec").mkdir()
             (root / "canon" / "aliases.json").write_text("{bad", encoding="utf-8")
             (root / "spec" / "07_nfrs.json").write_text(json.dumps({"metric": "error rate"}), encoding="utf-8")
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("invalid_aliases" in e for e in errs))
 
     def test_structurally_invalid_kind_file_is_reported(self):
@@ -93,7 +93,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps({"terms": [], "canonical_proposals": [], "canonical_conflicts": []}),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("invalid_kind_file" in e for e in errs))
             self.assertTrue(any("entries must be an array" in e for e in errs))
 
@@ -115,7 +115,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps({"canonical_refs_used": [], "canonical_proposals": [], "canonical_conflicts": []}),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("manifest.aliases[0] missing target_id" in e for e in errs))
 
     def test_missing_entry_lifecycle_is_reported(self):
@@ -148,7 +148,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps({"canonical_refs_used": [], "canonical_proposals": [], "canonical_conflicts": []}),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("missing introduced_at" in e for e in errs))
 
     def test_unknown_schema_uri_is_reported(self):
@@ -187,7 +187,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("schema_not_found" in e for e in errs))
             self.assertFalse(any("unresolved_canonical_semantic" in e for e in errs))
 
@@ -257,7 +257,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertFalse(any("unresolved_canonical_semantic" in e for e in errs))
 
     def test_file_mode_can_skip_unresolved_semantic_enforcement(self):
@@ -319,7 +319,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            strict = validate_canonical_integrity_file(str(root), str(sample))
+            strict = validate_canonical_integrity_file(str(root), str(sample), require_manifest_schema_registration=False)
             self.assertTrue(any("unresolved_canonical_semantic" in e for e in strict))
 
             non_strict = validate_canonical_integrity_file(

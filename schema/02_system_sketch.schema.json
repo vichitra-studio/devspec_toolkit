@@ -269,7 +269,11 @@
     "owner",
     "created_at",
     "seed_refs",
-    "components"
+    "components",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ],
   "allOf": [
     {

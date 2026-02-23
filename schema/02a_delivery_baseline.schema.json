@@ -89,6 +89,10 @@
     "created_at",
     "seed_refs",
     "environments",
-    "ci_gates"
+    "ci_gates",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

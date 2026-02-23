@@ -19,7 +19,7 @@ def canonical_autofix(
     spec_dir: str,
     write: bool = False,
     canon_dir: str = "canon",
-    require_manifest_schema_registration: bool = False,
+    require_manifest_schema_registration: bool = True,
 ) -> dict[str, list[str]]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):

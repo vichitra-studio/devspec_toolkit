@@ -1229,6 +1229,35 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "active"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "review_requirements"
+            ],
+            "properties": {
+              "review_requirements": {
+                "required": [
+                  "test_commands"
+                ],
+                "properties": {
+                  "test_commands": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -1775,6 +1804,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "plan"
+    "plan",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

@@ -8,7 +8,7 @@
       "preferred_label": "JWT",
       "definition": "Acronym for JSON Web Token.",
       "version": "1.0.0",
-      "status": "active",
+      "status": "deprecated",
       "owners": [
         "spec-platform"
       ],
@@ -16,7 +16,9 @@
         "jwt"
       ],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-02-21T00:00:00Z",
+        "deprecated_since": "2026-02-23T00:00:00Z",
+        "replaced_by": "cn:core:term:jwt"
       }
     }
   ]

@@ -26,7 +26,7 @@ class CanonicalLintTests(unittest.TestCase):
     def test_missing_manifest_reports_unresolved_input(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
-            errs = lint_canon_dir(td)
+            errs = lint_canon_dir(td, require_manifest_schema_registration=False)
             self.assertTrue(any("E520" in e for e in errs))
 
     def test_malformed_manifest_shapes_report_unresolved_input(self):
@@ -39,7 +39,7 @@ class CanonicalLintTests(unittest.TestCase):
             canon = Path(td) / "canon"
             canon.mkdir()
             (canon / "manifest.json").write_text("{bad", encoding="utf-8")
-            errs = lint_canon_dir(td)
+            errs = lint_canon_dir(td, require_manifest_schema_registration=False)
             self.assertTrue(any("invalid_manifest" in e for e in errs))
 
     def test_manifest_root_must_be_object(self):
@@ -88,7 +88,7 @@ class CanonicalLintTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = lint_canon_dir(td)
+            errs = lint_canon_dir(td, require_manifest_schema_registration=False)
             self.assertEqual([], errs)
 
     def test_lint_canon_dir_reports_malformed_aliases_without_manifest(self):
@@ -99,7 +99,7 @@ class CanonicalLintTests(unittest.TestCase):
             canon.mkdir(parents=True)
             (canon / "aliases.json").write_text("{bad", encoding="utf-8")
 
-            errs = lint_canon_dir(td)
+            errs = lint_canon_dir(td, require_manifest_schema_registration=False)
             self.assertTrue(any("invalid_aliases" in e for e in errs))
 
     def test_lint_manifest_requires_alias_target_id(self):
@@ -200,7 +200,7 @@ class CanonicalLintTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            errs = lint_canon_dir(td)
+            errs = lint_canon_dir(td, require_manifest_schema_registration=False)
             self.assertTrue(any("canonical_manifest_modular_mismatch" in e for e in errs))
 
     def test_schema_registry_includes_canon_modular_schemas(self):
@@ -320,7 +320,7 @@ class CanonicalLintTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = lint_canon_dir(str(root))
+            errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
             self.assertTrue(any("schema_invalid" in e for e in errs))
 
     def test_lint_canon_dir_validates_manifest_against_registered_schema(self):
@@ -368,7 +368,7 @@ class CanonicalLintTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            errs = lint_canon_dir(str(root))
+            errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
             self.assertTrue(any("schema_invalid" in e and "manifest.json" in e for e in errs))
 
     def test_lint_canon_dir_can_require_manifest_schema_registration(self):

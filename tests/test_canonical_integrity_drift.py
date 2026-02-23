@@ -48,7 +48,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 json.dumps({"metric": "error rate", "metric_ref": {"id": "cn:core:metric:failure-rate", "kind": "metric"}}),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("E210" in e for e in errs))
 
     def test_generic_ref_value_pair_drift_detected(self):
@@ -99,7 +99,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("E210" in e for e in errs))
 
     def test_missing_canonical_refs_used_entry_is_detected(self):
@@ -135,7 +135,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("canonical_refs_used_missing" in e for e in errs))
 
     def test_extra_canonical_refs_used_entry_is_detected(self):
@@ -174,7 +174,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("canonical_refs_used_extra" in e for e in errs))
 
     def test_unresolved_semantic_without_proposal_is_detected(self):
@@ -206,7 +206,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertTrue(any("unresolved_canonical_semantic" in e for e in errs))
 
     def test_unresolved_semantic_is_allowed_when_proposed(self):
@@ -246,7 +246,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertFalse(any("unresolved_canonical_semantic" in e for e in errs))
 
     def test_nfr_category_without_risk_category_ref_does_not_trigger_unresolved(self):
@@ -316,7 +316,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            errs = validate_canonical_integrity(str(root), str(root / "spec"))
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
             self.assertFalse(any("field=nfrs[0].category" in e for e in errs))
 
 

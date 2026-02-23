@@ -140,7 +140,8 @@
           "name",
           "target",
           "unit",
-          "measurement_method"
+          "measurement_method",
+          "unit_ref"
         ]
       }
     },
@@ -177,6 +178,10 @@
     "created_at",
     "seed_refs",
     "problem_statement",
-    "success_metrics"
+    "success_metrics",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

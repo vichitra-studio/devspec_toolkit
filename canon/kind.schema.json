@@ -5,6 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
     "registry_version": {
       "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver"
     },

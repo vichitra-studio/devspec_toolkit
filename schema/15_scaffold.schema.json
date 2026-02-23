@@ -127,7 +127,11 @@
     "service_skeleton",
     "route_map",
     "validators",
-    "build_status"
+    "build_status",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ],
   "allOf": [
     {

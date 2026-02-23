@@ -157,6 +157,10 @@
     "created_at",
     "seed_refs",
     "spec_first_policy",
-    "commit_message_rules"
+    "commit_message_rules",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

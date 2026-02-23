@@ -35,16 +35,8 @@
     "owner": {
       "$anchor": "owner",
       "type": "string",
-      "enum": [
-        "api",
-        "ui",
-        "system",
-        "ops",
-        "data",
-        "product",
-        "business",
-        "engineering"
-      ]
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Artifact owner \u2014 validated against canon/kinds/owner.json entries."
     },
     "tag": {
       "$anchor": "tag",

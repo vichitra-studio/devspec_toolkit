@@ -124,6 +124,10 @@
     "created_at",
     "seed_refs",
     "missing_elements",
-    "completeness_rating"
+    "completeness_rating",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

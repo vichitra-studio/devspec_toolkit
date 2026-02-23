@@ -70,7 +70,8 @@
           "title",
           "file_name",
           "area_of_concern",
-          "required_schema_sections"
+          "required_schema_sections",
+          "governance_label_ref"
         ]
       }
     },
@@ -100,6 +101,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "extensions"
+    "extensions",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

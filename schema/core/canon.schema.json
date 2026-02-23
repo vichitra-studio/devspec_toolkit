@@ -5,6 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri"
+    },
     "registry_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$"

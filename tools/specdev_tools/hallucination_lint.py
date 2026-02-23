@@ -27,7 +27,7 @@ def lint_hallucinations(
     repo_root: str | None = None,
     canon_dir: str = "canon",
     require_canon_dir: bool = False,
-    require_manifest_schema_registration: bool = False,
+    require_manifest_schema_registration: bool = True,
 ) -> list[str]:
     errors: list[str] = []
     known_ids: set[str] = set()
@@ -48,6 +48,8 @@ def lint_hallucinations(
     if canon.load_errors:
         return list(dict.fromkeys(canon.load_errors))
     known_command_prefixes = _load_command_prefixes(root)
+    # D13: Build canonical term index for free-text scanning
+    canonical_terms = _build_canonical_term_index(canon)
     for path in _iter_json(spec_dir):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -58,6 +60,7 @@ def lint_hallucinations(
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_scan_node(rel, data, canon, known_command_prefixes))
+        errors.extend(_check_free_text_terms(rel, data, canonical_terms))
         _collect_ids_and_refs(data, rel, known_ids, refs)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
@@ -181,3 +184,71 @@ def _load_command_prefixes(repo_root: str) -> set[str]:
             if token:
                 prefixes.add(token)
     return prefixes
+
+
+# D13: Free-text canonical term scanning
+
+# Fields checked for unbound canonical term mentions
+_FREE_TEXT_FIELDS = {"name", "description", "rationale", "justification", "definition"}
+
+# Fields that indicate a canonical ref is already bound nearby
+_REF_SUFFIXES = {"_ref", "_refs"}
+
+
+def _build_canonical_term_index(canon: CanonicalRegistry) -> dict[str, set[str]]:
+    """Build a lowercase label → set of canonical IDs index for term/acronym kinds."""
+    index: dict[str, set[str]] = {}
+    for cid, entry in canon.entries.items():
+        if entry.status == "retired":
+            continue
+        if entry.kind not in ("term", "acronym"):
+            continue
+        label = entry.payload.get("preferred_label", "")
+        if isinstance(label, str) and len(label) >= 3:
+            index.setdefault(label.lower(), set()).add(cid)
+        # Also index aliases
+        aliases = entry.payload.get("aliases", [])
+        if isinstance(aliases, list):
+            for alias in aliases:
+                if isinstance(alias, str) and len(alias) >= 3:
+                    index.setdefault(alias.lower(), set()).add(cid)
+    return index
+
+
+def _check_free_text_terms(
+    rel: str,
+    obj: Any,
+    canonical_terms: dict[str, set[str]],
+    path: str = "",
+) -> list[str]:
+    """Check free-text fields for mentions of canonical terms without a binding ref."""
+    if not canonical_terms:
+        return []
+    errs: list[str] = []
+    if isinstance(obj, dict):
+        # Collect all ref keys present at this level
+        bound_refs = {
+            k for k in obj
+            if any(k.endswith(s) for s in _REF_SUFFIXES)
+        }
+        for key, value in obj.items():
+            p = f"{path}.{key}" if path else key
+            if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:
+                # Skip if there's already a ref binding at this level
+                if bound_refs:
+                    continue
+                text_lower = value.lower()
+                for term, cids in canonical_terms.items():
+                    if term in text_lower:
+                        errs.append(
+                            f"E540 UNBOUND_CANONICAL_TERM {rel}:{p} "
+                            f"mentions canonical term '{term}' "
+                            f"(ids={sorted(cids)}) without a binding *_ref"
+                        )
+                        break  # One warning per field is enough
+            errs.extend(_check_free_text_terms(rel, value, canonical_terms, p))
+    elif isinstance(obj, list):
+        for idx, item in enumerate(obj):
+            errs.extend(_check_free_text_terms(rel, item, canonical_terms, f"{path}[{idx}]"))
+    return errs
+

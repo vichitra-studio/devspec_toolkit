@@ -85,7 +85,8 @@
         "required": [
           "capability_id",
           "verb",
-          "scope"
+          "scope",
+          "capability_ref"
         ]
       }
     },
@@ -115,6 +116,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "capabilities"
+    "capabilities",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

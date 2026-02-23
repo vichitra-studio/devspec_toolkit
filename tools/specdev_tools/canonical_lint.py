@@ -20,7 +20,7 @@ CANON_MANIFEST_SCHEMA_URI = "https://specdev.local/schema/core/canon/1"
 def lint_canon_dir(
     repo_root: str,
     canon_dir: str = "canon",
-    require_manifest_schema_registration: bool = False,
+    require_manifest_schema_registration: bool = True,
 ) -> list[str]:
     root = Path(os.path.abspath(repo_root))
     canon_root = root / canon_dir

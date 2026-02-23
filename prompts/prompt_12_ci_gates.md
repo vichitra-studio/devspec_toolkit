@@ -72,6 +72,17 @@ Available CLI tools include:
 - `./tools/run_specdev.sh seed-lint --repo-root ./devspec_toolkit` - Validate seed requirements
 - `./tools/run_specdev.sh docs-lint --repo-root ./devspec_toolkit` - Enforce docs policy
 
+## Canonical Registry (Required Input)
+- Load `canon/manifest.json` — the authoritative registry of all canonical terms.
+- Load `canon/aliases.json` — the alias resolution table.
+- For every semantic field you populate, search the manifest for a matching entry by `kind` + `preferred_label` or alias.
+- If a match exists: populate the corresponding `*_ref` field with `{id, kind}` at minimum.
+- If no match exists: add an entry to `canonical_proposals` with `temp_id`, `kind`, `proposed_label`, `definition`, and `source_field`.
+- If multiple matches exist or the match is ambiguous: add an entry to `canonical_conflicts`.
+- NEVER leave a `*_ref` field empty when a matching canonical entry exists.
+- NEVER use a deprecated canonical without checking `replaced_by` first.
+
+
 ## Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
@@ -155,7 +166,9 @@ Available CLI tools include:
 }
 ```
 
-## B4 Metadata Contract
-- Include `generation_quality`, `canonical_refs_used`, `canonical_proposals`, and `canonical_conflicts` in the output artifact whenever those fields exist in the step schema.
-- `canonical_refs_used` must list canonicals actually referenced by `*_ref` fields in this artifact.
-- Put unresolved or new terms into `canonical_proposals`; put ambiguous/conflicting mappings into `canonical_conflicts`.
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

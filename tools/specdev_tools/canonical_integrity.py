@@ -17,7 +17,7 @@ def validate_canonical_integrity(
     spec_dir: str,
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
-    require_manifest_schema_registration: bool = False,
+    require_manifest_schema_registration: bool = True,
 ) -> list[str]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
@@ -72,7 +72,7 @@ def validate_canonical_integrity_file(
     path: str,
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
-    require_manifest_schema_registration: bool = False,
+    require_manifest_schema_registration: bool = True,
 ) -> list[str]:
     preflight_errors = lint_canon_dir(
         repo_root,

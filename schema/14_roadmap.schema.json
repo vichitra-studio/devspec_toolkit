@@ -209,6 +209,10 @@
     "created_at",
     "seed_refs",
     "tech_stack",
-    "milestones"
+    "milestones",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

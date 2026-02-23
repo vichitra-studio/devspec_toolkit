@@ -486,9 +486,13 @@ class B4SchemaContractsTests(unittest.TestCase):
             )
 
             pre = validate_file(str(root), str(sample))
-            self.assertEqual([], pre, msg=f"Unexpected pre-autofix errors: {pre}")
+            # term_ref is now required by schema, so pre-autofix should report the missing ref
+            self.assertTrue(
+                any("'term_ref' is a required property" in e for e in pre),
+                msg=f"Expected missing term_ref before autofix, got: {pre}",
+            )
 
-            changes = canonical_autofix(str(root), str(root / "spec"), write=True)
+            changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
 
             payload = json.loads(sample.read_text(encoding="utf-8"))
@@ -571,7 +575,7 @@ class B4SchemaContractsTests(unittest.TestCase):
                 msg=f"Expected missing required canonical refs before autofix, got: {pre}",
             )
 
-            changes = canonical_autofix(str(root), str(root / "spec"), write=True)
+            changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
 
             payload = json.loads(sample.read_text(encoding="utf-8"))
@@ -656,9 +660,13 @@ class B4SchemaContractsTests(unittest.TestCase):
             )
 
             pre = validate_file(str(root), str(sample))
-            self.assertEqual([], pre, msg=f"Unexpected pre-autofix errors: {pre}")
+            # risk_category_ref is now required by schema
+            self.assertTrue(
+                any("'risk_category_ref' is a required property" in e for e in pre),
+                msg=f"Expected missing risk_category_ref before autofix, got: {pre}",
+            )
 
-            canonical_autofix(str(root), str(root / "spec"), write=True)
+            canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             payload = json.loads(sample.read_text(encoding="utf-8"))
             self.assertEqual(
                 {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
@@ -690,7 +698,7 @@ class B4SchemaContractsTests(unittest.TestCase):
             }
             sample.write_text(json.dumps(initial_payload, indent=2), encoding="utf-8")
 
-            changes = canonical_autofix(str(root), str(root / "spec"), write=True)
+            changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
             self.assertTrue(any("E520 UNRESOLVED_INPUT" in entry for entry in changes[str(sample)]))
             self.assertTrue(any("schema_not_found" in entry for entry in changes[str(sample)]))
@@ -717,7 +725,7 @@ class B4SchemaContractsTests(unittest.TestCase):
             }
             sample.write_text(json.dumps(initial_payload, indent=2), encoding="utf-8")
 
-            changes = canonical_autofix(str(root), str(root / "spec"), write=True)
+            changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
             self.assertTrue(any("E520 UNRESOLVED_INPUT" in entry for entry in changes[str(sample)]))
             self.assertTrue(any("missing_schema_uri" in entry for entry in changes[str(sample)]))

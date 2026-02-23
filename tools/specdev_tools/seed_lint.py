@@ -73,9 +73,20 @@ def _lint_prompt_manifest_refs(repo_root: str, errors: List[str]) -> None:
             errors.append(f"{path}: missing reference to spec/common/seed_manifest.json")
 
 
-def lint_seeds(repo_root: str, spec_dir: str) -> List[str]:
+def lint_seeds(repo_root: str, spec_dir: str, project_root: str | None = None) -> List[str]:
     errors: List[str] = []
-    project_root = _project_root_from_spec_dir(spec_dir)
+    # D20 fix: prefer explicit project_root, then repo_root; warn on spec_dir mismatch
+    implicit_root = _project_root_from_spec_dir(spec_dir)
+    if project_root is None:
+        project_root = os.path.abspath(repo_root)
+    else:
+        project_root = os.path.abspath(project_root)
+    if os.path.abspath(implicit_root) != project_root:
+        errors.append(
+            f"spec_dir scope warning: spec_dir '{spec_dir}' implies project root"
+            f" '{implicit_root}' but canonical project root is '{project_root}'."
+            f" Using canonical root."
+        )
     manifest = _load_manifest(repo_root, project_root, errors)
     if not manifest:
         return errors
@@ -83,6 +94,34 @@ def lint_seeds(repo_root: str, spec_dir: str) -> List[str]:
     seed_ids = [s.get("seed_id") for s in manifest.get("seeds", []) if isinstance(s, dict)]
     if len(seed_ids) != len(set(seed_ids)):
         errors.append("Seed manifest has duplicate seed_id values.")
+
+    # D19 fix: validate that each seed path exists on disk and doesn't escape project root
+    for seed in manifest.get("seeds", []):
+        if not isinstance(seed, dict):
+            continue
+        seed_id = seed.get("seed_id", "unknown")
+        seed_path = seed.get("path")
+        if not seed_path:
+            errors.append(f"Seed '{seed_id}' is missing 'path' field.")
+            continue
+        resolved = os.path.normpath(os.path.join(project_root, seed_path))
+        if not os.path.isfile(resolved):
+            errors.append(
+                f"Seed '{seed_id}' path '{seed_path}' does not exist or is not readable"
+                f" (resolved: {resolved})"
+            )
+        try:
+            common = os.path.commonpath(
+                [os.path.abspath(project_root), os.path.abspath(resolved)]
+            )
+            if common != os.path.abspath(project_root):
+                errors.append(
+                    f"Seed '{seed_id}' path '{seed_path}' escapes project root"
+                )
+        except ValueError:
+            errors.append(
+                f"Seed '{seed_id}' path '{seed_path}' escapes project root (different drive)"
+            )
 
     seed_id_set = set(seed_ids)
     for sid in manifest.get("global_seed_order", []):

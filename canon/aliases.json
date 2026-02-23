@@ -1,4 +1,5 @@
 {
+  "$schema": "https://specdev.local/schema/canon/aliases/1",
   "registry_version": "1.0.0",
   "aliases": [
     {
