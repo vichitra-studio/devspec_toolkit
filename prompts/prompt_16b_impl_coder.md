@@ -250,8 +250,7 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit",
-      "version": "1.0.0"
+      "kind": "unit"
     }
   ],
   "canonical_proposals": [],
@@ -348,8 +347,7 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit",
-      "version": "1.0.0"
+      "kind": "unit"
     }
   ],
   "canonical_proposals": [],

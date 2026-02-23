@@ -34,22 +34,6 @@
       "type": "string",
       "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
     },
-    "proposalId": {
-      "$anchor": "proposalId",
-      "type": "string",
-      "pattern": "^cp:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
-    },
-    "entryId": {
-      "$anchor": "entryId",
-      "oneOf": [
-        {
-          "$ref": "#/$defs/canonicalId"
-        },
-        {
-          "$ref": "#/$defs/proposalId"
-        }
-      ]
-    },
     "semver": {
       "$anchor": "semver",
       "type": "string",
@@ -65,20 +49,9 @@
       "type": "string",
       "enum": [
         "active",
-        "proposed",
         "deprecated",
         "sunset",
         "retired"
-      ]
-    },
-    "proposalReviewStatus": {
-      "$anchor": "proposalReviewStatus",
-      "type": "string",
-      "enum": [
-        "open",
-        "accepted",
-        "rejected",
-        "superseded"
       ]
     },
     "lifecycle": {
@@ -119,7 +92,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/$defs/entryId"
+          "$ref": "#/$defs/canonicalId"
         },
         "kind": {
           "type": "string",
@@ -138,9 +111,6 @@
         },
         "status": {
           "$ref": "#/$defs/entryStatus"
-        },
-        "review_status": {
-          "$ref": "#/$defs/proposalReviewStatus"
         },
         "owners": {
           "type": "array",
@@ -179,14 +149,6 @@
         "source_refs": {
           "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
         },
-        "breaking_change": {
-          "type": "boolean",
-          "default": false
-        },
-        "change_note": {
-          "type": "string",
-          "minLength": 1
-        },
         "lifecycle": {
           "$ref": "#/$defs/lifecycle"
         }
@@ -202,45 +164,6 @@
         "lifecycle"
       ],
       "allOf": [
-        {
-          "if": {
-            "properties": {
-              "id": {
-                "pattern": "^cp:"
-              }
-            },
-            "required": [
-              "id"
-            ]
-          },
-          "then": {
-            "properties": {
-              "status": {
-                "const": "proposed"
-              }
-            },
-            "required": [
-              "review_status"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "breaking_change": {
-                "const": true
-              }
-            },
-            "required": [
-              "breaking_change"
-            ]
-          },
-          "then": {
-            "required": [
-              "change_note"
-            ]
-          }
-        },
         {
           "if": {
             "properties": {

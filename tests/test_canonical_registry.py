@@ -33,7 +33,7 @@ class CanonicalRegistryTests(unittest.TestCase):
             (root / "canon" / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             reg = CanonicalRegistry.load(str(root))
             self.assertEqual(reg.resolve_alias("metric", "failure rate"), "cn:core:metric:error-rate")
-            errs = reg.validate_ref({"id": "cn:core:metric:error-rate", "kind": "metric", "version": "1.2.0"})
+            errs = reg.validate_ref({"id": "cn:core:metric:error-rate", "kind": "metric", "version": "^1.0.0"})
             self.assertEqual([], [e for e in errs if e.startswith("E")])
 
     def test_kind_mismatch(self):
@@ -146,24 +146,6 @@ class CanonicalRegistryTests(unittest.TestCase):
         self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec_first"))
         self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec-first"))
         self.assertEqual("cn:core:policy:spec-first", reg.resolve_alias("policy", "spec first"))
-
-    def test_proposal_entries_are_not_alias_resolvable(self):
-        reg = CanonicalRegistry.from_manifest(
-            {
-                "entries": [
-                    {
-                        "id": "cp:core:term:jwt",
-                        "kind": "term",
-                        "preferred_label": "JWT",
-                        "version": "0.0.1",
-                        "status": "proposed",
-                        "lifecycle": {"introduced_at": "2026-02-22T00:00:00Z"},
-                    }
-                ],
-                "aliases": [],
-            }
-        )
-        self.assertIsNone(reg.resolve_alias("term", "JWT"))
 
     def test_load_ignores_malformed_manifest_alias(self):
         with tempfile.TemporaryDirectory() as td:

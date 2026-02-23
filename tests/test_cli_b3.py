@@ -502,60 +502,60 @@ class CliB3Tests(unittest.TestCase):
 
             payload = json.loads(artifact.read_text(encoding="utf-8"))
             self.assertEqual(
-                {"id": "cn:core:stage:prod", "kind": "stage", "version": "1.0.0"},
+                {"id": "cn:core:stage:prod", "kind": "stage"},
                 payload.get("stage_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:status:active", "kind": "status", "version": "1.0.0"},
+                {"id": "cn:core:status:active", "kind": "status"},
                 payload.get("status_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:role:reviewer", "kind": "role", "version": "1.0.0"},
+                {"id": "cn:core:role:reviewer", "kind": "role"},
                 payload.get("role_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:policy:spec-first", "kind": "policy", "version": "1.0.0"},
+                {"id": "cn:core:policy:spec-first", "kind": "policy"},
                 payload.get("policy_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:action:authenticate", "kind": "action", "version": "1.0.0"},
+                {"id": "cn:core:action:authenticate", "kind": "action"},
                 payload.get("action_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:term:jwt", "kind": "term", "version": "1.0.0"},
+                {"id": "cn:core:term:jwt", "kind": "term"},
                 payload.get("term_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:term:jwt", "kind": "term", "version": "1.0.0"},
+                {"id": "cn:core:term:jwt", "kind": "term"},
                 payload["terms"][0].get("term_ref"),
             )
             self.assertNotIn("term_ref", payload["terms"][1])
             self.assertEqual(
-                {"id": "cn:core:interface:http-json", "kind": "interface", "version": "1.0.0"},
+                {"id": "cn:core:interface:http-json", "kind": "interface"},
                 payload.get("interface_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:event:login-succeeded", "kind": "event", "version": "1.0.0"},
+                {"id": "cn:core:event:login-succeeded", "kind": "event"},
                 payload.get("event_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:id_pattern:conventional-commit", "kind": "id_pattern", "version": "1.0.0"},
+                {"id": "cn:core:id_pattern:conventional-commit", "kind": "id_pattern"},
                 payload["commit_message_rules"].get("id_pattern_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:governance_label:security", "kind": "governance_label", "version": "1.0.0"},
+                {"id": "cn:core:governance_label:security", "kind": "governance_label"},
                 payload["extensions"][0].get("governance_label_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:tech_stack:python", "kind": "tech_stack", "version": "1.0.0"},
+                {"id": "cn:core:tech_stack:python", "kind": "tech_stack"},
                 payload["tech_stack"][0].get("tech_stack_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:dependency:auth-service", "kind": "dependency", "version": "1.0.0"},
+                {"id": "cn:core:dependency:auth-service", "kind": "dependency"},
                 payload["dependencies"][0].get("dependency_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:risk_category:authz", "kind": "risk_category", "version": "1.0.0"},
+                {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
                 payload["threats"][0].get("risk_category_ref"),
             )
             self.assertNotIn("action_ref", payload["items"][0])
@@ -670,12 +670,12 @@ class CliB3Tests(unittest.TestCase):
 
             payload = json.loads(artifact.read_text(encoding="utf-8"))
             self.assertEqual(
-                {"id": "cn:core:term:jwt", "kind": "term", "version": "1.0.0"},
+                {"id": "cn:core:term:jwt", "kind": "term"},
                 payload["terms"][0].get("term_ref"),
             )
             self.assertNotIn("term_ref", payload["terms"][1])
             self.assertEqual(
-                {"id": "cn:core:risk_category:authz", "kind": "risk_category", "version": "1.0.0"},
+                {"id": "cn:core:risk_category:authz", "kind": "risk_category"},
                 payload["threats"][0].get("risk_category_ref"),
             )
             self.assertNotIn("risk_category_ref", payload["threats"][1])
@@ -770,11 +770,11 @@ class CliB3Tests(unittest.TestCase):
 
             payload = json.loads(artifact.read_text(encoding="utf-8"))
             self.assertEqual(
-                {"id": "cn:core:stage:ci", "kind": "stage", "version": "1.0.0"},
+                {"id": "cn:core:stage:ci", "kind": "stage"},
                 payload.get("stage_ref"),
             )
             self.assertEqual(
-                {"id": "cn:core:environment:prod", "kind": "environment", "version": "1.0.0"},
+                {"id": "cn:core:environment:prod", "kind": "environment"},
                 payload.get("environment_ref"),
             )
 
@@ -952,12 +952,12 @@ class CliB3Tests(unittest.TestCase):
 
             payload = json.loads(artifact.read_text(encoding="utf-8"))
             self.assertEqual(
-                {"id": "cn:core:acronym:jwt", "kind": "acronym", "version": "1.0.0"},
+                {"id": "cn:core:acronym:jwt", "kind": "acronym"},
                 payload["terms"][0].get("acronym_ref"),
             )
             self.assertNotIn("acronym_ref", payload["terms"][1])
             self.assertEqual(
-                {"id": "cn:core:completeness_dimension:traceability", "kind": "completeness_dimension", "version": "1.0.0"},
+                {"id": "cn:core:completeness_dimension:traceability", "kind": "completeness_dimension"},
                 payload["missing_elements"][0].get("completeness_dimension_ref"),
             )
             self.assertNotIn("completeness_dimension_ref", payload["missing_elements"][1])

@@ -289,8 +289,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit",
-      "version": "1.0.0"
+      "kind": "unit"
     }
   ],
   "canonical_proposals": [],
