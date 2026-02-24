@@ -33,8 +33,11 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
+      - name: Setup Virtual Environment & Install tooling
+        run: |
+          python -m venv devspec_env
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          devspec_env/bin/pip install -e tools/
       - name: Prompt-schema sync
         run: python -m specdev_tools.cli prompt-sync spec --repo-root .
       - name: Canonical lint
@@ -88,8 +91,11 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
+      - name: Setup Virtual Environment & Install tooling
+        run: |
+          python -m venv devspec_env
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          devspec_env/bin/pip install -e tools/
       - name: Lint adversarial fixtures (same mechanism as fixtures)
         run: python -m specdev_tools.cli fixtures-lint spec
 
