@@ -35,7 +35,7 @@ Consult the matching `spec/NN_name.guide.md` before running the prompt for each 
 ## AI Assist Flow
 Prompts are designed for a two‑phase interaction to reduce rework:
 - Phase A — Clarify: the assistant ingests the step’s context and asks targeted Gap Questions when the “Self‑Audit Gate” is not satisfied.
-- Phase B — Emit: once answers are provided, the assistant emits a single fenced `json` block that validates against the schema.
+- Phase B — Emit: once answers are provided, the assistant writes the artifact JSON directly to disk and validates against the schema.
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; the assistant stops until answers are provided.
 
 ## Validation Cadence
@@ -99,7 +99,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **Missing Targets**: Validation fails if `target_ids` is missing or empty. Every threat must trace to at least one `api-*` or `component-*`.
 - **Bad Mitigation Links**: `mitigations` keys must use strict `traceRef` objects. If you link to `inv-*` or `nfr-*`, the tooling verifies those IDs exist.
 - **Invalid Category**: `category` must be one of the strict enum values (`authn`, `authz`, `business_logic`, `transport`, `data_privacy`).
-- **Schema Sync**: `prompt_11_redteam.md` has an embedded schema that must match `schema/11_redteam.schema.json`. Ensure they are kept in sync.
+- **Schema Sync**: `prompt_11_redteam.md` has an referenced step schema that must match `schema/11_redteam.schema.json`. Ensure they are kept in sync.
 
 ## Step 12 Troubleshooting
 - **Cycle Detected**: The validation tool (`validators/step_12.py`) enforces a DAG. If you have a cycle (A->B->A), you must break it by refactoring job dependencies.

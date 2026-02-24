@@ -15,7 +15,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 2 · System Sketch**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** include `trace` that connect components and connections to upstream or downstream artifacts.
 
@@ -29,19 +29,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - **Primary Source:** `docs/seed/seed_tech_stack.md` (required) for architecture decisions, patterns, and constraints.
 - Capabilities and owners from `spec/01_capabilities.json` to inform components.
-- Any existing `spec/05_interface_contracts.json` to align external interfaces and protocols.
-- Glossary terms `spec/03_glossary.json` to name components and connections consistently.
-- NFRs `spec/07_nfrs.json` that imply reliability and rate limits.
+- Use only upstream artifacts; do not ingest downstream interface, glossary, or NFR specs in this step.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 
 ## Dependency Order
 - Step 01 (Capabilities) is required input.
-- Step 05 (Interface Contracts) and Step 07 (NFRs) are optional context only if already drafted.
-- DO NOT hallucinate Step 05/07 content when missing; use `-tbd` or ask Gap Questions.
+- Do not depend on downstream specs; when interface/security/perf details are unknown, use `-tbd` or ask Gap Questions.
 - Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, trust_boundary, auth, rate_limit, reliability, schema_ref). Do not output it.
-- **Cross-Check**: If NFRs (`spec/07_nfrs.json`) or Interface Contracts (`spec/05_interface_contracts.json`) are present, align connection security and reliability with them. Do not assume constraints if these files are missing or empty.
+- **Cross-Check**: Align connection security and reliability with upstream charter constraints and required seeds only. Do not assume missing constraints.
 - Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
 - Rewrite responsibilities into 3–6 crisp bullets per component; complete connection details based on protocols and policy; ensure IDs are stable.
 - Emit JSON once reconciled.
@@ -54,7 +51,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: avoid generic “owns data”; specify data domains and SLAs.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Each in-scope capability maps to at least one component.
   - Every Step 01 capability appears in at least one component `trace` entry.
@@ -62,8 +59,8 @@ You are a senior specification author and validator. Your job is to emit a singl
   - External systems are identified with clear boundaries and owners.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states only if the schema defines them (Step 02 does not).
@@ -140,327 +137,26 @@ DO NOT:
 - Mark `type: external` without the `external-dependency` tag
 - Use `trust_boundary: internal` on connections that touch `type: external` components
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/02_system_sketch.schema.json",
-  "title": "02_system_sketch",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "components": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "component_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "service",
-              "db",
-              "queue",
-              "cache",
-              "job",
-              "ui",
-              "lib",
-              "external"
-            ]
-          },
-          "responsibilities": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-            "minItems": 3,
-            "maxItems": 6
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "critical-path",
-                "supporting",
-                "external-dependency",
-                "shared-platform",
-                "stateful",
-                "stateless",
-                "realtime",
-                "batch",
-                "latency-sensitive",
-                "throughput-sensitive",
-                "pii",
-                "phi",
-                "pci",
-                "confidential",
-                "public-data",
-                "multi-tenant",
-                "single-tenant",
-                "experimental",
-                "legacy",
-                "deprecated"
-              ]
-            }
-          },
-          "trace_refs": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            },
-            "minItems": 1
-          }
-        },
-        "required": [
-          "component_id",
-          "type",
-          "responsibilities",
-          "owner",
-          "trace_refs"
-        ]
-      }
-    },
-    "connections": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "from": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "to": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "http",
-              "grpc",
-              "event",
-              "rpc",
-              "db",
-              "file"
-            ]
-          },
-          "trust_boundary": {
-            "type": "string",
-            "enum": [
-              "internal",
-              "partner",
-              "public"
-            ]
-          },
-          "schema_ref": {
-            "type": "string",
-            "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
-          },
-          "auth": {
-            "type": "string",
-            "enum": [
-              "none",
-              "basic",
-              "oauth2",
-              "jwt",
-              "mTLS",
-              "key"
-            ]
-          },
-          "rate_limit": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "rps": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100000
-              },
-              "burst": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 200000
-              },
-              "window_s": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3600
-              },
-              "scope": {
-                "type": "string",
-                "enum": [
-                  "ip",
-                  "client",
-                  "token",
-                  "global"
-                ]
-              }
-            },
-            "required": [
-              "rps",
-              "scope"
-            ]
-          },
-          "reliability": {
-            "type": "string",
-            "enum": [
-              "best-effort",
-              "at-least-once",
-              "exactly-once"
-            ]
-          },
-          "trace_refs": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            },
-            "minItems": 1
-          }
-        },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "trust_boundary": {
-                  "enum": [
-                    "partner",
-                    "public"
-                  ]
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "auth",
-                "rate_limit"
-              ]
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "protocol": {
-                  "enum": [
-                    "event"
-                  ]
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "reliability"
-              ]
-            }
-          }
-        ],
-        "required": [
-          "from",
-          "to",
-          "protocol",
-          "trust_boundary",
-          "trace_refs"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "components"
-  ],
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "components": {
-            "minItems": 2
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "connections"
-        ],
-        "properties": {
-          "connections": {
-            "type": "array",
-            "minItems": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "connections": {
-            "type": "array",
-            "minItems": 1
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "connections": {
-            "items": {
-              "allOf": [
-                {
-                  "if": {
-                    "properties": {
-                      "from": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "then": {
-                    "required": [
-                      "from"
-                    ]
-                  }
-                },
-                {
-                  "if": {
-                    "properties": {
-                      "to": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "then": {
-                    "required": [
-                      "to"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        }
-      }
-    }
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/02_system_sketch.schema.json
+- Schema File: schema/02_system_sketch.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
-  "id": "system_sketch-catalog",
+  "id": "system-sketch-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "components": [
     {
       "component_id": "user-service",
@@ -471,7 +167,7 @@ DO NOT:
         "Persist user preferences"
       ],
       "owner": "api",
-      "trace_refs": [
+      "trace": [
         {
           "type": "doc",
           "id": "capability-user-management"
@@ -479,6 +175,35 @@ DO NOT:
       ]
     }
   ],
-  "connections": []
+  "connections": [],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

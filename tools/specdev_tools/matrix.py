@@ -6,6 +6,7 @@ def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[tuple[str, str]]]:
     """
     Generic traversal to find all ID definitions and references.
@@ -402,5 +403,9 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
     # Add extension information if available
     if extensions:
         result["extensions"] = extensions
+
+    integrity_errors = validate_trace_integrity(repo_root, spec_dir)
+    if integrity_errors:
+        result["integrity_errors"] = integrity_errors
     
     return result

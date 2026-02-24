@@ -1,0 +1,35 @@
+{
+  "registry_version": "1.0.0",
+  "entries": [
+    {
+      "id": "cn:core:metric:error-rate",
+      "kind": "metric",
+      "status": "active",
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:metric:failure-rate",
+      "kind": "metric",
+      "status": "active",
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ],
+  "aliases": [
+    {
+      "kind": "metric",
+      "normalized": "error rate",
+      "target_id": "cn:core:metric:error-rate",
+      "status": "active"
+    },
+    {
+      "kind": "metric",
+      "normalized": "error rate",
+      "target_id": "cn:core:metric:failure-rate",
+      "status": "active"
+    }
+  ]
+}

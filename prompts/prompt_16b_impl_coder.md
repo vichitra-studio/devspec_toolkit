@@ -32,6 +32,7 @@ Instead of outputting code directly to the user, you:
 - **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
 - **Objective:** Implement the `plan.spec_alignment.checklist` by filling `implementation` slots.
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
+- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -170,35 +171,206 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 4. **NEVER** modify `plan` outside `checklist[].implementation` evidence/status updates
 
 # Output Rules
-1.  Return exactly one fenced code block with language `json`.
+1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
 3.  Do NOT modify `plan` outside `checklist[].implementation` evidence/status updates. Update `review` only when a checklist action explicitly targets review fields.
+
+# Schema Reference
+- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema File: schema/16_impl_context.schema.json
+- Schema Registry: tools/schema_registry.json
 
 # Output Contract (Update Logic)
 *Input*:
 ```json
-{ "plan": { ... }, "execution": {} }
+{
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "in_progress",
+            "files_touched": ["src/auth/routes.py"],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {},
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}
 ```
 
 *Output*:
 ```json
 {
-  "plan": { ... }, 
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "files_touched": ["src/auth/routes.py"],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
     "execution_results": [
       {
-        "status": "passed",
-        "outcome_description": "Executed Auth Tests",
-        "reasoning": "All 5 tests passed, verifying JWT generation.",
-        "evidence": "pytest tests/auth/test_login.py ... [100%] PASSED"
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
       }
     ],
     "critical_evidence": {
-      "satisfied_checklist_ids": ["CHK_AUTH_01"],
-      "passed_test_commands": ["pytest tests/auth/test_login.py"]
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
     },
     "emergent_ambiguities": []
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

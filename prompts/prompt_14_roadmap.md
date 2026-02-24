@@ -20,7 +20,7 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 # Task
 - **Input context:** Completed Phase 1 specs (`00_charter.json` through `12_ci_gates.json`) AND any Phase 2 Custom Extensions.
 - **Objective:** Produce a high-level roadmap that sequences the work defined in both phases.
-- **Output type:** One JSON document conforming to the Embedded Schema.
+- **Output type:** One JSON document conforming to the referenced step schema.
 - **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
 
 ## Seed Order & Mandatory Sources
@@ -124,231 +124,24 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Use traceRef objects to cite upstream specs that shape the roadmap.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`.
-2. The JSON (excluding `$schema`) must validate against the Embedded Schema (specifically `schema/14_roadmap.schema.json`).
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON (excluding `$schema`) must validate against the referenced step schema listed in `Schema Reference`.
 3. Include a top-level `$schema` field that matches the schema URI.
 4. All milestones must have `target_date`, `deliverables`, and `source_milestones`.
 
 # Note on `$schema`
-The `$schema` field is required in the output and is stripped before validation, so it is intentionally omitted from the Embedded Schema block below.
+The `$schema` field is required in the output and is stripped before validation during prompt-schema sync checks.
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/14_roadmap.schema.json",
-  "title": "14_roadmap",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "tech_stack": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "languages": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "rationale": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "version"
-            ]
-          }
-        },
-        "frameworks": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "rationale": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "version"
-            ]
-          }
-        },
-        "infrastructure": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "rationale": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "version"
-            ]
-          }
-        },
-        "tools": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "version": {
-                "type": "string"
-              },
-              "rationale": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name",
-              "version"
-            ]
-          }
-        }
-      },
-      "required": ["languages", "frameworks"]
-    },
-    "milestones": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "milestone_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-          "name": { "type": "string" },
-          "target_date": { "type": "string", "format": "date" },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "in_progress",
-              "done",
-              "deferred"
-            ],
-            "default": "pending"
-          },
-          "risk_status": {
-            "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ],
-            "default": "low"
-          },
-          "user_story": { "type": "string", "description": "The specific user story this milestone addresses." },
-          "source_milestones": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
-            "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
-          },
-          "tasks": { 
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "task_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-                  "description": { "type": "string", "pattern": "^\\S+\\s+\\S+.*$" },
-                  "acceptance_criteria": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "criterion_id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-                        "text": { "type": "string", "minLength": 15 },
-                        "fixture_ref": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" }
-                      },
-                      "required": ["criterion_id", "text"]
-                    }
-                  },
-                  "status": { "type": "string", "enum": ["pending", "in_progress", "done"] }
-                },
-                "required": ["task_id", "description"]
-              },
-              "description": "Atomic sub-tasks required to complete the user story."
-          },
-          "deliverables": {
-            "type": "array",
-            "items": { "$ref": "https://specdev.local/schema/core/collections/1#traceRef" }
-          },
-          "risks": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" },
-          "spikes": { "$ref": "https://specdev.local/schema/core/collections/1#stringArray" }
+# Schema Reference
+- Schema URI: https://specdev.local/schema/14_roadmap.schema.json
+- Schema File: schema/14_roadmap.schema.json
+- Schema Registry: tools/schema_registry.json
 
-        },
-        "required": ["milestone_id", "name", "target_date", "user_story", "source_milestones", "tasks", "deliverables"]
-      }
-    },
-    "migration_plan": { "type": "string", "minLength": 1 },
-    "dependencies": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "type": { "type": "string", "enum": ["milestone", "external"] },
-          "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-          "owner": { "type": "string" },
-          "note": { "type": "string", "pattern": "^\\S+\\s+\\S+.*$" }
-        },
-        "required": ["type", "id"],
-        "allOf": [
-          {
-            "if": { "properties": { "type": { "const": "external" } }, "required": ["type"] },
-            "then": { "required": ["owner", "note"] }
-          }
-        ]
-      }
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    }
-  },
-  "required": ["id", "owner", "created_at", "tech_stack", "milestones"]
-}
-```
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -357,6 +150,9 @@ The `$schema` field is required in the output and is stripped before validation,
   "id": "roadmap-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "migration_plan": "none",
   "tech_stack": {
     "languages": [
@@ -397,6 +193,35 @@ The `$schema` field is required in the output and is stripped before validation,
       "risks": [],
       "spikes": []
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

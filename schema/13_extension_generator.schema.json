@@ -5,38 +5,106 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
-    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
-    "seed_refs": { "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray" },
+    "id": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    },
+    "owner": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+    },
+    "created_at": {
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+    },
+    "seed_refs": {
+      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+    },
     "extensions": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "extension_id": { 
-            "type": "string", 
+          "extension_id": {
+            "type": "string",
             "pattern": "^ext-[0-9]{2}-[a-z0-9-]+$",
-            "description": "Unique ID for the extension (e.g. 'ext-01-database')" 
+            "description": "Unique ID for the extension (e.g. 'ext-01-database')"
           },
-          "title": { "type": "string" },
-          "file_name": { 
-            "type": "string", 
+          "title": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string",
             "pattern": "^ext_[0-9]{2}_[a-z0-9_]+\\.json$",
-            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'" 
+            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'"
           },
-          "area_of_concern": { "type": "string", "description": "Domain (e.g. Data, Security, AI)" },
-          "justification": { "type": "string" },
+          "area_of_concern": {
+            "type": "string",
+            "description": "Domain (e.g. Data, Security, AI)"
+          },
+          "justification": {
+            "type": "string"
+          },
           "required_schema_sections": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "schema_design_guidelines": { "type": "string" }
+          "schema_design_guidelines": {
+            "type": "string"
+          },
+          "tag_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "policy_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "id_pattern_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "governance_label_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          }
         },
-        "required": ["extension_id", "title", "file_name", "area_of_concern", "required_schema_sections"]
+        "required": [
+          "extension_id",
+          "title",
+          "file_name",
+          "area_of_concern",
+          "required_schema_sections",
+          "governance_label_ref"
+        ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
-  "required": ["id", "owner", "created_at", "seed_refs", "extensions"]
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "seed_refs",
+    "extensions",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
+  ]
 }

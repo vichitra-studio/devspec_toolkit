@@ -7,7 +7,7 @@ All commands in this guide assume you run them from repo root with the toolkit a
 ## AI Assist Flow
 Where prompts apply in this phase (e.g., Scaffold updates, Trinity Plan/Review, Drift), use the two‑phase flow:
 - Phase A — Clarify: ask targeted questions based on the prompt’s “Self‑Audit Gate”.
-- Phase B — Emit: output exactly one fenced `json` block for the step’s artifact.
+- Phase B — Emit: write the step artifact JSON directly to disk.
 Clarify responses should be short, bulleted questions grouped by topic (no JSON, no code fences), prioritizing gating items; pause emission until those answers are provided.
 
 ## Step Progression

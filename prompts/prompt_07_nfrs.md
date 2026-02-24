@@ -15,7 +15,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 7 · Non‑Functional Requirements**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -29,7 +29,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Success metrics in `spec/00_charter.json` to align business outcomes with technical targets.
 - Glossary `spec/03_glossary.json` for metric names and units; FRs `spec/04_fr_list.json` for performance-critical behaviors.
-- Monitoring `spec/16_delivery_monitoring.json` (if exists) to align measurement_method and dashboards.
+- Do not depend on downstream monitoring specs; derive measurement_method from available upstream artifacts and seed guidance.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -45,14 +45,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask first.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Every NFR includes metric, target, unit, and measurement_method; prod-stage NFRs also have owner.
   - Names/units align with glossary; traces connect to relevant FRs/APIs/components.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete numbers and metrics; avoid "fast" or "secure". Every NFR must be measurable via specific metric.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
@@ -63,7 +63,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Step-Specific Completeness Checklist
 - NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
 - Each NFR includes metric, numeric/string target, unit, and measurement_method aligned with Step 18 dashboards/alerts.
-- Stage is set for when the target must be met (dev/staging/prod) and owner is named.
+- Stage is set for when the target must be met (dev/ci/staging/prod) and owner is named.
 - `trace` links to FRs, interfaces, or invariants where the NFR applies.
 
 ## Field-by-Field Guidance
@@ -81,7 +81,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Metrics**: Assign each NFR to a schema `category` and describe the `metric` in precise, customer-facing terms.
 - **Targets**: Provide numeric `target` values with `unit` and `measurement_method` so monitoring and CI use the same test.
 - **Observability**: Tie `measurement_method` to an actual query or dashboard to ensure observability.
-- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, staging, prod) to guide rollout plans.
+- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, ci, staging, prod) to guide rollout plans.
 - **Trace**: Use `trace` to connect NFRs to FRs, invariants, or delivery tasks that uphold the requirement. For component-level NFRs, trace to relevant API, doc, or capability references.
 - **Measurement Verification**: Ensure `measurement_method` is a verifiable query or URL (e.g., "PromQL: ...", "Grafana dashboard: ...").
 
@@ -99,113 +99,24 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Quick Reference
 - Categories: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy.
-- Stage: `dev`, `staging`, `prod`.
+- Stage: `dev`, `ci`, `staging`, `prod`.
 
 # Clarification Questions
 - Which performance, reliability, cost, security/privacy, and energy targets are non-negotiable? Which are stretch?
 - What are the exact units and where will each metric be measured (tool/query/url)?
-- At what stage must each target be met (dev/staging/prod)? Who owns it?
+- At what stage must each target be met (dev/ci/staging/prod)? Who owns it?
 - Which FRs, APIs, or components does each NFR apply to? Any invariants required to enforce it?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/07_nfrs.schema.json",
-  "title": "07_nfrs",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "nfrs": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "nfr_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "latency",
-              "throughput",
-              "availability",
-              "durability",
-              "cost",
-              "security",
-              "privacy",
-              "maintainability",
-              "usability",
-              "portability",
-              "energy"
-            ]
-          },
-          "metric": {
-            "type": "string"
-          },
-          "target": {
-            "oneOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "unit": {
-            "type": "string"
-          },
-          "measurement_method": {
-            "type": "string"
-          },
-          "stage": {
-            "type": "string",
-            "enum": [
-              "dev",
-              "staging",
-              "prod"
-            ]
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          }
-        },
-        "required": [
-          "nfr_id",
-          "category",
-          "metric",
-          "target",
-          "unit"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "nfrs"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/07_nfrs.schema.json
+- Schema File: schema/07_nfrs.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -213,6 +124,75 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "nfrs-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "nfrs": []
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "nfrs": [
+    {
+      "nfr_id": "nfr-latency-auth-login",
+      "category": "latency",
+      "metric": "p95 login latency",
+      "target": 200,
+      "unit": "ms",
+      "metric_ref": {
+        "id": "cn:core:metric:error-rate",
+        "kind": "metric"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
+      "environment_ref": {
+        "id": "cn:core:environment:prod",
+        "kind": "environment"
+      },
+      "measurement_method": "automated monitoring",
+      "stage": "prod",
+      "owner": "api"
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:metric:error-rate",
+      "kind": "metric"
+    },
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    },
+    {
+      "id": "cn:core:environment:prod",
+      "kind": "environment"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

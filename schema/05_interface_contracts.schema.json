@@ -119,6 +119,48 @@
             "items": {
               "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
             }
+          },
+          "interface_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "event_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "entity_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "policy_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "enum_provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Provenance tracking for externally-sourced enums in this API.",
+            "properties": {
+              "source_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "source_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "resolved_version": {
+                "type": "string"
+              },
+              "resolved_at": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+              },
+              "resolver": {
+                "type": "string",
+                "description": "Tool or person that resolved the enum values."
+              }
+            },
+            "required": [
+              "source_url",
+              "source_date",
+              "resolved_at"
+            ]
           }
         },
         "required": [
@@ -126,9 +168,30 @@
           "name",
           "version",
           "protocol",
-          "owner"
+          "owner",
+          "interface_ref"
         ]
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -136,6 +199,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "apis"
+    "apis",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

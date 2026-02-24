@@ -14,10 +14,15 @@ This reference collects recurring facts that developers need while authoring or 
 
 ## Naming & Schema Conventions
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).
-- **Owner enum**: one of `{api, ui, system, ops, data}`.
+- **Owner enum**: one of `{api, ui, system, ops, data, product, business, engineering}`.
 - **Artifacts**: include the canonical `$schema` URI exactly as emitted in the prompt.
 - **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from [schema/core/](../../schema/core/).
+
+## Scope Lock (`spec_dir`)
+- Enforce scope lock for every repo: set and persist `spec_dir` explicitly instead of inferring from cwd.
+- For this repository layout, the locked path is `devspec_toolkit/spec` (not top-level `spec`).
+- Automation and CI must pass the same `spec_dir` to every command to avoid path-assumption drift.
 
 ## Command Cheatsheet
 Set up your environment per [`getting_started.md`](getting_started.md#1-set-up-your-environment) before running these commands. Every other document links back here so this serves as the canonical command reference.
@@ -47,6 +52,16 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
 ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
 
+# Quality, hallucination, and canonical integrity
+./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+
+# Step-order integrity (strict waterfall)
+./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
+./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
+
 # Prompt workflow reminders
 ./tools/run_specdev.sh ai-help --step 04
 
@@ -54,6 +69,7 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --version 0.1.0 --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+```
 
 ### Alignment & Migration
 ```bash
@@ -82,7 +98,6 @@ python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.j
 python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
 python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
 ```
-```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
 ```bash
@@ -91,8 +106,14 @@ For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prom
 
 Invoke commands from the root of your host repository so relative paths to `spec/` and [./devspec_toolkit/](../../) resolve cleanly.
 
+## Strict Execution Policy
+- Workflow is forward-only.
+- There is no refinement mode.
+- Any accepted upstream change requires full replay of all downstream steps before merge.
+- In strict mode, CI runs quality, hallucination, dependency-order, and replay checks as blocking gates.
+
 ## Two-Phase AI Runner Mode
-- Prompts support a two-phase flow: Clarify (questions only) → Emit (single fenced `json`).
+- Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
 - Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
 - Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
 - Operational guidance for agents and runner tips: `docs/agents/agents.md`.

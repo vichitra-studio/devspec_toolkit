@@ -37,6 +37,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - **Specs**: Ingest relevant Feature Specs (`04_fr_list`), Interfaces (`05`), and Invariants (`06`).
 - **Codebase**: Scan existing files to populate `context.existing_structures` and `coding_examples`.
 - **Documentation Map**: Read `README.md` and `docs/README.md` to locate relevant structure/tooling/runbook docs; include any required docs by adding them to the seed manifest and `seed_refs`.
+- **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 # Operating Flow: Context Review → Synthesize → Clarify → Drift Check → Emit
 1.  **Context Review**: Determine which docs are required (root README map, tooling docs, architecture notes, ops runbooks). If any are required and not yet seeded, update `spec/common/seed_manifest.json` (add to `seeds` + `global_seed_order` + `nested_order` as needed) and include them in `step_requirements["16a"]`. Then ingest them and list in `seed_refs`.
@@ -210,112 +211,16 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 - Are there any ambiguous requirements that need resolution before coding?
 - Do we have existing tests we can extend, or must we create new ones?
 
-# Embedded Schema
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_impl_context.schema.json",
-  "title": "16_impl_context",
-  "type": "object",
-  "additionalProperties": false,
-  "$defs": {
-    "specRef": {
-      "type": "object",
-      "required": ["type", "id", "line_range", "commit_hash"],
-      "properties": {
-        "type": { "enum": ["fr", "api", "nfr", "inv", "fixture", "doc", "code"] },
-        "id": { "type": "string" },
-        "line_range": { "type": "string" },
-        "commit_hash": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
-      }
-    }
-  },
-  "properties": {
-    "id": { "type": "string" },
-    "owner": { "type": "string" },
-    "created_at": { "type": "string" },
-    "extensions": { "type": "object" },
-    "plan": {
-      "type": "object",
-      "required": ["summary", "spec_alignment", "review_requirements"],
-      "properties": {
-        "summary": {
-          "type": "object",
-          "required": ["functional_summary", "scope_in", "target_file_patterns"],
-          "properties": {
-            "functional_summary": { "type": "string" },
-            "scope_in": { "type": "array", "items": { "type": "string" } },
-            "scope_out": { "type": "array", "items": { "type": "string" } },
-            "target_file_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-        "spec_alignment": {
-          "type": "object",
-          "required": ["checklist"],
-          "properties": {
-            "requirements_summary": {
-                "type": "array",
-                "items": { "type": "object", "required": ["theme", "summary"], "properties": { "theme": { "type": "string" }, "summary": { "type": "string" } } }
-            },
-            "checklist": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "required": ["id", "spec_ref", "description", "linked_test_expectation"],
-                "properties": {
-                  "id": { "type": "string" },
-                  "spec_ref": { "$ref": "#/$defs/specRef" },
-                  "description": { "type": "string" },
-                  "linked_test_expectation": { "type": "string" },
-                  "checklist_status": { "enum": ["active", "deferred"] },
-                  "implementation": {
-                    "type": "object",
-                    "required": ["status", "actions"],
-                    "properties": {
-                      "status": { "enum": ["pending", "in_progress", "verified", "deferred"] },
-                      "files_touched": { "type": "array", "items": { "type": "string" } },
-                      "actions": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "required": ["type", "description"],
-                          "properties": {
-                            "type": { "enum": ["file_create", "file_edit", "run_command", "manual_verification"] },
-                            "description": { "type": "string" },
-                            "target": { "type": "string" },
-                            "command": { "type": "string" },
-                            "evidence": {
-                                "type": "object",
-                                "required": ["type", "content"],
-                                "properties": {
-                                    "type": { "enum": ["log", "snippet", "screenshot"] },
-                                    "content": { "type": "string" }
-                                }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "review_requirements": {
-           "type": "object",
-           "required": ["test_commands"],
-           "properties": {
-              "test_commands": { "type": "array", "items": { "type": "string" } }
-           }
-        }
-      }
-    }
-  },
-  "required": ["id", "plan"]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema File: schema/16_impl_context.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -323,10 +228,15 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "plan": {
+    "status": "active",
     "summary": {
        "functional_summary": "Implement core API login",
        "scope_in": ["Login", "Logout"],
+       "scope_out": ["OAuth login"],
        "target_file_patterns": ["src/auth/*.py"]
     },
     "spec_alignment": {
@@ -361,10 +271,43 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
     "context": {
        "existing_structures": [{ "signature": "class User", "source_file": "src/models.py" }]
     },
-    // plan.tasks REMOVED
     "review_requirements": {
       "test_commands": ["pytest tests/auth/"]
     }
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

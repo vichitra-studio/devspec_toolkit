@@ -1,0 +1,220 @@
+{
+  "$schema": "https://specdev.local/schema/canon/kind/1",
+  "kind": "nfr_category",
+  "entries": [
+    {
+      "id": "cn:core:nfr_category:latency",
+      "kind": "nfr_category",
+      "preferred_label": "latency",
+      "definition": "Time taken to respond to a request or complete an operation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "response-time"
+      ],
+      "tags": [
+        "performance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:throughput",
+      "kind": "nfr_category",
+      "preferred_label": "throughput",
+      "definition": "Number of requests or operations handled per unit time.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "rps",
+        "requests-per-second"
+      ],
+      "tags": [
+        "performance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:availability",
+      "kind": "nfr_category",
+      "preferred_label": "availability",
+      "definition": "Percentage of time the system is operational and accessible.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "uptime"
+      ],
+      "tags": [
+        "reliability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:durability",
+      "kind": "nfr_category",
+      "preferred_label": "durability",
+      "definition": "Guarantee that stored data persists without loss.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "data-persistence"
+      ],
+      "tags": [
+        "reliability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:cost",
+      "kind": "nfr_category",
+      "preferred_label": "cost",
+      "definition": "Financial cost constraints for infrastructure, operations, or services.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "business"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:security",
+      "kind": "nfr_category",
+      "preferred_label": "security",
+      "definition": "Protection against unauthorized access, data breaches, and threats.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "compliance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:privacy",
+      "kind": "nfr_category",
+      "preferred_label": "privacy",
+      "definition": "Protection of user data and compliance with privacy regulations.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "data-privacy"
+      ],
+      "tags": [
+        "compliance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:maintainability",
+      "kind": "nfr_category",
+      "preferred_label": "maintainability",
+      "definition": "Ease of modifying, extending, and debugging the system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "engineering"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:usability",
+      "kind": "nfr_category",
+      "preferred_label": "usability",
+      "definition": "Ease of use and quality of user experience.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "ux"
+      ],
+      "tags": [
+        "product"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:portability",
+      "kind": "nfr_category",
+      "preferred_label": "portability",
+      "definition": "Ability to run the system across different environments or platforms.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "engineering"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:nfr_category:energy",
+      "kind": "nfr_category",
+      "preferred_label": "energy",
+      "definition": "Energy consumption and efficiency constraints.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "power"
+      ],
+      "tags": [
+        "sustainability"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    }
+  ],
+  "registry_version": "1.0.0"
+}

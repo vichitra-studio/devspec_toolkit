@@ -21,7 +21,7 @@ You are a senior specification auditor and quality control expert. Your job is t
 # Task
 - **Input context:** all existing spec artifacts (`00_charter.json` through `12_ci_gates.json`) and their corresponding guides, plus the extension manifest (`13_extension_manifest.json`).
 - **Objective:** produce a complete, falsifiable completeness report for **Step 13a · Completeness Assessment**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Traceability:** connect findings to specific spec files and elements.
 
 ## Logic Update
@@ -46,7 +46,7 @@ You are a senior specification auditor and quality control expert. Your job is t
   - **Rationale Fields**: Must be populated for all `tech_stack` choices and `roadmap` items. Empty rationale = incomplete.
 
 ## Self-Audit Gate (do not output)
-- Compute a private completeness score. If < 0.5 (broken system or major files missing), stop and ask.
+- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
 - Gating items:
   - Can read at least 00, 01, 04, 05.
   - Identification of at least one missing element OR confirmation of 100% completeness.
@@ -83,13 +83,13 @@ You are a senior specification auditor and quality control expert. Your job is t
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
 - Guide: `devspec_toolkit/docs/prompts/shared_expectations.md`.
-- Shared expectations: `devspec_toolkit/docs/templates/shared_expectations.md`.
+- Shared expectations: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. `completeness_rating.target` should always be 10.
 5. `missing_elements` must list specific gaps, not general complaints.
@@ -126,105 +126,16 @@ You are a senior specification auditor and quality control expert. Your job is t
 - Is there a known reason for missing headers/sections (e.g. omitted by design)?
 - Who is the primary audience for this assessment?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
-  "title": "13a_completeness_assessment",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "missing_elements": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "element_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "category": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "high",
-              "medium",
-              "low"
-            ]
-          },
-          "impact_on_completeness": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "specification_source": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(13_extension_manifest\\.json)|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
-            }
-          }
-        },
-        "required": [
-          "element_id",
-          "category",
-          "description",
-          "priority",
-          "impact_on_completeness"
-        ]
-      }
-    },
-    "completeness_rating": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "current": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "target": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "confidence_level": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        }
-      },
-      "required": [
-        "current",
-        "target",
-        "confidence_level"
-      ]
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "missing_elements",
-    "completeness_rating"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/13a_completeness_assessment.schema.json
+- Schema File: schema/13a_completeness_assessment.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -232,11 +143,43 @@ You are a senior specification auditor and quality control expert. Your job is t
   "id": "assessment-20250101",
   "owner": "system",
   "created_at": "2025-01-01T12:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
   "missing_elements": [],
   "completeness_rating": {
     "current": 10,
     "target": 10,
     "confidence_level": 1.0
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

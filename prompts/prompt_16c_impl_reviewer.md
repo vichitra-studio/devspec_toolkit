@@ -25,6 +25,7 @@ You output the final version of the JSON, populating the `review` section.
 - **Input context:** `spec/impl_context/{step_id}.json` (Plan + Exec), plus the actual Codebase.
 - **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
 - **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{step_id}.json`.
+- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 ## Crucial Side Effect (Roadmap Sync)
 - If your `verdict` is `verified`, you **MUST** also update:
@@ -197,51 +198,255 @@ For each `checklist[]` item:
 3. **NEVER** skip `metadata_usage` rating
 
 # Output Rule
-1.  Return exactly one fenced code block with language `json`.
+1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
+
+# Schema Reference
+- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema File: schema/16_impl_context.schema.json
+- Schema Registry: tools/schema_registry.json
 
 # Output Contract (Update Logic)
 *Input*:
 ```json
-{ "plan": { ... }, "execution": { ... }, "review": {} }
+{
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {
+    "files_touched": ["src/auth/routes.py"],
+    "execution_results": [
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
+    ],
+    "critical_evidence": {
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
+    },
+    "emergent_ambiguities": []
+  },
+  "review": {},
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}
 ```
 
 *Output*:
 ```json
 {
-  "plan": { ... }, 
-  "execution": { ... },
+  "id": "step-api-core",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {"seed_id": "seed-overview"}
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implement core API login",
+      "scope_in": ["login"],
+      "scope_out": ["oauth"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "description": "POST /login returns JWT",
+          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "implementation": {
+            "status": "verified",
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/auth/routes.py",
+                "description": "Implement login handler",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "def login(request): return issue_token(request.user)"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "review_requirements": {
+      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": ["README.md"]
+    }
+  },
+  "execution": {
+    "files_touched": ["src/auth/routes.py"],
+    "execution_results": [
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response omitted token field required by contract.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
+    ],
+    "critical_evidence": {
+      "satisfied_checklist_ids": [],
+      "passed_test_commands": []
+    },
+    "emergent_ambiguities": []
+  },
   "review": {
     "ratings": {
-       "spec_completeness": 5,
-       "code_quality": 4,
-       "tests_completeness": 5,
-       "docs_completeness": 3
+      "spec_completeness": 3,
+      "code_quality": 3,
+      "tests_completeness": 2,
+      "docs_completeness": 3,
+      "metadata_usage": 4
     },
     "verdict": "deferred",
     "findings": [
       {
         "id": "finding-auth-01",
         "type": "bug",
-        "description": "Login fails on empty password",
+        "spec_ref": {
+          "type": "api",
+          "id": "api-auth-login",
+          "line_range": "L12-L15",
+          "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "description": "Login response omits token field required by contract.",
         "severity": "major",
         "remediation_task": {
-           "task_id": "rev-auth-01-fix",
-           "summary": "Add partial implementation for empty password check",
-           "checklist_ids": ["CHK_AUTH_01"],
-           "files_to_touch": ["src/auth/routes.py"]
+          "task_id": "fix-auth-token-response",
+          "summary": "Return JWT token in login response body.",
+          "checklist_ids": ["CHK_AUTH_01"],
+          "files_to_touch": ["src/auth/routes.py"]
+        },
+        "metadata": {
+          "source": "execution_results",
+          "impact": "blocks authentication acceptance criteria"
         }
       }
     ],
-    "fixture_status": {
-        "implemented_endpoints": ["api-auth-login"],
-        "test_results": [{ "fixture_ref": "fixture-auth-success", "status": "pass" }],
-        "ci_status": "green"
+    "next_actions": "Implement remediation task and rerun targeted auth tests."
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
     },
-    "security_status": "green",
-    "delivery_status": {
-        "deployments": [{ "env": "dev", "build_id": "b123", "status": "success" }]
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
     }
-  }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

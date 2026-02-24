@@ -52,6 +52,9 @@
                 },
                 "command": {
                   "type": "string"
+                },
+                "command_ref": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                 }
               },
               "required": [
@@ -60,12 +63,61 @@
                 "command"
               ]
             }
+          },
+          "environment_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "role_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          },
+          "security": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "CI security primitives for this job.",
+            "properties": {
+              "runner_labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Runner isolation labels (e.g. 'self-hosted', 'ubuntu-latest')."
+              },
+              "token_permissions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "read",
+                    "write",
+                    "none"
+                  ]
+                },
+                "description": "Token permission scopes (e.g. {'contents': 'read', 'packages': 'write'})."
+              },
+              "environment_protection": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "required_reviewers": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of required approvers before deployment."
+                  },
+                  "wait_timer_minutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Delay in minutes before deployment proceeds."
+                  }
+                }
+              }
+            }
           }
         },
         "required": [
           "job_id",
           "name",
-          "steps"
+          "steps",
+          "environment_ref"
         ]
       }
     },
@@ -84,6 +136,26 @@
           "maximum": 100
         }
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -91,6 +163,10 @@
     "owner",
     "created_at",
     "seed_refs",
-    "jobs"
+    "jobs",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

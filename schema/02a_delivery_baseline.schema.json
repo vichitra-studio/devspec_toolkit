@@ -25,31 +25,19 @@
     },
     "environments": {
       "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "dev": {
-          "type": "object",
-          "minProperties": 1
-        },
-        "ci": {
-          "type": "object",
-          "minProperties": 1
-        },
-        "staging": {
-          "type": "object",
-          "minProperties": 1
-        },
-        "prod": {
-          "type": "object",
-          "minProperties": 1
-        }
+      "propertyNames": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentName"
+      },
+      "additionalProperties": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentConfig"
       },
       "required": [
         "dev",
         "ci",
         "staging",
         "prod"
-      ]
+      ],
+      "minProperties": 4
     },
     "ci_gates": {
       "type": "array",
@@ -64,6 +52,35 @@
     },
     "compliance": {
       "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
+    },
+    "environment_ref": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+    },
+    "command_ref": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+    },
+    "policy_ref": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
     }
   },
   "required": [
@@ -72,6 +89,10 @@
     "created_at",
     "seed_refs",
     "environments",
-    "ci_gates"
+    "ci_gates",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

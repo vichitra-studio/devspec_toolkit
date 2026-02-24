@@ -1,5 +1,8 @@
 {
   "https://specdev.local/schema/core/atoms/1": "schema/core/atoms.schema.json",
+  "https://specdev.local/schema/core/canon/1": "schema/core/canon.schema.json",
+  "https://specdev.local/schema/canon/aliases/1": "canon/aliases.schema.json",
+  "https://specdev.local/schema/canon/kind/1": "canon/kind.schema.json",
   "https://specdev.local/schema/core/collections/1": "schema/core/collections.schema.json",
   "https://specdev.local/schema/core/errors/1": "schema/core/errors.schema.json",
   "https://specdev.local/schema/00_charter.schema.json": "schema/00_charter.schema.json",

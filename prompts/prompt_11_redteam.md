@@ -21,7 +21,7 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 # Task
 - **Input context:** Interface Contracts (`spec/05_interface_contracts.json`), System Sketch (`spec/02_system_sketch.json`), Invariants (`spec/06_invariants.json`), and NFRs (`spec/07_nfrs.json`).
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
-- **Output type:** One JSON document conforming to the Embedded Schema.
+- **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
 - **Constraint:** EVERY mitigation must link to a requirement (NFR, Inv, FR) or be a clear directive.
 
@@ -43,6 +43,7 @@ Use the `category` field to classify threats precisely:
 1.  **Attack Surface**: `spec/05_interface_contracts.json` (APIs) and `spec/02_system_sketch.json` (Components).
 2.  **Defenses**: `spec/06_invariants.json` (Security/Safety rules) and `spec/07_nfrs.json` (Security constraints).
 3.  **Logic**: `spec/04_fr_list.json` (Business rules).
+4.  **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
 
 ## Operating Flow: Attack → Trace → Mitigate
 1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
@@ -72,9 +73,9 @@ Use the `category` field to classify threats precisely:
 - [ ] Are `edge_cases` structured with IDs?
 
 # Output Rules
-1.  Return exactly one fenced code block with language `json`.
-2.  **NO** prose before or after the JSON.
-3.  Follow the **Embedded Schema** exactly.
+1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2.  Do not dump JSON in the chat thread; respond with a short confirmation that the artifact path was written and validation status.
+3.  Follow the referenced step schema exactly.
 4.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
 5.  `target_ids`: MUST be populated for every threat.
 6.  `mitigations`: MUST use `traceRef` structure (type + id).
@@ -136,137 +137,16 @@ Use the `category` field to classify threats precisely:
 - Are there specific legacy components known to be fragile?
 - What is the expected throughput (NFRs) to define "Resource Exhaustion" thresholds?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/11_redteam.schema.json",
-  "title": "11_redteam",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "trace": {
-      "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-    },
-    "threats": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "threat_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "vector": {
-            "type": "string"
-          },
-          "target_ids": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "authn",
-              "authz",
-              "business_logic",
-              "transport",
-              "data_privacy"
-            ]
-          },
-          "mitigations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "fr",
-                    "api",
-                    "nfr",
-                    "inv",
-                    "fixture",
-                    "doc",
-                    "capability"
-                  ]
-                },
-                "id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "note": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "type",
-                "id"
-              ]
-            }
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ]
-          }
-        },
-        "required": [
-          "threat_id",
-          "description",
-          "severity"
-        ]
-      }
-    },
-    "edge_cases": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "trigger": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "description"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "threats"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/11_redteam.schema.json
+- Schema File: schema/11_redteam.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -274,7 +154,17 @@ Use the `category` field to classify threats precisely:
   "id": "redteam-catalog",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "trace": { "type": "doc", "id": "spec-11" },
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "trace": [
+    {
+      "type": "doc",
+      "id": "spec-11"
+    }
+  ],
   "threats": [
     {
       "threat_id": "threat-authz-admin-bypass",
@@ -282,10 +172,23 @@ Use the `category` field to classify threats precisely:
       "vector": "Mass Assignment",
       "category": "authz",
       "severity": "critical",
-      "target_ids": [ { "type": "api", "id": "api-users-update-profile" } ],
+      "target_ids": [
+        {
+          "type": "api",
+          "id": "api-users-update-profile"
+        }
+      ],
       "mitigations": [
-        { "type": "inv", "id": "inv-profile-immutable-fields", "note": "Strict whitelist on updates" }
-      ]
+        {
+          "type": "inv",
+          "id": "inv-profile-immutable-fields",
+          "note": "Strict whitelist on updates"
+        }
+      ],
+      "risk_category_ref": {
+        "id": "cn:core:risk_category:authz",
+        "kind": "risk_category"
+      }
     }
   ],
   "edge_cases": [
@@ -294,6 +197,39 @@ Use the `category` field to classify threats precisely:
       "description": "Primary DB timeout under load",
       "trigger": "Connection Pool Exhaustion"
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:risk_category:authz",
+      "kind": "risk_category"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

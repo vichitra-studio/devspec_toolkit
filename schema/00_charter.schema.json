@@ -51,6 +51,9 @@
           },
           "needs": {
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          },
+          "role_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -127,6 +130,9 @@
           },
           "measurement_method": {
             "type": "string"
+          },
+          "unit_ref": {
+            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
         "required": [
@@ -134,7 +140,8 @@
           "name",
           "target",
           "unit",
-          "measurement_method"
+          "measurement_method",
+          "unit_ref"
         ]
       }
     },
@@ -143,6 +150,26 @@
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#link"
       }
+    },
+    "generation_quality": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+    },
+    "canonical_refs_used": {
+      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+    },
+    "canonical_proposals": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+      },
+      "default": []
+    },
+    "canonical_conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+      },
+      "default": []
     }
   },
   "required": [
@@ -151,6 +178,10 @@
     "created_at",
     "seed_refs",
     "problem_statement",
-    "success_metrics"
+    "success_metrics",
+    "generation_quality",
+    "canonical_refs_used",
+    "canonical_proposals",
+    "canonical_conflicts"
   ]
 }

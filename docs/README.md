@@ -19,6 +19,7 @@ Detailed breakdowns of the spec lifecycle phases:
 ### Tooling & Deep Dives
 - **[Coverage Matrix](developers/tooling/coverage_matrix.md)**: Understanding valid links between artifacts.
 - **[Gap Hunter Checklist](developers/tooling/gap_hunter_checklist.md)**: How to manually audit specs for quality.
+- **Strict mode checks**: quality and hallucination gates (`spec-quality-lint`, `hallucination-lint`) plus replay/dependency checks are documented in [Reference](developers/reference.md).
 
 ---
 

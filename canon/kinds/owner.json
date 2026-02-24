@@ -1,0 +1,151 @@
+{
+  "$schema": "https://specdev.local/schema/canon/kind/1",
+  "registry_version": "1.0.0",
+  "kind": "owner",
+  "entries": [
+    {
+      "id": "cn:core:owner:api",
+      "kind": "owner",
+      "preferred_label": "api",
+      "definition": "Artifact ownership domain: api.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:ui",
+      "kind": "owner",
+      "preferred_label": "ui",
+      "definition": "Artifact ownership domain: ui.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:system",
+      "kind": "owner",
+      "preferred_label": "system",
+      "definition": "Artifact ownership domain: system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:ops",
+      "kind": "owner",
+      "preferred_label": "ops",
+      "definition": "Artifact ownership domain: ops.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:data",
+      "kind": "owner",
+      "preferred_label": "data",
+      "definition": "Artifact ownership domain: data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:product",
+      "kind": "owner",
+      "preferred_label": "product",
+      "definition": "Artifact ownership domain: product.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:business",
+      "kind": "owner",
+      "preferred_label": "business",
+      "definition": "Artifact ownership domain: business.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:engineering",
+      "kind": "owner",
+      "preferred_label": "engineering",
+      "definition": "Artifact ownership domain: engineering.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "milestones": [
+    { "milestone_id": "m1-core-foundation" },
+    { "milestone_id": "m2-core-foundation" },
+    { "milestone_id": "m1-authentication" },
+    { "milestone_id": "m2-authentication" }
+  ]
+}

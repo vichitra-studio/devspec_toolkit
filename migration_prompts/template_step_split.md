@@ -93,7 +93,7 @@ Overall verification:
 
 ## Output Contract
 
-Return a fenced code block for EACH target file, clearly labeled:
+Write EACH target file directly to disk at its target path, then list written paths clearly:
 
 ### File 1: `{{TARGET_STEP_1}}.json`
 

@@ -15,7 +15,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 4 · Functional Requirements**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -28,9 +28,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` (goals/constraints) and Capabilities `spec/01_capabilities.json` as the source of behaviors.
-- Glossary `spec/03_glossary.json` to anchor terms; Interface Contracts `spec/05_interface_contracts.json` and NFRs `spec/07_nfrs.json` to inform criteria and traces.
+- Glossary `spec/03_glossary.json` to anchor terms; do not depend on downstream interface/NFR artifacts in this step.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Example fixtures `spec/08_fixtures.json` (if any) or `example/devspec_kit/spec/08_fixtures.json` for criterion shape.
+- Use examples from `example/devspec_kit` for criterion shape only; do not depend on downstream fixture artifacts.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate FRs (one behavior each) mapped from capabilities; include rationale, pre/postconditions, and ≥2 acceptance criteria candidates with measurable outcomes. Do not output it.
@@ -45,7 +45,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Every in-scope capability maps to ≥1 FR; each FR covers one behavior.
   - Each FR has ≥1 acceptance criterion with measurable outcome; top FRs include ≥2.
@@ -53,8 +53,8 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Traces to capability and (if known) API/NFR; IDs are kebab-case and stable.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
@@ -112,101 +112,76 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What are the negative paths and error conditions we must handle? Which belong in acceptance criteria?
 - Which capabilities, APIs, or NFRs does each FR map to? Any governance constraints to reflect?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/04_fr_list.schema.json",
-  "title": "04_fr_list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "functional_requirements": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "fr_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "statement": {
-            "type": "string",
-            "minLength": 20
-          },
-          "rationale": {
-            "type": "string"
-          },
-          "preconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "postconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "acceptance_criteria": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "criterion_id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "text": {
-                  "type": "string",
-                  "minLength": 15
-                },
-                "fixture_ref": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                }
-              },
-              "required": [
-                "criterion_id",
-                "text"
-              ]
-            }
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          }
-        },
-        "required": [
-          "fr_id",
-          "statement",
-          "acceptance_criteria"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "functional_requirements"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/04_fr_list.schema.json
+- Schema File: schema/04_fr_list.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
-  "id": "functional_requirements-catalog",
+  "id": "functional-requirements-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "functional_requirements": []
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "functional_requirements": [
+    {
+      "fr_id": "fr-auth-login",
+      "statement": "The system shall authenticate a user and issue a session token.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-auth-login-success",
+          "text": "Valid credentials return a signed token and user id."
+        }
+      ],
+      "capability_ref": {
+        "id": "cn:core:capability:example",
+        "kind": "capability"
+      }
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:capability:example",
+      "kind": "capability"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

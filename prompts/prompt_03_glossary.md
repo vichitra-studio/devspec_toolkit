@@ -15,7 +15,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 3 · Glossary**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability. Note that "minimal values" applies to metadata only, not semantic completeness.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -28,33 +28,33 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Context To Ingest
 - Charter `spec/00_charter.json` for business terms and metrics.
-- FRs `spec/04_fr_list.json` for recurring nouns and actions.
-- NFRs `spec/07_nfrs.json` and Monitoring `spec/16_delivery_monitoring.json` for metric names and units (if available).
+- Derive recurring nouns/actions from upstream charter and capability artifacts only.
+- Derive metric names/units from upstream charter and seed sources; do not depend on downstream NFR/monitoring artifacts.
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate terms grouped by domain (billing, auth, analytics, operations), including aliases and units for metrics. Do not output it.
 - Normalize to a canonical term per concept; track aliases in the definition text.
-- Self-audit; if any term driving FRs/NFRs is ambiguous, ask Gap Questions.
-- Rewrite definitions to include boundaries and units where applicable; ensure terms match usage in FRs/NFRs.
+- Self-audit; if any term driving upstream artifacts is ambiguous, ask Gap Questions.
+- Rewrite definitions to include boundaries and units where applicable; ensure terms match upstream artifact usage.
 - Emit JSON once reconciled.
 
 ## Heuristics For Completeness
 - Optional→expected: include `units` for any metric-like term; include `domain` to aid grouping.
-- Coverage hint: ensure every metric used in NFRs appears here with unit definitions.
-- Completeness formula: % of key nouns from FR statements and NFR metrics covered in the glossary.
+- Coverage hint: ensure every upstream metric appears here with unit definitions.
+- Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.
 - Ambiguity scrub: avoid circular or marketing language; specify inclusions/exclusions.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
-  - All key nouns in FR statements are present with clear definitions.
-  - All NFR metric names exist here with explicit units.
+  - All key nouns in upstream artifacts are present with clear definitions.
+  - All upstream metric names exist here with explicit units.
   - No duplicates/synonyms remain unresolved.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
@@ -103,69 +103,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Are there any external industry terms or compliance terms we must adopt verbatim?
 - Which acronyms must be expanded and standardized across docs and code?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/03_glossary.schema.json",
-  "title": "03_glossary",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "terms": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "term_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "term": {
-            "type": "string",
-            "minLength": 2
-          },
-          "definition": {
-            "type": "string",
-            "minLength": 20
-          },
-          "domain": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[a-z]+(?:-[a-z]+)*$"
-          },
-          "units": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9/]+$"
-          }
-        },
-        "required": [
-          "term_id",
-          "term",
-          "definition"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "terms"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/03_glossary.schema.json
+- Schema File: schema/03_glossary.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -173,6 +120,54 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "glossary-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "terms": []
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "terms": [
+    {
+      "term_id": "term-jwt",
+      "term": "JWT",
+      "definition": "Signed token used to represent authenticated user claims in API sessions.",
+      "term_ref": {
+        "id": "cn:core:term:example",
+        "kind": "term"
+      }
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:term:example",
+      "kind": "term"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

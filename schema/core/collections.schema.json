@@ -50,15 +50,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "fr",
-            "api",
-            "nfr",
-            "inv",
-            "fixture",
-            "doc",
-            "capability"
-          ]
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Trace type \u2014 validated against canon/kinds/trace_type.json entries."
         },
         "id": {
           "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
@@ -70,6 +63,405 @@
       "required": [
         "type",
         "id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "owner",
+              "note"
+            ]
+          }
+        }
+      ]
+    },
+    "canonicalRef": {
+      "$anchor": "canonicalRef",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "version": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "alias_used": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ]
+    },
+    "canonicalRefArray": {
+      "$anchor": "canonicalRefArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+      }
+    },
+    "canonicalProposal": {
+      "$anchor": "canonicalProposal",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temp_id": {
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "proposed_label": {
+          "type": "string"
+        },
+        "definition": {
+          "type": "string"
+        },
+        "source_field": {
+          "type": "string"
+        },
+        "suggested_namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9.]+$"
+        }
+      },
+      "required": [
+        "temp_id",
+        "kind",
+        "proposed_label",
+        "definition",
+        "source_field"
+      ]
+    },
+    "canonicalProposalArray": {
+      "$anchor": "canonicalProposalArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+      }
+    },
+    "canonicalConflict": {
+      "$anchor": "canonicalConflict",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field_path": {
+          "type": "string"
+        },
+        "input_value": {
+          "type": "string"
+        },
+        "candidate_ids": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_path",
+        "input_value",
+        "candidate_ids",
+        "reason"
+      ]
+    },
+    "canonicalConflictArray": {
+      "$anchor": "canonicalConflictArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
+      }
+    },
+    "environmentName": {
+      "$anchor": "environmentName",
+      "type": "string",
+      "enum": [
+        "dev",
+        "ci",
+        "staging",
+        "prod"
+      ]
+    },
+    "stageName": {
+      "$anchor": "stageName",
+      "type": "string",
+      "enum": [
+        "dev",
+        "ci",
+        "staging",
+        "prod"
+      ]
+    },
+    "environmentConfig": {
+      "$anchor": "environmentConfig",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "techStackItem": {
+      "$anchor": "techStackItem",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "tech_stack_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "techStackList": {
+      "$anchor": "techStackList",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#techStackItem"
+      }
+    },
+    "techStack": {
+      "$anchor": "techStack",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "languages": {
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+        },
+        "frameworks": {
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+        },
+        "infrastructure": {
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+        },
+        "tools": {
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+        }
+      },
+      "required": [
+        "languages",
+        "frameworks"
+      ]
+    },
+    "dependencyItem": {
+      "$anchor": "dependencyItem",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "milestone",
+            "external"
+          ]
+        },
+        "id": {
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "pattern": "^\\S+\\s+\\S+.*$"
+        },
+        "dependency_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "owner",
+              "note"
+            ]
+          }
+        }
+      ]
+    },
+    "dependencyList": {
+      "$anchor": "dependencyList",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
+          }
+        ]
+      }
+    },
+    "dependencyObjectList": {
+      "$anchor": "dependencyObjectList",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
+      }
+    },
+    "generationQuality": {
+      "$anchor": "generationQuality",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preflight_passed": {
+          "type": "boolean"
+        },
+        "evidence_records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "field_path": {
+                "type": "string"
+              },
+              "source_kind": {
+                "type": "string",
+                "enum": [
+                  "seed_ref",
+                  "canonical_ref",
+                  "upstream_ref"
+                ]
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field_path",
+              "source_kind",
+              "source_ref"
+            ]
+          }
+        },
+        "unresolved_inputs": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "assumptions": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "placeholder_scan": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "has_placeholders": {
+              "type": "boolean"
+            },
+            "tokens_found": {
+              "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+            }
+          },
+          "required": [
+            "has_placeholders"
+          ]
+        },
+        "self_check_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "check_id": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "details": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "check_id",
+              "passed"
+            ]
+          }
+        }
+      },
+      "required": [
+        "preflight_passed"
       ]
     },
     "seedRef": {

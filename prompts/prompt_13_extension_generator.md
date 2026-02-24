@@ -15,7 +15,7 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 # Task
 - **Input Context**: Step 01 (Capabilities), Step 02 (System Sketch), Step 04 (Requirements), Step 05 (Interfaces), Step 07 (NFRs).
 - **Objective**: Identify distinct architectural components or domains that require their own dedicated specification file (Extension) to avoid monolithic complexity.
-- **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the Embedded Schema.
+- **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the referenced step schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
 
 ## Seed Order & Mandatory Sources
@@ -56,54 +56,20 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
 
 # Output Rules
-1. Returns exactly one fenced code block with language `json`.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13_extension_generator.schema.json",
-  "title": "13_extension_generator",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
-    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
-    "extensions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "extension_id": { 
-            "type": "string", 
-            "pattern": "^ext-[0-9]{2}-[a-z0-9-]+$",
-            "description": "Unique ID for the extension (e.g. 'ext-01-database')" 
-          },
-          "title": { "type": "string" },
-          "file_name": { 
-            "type": "string", 
-            "pattern": "^ext_[0-9]{2}_[a-z0-9_]+\\.json$",
-            "description": "Must follow pattern 'ext_[0-9]{2}_[topic].json'" 
-          },
-          "area_of_concern": { "type": "string", "description": "Domain (e.g. Data, Security, AI)" },
-          "justification": { "type": "string" },
-          "required_schema_sections": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "schema_design_guidelines": { "type": "string" }
-        },
-        "required": ["extension_id", "title", "file_name", "area_of_concern", "required_schema_sections"]
-      }
-    }
-  },
-  "required": ["id", "owner", "created_at", "extensions"]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/13_extension_generator.schema.json
+- Schema File: schema/13_extension_generator.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -111,6 +77,11 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
   "id": "13-extension-manifest",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
   "extensions": [
     {
       "extension_id": "ext-01-database",
@@ -118,9 +89,51 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
       "file_name": "ext_01_database_schema.json",
       "area_of_concern": "Data Persistence",
       "justification": "System Sketch defines complex relational + vector data needs.",
-      "required_schema_sections": ["tables", "indexes", "relationships", "vector_config"],
-      "schema_design_guidelines": "Must implement SQL schema for users/docs and Vector schema for embeddings."
+      "required_schema_sections": [
+        "tables",
+        "indexes",
+        "relationships",
+        "vector_config"
+      ],
+      "schema_design_guidelines": "Must implement SQL schema for users/docs and Vector schema for embeddings.",
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      }
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

@@ -1,0 +1,42 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "unit",
+  "entries": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit",
+      "preferred_label": "milliseconds",
+      "definition": "Duration measured in milliseconds.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "ms",
+        "milliseconds"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit",
+      "preferred_label": "percent",
+      "definition": "Percentage value expressed on a 0-100 scale unless explicitly documented otherwise.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "percent",
+        "%"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

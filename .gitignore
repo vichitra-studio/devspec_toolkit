@@ -37,3 +37,6 @@ devspec_env/
 .vscode/
 .idea/
 .DS_Store
+
+# Generated artifacts
+tools/trace_matrix.json

@@ -20,6 +20,9 @@ jobs:
   validate:
     name: Schema & Spec Validation
     runs-on: ubuntu-latest
+    env:
+      SPECDEV_WARNINGS_AS_ERRORS: "1"
+      SPECDEV_REPLAY_DIFF_ERROR_MODE: "error"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,17 +33,45 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
+      - name: Setup Virtual Environment & Install tooling
+        run: |
+          python -m venv devspec_env
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          devspec_env/bin/pip install -e tools/
+      - name: Prompt-schema sync
+        run: python -m specdev_tools.cli prompt-sync spec --repo-root .
+      - name: Canonical lint
+        run: python -m specdev_tools.cli canonical-lint canon --repo-root .
+      - name: Canonical integrity
+        run: python -m specdev_tools.cli canonical-integrity spec --repo-root .
       - name: Validate all specs
         run: python -m specdev_tools.cli validate-all spec --repo-root .
+      - name: Spec quality lint
+        run: python -m specdev_tools.cli spec-quality-lint spec --repo-root .
+      - name: Hallucination lint
+        run: python -m specdev_tools.cli hallucination-lint spec --repo-root .
+      - name: Seed lint
+        run: python -m specdev_tools.cli seed-lint spec --repo-root .
+      - name: Docs lint
+        run: python -m specdev_tools.cli docs-lint spec --repo-root .
+      - name: Dependency order lint
+        run: python -m specdev_tools.cli dependency-order-lint --repo-root .
+      - name: Forward replay check
+        run: |
+          BASE_REF="origin/main"
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${{ github.base_ref }}" ]; then
+            BASE_REF="origin/${{ github.base_ref }}"
+          fi
+          python -m specdev_tools.cli forward-replay-check --repo-root . --base-ref "$BASE_REF"
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
         run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
       - name: Fixtures lint
-        run: python -m specdev_tools.cli fixtures-lint spec
+        run: python -m specdev_tools.cli fixtures-lint spec --repo-root .
       - name: Build trace matrix
-        run: python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json
+        env:
+          SPECDEV_MATRIX_STRICT: "1"
+        run: python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json --repo-root .
       - name: Upload matrix
         uses: actions/upload-artifact@v4
         with:
@@ -60,8 +91,11 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
-      - name: Install tooling
-        run: pip install -e tools/
+      - name: Setup Virtual Environment & Install tooling
+        run: |
+          python -m venv devspec_env
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          devspec_env/bin/pip install -e tools/
       - name: Lint adversarial fixtures (same mechanism as fixtures)
         run: python -m specdev_tools.cli fixtures-lint spec
 

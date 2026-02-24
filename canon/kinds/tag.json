@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "tag",
+  "entries": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag",
+      "preferred_label": "critical-path",
+      "definition": "Tag indicating direct impact on primary delivery path.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "priority-critical"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

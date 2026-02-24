@@ -1,0 +1,75 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "environment",
+  "entries": [
+    {
+      "id": "cn:core:environment:ci",
+      "kind": "environment",
+      "preferred_label": "ci",
+      "definition": "Automated integration environment used by CI pipelines.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "continuous integration"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:environment:dev",
+      "kind": "environment",
+      "preferred_label": "dev",
+      "definition": "Development environment used for iterative feature work.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "development"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:environment:prod",
+      "kind": "environment",
+      "preferred_label": "prod",
+      "definition": "Primary production environment for live traffic.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "production"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:environment:staging",
+      "kind": "environment",
+      "preferred_label": "staging",
+      "definition": "Environment mirroring production for release checks.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "pre-prod",
+        "preproduction"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}

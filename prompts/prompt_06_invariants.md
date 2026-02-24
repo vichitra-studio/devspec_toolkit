@@ -20,7 +20,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 # Task
 - **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
 - **Objective:** produce a complete, falsifiable artifact for **Step 6 · Invariants & Rules**.
-- **Output type:** one JSON document conforming to the Embedded Schema.
+- **Output type:** one JSON document conforming to the referenced step schema.
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
@@ -32,9 +32,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
-- FRs `spec/04_fr_list.json` and NFRs `spec/07_nfrs.json` to motivate rules.
+- FRs `spec/04_fr_list.json` to motivate rules.
 - Interface Contracts `spec/05_interface_contracts.json` for request/response constraints.
-- Governance expectations from `spec/10_governance.json` if rules reflect policies (e.g., commit references, versioning).
+- Governance expectations from project policy docs/seeds if rules reflect policies (e.g., commit references, versioning).
 - Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
 
 ## Operating Flow: Synthesize → Clarify → Emit
@@ -50,14 +50,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Ambiguity scrub: translate narrative policies into boolean/evaluable forms.
 
 ## Self-Audit Gate
-- If completeness < 0.9, ask questions.
+- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
 - Gating items:
   - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
   - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.
 
 # Output Rules
-1. Return exactly one fenced code block with language `json`. No prose before or after.
-2. The JSON must validate against the Embedded Schema below.
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
 5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
@@ -111,92 +111,16 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Which rules are hard errors vs warnings? Who is accountable for remediation?
 - Which FRs, NFRs, or governance policies motivate each invariant?
 
-# Embedded Schema
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/06_invariants.schema.json",
-  "title": "06_invariants",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "rules": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "inv_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "language": {
-            "type": "string",
-            "enum": [
-              "jsonlogic",
-              "cel",
-              "text"
-            ]
-          },
-          "expression": {
-            "type": "string"
-          },
-          "scope": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "components": {
-                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-              },
-              "apis": {
-                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-              }
-            }
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "warn",
-              "error"
-            ]
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          }
-        },
-        "required": [
-          "inv_id",
-          "description",
-          "language",
-          "expression",
-          "trace"
-        ]
-      }
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "rules"
-  ]
-}
-```
+# Schema Reference
+- Schema URI: https://specdev.local/schema/06_invariants.schema.json
+- Schema File: schema/06_invariants.schema.json
+- Schema Registry: tools/schema_registry.json
+
+## Hardening Protocol
+- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
+- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
+- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
+- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
@@ -204,6 +128,66 @@ You are a senior specification author and validator. Your job is to emit a singl
   "id": "invariants-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "rules": []
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "rules": [
+    {
+      "inv_id": "inv-session-token-required",
+      "description": "Authenticated endpoints require a valid session token.",
+      "language": "text",
+      "expression": "request.authenticated == true",
+      "scope": {
+        "components": [
+          "auth-service"
+        ]
+      },
+      "trace": [
+        {
+          "type": "doc",
+          "id": "fr-auth-login"
+        }
+      ],
+      "policy_ref": {
+        "id": "cn:core:policy:spec-first",
+        "kind": "policy"
+      }
+    }
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:policy:spec-first",
+      "kind": "policy"
+    }
+  ],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

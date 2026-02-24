@@ -1,0 +1,23 @@
+{
+  "registry_version": "1.0.0",
+  "kind": "metric",
+  "entries": [
+    {
+      "id": "cn:core:metric:error-rate",
+      "kind": "metric",
+      "preferred_label": "error_rate",
+      "definition": "Ratio of failed requests to total requests over a defined interval.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "failure-rate"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ]
+}
