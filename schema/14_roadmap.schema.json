@@ -77,6 +77,22 @@
             "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
             "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
           },
+          "fr_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^fr-[a-z0-9-]+$"
+            },
+            "description": "FR IDs from spec/04_fr_list.json that this milestone delivers."
+          },
+          "capability_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^cap-[a-z0-9-]+$"
+            },
+            "description": "Capability IDs from spec/01_capabilities.json that this milestone implements."
+          },
           "tasks": {
             "type": "array",
             "items": {
@@ -130,6 +146,29 @@
                 },
                 "metric_ref": {
                   "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                },
+                "depends_on": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "task_ids this task depends on (within same milestone). Must not create cycles."
+                },
+                "assumptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 15
+                  },
+                  "description": "Assumptions that must hold for this task to succeed."
+                },
+                "exit_conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 15
+                  },
+                  "description": "Conditions that definitively mark this task complete."
                 }
               },
               "required": [

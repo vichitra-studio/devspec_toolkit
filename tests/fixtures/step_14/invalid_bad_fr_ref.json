@@ -1,0 +1,64 @@
+{
+  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "id": "roadmap-bad-fr-ref",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "3.9"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": "0.95.0"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "user_story": "As a developer, I want a stable base API so that I can build features.",
+      "source_milestones": ["m1-core-foundation"],
+      "fr_refs": [
+        "fr-does-not-exist"
+      ],
+      "tasks": [
+        {
+          "task_id": "init-project",
+          "description": "Initialize project structure"
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "base-api"
+        }
+      ]
+    }
+  ],
+  "dependencies": [],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}

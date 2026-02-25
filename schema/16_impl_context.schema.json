@@ -1738,6 +1738,36 @@
               }
             }
           }
+        },
+        "semantic_review": {
+          "type": "object",
+          "properties": {
+            "fr_coverage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fr_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                  "satisfied": { "type": "boolean" },
+                  "evidence_summary": { "type": "string", "minLength": 20 },
+                  "checklist_ids": { "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray" }
+                },
+                "required": ["fr_id", "satisfied", "evidence_summary", "checklist_ids"],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "hallucinated_features": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 10 }
+            },
+            "scope_delta": {
+              "type": "string",
+              "description": "Free-text summary of any scope creep or unplanned features detected"
+            }
+          },
+          "required": ["fr_coverage"],
+          "additionalProperties": false
         }
       },
       "allOf": [
@@ -1768,6 +1798,19 @@
                 ]
               }
             }
+          }
+        },
+        {
+          "if": {
+            "required": ["verdict"],
+            "properties": {
+              "verdict": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "required": ["semantic_review"]
           }
         }
       ]

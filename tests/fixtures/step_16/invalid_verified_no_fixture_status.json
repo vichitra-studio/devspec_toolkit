@@ -1,0 +1,102 @@
+{
+  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "id": "step-impl-verified-no-fixture-status",
+  "owner": "api",
+  "created_at": "2024-01-15T10:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Implementation with verified verdict but no fixture_status at all.",
+      "scope_in": [
+        "auth-api"
+      ],
+      "scope_out": [
+        "frontend-ui"
+      ],
+      "target_file_patterns": [
+        "src/api/auth.py"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Authentication",
+          "summary": "Implement login endpoint"
+        }
+      ],
+      "checklist": [
+        {
+          "id": "cl-001",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-user-login",
+            "line_range": "L1-L10",
+            "commit_hash": "1111111111111111111111111111111111111111"
+          },
+          "description": "Implement user login endpoint",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "POST /auth/login returns 200 with JWT",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-auth-login",
+          "implementation": {
+            "status": "verified",
+            "files_touched": ["src/api/auth.py"],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/api/auth.py",
+                "description": "Add login route handler with JWT generation",
+                "evidence": {
+                  "type": "snippet",
+                  "content": "@app.post('/auth/login') def login(): return {'token': generate_jwt()}"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "not_required",
+      "rationale": "No public API surface changes."
+    },
+    "review_requirements": {
+      "test_commands": []
+    }
+  },
+  "review": {
+    "verdict": "verified",
+    "semantic_review": {
+      "fr_coverage": [
+        {
+          "fr_id": "fr-user-login",
+          "satisfied": true,
+          "evidence_summary": "Login endpoint returns signed JWT token with correct claims as verified by test suite passing.",
+          "checklist_ids": ["cl-001"]
+        }
+      ],
+      "hallucinated_features": [],
+      "scope_delta": "No scope changes detected"
+    }
+  },
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}

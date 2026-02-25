@@ -92,6 +92,27 @@ You must populate the `review` JSON object according to these specific definitio
     *   `files_to_touch`: List specific files to fix.
 *   *Expectation*: This object allows the Coder (16b) to run again and fix the issue.
 
+## 4b. `review.semantic_review` (required when verdict = verified)
+
+For each FR ID referenced in the checklist items:
+1. Set `fr_id` to the functional requirement ID from `spec/04_fr_list.json`
+2. Set `satisfied: true` only if:
+   - ≥1 checklist item has this FR in its `spec_ref.id`
+   - That item's `implementation.status == "verified"` with evidence
+   - Corresponding test appears in `execution.critical_evidence.passed_test_commands`
+3. Write `evidence_summary`: cite specific evidence content, not generic phrases. When `satisfied: false`, `evidence_summary` MUST cite the specific missing assertion, failing test, or unimplemented behavior — not a generic phrase like "Not implemented".
+4. List all `checklist_ids` that satisfy this FR (MANDATORY — `checklist_ids` is required even if `satisfied: false`; use `[]` only if no checklist item references this FR)
+
+`hallucinated_features`: List any implemented behavior NOT traceable to any FR, capability, or roadmap task. **Always include this field; use `[]` to explicitly assert no untraced behavior was detected.**
+
+`scope_delta`: Free-text summary of any scope creep or unplanned features detected during review. Include this field when any behavior deviates from the planned milestone scope. Omit only when scope is exactly as planned.
+
+**FORBIDDEN:**
+- `satisfied: true` when no evidence exists
+- Skipping FRs that appear in checklist spec_refs
+- Empty `evidence_summary`
+- Omitting `checklist_ids` from any `fr_coverage` entry
+
 ## 5. `review.verdict` (Closure Decision)
 
 | Verdict | Condition | Rating |
@@ -196,6 +217,10 @@ For each `checklist[]` item:
 1. **NEVER** give rating > 3 if any evidence is missing
 2. **NEVER** give rating 5 without verified security fixtures
 3. **NEVER** skip `metadata_usage` rating
+
+### Semantic Review
+1. **NEVER** emit `verdict: verified` without populating `semantic_review.fr_coverage` for every FR in the checklist
+2. **NEVER** mark `fr_id.satisfied: true` without citing concrete evidence in `evidence_summary`
 
 # Output Rule
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).

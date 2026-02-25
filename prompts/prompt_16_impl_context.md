@@ -366,6 +366,18 @@ Before emitting the Step 16 anchor artifact, verify:
     },
     "verdict": "verified",
     "next_actions": "Update API documentation with error codes",
+    "semantic_review": {
+      "fr_coverage": [
+        {
+          "fr_id": "fr-auth-login",
+          "satisfied": true,
+          "evidence_summary": "Login handler implemented with JWT token generation and validation, confirmed by passing pytest tests/auth/test_login.py::test_login_success",
+          "checklist_ids": ["chk-auth-01"]
+        }
+      ],
+      "hallucinated_features": [],
+      "scope_delta": "No scope creep detected; implementation matches plan exactly."
+    },
     "fixture_status": {
       "implemented_endpoints": ["api-auth-login"],
       "test_results": [

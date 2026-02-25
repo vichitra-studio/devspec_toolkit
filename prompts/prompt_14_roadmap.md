@@ -73,6 +73,9 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - **NO Orphan Milestones**: Every milestone must map to a user story.
 - **NO Missing Source Milestones**: Every milestone must include `source_milestones` that map to Step 09 IDs.
 - **NO Backward Planning**: Dates must proceed logically from earliest to latest.
+- **NEVER create a `depends_on` cycle**: Task A depending on B which depends on A is forbidden and will fail validation.
+- **NEVER use a `fr_refs` ID not present in `spec/04_fr_list.json`**: All FR references must be grounded in Step 04.
+- **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
 
 ## Field-by-Field Guidance
 ### tech_stack.languages / tech_stack.frameworks / tech_stack.infrastructure / tech_stack.tools
@@ -98,9 +101,35 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Use imperative verb form in `description` (e.g., "Implement authentication module").
 - Use `acceptance_criteria` for non-trivial tasks; include `criterion_id` and a >=15 character `text` (optional `fixture_ref`).
 
+### tasks[].depends_on
+- List `task_id` values this task depends on (within the same milestone only).
+- Do not create circular dependencies (A → B → A is forbidden).
+- Omit or use `[]` when the task has no intra-milestone dependencies.
+
+### tasks[].assumptions
+- List assumptions that must hold for this task to succeed (≥10 characters each).
+- Include at least one item when the task has external dependencies or uncertain preconditions.
+- Example: "Database migration scripts are applied before service restarts."
+
+### tasks[].exit_conditions
+- List conditions that definitively mark this task complete (≥10 characters each).
+- Be specific and verifiable (e.g., "All unit tests pass with 100% coverage for this module").
+- Do not duplicate `acceptance_criteria`; exit conditions describe the done state, not the test.
+
 ### milestones[].source_milestones
 - Provide one or more Step 09 milestone IDs this roadmap milestone decomposes.
 - Use kebab-case IDs; include multiple when a milestone spans upstream work.
+
+### milestones[].fr_refs
+- List FR IDs from `spec/04_fr_list.json` that this milestone delivers.
+- Must use exact IDs (e.g., `fr-user-login`). Every ID must exist in Step 04.
+- **If this milestone has deliverables, `fr_refs` MUST be non-empty.** Omit or use `[]` only if the milestone is purely infrastructure with no user-facing functional requirements (e.g., CI pipeline setup, dependency upgrades). A milestone with deliverables but no `fr_refs` is a traceability gap and a red flag.
+- Note: `fr_refs` and `capability_refs` belong on milestones, not on individual tasks. Tasks within a milestone inherit traceability through the milestone's refs.
+
+### milestones[].capability_refs
+- Bind to capability IDs from `spec/01_capabilities.json` that this milestone implements.
+- Must use exact IDs (e.g., `cap-authentication`). Every ID must exist in Step 01.
+- Omit or use `[]` if the milestone does not map to a specific capability.
 
 ### milestones[].risks
 - List only risks that are directly related to the milestone.

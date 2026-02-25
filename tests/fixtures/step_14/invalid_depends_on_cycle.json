@@ -1,0 +1,80 @@
+{
+  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "id": "roadmap-cycle-test",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    }
+  ],
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "3.9"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": "0.95.0"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "user_story": "As a developer, I want a stable base API so that I can build features.",
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
+      "tasks": [
+        {
+          "task_id": "task-a",
+          "description": "Task A depends on task-c creating a cycle",
+          "depends_on": [
+            "task-b"
+          ]
+        },
+        {
+          "task_id": "task-b",
+          "description": "Task B depends on task-c in the cycle",
+          "depends_on": [
+            "task-c"
+          ]
+        },
+        {
+          "task_id": "task-c",
+          "description": "Task C depends on task-a completing the cycle",
+          "depends_on": [
+            "task-a"
+          ]
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "base-api"
+        }
+      ]
+    }
+  ],
+  "dependencies": [],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}

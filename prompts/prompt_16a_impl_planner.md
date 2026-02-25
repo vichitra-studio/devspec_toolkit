@@ -64,6 +64,11 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 5. **NEVER** emit `linked_test_expectation` without corresponding `test_commands` entry
 6. **NEVER** leave spec/seed drift unaddressed when the plan introduces or depends on new policy, scope, or evidence rules — update specs accordingly.
 
+### Roadmap Coverage Violations
+1. **NEVER** emit a plan where a roadmap task_id has no corresponding checklist item
+2. **NEVER** create checklist items for tasks outside the active milestone scope (scope creep)
+3. **NEVER** use an `fr_id`, `cap_id`, or any non-task_id as `spec_ref.id` for a roadmap-coverage checklist item — `spec_ref.id` MUST equal the literal `task_id` from `spec/14_roadmap.json`
+
 ### Inference Violations
 1. **NEVER** hallucinate `existing_structures` — cite actual source file
 2. **NEVER** invent variable/class/function names not in spec
@@ -88,6 +93,19 @@ You must populate the JSON fields according to these specific definitions and ex
     *   *Expectation*: If a file is not matched here, the coder is forbidden from touching it.
 
 ## 2. `plan.spec_alignment.checklist` (The Contract)
+
+#### Roadmap Task Coverage (MANDATORY)
+
+For every `task_id` in the active milestone's `tasks[]` array from `spec/14_roadmap.json`:
+- Create ≥1 checklist item where `spec_ref.id == task_id` (literal equality — no fr_id or cap_id substitution)
+- If a task maps to multiple behaviors, create one checklist item per behavior (all with same `spec_ref.id`)
+- If a task has N `acceptance_criteria`, create ≥N checklist items, one per criterion, to preserve full traceability
+- Document the mapping in your blocker report if any task is ambiguous
+
+**FORBIDDEN:**
+- Checklist that does not cover every non-deferred roadmap task
+- Using `spec_ref.id` values not present in the active milestone's `tasks[]`
+
 *   `checklist`: A list of **Atomic Requirements**.
     *   `id`: Uppercase snake-case ID (stable, e.g. `CHK_AUTH_01`).
     *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
@@ -190,6 +208,11 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 *   **`coding_examples`**: Structured multi-file snippets.
     *   Use this instead of `coding_patterns`.
     *   Format: `{ "title": "...", "description": "...", "code": "..." }`.
+
+# Error Path Rules
+
+- For every roadmap task with `acceptance_criteria`: the corresponding checklist item's `linked_test_expectation` must reference a test that validates that criterion
+- For every roadmap task: at minimum one checklist item of type `behavior` and one of type `validation` must exist (behavior defines what, validation defines how it's proven)
 
 # Failure Modes (Pitfalls)
 *   **Ambiguity Paralysis**: Planner finds a gap and stops. *Fix*: Raise a "Clarification" task or flag `blocking` ambiguity in `plan.ambiguities`.

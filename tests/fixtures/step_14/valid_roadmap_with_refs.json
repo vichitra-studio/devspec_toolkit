@@ -1,0 +1,112 @@
+{
+  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "id": "roadmap-with-refs",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "seed_refs": [
+    {
+      "seed_id": "seed-overview"
+    },
+    {
+      "seed_id": "seed-tech-stack"
+    }
+  ],
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "3.9",
+        "rationale": "Primary language for backend services"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": "0.95.0",
+        "rationale": "High performance web framework"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "status": "done",
+      "risk_status": "low",
+      "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
+      "fr_refs": [
+        "fr-user-login",
+        "fr-user-registration"
+      ],
+      "capability_refs": [
+        "cap-authentication"
+      ],
+      "tasks": [
+        {
+          "task_id": "init-fastapi-project",
+          "description": "Initialize FastAPI project structure",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "project-structure-ready",
+              "text": "FastAPI app boots with expected folder layout in place."
+            }
+          ],
+          "assumptions": [
+            "Python 3.9 or newer is available in the deployment environment."
+          ],
+          "exit_conditions": [
+            "FastAPI application starts without errors and /health returns 200."
+          ]
+        },
+        {
+          "task_id": "configure-docker-compose",
+          "description": "Configure Docker compose for DB and App",
+          "depends_on": [
+            "init-fastapi-project"
+          ],
+          "assumptions": [
+            "Docker and docker-compose are installed on all developer machines."
+          ],
+          "exit_conditions": [
+            "docker-compose up succeeds and both app and database containers are running."
+          ]
+        },
+        {
+          "task_id": "implement-health-check",
+          "description": "Implement health check endpoint",
+          "depends_on": [
+            "configure-docker-compose"
+          ],
+          "exit_conditions": [
+            "GET /health returns HTTP 200 with JSON status field set to ok."
+          ]
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "health-endpoint"
+        }
+      ]
+    }
+  ],
+  "dependencies": [],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
+}

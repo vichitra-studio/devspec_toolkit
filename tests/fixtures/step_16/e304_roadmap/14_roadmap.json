@@ -1,0 +1,15 @@
+{
+  "milestones": [
+    {
+      "milestone_id": "m1-auth",
+      "tasks": [
+        {
+          "task_id": "implement-login"
+        },
+        {
+          "task_id": "implement-logout"
+        }
+      ]
+    }
+  ]
+}
