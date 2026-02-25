@@ -15,5 +15,11 @@
       "component_id": "user-service",
       "type": "service"
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

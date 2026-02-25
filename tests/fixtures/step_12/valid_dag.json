@@ -76,5 +76,11 @@
   "coverage_thresholds": {
     "lines": 80,
     "branches": 70
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

@@ -165,7 +165,7 @@ def main():
             print(f"Warning: Failed to load monitoring data: {e}")
     
     # Validate against schema first using existing tool
-    print(f"Validating {fixture_path} against schema...")
+    pass
     try:
         # Use the existing validation mechanism by calling the validate function directly
         import subprocess
@@ -185,16 +185,16 @@ def main():
         
         if result.returncode != 0:
             print("Schema validation failed:")
-            print(result.stderr)
+            pass
             sys.exit(1)
         else:
-            print("✓ Schema validation passed")
+            pass
     except Exception as e:
         print(f"Schema validation error: {e}")
         sys.exit(1)
     
     # Validate additional constraints
-    print("Validating additional constraints...")
+    pass
     errors = []
     
     # Check term uniqueness and optional field validation
@@ -209,10 +209,10 @@ def main():
     if errors:
         print("✗ Validation failed with the following errors:")
         for error in errors:
-            print(f"  - {error}")
+            pass
         sys.exit(1)
     else:
-        print("✓ All validations passed")
+        pass
         return 0
 
 

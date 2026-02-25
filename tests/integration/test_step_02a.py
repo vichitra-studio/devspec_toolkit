@@ -28,7 +28,7 @@ def load_schema_from_path(rel_path):
         return json.load(f)
 
 def validate_artifact(json_path, schema):
-    print(f"Validating {json_path}...")
+    pass
     try:
         data = load_json(json_path)
         
@@ -45,19 +45,19 @@ def validate_artifact(json_path, schema):
         resolver = jsonschema.RefResolver(base_uri=schema['$id'], referrer=schema, store=store)
         
         jsonschema.validate(instance=data, schema=schema, resolver=resolver)
-        print(f"✅ PASS: {json_path}")
+        pass
         return True
     except jsonschema.ValidationError as e:
         print(f"❌ FAIL: {json_path}")
-        print(f"   Reason: {e.message}")
-        print(f"   Path: {list(e.path)}")
+        pass
+        pass
         return False
     except Exception as e:
         print(f"⚠️ ERROR: {e}")
         return False
 
 def run_self_test(schema):
-    print("Running Self-Test against fixtures...")
+    pass
     fixtures_dir = os.path.join(REPO_ROOT, "tests/fixtures/step_02a")
     if not os.path.exists(fixtures_dir):
         print(f"Error: Fixtures directory not found at {fixtures_dir}")
@@ -79,14 +79,14 @@ def run_self_test(schema):
         full_path = os.path.join(fixtures_dir, filename)
         should_pass = expectations.get(filename, True) # Default to True unless known invalid
         
-        print(f"\nTesting {filename} (Expect {'PASS' if should_pass else 'FAIL'})...")
+        pass
         actual_result = validate_artifact(full_path, schema)
         
         if actual_result != should_pass:
             print(f"🚨 MISMATCH: Expected {should_pass}, got {actual_result}")
             all_passed = False
         else:
-            print(f"✅ MATCH")
+            pass
             
     return all_passed
 

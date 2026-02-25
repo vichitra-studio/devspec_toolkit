@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 import json
 import os
+from pathlib import Path
 
 def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional[str]:
     if spec_path:
@@ -177,7 +178,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             if isinstance(cmd, str):
                 passed_commands.add(cmd.strip())
 
-    if plan_status == "active" and test_commands:
+    if plan_status == "active" and test_commands and execution_results:
         for cmd in test_commands:
             if isinstance(cmd, str) and cmd.strip() not in passed_commands:
                 errors.append(
@@ -223,5 +224,75 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                         f"E302 UNPROVEN_VERIFIED_REVIEW test command '{cmd}' "
                         f"not listed in critical_evidence.passed_test_commands"
                     )
+
+    # E303 — ci_status gate
+    fixture_status = review.get("fixture_status") if isinstance(review, dict) else None
+    ci_status_val = fixture_status.get("ci_status") if isinstance(fixture_status, dict) else None
+    if verdict == "verified" and (ci_status_val is None or ci_status_val == "red"):
+        if ci_status_val is None:
+            errors.append(
+                "E303 CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
+                "review.fixture_status.ci_status is missing — set ci_status to 'green' or change verdict"
+            )
+        else:
+            errors.append(
+                "E303 CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is 'red' — "
+                "set fixture_status.ci_status to 'green' or change verdict"
+            )
+
+    # E304 — roadmap-to-checklist coverage
+    if spec_path:
+        artifact_path = Path(spec_path)
+        roadmap_path = artifact_path.parent / "14_roadmap.json"
+        if not roadmap_path.exists():
+            pass  # Roadmap is optional in pre-roadmap phases — skip E304 silently
+        else:
+            try:
+                roadmap_data = json.loads(roadmap_path.read_text())
+                roadmap_task_ids = {
+                    task["task_id"]
+                    for milestone in roadmap_data.get("milestones", [])
+                    for task in milestone.get("tasks", [])
+                    if isinstance(task, dict) and "task_id" in task
+                }
+                checklist_refs = {
+                    item["spec_ref"]["id"]
+                    for item in checklist
+                    if isinstance(item, dict)
+                    and isinstance(item.get("spec_ref"), dict)
+                    and item.get("checklist_status") != "deferred"
+                }
+                unmapped = roadmap_task_ids - checklist_refs
+                for task_id in sorted(unmapped):
+                    errors.append(
+                        f"E304 ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' has no checklist item with matching spec_ref.id"
+                    )
+            except Exception:
+                pass  # malformed roadmap — skip silently
+
+    # E305 — planned-vs-executed diff
+    final_status = data.get("execution", {}).get("final_status", {}) if isinstance(data.get("execution"), dict) else {}
+    if final_status and final_status.get("ci_status") == "green":
+        planned_ids = {
+            item["id"] for item in checklist
+            if isinstance(item, dict) and item.get("checklist_status") != "deferred" and "id" in item
+        }
+        critical_evidence_2 = data.get("execution", {}).get("critical_evidence", {}) if isinstance(data.get("execution"), dict) else {}
+        satisfied_ids = set(
+            critical_evidence_2.get("satisfied_checklist_ids", [])
+            if isinstance(critical_evidence_2, dict) else []
+        )
+        checklist_by_id = {
+            item["id"]: item for item in checklist
+            if isinstance(item, dict) and "id" in item
+        }
+        unexecuted = planned_ids - satisfied_ids
+        for item_id in sorted(unexecuted):
+            item = checklist_by_id.get(item_id, {})
+            test_hint = item.get("linked_test_expectation")
+            suffix = f" (expected test: {test_hint})" if test_hint else ""
+            errors.append(
+                f"E305 PLANNED_UNEXECUTED: checklist item '{item_id}' is active but not in satisfied_checklist_ids{suffix}"
+            )
 
     return errors

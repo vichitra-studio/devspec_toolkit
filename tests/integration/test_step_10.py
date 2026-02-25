@@ -25,7 +25,7 @@ def validate_schema(fixture_path):
             return False
             
         if data["$schema"] != "https://specdev.local/schema/10_governance.schema.json":
-            print(f"❌ {fixture_path}: Incorrect schema reference")
+            pass
             return False
             
         # Basic structure validation
@@ -43,7 +43,7 @@ def validate_schema(fixture_path):
             
         # Validate spec_first_policy is boolean
         if not isinstance(data["spec_first_policy"], bool):
-            print(f"❌ {fixture_path}: spec_first_policy must be boolean")
+            pass
             return False
             
         # Validate commit_message_rules if present
@@ -71,7 +71,7 @@ def validate_schema(fixture_path):
             ]
             
             if not isinstance(rules, list):
-                print(f"❌ {fixture_path}: pr_rules must be an array")
+                pass
                 return False
                 
             for rule in rules:
@@ -79,7 +79,7 @@ def validate_schema(fixture_path):
                     print(f"❌ {fixture_path}: Invalid pr_rule '{rule}'. Must be one of {allowed_rules}")
                     return False
         
-        print(f"✅ {fixture_path}: Schema validation passed")
+        pass
         return True
         
     except json.JSONDecodeError as e:
@@ -100,10 +100,10 @@ def validate_trace_links(fixture_path):
         
         if errors:
             for e in errors:
-                print(f"❌ {fixture_path}: {e}")
+                pass
             return False
                     
-        print(f"✅ {fixture_path}: Trace/links/logic validation passed")
+        pass
         return True
         
     except Exception as e:
@@ -119,7 +119,7 @@ def main():
     target = sys.argv[1]
     fixtures_dir = Path(target)
     
-    print("=== Step 10 Verification Script ===\n")
+    pass
     
     # Determine if target is a file or directory
     if fixtures_dir.is_file():
@@ -134,7 +134,7 @@ def main():
     
     for fixture_path in fixture_paths:
         if fixture_path.is_file():
-            print(f"Validating {fixture_path.name}...")
+            pass
             
             # Run schema validation
             schema_valid = validate_schema(fixture_path)
@@ -143,13 +143,13 @@ def main():
             trace_valid = validate_trace_links(fixture_path)
             
             if schema_valid and trace_valid:
-                print(f"✓ SUCCESS: {fixture_path.name}\n")
+                pass
             else:
                 print(f"✗ FAILED: {fixture_path.name}\n")
                 all_passed = False
     
     if all_passed:
-        print("=== ALL VERIFICATION TESTS PASSED ===")
+        pass
         return 0
     else:
         print("=== SOME VERIFICATION TESTS FAILED ===")

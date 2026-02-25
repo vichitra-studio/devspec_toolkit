@@ -14,5 +14,11 @@
   "spec_first_policy": true,
   "pr_rules": [
     "random-check-that-does-not-exist"
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

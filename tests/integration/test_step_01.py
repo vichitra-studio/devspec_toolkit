@@ -30,7 +30,6 @@ def load_system_sketch_components(path: str):
         return None
 
 def validate_file(file_path: str, should_pass: bool, component_ids) -> bool:
-    print(f"\nValidating {file_path} (Expect {'PASS' if should_pass else 'FAIL'})...")
     with open(file_path) as handle:
         instance = json.load(handle)
 
@@ -40,7 +39,6 @@ def validate_file(file_path: str, should_pass: bool, component_ids) -> bool:
 
     if should_pass:
         if passed:
-            print("✅ PASS")
             return True
         for err in errors:
             print(f"❌ FAIL: {err}")
@@ -55,7 +53,6 @@ def validate_file(file_path: str, should_pass: bool, component_ids) -> bool:
     return True
 
 def main() -> None:
-    print("Loading component IDs...")
     component_ids = load_system_sketch_components(SYSTEM_SKETCH_PATH)
     
     valid_fixtures = ["valid_minimal.json"]

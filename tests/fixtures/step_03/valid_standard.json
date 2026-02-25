@@ -32,5 +32,11 @@
       "definition": "A period of user activity within an application, tracked from initial interaction until the user stops interacting or times out.",
       "domain": "analytics"
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

@@ -98,9 +98,7 @@ def build_id_index():
         for fix in fixtures.get('fixtures', []):
             if 'fixture_id' in fix: index['fixture'].add(fix['fixture_id'])
 
-    print(f"Loaded ID Index: APIs={len(index['api'])}, Components={len(index['component'])}, "
-          f"FRs={len(index['fr'])}, NFRs={len(index['nfr'])}, Invariants={len(index['inv'])}, "
-          f"Capabilities={len(index['capability'])}, Fixtures={len(index['fixture'])}")
+    pass
     return index
 
 def validate_references(fixture_data, id_index):
@@ -114,7 +112,7 @@ def validate_references(fixture_data, id_index):
         current_threat_id = threat.get('threat_id', f"threat-{i}")
         
         if not target_ids:
-             print(f"❌ Threat {current_threat_id} has NO target_ids (Mandatory)")
+             pass
              all_valid = False
 
         for j, target in enumerate(target_ids):
@@ -152,7 +150,7 @@ def validate_references(fixture_data, id_index):
 
 def main():
     """Main verification function."""
-    print("=== Step 11 Verification Script (Enhanced) ===")
+    pass
     
     # Buid Index
     id_index = build_id_index()
@@ -169,24 +167,24 @@ def main():
     
     # Valid fixture
     valid_path = os.path.join(fixtures_dir, "valid_full.json")
-    print(f"\nValidating {valid_path}...")
+    pass
     
     valid_fixture = load_json_file(valid_path)
     if valid_fixture:
         refs_valid = validate_references(valid_fixture, id_index)
         if refs_valid:
-            print("✅ ID Reference validation passed")
+            pass
         else:
             print("❌ ID Reference validation failed")
             return 1
     else:
-        print("❌ Could not load valid_full.json")
+        pass
         return 1
     
     # Note: We skip negative tests for this run to focus on the 'valid' integration integrity
     # But in a real CI we would run them all.
     
-    print("\n=== VERIFICATION COMPLETE ===")
+    pass
     return 0
 
 if __name__ == "__main__":

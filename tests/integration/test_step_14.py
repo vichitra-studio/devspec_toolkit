@@ -55,6 +55,39 @@ class Step14IntegrationTests(unittest.TestCase):
             if tmp_path.exists():
                 tmp_path.unlink()
 
+    def test_invalid_depends_on_cycle(self):
+        errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "invalid_depends_on_cycle.json"))
+        self.assertTrue(errors, "Cycle fixture should fail validation")
+        self.assertTrue(
+            any("E141" in e for e in errors),
+            f"Expected E141 TASK_DEPENDENCY_CYCLE error. Got: {errors}",
+        )
+
+    def test_valid_roadmap_with_refs(self):
+        errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "valid_roadmap_with_refs.json"))
+        self.assertEqual([], errors, f"valid_roadmap_with_refs.json should pass validation. Errors: {errors}")
+
+    def test_invalid_bad_fr_ref(self):
+        # fr_ref cross-ref only fires when Step 04 artifact exists — create one in a tempdir
+        fixture = json.loads((self.fixtures_dir / "invalid_bad_fr_ref.json").read_text(encoding="utf-8"))
+        step04 = {
+            "functional_requirements": [
+                {"fr_id": "fr-user-login"},
+                {"fr_id": "fr-user-registration"},
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            tmp_fixture = tmp_dir / "14_roadmap.json"
+            tmp_fixture.write_text(json.dumps(fixture), encoding="utf-8")
+            (tmp_dir / "04_fr_list.json").write_text(json.dumps(step04), encoding="utf-8")
+            errors = validate_file(str(self.repo_root), str(tmp_fixture))
+        self.assertTrue(errors, "Fixture with unknown fr_ref should fail validation")
+        self.assertTrue(
+            any("fr-does-not-exist" in e for e in errors),
+            f"Expected unknown fr_ref error. Got: {errors}",
+        )
+
     def test_missing_step09_artifact_fails_when_source_milestones_present(self):
         fixture = json.loads((self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:

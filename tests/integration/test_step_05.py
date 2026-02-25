@@ -19,7 +19,6 @@ def validate_fixture(fixture_path):
     Returns:
         bool: True if validation passes, False otherwise
     """
-    print(f"Validating: {fixture_path}")
     
     # Use the specdev_tools CLI to validate
     try:
@@ -34,7 +33,6 @@ def validate_fixture(fixture_path):
         ], capture_output=True, text=True, env=env)
         
         if result.returncode == 0:
-            print(f"✓ {fixture_path.name} - VALID")
             return True
         else:
             print(f"✗ {fixture_path.name} - INVALID")
@@ -52,14 +50,12 @@ def main():
     test_fixtures_dir = Path('devspec_toolkit/tests/fixtures/step_05')
     
     if not test_fixtures_dir.exists():
-        print("Test fixtures directory does not exist")
         return 1
     
     # Get all JSON files in the directory
     fixture_files = list(test_fixtures_dir.glob('*.json'))
     
     if not fixture_files:
-        print("No test fixtures found")
         return 1
     
     # Validate each fixture
@@ -82,25 +78,19 @@ def main():
         results.append((fixture_file.name, passed))
     
     # Summary
-    print("\n" + "="*50)
-    print("VERIFICATION SUMMARY")
-    print("="*50)
     
     valid_count = sum(1 for _, valid in results if valid)
     total_count = len(results)
     
     for fixture_name, is_valid in results:
         status = "PASS" if is_valid else "FAIL"
-        print(f"{status}: {fixture_name}")
     
-    print(f"\nTotal: {valid_count}/{total_count} fixtures valid")
     
     # Exit with error if any fixture failed
     if valid_count != total_count:
         print("Some fixtures failed validation!")
         return 1
     else:
-        print("All fixtures passed validation!")
         return 0
 
 if __name__ == "__main__":

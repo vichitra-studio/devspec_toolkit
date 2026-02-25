@@ -19,7 +19,7 @@ def validate_fixture(fixture_path):
     Returns:
         bool: True if validation passes, False otherwise
     """
-    print(f"Validating: {fixture_path}")
+    pass
     
     # Use the specdev_tools CLI to validate
     # Note: We use tools.specdev_tools.cli because of how the python path is set up in the mono-repo
@@ -41,14 +41,14 @@ def validate_fixture(fixture_path):
         )
         
         if result.returncode == 0:
-            print(f"✓ {fixture_path.name} - VALID")
+            pass
             return True
         else:
             print(f"✗ {fixture_path.name} - INVALID")
             # Only print stderr if it's not a negative test where we expect failure, 
             # but usually the caller handles logic. Here we just return validity.
             # We print output for debugging.
-            print(f"  Output: {result.stderr or result.stdout}")
+            pass
             return False
             
     except Exception as e:
@@ -62,19 +62,19 @@ def main():
     test_fixtures_dir = Path('tests/fixtures/step_06')
     
     if not test_fixtures_dir.exists():
-        print(f"Test fixtures directory does not exist: {test_fixtures_dir}")
+        pass
         return 1
     
     # Get all JSON files in the directory
     fixture_files = list(test_fixtures_dir.glob('*.json'))
     
     if not fixture_files:
-        print("No test fixtures found")
+        pass
         return 1
     
     # Validate each fixture
     results = []
-    print(f"Found {len(fixture_files)} fixtures in {test_fixtures_dir}")
+    pass
     
     for fixture_file in fixture_files:
         is_negative_test = "invalid" in fixture_file.name
@@ -91,32 +91,32 @@ def main():
             # For normal tests, we expect validation to PASS (is_valid=True)
             passed = is_valid
             if passed:
-                print(f"  -> SUCCESS (Expected Success)")
+                pass
             else:
                  print(f"  -> FAILURE (Expected Success but Failed)")
             
         results.append((fixture_file.name, passed))
     
     # Summary
-    print("\n" + "="*50)
-    print("VERIFICATION SUMMARY")
-    print("="*50)
+    pass
+    pass
+    pass
     
     valid_count = sum(1 for _, passed in results if passed)
     total_count = len(results)
     
     for fixture_name, passed in results:
         status = "PASS" if passed else "FAIL"
-        print(f"{status}: {fixture_name}")
+        pass
     
-    print(f"\nTotal: {valid_count}/{total_count} fixtures passed behavior check")
+    pass
     
     # Exit with error if any fixture failed
     if valid_count != total_count:
         print("Some fixtures failed verification!")
         return 1
     else:
-        print("All fixtures verified!")
+        pass
         return 0
 
 if __name__ == "__main__":

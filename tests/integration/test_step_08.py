@@ -11,8 +11,8 @@ import json
 
 def run_command(command, description):
     """Run a command and return success status."""
-    print(f"\n{description}")
-    print(f"Command: {' '.join(command)}")
+    pass
+    pass
     
     env = os.environ.copy()
     pythonpath = env.get("PYTHONPATH", "")
@@ -22,9 +22,9 @@ def run_command(command, description):
 
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True, env=env)
-        print("✓ SUCCESS")
+        pass
         if result.stdout:
-            print(f"Output: {result.stdout}")
+            pass
         return True
     except subprocess.CalledProcessError as e:
         print("✗ FAILED")
@@ -33,7 +33,7 @@ def run_command(command, description):
 
 def check_unique_ids(directory):
     """Check that all fixture_ids are unique across checks."""
-    print(f"\nChecking for unique fixture_ids in {directory}...")
+    pass
     seen_ids = {}
     duplicates = []
     
@@ -65,15 +65,15 @@ def check_unique_ids(directory):
     if duplicates:
         print("✗ FAILED: Duplicate IDs found:")
         for d in duplicates:
-            print(f"  - {d}")
+            pass
         return False
     
-    print("✓ SUCCESS: All fixture_ids are unique")
+    pass
     return True
 
 def main():
     """Run all verification checks."""
-    print("=== Step 8 Verification Script ===")
+    pass
     
     success = True
     
@@ -151,7 +151,7 @@ def main():
     success &= check_unique_ids("devspec_toolkit/tests/fixtures/step_08")
 
     if success:
-        print("\n=== ALL VERIFICATION TESTS PASSED ===")
+        pass
         return 0
     else:
         print("\n=== SOME VERIFICATION TESTS FAILED ===")

@@ -18,6 +18,10 @@
       "description": "Allows users to search for products by keyword.",
       "scope": "in",
       "owner": "api",
+      "capability_ref": {
+        "id": "cn:product:capability:search-products",
+        "kind": "capability"
+      },
       "inputs": [
         "query_string",
         "page_number"
@@ -50,7 +54,51 @@
       "verb": "archive",
       "description": "Archive a user account.",
       "scope": "out",
-      "owner": "ops"
+      "owner": "ops",
+      "capability_ref": {
+        "id": "cn:ops:capability:archive-user",
+        "kind": "capability"
+      }
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true,
+    "evidence_records": [],
+    "unresolved_inputs": [],
+    "assumptions": [],
+    "placeholder_scan": {
+      "has_placeholders": false,
+      "tokens_found": []
+    },
+    "self_check_results": []
+  },
+  "canonical_refs_used": [
+    {
+      "id": "cn:product:capability:search-products",
+      "kind": "capability"
+    },
+    {
+      "id": "cn:ops:capability:archive-user",
+      "kind": "capability"
+    }
+  ],
+  "canonical_proposals": [
+    {
+      "temp_id": "search-products",
+      "kind": "capability",
+      "proposed_label": "search-products",
+      "definition": "Ability to search the product catalog by keyword and pagination.",
+      "source_field": "capabilities[0].capability_ref",
+      "suggested_namespace": "product"
+    },
+    {
+      "temp_id": "archive-user",
+      "kind": "capability",
+      "proposed_label": "archive-user",
+      "definition": "Ability to archive a user account, removing it from active use.",
+      "source_field": "capabilities[1].capability_ref",
+      "suggested_namespace": "ops"
+    }
+  ],
+  "canonical_conflicts": []
 }

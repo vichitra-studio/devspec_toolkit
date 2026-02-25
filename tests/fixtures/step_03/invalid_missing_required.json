@@ -16,5 +16,11 @@
       "term": "amount",
       "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees."
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

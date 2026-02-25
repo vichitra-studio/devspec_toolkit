@@ -66,5 +66,11 @@
     }
   ],
   "dependencies": [],
-  "trace": []
+  "trace": [],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

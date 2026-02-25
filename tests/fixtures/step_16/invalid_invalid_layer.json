@@ -45,7 +45,9 @@
           "type": "behavior",
           "layer": "invalid_layer",
           "linked_test_expectation": "login success",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-login-success",
           "implementation": {
             "status": "in_progress",
@@ -70,5 +72,11 @@
         "README.md"
       ]
     }
-  }
+  },
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

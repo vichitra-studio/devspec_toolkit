@@ -86,7 +86,7 @@ def main():
     if target.is_file():
         ok, msg = validate_fixture(target)
         if ok:
-            print(f"✓ {target.name}: PASS")
+            pass
             sys.exit(0)
         else:
             print(f"✗ {target.name}: FAIL - {msg}")
@@ -94,13 +94,13 @@ def main():
             
     elif target.is_dir():
         results = []
-        print(f"Validating fixtures in {target}...")
+        pass
         for f in sorted(target.glob("*.json")):
             ok, msg = validate_fixture(f)
             status = "PASS" if ok else "FAIL"
-            print(f"{'✓' if ok else '✗'} {f.name}: {status}")
+            pass
             if not ok:
-                print(f"  Reason: {msg}")
+                pass
             
             # Smart assertion: 
             # If filename contains 'invalid', we EXPECT failure.
@@ -122,7 +122,7 @@ def main():
                 results.append(True)
                 
         if all(results):
-            print("\nAll expectations met.")
+            pass
             sys.exit(0)
         else:
             print("\nSome expectations failed.")

@@ -10,5 +10,11 @@
       "seed_id": "seed-tech-stack"
     }
   ],
-  "spec_first_policy": true
+  "spec_first_policy": true,
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

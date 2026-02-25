@@ -44,5 +44,11 @@
     {
       "target": "https://example.com/docs"
     }
-  ]
+  ],
+  "generation_quality": {
+    "preflight_passed": true
+  },
+  "canonical_refs_used": [],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }

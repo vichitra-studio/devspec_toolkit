@@ -74,23 +74,19 @@ def validate_extension_naming(manifest_path, spec_dir):
 
 def validate_extension_manifest(manifest_path, spec_dir):
     """Main validation function."""
-    print(f"Validating manifest: {manifest_path}")
     
     # Validate schema
     is_valid, message = validate_manifest_schema(manifest_path)
-    print(f"Schema validation: {'PASS' if is_valid else 'FAIL'} - {message}")
     
     if not is_valid:
         return False
     
     # Validate naming and file existence
     is_valid, message = validate_extension_naming(manifest_path, spec_dir)
-    print(f"Naming validation: {'PASS' if is_valid else 'FAIL'} - {message}")
     
     if not is_valid:
         return False
     
-    print("All validations passed!")
     return True
 
 def main():

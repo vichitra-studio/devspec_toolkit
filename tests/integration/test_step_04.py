@@ -26,7 +26,6 @@ def validate_fixture(fixture_path, should_pass=True):
         bool: True if the outcome matches expectation, False otherwise.
     """
     
-    print(f"Checking: {fixture_path} (Expect {'PASS' if should_pass else 'FAIL'})")
     
     # 1. Schema Validation via CLI
     env = os.environ.copy()
@@ -41,7 +40,6 @@ def validate_fixture(fixture_path, should_pass=True):
     
     if should_pass and not schema_valid:
         print(f"❌ FAIL: Expected PASS but got Schema Validation Error:")
-        print(result.stderr)
         return False
         
     if not should_pass and schema_valid:
@@ -67,7 +65,6 @@ def validate_fixture(fixture_path, should_pass=True):
                     print(f"❌ FAIL: {err}")
                 return False
             
-            print(f"✅ PASS: Schema & Logic valid.")
             return True
             
         except Exception as e:
@@ -90,8 +87,6 @@ def main():
     if len(sys.argv) > 1:
         test_cases = [(path, True) for path in sys.argv[1:]]
     
-    print("Verifying Step 4 fixtures...")
-    print("=" * 60)
     
     all_success = True
     
@@ -105,9 +100,7 @@ def main():
             # but here we'll count it as a failure to ensure we fix paths
             all_success = False
     
-    print("=" * 60)
     if all_success:
-        print("🎉 ALL FIXTURES PASSED VERIFICATION")
         return 0
     else:
         print("💀 VERIFICATION FAILED")
