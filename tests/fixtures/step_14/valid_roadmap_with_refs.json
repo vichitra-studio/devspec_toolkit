@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "tech_stack": {
     "languages": [
       {
@@ -65,6 +66,12 @@
         {
           "task_id": "configure-docker-compose",
           "description": "Configure Docker compose for DB and App",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "docker-compose-ready",
+              "text": "Docker compose configuration starts DB and App containers successfully."
+            }
+          ],
           "depends_on": [
             "init-fastapi-project"
           ],
@@ -78,6 +85,12 @@
         {
           "task_id": "implement-health-check",
           "description": "Implement health check endpoint",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "health-check-ok",
+              "text": "GET /health returns HTTP 200 with JSON status ok."
+            }
+          ],
           "depends_on": [
             "configure-docker-compose"
           ],

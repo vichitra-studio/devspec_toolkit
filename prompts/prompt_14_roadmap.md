@@ -1,5 +1,13 @@
 # Step 14 · Roadmap
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the scope down into sequential, verifiable milestones, where **Each Milestone** corresponds to exactly **One User Story** decomposed into atomic sub-tasks.
 
@@ -35,7 +43,16 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Extension Specs: All `spec/ext_*.json` files defined in the manifest.
 - Charter: `spec/00_charter.json` for strategic goals.
 - Completeness: `spec/13a_completeness_assessment.json`.
-- Guide: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- Guide: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Strategic goals and success metrics for milestone alignment
+- **09_impl_plan.json**: Tech stack decisions and milestone IDs for `source_milestones` binding
+- **13_extension_manifest.json**: Extension IDs and areas of concern for scheduling extension work
+- **13a_completeness_assessment.json**: High-priority missing elements to schedule as remediation milestones
+- **04_fr_list.json**: FR IDs for `fr_refs` binding on milestones
+- **01_capabilities.json**: Capability IDs for `capability_refs` binding on milestones
 
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
 - **Ingest**: Scan all `spec/` artifacts (Steps 00-13) to understand the complete scope.
@@ -59,6 +76,10 @@ Before emitting, verify:
 - No upstream capability, FR, or milestone ID is silently dropped.
 - All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
 - If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 **Extraction Mandate**:
 - Every FR ID from `04_functional_requirements.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
@@ -193,6 +214,7 @@ The `$schema` field is required in the output and is stripped before validation 
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "migration_plan": "none",
   "tech_stack": {
     "languages": [
@@ -222,14 +244,16 @@ The `$schema` field is required in the output and is stripped before validation 
               { "criterion_id": "project-structure-ready", "text": "Project boots with FastAPI app and expected folder layout." }
             ]
           },
-          { "task_id": "configure-docker-compose", "description": "Configure Docker compose for DB and App" },
-          { "task_id": "implement-health-check", "description": "Implement health check endpoint" }
+          { "task_id": "configure-docker-compose", "description": "Configure Docker compose for DB and App", "acceptance_criteria": [{ "criterion_id": "docker-ready", "text": "docker-compose up starts DB and App containers." }] },
+          { "task_id": "implement-health-check", "description": "Implement health check endpoint", "acceptance_criteria": [{ "criterion_id": "health-ok", "text": "GET /health returns 200 with status ok." }] }
       ],
       "deliverables": [
         { "type": "doc", "id": "charter" },
         { "type": "nfr", "id": "ci-gates" }
       ],
       "target_date": "2025-02-01",
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     }

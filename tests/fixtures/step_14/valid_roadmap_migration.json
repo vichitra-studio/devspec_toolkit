@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "migration_plan": "Migrate legacy auth tables to the new schema after core API validation.",
   "tech_stack": {
     "languages": [
@@ -66,11 +67,23 @@
         },
         {
           "task_id": "configure-docker-compose",
-          "description": "Configure Docker compose for DB and App"
+          "description": "Configure Docker compose for DB and App",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "docker-compose-runs",
+              "text": "Docker compose up starts both DB and app containers successfully."
+            }
+          ]
         },
         {
           "task_id": "implement-health-check",
-          "description": "Implement health check endpoint"
+          "description": "Implement health check endpoint",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "health-endpoint-ok",
+              "text": "GET /health returns 200 with JSON status body."
+            }
+          ]
         }
       ],
       "deliverables": [
@@ -79,6 +92,8 @@
           "id": "health-endpoint"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     }

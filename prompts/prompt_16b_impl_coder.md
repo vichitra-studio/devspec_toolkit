@@ -1,5 +1,13 @@
 # Step 16b · Implementation Coder
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Execute the plan defined in Step 16a. This step acts as the "Builder" that turns the Plan into Reality (Code + Configs + Docs), ensuring rigor and adherence to the specified file boundaries and test contracts.
 
@@ -32,7 +40,13 @@ Instead of outputting code directly to the user, you:
 - **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
 - **Objective:** Implement the `plan.spec_alignment.checklist` by filling `implementation` slots.
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
-- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **spec/impl_context/{step_id}.json (The Plan)**: Checklist items with implementation actions, target file patterns, and test expectations
+- **plan.context.coding_examples**: Ground-truth code patterns for implementation style
+- **plan.review_requirements.test_commands**: Commands to execute for verification evidence
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -184,6 +198,10 @@ Before emitting, verify:
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
 - No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
 - If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
@@ -200,6 +218,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -222,6 +241,8 @@ Before emitting, verify:
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-security-auth"],
+          "fixture_ref": "fixture-login-jwt",
           "implementation": {
             "status": "in_progress",
             "files_touched": ["src/auth/routes.py"],
@@ -277,6 +298,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -299,6 +321,8 @@ Before emitting, verify:
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-security-auth"],
+          "fixture_ref": "fixture-login-jwt",
           "implementation": {
             "status": "verified",
             "files_touched": ["src/auth/routes.py"],

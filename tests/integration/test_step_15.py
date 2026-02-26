@@ -9,8 +9,6 @@ import sys
 import re
 from pathlib import Path
 
-# Add tools to path
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools"))
 
 # Enum definitions matching schema
 VALID_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
@@ -49,7 +47,7 @@ def validate_route_map(data):
     """
     Validate route_map items using extracted validator.
     """
-    from specdev_tools.validators.step_15 import validate_step_15
+    from specdev_tools.validation.validators.step_15 import validate_step_15
     
     errors = validate_step_15(data, ".")
     if errors:

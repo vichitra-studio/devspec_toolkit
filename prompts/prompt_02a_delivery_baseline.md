@@ -1,5 +1,13 @@
 # Step 02a · Delivery Baseline
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Capture the minimum delivery infrastructure (environments, CI expectations, and compliance guardrails) needed to take the system sketch from spec to running code safely. This baseline makes deployment assumptions explicit early so fixture execution, governance, and implementation planning share the same operational picture.
 
@@ -29,8 +37,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - System Sketch `spec/02_system_sketch.json` for components and external dependencies that affect env setup.
 - Do not depend on downstream NFR/governance specs; use charter constraints and required seeds for baseline coverage.
-- Current CI configs (if present) and `devspec_toolkit/tests/run.sh` usage from the reference docs.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Current CI configs (if present) and `$TOOLKIT_ROOT/tests/run.sh` usage from the reference docs.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure
+- **docs/seed/seed_tech_stack.md**: Runtime versions, cloud providers, and infrastructure constraints for environment definitions
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
@@ -60,6 +73,10 @@ Before emitting, verify:
 - No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
 - All environment names (`dev`, `ci`, `staging`, `prod`) align with canonical stage values.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -139,6 +156,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "environments": {
     "dev": {"runtime": "python3.11"},
     "ci": {"runner": "ubuntu-latest"},

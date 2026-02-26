@@ -1,5 +1,13 @@
 # Step 13a · Completeness Assessment
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Assess the completeness of Phase 1 specifications and identify gaps that prevent achieving perfect system implementation readiness. This step evaluates the current specification state against ideal completeness criteria and generates actionable recommendations for improvement.
 
@@ -61,6 +69,10 @@ Before emitting, verify:
 - All specs 00–12 have been evaluated for completeness — no step is skipped in the assessment.
 - No extension is marked complete without evidence of the corresponding spec file existing on disk.
 - If any spec file is absent and its absence is ambiguous (skipped vs. not-yet-written): add a gap question (Clarify mode) rather than assuming completion.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 ## Negative Constraints
 - **DO NOT** rate completeness as 10/10 if any "TBD" values exist.
@@ -91,8 +103,14 @@ Before emitting, verify:
 
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
-- Guide: `devspec_toolkit/docs/prompts/shared_expectations.md`.
-- Shared expectations: `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- Guide: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+- Shared expectations: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json through 12_ci_gates.json**: Required fields, trace links, and completeness indicators for gap analysis
+- **13_extension_manifest.json**: Extension IDs and filenames to verify physical existence on disk
+- **Traceability matrix**: FR-to-API, API-to-fixture, and invariant-to-FR coverage for completeness scoring
 
 
 
@@ -155,6 +173,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "missing_elements": [],
   "completeness_rating": {
     "current": 10,

@@ -10,6 +10,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "environments": {
     "dev": {},
     "ci": {

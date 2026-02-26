@@ -1,5 +1,13 @@
 # Step 03 · Glossary
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Create a single vocabulary that removes ambiguity across product, engineering, and governance stakeholders. The glossary keeps later artifacts crisp by codifying domain terms, measurement units, and context that might otherwise drift between documents.
 
@@ -30,7 +38,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Charter `spec/00_charter.json` for business terms and metrics.
 - Derive recurring nouns/actions from upstream charter and capability artifacts only.
 - Derive metric names/units from upstream charter and seed sources; do not depend on downstream NFR/monitoring artifacts.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Business terms from `goals`, metric names and units from `success_metrics`, persona names from `user_segments`
+- **01_capabilities.json**: Recurring nouns and action verbs from capability names and descriptions for domain vocabulary
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate terms grouped by domain (billing, auth, analytics, operations), including aliases and units for metrics. Do not output it.
@@ -60,6 +73,10 @@ Before emitting, verify:
 - All `term_ref` cross-references within this glossary resolve to other `term_id` values defined in this artifact.
 - Units referenced in `spec/00_charter.json` `success_metrics` are defined here with canonical unit values.
 - If any charter or capability term is ambiguous: add a gap question (Clarify mode) rather than inventing a definition.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -134,6 +151,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "terms": [
     {
       "term_id": "term-jwt",

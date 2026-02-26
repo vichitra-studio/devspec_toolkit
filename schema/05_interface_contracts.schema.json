@@ -14,6 +14,9 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "spec_refs_ingested": {
+      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
+    },
     "seed_refs": {
       "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
     },
@@ -192,6 +195,10 @@
         "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
       },
       "default": []
+    },
+    "_migration_notes": {
+      "type": "string",
+      "description": "Optional migration notes added during schema version upgrades."
     }
   },
   "required": [
@@ -199,6 +206,7 @@
     "owner",
     "created_at",
     "seed_refs",
+    "spec_refs_ingested",
     "apis",
     "generation_quality",
     "canonical_refs_used",

@@ -19,9 +19,13 @@ This reference collects recurring facts that developers need while authoring or 
 - **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from [schema/core/](../../schema/core/).
 
+## Path Conventions
+See [path_conventions.md](path_conventions.md) for canonical path variables (`$PRODUCT_ROOT`, `$TOOLKIT_ROOT`, `$SPEC_DIR`, etc.) and the dual-root convention.
+
 ## Scope Lock (`spec_dir`)
 - Enforce scope lock for every repo: set and persist `spec_dir` explicitly instead of inferring from cwd.
-- For this repository layout, the locked path is `devspec_toolkit/spec` (not top-level `spec`).
+- **Consumer repos** (projects that vendor the toolkit as a submodule): the locked `spec_dir` is `<product-repo>/spec/` — this is where your live spec artifacts live.
+- **Toolkit repo itself**: the locked path is `devspec_toolkit/spec` (not a top-level `spec/`). This contains the toolkit's own baseline specs.
 - Automation and CI must pass the same `spec_dir` to every command to avoid path-assumption drift.
 
 ## Command Cheatsheet
@@ -67,8 +71,8 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 
 # Changelog utilities (migration system)
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --version 0.1.0 --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --version 0.3.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --validate 0.3.0 --repo-root ./devspec_toolkit
 ```
 
 ### Alignment & Migration
@@ -92,11 +96,11 @@ specdev align prompts --spec-dir spec --output prompts/migration/ --mode upgrade
 
 
 ### Step-Specific Verification
-For deep validation of specific steps (DAGs, cycles, logic), use the dedicated scripts:
+For deep validation of specific steps (DAGs, cycles, logic), use `pytest` to run the dedicated integration tests:
 ```bash
-python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.json
-python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
-python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
+pytest devspec_toolkit/tests/integration/test_step_02.py --spec spec/02_system_sketch.json -v
+pytest devspec_toolkit/tests/integration/test_step_12.py --spec tests/fixtures/step_12/valid_dag.json -v
+pytest devspec_toolkit/tests/integration/test_step_15.py --spec tests/fixtures/step_15/valid_full.json -v
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:

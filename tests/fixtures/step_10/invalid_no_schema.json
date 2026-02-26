@@ -10,6 +10,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "spec_first_policy": true,
   "generation_quality": {
     "preflight_passed": true

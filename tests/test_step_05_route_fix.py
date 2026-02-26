@@ -1,10 +1,6 @@
 import unittest
-from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.validators.step_05 import validate_step_05
+from specdev_tools.validation.validators.step_05 import validate_step_05
 
 
 class Step05RouteValidationTests(unittest.TestCase):

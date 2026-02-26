@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "tech_stack": {
     "languages": [
       {
@@ -80,11 +81,23 @@
         },
         {
           "task_id": "configure-docker-compose",
-          "description": "Configure Docker compose for DB and App"
+          "description": "Configure Docker compose for DB and App",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "docker-compose-runs",
+              "text": "Docker compose up starts both DB and app containers successfully."
+            }
+          ]
         },
         {
           "task_id": "implement-health-check",
-          "description": "Implement health check endpoint"
+          "description": "Implement health check endpoint",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "health-endpoint-ok",
+              "text": "GET /health returns 200 with JSON status body."
+            }
+          ]
         }
       ],
       "deliverables": [
@@ -97,6 +110,8 @@
           "id": "project-structure"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     },
@@ -123,11 +138,23 @@
         },
         {
           "task_id": "create-user-registration",
-          "description": "Create user registration endpoint"
+          "description": "Create user registration endpoint",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "registration-endpoint-works",
+              "text": "POST /register creates a new user and returns 201 status."
+            }
+          ]
         },
         {
           "task_id": "setup-password-hashing",
-          "description": "Set up password hashing"
+          "description": "Set up password hashing",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "passwords-hashed",
+              "text": "User passwords are stored using bcrypt with salt rounds."
+            }
+          ]
         }
       ],
       "deliverables": [
@@ -140,6 +167,8 @@
           "id": "auth-architecture"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [
         "Security vulnerabilities in token implementation"
       ],

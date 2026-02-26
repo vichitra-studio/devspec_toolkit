@@ -1,5 +1,13 @@
 # Step 01 · Capabilities
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Translate the charter into a catalog of system capabilities with explicit verbs, scope boundaries, and operating conditions. This step defines what value the system must deliver, when it is intentionally deferred, and how each capability traces back to stakeholders and success metrics.
 
@@ -31,8 +39,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Charter scope and success metrics from `spec/00_charter.json` to anchor what’s “in” now vs “future”.
 - Use canonical nouns/verbs from required seeds and charter language; do not depend on downstream glossary/FR artifacts.
 - Draft capability boundaries from charter scope and seed constraints; do not depend on system sketch artifacts.
-- Use provided examples only from `example/devspec_kit` for format calibration, never as source truth.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Schema: `$SCHEMA_DIR/01_capabilities.schema.json` for Output Contract shape and required fields.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **docs/seed/seed_overview.md**: Scope boundaries, user persona definitions, and high-level feature expectations
+- **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
@@ -60,6 +73,10 @@ Before emitting, verify:
 - No charter goal is silently dropped — each must map to at least one named capability.
 - All `trace` entries reference IDs present in `spec/00_charter.json` (`goals[*].id`, `success_metrics[*].id`).
 - If any charter goal cannot be mapped to a capability: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -146,6 +163,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "capabilities": [
     {
       "capability_id": "capability-authentication",

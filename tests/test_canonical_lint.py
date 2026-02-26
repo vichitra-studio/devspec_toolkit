@@ -1,13 +1,10 @@
 import unittest
 from pathlib import Path
-import sys
 import json
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.canonical_lint import lint_manifest
-from specdev_tools.canonical_lint import lint_canon_dir
-from specdev_tools.registry import SchemaRegistry
+from specdev_tools.canonical.lint import lint_manifest
+from specdev_tools.canonical.lint import lint_canon_dir
+from specdev_tools.core.registry import SchemaRegistry
 
 FIXTURE_DIR = Path(__file__).resolve().parents[0] / "fixtures" / "canonical"
 

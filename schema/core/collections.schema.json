@@ -480,6 +480,15 @@
         },
         "note": {
           "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 hash of the seed document at time of ingestion."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version identifier of the seed document."
         }
       },
       "required": [
@@ -493,6 +502,37 @@
         "$ref": "https://specdev.local/schema/core/collections/1#seedRef"
       },
       "minItems": 1
+    },
+    "specRefIngested": {
+      "$anchor": "specRefIngested",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "pattern": "^\\d{2}[a-z]?$",
+          "description": "Pipeline step number of the ingested artifact."
+        },
+        "artifact_id": {
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 hash of the ingested artifact."
+        }
+      },
+      "required": [
+        "step_id",
+        "artifact_id"
+      ]
+    },
+    "specRefsIngestedArray": {
+      "$anchor": "specRefsIngestedArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#specRefIngested"
+      }
     },
     "anyJson": {
       "$anchor": "anyJson",

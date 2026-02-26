@@ -142,6 +142,9 @@ def main():
     al.add_argument("--output", help="Output directory for generated prompts")
     al.add_argument("--mode", choices=["bootstrap", "upgrade"], default="upgrade",
                     help="Prompt generation mode (default: upgrade)")
+    al.add_argument("--backup-dir", help="Backup directory to restore from (for rollback)")
+    al.add_argument("--yes", "-y", action="store_true",
+                    help="Skip confirmation prompts (for non-interactive use)")
 
     args = p.parse_args()
 
@@ -158,7 +161,7 @@ def main():
                      break
              
     if args.cmd == "validate":
-        from .validate import validate_file
+        from .validation.validate import validate_file
         repo_root = os.path.abspath(args.repo_root)
         file_path = os.path.abspath(args.file)
         errs = validate_file(repo_root, file_path)
@@ -181,13 +184,13 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "validate-all":
-        from .validate import validate_dir
+        from .validation.validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = validate_dir(repo_root, spec_dir)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "matrix":
-        from .matrix import build_trace_matrix
+        from .validation.matrix import build_trace_matrix
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         res = build_trace_matrix(repo_root, spec_dir)
@@ -208,29 +211,29 @@ def main():
                 print(error, file=sys.stderr)
             sys.exit(1)
     elif args.cmd == "fixtures-lint":
-        from .fixtures_lint import lint_fixtures
+        from .validation.fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_fixtures(spec_dir)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "invariants-check":
-        from .invariants import run_invariants
+        from .validation.invariants import run_invariants
         spec_dir = os.path.abspath(args.spec_dir)
         sample = json.load(open(args.sample, "r", encoding="utf-8"))
         res = run_invariants(spec_dir, sample)
         print(json.dumps(res, indent=2))
     elif args.cmd == "seed-lint":
-        from .seed_lint import lint_seeds
+        from .validation.seed_lint import lint_seeds
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_seeds(repo_root, spec_dir)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "docs-lint":
-        from .docs_lint import lint_docs
+        from .validation.docs_lint import lint_docs
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_docs(spec_dir)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "prompt-sync":
-        from .prompt_schema_sync import run_prompt_schema_sync
+        from .generation.prompt_schema_sync import run_prompt_schema_sync
         repo_root = os.path.abspath(args.repo_root)
         expected_spec_dir = os.path.abspath(os.path.join(repo_root, "spec"))
         if args.spec_dir:
@@ -250,7 +253,7 @@ def main():
         errs = run_prompt_schema_sync(repo_root)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-lint":
-        from .canonical_lint import lint_canon_dir
+        from .canonical.lint import lint_canon_dir
         repo_root = os.path.abspath(args.repo_root)
         errs = lint_canon_dir(
             repo_root,
@@ -259,7 +262,7 @@ def main():
         )
         _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-integrity":
-        from .canonical_integrity import validate_canonical_integrity
+        from .canonical.integrity import validate_canonical_integrity
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = validate_canonical_integrity(
@@ -270,7 +273,7 @@ def main():
         )
         _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-autofix":
-        from .canonical_autofix import canonical_autofix
+        from .canonical.autofix import canonical_autofix
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         if not os.path.isdir(spec_dir):
@@ -316,12 +319,12 @@ def main():
         else:
             print("OK (dry-run)")
     elif args.cmd == "spec-quality-lint":
-        from .spec_quality_lint import lint_spec_quality
+        from .validation.spec_quality_lint import lint_spec_quality
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_spec_quality(spec_dir)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "hallucination-lint":
-        from .hallucination_lint import lint_hallucinations
+        from .validation.hallucination_lint import lint_hallucinations
         spec_dir = os.path.abspath(args.spec_dir)
         repo_root = os.path.abspath(args.repo_root)
         if not os.path.isdir(spec_dir):
@@ -336,7 +339,7 @@ def main():
         )
         _print_and_exit_if_errors(errs)
     elif args.cmd == "traceability-check":
-        from .traceability_closure import check_traceability_closure
+        from .validation.traceability_closure import check_traceability_closure
         spec_dir = os.path.abspath(args.spec_dir)
         repo_root = os.path.abspath(args.repo_root)
         errs = check_traceability_closure(spec_dir, repo_root)
@@ -359,13 +362,13 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "dependency-order-lint":
-        from .dependency_order_lint import lint_dependency_order
+        from .validation.dependency_order_lint import lint_dependency_order
         repo_root = os.path.abspath(args.repo_root)
         errs = lint_dependency_order(repo_root)
         _print_and_exit_if_errors(errs)
     elif args.cmd == "forward-replay-check":
-        from .forward_replay_check import check_forward_replay
-        from .validate import _resolve_replay_base_ref
+        from .validation.forward_replay_check import check_forward_replay
+        from .validation.validate import _resolve_replay_base_ref
         repo_root = os.path.abspath(args.repo_root)
         base_ref = args.base_ref or _resolve_replay_base_ref(repo_root)
         errs = check_forward_replay(
@@ -375,7 +378,7 @@ def main():
         )
         _print_and_exit_if_errors(errs)
     elif args.cmd == "governance-check":
-        from .governance import check_commit_message
+        from .validation.governance import check_commit_message
         spec_dir = os.path.abspath(args.spec_dir)
         msg = args.message
         if os.path.exists(msg) and os.path.isfile(msg):
@@ -401,7 +404,7 @@ def main():
             print("5. Ensure all IDs use kebab-case format")
             print("6. No examples should be included in the AI output")
     elif args.cmd == "changelog":
-        from .changelog_parser import (
+        from .core.changelog_parser import (
             list_versions,
             load_version,
             get_toolkit_version,
@@ -454,7 +457,7 @@ def main():
             print("  --version    Show details for a specific version")
             print("  --validate   Validate a version's changelog against format.yaml")
     elif args.cmd == "align":
-        from .schema_differ import (
+        from .generation.schema_differ import (
             diff_spec_directory,
             format_status_report,
             format_diff_report,
@@ -466,7 +469,7 @@ def main():
             validate_pre_migration,
             log_operation,
         )
-        from .prompt_generator import (
+        from .generation.prompt_generator import (
             generate_prompts,
             write_prompts,
             format_prompts_report,
@@ -524,31 +527,61 @@ def main():
             if not backups:
                 print("No backups found in spec/migration_backups/")
                 sys.exit(0)
-            print("\n🔙 Available Backups")
-            print("━" * 20)
-            for i, backup in enumerate(backups, 1):
-                print(f"  {i}. {backup.backup_dir.name}")
-            
-            # Interactive selection
-            try:
-                choice = input("\nSelect backup to restore [1]: ").strip()
-                idx = int(choice) - 1 if choice else 0
-                if 0 <= idx < len(backups):
-                    selected = backups[idx]
-                    confirm = input(f"Restore from {selected.backup_dir.name}? [y/N]: ").strip().lower()
-                    if confirm == 'y':
-                        restore_backup(spec_dir, selected)
-                        log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
-                        print(f"✅ Restored from {selected.backup_dir.name}")
+
+            selected = None
+
+            # Non-interactive: --backup-dir selects directly
+            if getattr(args, 'backup_dir', None):
+                from pathlib import Path as _Path
+                target_name = _Path(args.backup_dir).name
+                for b in backups:
+                    if b.backup_dir.name == target_name:
+                        selected = b
+                        break
+                if selected is None:
+                    print(f"Error: backup '{args.backup_dir}' not found", file=sys.stderr)
+                    sys.exit(1)
+            else:
+                # Interactive mode requires TTY
+                if not sys.stdin.isatty() and not getattr(args, 'yes', False):
+                    print("Error: rollback requires --backup-dir or --yes in non-interactive mode", file=sys.stderr)
+                    sys.exit(1)
+
+                print("\n🔙 Available Backups")
+                print("━" * 20)
+                for i, backup in enumerate(backups, 1):
+                    print(f"  {i}. {backup.backup_dir.name}")
+
+                try:
+                    choice = input("\nSelect backup to restore [1]: ").strip()
+                    idx = int(choice) - 1 if choice else 0
+                    if 0 <= idx < len(backups):
+                        selected = backups[idx]
                     else:
+                        print("Invalid selection.")
+                        sys.exit(1)
+                except (ValueError, EOFError, KeyboardInterrupt):
+                    print("\nCancelled.")
+                    sys.exit(1)
+
+            # Confirm unless --yes
+            if selected and not getattr(args, 'yes', False):
+                try:
+                    confirm = input(f"Restore from {selected.backup_dir.name}? [y/N]: ").strip().lower()
+                    if confirm != 'y':
                         print("Cancelled.")
-                else:
-                    print("Invalid selection.")
-            except (ValueError, EOFError, KeyboardInterrupt):
-                print("\nCancelled.")
+                        sys.exit(0)
+                except (EOFError, KeyboardInterrupt):
+                    print("\nCancelled.")
+                    sys.exit(1)
+
+            if selected:
+                restore_backup(spec_dir, selected)
+                log_operation(spec_dir, f"Restored from {selected.backup_dir.name}", "success")
+                print(f"✅ Restored from {selected.backup_dir.name}")
         elif args.action == "validate":
              # Post-migration validation
-            from .schema_differ import validate_post_migration, get_toolkit_version
+            from .generation.schema_differ import validate_post_migration, get_toolkit_version
             
             toolkit_version = get_toolkit_version(repo_root)
             if not toolkit_version:

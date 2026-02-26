@@ -1,10 +1,6 @@
-import sys
-from pathlib import Path
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.trace_types import normalize_trace_type, is_valid_trace_type
+from specdev_tools.core.trace_types import normalize_trace_type, is_valid_trace_type
 
 
 class TraceTypesTests(unittest.TestCase):

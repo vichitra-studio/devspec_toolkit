@@ -2,11 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.hallucination_lint import lint_hallucinations
+from specdev_tools.validation.hallucination_lint import lint_hallucinations
 
 
 class HallucinationLintTests(unittest.TestCase):

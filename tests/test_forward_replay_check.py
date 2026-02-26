@@ -3,11 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.forward_replay_check import check_forward_replay
+from specdev_tools.validation.forward_replay_check import check_forward_replay
 
 
 class ForwardReplayCheckTests(unittest.TestCase):
@@ -30,7 +27,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec" / "00_charter.json").write_text("{}", encoding="utf-8")
             (root / "spec" / "01_capabilities.json").write_text("{}", encoding="utf-8")
             (root / "spec" / "02_system_sketch.json").write_text("{}", encoding="utf-8")
-            with patch("specdev_tools.forward_replay_check._changed_files", return_value=(missing_changes, None)):
+            with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=(missing_changes, None)):
                 errs = check_forward_replay(str(root), base_ref="origin/main")
             self.assertTrue(any("E550" in e for e in errs))
 
@@ -43,7 +40,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
                 json.dumps({"steps": ["00", "01"]}), encoding="utf-8"
             )
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=([], "fatal: bad revision"),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main")
@@ -58,7 +55,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
                 json.dumps({"steps": ["00", "01"]}), encoding="utf-8"
             )
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=([], "fatal: bad revision"),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main", diff_error_mode="ignore")
@@ -73,7 +70,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
                 json.dumps({"steps": ["00", "01"]}), encoding="utf-8"
             )
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=([], "fatal: bad revision"),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main", diff_error_mode="warn")
@@ -99,7 +96,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec" / "01_capabilities.json").write_text("{}", encoding="utf-8")
             (root / "spec" / "02_system_sketch.json").write_text("{}", encoding="utf-8")
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=(complete_changes, None),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main")
@@ -115,7 +112,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=(["spec/99_future.json"], None),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main")
@@ -131,7 +128,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             )
             noisy = "warning: Not a git repository.\n" + ("usage: git diff\n" * 50)
             with patch(
-                "specdev_tools.forward_replay_check._changed_files",
+                "specdev_tools.validation.forward_replay_check._changed_files",
                 return_value=([], "not-a-git-repository"),
             ):
                 errs = check_forward_replay(str(root), base_ref="origin/main")
@@ -146,7 +143,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec" / "00_charter.json").write_text('{}', encoding="utf-8")
             (root / "spec" / "01_capabilities.json").write_text('{"id": "foo-123"}', encoding="utf-8")
             
-            with patch("specdev_tools.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
+            with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
                 with patch("subprocess.run") as mock_run:
                     mock_run.return_value.returncode = 0
                     mock_run.return_value.stdout = '{"id": "dropped-id"}'
@@ -163,7 +160,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec" / "00_charter.json").write_text('{"id": "kept-id"}', encoding="utf-8")
             (root / "spec" / "01_capabilities.json").write_text('{"id": "kept-id", "new_id": "added-id"}', encoding="utf-8")
 
-            with patch("specdev_tools.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
+            with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
                 with patch("subprocess.run") as mock_run:
                     mock_run.return_value.returncode = 0
                     mock_run.return_value.stdout = '{"id": "kept-id"}'
@@ -180,7 +177,7 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec" / "00_charter.json").write_text('{}', encoding="utf-8")
             (root / "spec" / "01_capabilities.json").write_text('{}', encoding="utf-8")
             
-            with patch("specdev_tools.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
+            with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=(["spec/00_charter.json", "spec/01_capabilities.json"], None)):
                 with patch("subprocess.run") as mock_run:
                     mock_run.return_value.returncode = 128
                     mock_run.return_value.stdout = ''
@@ -196,8 +193,8 @@ class ForwardReplayCheckTests(unittest.TestCase):
             (root / "spec").mkdir()
             (root / "tools" / "step_order.json").write_text(json.dumps({"steps": ["00"]}), encoding="utf-8")
             
-            with patch("specdev_tools.forward_replay_check._changed_files", return_value=([], None)):
-                with patch("specdev_tools.forward_replay_check.check_traceability_closure", return_value=["E560 TRACEABILITY_GAP fake gap"]):
+            with patch("specdev_tools.validation.forward_replay_check._changed_files", return_value=([], None)):
+                with patch("specdev_tools.validation.forward_replay_check.check_traceability_closure", return_value=["E560 TRACEABILITY_GAP fake gap"]):
                     errs = check_forward_replay(str(root), base_ref="origin/main")
                     
             self.assertTrue(any("W560 TRACEABILITY_GAP fake gap" in e for e in errs))

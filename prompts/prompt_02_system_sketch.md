@@ -1,5 +1,13 @@
 # Step 02 · System Sketch
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Build a lightweight architecture map that shows the components required to deliver the approved capabilities and how data flows between them. The system sketch communicates ownership, technology choices, and integration contracts early so interface design and delivery planning stay coherent.
 
@@ -30,7 +38,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Primary Source:** `docs/seed/seed_tech_stack.md` (required) for architecture decisions, patterns, and constraints.
 - Capabilities and owners from `spec/01_capabilities.json` to inform components.
 - Use only upstream artifacts; do not ingest downstream interface, glossary, or NFR specs in this step.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **docs/seed/seed_tech_stack.md**: Architecture patterns, technology constraints, and infrastructure decisions
+- **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set
 
 ## Operating Flow: Synthesize → Clarify → Emit
 
@@ -66,6 +79,10 @@ Before emitting, verify:
 - All `owner` values on components resolve to owner enums defined in canonical registry or `spec/01_capabilities.json`.
 - All tech choices align with constraints in `docs/seed/seed_tech_stack.md`; no stack choice contradicts a seed constraint.
 - If any capability cannot be assigned to a component: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -166,6 +183,7 @@ DO NOT:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "components": [
     {
       "component_id": "user-service",

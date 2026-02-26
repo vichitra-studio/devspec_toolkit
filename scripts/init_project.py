@@ -67,7 +67,7 @@ jobs:
           python-version: "3.x"
           cache: "pip"
       - name: Create virtualenv
-        run: python -m venv dev_env
+        run: python -m venv dev_env  # Matches default --venv-name
       - name: Install tooling
         run: |
           dev_env/bin/pip install --upgrade pip
@@ -127,6 +127,7 @@ def main():
     parser.add_argument("--target", default=".", help="Target project directory")
     parser.add_argument("--toolkit-url", default="https://github.com/vichitra-studio/devspec_toolkit.git", help="URL of the devspec_toolkit repo")
     parser.add_argument("--toolkit-root", help="Explicit path to devspec_toolkit source directory")
+    parser.add_argument("--venv-name", default="dev_env", help="Name for the virtual environment (default: dev_env)")
     parser.add_argument("--strict", action="store_true", help="Enable strict governance (commit-msg hooks)")
     args = parser.parse_args()
 
@@ -274,10 +275,11 @@ def main():
         print(".pre-commit-config.yaml exists. Please manually ensure devspec hooks are configured.")
 
     # 6. Setup Virtual Environment
-    venv_dir = os.path.join(target_dir, "dev_env")
+    venv_name = args.venv_name
+    venv_dir = os.path.join(target_dir, venv_name)
     if not os.path.exists(venv_dir):
-        print("Creating virtual environment 'dev_env'...")
-        run_cmd([sys.executable, "-m", "venv", "dev_env"], cwd=target_dir)
+        print(f"Creating virtual environment '{venv_name}'...")
+        run_cmd([sys.executable, "-m", "venv", venv_name], cwd=target_dir)
         
         # Determine pip path (bin vs Scripts for cross-platform compatibility, though likely unix here)
         venv_bin = os.path.join(venv_dir, "bin")
@@ -305,7 +307,7 @@ def main():
             run_cmd([pip_cmd, "install", "-e", tools_path], cwd=target_dir)
 
     else:
-        print("Virtual environment 'dev_env' already exists.")
+        print(f"Virtual environment '{venv_name}' already exists.")
         # We still need the bin paths for subsequent steps
         venv_bin = os.path.join(venv_dir, "bin")
         if sys.platform == "win32":
@@ -358,7 +360,7 @@ def main():
 
     # 7. Gitignore
     gitignore_path = os.path.join(target_dir, ".gitignore")
-    ignore_entry = "dev_env/"
+    ignore_entry = f"{venv_name}/"
     if os.path.exists(gitignore_path):
         with open(gitignore_path, "r") as f:
             content = f.read()
@@ -373,13 +375,13 @@ def main():
 
     # 8. Update README
     readme_path = os.path.join(target_dir, "README.md")
-    setup_docs = """
+    setup_docs = f"""
 ## Development Setup
 This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/devspec_toolkit) for specification-driven development.
 
 1. **Activate Environment**:
    ```bash
-   source dev_env/bin/activate
+   source {venv_name}/bin/activate
    ```
 2. **Run Toolkit Commands**:
    ```bash
@@ -403,7 +405,7 @@ This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/de
     print("\nInitialization complete!")
     print("Next steps:")
     print("1. Fill out docs/seed/seed_overview.md and seed_tech_stack.md")
-    print("2. Activate your environment: source dev_env/bin/activate")
+    print(f"2. Activate your environment: source {venv_name}/bin/activate")
     print("3. Start your first spec or run `./tools/run_specdev.sh --help`")
 
 if __name__ == "__main__":

@@ -1,5 +1,13 @@
 # Step 12 · CI Gates
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Translate governance rules and fixture expectations into enforceable CI automation. Well-specified gates keep the spec authoritative by blocking merges that violate schemas, fixtures, or coverage commitments.
 
@@ -29,7 +37,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Delivery Baseline `spec/02a_delivery_baseline.json` for environments and required gates.
 - Governance `spec/10_governance.json` for policies; existing CI configs if present.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **02a_delivery_baseline.json**: Environment definitions and required CI gate names for job creation
+- **10_governance.json**: PR rules and validation commands that must be implemented as CI job steps
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private CI Ledger: list jobs (id/name), dependencies (`requires`), steps (validators/commands), and optional coverage thresholds. Do not output it.
@@ -56,6 +69,10 @@ Before emitting, verify:
 - Every environment stage (`dev`, `ci`, `staging`, `prod`) in the delivery baseline has coverage from ≥1 CI job.
 - All `requires` dependencies between jobs form a valid DAG — no circular dependencies.
 - If any required gate cannot be expressed as a CI job: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 ## Negative Constraints
 - Do not output YAML, Markdown prose, or any text outside the JSON schema.
@@ -156,6 +173,7 @@ Available CLI tools include:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "jobs": [],
   "generation_quality": {
     "preflight_passed": true,

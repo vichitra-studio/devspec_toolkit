@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **AI Spec Driven Development Toolkit** is a schema-first, AI-assisted workflow that turns spec → implementation into a deterministic pipeline. It is typically vendored as a git submodule at `<product-repo>/devspec_toolkit/` beside the host repo's live `spec/` directory.
 
-Current version: **0.2.2** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
+Current version: **0.3.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
 
 ---
 
@@ -61,7 +61,7 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 
 # Changelog
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --validate 0.3.0 --repo-root ./devspec_toolkit
 ```
 
 ### Alignment & Migration
@@ -83,10 +83,8 @@ pytest tests/
 # Single test file
 pytest tests/test_canonical_integrity.py
 
-# Step-specific integration tests
-python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.json
-python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
-python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
+# Integration tests
+pytest tests/integration/ -v
 ```
 
 Set `SPECDEV_WARNINGS_AS_ERRORS=1` to promote warning-level messages to errors.
@@ -111,7 +109,12 @@ Artifacts live in `spec/NN_name.json`; human guides in `spec/NN_name.guide.md`. 
 
 - `schema/` — JSON Schemas for every step plus `schema/core/` (atoms, collections, errors shared across steps)
 - `canon/` — Canonical registry (`manifest.json`, `aliases.json`) for shared vocabulary: units, stages, environments, roles, NFR categories, trace types, owners, etc. Referenced by canonical-lint and canonical-integrity checks.
-- `tools/specdev_tools/` — Python CLI package; entry point at `cli.py`, one module per linting/validation command
+- `tools/specdev_tools/` — Python CLI package; entry point at `cli.py`, organized into subpackages:
+  - `core/` — errors, registry, trace_types, changelog_parser
+  - `validation/` — validate, validators/, linters (fixtures, seed, docs, quality, hallucination, dependency, forward-replay, traceability, invariants, governance, matrix)
+  - `generation/` — prompt_generator, prompt_schema_sync, schema_differ
+  - `canonical/` — autofix, integrity, lint, registry
+  - `migration/` — planner, runner
 - `tools/schema_registry.json` — Maps step names to their JSON Schema paths
 - `tools/step_order.json` — Defines the strict waterfall dependency DAG
 - `tools/trace_matrix.json` — Generated cross-artifact traceability matrix (FR ↔ API ↔ fixture ↔ NFR)

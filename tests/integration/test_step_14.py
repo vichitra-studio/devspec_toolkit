@@ -1,12 +1,9 @@
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
-
-from specdev_tools.validate import validate_file
+from specdev_tools.validation.validate import validate_file
 
 
 class Step14IntegrationTests(unittest.TestCase):
@@ -86,6 +83,46 @@ class Step14IntegrationTests(unittest.TestCase):
         self.assertTrue(
             any("fr-does-not-exist" in e for e in errors),
             f"Expected unknown fr_ref error. Got: {errors}",
+        )
+
+    def test_e142_tech_stack_mismatch(self):
+        """E142: roadmap tech not present in Step 09 tech_stack triggers error."""
+        # Use valid_roadmap.json as base — it references python, javascript, fastapi, react, etc.
+        fixture = json.loads(
+            (self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8")
+        )
+        # Create Step 09 with a completely different tech stack so all roadmap tech names mismatch
+        step09 = {
+            "tech_stack": {
+                "languages": [
+                    {"name": "rust", "version": "1.70", "rationale": "Systems language"}
+                ],
+                "frameworks": [
+                    {"name": "actix-web", "version": "4.0", "rationale": "Rust web framework"}
+                ],
+                "infrastructure": [],
+                "tools": []
+            },
+            "milestones": [
+                {
+                    "milestone_id": "m1-core-foundation",
+                    "deliverables": ["Health endpoint"]
+                },
+                {
+                    "milestone_id": "m2-authentication",
+                    "deliverables": ["Auth endpoints"]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            tmp_fixture = tmp_dir / "14_roadmap.json"
+            tmp_fixture.write_text(json.dumps(fixture), encoding="utf-8")
+            (tmp_dir / "09_impl_plan.json").write_text(json.dumps(step09), encoding="utf-8")
+            errors = validate_file(str(self.repo_root), str(tmp_fixture))
+        self.assertTrue(
+            any("E142" in e for e in errors),
+            f"Expected E142 TECH_STACK_MISMATCH error. Got: {errors}",
         )
 
     def test_missing_step09_artifact_fails_when_source_milestones_present(self):

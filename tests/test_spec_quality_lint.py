@@ -2,11 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.spec_quality_lint import lint_spec_quality
+from specdev_tools.validation.spec_quality_lint import lint_spec_quality
 
 
 class SpecQualityLintTests(unittest.TestCase):
@@ -97,28 +94,28 @@ class SpecQualityLintTests(unittest.TestCase):
             self.assertTrue(any("artifact.json missing top-level 'generation_quality'" in e for e in errs))
 
     def test_detects_assumption_vague_quantifier(self):
-        from specdev_tools.spec_quality_lint import _check_assumptions
+        from specdev_tools.validation.spec_quality_lint import _check_assumptions
         errs = _check_assumptions("test.json", {"assumptions": ["Some things are fast"]}, set())
         self.assertTrue(any("W571 ASSUMPTION_VAGUE_QUANTIFIER" in e and "ref=Some" in e for e in errs))
         self.assertTrue(any("W571 ASSUMPTION_VAGUE_QUANTIFIER" in e and "ref=fast" in e for e in errs))
 
     def test_detects_assumption_placeholder(self):
-        from specdev_tools.spec_quality_lint import _check_assumptions
+        from specdev_tools.validation.spec_quality_lint import _check_assumptions
         errs = _check_assumptions("test.json", {"assumptions": ["This is TBD"]}, set())
         self.assertTrue(any("E512 ASSUMPTION_HAS_PLACEHOLDER" in e for e in errs))
 
     def test_detects_assumption_unbound_id(self):
-        from specdev_tools.spec_quality_lint import _check_assumptions
+        from specdev_tools.validation.spec_quality_lint import _check_assumptions
         errs = _check_assumptions("test.json", {"assumptions": ["fr-auth-login works"]}, set(["fr-other"]))
         self.assertTrue(any("W573 ASSUMPTION_UNBOUND_ID" in e and "ref=fr-auth-login" in e for e in errs))
 
     def test_detects_assumption_count_high(self):
-        from specdev_tools.spec_quality_lint import _check_assumptions
+        from specdev_tools.validation.spec_quality_lint import _check_assumptions
         errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]}, set())
         self.assertTrue(any("W572 ASSUMPTION_COUNT_HIGH" in e for e in errs))
 
     def test_detects_placeholder_count_mismatch(self):
-        from specdev_tools.spec_quality_lint import _check_placeholder_scan_agreement
+        from specdev_tools.validation.spec_quality_lint import _check_placeholder_scan_agreement
         # Agent declares only "TBD" but independent scan found "TBD" and "TODO" — "TODO" is missed
         errs = _check_placeholder_scan_agreement("test.json", {
             "generation_quality": {

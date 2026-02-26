@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "extensions": [
     {
       "extension_id": "ext-01-database-schema",

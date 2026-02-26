@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "nfrs": [
     {
       "nfr_id": "invalid-id-format",

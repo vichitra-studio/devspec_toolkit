@@ -1,5 +1,13 @@
 # Step 16a · Implementation Planner
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Produce a **machine-checkable blueprint** for implementation using the **Checklist-Driven Architecture**. Every piece of work must be:
 1. **Traceable**: Linked to a specific spec requirement with commit hash
@@ -37,7 +45,15 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - **Specs**: Ingest relevant Feature Specs (`04_fr_list`), Interfaces (`05`), and Invariants (`06`).
 - **Codebase**: Scan existing files to populate `context.existing_structures` and `coding_examples`.
 - **Documentation Map**: Read `README.md` and `docs/README.md` to locate relevant structure/tooling/runbook docs; include any required docs by adding them to the seed manifest and `seed_refs`.
-- **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- **Guide**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **14_roadmap.json**: Active milestone task IDs, acceptance criteria, and sequencing for checklist creation
+- **04_fr_list.json**: FR IDs and acceptance criteria for behavior checklist items
+- **05_interface_contracts.json**: API IDs, routes, and schemas for API-layer checklist items
+- **06_invariants.json**: Invariant IDs for validation/constraint checklist items
+- **Codebase scan**: Existing file structures and signatures for `context.existing_structures`
 
 # Operating Flow: Context Review → Synthesize → Clarify → Drift Check → Emit
 1.  **Context Review**: Determine which docs are required (root README map, tooling docs, architecture notes, ops runbooks). If any are required and not yet seeded, update `spec/common/seed_manifest.json` (add to `seeds` + `global_seed_order` + `nested_order` as needed) and include them in `step_requirements["16a"]`. Then ingest them and list in `seed_refs`.
@@ -47,6 +63,9 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 5.  **Implementation Slots**: Define execution slots (`checklist[].implementation`) for each item.
 6.  **Drift Check**: Compare planned changes against current specs/seed. If the plan relies on new policies, processes, or scope not captured in `spec/` or `docs/seed`, update the relevant spec/seed files in-scope **before** finalizing the plan.
 7.  **Emit**: Generate the JSON.
+
+### Roadmap-to-Checklist Coverage
+Every `tasks[].task_id` from `14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
 
 ## FORBIDDEN ACTIONS (Immediate Rejection)
 
@@ -242,6 +261,10 @@ Before emitting, verify:
 - No upstream capability, FR, or milestone ID is silently dropped.
 - All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
 - If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 **Extraction Mandate**:
 - Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
@@ -266,6 +289,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -289,6 +313,8 @@ Before emitting, verify:
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
           "implementation": {
              "status": "pending",

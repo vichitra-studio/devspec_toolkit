@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "spec_first_policy": true,
   "pr_rules": [
     "random-check-that-does-not-exist"

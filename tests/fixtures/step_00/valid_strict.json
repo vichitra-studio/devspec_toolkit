@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
   "in_scope": [
     "User Authentication",

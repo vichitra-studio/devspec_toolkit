@@ -3,11 +3,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.seed_lint import lint_seeds
+from specdev_tools.validation.seed_lint import lint_seeds
 
 
 class SeedPathValidationTests(unittest.TestCase):
@@ -87,6 +84,30 @@ class SeedPathValidationTests(unittest.TestCase):
         self.assertTrue(
             any("missing 'path' field" in e for e in errors),
             f"Expected missing path field error, got: {errors}",
+        )
+
+    def test_undeclared_seed_on_disk_emits_warning(self):
+        """On-disk .md file not declared in manifest triggers W550 UNDECLARED_SEED."""
+        manifest = {
+            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "seeds": [
+                {"seed_id": "seed-overview", "path": "docs/seed/overview.md"}
+            ],
+            "global_seed_order": ["seed-overview"],
+            "seed_directory": "docs/seed",
+        }
+        tmpdir, spec_dir, repo_root = self._create_temp_project(
+            manifest, seed_files=["docs/seed/overview.md", "docs/seed/extra_undeclared.md"]
+        )
+        errors = lint_seeds(repo_root, spec_dir)
+        w550_errors = [e for e in errors if "W550" in e or "UNDECLARED_SEED" in e]
+        self.assertTrue(
+            len(w550_errors) > 0,
+            f"Expected W550 UNDECLARED_SEED warning for extra_undeclared.md, got: {errors}",
+        )
+        self.assertTrue(
+            any("extra_undeclared.md" in e for e in w550_errors),
+            f"W550 should mention the undeclared file, got: {w550_errors}",
         )
 
     def test_path_escape_fails(self):

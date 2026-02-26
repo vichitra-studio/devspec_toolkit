@@ -1,5 +1,13 @@
 # Step 08 · Test Plan & Fixtures
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Supply deterministic inputs and expected outputs that exercise functional and non-functional behaviors across the spec. These fixtures form the backbone of automated validation, red-team loops, and regression detection.
 
@@ -34,8 +42,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - FRs `spec/04_fr_list.json` for acceptance criteria; Interface Contracts `spec/05_interface_contracts.json` for payloads.
 - Invariants `spec/06_invariants.json` and NFRs `spec/07_nfrs.json` for negative and performance cases.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Example fixtures in `example/devspec_kit/spec/08_fixtures.json` for structure and modes.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+- Schema: `$SCHEMA_DIR/08_fixtures.schema.json` for fixture structure, mode enums, and target format.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **04_fr_list.json**: Acceptance criteria to derive happy-path, edge, and failure fixture scenarios; FR IDs for `targets`
+- **05_interface_contracts.json**: Request/response schemas for payload shapes; error definitions for negative fixtures; API IDs for `targets`
+- **06_invariants.json**: Invariant IDs with `severity: error` for negative-case fixtures that verify enforcement
+- **07_nfrs.json**: Performance-critical NFR IDs for benchmark or load-test fixtures
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Coverage Ledger mapping FR acceptance criteria to fixtures: happy-path, edge, and failure, plus contract/e2e/redteam modes. Do not output it.
@@ -64,6 +79,10 @@ Before emitting, verify:
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
 - All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -143,6 +162,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "fixtures": [
     {
       "fixture_id": "fixture-auth-login-success",

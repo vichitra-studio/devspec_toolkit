@@ -1,5 +1,13 @@
 # Step 05 · Interface Contracts
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Document the external facing contracts (routes, schemas, security, and versioning) that expose capabilities to clients and downstream systems. Accurate interface contracts let scaffolding tools, test fixtures, and runtime monitors enforce the spec without hand translation.
 
@@ -30,8 +38,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 - FRs `spec/04_fr_list.json` to derive behaviors and acceptance evidence.
 - System Sketch `spec/02_system_sketch.json` for owners and integration points.
 - Glossary `spec/03_glossary.json` for resource/action naming.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
 - Use example fixtures for payload shapes and error cases; do not depend on downstream fixture artifacts.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **04_fr_list.json**: FR IDs and acceptance criteria to derive API behaviors and trace bindings
+- **02_system_sketch.json**: Component IDs for ownership assignment; connection protocols and trust boundaries for security
+- **03_glossary.json**: Domain terms for resource/action naming in routes and payloads
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of APIs (id, name, version, protocol, route/method, request/response schemas, security, errors, owner, traces). Do not output it.
@@ -60,6 +74,10 @@ Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -147,6 +165,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "apis": [],
   "generation_quality": {
     "preflight_passed": true,

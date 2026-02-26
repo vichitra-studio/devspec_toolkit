@@ -2,10 +2,7 @@ import json
 import os
 import sys
 
-# Add tools directory to path so we can import specdev_tools
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../tools")))
-
-from specdev_tools.validators.step_02 import validate_step_02
+from specdev_tools.validation.validators.step_02 import validate_step_02
 
 # Adjust these for when the script is moved to tests/integration
 TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))

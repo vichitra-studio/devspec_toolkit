@@ -12,11 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add the tools directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools"))
-
-# Import the validate function directly from validate module
-from specdev_tools.validate import validate_file
+from specdev_tools.validation.validate import validate_file
 
 
 def load_json(path):

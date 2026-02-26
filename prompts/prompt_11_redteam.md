@@ -1,5 +1,13 @@
 # Step 11 · Red‑Team / Failure Modes
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Proactively identify security threats, failure modes, and edge cases. Ensure every threat is directly **traceable** to a specific public API or system component, and define actionable **mitigations** linked to requirements or invariants.
 
@@ -43,7 +51,15 @@ Use the `category` field to classify threats precisely:
 1.  **Attack Surface**: `spec/05_interface_contracts.json` (APIs) and `spec/02_system_sketch.json` (Components).
 2.  **Defenses**: `spec/06_invariants.json` (Security/Safety rules) and `spec/07_nfrs.json` (Security constraints).
 3.  **Logic**: `spec/04_fr_list.json` (Business rules).
-4.  **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
+4.  **Guide**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **05_interface_contracts.json**: API IDs, routes, methods, and security settings to identify attack surfaces
+- **02_system_sketch.json**: Component IDs, trust boundaries, and external dependencies for threat scoping
+- **06_invariants.json**: Existing security/safety rules (inv IDs) for mitigation linking
+- **07_nfrs.json**: Security constraints and throughput thresholds for resource exhaustion threat modeling
+- **04_fr_list.json**: Business logic rules for logic-flaw threat identification
 
 ## Operating Flow: Attack → Trace → Mitigate
 1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
@@ -80,6 +96,10 @@ Before emitting, verify:
 - Every security-relevant `inv_id` in `spec/06_invariants.json` has a corresponding threat entry that tests its enforcement.
 - All `target_ids[*].id` values resolve to existing `api_id`, `component_id`, or `fr_id` values in their referenced spec files.
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -168,6 +188,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "trace": [
     {
       "type": "doc",

@@ -11,8 +11,6 @@ import os
 import subprocess
 from pathlib import Path
 
-# Add tools to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../tools")))
 
 def validate_fixture(fixture_path, should_pass=True):
     """
@@ -53,7 +51,7 @@ def validate_fixture(fixture_path, should_pass=True):
     # 2. logical Validation (only if schema passed and we expected it to)
     if should_pass:
         try:
-            from specdev_tools.validators.step_04 import validate_step_04
+            from specdev_tools.validation.validators.step_04 import validate_step_04
             with open(fixture_path, 'r') as f:
                 fixture_data = json.load(f)
             

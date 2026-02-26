@@ -1,5 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/Vichitra-Collective/devspec/main/schema/14_roadmap.schema.json",
+    "spec_refs_ingested": [],
     "project_name": "Fixture Dummy Roadmap",
     "milestones": []
 }

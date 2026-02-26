@@ -1,5 +1,13 @@
 # Step 00 · Project Charter
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Establish the authoritative charter that captures the business problem, intended users, constraints, and measurable success criteria in falsifiable language. This artifact anchors downstream decisions by making scope boundaries, stakeholder needs, and success metrics explicit enough to trace through every later step.
 
@@ -31,8 +39,15 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Constraints Source:** `docs/seed/seed_tech_stack.md` (required) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.
-- Examples: `example/devspec_kit/spec/00_charter.json`, `example/devspec_kit/spec/07_nfrs.json` for shape of success metrics.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, reference `$TOOLKIT_ROOT/docs/developers/reference.md`.
+- Schema: `$SCHEMA_DIR/00_charter.schema.json` for Output Contract shape and required fields.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **docs/seed/seed_overview.md**: Project scope boundaries, business objectives, target users, and high-level success criteria
+- **docs/seed/seed_tech_stack.md**: Hardware/legacy constraints for `out_of_scope` or `assumptions`; technology constraints informing `risks`
+- **03_glossary.json** (if present): Domain terms and metric units for consistent naming in `success_metrics`
+- **07_nfrs.json** (if present): Metric names and units to align `success_metrics` terminology
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger containing: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics (metric→unit→target→method). Do not output it.
@@ -63,6 +78,10 @@ Before emitting, verify:
 - No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
 - All metric names and units in `success_metrics` align with terminology used in the seed documents.
 - If any seed statement is ambiguous or contradictory: add a gap question (Clarify mode) rather than making an assumption.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -153,6 +172,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "title": "Project Charter",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
   "success_metrics": [],

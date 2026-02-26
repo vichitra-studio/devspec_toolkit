@@ -1,5 +1,13 @@
 # Step 13 · Extension Generator
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Formalizes the creation of domain-specific specifications (extensions). Instead of letting the roadmap or implementation drift into undefined territory, this step explicitly "discovers" complex areas (Database, Security, ML Models) and creates a manifest of dedicated specs to describe them.
 
@@ -27,7 +35,15 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 ## Context To Ingest
 - **System Sketch** (`spec/02_system_sketch.json`): Look for "Database", "AI Engine", "Third Party", or "Infrastructure" bubbles.
 - **NFRs** (`spec/07_nfrs.json`): Look for "Compliance", "Security", or "Scale" constraints that imply deep complexity.
-- **Guide**: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- **Guide**: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **02_system_sketch.json**: Component types (database, AI engine, external) indicating deep domain complexity
+- **07_nfrs.json**: Compliance, security, and scale constraints implying extension-worthy complexity
+- **01_capabilities.json**: Capability scope for identifying which domains need dedicated specs
+- **04_fr_list.json**: Complex business logic requirements that may need dedicated extension specs
+- **05_interface_contracts.json**: Integration patterns to distinguish standard APIs from deep domain verticals
 
 ## Operating Flow: Analyze → Filter → Plan
 - **Analyze**: Scan the input specs for complex subsystems.
@@ -60,6 +76,10 @@ Before emitting, verify:
 - Each `extension_id` has a `justification` that references a specific `component_id` or `nfr_id` from upstream specs.
 - No identified architectural gap is silently dropped without explicit `out_of_scope` rationale.
 - If any domain complexity is unclear: add a gap question (Clarify mode) rather than generating a speculative extension.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 ## Negative Constraints
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
@@ -91,6 +111,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "extensions": [
     {
       "extension_id": "ext-01-database",

@@ -1,5 +1,13 @@
 # Step 10 · Governance & Change Control
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Set the policies that keep the spec authoritative by covering change control, versioning, reviewer expectations, and how code changes reference spec artifacts. Strong governance ensures every update flows through spec-first workflows and remains auditable.
 
@@ -36,7 +44,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Charter `spec/00_charter.json` for organizational goals/constraints; Implementation Plan `spec/09_impl_plan.json` for cadence.
 - Use CI expectations from required seeds and current repo automation docs; do not depend on downstream CI-gates spec.
 - Current commit conventions (if any) found in repo history or CONTRIBUTING docs.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Organizational constraints and compliance requirements for governance rules
+- **09_impl_plan.json**: Delivery cadence and milestone schedule for review cadence and branching strategy alignment
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Governance Ledger: versioning strategy, PR rules (required validations), spec_first_policy, commit message pattern, reviewers/roles. Do not output it.
@@ -63,6 +76,10 @@ Before emitting, verify:
 - The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
 - No charter-level change-control requirement is silently dropped.
 - If any organizational constraint cannot be expressed as a governance rule: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -143,6 +160,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "spec_first_policy": true,
   "commit_message_rules": {
     "require_spec_ids": true

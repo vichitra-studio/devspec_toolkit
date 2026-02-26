@@ -1,5 +1,13 @@
 # Step 16c · Implementation Reviewer
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes.
 
@@ -25,7 +33,13 @@ You output the final version of the JSON, populating the `review` section.
 - **Input context:** `spec/impl_context/{step_id}.json` (Plan + Exec), plus the actual Codebase.
 - **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
 - **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{step_id}.json`.
-- **Guide:** `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **spec/impl_context/{step_id}.json (Plan + Execution)**: Checklist items, implementation evidence, and execution results for audit
+- **Actual codebase**: Source files for verification that implementation matches plan
+- **plan.review_requirements.test_commands**: Test commands to verify against execution results
 
 ## Crucial Side Effect (Roadmap Sync)
 - If your `verdict` is `verified`, you **MUST** also update:
@@ -235,6 +249,10 @@ Before emitting, verify:
 - Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
 - No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
 - If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
@@ -251,6 +269,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -271,6 +290,8 @@ Before emitting, verify:
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-security-auth"],
+          "fixture_ref": "fixture-login-jwt",
           "implementation": {
             "status": "verified",
             "actions": [
@@ -346,6 +367,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -366,6 +388,8 @@ Before emitting, verify:
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-security-auth"],
+          "fixture_ref": "fixture-login-jwt",
           "implementation": {
             "status": "verified",
             "actions": [

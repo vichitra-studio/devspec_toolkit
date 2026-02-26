@@ -1,5 +1,13 @@
 # Step 16 · Implementation Context (Trinity Anchor)
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Create or update the **canonical Step 16 anchor** at the Step 16 anchor artifact in the `spec` root.
 This file is the **root reference** for the Trinity Loop and exists alongside per‑milestone execution files in `spec/impl_context/`. It must:
@@ -37,7 +45,17 @@ implementation checklist, and review expectations for the *current* execution cy
 - **Core Specs**: Relevant FRs (04), APIs (05), Invariants (06), NFRs (07), Fixtures (08).
 - **Active Impl Contexts**: Enumerate any active files in `spec/impl_context/` (16a/b/c).
 - **Documentation Map**: `README.md` and `docs/README.md` for current doc surface.
-- **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
+- **Guide**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **14_roadmap.json**: Current milestone scope, task IDs, and sequencing for checklist creation
+- **09_impl_plan.json**: Tech stack and constraints for solution architecture
+- **04_fr_list.json**: FR IDs and acceptance criteria for checklist spec_ref bindings
+- **05_interface_contracts.json**: API IDs for checklist items covering endpoint implementation
+- **06_invariants.json**: Invariant IDs for validation checklist items
+- **07_nfrs.json**: NFR IDs for performance and reliability checklist items
+- **Active impl contexts** (`spec/impl_context/*.json`): Existing milestone context for drift detection
 
 # Operating Flow (MANDATORY)
 1. **Context Review**: Resolve seeds and ingest required sources.
@@ -169,6 +187,10 @@ Before emitting, verify:
 - Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
 - No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
 - If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
@@ -227,6 +249,7 @@ Before emitting, verify:
   "seed_refs": [
     { "seed_id": "seed-overview", "path": "docs/seed/seed_overview.md" }
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -255,6 +278,8 @@ Before emitting, verify:
           },
           "description": "User can login with valid credentials.",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_login_success",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
           "implementation": {
             "status": "pending",

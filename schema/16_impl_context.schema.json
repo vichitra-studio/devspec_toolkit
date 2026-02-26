@@ -110,6 +110,9 @@
     "created_at": {
       "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
     },
+    "spec_refs_ingested": {
+      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
+    },
     "seed_refs": {
       "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
     },
@@ -475,7 +478,8 @@
                             "status_ref": {
                               "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                             }
-                          }
+                          },
+                          "required": ["status"]
                         },
                         "then": {
                           "properties": {
@@ -506,12 +510,31 @@
                           "checklist_status": {
                             "const": "deferred"
                           }
-                        }
+                        },
+                        "required": ["checklist_status"]
                       }
                     },
                     "then": {
                       "required": [
                         "implementation"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "not": {
+                        "properties": {
+                          "checklist_status": {
+                            "const": "deferred"
+                          }
+                        },
+                        "required": ["checklist_status"]
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "nfr_refs",
+                        "fixture_ref"
                       ]
                     }
                   }
@@ -747,26 +770,8 @@
             "nfr_measurement_methods": {
               "type": "object",
               "additionalProperties": false,
-              "properties": {
-                "nfr-availability-uptime": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "command": {
-                      "type": "string"
-                    },
-                    "expected": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-                    }
-                  }
-                },
-                "nfr-privacy-cookie-free": {
+              "patternProperties": {
+                "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
@@ -789,14 +794,8 @@
             "timeout_constants": {
               "type": "object",
               "additionalProperties": false,
-              "properties": {
-                "EMAIL_DELIVERY_TIMEOUT": {
-                  "type": "integer"
-                },
-                "DNS_VERIFICATION_TIMEOUT": {
-                  "type": "integer"
-                },
-                "ANALYTICS_BEACON_TIMEOUT": {
+              "patternProperties": {
+                "^[A-Z][A-Z0-9_]*$": {
                   "type": "integer"
                 }
               }
@@ -1766,7 +1765,7 @@
               "description": "Free-text summary of any scope creep or unplanned features detected"
             }
           },
-          "required": ["fr_coverage"],
+          "required": ["fr_coverage", "hallucinated_features"],
           "additionalProperties": false
         }
       },
@@ -1840,6 +1839,10 @@
         "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
       },
       "default": []
+    },
+    "_migration_notes": {
+      "type": "string",
+      "description": "Optional migration notes added during version upgrades."
     }
   },
   "required": [
@@ -1847,6 +1850,7 @@
     "owner",
     "created_at",
     "seed_refs",
+    "spec_refs_ingested",
     "plan",
     "generation_quality",
     "canonical_refs_used",

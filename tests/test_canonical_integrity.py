@@ -2,11 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.canonical_integrity import validate_canonical_integrity, validate_canonical_integrity_file
+from specdev_tools.canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
 
 
 class CanonicalIntegrityTests(unittest.TestCase):

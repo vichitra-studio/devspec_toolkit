@@ -1,5 +1,13 @@
 # Step 15 · Scaffold Generation
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
@@ -31,7 +39,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Interface Contracts `spec/05_interface_contracts.json` for route map; System Sketch `spec/02_system_sketch.json` for component context.
 - FRs `spec/04_fr_list.json` for behavior coverage.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference; any org boilerplate.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference; any org boilerplate.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **05_interface_contracts.json**: API IDs, routes, methods, and protocols for route_map generation
+- **02_system_sketch.json**: Component IDs and types for service skeleton module mapping
+- **04_fr_list.json**: FR IDs with acceptance criteria requiring specific HTTP endpoints
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Scaffold Ledger: service_skeleton (language/framework/modules) and route_map mapping each public `api_ref` to path/method. Do not output it.
@@ -58,6 +72,10 @@ Before emitting, verify:
 - Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
 - All `api_ref` values in `route_map` resolve to valid `api_id` entries in `spec/05_interface_contracts.json`.
 - If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -133,6 +151,7 @@ Before emitting, verify:
   "seed_refs": [
     {"seed_id": "seed-overview"}
   ],
+  "spec_refs_ingested": [],
   "service_skeleton": {
     "language": "python"
   },

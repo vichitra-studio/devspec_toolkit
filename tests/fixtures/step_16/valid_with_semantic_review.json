@@ -8,6 +8,7 @@
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -59,6 +60,35 @@
               }
             ]
           }
+        },
+        {
+          "id": "REQ_AUTH_LOGIN_VAL",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-user-login",
+            "line_range": "L1-L10",
+            "commit_hash": "1111111111111111111111111111111111111111"
+          },
+          "description": "Validate user login endpoint returns JWT",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "POST /auth/login returns 200 with JWT",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-auth-login",
+          "implementation": {
+            "status": "verified",
+            "files_touched": ["src/api/auth.py"],
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify JWT token structure in test output",
+                "evidence": {
+                  "type": "log",
+                  "content": "PASSED tests/test_auth.py::test_login_returns_jwt"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -95,7 +125,7 @@
     },
     "critical_evidence": {
       "passed_test_commands": ["pytest tests/test_auth.py"],
-      "satisfied_checklist_ids": ["REQ_AUTH_LOGIN"]
+      "satisfied_checklist_ids": ["REQ_AUTH_LOGIN", "REQ_AUTH_LOGIN_VAL"]
     }
   },
   "review": {

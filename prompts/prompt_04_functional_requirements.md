@@ -1,5 +1,13 @@
 # Step 04 · Functional Requirements
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Turn capabilities into falsifiable statements of system behavior with clear entry conditions, expected outcomes, and measurable acceptance evidence. These requirements become the contract linking stakeholder intent to APIs, fixtures, and monitoring.
 
@@ -29,8 +37,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 ## Context To Ingest
 - Charter `spec/00_charter.json` (goals/constraints) and Capabilities `spec/01_capabilities.json` as the source of behaviors.
 - Glossary `spec/03_glossary.json` to anchor terms; do not depend on downstream interface/NFR artifacts in this step.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Use examples from `example/devspec_kit` for criterion shape only; do not depend on downstream fixture artifacts.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+- Schema: `$SCHEMA_DIR/04_fr_list.schema.json` for Output Contract shape and criterion structure.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Project scope boundaries and success criteria for FR rationale
+- **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs
+- **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate FRs (one behavior each) mapped from capabilities; include rationale, pre/postconditions, and ≥2 acceptance criteria candidates with measurable outcomes. Do not output it.
@@ -59,6 +73,10 @@ Before emitting, verify:
 - No upstream capability, FR, or milestone ID is silently dropped.
 - All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
 - If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 **Extraction Mandate**:
 - Every capability ID from `01_capabilities.json` must map to ≥1 FR. List any capability left without an FR and explain why.
@@ -145,6 +163,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "functional_requirements": [
     {
       "fr_id": "fr-auth-login",

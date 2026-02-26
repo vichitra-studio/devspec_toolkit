@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -58,6 +59,30 @@
                 "type": "file_create",
                 "target": "src/auth.py",
                 "description": "Create auth module"
+              }
+            ]
+          }
+        },
+        {
+          "id": "REQ_CORE_001_VAL",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-core-login",
+            "line_range": "L10-L20",
+            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+          },
+          "description": "Validate login function returns correct response",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "login validation passes",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-login-success",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify login response schema"
               }
             ]
           }

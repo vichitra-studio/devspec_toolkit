@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "extensions": {
     "execution_context": {
       "command_overrides": {
@@ -102,6 +103,30 @@
                   "type": "log",
                   "content": "HTTP/1.1 200 OK\nContent-Type: application/json"
                 }
+              }
+            ]
+          }
+        },
+        {
+          "id": "REQ_API_VALIDATION",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-get-profile",
+            "line_range": "L20-L40",
+            "commit_hash": "3333333333333333333333333333333333333333"
+          },
+          "description": "Validate GET /profile endpoint returns correct data",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "returns expected profile fields",
+          "nfr_refs": ["nfr-availability-uptime"],
+          "fixture_ref": "fixture-api-profile-get",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify profile endpoint returns correct data"
               }
             ]
           }

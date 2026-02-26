@@ -1,5 +1,13 @@
 # Step 06 · Invariants & Rules
 
+## Path Variables
+| Variable | Description |
+|---|---|
+| `$PRODUCT_ROOT` | Root of the consumer/product repository |
+| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
+| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
+| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
+
 ## Purpose
 Capture the non-negotiable truths, guardrails, and data relationships the system must uphold regardless of implementation. These invariants feed governance, contract validation, and monitoring so deviations trigger alerts before customers feel impact.
 
@@ -35,7 +43,12 @@ You are a senior specification author and validator. Your job is to emit a singl
 - FRs `spec/04_fr_list.json` to motivate rules.
 - Interface Contracts `spec/05_interface_contracts.json` for request/response constraints.
 - Governance expectations from project policy docs/seeds if rules reflect policies (e.g., commit references, versioning).
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
+- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
+
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **04_fr_list.json**: Acceptance criteria (especially negative cases and error conditions) to encode as invariant rules
+- **05_interface_contracts.json**: Error response definitions and request/response constraints for rule scoping
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate invariants with: inv_id, business description, executable expression (jsonlogic/CEL), scope (components/apis), severity, and traces. Do not output it.
@@ -63,6 +76,10 @@ Before emitting, verify:
 - All `trace` entries reference valid `fr_id` or `api_id` values from Steps 04 or 05.
 - No business rule, security boundary, or data integrity constraint is silently omitted.
 - If any constraint cannot be expressed in the supported `language` formats: add a gap question (Clarify mode) rather than skipping it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -142,6 +159,7 @@ Before emitting, verify:
       "seed_id": "seed-overview"
     }
   ],
+  "spec_refs_ingested": [],
   "rules": [
     {
       "inv_id": "inv-session-token-required",

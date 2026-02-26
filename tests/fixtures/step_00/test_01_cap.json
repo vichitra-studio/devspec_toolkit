@@ -11,6 +11,7 @@
       "seed_id": "seed-tech-stack"
     }
   ],
+  "spec_refs_ingested": [],
   "capabilities": [
     {
       "capability_id": "capability-approve-budget",

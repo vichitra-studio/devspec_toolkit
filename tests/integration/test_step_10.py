@@ -10,8 +10,6 @@ import os
 import re
 from pathlib import Path
 
-# Add the devspec_toolkit to path so we can import specdev_tools
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools"))
 
 def validate_schema(fixture_path):
     """Validate that the fixture conforms to the governance schema"""
@@ -92,7 +90,7 @@ def validate_schema(fixture_path):
 def validate_trace_links(fixture_path):
     """Validate trace and links fields using the extracted validator."""
     try:
-        from specdev_tools.validators.step_10 import validate_step_10
+        from specdev_tools.validation.validators.step_10 import validate_step_10
         with open(fixture_path, 'r') as f:
             data = json.load(f)
             

@@ -3,11 +3,8 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.forward_replay_check import check_forward_replay
+from specdev_tools.validation.forward_replay_check import check_forward_replay
 
 
 class ForwardReplayCheckIntegrationTests(unittest.TestCase):

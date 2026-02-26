@@ -2,18 +2,19 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-
-from specdev_tools.prompt_schema_sync import run_prompt_schema_sync
+from specdev_tools.generation.prompt_schema_sync import run_prompt_schema_sync
 
 
 class PromptSchemaSyncTests(unittest.TestCase):
     def test_repo_prompt_schema_sync_is_clean(self):
         repo_root = Path(__file__).resolve().parents[1]
         errs = run_prompt_schema_sync(str(repo_root))
-        self.assertEqual([], errs, msg=f"Repo prompt/schema drift detected: {errs}")
+        # W580 SUBSTEP_DRIFT warnings are expected for 16b/16c prompts that
+        # intentionally include cross-domain keys (plan, execution) for
+        # full-context review.  Filter them out for this assertion.
+        hard_errors = [e for e in errs if not e.startswith("W580")]
+        self.assertEqual([], hard_errors, msg=f"Repo prompt/schema drift detected: {hard_errors}")
 
     def test_detects_missing_required(self):
         with tempfile.TemporaryDirectory() as td:
@@ -529,6 +530,92 @@ class PromptSchemaSyncTests(unittest.TestCase):
             )
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("schema_uri_mismatch" in e for e in errs))
+
+    def test_step_from_prompt_name_returns_substep_id(self):
+        """_step_from_prompt_name should return '16a', not '16'."""
+        from specdev_tools.generation.prompt_schema_sync import _step_from_prompt_name
+        self.assertEqual(_step_from_prompt_name("prompt_16a_impl_planner.md"), "16a")
+        self.assertEqual(_step_from_prompt_name("prompt_16b_impl_coder.md"), "16b")
+        self.assertEqual(_step_from_prompt_name("prompt_16c_impl_reviewer.md"), "16c")
+        self.assertEqual(_step_from_prompt_name("prompt_04_functional_requirements.md"), "04")
+        self.assertIsNone(_step_from_prompt_name("not_a_prompt.md"))
+
+    def test_substep_drift_detection_w580(self):
+        """W580: sub-step prompt with keys from another sub-step's domain triggers warning."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            # Create Step 16 schema (base schema used for all sub-steps)
+            (root / "schema" / "16_impl_context.schema.json").write_text(
+                json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {
+                            "plan": {"type": "object"},
+                            "execution": {"type": "object"},
+                            "review": {"type": "object"},
+                        },
+                        "required": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # Create a 16a prompt whose output contract contains "review" (a 16c key)
+            (root / "prompts" / "prompt_16a_impl_planner.md").write_text(
+                (
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"plan\": {\"status\": \"active\"}, \"review\": {\"verdict\": \"pending\"}}\n"
+                    "```\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            w580_errs = [e for e in errs if "W580" in e]
+            self.assertTrue(
+                len(w580_errs) > 0,
+                f"Expected W580 SUBSTEP_DRIFT warning. Got: {errs}"
+            )
+            self.assertTrue(
+                any("review" in e for e in w580_errs),
+                f"Expected W580 to mention 'review' as foreign key. Got: {w580_errs}"
+            )
+
+    def test_substep_no_drift_when_keys_match_domain(self):
+        """No W580 when sub-step output contract only contains its own domain keys."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            (root / "schema" / "16_impl_context.schema.json").write_text(
+                json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {
+                            "plan": {"type": "object"},
+                        },
+                        "required": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # 16a prompt with only 16a domain keys
+            (root / "prompts" / "prompt_16a_impl_planner.md").write_text(
+                (
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"plan\": {\"status\": \"active\"}}\n"
+                    "```\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            w580_errs = [e for e in errs if "W580" in e]
+            self.assertEqual(
+                w580_errs, [],
+                f"Did not expect W580 errors. Got: {w580_errs}"
+            )
 
 
 if __name__ == "__main__":

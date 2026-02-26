@@ -9,10 +9,7 @@ import sys
 import os
 from pathlib import Path
 
-# Add the toolkit tools dir to path so we can import specdev_tools
-sys.path.insert(0, str(Path(__file__).parents[2] / "tools"))
-
-from specdev_tools.validate import validate_file
+from specdev_tools.validation.validate import validate_file
 
 def main():
     """Validate all test fixtures for Step 09"""

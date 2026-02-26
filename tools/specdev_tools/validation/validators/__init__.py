@@ -1,0 +1,5 @@
+"""Step validators for the DevSpec pipeline.
+
+Each ``step_NN`` module exposes a ``validate_step_NN`` function that
+performs deep (semantic) validation beyond what JSON Schema alone catches.
+"""
