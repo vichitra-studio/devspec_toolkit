@@ -55,6 +55,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Versioning strategy present; spec_first_policy explicit; commit message requirements clear and actionable.
   - PR rules list core validations; reviewers cover necessary disciplines.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every organizational constraint in `spec/00_charter.json` (`constraints`, `compliance`) is encoded as a governance rule, PR policy, or commit convention.
+- All `pr_rules` commands reference valid `specdev` CLI subcommands (validate, validate-all, matrix, fixtures-lint, etc.).
+- The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
+- No charter-level change-control requirement is silently dropped.
+- If any organizational constraint cannot be expressed as a governance rule: add a gap question (Clarify mode) rather than omitting it.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

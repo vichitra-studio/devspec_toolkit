@@ -4,10 +4,13 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 
+from .traceability_closure import check_traceability_closure
 
 SPEC_FILE_RE = re.compile(r"spec/(\d{2}[a-z]?)_[a-z0-9_]+\.json$")
+ID_MATCH_RE = re.compile(r"[a-z]+-[a-z0-9-]+")
 
 
 def check_forward_replay(
@@ -43,6 +46,23 @@ def check_forward_replay(
                     f"E550 FORWARD_REPLAY_MISSING changed={step} missing_downstream={downstream}"
                 )
                 break
+
+    semantic_errors = _check_semantic_coverage(root, set(known_changed), base_ref)
+    
+    for err in semantic_errors:
+        if err["type"] == "skip":
+            errors.append(f"W550 SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={err['path']}")
+        elif err["type"] == "regression":
+            dropped_str = ",".join(err["dropped_ids"])
+            errors.append(f"E550 SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}")
+
+    tc_errors = check_traceability_closure(str(root / "spec"), str(root))
+    for err in tc_errors:
+        if err.startswith("E560"):
+            errors.append(err.replace("E560", "W560", 1))
+        else:
+            errors.append(err)
+
     return errors
 
 
@@ -69,3 +89,69 @@ def _load_steps(path: Path) -> list[str]:
 
 def _step_exists(spec_dir: Path, step: str) -> bool:
     return any(spec_dir.glob(f"{step}_*.json"))
+
+
+def _extract_ids_from_spec(path: str) -> set[str]:
+    ids = set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return ids
+
+    def _crawl(data):
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if k == "id" and isinstance(v, str):
+                    for match in ID_MATCH_RE.findall(v):
+                        ids.add(match)
+                if isinstance(v, (dict, list)):
+                    _crawl(v)
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    _crawl(item)
+
+    _crawl(obj)
+    return ids
+
+
+def _check_semantic_coverage(repo_root: Path, changed_steps: set[str], base_ref: str) -> list[dict]:
+    errors = []
+    spec_dir = repo_root / "spec"
+    
+    for step in changed_steps:
+        for new_path in spec_dir.glob(f"{step}_*.json"):
+            rel_path = new_path.relative_to(repo_root).as_posix()
+                
+            cmd = ["git", "-C", str(repo_root), "show", f"{base_ref}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                stderr_lower = result.stderr.lower()
+                if "does not exist in" not in stderr_lower and "exists on disk, but not in" not in stderr_lower:
+                    errors.append({
+                        "type": "skip",
+                        "path": rel_path,
+                        "base_ref": base_ref
+                    })
+                continue
+                
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".json")
+            try:
+                with os.fdopen(tmp_fd, "w", encoding="utf-8") as tmp:
+                    tmp.write(result.stdout)
+                old_ids = _extract_ids_from_spec(tmp_path)
+            finally:
+                os.remove(tmp_path)
+                
+            new_ids = _extract_ids_from_spec(str(new_path))
+                
+            dropped = sorted(old_ids - new_ids)
+            if dropped:
+                errors.append({
+                    "type": "regression",
+                    "path": rel_path,
+                    "dropped_ids": dropped
+                })
+                
+    return errors

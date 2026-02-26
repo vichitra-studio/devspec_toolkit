@@ -58,6 +58,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - All cross-component integrations appear as connections with protocol/auth; event connections include reliability.
   - External systems are identified with clear boundaries and owners.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every `capability_id` from `spec/01_capabilities.json` is reflected in ≥1 component's `trace` or `links`, OR explicitly listed in `out_of_scope` with rationale.
+- No capability is left without an architectural home — every capability must be owned by a `component_id`.
+- All `owner` values on components resolve to owner enums defined in canonical registry or `spec/01_capabilities.json`.
+- All tech choices align with constraints in `docs/seed/seed_tech_stack.md`; no stack choice contradicts a seed constraint.
+- If any capability cannot be assigned to a component: add a gap question (Clarify mode) rather than omitting it.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

@@ -72,6 +72,15 @@ Use the `category` field to classify threats precisely:
 - [ ] Are `mitigations` structured objects with types, not just strings?
 - [ ] Are `edge_cases` structured with IDs?
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`, OR is explicitly listed in `out_of_scope` with rationale (low-risk internal-only endpoints).
+- Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
+- Every security-relevant `inv_id` in `spec/06_invariants.json` has a corresponding threat entry that tests its enforcement.
+- All `target_ids[*].id` values resolve to existing `api_id`, `component_id`, or `fr_id` values in their referenced spec files.
+- If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
+
 # Output Rules
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  Do not dump JSON in the chat thread; respond with a short confirmation that the artifact path was written and validation status.

@@ -53,6 +53,14 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Non-trivial capabilities include either pre/postconditions or error_states.
   - No duplicate or overlapping capabilities (glossary-normalized).
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every goal and success metric in `spec/00_charter.json` is addressed by ≥1 `capability_id`, OR explicitly listed in `out_of_scope` with rationale.
+- No charter goal is silently dropped — each must map to at least one named capability.
+- All `trace` entries reference IDs present in `spec/00_charter.json` (`goals[*].id`, `success_metrics[*].id`).
+- If any charter goal cannot be mapped to a capability: add a gap question (Clarify mode) rather than omitting it.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

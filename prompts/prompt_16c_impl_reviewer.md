@@ -226,6 +226,16 @@ For each `checklist[]` item:
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
 
+## Self-Audit Gate
+
+### Coverage Closure
+Before emitting, verify:
+- Every `checklist` item in `spec/impl_context/{step_id}.json` has a corresponding entry in `review.findings` with a verdict.
+- All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
+- Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
+- No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
+- If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
+
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
 - Schema File: schema/16_impl_context.schema.json

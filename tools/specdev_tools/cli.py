@@ -18,7 +18,16 @@ def _has_error_messages(messages: list[str]) -> bool:
     if _warnings_as_errors():
         return bool(messages)
     return any(not _is_warning_message(message) for message in messages)
-
+def _print_and_exit_if_errors(errs: list[str]) -> None:
+    if errs:
+        for e in errs:
+            print(e, file=sys.stderr)
+    if _has_error_messages(errs):
+        sys.exit(1)
+    if errs:
+        print("OK (warnings)")
+    else:
+        print("OK")
 
 
 def check_venv():
@@ -94,6 +103,11 @@ def main():
     hl.add_argument("--repo-root", default=".")
     hl.add_argument("--canon-dir", default="canon")
 
+    tc = sub.add_parser("traceability-check")
+    tc.add_argument("spec_dir")
+    tc.add_argument("--repo-root", default=".")
+    tc.add_argument("--json", action="store_true", help="Output results as JSON")
+
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
 
@@ -165,27 +179,13 @@ def main():
             if _has_error_messages(errs):
                 sys.exit(1)
         else:
-            if errs:
-                for e in errs: print(e, file=sys.stderr)
-            if _has_error_messages(errs):
-                sys.exit(1)
-            if errs:
-                print("OK (warnings)")
-            else:
-                print("OK")
+            _print_and_exit_if_errors(errs)
     elif args.cmd == "validate-all":
         from .validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = validate_dir(repo_root, spec_dir)
-        if errs:
-            for e in errs: print(e, file=sys.stderr)
-        if _has_error_messages(errs):
-            sys.exit(1)
-        if errs:
-            print("OK (warnings)")
-        else:
-            print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "matrix":
         from .matrix import build_trace_matrix
         repo_root = os.path.abspath(args.repo_root)
@@ -211,10 +211,7 @@ def main():
         from .fixtures_lint import lint_fixtures
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_fixtures(spec_dir)
-        if errs:
-            for e in errs: print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "invariants-check":
         from .invariants import run_invariants
         spec_dir = os.path.abspath(args.spec_dir)
@@ -226,20 +223,12 @@ def main():
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_seeds(repo_root, spec_dir)
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "docs-lint":
         from .docs_lint import lint_docs
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_docs(spec_dir)
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "prompt-sync":
         from .prompt_schema_sync import run_prompt_schema_sync
         repo_root = os.path.abspath(args.repo_root)
@@ -259,11 +248,7 @@ def main():
             print(f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}", file=sys.stderr)
             sys.exit(1)
         errs = run_prompt_schema_sync(repo_root)
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-lint":
         from .canonical_lint import lint_canon_dir
         repo_root = os.path.abspath(args.repo_root)
@@ -272,11 +257,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
         )
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-integrity":
         from .canonical_integrity import validate_canonical_integrity
         repo_root = os.path.abspath(args.repo_root)
@@ -287,15 +268,7 @@ def main():
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
         )
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-        if _has_error_messages(errs):
-            sys.exit(1)
-        if errs:
-            print("OK (warnings)")
-        else:
-            print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-autofix":
         from .canonical_autofix import canonical_autofix
         repo_root = os.path.abspath(args.repo_root)
@@ -346,11 +319,7 @@ def main():
         from .spec_quality_lint import lint_spec_quality
         spec_dir = os.path.abspath(args.spec_dir)
         errs = lint_spec_quality(spec_dir)
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "hallucination-lint":
         from .hallucination_lint import lint_hallucinations
         spec_dir = os.path.abspath(args.spec_dir)
@@ -365,20 +334,35 @@ def main():
             require_canon_dir=True,
             require_manifest_schema_registration=True,
         )
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
+    elif args.cmd == "traceability-check":
+        from .traceability_closure import check_traceability_closure
+        spec_dir = os.path.abspath(args.spec_dir)
+        repo_root = os.path.abspath(args.repo_root)
+        errs = check_traceability_closure(spec_dir, repo_root)
+        if getattr(args, "json", False):
+            output = []
+            if errs:
+                for e in errs:
+                    output.append(
+                        {
+                            "file": spec_dir,
+                            "error": e,
+                            "status": "WARN" if _is_warning_message(e) else "FAIL",
+                        }
+                    )
+            else:
+                output.append({"file": spec_dir, "status": "PASS"})
+            print(json.dumps(output, indent=2))
+            if _has_error_messages(errs):
+                sys.exit(1)
+        else:
+            _print_and_exit_if_errors(errs)
     elif args.cmd == "dependency-order-lint":
         from .dependency_order_lint import lint_dependency_order
         repo_root = os.path.abspath(args.repo_root)
         errs = lint_dependency_order(repo_root)
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "forward-replay-check":
         from .forward_replay_check import check_forward_replay
         from .validate import _resolve_replay_base_ref
@@ -389,11 +373,7 @@ def main():
             base_ref=base_ref,
             diff_error_mode=args.diff_error_mode,
         )
-        if errs:
-            for e in errs:
-                print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "governance-check":
         from .governance import check_commit_message
         spec_dir = os.path.abspath(args.spec_dir)
@@ -404,10 +384,7 @@ def main():
             except Exception:
                 pass
         errs = check_commit_message(spec_dir, msg)
-        if errs:
-            for e in errs: print(e, file=sys.stderr)
-            sys.exit(1)
-        print("OK")
+        _print_and_exit_if_errors(errs)
     elif args.cmd == "ai-help":
         if args.step:
             print(f"AI help for step {args.step}:")

@@ -52,6 +52,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Request/response schemas known or marked `-tbd` with plan; errors enumerated.
   - Security explicitly chosen and justified; owner set; traces to FRs/capabilities present.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every FR in `spec/04_functional_requirements.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
+- All `trace` entries on APIs reference valid `fr_id` values from `spec/04_functional_requirements.json`.
+- Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
+- All resource and action names align with `term_id` values from `spec/03_glossary.json`.
+- If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

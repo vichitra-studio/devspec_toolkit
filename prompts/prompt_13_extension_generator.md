@@ -52,6 +52,15 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - **Redefinition**: Creating `ext_02_api.json` that conflicts with `05_interface_contracts.json`.
 - **Ignoring Flow**: Extensions are for *deep* verticals (AI, Blockchain), not horizontal layers (Frontend, Backend).
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every complex domain identified in `spec/02_system_sketch.json` components (event sourcing, CQRS, multi-tenancy, etc.) has been evaluated for whether an extension spec is needed.
+- Every compliance/security constraint in `spec/07_nfrs.json` with `category: security` or `category: compliance` has been evaluated for extension need.
+- Each `extension_id` has a `justification` that references a specific `component_id` or `nfr_id` from upstream specs.
+- No identified architectural gap is silently dropped without explicit `out_of_scope` rationale.
+- If any domain complexity is unclear: add a gap question (Clarify mode) rather than generating a speculative extension.
+
 ## Negative Constraints
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
 

@@ -55,6 +55,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
   - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every constraint in `spec/04_functional_requirements.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR explicitly listed in `out_of_scope` with rationale.
+- Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
+- All `trace` entries reference valid `fr_id` or `api_id` values from Steps 04 or 05.
+- No business rule, security boundary, or data integrity constraint is silently omitted.
+- If any constraint cannot be expressed in the supported `language` formats: add a gap question (Clarify mode) rather than skipping it.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

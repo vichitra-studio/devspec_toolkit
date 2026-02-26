@@ -52,6 +52,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Secrets are names only; no values.
   - Compliance labels reflect real obligations (or explicitly none).
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
+- All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
+- No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
+- All environment names (`dev`, `ci`, `staging`, `prod`) align with canonical stage values.
+- If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

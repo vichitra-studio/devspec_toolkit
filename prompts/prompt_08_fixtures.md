@@ -55,6 +55,16 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Each high-priority FR has ≥1 fixture; negative fixtures exist for key errors; contract mode covers each public API.
   - Inputs/expected align with schemas; targets list correct IDs; tags present for CI gating where needed.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every FR acceptance criterion in `spec/04_functional_requirements.json` has ≥1 fixture with a matching `targets` entry referencing that `fr_id`.
+- Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
+- Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
+- Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
+- All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
+- If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

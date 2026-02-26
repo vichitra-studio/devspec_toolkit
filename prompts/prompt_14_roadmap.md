@@ -52,6 +52,17 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - Confirm that existing specs cover enough scope to justify a roadmap.
 - Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every upstream requirement referenced in "Context To Ingest" is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
+- No upstream capability, FR, or milestone ID is silently dropped.
+- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
+- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+
+**Extraction Mandate**:
+- Every FR ID from `04_functional_requirements.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
+
 ## Best Practices
 - **One Milestone = One User Story**: Every milestone must map individually to a specific user story. Do not bundle multiple stories into one vague milestone.
 - **Atomic Decomposition**: Each User Story must be broken down into specific, unambiguous, atomic sub-tasks.

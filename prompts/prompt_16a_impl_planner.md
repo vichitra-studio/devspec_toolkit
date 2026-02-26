@@ -234,6 +234,18 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 - Are there any ambiguous requirements that need resolution before coding?
 - Do we have existing tests we can extend, or must we create new ones?
 
+## Self-Audit Gate
+
+### Coverage Closure
+Before emitting, verify:
+- Every upstream requirement referenced in "Context To Ingest" is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
+- No upstream capability, FR, or milestone ID is silently dropped.
+- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
+- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+
+**Extraction Mandate**:
+- Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
+
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
 - Schema File: schema/16_impl_context.schema.json

@@ -50,6 +50,9 @@ def lint_hallucinations(
     known_command_prefixes = _load_command_prefixes(root)
     # D13: Build canonical term index for free-text scanning
     canonical_terms = _build_canonical_term_index(canon)
+    nfr_ids = _load_nfr_ids(spec_dir)
+    if nfr_ids is None:
+        errors.append("W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent")
     for path in _iter_json(spec_dir):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -61,6 +64,10 @@ def lint_hallucinations(
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_scan_node(rel, data, canon, known_command_prefixes))
         errors.extend(_check_free_text_terms(rel, data, canonical_terms))
+        errors.extend(_check_existing_structures_paths(rel, data, root))
+        errors.extend(_check_linked_test_expectations(rel, data, root))
+        if nfr_ids is not None:
+            errors.extend(_check_nfr_refs(rel, data, nfr_ids))
         _collect_ids_and_refs(data, rel, known_ids, refs)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
@@ -215,6 +222,72 @@ def _build_canonical_term_index(canon: CanonicalRegistry) -> dict[str, set[str]]
     return index
 
 
+_PATH_EXTENSIONS = (".py", ".ts", ".js", ".go", ".java", ".rb", ".sh", ".json")
+
+
+def _looks_like_path(s: str) -> bool:
+    return "/" in s or any(s.endswith(ext) for ext in _PATH_EXTENSIONS)
+
+
+def _collect_values_under_key(obj: Any, target_key: str) -> list[str]:
+    results: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == target_key and isinstance(v, str):
+                results.append(v)
+            elif k == target_key and isinstance(v, list):
+                for i in v:
+                    if isinstance(i, str):
+                        results.append(i)
+                    elif isinstance(i, dict) and "source_file" in i and isinstance(i["source_file"], str):
+                        results.append(i["source_file"])
+            else:
+                results.extend(_collect_values_under_key(v, target_key))
+    elif isinstance(obj, list):
+        for item in obj:
+            results.extend(_collect_values_under_key(item, target_key))
+    return results
+
+
+def _check_existing_structures_paths(rel: str, data: Any, repo_root: str) -> list[str]:
+    errs: list[str] = []
+    for path in _collect_values_under_key(data, "existing_structures"):
+        if _looks_like_path(path) and not os.path.exists(os.path.join(repo_root, path)):
+            errs.append(f"E530 EXISTING_STRUCTURE_PATH_NOT_FOUND {rel}:existing_structures path={path}")
+    return errs
+
+
+def _check_linked_test_expectations(rel: str, data: Any, repo_root: str) -> list[str]:
+    errs: list[str] = []
+    for path in _collect_values_under_key(data, "linked_test_expectation"):
+        if _looks_like_path(path) and not os.path.exists(os.path.join(repo_root, path)):
+            errs.append(f"E530 LINKED_TEST_FILE_NOT_FOUND {rel}:linked_test_expectation path={path}")
+    return errs
+
+
+def _load_nfr_ids(spec_dir: str) -> set[str] | None:
+    path = os.path.join(spec_dir, "07_nfrs.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return {n["id"] for n in data.get("nfrs", []) if isinstance(n, dict) and "id" in n}
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _check_nfr_refs(rel: str, data: Any, nfr_ids: set[str]) -> list[str]:
+    errs: list[str] = []
+    refs: list[str] = []
+    refs.extend(_collect_values_under_key(data, "nfr_refs"))
+    refs.extend(_collect_values_under_key(data, "nfr_ref"))
+    for ref in refs:
+        if ref not in nfr_ids:
+            errs.append(f"E530 UNRESOLVED_NFR_REF {rel} nfr_ref={ref}")
+    return errs
+
+
 def _check_free_text_terms(
     rel: str,
     obj: Any,
@@ -241,7 +314,7 @@ def _check_free_text_terms(
                 for term, cids in canonical_terms.items():
                     if term in text_lower:
                         errs.append(
-                            f"E540 UNBOUND_CANONICAL_TERM {rel}:{p} "
+                            f"E541 UNBOUND_CANONICAL_TERM {rel}:{p} "
                             f"mentions canonical term '{term}' "
                             f"(ids={sorted(cids)}) without a binding *_ref"
                         )

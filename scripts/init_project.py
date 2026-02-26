@@ -101,10 +101,32 @@ def get_git_root(path):
     except subprocess.CalledProcessError:
         return None
 
+def _find_seed_templates(toolkit_path, script_dir):
+    # Priority 1: direct (standard submodule checkout)
+    direct = os.path.join(toolkit_path, "seed_templates")
+    if os.path.isdir(direct):
+        return direct
+    # Priority 2: nested (repo has inner devspec_toolkit/ folder)
+    nested = os.path.join(toolkit_path, "devspec_toolkit", "seed_templates")
+    if os.path.isdir(nested):
+        return nested
+    # Priority 3: relative to script location (running from source)
+    source = os.path.abspath(os.path.join(script_dir, "..", "seed_templates"))
+    if os.path.isdir(source):
+        return source
+    return None
+
+def _get_toolkit_root(toolkit_path, script_dir):
+    seed_dir = _find_seed_templates(toolkit_path, script_dir)
+    if seed_dir:
+        return os.path.dirname(seed_dir)
+    return toolkit_path
+
 def main():
     parser = argparse.ArgumentParser(description="Initialize DevSpec Toolkit in a project")
     parser.add_argument("--target", default=".", help="Target project directory")
     parser.add_argument("--toolkit-url", default="https://github.com/vichitra-studio/devspec_toolkit.git", help="URL of the devspec_toolkit repo")
+    parser.add_argument("--toolkit-root", help="Explicit path to devspec_toolkit source directory")
     parser.add_argument("--strict", action="store_true", help="Enable strict governance (commit-msg hooks)")
     args = parser.parse_args()
 
@@ -125,8 +147,11 @@ def main():
         pass
 
     # 2. Add Submodule
-    toolkit_path = os.path.join(target_dir, "devspec_toolkit")
-    if os.path.exists(toolkit_path):
+    toolkit_path = os.path.abspath(args.toolkit_root) if args.toolkit_root else os.path.join(target_dir, "devspec_toolkit")
+    
+    if args.toolkit_root:
+        print(f"Using explicit toolkit root at {toolkit_path}. Skipping submodule add.")
+    elif os.path.exists(toolkit_path):
         print("devspec_toolkit directory already exists. Skipping submodule add.")
     else:
         print(f"Adding submodule from {args.toolkit_url}...")
@@ -138,6 +163,9 @@ def main():
             print("Please check the URL, your network connection, or if 'devspec_toolkit' matches .gitignore.")
             print("If a partial directory exists, try: rm -rf devspec_toolkit")
             sys.exit(1)
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    actual_toolkit_root = _get_toolkit_root(toolkit_path, script_dir)
 
     # 3. Init spec/ directory
     spec_dir = os.path.join(target_dir, "spec")
@@ -160,15 +188,8 @@ def main():
 
     seed_manifest_target = os.path.join(spec_common_dir, "seed_manifest.json")
     if not os.path.exists(seed_manifest_target):
-        # Try to copy the seed manifest from toolkit source
-        manifest_candidates = [
-            os.path.join(toolkit_path, "spec", "common", "seed_manifest.json"),
-            os.path.join(toolkit_path, "devspec_toolkit", "spec", "common", "seed_manifest.json"),
-        ]
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        manifest_candidates.append(os.path.abspath(os.path.join(script_dir, "..", "spec", "common", "seed_manifest.json")))
-        manifest_src = next((p for p in manifest_candidates if os.path.exists(p)), None)
-        if manifest_src:
+        manifest_src = os.path.join(actual_toolkit_root, "spec", "common", "seed_manifest.json")
+        if os.path.exists(manifest_src):
             print("Copying seed_manifest.json to spec/common/...")
             shutil.copy2(manifest_src, seed_manifest_target)
         else:
@@ -224,33 +245,11 @@ def main():
     else:
         print("Warning: ensure_venv.py template not found; skipping.")
     
-    # Check for seed templates in the *toolkit* inside the target, or assume we are running *from* a toolkit source?
-    # Strategy: We assume the script is valid, but where are the templates?
-    # If we just added the submodule, they are in `devspec_toolkit/seed_templates`
-    
-    toolkit_seed_src = os.path.join(toolkit_path, "devspec_toolkit", "seed_templates") 
-    # Note: the internal structure is devspec_toolkit/devspec_toolkit/seed_templates based on my `ls` earlier?
-    # Let's double check.
-    # Earlier I did `list_dir devspec_toolkit/devspec_toolkit`.
-    # And `seed_templates` was there.
-    # So if I submodule the *repo* into `devspec_toolkit`, the path is `target/devspec_toolkit/devspec_toolkit/seed_templates`?
-    # Let's checking `ls` output again usually submodule root matches repo root.
-    # My `ls` was `/Users/.../devspec_toolkit/devspec_toolkit`.
-    # This implies the repo name is one thing, and it has a subdir `devspec_toolkit`.
-    # If the user submodules the repo, they get the root.
-    # So `target/devspec_toolkit/devspec_toolkit/seed_templates` seems correct given the current workspace.
-    # WAIT. The workspace is `.../vc-code/devspec_toolkit`.
-    # Inside it is `devspec_toolkit` folder.
-    # And `README.md` is in `devspec_toolkit/devspec_toolkit/README.md`?
-    # No, Step 8 says `file:///Users/vichitracollective/vc-code/devspec_toolkit/devspec_toolkit/README.md`.
-    # And Step 4 `list_dir` of `.../devspec_toolkit/devspec_toolkit` showed README.
-    # So the repo has a top-level folder `devspec_toolkit`.
-    # So if I submodule it, `target/devspec_toolkit` will contain `devspec_toolkit`.
-    # So source is `target/devspec_toolkit/devspec_toolkit/seed_templates`.
-    
-    if os.path.exists(toolkit_seed_src):
-        for item in os.listdir(toolkit_seed_src):
-            s = os.path.join(toolkit_seed_src, item)
+    seed_templates_dir = _find_seed_templates(toolkit_path, script_dir)
+    if seed_templates_dir:
+        print(f"Found seed templates at {seed_templates_dir}")
+        for item in os.listdir(seed_templates_dir):
+            s = os.path.join(seed_templates_dir, item)
             d = os.path.join(docs_seed_dir, item)
             if os.path.isfile(s):
                 if not os.path.exists(d):
@@ -259,23 +258,17 @@ def main():
                 else:
                     print(f"Skipping {item} (already exists)")
     else:
-        # Fallback: maybe we are running *from* the toolkit source and not using the submodule copy?
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        fallback_src = os.path.abspath(os.path.join(script_dir, "..", "seed_templates"))
-        if os.path.exists(fallback_src):
-             for item in os.listdir(fallback_src):
-                s = os.path.join(fallback_src, item)
-                d = os.path.join(docs_seed_dir, item)
-                if os.path.isfile(s) and not os.path.exists(d):
-                    print(f"Copying {item} to docs/seed/ (from local source)...")
-                    shutil.copy2(s, d)
+        print("Warning: Seed templates not found. Could not copy seed templates to docs/seed/.")
+    
+    rel_toolkit_root = os.path.relpath(actual_toolkit_root, target_dir).replace("\\", "/")
     
     # 5. Hook setup (Pre-commit)
     pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
     if not os.path.exists(pre_commit_file):
         print("Creating .pre-commit-config.yaml...")
+        config_content = PRE_COMMIT_TEMPLATE.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
         with open(pre_commit_file, "w") as f:
-            f.write(PRE_COMMIT_TEMPLATE)
+            f.write(config_content)
         print("Note: You need to install pre-commit (pip install pre-commit) and run 'pre-commit install'")
     else:
         print(".pre-commit-config.yaml exists. Please manually ensure devspec hooks are configured.")
@@ -284,14 +277,14 @@ def main():
     venv_dir = os.path.join(target_dir, "dev_env")
     if not os.path.exists(venv_dir):
         print("Creating virtual environment 'dev_env'...")
-        run_cmd(["python3", "-m", "venv", "dev_env"], cwd=target_dir)
+        run_cmd([sys.executable, "-m", "venv", "dev_env"], cwd=target_dir)
         
         # Determine pip path (bin vs Scripts for cross-platform compatibility, though likely unix here)
         venv_bin = os.path.join(venv_dir, "bin")
         if sys.platform == "win32":
             venv_bin = os.path.join(venv_dir, "Scripts")
         
-        pip_cmd = os.path.join(venv_bin, "pip3")
+        pip_cmd = os.path.join(venv_bin, "pip")
 
         print("Upgrading pip...")
         run_cmd([pip_cmd, "install", "--upgrade", "pip"], cwd=target_dir)
@@ -300,14 +293,16 @@ def main():
         run_cmd([pip_cmd, "install", "pre-commit"], cwd=target_dir)
 
         print("Installing toolkit dependencies...")
-        # requirements.txt path relative to target -> devspec_toolkit/tools/requirements.txt
-        reqs_path = os.path.join(target_dir, "devspec_toolkit", "tools", "requirements.txt")
+        
+        # requirements.txt path relative to actual toolkit root
+        reqs_path = os.path.join(actual_toolkit_root, "tools", "requirements.txt")
         if os.path.exists(reqs_path):
              run_cmd([pip_cmd, "install", "-r", reqs_path], cwd=target_dir)
         
         # Install toolkit in editable mode
-        tools_path = os.path.join(target_dir, "devspec_toolkit", "tools")
-        run_cmd([pip_cmd, "install", "-e", tools_path], cwd=target_dir)
+        tools_path = os.path.join(actual_toolkit_root, "tools")
+        if os.path.exists(tools_path):
+            run_cmd([pip_cmd, "install", "-e", tools_path], cwd=target_dir)
 
     else:
         print("Virtual environment 'dev_env' already exists.")
@@ -338,7 +333,7 @@ def main():
                     print("Enabling governance check in pre-commit config...")
                     new_content = config_content.replace("#  - id: devspec-governance", "  - id: devspec-governance")
                     new_content = new_content.replace("#    name: DevSpec Governance Check", "    name: DevSpec Governance Check")
-                    new_content = new_content.replace("#    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message", "    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message")
+                    new_content = new_content.replace("#    entry: ./tools/run_specdev.sh", "    entry: ./tools/run_specdev.sh")
                     new_content = new_content.replace("#    language: python", "    language: system") # Ensure system language here too
                     new_content = new_content.replace("#    stages: [commit-msg]", "    stages: [commit-msg]")
                     with open(config_path, "w") as f:
@@ -354,8 +349,10 @@ def main():
     ci_file = os.path.join(workflows_dir, "spec_validation.yml")
     if not os.path.exists(ci_file):
         print("Creating CI workflow .github/workflows/spec_validation.yml...")
+        ci_content = CI_WORKFLOW_TEMPLATE.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
+        ci_content = ci_content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
         with open(ci_file, "w") as f:
-            f.write(CI_WORKFLOW_TEMPLATE)
+            f.write(ci_content)
     else:
         print("CI workflow already exists.")
 

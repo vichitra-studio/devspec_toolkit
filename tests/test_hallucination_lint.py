@@ -232,5 +232,92 @@ class HallucinationLintTests(unittest.TestCase):
             self.assertFalse(any("schema_uri_not_registered" in e for e in relaxed))
 
 
+    def test_existing_structures_missing_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"existing_structures": ["src/does_not_exist.py"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in errs))
+
+    def test_existing_structures_real_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "src").mkdir()
+            (root / "src" / "real_file.py").write_text("# exists", encoding="utf-8")
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"existing_structures": ["src/real_file.py"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertFalse(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in errs))
+
+    def test_existing_structures_object_path_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"existing_structures": [{"signature": "foo", "source_file": "src/does_not_exist.py"}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in errs))
+
+    def test_existing_structures_object_path_real(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "src").mkdir()
+            (root / "src" / "real_file.py").write_text("# exists", encoding="utf-8")
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"existing_structures": [{"signature": "foo", "source_file": "src/real_file.py"}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertFalse(any("EXISTING_STRUCTURE_PATH_NOT_FOUND" in e for e in errs))
+
+    def test_linked_test_expectation_missing_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"linked_test_expectation": "tests/missing_test.py"}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("LINKED_TEST_FILE_NOT_FOUND" in e for e in errs))
+
+    def test_nfr_refs_unresolved(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"id": "nfr-perf", "unit": "ms"}]}),
+                encoding="utf-8",
+            )
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"nfr_refs": ["nfr-perf", "nfr-invented"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(any("UNRESOLVED_NFR_REF" in e and "nfr-invented" in e for e in errs))
+            self.assertFalse(any("UNRESOLVED_NFR_REF" in e and "nfr-perf" in e for e in errs))
+
+    def test_nfr_refs_skipped_when_07_absent(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"nfr_refs": ["nfr-anything"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertFalse(any("UNRESOLVED_NFR_REF" in e for e in errs))
+
+
 if __name__ == "__main__":
     unittest.main()

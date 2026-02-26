@@ -175,6 +175,16 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
 3.  Do NOT modify `plan` outside `checklist[].implementation` evidence/status updates. Update `review` only when a checklist action explicitly targets review fields.
 
+## Self-Audit Gate
+
+### Coverage Closure
+Before emitting, verify:
+- Every `checklist` item in `spec/impl_context/{step_id}.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
+- All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
+- Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
+- No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
+- If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
+
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
 - Schema File: schema/16_impl_context.schema.json

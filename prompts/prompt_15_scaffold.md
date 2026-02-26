@@ -50,6 +50,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Route map includes all public APIs; paths/methods consistent with contracts.
   - Service skeleton sufficient to run a minimal service; validators listed.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every `api_id` in `spec/05_interface_contracts.json` has a corresponding entry in `route_map` with a matching `method` and `path`.
+- Every service `component_id` in `spec/02_system_sketch.json` has a scaffold module or directory represented in `service_skeleton`.
+- Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
+- All `api_ref` values in `route_map` resolve to valid `api_id` entries in `spec/05_interface_contracts.json`.
+- If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

@@ -162,6 +162,14 @@ Before emitting the Step 16 anchor artifact, verify:
 - [ ] If `plan.status` is `deferred`, `deferred_reason` is provided.
 - [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor.
 
+### Coverage Closure
+Before emitting, verify:
+- Every `milestone_id` from `spec/14_roadmap.json` that is in scope for this session has ≥1 `checklist` item in `plan.spec_alignment.checklist`.
+- All `spec_ref.id` values in the checklist resolve to IDs present in their referenced upstream spec files (`fr_id`, `api_id`, `inv_id`, `nfr_id`, `fixture_id`).
+- Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
+- No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
+- If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
+
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
 2. **Use specific test commands**, not vague placeholders (e.g., `pytest tests/auth/test_login.py::test_success`).

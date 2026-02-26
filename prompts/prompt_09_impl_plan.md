@@ -52,6 +52,15 @@ You are a senior specification author and validator. Your job is to emit a singl
   - `tech_stack` aligns with `01_capabilities.json`.
   - Dependencies listed for external teams/systems; plan aligns with governance/CI expectations.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every `capability_id` from `spec/01_capabilities.json` appears in ≥1 milestone's scope or deliverables, OR explicitly listed in `out_of_scope` with rationale.
+- All `component_id` values from `spec/02_system_sketch.json` are reflected in the `tech_stack` or architecture decisions.
+- Every charter constraint in `spec/00_charter.json` (`constraints`, `risks`) is addressed in milestones, risks, or migration plan.
+- All dependencies between milestones are explicit — no implicit ordering assumptions.
+- If any capability has unclear implementation path: add a gap question (Clarify mode) rather than deferring silently.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.

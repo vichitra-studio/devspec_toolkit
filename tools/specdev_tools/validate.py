@@ -210,6 +210,9 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
                 require_manifest_schema_registration=True,
             )
         )
+        from .traceability_closure import check_traceability_closure
+        tc_errors = check_traceability_closure(spec_dir, repo_root)
+        failures.extend(tc_errors)
 
     root = Path(os.path.abspath(repo_root))
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
@@ -226,6 +229,19 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
                 failures.extend(check_forward_replay(repo_root, base_ref=base_ref, diff_error_mode=mode))
     if (root / "schema").exists() and (root / "prompts").exists():
         failures.extend(run_prompt_schema_sync(repo_root))
+
+    # Honor SPECDEV_WARNINGS_AS_ERRORS for any W-coded traceability gaps,
+    # and deduplicate divergent error signals (duplicate reporting of gaps)
+    warn_as_error = os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
+    
+    if warn_as_error:
+        failures = [f.replace("W560", "E560", 1) if f.startswith("W560") else f for f in failures]
+        
+    failures = list(dict.fromkeys(failures))
+    
+    if not warn_as_error:
+        e560_bases = {f.replace("E560", "W560", 1) for f in failures if f.startswith("E560")}
+        failures = [f for f in failures if not (f.startswith("W560") and f in e560_bases)]
 
     return failures
 

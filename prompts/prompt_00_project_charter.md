@@ -56,6 +56,14 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Success metrics include unit+target+measurement_method (baseline where available) for ≥2 metrics.
   - Owner reflects accountability for charter maintenance.
 
+
+### Coverage Closure
+Before emitting, verify:
+- Every requirement stated in `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` is reflected in `goals`, `constraints`, `success_metrics`, or `user_segments`, OR explicitly listed in `out_of_scope` with rationale.
+- No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
+- All metric names and units in `success_metrics` align with terminology used in the seed documents.
+- If any seed statement is ambiguous or contradictory: add a gap question (Clarify mode) rather than making an assumption.
+
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
