@@ -1,0 +1,1986 @@
+
+ ▐▛███▜▌   Claude Code v2.1.59
+▝▜█████▛▘  Opus 4.6 · Claude Max
+  ▘▘ ▝▝    ~/vc-code/vc_wesbite/devspec_toolkit
+
+❯ study the repo and the purpose of the toolkit.                            
+  I want to iderstand how can I introduce automation of this toolkit using  
+  vanilla version of claude?                                                
+  I also want to understand how can I improve the speccing jounrey using    
+  claude feature.                                                           
+  think in terms of agents, skills, tooling etc.                            
+
+⏺ I'll study the repo thoroughly to understand its architecture, then analyze
+  automation opportunities with Claude. Let me explore in parallel.
+
+⏺ 3 Explore agents finished (ctrl+o to expand)
+   ├─ Explore repo structure deeply · 51 tool uses · 71.4k tokens
+   │  ⎿  Done
+   ├─ Study prompts and AI workflow · 35 tool uses · 64.9k tokens
+   │  ⎿  Done
+   └─ Study schema and validation system · 44 tool uses · 69.4k tokens
+      ⎿  Done
+
+❯ continur 
+
+⏺ Let me continue with the remaining explorations.
+
+⏺ Explore(Explore repo structure and prompts)
+  ⎿  Done (34 tool uses · 80.0k tokens · 2m 6s)
+  (ctrl+o to expand)
+
+⏺ Now I have a deep understanding of the toolkit. Let me synthesize everything
+  into a comprehensive analysis.
+
+  ---
+  DevSpec Toolkit: Automation & Improvement Strategy with Claude
+
+  What This Toolkit Is (TL;DR)
+
+  A 22-step waterfall pipeline (Steps 00→16c) that turns seed documents into
+  validated, traceable specs and implementation. Each step has:
+  - A JSON Schema defining the artifact shape
+  - A deterministic prompt (prompts/prompt_NN_*.md) that instructs AI
+  - A validation gate (schema + semantic linters)
+  - Traceability links to upstream/downstream artifacts
+
+  The AI workflow today is manual copy-paste: you read the prompt, feed it to an
+   AI, get JSON back, write to disk, run validation. The agent protocol
+  (docs/agents/manifest.json) defines a two-phase "Clarify → Emit" flow, but
+  nothing enforces it programmatically.
+
+  ---
+  Three Layers of Claude Automation
+
+  Layer 1: Claude Code as the Spec Runner (Today, Zero Code Changes)
+
+  You can use vanilla Claude Code right now as a spec-authoring agent:
+
+  ┌──────────────┬──────────────────────────────────────────────────────────┐
+  │  Capability  │                           How                            │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Read prompt  │ Claude reads                                             │
+  │ contracts    │ prompts/prompt_04_functional_requirements.md directly    │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Ingest seeds │ Claude reads spec/common/seed_manifest.json, then reads  │
+  │              │ each seed doc                                            │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Emit         │ Claude writes JSON directly to                           │
+  │ artifacts    │ spec/04_functional_requirements.json                     │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Validate     │ Claude runs ./tools/run_specdev.sh validate              │
+  │              │ spec/04_functional_requirements.json --repo-root .       │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Fix & retry  │ Claude reads validation errors, edits the artifact,      │
+  │              │ re-validates                                             │
+  ├──────────────┼──────────────────────────────────────────────────────────┤
+  │ Two-phase    │ You instruct Claude to follow the Clarify → Emit flow in │
+  │ protocol     │  its system prompt                                       │
+  └──────────────┴──────────────────────────────────────────────────────────┘
+
+  What's missing: orchestration. You'd manually say "now do step 04" then "now
+  do step 05". Each step is a separate conversation or requires manual
+  coordination.
+
+  Layer 2: Claude Code Skills + Hooks (Medium Effort, High Impact)
+
+  Build custom skills (slash commands) and hooks that automate the
+  orchestration:
+
+  Skills to build:
+
+  ┌─────────────────┬──────────┬────────────────────────────────────────────┐
+  │      Skill      │ Trigger  │                What It Does                │
+  ├─────────────────┼──────────┼────────────────────────────────────────────┤
+  │                 │ User     │ Reads prompt_NN, ingests seeds per         │
+  │ /spec-step <NN> │ invokes  │ manifest, follows Clarify→Emit, writes     │
+  │                 │          │ artifact, validates                        │
+  ├─────────────────┼──────────┼────────────────────────────────────────────┤
+  │                 │ User     │ Runs full validation ritual (validate →    │
+  │ /spec-validate  │ invokes  │ seed-lint → docs-lint → matrix →           │
+  │                 │          │ fixtures-lint)                             │
+  ├─────────────────┼──────────┼────────────────────────────────────────────┤
+  │ /spec-review    │ User     │ Runs 16c reviewer prompt against current   │
+  │                 │ invokes  │ impl_context                               │
+  ├─────────────────┼──────────┼────────────────────────────────────────────┤
+  │ /spec-status    │ User     │ Shows pipeline progress (which steps have  │
+  │                 │ invokes  │ artifacts, which are stale)                │
+  ├─────────────────┼──────────┼────────────────────────────────────────────┤
+  │ /spec-replay    │ User     │ Replays step NN and all downstream steps   │
+  │ <NN>            │ invokes  │ after an upstream change                   │
+  └─────────────────┴──────────┴────────────────────────────────────────────┘
+
+  Hooks to build (.claude/hooks/):
+
+  ┌──────────────────┬────────────────┬─────────────────────────────────────┐
+  │       Hook       │    Trigger     │               Purpose               │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ post-write on    │ After any spec │ Auto-run validate +                 │
+  │ spec/*.json      │  file write    │ canonical-integrity on the written  │
+  │                  │                │ file                                │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ pre-commit       │ Before git     │ Run governance-check on commit      │
+  │                  │ commit         │ message                             │
+  ├──────────────────┼────────────────┼─────────────────────────────────────┤
+  │ post-edit on     │ After spec     │ Run seed-lint to verify seed_refs   │
+  │ spec/*.json      │ edit           │ still valid                         │
+  └──────────────────┴────────────────┴─────────────────────────────────────┘
+
+  CLAUDE.md additions — encode the agent protocol directly:
+
+  ## Spec Authoring Protocol
+  When asked to work on a spec step:
+  1. Read `spec/common/seed_manifest.json` first
+  2. Read the step's prompt from `prompts/prompt_NN_*.md`
+  3. Ingest all seeds listed in `step_requirements[NN]`
+  4. Apply Self-Audit Gate: if confidence < 0.9, output bulleted questions ONLY
+  5. When ready, write JSON to `spec/NN_name.json` (not fenced output)
+  6. Run: `./tools/run_specdev.sh validate spec/NN_name.json --repo-root .`
+  7. If validation fails, fix and re-validate (max 3 attempts)
+  8. Run: `./tools/run_specdev.sh seed-lint spec --repo-root .`
+
+  Layer 3: Multi-Agent Pipeline with Claude Agent SDK (High Effort, Maximum 
+  Automation)
+
+  Build a purpose-built agent system using the Claude Agent SDK:
+
+  Orchestrator Agent
+  ├── Discovery Agent (Steps 00-12)
+  │   ├── Charter Agent (Step 00)
+  │   ├── Capabilities Agent (Step 01)
+  │   ├── ...per-step specialist agents
+  │   └── CI Gates Agent (Step 12)
+  ├── Implementation Agent (Steps 13-16c)
+  │   ├── Planner Agent (16a)
+  │   ├── Coder Agent (16b)  ← Trinity Loop
+  │   └── Reviewer Agent (16c)
+  └── Validation Agent (cross-cutting)
+      ├── Schema Validator
+      ├── Canonical Integrity Checker
+      ├── Hallucination Detector
+      └── Traceability Closer
+
+  Each agent would:
+  - Have tools scoped to its step (read prompts, write artifacts, run CLI
+  commands)
+  - Follow the two-phase protocol enforced programmatically (not by prompt
+  alone)
+  - Pass structured handoff context to the next agent (not conversation history)
+  - Have retry logic with escalation after 2 failures
+
+  ---
+  Specific Claude Features to Leverage
+
+  ┌────────────────────┬────────────────────────────────────────────────────┐
+  │      Feature       │                    Application                     │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Extended thinking  │ Self-Audit Gate scoring — let Claude reason about  │
+  │                    │ confidence before emitting                         │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Tool use           │ Bind run_specdev.sh commands as tools; Claude      │
+  │                    │ calls validate/lint natively                       │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ System prompts     │ Embed the agent protocol from                      │
+  │                    │ docs/agents/agents.md as system instructions       │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Multi-turn         │ The Clarify → Emit loop maps naturally to          │
+  │ conversations      │ multi-turn: ask questions, get answers, then emit  │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Prompt caching     │ Cache the seed documents + upstream specs (they    │
+  │                    │ don't change within a step)                        │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Claude Code hooks  │ Auto-validate on every spec write; auto-lint on    │
+  │                    │ commit                                             │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ Claude Code slash  │ /spec-step 04 to run a full step with all protocol │
+  │ commands           │  enforcement                                       │
+  ├────────────────────┼────────────────────────────────────────────────────┤
+  │ MCP servers        │ Build an MCP server that exposes the specdev CLI   │
+  │                    │ as structured tools                                │
+  └────────────────────┴────────────────────────────────────────────────────┘
+
+  ---
+  Recommended Starting Point
+
+  Start with Layer 2 — it gives you 80% of the value with 20% of the effort:
+
+  1. Add the agent protocol to CLAUDE.md — Claude Code will follow it
+  automatically
+  2. Create a /spec-step skill that orchestrates: read prompt → ingest seeds →
+  clarify/emit → validate → report
+  3. Add a post-write hook that auto-validates any spec JSON you write
+  4. Use Task tool parallelism — run validation commands in parallel (validate +
+   seed-lint + canonical-integrity are independent)
+
+  Want me to build any of these? I can start with the CLAUDE.md agent protocol
+  additions, a custom skill, or the hook configuration.
+
+✻ Brewed for 3m 0s
+
+❯ read prompt → ingest seeds → clarify/emit → validate → report             
+  This doesnt have a review which reviews that all system requirements are  
+  captured, if all the requires info from seed docs and upstream specs got  
+  distilled for the required step.                                          
+
+⏺ You're right — there's a critical completeness review gap between "emit" and
+  "validate". The current flow blindly validates schema conformance but never
+  checks:
+
+  1. Did the artifact actually capture everything from the seeds?
+  2. Are all upstream spec requirements distilled into this step?
+  3. Were any seed requirements silently dropped?
+
+  Let me study how the toolkit's existing coverage checks work to understand
+  what's already built vs what's missing.
+
+⏺ Explore(Study coverage and completeness checks)
+  ⎿  Done (24 tool uses · 92.7k tokens · 1m 29s)
+  (ctrl+o to expand)
+
+⏺ This confirms exactly what you're pointing out. Here's the gap analysis:
+
+  ---
+  The Missing Review Phase
+
+  The current pipeline has structural validation but no semantic completeness 
+  review. Here's what falls through:
+
+  What's validated today (structural)
+
+  - Schema conformance
+  - IDs exist and resolve (forward-chain only)
+  - No placeholder tokens (TBD/TODO)
+  - Canonical terms aren't invented
+  - Forward traceability: Charter → Capabilities → FRs → APIs → Fixtures
+
+  What's NOT validated (semantic — your point)
+
+  ┌──────────────────────┬──────────────────────────────────────────────────┐
+  │         Gap          │                     Example                      │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Seed requirement     │ Seed says "must support SSO" — no FR mentions    │
+  │ dropped              │ SSO, no error raised                             │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Upstream goal        │ Charter goal has 3 aspects, FR covers 1, traces  │
+  │ partially covered    │ to the goal — closure check passes               │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Extraction intent    │ step_order.json says "extract constraints for    │
+  │ not fulfilled        │ invariants" — step 06 ignores half of them       │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Reverse traceability │ API exists with no backing FR — nobody asked for │
+  │                      │  it (scope creep)                                │
+  ├──────────────────────┼──────────────────────────────────────────────────┤
+  │ Capability → FR      │ Capability says "real-time notifications" but    │
+  │ mapping quality      │ mapped FR says "email notifications"             │
+  └──────────────────────┴──────────────────────────────────────────────────┘
+
+  The Corrected Flow
+
+  Instead of:
+
+  read prompt → ingest seeds → clarify/emit → validate → report
+
+  It should be:
+
+  read prompt → ingest seeds → clarify/emit → REVIEW → validate → report
+                                                 │
+                                      ┌──────────┴──────────┐
+                                      │   Completeness       │
+                                      │   Review Gate        │
+                                      ├─────────────────────┤
+                                      │ 1. Upstream coverage │  ← every upstream
+   ID consumed or explicitly excluded
+                                      │ 2. Seed distillation │  ← every seed
+  requirement reflected in output
+                                      │ 3. Extraction audit  │  ←
+  extraction_intent from step_order fulfilled
+                                      │ 4. Reverse trace     │  ← nothing in
+  output lacks upstream justification
+                                      │ 5. Semantic fidelity │  ← meaning
+  preserved, not just ID linked
+                                      └─────────────────────┘
+
+  What This Review Phase Would Need
+
+  Inputs:
+  - The emitted artifact (just written to disk)
+  - All upstream specs declared in step_order.json → required_spec_inputs
+  - All seeds declared in seed_manifest.json → step_requirements[NN]
+  - The extraction_intent for this step (from step_order.json)
+  - The prompt's Coverage Closure checklist
+
+  Checks (5 dimensions):
+
+  1. Upstream ID Coverage — For every ID in upstream specs that this step should
+   consume: is it traced, or explicitly out-of-scope with rationale?
+  2. Seed Distillation — For every requirement/constraint/persona in the seed
+  docs: does some element in the output reflect it? (This is the hardest —
+  requires semantic comparison, not just ID matching.)
+  3. Extraction Intent Fulfillment — The extraction_intent in step_order.json
+  says things like "Extract goals and constraints for FR rationale." Did the
+  artifact actually extract those?
+  4. Reverse Traceability — Every element in the output should trace back to
+  something upstream. If an FR exists with no trace to any capability or charter
+   goal, it's either scope creep or a missing trace.
+  5. Semantic Fidelity — The meaning was preserved through distillation. A
+  charter goal about "sub-200ms response times" shouldn't become an NFR about
+  "fast responses."
+
+  How Claude Fits In
+
+  Checks 1 and 4 are automatable (ID comparison). Checks 2, 3, and 5 are
+  semantic — this is where Claude adds unique value. No lint tool can verify
+  that "must support SSO" from a seed doc was faithfully distilled into
+  fr-sso-oauth. But Claude can read both documents and make that judgment.
+
+  This suggests a hybrid review:
+
+  ┌────────────────────────────┬────────────────────────────────────────────┐
+  │           Check            │                   Method                   │
+  ├────────────────────────────┼────────────────────────────────────────────┤
+  │ Upstream ID coverage       │ Automated (extend traceability_closure.py) │
+  ├────────────────────────────┼────────────────────────────────────────────┤
+  │ Reverse traceability       │ Automated (extend matrix.py)               │
+  ├────────────────────────────┼────────────────────────────────────────────┤
+  │ Seed distillation          │ Claude-powered semantic comparison         │
+  ├────────────────────────────┼────────────────────────────────────────────┤
+  │ Extraction intent          │ Claude-powered against step_order.json     │
+  │ fulfillment                │ intents                                    │
+  ├────────────────────────────┼────────────────────────────────────────────┤
+  │ Semantic fidelity          │ Claude-powered meaning preservation check  │
+  └────────────────────────────┴────────────────────────────────────────────┘
+
+  ---
+  Want me to design the concrete implementation plan for this review phase? I
+  can spec out:
+  - The automated checks (new CLI commands or extensions to existing ones)
+  - The Claude-powered review prompt/skill
+  - How it integrates into the /spec-step flow
+  - The schema for the review output artifact
+
+✻ Crunched for 2m 15s
+
+❯ Also, the specs themselves become huge JSONs.                             
+  how do I optimise these?                                                  
+                                                                            
+  i have seen charter capability specs that reached 1500 lines. And that    
+  itself will more than 30k tokens.                                         
+                                                                            
+  How do I optimise the workflow to work with huge specs, specially when    
+  multiple specs might be needed to be read at a given time.                
+
+⏺ This is a real scaling problem. Let me study the actual spec sizes and the
+  extraction patterns to give you concrete optimization strategies.
+
+⏺ Explore(Analyze spec sizes and extraction patterns)
+  ⎿  Done (29 tool uses · 64.5k tokens · 10m 10s)
+  (ctrl+o to expand)
+
+⏺ Excellent data. Now I can give you a complete answer on both the token problem
+   and the architectural solutions.
+
+  ---
+  The Token Problem: Quantified
+
+  For a typical project with 10 FRs, 5 APIs, decent charter:
+
+  ┌─────────────┬──────────────────────┬────────────┬──────────────┬───────┐
+  │             │   Upstream specs     │  Tokens    │   Tokens     │       │
+  │    Step     │        needed        │  ingested  │  actually    │ Waste │
+  │             │                      │            │     used     │       │
+  ├─────────────┼──────────────────────┼────────────┼──────────────┼───────┤
+  │             │ Charter +            │            │              │       │
+  │ 04 (FRs)    │ Capabilities +       │ ~5,000     │ ~1,200       │ 76%   │
+  │             │ Glossary             │            │              │       │
+  ├─────────────┼──────────────────────┼────────────┼──────────────┼───────┤
+  │ 09 (Impl    │ 6 specs              │ ~10,000    │ ~3,000       │ 70%   │
+  │ Plan)       │                      │            │              │       │
+  ├─────────────┼──────────────────────┼────────────┼──────────────┼───────┤
+  │ 16a         │ 5 specs + roadmap    │ ~15,000    │ ~4,000       │ 73%   │
+  │ (Planner)   │                      │            │              │       │
+  └─────────────┴──────────────────────┴────────────┴──────────────┴───────┘
+
+  And that's per step. Across a full pipeline: ~59k tokens ingested, ~19k
+  actually needed. 40k tokens wasted.
+
+  The root cause: extraction_intent in step_order.json tells you exactly which
+  fields each step needs — but nothing enforces it. The AI reads entire
+  1500-line specs when it needs 3 fields.
+
+  ---
+  Three-Layer Optimization Strategy
+
+  Layer 1: Spec Projection (Mechanical — biggest win)
+
+  Build a specdev project command that slices specs before they reach Claude:
+
+  step_order.json says step 04 needs from charter:
+    "Extract goals and constraints for FR rationale"
+                      ↓
+  Project charter to only { goals, constraints, in_scope, out_of_scope }
+                      ↓
+  Feed 700 tokens instead of 3,400
+
+  How it works:
+
+  extraction_intent (natural language)
+          ↓
+  field_map.json (new file, machine-readable)
+          ↓
+  specdev project --for-step 04 --output /tmp/context/
+          ↓
+  Projected specs written to temp dir
+          ↓
+  Claude ingests projected specs only
+
+  The new field_map.json would formalize extraction intent:
+
+  {
+    "04": {
+      "00_charter.json": ["goals", "constraints", "in_scope", "out_of_scope"],
+      "01_capabilities.json": ["capabilities[].capability_id",
+  "capabilities[].scope"],
+      "03_glossary.json": ["terms[].term", "terms[].definition"]
+    },
+    "09": {
+      "00_charter.json": ["goals", "constraints", "risks"],
+      "01_capabilities.json": ["capabilities[].capability_id",
+  "capabilities[].approved_tech"],
+      "04_functional_requirements.json": ["functional_requirements[].fr_id",
+  "functional_requirements[].statement",
+  "functional_requirements[].acceptance_criteria"]
+    }
+  }
+
+  Impact: 60-75% token reduction per step.
+
+  Layer 2: Tiered Ingestion (Architectural)
+
+  Not all context is needed at the same depth. Structure ingestion in tiers:
+
+  Tier 0 — IDs only          (~5% of tokens)
+    Just the IDs and names from upstream specs.
+    Used for: traceability binding, reference validation
+
+  Tier 1 — Summaries          (~15% of tokens)
+    IDs + one-line statements/descriptions.
+    Used for: FR-to-capability mapping, scope checking
+
+  Tier 2 — Projected fields   (~30% of tokens)
+    Fields specified by extraction_intent.
+    Used for: actual spec authoring
+
+  Tier 3 — Full spec          (~100% of tokens)
+    Complete JSON.
+    Used for: ONLY when reviewing/auditing completeness
+
+  How Claude uses tiers in practice:
+
+  /spec-step 04
+
+  1. Load Tier 0 of all upstream specs (IDs only)     → ~500 tokens
+  2. Load Tier 2 of required specs (projected fields)  → ~1,200 tokens
+  3. Load seeds in full (they're small prose docs)      → ~800 tokens
+  4. Load the prompt contract                           → ~2,000 tokens
+                                                         ─────────────
+                                                Total:    ~4,500 tokens
+
+  vs. today: ~12,000+ tokens
+
+  Tier 3 (full spec) is reserved only for the review phase — when Claude needs
+  to verify nothing was dropped. And even then, it can be done one spec at a
+  time rather than all at once.
+
+  Layer 3: Index-First Architecture (Long-term)
+
+  Build a spec index that Claude queries on demand instead of loading everything
+   upfront:
+
+  spec_index.json (auto-generated, lightweight)
+  ├── ids: { "fr-user-login": { step: "04", line: 42, statement: "..." } }
+  ├── traces: { "fr-user-login" → ["cap-auth", "goal-secure-access"] }
+  ├── coverage: { "cap-auth" → ["fr-user-login", "fr-sso-oauth"] }
+  └── canonicals: { "cn:action:create" → ["fr-user-login", "api-session-create"]
+   }
+
+  Claude reads the index (~2k tokens), identifies what it needs, then reads only
+   the specific sections using line offsets. This is how the Read tool already
+  works — you can read specific line ranges.
+
+  ---
+  Revised Flow With Review Phase + Token Optimization
+
+  ┌─────────────────────────────────────────────────────┐
+  │                  /spec-step <NN>                     │
+  ├─────────────────────────────────────────────────────┤
+  │                                                      │
+  │  1. PREPARE CONTEXT                                  │
+  │     ├─ Read step_order.json → get dependencies       │
+  │     ├─ Run: specdev project --for-step NN            │
+  │     │   → Tier 2 projected specs to /tmp/context/    │
+  │     ├─ Read seed_manifest → load required seeds      │
+  │     └─ Read prompt_NN_*.md                           │
+  │                                        ~4,500 tokens │
+  │                                                      │
+  │  2. CLARIFY (if needed)                              │
+  │     ├─ Apply Self-Audit Gate on projected context     │
+  │     ├─ If confidence < 0.9 → bulleted questions only │
+  │     └─ Wait for answers before proceeding            │
+  │                                                      │
+  │  3. EMIT                                             │
+  │     ├─ Write artifact to spec/NN_name.json           │
+  │     └─ Populate seed_refs from actually-used seeds   │
+  │                                                      │
+  │  4. REVIEW  ← NEW PHASE                              │
+  │     │                                                │
+  │     │  4a. Structural (automated, no extra tokens)   │
+  │     │  ├─ validate (schema conformance)              │
+  │     │  ├─ seed-lint                                  │
+  │     │  ├─ canonical-integrity                        │
+  │     │  └─ hallucination-lint                         │
+  │     │                                                │
+  │     │  4b. Completeness (Claude, Tier 0 context)     │
+  │     │  ├─ Load ONLY Tier 0 (IDs) of upstream specs   │
+  │     │  ├─ Load the emitted artifact                  │
+  │     │  ├─ Check: every upstream ID traced or scoped  │
+  │     │  ├─ Check: no output element lacks upstream    │
+  │     │  │         justification (reverse trace)       │
+  │     │  └─ Report: { covered: [], dropped: [],        │
+  │     │              unjustified: [] }                  │
+  │     │                                    ~2k tokens  │
+  │     │                                                │
+  │     │  4c. Semantic (Claude, targeted Tier 3)        │
+  │     │  ├─ For each "dropped" ID from 4b:             │
+  │     │  │   Load ONLY that section from upstream spec │
+  │     │  │   (Read tool with line offset)              │
+  │     │  ├─ Verify: was it intentionally excluded?     │
+  │     │  ├─ For each "unjustified" element:            │
+  │     │  │   Is it scope creep or missing trace?       │
+  │     │  └─ Check extraction_intent fulfillment        │
+  │     │                          ~500 tokens per issue │
+  │     │                                                │
+  │     │  4d. Verdict                                   │
+  │     │  ├─ PASS: all upstream consumed, no creep      │
+  │     │  ├─ WARN: minor gaps, auto-fixable             │
+  │     │  └─ FAIL: requirements dropped, needs re-emit  │
+  │     │                                                │
+  │  5. REPORT                                           │
+  │     └─ Summary: what was emitted, review verdict,    │
+  │        validation results, next step ready            │
+  └─────────────────────────────────────────────────────┘
+
+  Key insight: The review phase (step 4) uses progressive loading — start with
+  IDs only (Tier 0), then selectively load full sections only for flagged
+  issues. This keeps the review under ~3k additional tokens instead of
+  re-reading all upstream specs at full depth.
+
+  ---
+  Token Budget Per Step (Optimized)
+
+  ┌─────────────────────────────┬─────────┬─────────────────────────────────┐
+  │            Phase            │ Tokens  │              What               │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Context prep                │ ~4,500  │ Projected specs + seeds +       │
+  │                             │         │ prompt                          │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Clarify/Emit                │ ~2,000  │ AI reasoning + output           │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Review (structural)         │ 0       │ CLI commands, no LLM tokens     │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Review (completeness)       │ ~2,000  │ Tier 0 IDs + emitted artifact   │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Review (semantic, if        │ ~1,500  │ Targeted reads for flagged      │
+  │ needed)                     │         │ items                           │
+  ├─────────────────────────────┼─────────┼─────────────────────────────────┤
+  │ Total                       │ ~10,000 │ vs. ~30,000+ today              │
+  └─────────────────────────────┴─────────┴─────────────────────────────────┘
+
+  ---
+  Concrete Build Order
+
+  1. field_map.json — Formalize extraction_intent into machine-readable field
+  paths (manual, 2 hours)
+  2. specdev project CLI command — Slice specs by field_map (code, 4 hours)
+  3. specdev index CLI command — Generate Tier 0 index from all specs (code, 3
+  hours)
+  4. Review prompt template — Claude-powered completeness check using Tier 0 +
+  targeted reads (prompt, 2 hours)
+  5. /spec-step skill — Orchestrate the full flow above (Claude Code skill, 3
+  hours)
+
+  Want me to start building any of these?
+
+✻ Worked for 2m 35s
+
+❯ what step_order.json?                                                     
+                                                                            
+  I also built this python utility to work with                             
+  json/Users/vichitracollective/vc-code/devspec_toolkit/devspec_toolkit/too 
+  ls/thirdparty/opencode/tools/json_utils.py                                
+
+⏺ Read 2 files (ctrl+o to expand)
+
+⏺ Good — now I see the full picture. Two important corrections to my earlier
+  analysis:
+
+  Correction: step_order.json
+
+  step_order.json does have extraction_intent — but it's natural language only.
+  There are no field paths. For example:
+
+  "04": {
+    "extraction_intent": {
+      "00_charter.json": "Extract goals and constraints for FR rationale",
+      "01_capabilities.json": "Extract capability IDs to map each to one or more
+   FRs"
+    }
+  }
+
+  This tells a human/AI what to look for, but there's no ["goals", 
+  "constraints"] field-path mapping. So the projection idea needs an
+  intermediate step: turning these intents into concrete jq paths.
+
+  Your json_utils.py — This Is the Foundation
+
+  You've already built the right primitives. Here's what matters:
+
+  ┌───────────────────┬───────────────────────────┬────────────────────────┐
+  │      Command      │       What it does        │   How it helps with    │
+  │                   │                           │      large specs       │
+  ├───────────────────┼───────────────────────────┼────────────────────────┤
+  │                   │ Targeted jq read — blocks │ Forces agents to read  │
+  │ read file .goals  │  full . reads (line       │ only what they need    │
+  │                   │ 136-138)                  │                        │
+  ├───────────────────┼───────────────────────────┼────────────────────────┤
+  │ keys file .       │ List top-level keys       │ Agent sees the shape,  │
+  │                   │ without loading values    │ picks what to read     │
+  ├───────────────────┼───────────────────────────┼────────────────────────┤
+  │                   │ Visual tree with types    │ Agent understands      │
+  │ structure file .  │ and array counts          │ 1500-line spec in ~50  │
+  │                   │                           │ tokens                 │
+  ├───────────────────┼───────────────────────────┼────────────────────────┤
+  │ schema file       │ Schema-aware field        │ Agent knows what       │
+  │ .capabilities     │ discovery                 │ fields exist before    │
+  │                   │                           │ reading                │
+  └───────────────────┴───────────────────────────┴────────────────────────┘
+
+  The key design decision on line 136 is critical:
+  if jq_filter == ".":
+      print("Error: Full JSON reads are not allowed because they are 
+  inefficient.")
+
+  You've already enforced the discipline — no full-file reads. But nothing 
+  connects extraction_intent to this tool so that Claude automatically knows
+  which paths to read.
+
+  The Real Optimization: Connect extraction_intent → json_utils
+
+  Here's what the flow should look like with your existing tools:
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  /spec-step 04                                          │
+  ├─────────────────────────────────────────────────────────┤
+  │                                                         │
+  │  1. ORIENT (minimal tokens)                             │
+  │     ├─ Read step_order.json → get step 04 metadata      │
+  │     │  required_spec_inputs: [charter, capabilities,    │
+  │     │                         glossary]                 │
+  │     │  extraction_intent: { charter: "goals+constraints",│
+  │     │                       capabilities: "capability IDs"}│
+  │     │                                                   │
+  │     ├─ For each upstream spec:                          │
+  │     │   json_utils structure spec/00_charter.json       │
+  │     │   → See shape in ~30 tokens (not 1500 lines)     │
+  │     │                                                   │
+  │     └─ json_utils schema spec/00_charter.json .         │
+  │        → Know what fields exist from schema             │
+  │                                                         │
+  │  2. EXTRACT (targeted reads only)                       │
+  │     ├─ json_utils read spec/00_charter.json .goals      │
+  │     ├─ json_utils read spec/00_charter.json .constraints│
+  │     ├─ json_utils read spec/00_charter.json .in_scope   │
+  │     ├─ json_utils read spec/01_capabilities.json        │
+  │     │    '.capabilities[].capability_id'                │
+  │     ├─ json_utils read spec/01_capabilities.json        │
+  │     │    '.capabilities[].scope'                        │
+  │     └─ json_utils read spec/03_glossary.json            │
+  │          '.terms[] | {term, definition}'                │
+  │                                                         │
+  │     → Total: ~700 tokens instead of ~5,000              │
+  │                                                         │
+  │  3. CLARIFY / EMIT (as before)                          │
+  │                                                         │
+  │  4. REVIEW (progressive reads)                          │
+  │     ├─ json_utils keys on emitted artifact              │
+  │     │   → verify all expected sections exist            │
+  │     ├─ json_utils read emitted artifact                 │
+  │     │    '.functional_requirements[].trace'             │
+  │     │   → verify every FR traces to upstream            │
+  │     ├─ For any gaps found:                              │
+  │     │   json_utils read upstream spec at specific path  │
+  │     │   → targeted deep-read only for flagged items     │
+  │     └─ Automated: validate + seed-lint + canonical-lint │
+  │                                                         │
+  │  5. REPORT                                              │
+  └─────────────────────────────────────────────────────────┘
+
+  What's Missing: The Glue
+
+  You have the bottom layer (json_utils) and the top layer (step_order.json with
+   extraction_intent). What's missing is the glue that connects them. Three
+  options:
+
+  Option A: Formalize extraction_intent into jq paths (new file)
+
+  Add a tools/extraction_paths.json:
+
+  {
+    "04": {
+      "00_charter.json": [
+        ".goals",
+        ".constraints",
+        ".in_scope",
+        ".out_of_scope"
+      ],
+      "01_capabilities.json": [
+        ".capabilities[] | {capability_id, scope, owner}"
+      ],
+      "03_glossary.json": [
+        ".terms[] | {term, definition}"
+      ]
+    }
+  }
+
+  Then json_utils gets a new command:
+
+  json_utils extract-for-step spec/ --step 04 --paths-file extraction_paths.json
+  # Outputs all needed context, nothing more
+
+  Option B: Let Claude resolve intents at runtime (zero code changes)
+
+  Encode this in CLAUDE.md or a skill prompt:
+
+  When working on step NN:
+  1. Read step_order.json → step_metadata[NN].extraction_intent
+  2. For each upstream spec, run: json_utils structure <file>
+  3. Based on extraction_intent + structure, determine which jq paths to read
+  4. Use json_utils read <file> <path> for each — NEVER read full files
+  5. Use json_utils patch/insert to write to output — NEVER write full files
+
+  This is cheaper to implement but relies on Claude making good path choices
+  every time.
+
+  Option C: Hybrid — Claude resolves once, cache the paths
+
+  First run: Claude reads extraction_intent + schema, produces the jq paths,
+  saves to extraction_paths.json. Subsequent runs: use the cached paths
+  directly. Best of both worlds.
+
+  ---
+  For the Review Phase Specifically
+
+  Your json_utils makes the review phase token-cheap:
+
+  REVIEW: Did step 04 capture everything from charter?
+
+  1. json_utils read spec/00_charter.json '.goals[].goal_id'
+     → ["goal-auth", "goal-perf", "goal-a11y"]           ~20 tokens
+
+  2. json_utils read spec/04_fr_list.json
+       '.functional_requirements[].trace[] | select(.type=="goal") | .id'
+     → ["goal-auth", "goal-perf"]                         ~15 tokens
+
+  3. Diff: goal-a11y is in charter but not traced by any FR
+     → REVIEW FINDING: dropped requirement
+
+  Total review cost: ~50 tokens of jq reads + Claude reasoning
+  vs. reading both full files: ~6,000 tokens
+
+  Which direction do you want to go — A (formalize extraction paths), B (Claude
+  resolves at runtime), or C (hybrid)?
+
+✻ Sautéed for 50s
+
+❯ The more dowstream we go, we would need very specific field. Like         
+  capabilities[4], nfr[10], fr[1]                                           
+                                                                            
+  And not just read whole arrays of capabilities, nfr, fr.                  
+                                                                            
+  How will we handle this super sliced extraction?                          
+
+⏺ You're describing the real problem. By step 16a, you don't need "all FRs" —
+  you need fr[3] and fr[7] because those are the ones tied to the current
+  milestone's tasks. The extraction is graph-driven, not field-driven.
+
+  Let me trace how this actually works through the pipeline.
+
+⏺ Read 2 files (ctrl+o to expand)
+
+⏺ Now I see the full picture. The trace matrix already builds the graph — it
+  knows fr-user-login links to api-session-create links to fixture-login-happy.
+  The problem is that this graph isn't used for context slicing.
+
+  Here's how super-sliced extraction actually has to work:
+
+  The Problem: Extraction Is Graph Traversal, Not Field Projection
+
+  Static field paths (".goals", ".capabilities") work for early steps (00-05).
+  But from step 06 onward, what you need is determined by the trace graph:
+
+  Step 16a working on milestone-02:
+    milestone-02.tasks → [task-payment-flow, task-payment-refund]
+    task-payment-flow.fr_refs → [fr-payment-create]
+    fr-payment-create.trace → [cap-payments, api-payment-create]
+    api-payment-create → needs its request/response schema
+    fr-payment-create.acceptance_criteria → needs these for checklist
+
+    You DON'T need fr-user-login, fr-search, or any of the other 47 FRs.
+
+  So the extraction path is:
+
+  milestone ID → task IDs → FR IDs → specific FR objects → their traced APIs →
+  those API contracts
+
+  This is a graph walk, not a field filter.
+
+  Solution: trace_matrix.json Becomes the Index
+
+  The matrix already builds this graph. The missing piece is a command that
+  takes an entry point and returns only the connected subgraph with full detail:
+
+  # "Give me everything connected to milestone-02"
+  json_utils read trace_matrix.json \
+    '.matrix[] | select(.fr_id == "fr-payment-create")'
+
+  # Returns:
+  {
+    "fr_id": "fr-payment-create",
+    "apis": ["api-payment-create"],
+    "fixtures": ["fix-payment-happy", "fix-payment-decline"],
+    "nfrs": ["nfr-latency-p99"],
+    "threats": ["threat-payment-injection"]
+  }
+
+  Now Claude knows exactly which array indices to read from each spec.
+
+  The Architecture: Index → Resolve → Slice → Feed
+
+  ┌──────────────────────────────────────────────────────────┐
+  │  PHASE 1: BUILD INDEX  (automated, run once per edit)    │
+  │                                                          │
+  │  specdev matrix spec/ → trace_matrix.json                │
+  │                                                          │
+  │  This gives you:                                         │
+  │  fr-payment-create → api-payment-create                  │
+  │                    → fix-payment-happy                    │
+  │                    → nfr-latency-p99                      │
+  │                    → threat-payment-injection             │
+  └───────────────────────────┬──────────────────────────────┘
+                              │
+  ┌───────────────────────────▼──────────────────────────────┐
+  │  PHASE 2: RESOLVE SCOPE  (given a task/milestone/FR)     │
+  │                                                          │
+  │  Input: "I'm working on milestone-02"                    │
+  │                                                          │
+  │  json_utils read spec/14_roadmap.json                    │
+  │    '.milestones[] | select(.milestone_id=="milestone-02")│
+  │     | .fr_refs'                                          │
+  │  → ["fr-payment-create", "fr-payment-refund"]            │
+  │                                                          │
+  │  json_utils read trace_matrix.json                       │
+  │    '.matrix[] | select(.fr_id=="fr-payment-create"       │
+  │     or .fr_id=="fr-payment-refund")'                     │
+  │  → { apis: [...], fixtures: [...], nfrs: [...] }         │
+  │                                                          │
+  │  Now you have the FULL ID SET for this scope.            │
+  └───────────────────────────┬──────────────────────────────┘
+                              │
+  ┌───────────────────────────▼──────────────────────────────┐
+  │  PHASE 3: SLICE  (jq select by resolved IDs)             │
+  │                                                          │
+  │  json_utils read spec/04_fr_list.json                    │
+  │    '.functional_requirements[]                           │
+  │     | select(.fr_id=="fr-payment-create"                 │
+  │        or .fr_id=="fr-payment-refund")'                  │
+  │  → 2 FR objects out of 50.  ~200 tokens, not 5,000      │
+  │                                                          │
+  │  json_utils read spec/05_interface_contracts.json        │
+  │    '.apis[] | select(.api_id=="api-payment-create")'     │
+  │  → 1 API object.  ~150 tokens, not 3,000                │
+  │                                                          │
+  │  json_utils read spec/07_nfrs.json                       │
+  │    '.nfrs[] | select(.nfr_id=="nfr-latency-p99")'       │
+  │  → 1 NFR object.  ~80 tokens, not 2,000                 │
+  └───────────────────────────┬──────────────────────────────┘
+                              │
+  ┌───────────────────────────▼──────────────────────────────┐
+  │  TOTAL CONTEXT FOR STEP 16a on milestone-02:             │
+  │                                                          │
+  │  Milestone scope:    ~100 tokens                         │
+  │  2 FRs (full):       ~400 tokens                         │
+  │  1 API (full):       ~150 tokens                         │
+  │  1 NFR:              ~80 tokens                          │
+  │  2 Fixtures:         ~200 tokens                         │
+  │  Seeds:              ~800 tokens                         │
+  │  Prompt:             ~2,000 tokens                       │
+  │  ─────────────────────────────────                       │
+  │  TOTAL:              ~3,730 tokens                       │
+  │                                                          │
+  │  vs. reading all upstream specs: ~25,000+ tokens         │
+  │  SAVINGS: 85%                                            │
+  └──────────────────────────────────────────────────────────┘
+
+  What json_utils Needs
+
+  Your json_utils already handles the individual reads. What it lacks is a
+  scope-aware batch command. Two options:
+
+  Option A: New slice command in json_utils
+
+  json_utils slice spec/ \
+    --scope milestone-02 \
+    --matrix trace_matrix.json \
+    --step-order step_order.json
+
+  This would:
+  1. Read the matrix to find connected IDs
+  2. Walk the trace graph from the scope entry point
+  3. For each upstream spec, emit only the connected objects
+  4. Output a single combined context JSON
+
+  Option B: Keep json_utils dumb, put the logic in the orchestrator
+
+  Claude (or a skill/agent) does the graph walk using existing json_utils read
+  calls:
+
+  1. json_utils read roadmap '.milestones[] | select(...) | .fr_refs'
+  2. json_utils read trace_matrix '.matrix[] | select(.fr_id == ...)'
+  3. For each resolved ID: json_utils read <spec> '.array[] | select(.id ==
+  ...)'
+
+  This is 4-6 jq calls instead of one, but zero new code — just orchestration
+  logic.
+
+  The Review Phase With Super-Slicing
+
+  The review becomes cheap too:
+
+  REVIEW for step 16a, milestone-02:
+
+  1. Resolved scope: fr-payment-create, fr-payment-refund
+     (already known from phase 2)
+
+  2. Check emitted artifact traces back to these:
+     json_utils read spec/16a_impl_planner.json \
+       '.plan.checklist[].spec_ref.id'
+     → ["fr-payment-create", "fr-payment-refund"]  ✓ both covered
+
+  3. Check nothing extra crept in:
+     json_utils read spec/16a_impl_planner.json \
+       '.plan.checklist[].spec_ref.id'
+     → Any ID not in resolved scope? → scope creep flag
+
+  4. Check acceptance criteria covered:
+     json_utils read spec/04_fr_list.json \
+       '.functional_requirements[]
+        | select(.fr_id=="fr-payment-create")
+        | .acceptance_criteria[].criterion_id'
+     → ["ac-payment-valid", "ac-payment-declined"]
+
+     json_utils read spec/16a_impl_planner.json \
+       '.plan.checklist[].linked_test_expectation'
+     → Do these cover both criteria?
+
+  Total review: ~8 jq reads, ~500 tokens. Not 25,000.
+
+  Summary
+
+  ┌───────────────────┬─────────────────┬───────────────┬──────────────────┐
+  │     Approach      │  Early steps    │  Mid steps    │   Late steps     │
+  │                   │     (00-05)     │    (06-12)    │     (13-16c)     │
+  ├───────────────────┼─────────────────┼───────────────┼──────────────────┤
+  │ Field projection  │ Works well      │ Partial       │ Useless          │
+  ├───────────────────┼─────────────────┼───────────────┼──────────────────┤
+  │ Graph-driven      │ Overkill        │ Right fit     │ Essential        │
+  │ slicing           │                 │               │                  │
+  ├───────────────────┼─────────────────┼───────────────┼──────────────────┤
+  │ Entry point       │ N/A             │ FR IDs, API   │ Milestone, task  │
+  │                   │                 │ IDs           │ ID               │
+  └───────────────────┴─────────────────┴───────────────┴──────────────────┘
+
+  The trace matrix is the key. It's already being generated — it just needs to
+  be used as the index for context slicing, not just for validation reporting.
+
+  Want me to build the slice command for json_utils, or spec out the
+  orchestration logic that Claude would follow using existing read commands?
+
+✻ Cogitated for 56s
+
+❯ I would want to do as many things via tooling as possible.                
+  This keeps the tokens in check, prevents balooning and prevents           
+  unnecessary noise.                                                        
+                                                                            
+  Having said that, json_utils is supposed to be a very low level general   
+  purpose util.                                                             
+  I would rather build a wrapper around it which is toolkit specific.       
+
+⏺ That's the right layering. json_utils stays generic (jq wrapper), and you
+  build a toolkit-aware orchestration layer on top that knows about steps,
+  traces, scopes, and the spec pipeline.
+
+  Let me understand what you already have before designing this.
+
+⏺ Explore(Map existing tooling and CLI)
+  ⎿  Done (45 tool uses · 63.9k tokens · 1m 23s)
+  (ctrl+o to expand)
+
+⏺ Good. Now I have the full picture. Here's the design:
+
+  Architecture: Two New Layers
+
+  ┌─────────────────────────────────────────────────┐
+  │  Claude Code  (skills, CLAUDE.md, hooks)        │  ← orchestrates
+  ├─────────────────────────────────────────────────┤
+  │  specdev context  (NEW CLI commands)            │  ← toolkit-aware slicing
+  │  tools/specdev_tools/context/                   │
+  ├─────────────────────────────────────────────────┤
+  │  json_utils  (generic jq wrapper)               │  ← dumb reads/writes
+  ├─────────────────────────────────────────────────┤
+  │  specdev validate / lint / matrix  (existing)   │  ← validation
+  └─────────────────────────────────────────────────┘
+
+  json_utils stays generic. The new context/ package is the toolkit-aware brain
+  that knows about steps, traces, and scopes.
+
+  The specdev context Command Family
+
+  1. specdev context scope — Resolve what IDs are in play
+
+  Given an entry point (milestone, FR, capability), walk the trace graph and
+  return the complete set of IDs needed.
+
+  # "What do I need for milestone-02?"
+  specdev context scope spec/ --entry milestone-02 --repo-root .
+
+  # Output (JSON to stdout, machine-readable):
+  {
+    "entry": "milestone-02",
+    "resolved_ids": {
+      "milestones": ["milestone-02"],
+      "tasks": ["task-payment-flow", "task-payment-refund"],
+      "frs": ["fr-payment-create", "fr-payment-refund"],
+      "apis": ["api-payment-create", "api-payment-refund"],
+      "fixtures": ["fix-payment-happy", "fix-payment-decline"],
+      "nfrs": ["nfr-latency-p99"],
+      "threats": ["threat-payment-injection"],
+      "capabilities": ["cap-payments"],
+      "invariants": ["inv-payment-positive-amount"]
+    },
+    "source_files": {
+      "fr-payment-create": {"file": "spec/04_fr_list.json", "path":
+  ".functional_requirements[3]"},
+      "api-payment-create": {"file": "spec/05_interface_contracts.json", "path":
+   ".apis[7]"}
+    }
+  }
+
+  This is pure graph traversal on trace_matrix.json + the spec files. No LLM
+  needed.
+
+  2. specdev context extract — Pull only the scoped objects
+
+  Given a resolved scope, extract the actual JSON objects.
+
+  # "Give me the full context for step 16a, scoped to milestone-02"
+  specdev context extract spec/ \
+    --step 16a \
+    --entry milestone-02 \
+    --repo-root .
+
+  # Output: compact JSON with ONLY the relevant objects
+  {
+    "step": "16a",
+    "scope": "milestone-02",
+    "extraction_intent": {
+      "14_roadmap.json": "Extract active milestone tasks for checklist 
+  planning",
+      "04_functional_requirements.json": "Extract FR specs for atomic checklist 
+  items"
+    },
+    "context": {
+      "milestone": { /* just milestone-02 object */ },
+      "functional_requirements": [
+        { /* fr-payment-create full object */ },
+        { /* fr-payment-refund full object */ }
+      ],
+      "apis": [
+        { /* api-payment-create full object */ }
+      ],
+      "nfrs": [
+        { /* nfr-latency-p99 full object */ }
+      ],
+      "invariants": [
+        { /* inv-payment-positive-amount full object */ }
+      ]
+    },
+    "token_estimate": 730,
+    "vs_full_read_estimate": 12400
+  }
+
+  3. specdev context review — Completeness check (the missing review phase)
+
+  Given an emitted artifact and its scope, check that everything was captured.
+
+  specdev context review spec/16a_impl_planner.json \
+    --step 16a \
+    --entry milestone-02 \
+    --repo-root .
+
+  # Output:
+  {
+    "verdict": "FAIL",
+    "upstream_coverage": {
+      "covered": ["fr-payment-create", "api-payment-create",
+  "inv-payment-positive-amount"],
+      "dropped": ["fr-payment-refund"],
+      "reason_required": ["fr-payment-refund"]
+    },
+    "reverse_trace": {
+      "unjustified": [],
+      "scope_creep": []
+    },
+    "acceptance_criteria_coverage": {
+      "fr-payment-create": {
+        "total": 3,
+        "covered_by_checklist": 2,
+        "missing": ["ac-payment-idempotency"]
+      }
+    },
+    "seed_distillation": "requires_llm",
+    "errors": [
+      "E560 TRACEABILITY_GAP fr_not_in_checklist fr-payment-refund",
+      "E560 TRACEABILITY_GAP acceptance_criterion_missing 
+  ac-payment-idempotency"
+    ]
+  }
+
+  This is the review gate you identified as missing. The structural checks (ID
+  coverage, reverse trace, acceptance criteria) are fully automated — no LLM.
+  Only seed_distillation (did the prose meaning survive?) needs Claude.
+
+  4. specdev context structure — Lightweight shape for orientation
+
+  specdev context structure spec/ --step 04 --repo-root .
+
+  # Output: what Claude sees first, before any reads
+  {
+    "step": "04",
+    "required_inputs": [
+      {"file": "00_charter.json", "keys": ["goals", "constraints", "in_scope",
+  ...], "array_counts": {"goals": 5, "stakeholders": 3}},
+      {"file": "01_capabilities.json", "keys": ["capabilities"], "array_counts":
+   {"capabilities": 12}},
+      {"file": "03_glossary.json", "keys": ["terms"], "array_counts": {"terms":
+  28}}
+    ],
+    "extraction_intent": {
+      "00_charter.json": "Extract goals and constraints for FR rationale",
+      "01_capabilities.json": "Extract capability IDs to map each to one or more
+   FRs",
+      "03_glossary.json": "Extract canonical terms to anchor FR language"
+    },
+    "seeds_required": ["seed-overview"],
+    "output_schema_keys": ["functional_requirements", "generation_quality",
+  "canonical_refs_used"]
+  }
+
+  ~200 tokens. Claude now knows the shape of everything without reading any
+  spec.
+
+  How It All Fits Together
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  FULL STEP FLOW (e.g., /spec-step 16a --scope milestone-02)   │
+  ├────────────────────────────────────────────────────────────────┤
+  │                                                                │
+  │  1. ORIENT                                          ~200 tok   │
+  │     specdev context structure spec/ --step 16a                 │
+  │     → shape of all inputs + extraction intents                 │
+  │                                                                │
+  │  2. SCOPE                                           ~150 tok   │
+  │     specdev context scope spec/ --entry milestone-02           │
+  │     → resolved ID set (FRs, APIs, NFRs needed)                │
+  │                                                                │
+  │  3. EXTRACT                                         ~700 tok   │
+  │     specdev context extract spec/ --step 16a                   │
+  │       --entry milestone-02                                     │
+  │     → only the objects in scope, ready to consume              │
+  │                                                                │
+  │  4. SEEDS                                           ~800 tok   │
+  │     Read seed docs (these are small prose, read in full)       │
+  │                                                                │
+  │  5. PROMPT                                        ~2,000 tok   │
+  │     Read prompts/prompt_16a_impl_planner.md                    │
+  │                                                                │
+  │  6. CLARIFY / EMIT                                             │
+  │     Claude follows prompt contract, writes artifact            │
+  │                                                                │
+  │  7. REVIEW (automated)                              ~100 tok   │
+  │     specdev context review spec/16a_impl_planner.json          │
+  │       --step 16a --entry milestone-02                          │
+  │     → verdict: PASS/WARN/FAIL + specific gaps                 │
+  │                                                                │
+  │  8. REVIEW (semantic, only if review found gaps)    ~300 tok   │
+  │     For each "dropped" or "missing" item:                      │
+  │     json_utils read <upstream_spec> '<specific_path>'          │
+  │     → Claude checks if omission was intentional               │
+  │                                                                │
+  │  9. VALIDATE (existing commands)                       0 tok   │
+  │     specdev validate + seed-lint + canonical-integrity         │
+  │     → all CLI, no LLM tokens                                  │
+  │                                                                │
+  │  10. REPORT                                                    │
+  │      Summary of what was emitted + review verdict              │
+  │                                                                │
+  │  TOTAL: ~4,250 tokens                                          │
+  │  vs. reading all upstream specs raw: ~25,000+ tokens           │
+  │  SAVINGS: 83%                                                  │
+  └────────────────────────────────────────────────────────────────┘
+
+  Package Structure
+
+  tools/specdev_tools/context/
+  ├── __init__.py          # Public API exports
+  ├── scope_resolver.py    # Graph walk on trace matrix + specs
+  ├── extractor.py         # Build scoped context from resolved IDs
+  ├── reviewer.py          # Completeness review (automated checks)
+  └── structure.py         # Lightweight shape/orientation
+
+  Each module:
+  - Takes spec_dir, repo_root, step_id, optional entry_id
+  - Returns structured dict (JSON-serializable)
+  - Uses existing matrix.py graph traversal logic
+  - Uses existing SchemaRegistry for schema resolution
+  - Calls json_utils or direct json.load + jq-style filtering for extraction
+
+  CLI additions to cli.py:
+  specdev context scope <spec_dir> --entry <id> [--repo-root .]
+  specdev context extract <spec_dir> --step <NN> --entry <id> [--repo-root .]
+  specdev context review <artifact> --step <NN> --entry <id> [--repo-root .]
+  specdev context structure <spec_dir> --step <NN> [--repo-root .]
+
+  Early Steps vs Late Steps
+
+  ┌──────────┬───────────────────┬─────────────────────────────────────────┐
+  │  Step    │    Scope entry    │            Extract strategy             │
+  │  range   │                   │                                         │
+  ├──────────┼───────────────────┼─────────────────────────────────────────┤
+  │ 00-03    │ No scope needed   │ extract uses extraction_intent field    │
+  │          │                   │ paths (static)                          │
+  ├──────────┼───────────────────┼─────────────────────────────────────────┤
+  │ 04-08    │ Capability ID or  │ scope walks capability → FRs → APIs     │
+  │          │ FR ID             │                                         │
+  ├──────────┼───────────────────┼─────────────────────────────────────────┤
+  │ 09-12    │ Full spec (no     │ extract uses field projection only      │
+  │          │ slicing)          │                                         │
+  ├──────────┼───────────────────┼─────────────────────────────────────────┤
+  │ 13-16c   │ Milestone or task │ scope walks milestone → tasks → FRs →   │
+  │          │  ID               │ APIs → fixtures                         │
+  └──────────┴───────────────────┴─────────────────────────────────────────┘
+
+  For early steps, scope returns "all" and extract falls back to field-level
+  projection based on extraction_intent. For late steps, scope does the heavy
+  graph walk. Same interface, different resolution strategy internally.
+
+  Want me to build this?
+
+✻ Sautéed for 2m 33s
+
+❯ review gate need to review the semantic correctness and completeness as   
+  well                                                                      
+
+⏺ You're right. The automated ID-matching review I described catches structural
+  gaps ("fr-payment-refund is missing from checklist") but misses semantic ones:
+
+  - Did fr-payment-create in the emitted artifact actually preserve the meaning
+  of the original FR?
+  - Did the checklist item for "payment validation" actually cover what the
+  acceptance criterion ac-payment-idempotency requires?
+  - Did the extraction from seed doc "payments must comply with PCI-DSS" get
+  faithfully distilled into the invariant, or was it watered down to "follow
+  security best practices"?
+
+  These are judgments that require reading two texts and comparing meaning. Only
+   an LLM can do that.
+
+  But the problem is: if we feed the LLM full specs for semantic comparison,
+  we're back to 25k+ tokens.
+
+  The Trick: Automated Structural Review Narrows the Semantic Review Scope
+
+  The structural review (phase 7 in the flow) produces a precise hit list of
+  what needs semantic checking. Instead of "compare these two 1500-line files",
+  it becomes "compare these 3 specific pairs":
+
+  STRUCTURAL REVIEW OUTPUT:
+  {
+    "covered": ["fr-payment-create", "fr-payment-refund"],   ← IDs present
+    "dropped": [],                                            ← nothing missing
+  structurally
+    "acceptance_criteria_coverage": {
+      "fr-payment-create": { "covered": 2, "missing": ["ac-payment-idempotency"]
+   }
+    }
+  }
+
+  Now the semantic review doesn't compare whole files. It gets surgical pairs:
+
+  SEMANTIC REVIEW INPUT (auto-generated from structural output):
+
+  Pair 1: Does the checklist item faithfully represent the FR?
+    - Source: fr-payment-create.statement (80 tokens)
+    - Target: checklist[3].description (50 tokens)
+
+  Pair 2: Why is ac-payment-idempotency not covered?
+    - Source: ac-payment-idempotency.text (40 tokens)
+    - Target: all checklist items mentioning "payment" (100 tokens)
+
+  Pair 3: Seed distillation check
+    - Source: seed_overview.md lines mentioning "PCI" (30 tokens)
+    - Target: invariants referencing "payment" (60 tokens)
+
+  ~360 tokens for semantic review, not 25,000.
+
+  Revised specdev context review — Two-Pass Design
+
+  specdev context review spec/16a_impl_planner.json \
+    --step 16a \
+    --entry milestone-02 \
+    --repo-root .
+
+  Output becomes:
+
+  {
+    "verdict": "NEEDS_SEMANTIC_REVIEW",
+
+    "structural_review": {
+      "status": "PASS",
+      "upstream_coverage": { "covered": [...], "dropped": [] },
+      "reverse_trace": { "unjustified": [], "scope_creep": [] },
+      "acceptance_criteria_coverage": {
+        "fr-payment-create": { "total": 3, "covered": 2, "missing":
+  ["ac-payment-idempotency"] }
+      }
+    },
+
+    "semantic_review_pairs": [
+      {
+        "check_type": "faithfulness",
+        "description": "Does checklist item preserve FR meaning?",
+        "source": {
+          "id": "fr-payment-create",
+          "file": "spec/04_fr_list.json",
+          "path": ".functional_requirements[3].statement",
+          "text": "The system shall create a payment record with idempotency 
+  key, validate card details against processor, and return a payment 
+  confirmation with transaction ID within 2 seconds."
+        },
+        "target": {
+          "id": "checklist-item-03",
+          "file": "spec/16a_impl_planner.json",
+          "path": ".plan.checklist[3].description",
+          "text": "Implement payment creation endpoint with card validation"
+        },
+        "concern": "Source mentions idempotency key and 2-second SLA. Target 
+  mentions neither."
+      },
+      {
+        "check_type": "acceptance_criterion_gap",
+        "description": "Acceptance criterion has no matching checklist item",
+        "source": {
+          "id": "ac-payment-idempotency",
+          "file": "spec/04_fr_list.json",
+          "path": ".functional_requirements[3].acceptance_criteria[2]",
+          "text": "Duplicate payment requests with same idempotency key within 
+  24h return original response without creating new charge"
+        },
+        "target": {
+          "nearest_match": "checklist-item-03",
+          "file": "spec/16a_impl_planner.json",
+          "path": ".plan.checklist[3]",
+          "text": "Implement payment creation endpoint with card validation"
+        },
+        "concern": "No checklist item addresses idempotency handling"
+      },
+      {
+        "check_type": "seed_distillation",
+        "description": "Seed requirement may not be fully captured",
+        "source": {
+          "origin": "seed-overview",
+          "file": "docs/seed/seed_overview.md",
+          "excerpt": "All payment processing must comply with PCI-DSS Level 1 
+  requirements including tokenized card storage",
+          "line_range": [42, 43]
+        },
+        "target": {
+          "id": "inv-payment-security",
+          "file": "spec/06_invariants.json",
+          "path": ".rules[5]",
+          "text": "Payment data must be encrypted at rest and in transit"
+        },
+        "concern": "Source specifies PCI-DSS Level 1 and tokenized storage. 
+  Target only mentions encryption — tokenization and compliance level not 
+  captured."
+      },
+      {
+        "check_type": "quantifier_weakening",
+        "description": "Specific metric weakened to vague language",
+        "source": {
+          "id": "fr-payment-create",
+          "file": "spec/04_fr_list.json",
+          "path": ".functional_requirements[3].statement",
+          "excerpt": "within 2 seconds"
+        },
+        "target": {
+          "id": "checklist-item-03",
+          "file": "spec/16a_impl_planner.json",
+          "path": ".plan.checklist[3].description",
+          "excerpt": "with acceptable latency"
+        },
+        "concern": "Concrete '2 seconds' replaced with vague 'acceptable 
+  latency'"
+      }
+    ],
+
+    "token_cost": {
+      "structural_review": 0,
+      "semantic_pairs_total_tokens": 420,
+      "vs_full_file_comparison": 18600
+    }
+  }
+
+  What's Automated vs What Needs Claude
+
+  The review command does all the detective work mechanically:
+
+  ┌─────────────────────┬──────────────────┬────────────────────────────────┐
+  │        Check        │    Automated?    │              How               │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │ ID presence         │ Fully            │ Set comparison on IDs          │
+  │ (covered/dropped)   │                  │                                │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │ Reverse trace       │ Fully            │ Output IDs not in resolved     │
+  │ (scope creep)       │                  │ scope                          │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │ Acceptance criteria │                  │ Match criterion_ids to         │
+  │  coverage           │ Fully            │ checklist                      │
+  │                     │                  │ linked_test_expectations       │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │                     │ Pair generation  │                                │
+  │ Faithfulness        │ automated,       │ Tool extracts the two texts +  │
+  │ (meaning preserved) │ judgment needs   │ flags concern; Claude judges   │
+  │                     │ Claude           │                                │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │                     │ Pair generation  │ Tool greps seed docs for terms │
+  │ Seed distillation   │ automated,       │  matching scope, extracts      │
+  │                     │ judgment needs   │ excerpts                       │
+  │                     │ Claude           │                                │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │                     │ Detection        │ Tool compares numbers/units in │
+  │ Quantifier          │ automated,       │  source vs vague words in      │
+  │ weakening           │ judgment needs   │ target                         │
+  │                     │ Claude           │                                │
+  ├─────────────────────┼──────────────────┼────────────────────────────────┤
+  │                     │ Pair generation  │ Tool lists all seed statements │
+  │ Completeness of     │ automated,       │  in scope, matches to spec     │
+  │ distillation        │ judgment needs   │ elements                       │
+  │                     │ Claude           │                                │
+  └─────────────────────┴──────────────────┴────────────────────────────────┘
+
+  The concern field in each pair is generated by heuristics:
+  - Faithfulness: diff the key nouns/verbs between source and target
+  - Seed distillation: grep seed for domain terms, check if spec mentions them
+  - Quantifier weakening: regex for numbers/units in source, check if target has
+   vague words instead
+
+  These heuristics can be wrong — they're hints, not verdicts. Claude reads the
+  pair + concern and makes the final call.
+
+  How Claude Consumes This
+
+  Claude doesn't read the review JSON raw. The /spec-step skill formats it:
+
+  SEMANTIC REVIEW — 4 pairs to evaluate:
+
+  1. FAITHFULNESS: fr-payment-create → checklist-item-03
+     Source: "create payment record with idempotency key, validate card
+             details, return confirmation with transaction ID within 2s"
+     Target: "Implement payment creation endpoint with card validation"
+     Concern: idempotency key and 2-second SLA missing from target
+
+     VERDICT: ___
+
+  2. ACCEPTANCE GAP: ac-payment-idempotency → no match
+     Criterion: "Duplicate requests with same idempotency key within 24h
+                return original response without creating new charge"
+     Nearest: checklist-item-03 "payment creation endpoint with card validation"
+     Concern: No checklist item addresses idempotency
+
+     VERDICT: ___
+
+  3. SEED DISTILLATION: seed-overview → inv-payment-security
+     Seed: "PCI-DSS Level 1 requirements including tokenized card storage"
+     Spec: "Payment data must be encrypted at rest and in transit"
+     Concern: tokenization and compliance level not captured
+
+     VERDICT: ___
+
+  4. QUANTIFIER WEAKENING: fr-payment-create → checklist-item-03
+     Source: "within 2 seconds"
+     Target: "with acceptable latency"
+     Concern: concrete metric replaced with vague language
+
+     VERDICT: ___
+
+  Claude reads 420 tokens of context and returns 4 verdicts. Compare to reading
+  two full 1500-line specs (~30k tokens) and hoping it notices the idempotency
+  gap.
+
+  The reviewer.py Implementation
+
+  The automated part needs these capabilities:
+
+  # tools/specdev_tools/context/reviewer.py
+
+  class ReviewPair:
+      check_type: str          # faithfulness | acceptance_gap | 
+  seed_distillation | quantifier_weakening
+      source: SourceRef        # {id, file, path, text}
+      target: TargetRef        # {id, file, path, text}  
+      concern: str             # heuristic-generated hint
+
+  class ReviewResult:
+      structural: StructuralReview     # ID coverage, reverse trace, AC coverage
+      semantic_pairs: list[ReviewPair] # pairs for LLM judgment
+      verdict: str                     # PASS | NEEDS_SEMANTIC_REVIEW | FAIL
+
+  def review(artifact_path, step, entry_id, spec_dir, repo_root) -> 
+  ReviewResult:
+      # 1. Run structural review (existing traceability_closure + matrix logic)
+      # 2. Generate semantic pairs:
+      #    a. For each covered ID: extract source text + target text → 
+  faithfulness pair
+      #    b. For each missing AC: find nearest checklist match → acceptance_gap
+   pair  
+      #    c. For each seed requirement in scope: grep for distillation → seed 
+  pair
+      #    d. For each source with numbers: check target for vague words → 
+  quantifier pair
+      # 3. Return structured result
+
+  The heuristics for generating concern strings:
+
+  - Faithfulness: extract nouns from source, check which are missing from target
+  - Seed distillation: extract key terms from seed excerpt (PCI-DSS, tokenized,
+  Level 1), check if target contains them
+  - Quantifier weakening: regex \d+\s*(ms|seconds|s|%|MB|GB|req/s) in source,
+  check if target has fast|quick|acceptable|reasonable|adequate instead
+
+  These are cheap string operations. No LLM needed for pair generation — only
+  for final judgment.
+
+  Updated Package Structure
+
+  tools/specdev_tools/context/
+  ├── __init__.py
+  ├── scope_resolver.py     # Graph walk: entry ID → full ID set
+  ├── extractor.py          # Build scoped context from resolved IDs
+  ├── reviewer.py           # Two-pass review (structural + semantic pairs)
+  │   ├── structural_checks()    # ID coverage, reverse trace, AC coverage
+  │   ├── faithfulness_pairs()   # Compare source/target meaning
+  │   ├── seed_distillation_pairs()  # Check seed → spec preservation
+  │   └── quantifier_weakening_pairs()  # Detect vague replacements
+  └── structure.py          # Lightweight orientation
+
+  The semantic review categories to implement:
+
+  ┌──────────────┬────────────────┬───────────────────────┬───────────────┐
+  │   Category   │     Source     │        Target         │ Heuristic for │
+  │              │                │                       │    concern    │
+  ├──────────────┼────────────────┼───────────────────────┼───────────────┤
+  │ Faithfulness │ FR/capability  │ Checklist/API/emitted │ Noun diff     │
+  │              │ statement      │  element              │ between texts │
+  ├──────────────┼────────────────┼───────────────────────┼───────────────┤
+  │ Acceptance   │ Acceptance     │ Nearest checklist     │ Jaccard       │
+  │ gap          │ criterion text │ item                  │ similarity <  │
+  │              │                │                       │ threshold     │
+  ├──────────────┼────────────────┼───────────────────────┼───────────────┤
+  │ Seed         │ Seed doc       │ Spec element          │ Key term      │
+  │ distillation │ excerpt        │ referencing seed      │ presence      │
+  │              │                │                       │ check         │
+  ├──────────────┼────────────────┼───────────────────────┼───────────────┤
+  │ Quantifier   │ Any text with  │ Corresponding target  │ Number →      │
+  │ weakening    │ numbers/units  │ text                  │ vague word    │
+  │              │                │                       │ substitution  │
+  ├──────────────┼────────────────┼───────────────────────┼───────────────┤
+  │ Scope        │ Extraction     │                       │ Expected      │
+  │ completeness │ intent         │ Emitted artifact keys │ fields vs     │
+  │              │ description    │                       │ actual fields │
+  └──────────────┴────────────────┴───────────────────────┴───────────────┘
+
+  Want me to build this?
+
+✻ Sautéed for 1m 4s
+
+❯ What about completeness of system requirements from seed docs? How will   
+  they get reviewed?                                                        
+
+⏺ This is the hardest problem. Seed docs are unstructured prose — there are no
+  IDs to trace against. A paragraph like:
+
+  "The platform must support multi-tenant isolation with per-tenant encryption 
+  keys. All API responses must include rate-limit headers. Users expect 
+  sub-200ms search latency on catalogs up to 1M items."
+
+  That's three distinct requirements buried in two sentences. No IDs, no
+  structure. You can't do a set comparison like you can with fr-payment-create.
+
+  Let me look at how seeds are structured today and what seed_refs actually
+  captures.
+
+⏺ Read 1 file (ctrl+o to expand)
+
+⏺ Explore(Study seed docs and seed_refs usage)
+  ⎿  Done (26 tool uses · 55.6k tokens · 1m 3s)
+  (ctrl+o to expand)
+
+⏺ Now I see the full gap. Here's the problem and solution:
+
+  The Fundamental Problem
+
+  Seed tracking today is file-level only:
+
+  "seed_refs": [{"seed_id": "seed-overview"}]   // ← "I used this file"
+
+  A seed doc might contain 40 distinct requirements across 15 sections. The
+  toolkit has no idea which of those 40 requirements made it into specs and
+  which were silently dropped.
+
+  The schema already has unused fields that anticipated this:
+  {
+    "seed_id": "seed-overview",
+    "section": "2.1 Problem Statement",   // ← EXISTS but nobody populates it
+    "note": "Extracted multi-tenant req",  // ← EXISTS but nobody populates it
+    "hash": "sha256..."                    // ← EXISTS but nobody populates it
+  }
+
+  But even section is too coarse. A section can contain 5 requirements.
+
+  The Solution: Seed Requirement Index
+
+  One-time extraction that turns prose into traceable units. This happens once 
+  per seed doc (not per step), and then every step traces against it
+  mechanically.
+
+  Step 1: Extract requirements from seed prose → seed_requirements.json
+
+  This is the only part that must use an LLM. But it happens once, when the seed
+   doc is written or updated.
+
+  specdev context index-seeds docs/seed/ --manifest
+  spec/common/seed_manifest.json
+
+  Input: docs/seed/seed_overview.md
+  ## Problem & Users
+  The platform must support multi-tenant isolation with per-tenant
+  encryption keys. All API responses must include rate-limit headers.
+
+  ## Performance
+  Users expect sub-200ms search latency on catalogs up to 1M items.
+  Search must support faceted filtering without degradation.
+
+  ## Compliance
+  All payment processing must comply with PCI-DSS Level 1.
+  User data must be deletable within 72 hours of GDPR request.
+
+  Output: spec/common/seed_requirements.json
+  {
+    "$schema": "https://specdev.local/schema/seed_requirements.schema.json",
+    "version": "0.1.0",
+    "source_hash": "sha256:abc123...",
+    "requirements": [
+      {
+        "req_id": "seedreq-multi-tenant-isolation",
+        "seed_id": "seed-overview",
+        "section": "Problem & Users",
+        "line_range": [3, 4],
+        "text": "The platform must support multi-tenant isolation with 
+  per-tenant encryption keys",
+        "category": "security",
+        "expected_steps": ["00", "04", "06", "07", "11"]
+      },
+      {
+        "req_id": "seedreq-rate-limit-headers",
+        "seed_id": "seed-overview",
+        "section": "Problem & Users",
+        "line_range": [4, 5],
+        "text": "All API responses must include rate-limit headers",
+        "category": "api",
+        "expected_steps": ["04", "05", "07"]
+      },
+      {
+        "req_id": "seedreq-search-latency",
+        "seed_id": "seed-overview",
+        "section": "Performance",
+        "line_range": [7, 8],
+        "text": "Sub-200ms search latency on catalogs up to 1M items",
+        "category": "nfr",
+        "expected_steps": ["04", "07", "08"]
+      },
+      {
+        "req_id": "seedreq-faceted-search",
+        "seed_id": "seed-overview",
+        "section": "Performance",
+        "line_range": [8, 9],
+        "text": "Search must support faceted filtering without degradation",
+        "category": "fr",
+        "expected_steps": ["04", "05"]
+      },
+      {
+        "req_id": "seedreq-pci-dss",
+        "seed_id": "seed-overview",
+        "section": "Compliance",
+        "line_range": [11, 12],
+        "text": "All payment processing must comply with PCI-DSS Level 1",
+        "category": "compliance",
+        "expected_steps": ["04", "06", "07", "11"]
+      },
+      {
+        "req_id": "seedreq-gdpr-deletion",
+        "seed_id": "seed-overview",
+        "section": "Compliance",
+        "line_range": [12, 13],
+        "text": "User data must be deletable within 72 hours of GDPR request",
+        "category": "compliance",
+        "expected_steps": ["04", "06", "07"]
+      }
+    ]
+  }
+
+  Key properties:
+  - req_id: kebab-case, traceable, stable across edits
+  - line_range: pinpoints exact source location for targeted reads later
+  - text: the actual requirement text (verbatim or minimally normalized)
+  - expected_steps: which pipeline steps should consume this requirement
+  - source_hash: SHA-256 of the seed doc at extraction time — if seed changes,
+  index is stale
+
+  Step 2: Specs trace to seedreq-* IDs (not just seed-overview)
+
+  The seed_refs schema already supports this — we just use note and extend the
+  pattern:
+
+  // In spec/04_fr_list.json, FR traces:
+  {
+    "fr_id": "fr-search-catalog",
+    "statement": "System provides sub-200ms faceted search across product 
+  catalog",
+    "trace": [
+      {"type": "capability", "id": "cap-search"},
+      {"type": "seed-requirement", "id": "seedreq-search-latency"},
+      {"type": "seed-requirement", "id": "seedreq-faceted-search"}
+    ]
+  }
+
+  Now the trace graph includes seed requirements as first-class nodes.
+
+  Step 3: Automated completeness check
+
+  Once requirements have IDs, the review becomes mechanical:
+
+  specdev context review-seeds spec/ --repo-root .
+
+  {
+    "total_seed_requirements": 6,
+    "coverage": {
+      "fully_traced": [
+        {
+          "req_id": "seedreq-search-latency",
+          "traced_by": ["fr-search-catalog", "nfr-search-p99"],
+          "steps_covered": ["04", "07"]
+        }
+      ],
+      "partially_traced": [
+        {
+          "req_id": "seedreq-multi-tenant-isolation",
+          "traced_by": ["fr-tenant-isolation"],
+          "steps_covered": ["04"],
+          "expected_but_missing": ["06", "07", "11"],
+          "concern": "FR exists but no invariant, NFR, or threat model 
+  references it"
+        }
+      ],
+      "not_traced": [
+        {
+          "req_id": "seedreq-rate-limit-headers",
+          "expected_steps": ["04", "05", "07"],
+          "steps_covered": [],
+          "concern": "No spec artifact references this requirement"
+        }
+      ],
+      "explicitly_excluded": []
+    },
+    "stale_index": false,
+    "seed_hash_match": true
+  }
+
+  Zero LLM tokens for this check. Pure set comparison on IDs.
+
+  Step 4: Semantic review only for edge cases
+
+  The structural check above catches "seedreq-rate-limit-headers is completely
+  missing". But what about:
+
+  Seed says: "PCI-DSS Level 1"
+  Spec says: "must comply with PCI-DSS"
+  → Level 1 was silently dropped
+
+  This is where the reviewer generates a semantic pair — but only for traced
+  requirements:
+
+  {
+    "check_type": "seed_faithfulness",
+    "source": {
+      "req_id": "seedreq-pci-dss",
+      "text": "All payment processing must comply with PCI-DSS Level 1"
+    },
+    "target": {
+      "id": "inv-payment-compliance",
+      "text": "Payment processing must follow PCI-DSS requirements"
+    },
+    "concern": "Source specifies 'Level 1', target says generic 'requirements'. 
+  Compliance level dropped."
+  }
+
+  The heuristic for generating concerns: extract specificity markers (numbers,
+  levels, proper nouns, acronyms with qualifiers) from source and check if
+  target preserves them.
+
+  How index-seeds Works (the LLM step)
+
+  This is a one-time cost per seed document. The prompt is tight:
+
+  Read this seed document. Extract every discrete system requirement
+  as a separate entry. A "requirement" is any statement that:
+  - Constrains what the system MUST or MUST NOT do
+  - Specifies a measurable quality attribute (latency, uptime, etc.)
+  - Mandates compliance with a standard or regulation
+  - Defines a user-facing behavior expectation
+
+  For each requirement:
+  1. req_id: kebab-case identifier (prefix: seedreq-)
+  2. text: exact or minimally normalized quote
+  3. section: which markdown heading it falls under
+  4. line_range: [start_line, end_line]
+  5. category: one of [fr, nfr, security, compliance, api, data, ux, ops]
+  6. expected_steps: which pipeline steps should address this
+
+  Write to spec/common/seed_requirements.json
+
+  Cost: ~2,000 tokens per seed document. Happens once. Not per step.
+
+  Staleness Detection
+
+  When a seed doc changes, the index is stale:
+
+  specdev context check-seed-freshness spec/ --repo-root .
+
+  # Output:
+  {
+    "seed-overview": {
+      "indexed_hash": "sha256:abc123...",
+      "current_hash": "sha256:def456...",
+      "stale": true,
+      "changed_lines": [7, 8, 14, 15],
+      "affected_requirements": ["seedreq-search-latency", "seedreq-new-unknown"]
+    }
+  }
+
+  This can be a pre-commit hook or part of seed-lint. If stale, the skill
+  re-runs index-seeds on only the changed sections.
+
+  Complete Flow With Seed Review
+
+  SEED AUTHORING (one-time per seed change)
+  ───────────────────────────────────────────
+  1. Human writes/updates docs/seed/seed_overview.md
+  2. specdev context index-seeds (LLM extracts requirements →
+  seed_requirements.json)
+  3. Commit seed_requirements.json alongside the seed doc
+
+  SPEC AUTHORING (per step)
+  ───────────────────────────────────────────
+  4. specdev context extract --step 04 ...
+     → includes relevant seedreq-* IDs in context
+  5. Claude emits spec with trace to seedreq-* IDs
+  6. specdev context review --step 04 ...
+     → structural: checks seedreq IDs are traced
+     → semantic pairs: checks meaning preserved (only for flagged items)
+
+  PIPELINE-WIDE REVIEW (periodic or at milestone)
+  ───────────────────────────────────────────
+  7. specdev context review-seeds spec/
+     → across ALL specs, checks every seedreq-* is traced somewhere
+     → flags partially traced (in FR but not in invariant/NFR)
+     → flags completely untraced
+     → generates semantic pairs for faithfulness check
+
+  Updated Package Structure
+
+  tools/specdev_tools/context/
+  ├── __init__.py
+  ├── scope_resolver.py        # Graph walk: entry ID → full ID set
+  ├── extractor.py             # Build scoped context from resolved IDs
+  ├── reviewer.py              # Per-step review (structural + semantic pairs)
+  ├── seed_indexer.py          # NEW: Extract requirements from prose →
+  seed_requirements.json
+  ├── seed_reviewer.py         # NEW: Pipeline-wide seed coverage check
+  ├── freshness.py             # NEW: Detect stale seed indexes
+  └── structure.py             # Lightweight orientation
+
+  CLI additions:
+    specdev context index-seeds <seed_dir> --manifest <path>
+    specdev context review-seeds <spec_dir>
+    specdev context check-seed-freshness <spec_dir>
+
+  Token Budget Summary
+
+  ┌────────────────────────────────┬──────────────────┬────────────────────┐
+  │            Activity            │      Tokens      │     Frequency      │
+  ├────────────────────────────────┼──────────────────┼────────────────────┤
+  │ Seed indexing (LLM)            │ ~2,000 per seed  │ Once per seed      │
+  │                                │ doc              │ change             │
+  ├────────────────────────────────┼──────────────────┼────────────────────┤
+  │ Seed coverage check            │ 0                │ Every step         │
+  │ (automated)                    │                  │                    │
+  ├────────────────────────────────┼──────────────────┼────────────────────┤
+  │ Seed faithfulness pairs (LLM)  │ ~50 per flagged  │ Only for flagged   │
+  │                                │ pair             │ items              │
+  ├────────────────────────────────┼──────────────────┼────────────────────┤
+  │ Full pipeline seed review      │ 0                │ Periodic           │
+  │ (automated)                    │                  │                    │
+  ├────────────────────────────────┼──────────────────┼────────────────────┤
+  │ vs. reading full seed docs     │ ~3,000 per step  │ Every step         │
+  │ every step                     │                  │ (current)          │
+  └────────────────────────────────┴──────────────────┴────────────────────┘
+
+  Over a 22-step pipeline: ~3,000 tokens total vs ~66,000 tokens (reading seeds
+  at every step).
+
+  The key insight: extract once, trace mechanically, review semantically only at
+   the edges.
+
+  Want me to build this? I'd start with seed_indexer.py + seed_reviewer.py + the
+   schema for seed_requirements.json.
+
+✻ Cogitated for 2m 36s

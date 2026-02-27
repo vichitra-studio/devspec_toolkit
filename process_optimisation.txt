@@ -1,0 +1,289 @@
+The Loop You're In (From Your Data)
+
+  Your insights literally called it "Groundhog Day":
+
+  At least 8 sessions follow the exact same pattern:
+    1. You: "Do exhaustive one-pass review of phase 3 against RFC"
+    2. Claude: Spawns parallel agents, explores codebase, plans approach
+    3. You: [watches progress for a few minutes]
+    4. You: Interrupts and kills the session (frustrated)
+    5. You: Opens new session, asks for same thing with different phrasing
+    6. [Repeat steps 2-5]
+    7. Eventually: You let Claude finish, it works, all tests pass ✅
+
+  Then next day: Repeat entire cycle with different feature
+
+  Result: 14 interruptions across 44 sessions (32% failure rate on reviews)
+
+  ---
+  Why You Get Stuck (3 Root Causes)
+
+  1⃣  Vague Scope = Unbounded Exploration
+
+  YOU: "Do an exhaustive review of the implementation against the RFC"
+
+  WHAT YOU MEAN:
+    "Tell me the 5-10 biggest gaps so I can prioritize fixes"
+
+  WHAT CLAUDE HEARS:
+    "Analyze every file, every function, every decision against every requirement
+     in the RFC. Leave no stone unturned. Show me everything."
+
+  WHAT CLAUDE DOES:
+    - Spawns Explore subagents to find all relevant files
+    - Spawns Plan subagents to map dependencies
+    - Spawns analysis subagents to check each area
+    - Spends 10-15 minutes setting up before producing output
+
+  YOU THINK:
+    "This is taking forever, shouldn't this be faster?"
+    [Interrupts]
+
+  The problem: "Exhaustive" without output constraints = infinite scope
+
+  2⃣  Output Format Mismatch
+
+  YOU EXPECT (implicit):
+    A structured table: [File | Line | Gap | Severity | Fix]
+    Or bullet list: "- Gap 1: ...\n- Gap 2: ..."
+    Something scannable in 30 seconds
+
+  CLAUDE PRODUCES (reasonable but not what you want):
+    - Multi-turn planning steps
+    - Intermediate findings by module
+    - Detailed analysis with context
+    - Recommendations for each gap
+    - Total output: 3-4K words, 5-10 messages
+
+  YOU SEE:
+    Claude is "taking too long," "exploring too much," "not getting to the point"
+    [Interrupts]
+
+  CLAUDE THINKS:
+    "User didn't say how to format output, I'm being thorough"
+
+  The problem: Implicit expectations ≠ explicit output spec
+
+  3⃣  You Let the "Exploratory" Phase Show
+
+  IDEAL WORKFLOW (what you want):
+    [User submits review request]
+    [Claude does all exploration offline]
+    [Claude produces final output in one message]
+    ✅ Done
+
+  ACTUAL WORKFLOW (what happens):
+    [User submits review request]
+    [Claude's exploration shows up as multiple agent spawns, planning messages]
+    [You see: "Task spawned... analyzing files... cross-referencing..."]
+    [You think: "This should be faster, why are there so many steps?"]
+    [You interrupt after 2-3 minutes]
+    ❌ No output, session wasted
+
+  The problem: You see the machinery working and lose faith before it's done
+
+  ---
+  Why You Restart With the Same Approach (The Loop)
+
+  Session 1: Ask for exhaustive review → Too vague → Interrupt (frustrated)
+  Session 2: Ask for "complete one-pass review" → Still too vague → Interrupt
+  Session 3: Ask for "exhaustive final review to end all reviews" → Too vague → Interrupt
+  Session 4: Give up, ask Claude to "just list the gaps" → Still explores → Interrupt
+  Session 5: Finally let Claude finish → IT WORKS, all tests pass ✅
+  Session 6: Same feature, new RFC → "Do exhaustive review" → Interrupt (habit)
+
+  Why the loop?
+  - You know the old approach eventually works (session 5 proved it)
+  - You keep hoping "this time will be faster"
+  - Each interrupt costs time, so you restart with same vague instruction
+  - But same vague instruction → same exploration phase → same impatience
+
+  ---
+  The Real Problem (You Spot It, Then Ignore It)
+
+  From your insights:
+
+  "Your best results come from sessions where you provide Claude with detailed, pre-written plan documents and ask for sequenced, atomic task execution. Sessions like
+  the v0.3.0 three-phase implementation (with all 317 tests passing) show that your upfront planning investment pays off dramatically."
+
+  Translation: When you write the plan yourself (offline), you don't interrupt. The implementation succeeds.
+
+  But when you ask Claude to do the review (exploratory work), you interrupt every time.
+
+  Why?
+  - Pre-written plan = you already did the thinking, Claude just executes
+  - Review request = you're asking Claude to do the thinking while you watch
+  - Watching = impatience = interruption
+
+  ---
+  How the New Strategy Breaks the Loop
+
+  The subagent-optimized strategy I created eliminates manual reviews entirely and replaces them with automated gates:
+
+  OLD WORKFLOW (Stuck in loop):
+    You: "Exhaustive review" [vague]
+    Claude: Explores, spins up agents
+    You: Waits 5 min, gets impatient, interrupts
+    [Repeat 7 times]
+
+  NEW WORKFLOW (Automated):
+    You: Write plan doc (offline, no rushing)
+    Main agent: Generate task JSON (2 turns, minimal tokens)
+    Main agent: Execute tasks with subagents (hands-off)
+    Subagent 1: Scan codebase → Report files (isolated, fast, no interruption point)
+    Subagent 2: Implement task 1 → Run test gate (isolated, fast)
+    Subagent 3: Implement task 2 → Run test gate (isolated, fast)
+    Main agent: Report summary (you see only final results)
+    ✅ No review loop, no interruptions
+
+  Why this works:
+  1. You do the planning work yourself (offline, no pressure)
+  2. Main agent only orchestrates (minimal time, minimal bloat)
+  3. Subagents execute isolated tasks (no exploratory phase to watch)
+  4. Test gates are automatic (no "waiting for approval")
+  5. You see only task completion summaries (no intermediate messiness)
+
+  ---
+  Why You're Stuck (In One Sentence)
+
+  You ask Claude to think (review) while you watch, get impatient after 2 minutes, interrupt, then restart with the same vague instruction. The loop never breaks
+  because you keep asking the same question hoping for faster results.
+
+  ---
+  How to Break It (Three Options)
+
+  Option 1: Front-Load Your Thinking (Recommended)
+
+  Stop asking Claude to review. Write the plan yourself.
+
+  ❌ "Review the implementation against the RFC and tell me what's missing"
+  ✅ "I reviewed the RFC and I see these 5 gaps:
+     1. Validator X missing
+     2. CLI integration not wired
+     3. Tests incomplete
+     [... list everything]
+
+     Now generate a task list to fix these."
+
+  Why it works: You did the thinking offline, Claude just executes. No interruption points.
+
+  Option 2: Constrain Review Scope (If You Must Review)
+
+  Give Claude specific scope constraints, not "exhaustive."
+
+  ❌ "Exhaustive review of phase 3"
+  ✅ "Review ONLY the validator implementations (3 files).
+     Check: (1) schema compliance, (2) test coverage, (3) error handling.
+     Output: 1-page markdown with findings."
+
+  Why it works: Bounded scope = finite exploration = Claude finishes in 5 minutes. You won't be tempted to interrupt.
+
+  Option 3: Specify Output Format (Essential Either Way)
+
+  Tell Claude exactly what format you want before you ask.
+
+  GOOD:
+  "Review gaps in implementation. Output as:
+  [
+    {
+      "file": "path",
+      "gap": "description",
+      "severity": "high|medium|low",
+      "fix": "specific action"
+    }
+  ]
+
+  Do NOT write prose analysis. Return ONLY the JSON array."
+
+  Why it works: Clear format = Claude knows what "done" looks like. Shorter output = you don't interrupt.
+
+  ---
+  The Pattern You'll Recognize
+
+  From your insights, here's what actually happened in your best sessions:
+
+  Session: v0.3.0 Release (FULLY ACHIEVED, rated "essential")
+    - You provided detailed 3-phase plan document
+    - Claude executed phases 1→2→3 sequentially
+    - All tests passed at end
+    - Duration: 1 session
+    - Interruptions: 0
+
+  Session: RFC Gap Remediation (FULLY ACHIEVED, rated "essential")
+    - You provided concrete gap list (from external RFC report)
+    - Claude generated atomic fixes
+    - All 339 tests passed
+    - Duration: 1 session
+    - Interruptions: 0
+
+  Session: Exhaustive Phase 3 Review (PARTIALLY ACHIEVED)
+    - You asked: "Exhaustive one-pass review of phase 3 plan"
+    - Claude began exploring
+    - [3 min later] You interrupted (before output)
+    - Duration: ~10 min wasted
+    - Interruptions: Yes
+
+  Session: Exhaustive Phase 3 Review (Attempt 2) (PARTIALLY ACHIEVED)
+    - You asked: "Complete review of phase 3 implementation"
+    - Claude began exploring
+    - [2 min later] You interrupted again
+    - Duration: ~10 min wasted
+    - Interruptions: Yes
+
+  [Pattern repeats 6-7 more times]
+
+  ---
+  Your Escape Route
+
+  Stop doing manual reviews. Instead:
+
+  1. Review yourself (offline, at your own pace)
+    - You have the RFC
+    - You have the code
+    - You can read them both
+    - Takes 30 min instead of asking Claude
+  2. Give Claude your conclusions
+    - "I found these 5 gaps..."
+    - "Implement these fixes in this order..."
+    - Claude executes, tests pass
+    - Done in 1 session
+  3. Or use automated review (from new strategy)
+    - Pre-impl: Explore subagent finds files (Explore type, 2 turns, fast)
+    - Implementation: Subagents execute
+    - Post-impl: Explore subagent cross-references (automated, no interruption)
+    - All gates automatic, zero interruptions
+
+  ---
+  The Uncomfortable Truth
+
+  Your insights put it this way:
+
+  "You clearly trust Claude more with execution than with analysis framing... when you trust the plan and let Claude run — as in your v0.3.0 migration or gap
+  remediation sessions — the results are excellent. But when the review phase doesn't converge to your expectations quickly, you'd rather kill the session and restart
+  with refined instructions than let Claude finish an unsatisfying analysis."
+
+  Translation: You don't trust Claude's exploratory/analytical process. You only trust Claude's execution.
+
+  Solution: Stop asking Claude to do exploratory work. Do it yourself, then hand off execution.
+
+  ---
+  One Concrete Fix (This Week)
+
+  For your next feature, try this:
+
+  BEFORE (causes loops):
+    "Review the implementation for gaps against the RFC"
+
+  AFTER (no loops):
+    Step 1: YOU read the RFC + code (30 min, offline)
+    Step 2: YOU write down what's missing
+    Step 3: You ask Claude: "Here are 5 gaps. Generate a task list to fix them."
+    Step 4: Claude executes (1-2 hours, all automated)
+
+  Result: 0 interruptions, 1 session, all tests pass.
+
+  ---
+  Does this explain the loop? The root cause is that you ask Claude to think while you watch, lose patience, and restart with the same vague request. The escape is to
+  either do the thinking yourself first, or use the automated gates in the new strategy.
+
+✻ Baked for 40s
