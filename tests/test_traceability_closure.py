@@ -76,20 +76,38 @@ class TestTraceabilityClosure(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self._write_all(d, roadmap=ROADMAP_EMPTY)
             errs = check_traceability_closure(d)
-            self.assertTrue(any("fr_without_milestone" in e for e in errs))
+            self.assertTrue(any("W561" in e and "UNCOVERED_FR" in e for e in errs))
 
     def test_milestone_without_checklist(self):
         with tempfile.TemporaryDirectory() as d:
             self._write_all(d, impl=IMPL_EMPTY)
             errs = check_traceability_closure(d)
-            self.assertTrue(any("milestone_without_checklist" in e for e in errs))
+            self.assertTrue(any("W562" in e and "ORPHAN_MILESTONE" in e for e in errs))
 
     def test_milestone_with_unrelated_checklist_task_is_gap(self):
         """Checklist with entries that don't cover the milestone's task IDs should still be a gap."""
         with tempfile.TemporaryDirectory() as d:
             self._write_all(d, impl=IMPL_UNRELATED_TASK)
             errs = check_traceability_closure(d)
-            self.assertTrue(any("milestone_without_checklist" in e for e in errs))
+            self.assertTrue(any("W562" in e for e in errs))
+
+    def test_task_without_checklist_emits_W563(self):
+        """Roadmap task not present in checklist emits W563."""
+        with tempfile.TemporaryDirectory() as d:
+            roadmap_two_tasks = {
+                "milestones": [{
+                    "milestone_id": "ms-v1",
+                    "fr_refs": ["fr-login"],
+                    "tasks": [{"task_id": "task-1"}, {"task_id": "task-2"}]
+                }]
+            }
+            # Checklist only covers task-1
+            self._write_all(d, roadmap=roadmap_two_tasks, impl=IMPL_FULL)
+            errs = check_traceability_closure(d)
+            self.assertTrue(
+                any("W563" in e and "task-2" in e for e in errs),
+                f"Expected W563 for task-2. Got: {errs}"
+            )
 
     def test_charter_goal_without_capability_detected(self):
         """Charter goal with no matching capability trace raises E560."""

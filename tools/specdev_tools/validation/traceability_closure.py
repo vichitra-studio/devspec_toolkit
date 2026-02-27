@@ -106,16 +106,16 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     if "frs" in data and "roadmap" in data:
         for fr_id in sorted(fr_ids - milestone_fr_refs):
-            errors.append(f"E560 TRACEABILITY_GAP fr_without_milestone {fr_id}")
+            errors.append(f"W561 UNCOVERED_FR {fr_id}")
 
     if "roadmap" in data and "impl_planner" in data:
         for ms_id in sorted(milestone_ids - checklist_milestone_refs):
-            errors.append(f"E560 TRACEABILITY_GAP milestone_without_checklist {ms_id}")
+            errors.append(f"W562 ORPHAN_MILESTONE {ms_id}")
 
         # Task-level traceability: each task should be referenced by at least one checklist item
         for ms_id, tasks in milestone_task_ids.items():
             for task_id in tasks:
                 if task_id not in checklist_task_refs:
-                    errors.append(f"E560 TRACEABILITY_GAP task_without_checklist {task_id} (milestone: {ms_id})")
+                    errors.append(f"W563 CHECKLIST_ROADMAP_MISMATCH {task_id} (milestone: {ms_id})")
 
     return errors

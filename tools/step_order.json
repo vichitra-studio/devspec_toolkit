@@ -449,7 +449,7 @@
     },
     "14": {
       "required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"],
-      "required_seed_inputs": ["seed-overview"],
+      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
       "extraction_intent": {
         "09_impl_plan.json": "Extract tech stack and milestones for roadmap sequencing",
         "00_charter.json": "Extract strategic goals for milestone prioritization",

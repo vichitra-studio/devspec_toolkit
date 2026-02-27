@@ -323,6 +323,43 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                     f"E304 ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}"
                 )
 
+    # W581 — milestone_ref binding validation
+    if spec_path:
+        artifact_path_ms = Path(spec_path)
+        roadmap_path_ms = artifact_path_ms.parent / "14_roadmap.json"
+        if roadmap_path_ms.exists():
+            try:
+                roadmap_data_ms = json.loads(roadmap_path_ms.read_text())
+                task_to_milestone: dict[str, str] = {}
+                for ms in roadmap_data_ms.get("milestones", []):
+                    ms_id = ms.get("milestone_id", "")
+                    for task in ms.get("tasks", []):
+                        if isinstance(task, dict) and "task_id" in task:
+                            task_to_milestone[task["task_id"]] = ms_id
+
+                for item in checklist:
+                    if not isinstance(item, dict):
+                        continue
+                    if item.get("checklist_status") == "deferred":
+                        continue
+                    item_id = item.get("id", "unknown")
+                    milestone_ref = item.get("milestone_ref")
+                    spec_ref_id = None
+                    if isinstance(item.get("spec_ref"), dict):
+                        spec_ref_id = item["spec_ref"].get("id")
+
+                    if milestone_ref is None:
+                        errors.append(f"W581 MILESTONE_REF_MISSING item={item_id}")
+                    elif spec_ref_id and spec_ref_id in task_to_milestone:
+                        expected_ms = task_to_milestone[spec_ref_id]
+                        if milestone_ref != expected_ms:
+                            errors.append(
+                                f"E582 MILESTONE_REF_MISMATCH milestone_ref mismatch item={item_id} "
+                                f"expected={expected_ms} got={milestone_ref}"
+                            )
+            except (OSError, json.JSONDecodeError, KeyError, TypeError):
+                pass  # Roadmap parse errors already handled by E304
+
     # E305 — planned-vs-executed diff
     final_status = data.get("execution", {}).get("final_status", {}) if isinstance(data.get("execution"), dict) else {}
     if final_status and final_status.get("ci_status") == "green":

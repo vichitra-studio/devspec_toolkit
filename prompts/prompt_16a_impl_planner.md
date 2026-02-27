@@ -121,6 +121,8 @@ For every `task_id` in the active milestone's `tasks[]` array from `spec/14_road
 - If a task has N `acceptance_criteria`, create ≥N checklist items, one per criterion, to preserve full traceability
 - Document the mapping in your blocker report if any task is ambiguous
 
+Every checklist item MUST include a `milestone_ref` field containing the `milestone_id` from Step 14 that owns the referenced task. Deferred items inherit the milestone_ref of their parent scope.
+
 **FORBIDDEN:**
 - Checklist that does not cover every non-deferred roadmap task
 - Using `spec_ref.id` values not present in the active milestone's `tasks[]`

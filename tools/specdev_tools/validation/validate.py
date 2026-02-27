@@ -262,14 +262,17 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
     # and deduplicate divergent error signals (duplicate reporting of gaps)
     warn_as_error = os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
     
+    warn_promote_pairs = [("W560", "E560"), ("W561", "E561"), ("W562", "E562"), ("W563", "E563")]
     if warn_as_error:
-        failures = [f.replace("W560", "E560", 1) if f.startswith("W560") else f for f in failures]
-        
+        for w_code, e_code in warn_promote_pairs:
+            failures = [f.replace(w_code, e_code, 1) if f.startswith(w_code) else f for f in failures]
+
     failures = list(dict.fromkeys(failures))
-    
+
     if not warn_as_error:
-        e560_bases = {f.replace("E560", "W560", 1) for f in failures if f.startswith("E560")}
-        failures = [f for f in failures if not (f.startswith("W560") and f in e560_bases)]
+        for w_code, e_code in warn_promote_pairs:
+            e_bases = {f.replace(e_code, w_code, 1) for f in failures if f.startswith(e_code)}
+            failures = [f for f in failures if not (f.startswith(w_code) and f in e_bases)]
 
     return failures
 

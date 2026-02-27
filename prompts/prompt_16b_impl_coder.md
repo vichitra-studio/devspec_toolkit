@@ -43,6 +43,8 @@ Instead of outputting code directly to the user, you:
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
 ### Extraction Intent
+From `14_roadmap.json`: Extract the active `milestone_id` and its deliverables list. Each execution result should include `milestone_ref` to trace back to the roadmap milestone.
+
 For each upstream artifact ingested, extract the following:
 - **spec/impl_context/{step_id}.json (The Plan)**: Checklist items with implementation actions, target file patterns, and test expectations
 - **plan.context.coding_examples**: Ground-truth code patterns for implementation style

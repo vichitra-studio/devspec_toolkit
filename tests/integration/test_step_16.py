@@ -296,5 +296,166 @@ class TestStep16(unittest.TestCase):
             f"Expected E307 BEHAVIOR_VALIDATION_PAIRING error. Got: {errors}"
         )
 
+    def _make_milestone_ref_fixture(self, tmpdir, checklist_items, roadmap_milestones):
+        """Helper to create a step_16 fixture with roadmap for milestone_ref tests."""
+        tmp_dir = Path(tmpdir)
+        data = {
+            "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+            "id": "step-ms-ref-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "seed_refs": [{"seed_id": "seed-overview"}, {"seed_id": "seed-tech-stack"}],
+            "spec_refs_ingested": [],
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "Test milestone_ref binding.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/main.py"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": checklist_items
+                },
+                "docs_impact": {
+                    "status": "required",
+                    "rationale": "Code changes.",
+                    "docs_touched": ["README.md"]
+                },
+                "review_requirements": {"test_commands": ["pytest tests/"]}
+            },
+            "generation_quality": {
+                "preflight_passed": True,
+                "evidence_records": [],
+                "unresolved_inputs": [],
+                "assumptions": [],
+                "placeholder_scan": {"has_placeholders": False, "tokens_found": []},
+                "self_check_results": []
+            },
+            "canonical_refs_used": [],
+            "canonical_proposals": [],
+            "canonical_conflicts": []
+        }
+        fixture_path = tmp_dir / "16_impl_context.json"
+        fixture_path.write_text(json.dumps(data), encoding="utf-8")
+
+        roadmap = {"milestones": roadmap_milestones}
+        (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+
+        common_dir = tmp_dir / "common"
+        common_dir.mkdir()
+        (common_dir / "seed_manifest.json").write_text(
+            json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+            encoding="utf-8"
+        )
+        return str(fixture_path)
+
+    def test_checklist_missing_milestone_ref_warns_W581(self):
+        """W581: checklist item without milestone_ref field emits W581."""
+        checklist = [{
+            "id": "CHK_01",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Implement login",
+            "type": "behavior",
+            "layer": "api",
+            "linked_test_expectation": "pytest test_login",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login"
+        }, {
+            "id": "CHK_01_VAL",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Validate login",
+            "type": "validation",
+            "layer": "tests",
+            "linked_test_expectation": "pytest test_login_val",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login"
+        }]
+        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_milestone_ref_fixture(td, checklist, milestones)
+            errors = validate_file(self.repo_root, path)
+
+        self.assertTrue(
+            any("W581" in e for e in errors),
+            f"Expected W581 MILESTONE_REF_MISSING. Got: {errors}"
+        )
+
+    def test_checklist_valid_milestone_ref_passes(self):
+        """Valid milestone_ref matching roadmap should not emit W581 or E582."""
+        checklist = [{
+            "id": "CHK_01",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Implement login",
+            "type": "behavior",
+            "layer": "api",
+            "linked_test_expectation": "pytest test_login",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login",
+            "milestone_ref": "ms-v1"
+        }, {
+            "id": "CHK_01_VAL",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Validate login",
+            "type": "validation",
+            "layer": "tests",
+            "linked_test_expectation": "pytest test_login_val",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login",
+            "milestone_ref": "ms-v1"
+        }]
+        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_milestone_ref_fixture(td, checklist, milestones)
+            errors = validate_file(self.repo_root, path)
+
+        w581 = [e for e in errors if "W581" in e]
+        e582 = [e for e in errors if "E582" in e]
+        self.assertEqual(w581, [], f"Did not expect W581. Got: {w581}")
+        self.assertEqual(e582, [], f"Did not expect E582. Got: {e582}")
+
+    def test_checklist_wrong_milestone_ref_errors(self):
+        """milestone_ref not matching task_to_milestone mapping should emit E582."""
+        checklist = [{
+            "id": "CHK_01",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Implement login",
+            "type": "behavior",
+            "layer": "api",
+            "linked_test_expectation": "pytest test_login",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login",
+            "milestone_ref": "ms-WRONG"
+        }, {
+            "id": "CHK_01_VAL",
+            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
+                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "description": "Validate login",
+            "type": "validation",
+            "layer": "tests",
+            "linked_test_expectation": "pytest test_login_val",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": "fixture-login",
+            "milestone_ref": "ms-v1"
+        }]
+        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_milestone_ref_fixture(td, checklist, milestones)
+            errors = validate_file(self.repo_root, path)
+
+        self.assertTrue(
+            any("E582" in e for e in errors),
+            f"Expected E582 milestone_ref mismatch. Got: {errors}"
+        )
+
 if __name__ == '__main__':
     unittest.main()

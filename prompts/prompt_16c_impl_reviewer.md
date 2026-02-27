@@ -41,6 +41,8 @@ For each upstream artifact ingested, extract the following:
 - **Actual codebase**: Source files for verification that implementation matches plan
 - **plan.review_requirements.test_commands**: Test commands to verify against execution results
 
+Before marking a milestone complete, verify all deliverables listed in `14_roadmap.json` for that milestone are satisfied by `execution_results`. A milestone with unverified deliverables MUST NOT be marked `done`.
+
 ## Crucial Side Effect (Roadmap Sync)
 - If your `verdict` is `verified`, you **MUST** also update:
     - `spec/14_roadmap.json`: Set the corresponding milestone's status to `done`.

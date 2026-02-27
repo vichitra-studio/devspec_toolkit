@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re as _re
 from typing import Dict, List, Set
 
 from .validate import validate_file
@@ -68,7 +69,8 @@ def _lint_prompt_manifest_refs(repo_root: str, errors: List[str]) -> None:
             continue
         path = os.path.join(prompts_dir, fn)
         try:
-            text = open(path, "r", encoding="utf-8").read()
+            with open(path, "r", encoding="utf-8") as fh:
+                text = fh.read()
         except Exception as e:
             errors.append(f"Failed to read prompt: {path} ({e})")
             continue
@@ -76,6 +78,63 @@ def _lint_prompt_manifest_refs(repo_root: str, errors: List[str]) -> None:
             errors.append(f"{path}: missing 'Seed Order & Mandatory Sources' section")
         if "spec/common/seed_manifest.json" not in text:
             errors.append(f"{path}: missing reference to spec/common/seed_manifest.json")
+
+
+_STOP_WORDS = frozenset({
+    "the", "this", "that", "with", "from", "have", "will", "been", "each",
+    "which", "their", "about", "would", "could", "should", "there", "these",
+    "those", "other", "after", "before", "where", "being", "does", "into",
+    "over", "only", "than", "them", "then", "they", "when", "also", "more",
+    "most", "some", "such", "very", "just", "like", "make", "made", "must",
+    "need", "used",
+})
+
+def _tokenize(text: str) -> set:
+    return {w for w in _re.findall(r"[a-z0-9]{4,}", text.lower()) if w not in _STOP_WORDS}
+
+
+def _check_seed_content_overlap(
+    spec_dir: str, manifest: Dict, project_root: str, errors: List[str]
+) -> None:
+    seed_paths: Dict[str, str] = {}
+    for seed in manifest.get("seeds", []):
+        if isinstance(seed, dict) and seed.get("seed_id") and seed.get("path"):
+            resolved = os.path.normpath(os.path.join(project_root, seed["path"]))
+            if os.path.isfile(resolved):
+                seed_paths[seed["seed_id"]] = resolved
+
+    for root_dir, _, files in os.walk(spec_dir):
+        for fn in files:
+            if not fn.endswith(".json"):
+                continue
+            file_path = os.path.join(root_dir, fn)
+            try:
+                with open(file_path, "r", encoding="utf-8") as fh:
+                    instance = json.load(fh)
+            except Exception:
+                continue
+            seed_refs = instance.get("seed_refs", [])
+            if not isinstance(seed_refs, list):
+                continue
+            spec_text = json.dumps(instance)
+            spec_tokens = _tokenize(spec_text)
+            for ref in seed_refs:
+                if not isinstance(ref, dict):
+                    continue
+                sid = ref.get("seed_id")
+                if not sid or sid not in seed_paths:
+                    continue
+                try:
+                    with open(seed_paths[sid], "r", encoding="utf-8") as fh:
+                        seed_text = fh.read()
+                except Exception:
+                    continue
+                seed_tokens = _tokenize(seed_text)
+                shared = len(spec_tokens & seed_tokens)
+                if shared < 3:
+                    errors.append(
+                        f"W140 SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={fn} shared_tokens={shared}"
+                    )
 
 
 def lint_seeds(
@@ -179,6 +238,8 @@ def lint_seeds(
 
     _lint_prompt_manifest_refs(repo_root, errors)
 
+    _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
+
     for root, _, files in os.walk(spec_dir):
         for fn in files:
             if not fn.endswith(".json"):
@@ -192,7 +253,8 @@ def lint_seeds(
                 continue
 
             try:
-                instance = json.load(open(file_path, "r", encoding="utf-8"))
+                with open(file_path, "r", encoding="utf-8") as fh:
+                    instance = json.load(fh)
             except Exception:
                 continue
 

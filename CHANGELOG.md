@@ -15,6 +15,7 @@ All detailed version records are stored in the [`changelog/`](./changelog/) dire
 
 | Version | Release Date | Documentation | Migration Spec | Status |
 | :--- | :--- | :--- | :--- | :--- |
+| **Unreleased** | — | — | — | E561/E562/E563 differentiated traceability codes, W140 seed content overlap check, W581/E582 milestone_ref binding, seed-tech-stack required for step 14 |
 | **[0.3.0]** | 2026-02-26 | [v0.3.0.md](changelog/v0.3.0.md) | [v0.3.0.yaml](changelog/v0.3.0.yaml) | ✅ Migration Hardening & Reorg |
 | **[0.2.1]** | 2026-02-07 | [v0.2.1.md](changelog/v0.2.1.md) | [v0.2.1.yaml](changelog/v0.2.1.yaml) | ⚠️ **Breaking** |
 | **[0.2.0]** | 2026-01-17 | [v0.2.0.md](changelog/v0.2.0.md) | [v0.2.0.yaml](changelog/v0.2.0.yaml) | ⚠️ **Breaking** (Schema Hardening) |
