@@ -1545,6 +1545,217 @@ class CliTests(unittest.TestCase):
                         msg=f"command={command} err={err}",
                     )
 
+    def test_prompt_context_step04(self):
+        """Test that prompt-context step 04 outputs markdown table with >=13 downstream rows."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            tools_dir = repo_root / "tools"
+            tools_dir.mkdir()
+
+            # Write a minimal step_order.json
+            step_order = {
+                "version": "1.0.0",
+                "allowed_upstream_dependencies": {
+                    "00": [],
+                    "01": ["00"],
+                    "02": ["00", "01"],
+                    "02a": ["00", "01", "02"],
+                    "03": ["00", "01", "02", "02a"],
+                    "04": ["00", "01", "02", "02a", "03"],
+                    "05": ["00", "01", "02", "02a", "03", "04"],
+                    "06": ["00", "01", "02", "02a", "03", "04", "05"],
+                    "07": ["00", "01", "02", "02a", "03", "04", "05", "06"],
+                    "08": ["00", "01", "02", "02a", "03", "04", "05", "06", "07"],
+                    "09": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08"],
+                    "10": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09"],
+                    "11": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10"],
+                    "12": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11"],
+                    "13": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"],
+                    "13a": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"],
+                    "14": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a"],
+                    "15": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14"],
+                    "16": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15"],
+                    "16a": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16"],
+                    "16b": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a"],
+                    "16c": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a", "16b"],
+                },
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
+                    "02": {"required_spec_inputs": ["01_capabilities.json"], "required_seed_inputs": []},
+                    "02a": {"required_spec_inputs": ["02_system_sketch.json"], "required_seed_inputs": []},
+                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": []},
+                    "04": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "03_glossary.json"], "required_seed_inputs": []},
+                    "05": {"required_spec_inputs": ["04_functional_requirements.json", "02_system_sketch.json", "03_glossary.json"], "required_seed_inputs": []},
+                    "06": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "07": {"required_spec_inputs": ["00_charter.json", "03_glossary.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "08": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json", "07_nfrs.json"], "required_seed_inputs": []},
+                    "09": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "02_system_sketch.json", "04_functional_requirements.json", "05_interface_contracts.json", "07_nfrs.json"], "required_seed_inputs": []},
+                    "10": {"required_spec_inputs": ["00_charter.json", "09_impl_plan.json"], "required_seed_inputs": []},
+                    "11": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "06_invariants.json", "07_nfrs.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "12": {"required_spec_inputs": ["02a_delivery_baseline.json", "10_governance.json"], "required_seed_inputs": []},
+                    "13": {"required_spec_inputs": ["02_system_sketch.json", "07_nfrs.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "13a": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json", "13_extension_generator.json"], "required_seed_inputs": []},
+                    "14": {"required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"], "required_seed_inputs": []},
+                    "15": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "16": {"required_spec_inputs": ["14_roadmap.json", "09_impl_plan.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "16a": {"required_spec_inputs": ["14_roadmap.json", "16_impl_context.json", "04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json"], "required_seed_inputs": []},
+                    "16b": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json"], "required_seed_inputs": []},
+                    "16c": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                }
+            }
+            (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+
+            code, out, err = self._run_cli(["prompt-context", "04", "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+
+            # Verify markdown table format (pipes | and hyphens -)
+            lines = out.split("\n")
+            self.assertGreaterEqual(len(lines), 3)  # At least header, separator, 1 data row
+            self.assertIn("|", lines[0])  # Header has pipes
+            self.assertIn("-", lines[1])  # Separator has hyphens
+
+            # Count data rows (lines after separator that have content)
+            data_rows = [l for l in lines[2:] if l.strip() and "|" in l]
+            self.assertGreaterEqual(len(data_rows), 13, msg=f"Expected >=13 downstream rows, got {len(data_rows)}")
+
+    def test_prompt_context_step00(self):
+        """Test that prompt-context step 00 outputs markdown table with >=8 downstream rows."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            tools_dir = repo_root / "tools"
+            tools_dir.mkdir()
+
+            # Write a minimal step_order.json
+            step_order = {
+                "version": "1.0.0",
+                "allowed_upstream_dependencies": {
+                    "00": [],
+                    "01": ["00"],
+                    "02": ["00", "01"],
+                    "02a": ["00", "01", "02"],
+                    "03": ["00", "01", "02", "02a"],
+                    "04": ["00", "01", "02", "02a", "03"],
+                    "05": ["00", "01", "02", "02a", "03", "04"],
+                    "06": ["00", "01", "02", "02a", "03", "04", "05"],
+                    "07": ["00", "01", "02", "02a", "03", "04", "05", "06"],
+                    "08": ["00", "01", "02", "02a", "03", "04", "05", "06", "07"],
+                    "09": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08"],
+                    "10": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09"],
+                    "11": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10"],
+                    "12": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11"],
+                    "13": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"],
+                    "13a": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13"],
+                    "14": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a"],
+                    "15": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14"],
+                    "16": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15"],
+                    "16a": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16"],
+                    "16b": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a"],
+                    "16c": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a", "16b"],
+                },
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
+                    "02": {"required_spec_inputs": ["01_capabilities.json"], "required_seed_inputs": []},
+                    "02a": {"required_spec_inputs": ["02_system_sketch.json"], "required_seed_inputs": []},
+                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": []},
+                    "04": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "03_glossary.json"], "required_seed_inputs": []},
+                    "05": {"required_spec_inputs": ["04_functional_requirements.json", "02_system_sketch.json", "03_glossary.json"], "required_seed_inputs": []},
+                    "06": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "07": {"required_spec_inputs": ["00_charter.json", "03_glossary.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "08": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json", "07_nfrs.json"], "required_seed_inputs": []},
+                    "09": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "02_system_sketch.json", "04_functional_requirements.json", "05_interface_contracts.json", "07_nfrs.json"], "required_seed_inputs": []},
+                    "10": {"required_spec_inputs": ["00_charter.json", "09_impl_plan.json"], "required_seed_inputs": []},
+                    "11": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "06_invariants.json", "07_nfrs.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "12": {"required_spec_inputs": ["02a_delivery_baseline.json", "10_governance.json"], "required_seed_inputs": []},
+                    "13": {"required_spec_inputs": ["02_system_sketch.json", "07_nfrs.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "13a": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json", "13_extension_generator.json"], "required_seed_inputs": []},
+                    "14": {"required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"], "required_seed_inputs": []},
+                    "15": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                    "16": {"required_spec_inputs": ["14_roadmap.json", "09_impl_plan.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
+                    "16a": {"required_spec_inputs": ["14_roadmap.json", "16_impl_context.json", "04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json"], "required_seed_inputs": []},
+                    "16b": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json"], "required_seed_inputs": []},
+                    "16c": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                }
+            }
+            (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+
+            code, out, err = self._run_cli(["prompt-context", "00", "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+
+            # Count data rows
+            lines = out.split("\n")
+            data_rows = [l for l in lines[2:] if l.strip() and "|" in l]
+            self.assertGreaterEqual(len(data_rows), 8, msg=f"Expected >=8 downstream rows, got {len(data_rows)}")
+
+    def test_prompt_context_unknown_step(self):
+        """Test that prompt-context errors gracefully for unknown steps."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            tools_dir = repo_root / "tools"
+            tools_dir.mkdir()
+
+            step_order = {
+                "version": "1.0.0",
+                "allowed_upstream_dependencies": {
+                    "00": [],
+                    "01": ["00"],
+                },
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
+                }
+            }
+            (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+
+            code, out, err = self._run_cli(["prompt-context", "99", "--repo-root", str(repo_root)])
+            self.assertNotEqual(0, code)
+            self.assertIn("Unknown step", err)
+
+    def test_prompt_context_output_format(self):
+        """Test that prompt-context outputs valid markdown table format."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            tools_dir = repo_root / "tools"
+            tools_dir.mkdir()
+
+            step_order = {
+                "version": "1.0.0",
+                "allowed_upstream_dependencies": {
+                    "00": [],
+                    "01": ["00"],
+                    "03": ["00", "01", "02", "02a"],
+                },
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": [], "extraction_intent": {"00_charter.json": "Extract goals"}},
+                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": [], "extraction_intent": {"00_charter.json": "Extract terms", "01_capabilities.json": "Extract verbs"}},
+                }
+            }
+            (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+
+            code, out, err = self._run_cli(["prompt-context", "00", "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+
+            lines = out.split("\n")
+            # Verify structure: header, separator, data rows
+            self.assertGreaterEqual(len(lines), 3)
+
+            # Header row must have pipes
+            self.assertIn("|", lines[0])
+            self.assertIn("Step", lines[0])
+            self.assertIn("Name", lines[0])
+            self.assertIn("Extraction Intent", lines[0])
+
+            # Separator row must have hyphens
+            self.assertIn("|", lines[1])
+            self.assertIn("-", lines[1])
+
+            # Data rows must have pipes
+            for line in lines[2:]:
+                if line.strip():
+                    self.assertIn("|", line)
+
 
 if __name__ == "__main__":
     unittest.main()

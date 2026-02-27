@@ -98,6 +98,7 @@
     },
     "success_metrics": {
       "type": "array",
+      "minItems": 2,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -187,6 +188,8 @@
     "spec_refs_ingested",
     "problem_statement",
     "success_metrics",
+    "stakeholders",
+    "user_segments",
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",

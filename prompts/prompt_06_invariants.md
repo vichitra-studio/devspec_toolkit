@@ -1,5 +1,7 @@
 # Step 06 · Invariants & Rules
 
+Run `specdev prompt-context 06` to see downstream consumers. This prompt's output feeds X downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -64,6 +66,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
   - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.

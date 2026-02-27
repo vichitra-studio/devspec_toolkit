@@ -1,5 +1,7 @@
 # Step 15 · Scaffold Generation
 
+Run `specdev prompt-context 15` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -63,6 +65,7 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - Route map includes all public APIs; paths/methods consistent with contracts.
   - Service skeleton sufficient to run a minimal service; validators listed.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

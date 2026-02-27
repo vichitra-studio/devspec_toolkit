@@ -1,5 +1,7 @@
 # Step 16 · Implementation Context (Trinity Anchor)
 
+Run `specdev prompt-context 16` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -179,6 +181,7 @@ Before emitting the Step 16 anchor artifact, verify:
 - [ ] If `docs_impact.status` is `required`, `docs_touched` has at least one entry.
 - [ ] If `plan.status` is `deferred`, `deferred_reason` is provided.
 - [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ### Coverage Closure
 Before emitting, verify:

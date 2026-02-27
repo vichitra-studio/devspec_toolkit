@@ -1,5 +1,7 @@
 # Step 05 · Interface Contracts
 
+Run `specdev prompt-context 05` to see downstream consumers. This prompt's output feeds X downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -61,6 +63,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - For HTTP: route and method set; for gRPC: service/method identified.
   - Request/response schemas known or marked `-tbd` with plan; errors enumerated.

@@ -1,5 +1,7 @@
 # Step 13a · Completeness Assessment
 
+Run `specdev prompt-context 13a` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -60,6 +62,7 @@ You are a senior specification auditor and quality control expert. Your job is t
   - Identification of at least one missing element OR confirmation of 100% completeness.
   - Ratings provided for current implementation state.
 - **Extension Check**: Ensure all extensions in manifest are present.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

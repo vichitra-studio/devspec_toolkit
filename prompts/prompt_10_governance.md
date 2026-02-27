@@ -1,5 +1,7 @@
 # Step 10 · Governance & Change Control
 
+Run `specdev prompt-context 10` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -67,6 +69,7 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - Versioning strategy present; spec_first_policy explicit; commit message requirements clear and actionable.
   - PR rules list core validations; reviewers cover necessary disciplines.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

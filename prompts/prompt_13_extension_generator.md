@@ -1,5 +1,7 @@
 # Step 13 · Extension Generator
 
+Run `specdev prompt-context 13` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -67,6 +69,7 @@ For each upstream artifact ingested, extract the following:
 - **Library Bloat**: Are you creating extensions for trivial things (e.g., `ext_01_logging.json`)? Use Step 07 NFRs instead.
 - **Redefinition**: Creating `ext_02_api.json` that conflicts with `05_interface_contracts.json`.
 - **Ignoring Flow**: Extensions are for *deep* verticals (AI, Blockchain), not horizontal layers (Frontend, Backend).
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

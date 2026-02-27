@@ -1,5 +1,7 @@
 # Step 00 · Project Charter
 
+Run `specdev prompt-context 00` to see downstream consumers. This prompt's output feeds 8 downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -63,6 +65,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate (do not output)
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items to check before emitting:
   - Problem statement names users, pain, measurable business impact, and hard constraints.
   - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
@@ -175,7 +178,39 @@ Before emitting, verify:
   "spec_refs_ingested": [],
   "title": "Project Charter",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
-  "success_metrics": [],
+  "stakeholders": [
+    {
+      "role": "Engineering Lead",
+      "needs": ["Clear authentication requirements", "Defined session lifecycle"]
+    }
+  ],
+  "user_segments": [
+    {
+      "segment_id": "end-user",
+      "description": "Registered users who authenticate via standard login flows.",
+      "jobs_to_be_done": ["Log in securely"],
+      "pains": ["Inconsistent session handling"],
+      "gains": ["Reliable authentication"]
+    }
+  ],
+  "success_metrics": [
+    {
+      "metric_id": "login-success-rate",
+      "name": "Login Success Rate",
+      "target": "99.5%",
+      "unit": "percent",
+      "measurement_method": "Ratio of successful logins to total attempts",
+      "unit_ref": { "id": "cn:core:unit:percent", "kind": "unit" }
+    },
+    {
+      "metric_id": "session-error-rate",
+      "name": "Session Error Rate",
+      "target": "< 0.1%",
+      "unit": "percent",
+      "measurement_method": "Ratio of session errors to total sessions",
+      "unit_ref": { "id": "cn:core:unit:percent", "kind": "unit" }
+    }
+  ],
   "generation_quality": {
     "assumptions": []
   },

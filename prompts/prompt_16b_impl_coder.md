@@ -1,5 +1,7 @@
 # Step 16b · Implementation Coder
 
+Run `specdev prompt-context 16b` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -160,6 +162,9 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 *   **Silent Failure**: Tests fail but `execution_results` says "PASS". *Fix*: Enforce strict log matching (evidence must contain "PASSED").
 *   **Blind Copying**: Pasting config without validating against schema. *Fix*: Use `traceRef` or validate structure locally.
 *   **Mind Reading**: Guessing implementation details (names, logic) that are not in the plan. *Fix*: Treat as **Ambiguity** and REJECT.
+
+## Self-Audit Gate (Score Threshold)
+If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ## FORBIDDEN ACTIONS (Immediate Rejection)
 

@@ -1,5 +1,7 @@
 # Step 11 · Red‑Team / Failure Modes
 
+Run `specdev prompt-context 11` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -87,6 +89,7 @@ For each upstream artifact ingested, extract the following:
 - [ ] Are all `target_ids` valid IDs from Step 05 (APIs) or Step 02 (Components)?
 - [ ] Are `mitigations` structured objects with types, not just strings?
 - [ ] Are `edge_cases` structured with IDs?
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

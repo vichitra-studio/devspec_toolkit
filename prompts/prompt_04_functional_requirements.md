@@ -1,5 +1,7 @@
 # Step 04 · Functional Requirements
 
+Run `specdev prompt-context 04` to see downstream consumers. This step has 13 downstream consumers — see `specdev prompt-context 04`. This prompt's output feeds 13 downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -60,6 +62,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Every in-scope capability maps to ≥1 FR; each FR covers one behavior.
   - Each FR has ≥1 acceptance criterion with measurable outcome; top FRs include ≥2.
@@ -172,7 +175,15 @@ Before emitting, verify:
         {
           "criterion_id": "ac-auth-login-success",
           "text": "Valid credentials return a signed token and user id."
+        },
+        {
+          "criterion_id": "ac-auth-login-failure",
+          "text": "Invalid credentials return a 401 error with no token."
         }
+      ],
+      "trace": [
+        { "type": "capability", "id": "cap-user-auth" },
+        { "type": "api", "id": "api-session-create" }
       ],
       "capability_ref": {
         "id": "cn:core:capability:example",

@@ -1,5 +1,7 @@
 # Step 16c · Implementation Reviewer
 
+Run `specdev prompt-context 16c` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -210,6 +212,9 @@ For each `checklist[]` item:
 *   **Rubber Stamping**: Approving based on prose summary, not test logs. *Fix*: Verify `execution.execution_results` matches `critical_evidence`.
 *   **Infinite Loop**: Failing to spawn recursive `remediation_tasks` for findings. *Fix*: Every finding must have a `task` unless it's a "won't fix".
 *   **Security Bypass**: Verifying while `security_status` is RED. *Fix*: Check Step 11/17 gates explicitly.
+
+## Self-Audit Gate (Score Threshold)
+If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ## FORBIDDEN ACTIONS (Immediate Rejection)
 

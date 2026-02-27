@@ -48,7 +48,8 @@
           "id": "api-login",
           "note": "Authentication API endpoint"
         }
-      ]
+      ],
+      "capability_ref": "cap-user-authentication"
     },
     {
       "fr_id": "fr-user-logout",
@@ -66,6 +67,10 @@
           "criterion_id": "ac-logout-success",
           "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page",
           "fixture_ref": "fixture-user-logout-success"
+        },
+        {
+          "criterion_id": "ac-logout-session-cleared",
+          "text": "Given user has logged out, when user attempts to access protected resource, then system redirects to login page"
         }
       ],
       "trace": [
@@ -74,7 +79,8 @@
           "id": "cap-user-session-management",
           "note": "Manages user session lifecycle"
         }
-      ]
+      ],
+      "capability_ref": "cap-user-session-management"
     }
   ],
   "generation_quality": {

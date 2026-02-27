@@ -1,5 +1,7 @@
 # Step 14 · Roadmap
 
+Run `specdev prompt-context 14` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -68,6 +70,7 @@ For each upstream artifact ingested, extract the following:
 ## Self-Audit Gate
 - Confirm that existing specs cover enough scope to justify a roadmap.
 - Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure

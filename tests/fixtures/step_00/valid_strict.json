@@ -65,6 +65,17 @@
         "kind": "unit"
       },
       "measurement_method": "P95 via Datadog"
+    },
+    {
+      "metric_id": "uptime",
+      "name": "System Uptime",
+      "target": 99.99,
+      "unit": "percent",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "measurement_method": "Monthly monitoring"
     }
   ],
   "generation_quality": {

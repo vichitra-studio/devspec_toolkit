@@ -1,5 +1,7 @@
 # Step 08 · Test Plan & Fixtures
 
+Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds X downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -66,6 +68,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Each high-priority FR has ≥1 fixture; negative fixtures exist for key errors; contract mode covers each public API.
   - Inputs/expected align with schemas; targets list correct IDs; tags present for CI gating where needed.

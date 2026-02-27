@@ -45,7 +45,7 @@
           },
           "acceptance_criteria": {
             "type": "array",
-            "minItems": 1,
+            "minItems": 2,
             "items": {
               "type": "object",
               "additionalProperties": false,
@@ -90,6 +90,7 @@
           "fr_id",
           "statement",
           "acceptance_criteria",
+          "trace",
           "capability_ref"
         ]
       }

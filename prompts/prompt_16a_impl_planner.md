@@ -1,5 +1,7 @@
 # Step 16a · Implementation Planner
 
+Run `specdev prompt-context 16a` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -66,6 +68,9 @@ For each upstream artifact ingested, extract the following:
 
 ### Roadmap-to-Checklist Coverage
 Every `tasks[].task_id` from `14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
+
+## Self-Audit Gate (Score Threshold)
+If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ## FORBIDDEN ACTIONS (Immediate Rejection)
 

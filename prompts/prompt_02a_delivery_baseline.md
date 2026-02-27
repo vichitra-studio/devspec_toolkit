@@ -1,5 +1,7 @@
 # Step 02a · Delivery Baseline
 
+Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds X downstream steps.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -59,6 +61,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - All four environments listed; each has enough detail to differentiate.
   - CI gates include core validations; governance and coverage accounted for where relevant.

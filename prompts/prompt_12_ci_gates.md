@@ -1,5 +1,7 @@
 # Step 12 · CI Gates
 
+Run `specdev prompt-context 12` to see downstream consumers.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -60,6 +62,7 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - All core validations present; dependencies declared; steps named clearly.
   - Coverage thresholds stated or explicitly deferred with rationale.
+- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
 ### Coverage Closure
