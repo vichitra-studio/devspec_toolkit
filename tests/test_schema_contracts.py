@@ -136,7 +136,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "prod": {"url": "https://example.com"},
             },
             "ci_gates": ["validate-all"],
-            "generation_quality": {"preflight_passed": True},
+            "generation_quality": {"assumptions": []},
             "canonical_refs_used": [],
             "canonical_proposals": [],
             "canonical_conflicts": [],
@@ -372,7 +372,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "environment_ref": {"id": "cn:core:environment:prod", "kind": "environment"},
                             }
                         ],
-                        "generation_quality": {"preflight_passed": True},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -473,7 +473,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "units": "ms",
                             }
                         ],
-                        "generation_quality": {"preflight_passed": True},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -557,7 +557,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "stage": "prod",
                             }
                         ],
-                        "generation_quality": {"preflight_passed": True},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -647,7 +647,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "severity": "high",
                             }
                         ],
-                        "generation_quality": {"preflight_passed": True},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],

@@ -43,7 +43,7 @@
     }
   ],
   "generation_quality": {
-    "preflight_passed": true
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

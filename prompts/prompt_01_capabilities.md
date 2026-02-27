@@ -59,7 +59,7 @@ For each upstream artifact ingested, extract the following:
 - Naming: prefer `capability-<verb>-<noun>` from glossary; avoid UI- or table-centric names.
 
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
+- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - Gating items:
   - All in-scope charter goals map to at least one capability.
   - Each capability contains a clear verb, scope, owner (if not external), and minimal inputs/outputs.
@@ -176,15 +176,7 @@ Before emitting, verify:
     }
   ],
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [
     {
@@ -208,5 +200,5 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
 2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
 3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

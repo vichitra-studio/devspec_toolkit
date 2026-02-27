@@ -382,87 +382,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "preflight_passed": {
-          "type": "boolean"
-        },
-        "evidence_records": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "field_path": {
-                "type": "string"
-              },
-              "source_kind": {
-                "type": "string",
-                "enum": [
-                  "seed_ref",
-                  "canonical_ref",
-                  "upstream_ref"
-                ]
-              },
-              "source_ref": {
-                "type": "string"
-              },
-              "note": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "field_path",
-              "source_kind",
-              "source_ref"
-            ]
-          }
-        },
-        "unresolved_inputs": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-        },
         "assumptions": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-        },
-        "placeholder_scan": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "has_placeholders": {
-              "type": "boolean"
-            },
-            "tokens_found": {
-              "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-            }
-          },
-          "required": [
-            "has_placeholders"
-          ]
-        },
-        "self_check_results": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "check_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-              },
-              "passed": {
-                "type": "boolean"
-              },
-              "details": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "check_id",
-              "passed"
-            ]
-          }
         }
-      },
-      "required": [
-        "preflight_passed"
-      ]
+      }
     },
     "seedRef": {
       "$anchor": "seedRef",

@@ -27,7 +27,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E410",
             "E420",
             "E510",
-            "E511",
+
             "E512",
             "E520",
             "E521",

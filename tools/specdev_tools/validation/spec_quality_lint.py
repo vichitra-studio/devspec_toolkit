@@ -32,9 +32,8 @@ def lint_spec_quality(spec_dir: str) -> list[str]:
             continue
         rel = os.path.relpath(path, spec_dir)
         errors.extend(_check_required_top_level(rel, data))
-        placeholder_errs, placeholder_tokens = _check_placeholders(rel, data)
+        placeholder_errs, _ = _check_placeholders(rel, data)
         errors.extend(placeholder_errs)
-        errors.extend(_check_placeholder_scan_agreement(rel, data, placeholder_tokens))
         errors.extend(_check_critical_arrays(rel, data))
         _collect_ids_and_refs(data, rel, known_ids, refs)
 
@@ -79,38 +78,14 @@ def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[str]:
     rel = os.path.relpath(path, base)
     errs: list[str] = []
     errs.extend(_check_required_top_level(rel, data))
-    placeholder_errs, placeholder_tokens = _check_placeholders(rel, data)
+    placeholder_errs, _ = _check_placeholders(rel, data)
     errs.extend(placeholder_errs)
-    errs.extend(_check_placeholder_scan_agreement(rel, data, placeholder_tokens))
     errs.extend(_check_critical_arrays(rel, data))
     # Intra-artifact assumption check (single-file mode: no cross-artifact IDs)
     single_ids: set[str] = set()
     single_refs: list[tuple[str, str, str]] = []
     _collect_ids_and_refs(data, rel, single_ids, single_refs)
     errs.extend(_check_assumptions(rel, data, single_ids))
-    return errs
-
-
-def _check_placeholder_scan_agreement(rel: str, data: dict, actual_tokens: set[str]) -> list[str]:
-    """RFC 3.2: E511 if independent scan finds tokens NOT reported in generation_quality.placeholder_scan.tokens_found."""
-    errs = []
-    gq = data.get("generation_quality")
-    if not isinstance(gq, dict):
-        return errs
-    scan = gq.get("placeholder_scan")
-    if not isinstance(scan, dict):
-        return errs
-    tokens = scan.get("tokens_found")
-    if tokens is None:
-        return errs
-    if not isinstance(tokens, list):
-        errs.append(f"E511 PLACEHOLDER_SCAN_MISMATCH {rel} generation_quality.placeholder_scan.tokens_found must be a list")
-        return errs
-    declared_upper = {str(t).upper() for t in tokens}
-    missed = actual_tokens - declared_upper
-    if missed:
-        missed_sorted = sorted(missed)
-        errs.append(f"E511 PLACEHOLDER_SCAN_MISMATCH {rel} agent_missed={missed_sorted}")
     return errs
 
 

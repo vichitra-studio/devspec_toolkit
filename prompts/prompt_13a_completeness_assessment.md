@@ -54,7 +54,7 @@ You are a senior specification auditor and quality control expert. Your job is t
   - **Rationale Fields**: Must be populated for all `tech_stack` choices and `roadmap` items. Empty rationale = incomplete.
 
 ## Self-Audit Gate (do not output)
-- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
+- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - Gating items:
   - Can read at least 00, 01, 04, 05.
   - Identification of at least one missing element OR confirmation of 100% completeness.
@@ -181,15 +181,7 @@ For each upstream artifact ingested, extract the following:
     "confidence_level": 1.0
   },
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],
@@ -209,5 +201,5 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
 2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
 3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

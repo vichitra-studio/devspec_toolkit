@@ -108,15 +108,7 @@
   ],
   "trace": [],
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

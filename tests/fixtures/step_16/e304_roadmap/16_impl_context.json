@@ -43,7 +43,9 @@
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "POST /auth/login returns 200 with JWT",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-auth-login"
         }
       ]
@@ -53,19 +55,13 @@
       "rationale": "No public API surface changes."
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/"]
+      "test_commands": [
+        "pytest tests/"
+      ]
     }
   },
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

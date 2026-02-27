@@ -18,7 +18,7 @@ class SpecQualityLintTests(unittest.TestCase):
                         "owner": "system",
                         "created_at": "2026-01-01T00:00:00Z",
                         "seed_refs": [],
-                        "generation_quality": {"completeness": 1, "correctness": 1, "consistency": 1},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -114,47 +114,26 @@ class SpecQualityLintTests(unittest.TestCase):
         errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]}, set())
         self.assertTrue(any("W572 ASSUMPTION_COUNT_HIGH" in e for e in errs))
 
-    def test_detects_placeholder_count_mismatch(self):
-        from specdev_tools.validation.spec_quality_lint import _check_placeholder_scan_agreement
-        # Agent declares only "TBD" but independent scan found "TBD" and "TODO" — "TODO" is missed
-        errs = _check_placeholder_scan_agreement("test.json", {
-            "generation_quality": {
-                "placeholder_scan": {
-                    "tokens_found": ["TBD"]
-                }
-            }
-        }, {"TBD", "TODO"})
-        self.assertTrue(any("E511 PLACEHOLDER_SCAN_MISMATCH test.json" in e and "TODO" in e for e in errs))
-
-        # Counts match but different tokens: agent says ["TBD-1","TBD-2"], scan finds ["TODO-A","TODO-B"]
-        errs_diff = _check_placeholder_scan_agreement("test.json", {
-            "generation_quality": {
-                "placeholder_scan": {
-                    "tokens_found": ["TBD-1", "TBD-2"]
-                }
-            }
-        }, {"TODO-A", "TODO-B"})
-        self.assertTrue(any("E511 PLACEHOLDER_SCAN_MISMATCH" in e for e in errs_diff))
-
-        # No mismatch when agent declares all found tokens
-        errs_ok = _check_placeholder_scan_agreement("test.json", {
-            "generation_quality": {
-                "placeholder_scan": {
-                    "tokens_found": ["TBD", "TODO"]
-                }
-            }
-        }, {"TBD", "TODO"})
-        self.assertEqual(errs_ok, [])
-
-        errs2 = _check_placeholder_scan_agreement("test.json", {
-            "generation_quality": {
-                "placeholder_scan": {
-                    "tokens_found": "not a list"
-                }
-            }
-        }, {"TBD"})
-        self.assertTrue(any("tokens_found must be a list" in e for e in errs2))
-
+    def test_simplified_generation_quality_accepted(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "00_charter.json").write_text(
+                json.dumps({
+                    "id": "charter",
+                    "owner": "system",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "seed_refs": [],
+                    "generation_quality": {"assumptions": []},
+                    "canonical_refs_used": [],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_spec_quality(str(root / "spec"))
+            gq_errs = [e for e in errs if "generation_quality" in e]
+            self.assertEqual(gq_errs, [])
 
 
 if __name__ == "__main__":

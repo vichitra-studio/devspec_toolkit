@@ -307,7 +307,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                                 "definition": "JSON Web Token used to carry signed authentication claims.",
                             }
                         ],
-                        "generation_quality": {"preflight_passed": True},
+                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],

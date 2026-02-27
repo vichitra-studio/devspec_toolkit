@@ -47,7 +47,9 @@
           "type": "behavior",
           "layer": "service",
           "linked_test_expectation": "login success",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-login-success",
           "implementation": {
             "status": "in_progress",
@@ -75,7 +77,9 @@
           "type": "validation",
           "layer": "tests",
           "linked_test_expectation": "login validation passes",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-login-success",
           "implementation": {
             "status": "pending",
@@ -97,21 +101,15 @@
       ]
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/"]
+      "test_commands": [
+        "pytest tests/"
+      ]
     }
   },
   "execution": {},
   "review": {},
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

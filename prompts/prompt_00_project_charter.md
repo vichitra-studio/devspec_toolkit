@@ -62,7 +62,7 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: remove “improve/optimize/user-friendly/fast”; replace with quantifiable targets and timeframes.
 
 ## Self-Audit Gate (do not output)
-- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
+- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - Gating items to check before emitting:
   - Problem statement names users, pain, measurable business impact, and hard constraints.
   - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
@@ -177,15 +177,7 @@ Before emitting, verify:
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
   "success_metrics": [],
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],
@@ -205,5 +197,5 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
 2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
 3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

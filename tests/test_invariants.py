@@ -25,7 +25,7 @@ def _make_spec_file(tmp_path, rules, filename="06_invariants.json"):
         "seed_refs": [],
         "spec_refs_ingested": [],
         "rules": rules,
-        "generation_quality": {"preflight_passed": True},
+        "generation_quality": {"assumptions": []},
         "canonical_refs_used": [],
         "canonical_proposals": [],
         "canonical_conflicts": [],

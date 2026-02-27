@@ -43,11 +43,15 @@
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "POST /auth/login returns 200 with JWT",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-auth-login",
           "implementation": {
             "status": "verified",
-            "files_touched": ["src/api/auth.py"],
+            "files_touched": [
+              "src/api/auth.py"
+            ],
             "actions": [
               {
                 "type": "file_edit",
@@ -68,7 +72,9 @@
       "rationale": "No public API surface changes."
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/test_auth.py"]
+      "test_commands": [
+        "pytest tests/test_auth.py"
+      ]
     }
   },
   "execution": {
@@ -92,14 +98,20 @@
       "ci_status": "green"
     },
     "critical_evidence": {
-      "passed_test_commands": ["pytest tests/test_auth.py"],
-      "satisfied_checklist_ids": ["cl-001"]
+      "passed_test_commands": [
+        "pytest tests/test_auth.py"
+      ],
+      "satisfied_checklist_ids": [
+        "cl-001"
+      ]
     }
   },
   "review": {
     "verdict": "verified",
     "fixture_status": {
-      "implemented_endpoints": ["auth-login"],
+      "implemented_endpoints": [
+        "auth-login"
+      ],
       "test_results": [
         {
           "fixture_ref": "fixture-auth-login",
@@ -110,15 +122,7 @@
     }
   },
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

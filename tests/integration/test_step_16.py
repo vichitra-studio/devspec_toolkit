@@ -325,14 +325,7 @@ class TestStep16(unittest.TestCase):
                 },
                 "review_requirements": {"test_commands": ["pytest tests/"]}
             },
-            "generation_quality": {
-                "preflight_passed": True,
-                "evidence_records": [],
-                "unresolved_inputs": [],
-                "assumptions": [],
-                "placeholder_scan": {"has_placeholders": False, "tokens_found": []},
-                "self_check_results": []
-            },
+            "generation_quality": {"assumptions": []},
             "canonical_refs_used": [],
             "canonical_proposals": [],
             "canonical_conflicts": []

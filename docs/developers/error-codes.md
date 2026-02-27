@@ -14,6 +14,10 @@
 
 **Resolution**: Update the stale artifact(s) to use the current canonical ID. The error message includes per-artifact paths showing which file uses which canonical ID.
 
+### E511 PLACEHOLDER_SCAN_MISMATCH
+
+**Removed in v0.4.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The `placeholder_scan` sub-field of `generation_quality` has been removed.
+
 ### E561 / W561 UNCOVERED_FR
 
 **Trigger**: A functional requirement defined in step 04 is not assigned to any milestone in step 14 (`fr_refs`).

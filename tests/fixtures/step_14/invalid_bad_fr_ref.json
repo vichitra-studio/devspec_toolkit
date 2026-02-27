@@ -29,7 +29,9 @@
       "name": "Core Foundation",
       "target_date": "2025-02-01",
       "user_story": "As a developer, I want a stable base API so that I can build features.",
-      "source_milestones": ["m1-core-foundation"],
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
       "fr_refs": [
         "fr-does-not-exist"
       ],
@@ -49,15 +51,7 @@
   ],
   "dependencies": [],
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],

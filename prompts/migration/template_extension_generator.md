@@ -18,7 +18,7 @@
 The migrated artifact MUST include:
 
 - `$schema`: Set to the canonical URI above.
-- `generation_quality`: Object with `preflight_passed` boolean.
+- `generation_quality`: Object with `assumptions` array.
 - `canonical_refs_used`: Array of canonical reference objects.
 - `canonical_proposals`: Array (may be empty).
 - `canonical_conflicts`: Array (may be empty).

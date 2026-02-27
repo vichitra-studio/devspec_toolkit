@@ -25,8 +25,18 @@ change_types:
   - change_type     # Field type changed
   - add_constraint  # New validation constraint
   - paradigm_shift  # Format change (prose→JSON)
+  - add_module      # New module/file added to tools
+  - add_config      # New configuration added
+  - change_config   # Configuration changed
+  - change_schema   # Schema structure modified
+  - add_definition  # New shared definition added
+  - add_script      # New script/migration tool added
+  - remove_validator # Validator or error code removed
+  - fix             # Bug fix
+  - internal_restructure # Internal code reorganization
 
 migration_actions:
+  - none           # No migration needed
   - auto           # Mechanical fix, applied automatically
   - ai_assisted    # Requires AI prompt generation
   - merge          # Step consolidation

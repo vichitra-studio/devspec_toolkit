@@ -43,11 +43,15 @@
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "POST /auth/login returns 200 with JWT",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-auth-login",
           "implementation": {
             "status": "verified",
-            "files_touched": ["src/api/auth.py"],
+            "files_touched": [
+              "src/api/auth.py"
+            ],
             "actions": [
               {
                 "type": "file_edit",
@@ -79,7 +83,9 @@
           "fr_id": "fr-user-login",
           "satisfied": true,
           "evidence_summary": "Login endpoint returns signed JWT token with correct claims as verified by test suite passing.",
-          "checklist_ids": ["cl-001"]
+          "checklist_ids": [
+            "cl-001"
+          ]
         }
       ],
       "hallucinated_features": [],
@@ -87,15 +93,7 @@
     }
   },
   "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
+    "assumptions": []
   },
   "canonical_refs_used": [],
   "canonical_proposals": [],
