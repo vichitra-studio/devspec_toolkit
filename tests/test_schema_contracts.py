@@ -16,7 +16,7 @@ class SchemaContractsTests(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parents[1]
         self.schema_root = self.repo_root / "schema"
 
-    def test_all_step_schemas_include_b4_top_level_fields(self):
+    def test_all_step_schemas_include_metadata_top_level_fields(self):
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
             with path.open("r", encoding="utf-8") as f:
                 schema = json.load(f)
@@ -38,7 +38,7 @@ class SchemaContractsTests(unittest.TestCase):
                 schema = json.load(f)
             self.assertGreater(_count_canonical_ref_slots(schema), 0, msg=path.name)
 
-    def test_b4_expected_canonical_ref_kinds_exist_per_step(self):
+    def test_expected_canonical_ref_kinds_exist_per_step(self):
         expected_by_step = {
             "00": {"role", "unit"},
             "01": {"capability", "action", "entity", "role"},
@@ -210,7 +210,7 @@ class SchemaContractsTests(unittest.TestCase):
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
         self.assertTrue(errors, msg="String dependency payload unexpectedly passed")
 
-    def test_validate_file_enforces_b4_top_level_fields_for_step_artifacts(self):
+    def test_validate_file_enforces_metadata_top_level_fields_for_step_artifacts(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "tools").mkdir()
@@ -263,7 +263,7 @@ class SchemaContractsTests(unittest.TestCase):
             self.assertTrue(any("missing top-level 'canonical_proposals'" in e for e in errs))
             self.assertTrue(any("missing top-level 'canonical_conflicts'" in e for e in errs))
 
-    def test_validate_file_enforces_b4_even_with_nonstandard_filename(self):
+    def test_validate_file_enforces_metadata_even_with_nonstandard_filename(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "tools").mkdir()

@@ -73,7 +73,7 @@ class TestNoEmptyTemplates:
 
 
 class TestTemplateContentValidation:
-    """Templates reference canonical schema URIs and B4 fields."""
+    """Templates reference canonical schema URIs and metadata fields."""
 
     @pytest.mark.parametrize("template_name", EXPECTED_TEMPLATES)
     def test_templates_reference_canonical_schema_uri(self, templates_dir, template_name):
@@ -87,7 +87,7 @@ class TestTemplateContentValidation:
         )
 
     @pytest.mark.parametrize("template_name", EXPECTED_TEMPLATES)
-    def test_templates_include_b4_fields(self, templates_dir, template_name):
+    def test_templates_include_metadata_fields(self, templates_dir, template_name):
         """Each template mentions generation_quality and canonical_refs_used."""
         path = templates_dir / template_name
         if not path.exists():

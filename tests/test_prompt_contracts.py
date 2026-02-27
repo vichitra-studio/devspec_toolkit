@@ -14,7 +14,7 @@ class PromptContractsTests(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parents[1]
         self.prompt_dir = Path(__file__).resolve().parents[1] / "prompts"
 
-    def test_output_contract_examples_include_b4_fields(self):
+    def test_output_contract_examples_include_metadata_fields(self):
         for path in sorted(self.prompt_dir.glob("prompt_*.md")):
             text = path.read_text(encoding="utf-8")
             if "# Output Contract" not in text or "## B4 Metadata Contract" not in text:

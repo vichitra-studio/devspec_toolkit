@@ -218,7 +218,8 @@ def main():
     elif args.cmd == "invariants-check":
         from .validation.invariants import run_invariants
         spec_dir = os.path.abspath(args.spec_dir)
-        sample = json.load(open(args.sample, "r", encoding="utf-8"))
+        with open(args.sample, "r", encoding="utf-8") as fh:
+            sample = json.load(fh)
         res = run_invariants(spec_dir, sample)
         print(json.dumps(res, indent=2))
     elif args.cmd == "seed-lint":

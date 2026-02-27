@@ -149,7 +149,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("property_drift field='trace'" in e for e in errs))
 
-    def test_detects_missing_b4_property_when_not_declared_anywhere(self):
+    def test_detects_missing_metadata_property_when_not_declared_anywhere(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "schema").mkdir()
@@ -223,7 +223,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             errs = run_prompt_schema_sync(str(root))
             self.assertTrue(any("missing_required_canonical_refs" in e for e in errs))
 
-    def test_b4_text_mention_does_not_bypass_missing_property_check(self):
+    def test_metadata_text_mention_does_not_bypass_missing_property_check(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "schema").mkdir()

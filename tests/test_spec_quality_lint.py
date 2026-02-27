@@ -51,7 +51,7 @@ class SpecQualityLintTests(unittest.TestCase):
             errs = lint_spec_quality(str(root / "spec"))
             self.assertFalse(any("seed_manifest.json missing top-level" in e for e in errs))
 
-    def test_detects_missing_b4_top_level_fields(self):
+    def test_detects_missing_metadata_top_level_fields(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "spec").mkdir()
