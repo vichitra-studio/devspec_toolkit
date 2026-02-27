@@ -90,6 +90,27 @@
         "introduced_at"
       ]
     },
+    "aliasLifecycle": {
+      "$anchor": "aliasLifecycle",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deprecated_since": {
+          "type": "string",
+          "format": "date"
+        },
+        "sunset_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "replaced_by": {
+          "$ref": "#/$defs/canonicalId"
+        }
+      },
+      "required": [
+        "deprecated_since"
+      ]
+    },
     "entry": {
       "$anchor": "entry",
       "type": "object",
@@ -261,9 +282,8 @@
         "status": {
           "$ref": "#/$defs/aliasStatus"
         },
-        "deprecated_since": {
-          "type": "string",
-          "format": "date-time"
+        "lifecycle": {
+          "$ref": "#/$defs/aliasLifecycle"
         }
       },
       "required": [
@@ -286,7 +306,7 @@
           },
           "then": {
             "required": [
-              "deprecated_since"
+              "lifecycle"
             ]
           }
         }

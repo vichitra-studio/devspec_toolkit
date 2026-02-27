@@ -1,6 +1,7 @@
 import unittest
 
 from specdev_tools.validation.validators import (
+    step_04,
     step_05,
     step_02a,
     step_06,
@@ -74,6 +75,71 @@ class StepValidatorsTests(unittest.TestCase):
     def test_step_14_external_dependency_missing_owner(self):
         errs = step_14.validate_step_14({"milestones": [], "dependencies": [{"type": "external", "id": "auth-service"}]}, ".")
         self.assertTrue(errs)
+
+
+    # T09a: step_04 tests
+    def test_step_04_bad_fr_id_format(self):
+        errs = step_04.validate_step_04({"functional_requirements": [{"fr_id": "BAD_ID"}]}, ".")
+        self.assertTrue(any("convention" in e for e in errs))
+
+    def test_step_04_valid_fr_id(self):
+        errs = step_04.validate_step_04({"functional_requirements": [{"fr_id": "fr-login", "title": "User login"}]}, ".")
+        self.assertFalse(any("convention" in e for e in errs))
+
+    # T10a: step_06 tests
+    def test_step_06_bad_inv_id_format(self):
+        errs = step_06.validate_step_06({"rules": [{"inv_id": "BAD", "trace": ["fr-a"]}]}, ".")
+        self.assertTrue(any("convention" in e for e in errs))
+
+    def test_step_06_bad_trace_target(self):
+        errs = step_06.validate_step_06({"rules": [{"inv_id": "inv-a", "trace": ["not-a-valid-id"]}]}, ".")
+        self.assertTrue(any("pattern" in e for e in errs))
+
+    # T11a: step_07 tests
+    def test_step_07_bad_nfr_id_format(self):
+        errs = step_07.validate_step_07({"nfrs": [{"nfr_id": "BAD"}]}, ".")
+        self.assertTrue(any("convention" in e for e in errs))
+
+    def test_step_07_target_no_digit(self):
+        errs = step_07.validate_step_07({"nfrs": [{"nfr_id": "nfr-perf", "target": "high"}]}, ".")
+        self.assertTrue(any("no digit" in e for e in errs))
+
+    # T12a: step_08 tests
+    def test_step_08_bad_fixture_id(self):
+        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "BAD", "targets": ["fr-a"]}]}, ".")
+        self.assertTrue(any("convention" in e for e in errs))
+
+    def test_step_08_bad_target_format(self):
+        errs = step_08.validate_step_08({"fixtures": [{"fixture_id": "fix-a", "targets": ["not-valid"]}]}, ".")
+        self.assertTrue(any("pattern" in e for e in errs))
+
+    # T13a: step_12 tests
+    def test_step_12_circular_dependency(self):
+        errs = step_12.validate_step_12(
+            {"jobs": [
+                {"job_id": "j1", "requires": ["j2"], "steps": [{"id": "s", "command": "echo"}]},
+                {"job_id": "j2", "requires": ["j1"], "steps": [{"id": "s", "command": "echo"}]},
+            ]}, "."
+        )
+        self.assertTrue(any("Circular" in e for e in errs))
+
+    def test_step_12_valid_dag(self):
+        errs = step_12.validate_step_12(
+            {"jobs": [
+                {"job_id": "j1", "requires": [], "steps": [{"id": "s", "command": "echo"}]},
+                {"job_id": "j2", "requires": ["j1"], "steps": [{"id": "s", "command": "echo"}]},
+            ]}, "."
+        )
+        self.assertFalse(any("Circular" in e for e in errs))
+
+    # T14a: step_13a tests
+    def test_step_13a_bad_element_id(self):
+        errs = step_13a.validate_step_13a({"missing_elements": [{"element_id": "BAD ID!", "impact_score": 50}]}, ".")
+        self.assertTrue(any("convention" in e for e in errs))
+
+    def test_step_13a_incomplete_but_no_missing(self):
+        errs = step_13a.validate_step_13a({"missing_elements": [], "summary": {"completeness": 50}}, ".")
+        self.assertTrue(any("missing_elements is empty" in e for e in errs))
 
 
 if __name__ == "__main__":

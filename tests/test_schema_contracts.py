@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
-from specdev_tools.canonical.autofix import canonical_autofix
+from specdev_tools.canonical.autofix import _try_infer_ref, canonical_autofix
 from specdev_tools.core.registry import SchemaRegistry
 from specdev_tools.validation.validate import _registry_for, validate_file
 
@@ -729,6 +729,95 @@ class SchemaContractsTests(unittest.TestCase):
 
             payload = json.loads(sample.read_text(encoding="utf-8"))
             self.assertEqual(initial_payload, payload)
+
+    def test_canonical_autofix_skips_deprecated_alias_and_emits_warn(self):
+        """Autofix must NOT inject a ref when the matched alias is deprecated.
+
+        Regression guard for the deprecation guard in _try_infer_ref():
+        after resolve_alias() succeeds, if alias_is_deprecated() returns True the
+        function must append a WARN message and return without mutating the document.
+
+        This test exercises _try_infer_ref() directly so that the schema-validator
+        lookup (which would need a fully wired SchemaRegistry) does not interfere
+        with the deprecated-alias guard that runs before _apply_if_schema_valid().
+        """
+        from specdev_tools.canonical.registry import CanonicalRegistry
+
+        # Build a registry with one active entry and one deprecated alias.
+        # The deprecated alias "old-ms" resolves unambiguously to cn:core:unit:ms,
+        # but alias_is_deprecated("unit", "old-ms") must return True.
+        registry = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {
+                        "id": "cn:core:unit:ms",
+                        "kind": "unit",
+                        "preferred_label": "milliseconds",
+                        "version": "1.0.0",
+                        "status": "active",
+                        "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                    }
+                ],
+                "aliases": [
+                    {
+                        "kind": "unit",
+                        "normalized": "old-ms",
+                        "target_id": "cn:core:unit:ms",
+                        "status": "deprecated",
+                        "lifecycle": {
+                            "deprecated_since": "2026-01-15",
+                            "sunset_date": "2099-12-31",
+                            "replaced_by": "cn:core:unit:ms",
+                        },
+                    }
+                ],
+            }
+        )
+
+        # Confirm the registry wired up correctly before testing autofix behavior.
+        self.assertEqual("cn:core:unit:ms", registry.resolve_alias("unit", "old-ms"))
+        self.assertTrue(registry.alias_is_deprecated("unit", "old-ms"))
+
+        # Document node that would normally trigger ("unit" -> "unit_ref") inference.
+        obj = {"unit": "old-ms"}
+        root_data = dict(obj)
+        file_changes: list = []
+
+        # Call _try_infer_ref() with schema_validator=None so _apply_if_schema_valid()
+        # would always succeed — the ONLY gate is the deprecation guard.
+        _try_infer_ref(
+            obj=obj,
+            source_field="unit",
+            target_ref_field="unit_ref",
+            kind="unit",
+            registry=registry,
+            file_changes=file_changes,
+            root_data=root_data,
+            schema_validator=None,
+            path="nfrs[0]",
+        )
+
+        # unit_ref must NOT have been injected.
+        self.assertNotIn(
+            "unit_ref",
+            obj,
+            f"Autofix must not inject unit_ref for a deprecated alias, got obj={obj}",
+        )
+
+        # A WARN message must have been appended.
+        warn_messages = [m for m in file_changes if m.startswith("WARN")]
+        self.assertTrue(
+            warn_messages,
+            f"Expected at least one WARN message, got file_changes={file_changes}",
+        )
+        self.assertTrue(
+            any("deprecated" in m for m in warn_messages),
+            f"Expected 'deprecated' in WARN message, got: {warn_messages}",
+        )
+        self.assertTrue(
+            any("replaced_by" in m for m in warn_messages),
+            f"Expected 'replaced_by' in WARN message, got: {warn_messages}",
+        )
 
 
 def _count_canonical_ref_slots(obj) -> int:

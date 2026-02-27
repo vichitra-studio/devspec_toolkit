@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from typing import Any
@@ -128,6 +129,14 @@ def _try_infer_ref(
         return
     resolved = registry.resolve_alias(kind, value)
     if not resolved:
+        return
+    if registry.alias_is_deprecated(kind, value):
+        normalized = " ".join(p for p in re.split(r"[\s_-]+", value.lower().strip()) if p)
+        lc = registry.alias_lifecycle.get((kind, normalized), {})
+        replaced_by = lc.get("replaced_by", "")
+        file_changes.append(
+            f"WARN {path or '$'} skipped autofix for deprecated alias {source_field}='{value}' replaced_by={replaced_by}"
+        )
         return
     candidate_ref = {"id": resolved, "kind": kind}
     if not _apply_if_schema_valid(obj, target_ref_field, candidate_ref, root_data, schema_validator):

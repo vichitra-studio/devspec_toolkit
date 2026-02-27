@@ -32,7 +32,7 @@ def validate_canonical_integrity(
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
     errors: list[str] = list(registry.load_errors)
     schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
-    observed: dict[tuple[str, str], set[str]] = {}
+    observed: dict[tuple[str, str], dict[str, list[str]]] = {}
     for path in _iter_json_files(spec_dir_abs):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -57,12 +57,13 @@ def validate_canonical_integrity(
                 enforce_unresolved_semantics=enforce_unresolved_for_doc,
             )
         )
-        _collect_observed_semantics(data, observed)
+        _collect_observed_semantics(data, observed, rel)
 
-    for (kind, value), ids in observed.items():
-        if len(ids) > 1:
+    for (kind, value), cid_paths in observed.items():
+        if len(cid_paths) > 1:
+            detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                f"E210 CROSS_ARTIFACT_DRIFT kind={kind} value='{value}' canonical_ids={sorted(ids)}"
+                f"E211 PARTIAL_DRIFT kind={kind} value='{value}' {detail}"
             )
     return errors
 
@@ -105,12 +106,13 @@ def validate_canonical_integrity_file(
             enforce_unresolved_semantics=enforce_unresolved_for_doc,
         )
     )
-    observed: dict[tuple[str, str], set[str]] = {}
-    _collect_observed_semantics(data, observed)
-    for (kind, value), ids in observed.items():
-        if len(ids) > 1:
+    observed: dict[tuple[str, str], dict[str, list[str]]] = {}
+    _collect_observed_semantics(data, observed, path)
+    for (kind, value), cid_paths in observed.items():
+        if len(cid_paths) > 1:
+            detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                f"E210 CROSS_ARTIFACT_DRIFT kind={kind} value='{value}' canonical_ids={sorted(ids)} {path}"
+                f"E211 PARTIAL_DRIFT kind={kind} value='{value}' {detail}"
             )
     return errors
 
@@ -211,7 +213,7 @@ def _collect_used_canonical_ref_ids(obj: Any) -> set[str]:
     return refs
 
 
-def _collect_observed_semantics(obj: Any, observed: dict[tuple[str, str], set[str]]) -> None:
+def _collect_observed_semantics(obj: Any, observed: dict[tuple[str, str], dict[str, list[str]]], rel: str = "") -> None:
     if isinstance(obj, dict):
         alias_value_fields: dict[str, tuple[str, ...]] = {
             "stage_ref": ("stage", "environment"),
@@ -233,13 +235,13 @@ def _collect_observed_semantics(obj: Any, observed: dict[tuple[str, str], set[st
                 value = obj.get(value_field)
                 if isinstance(value, str):
                     normalized = " ".join(value.strip().lower().split())
-                    observed.setdefault((kind, normalized), set()).add(cid)
+                    observed.setdefault((kind, normalized), {}).setdefault(cid, []).append(rel)
                     break
         for v in obj.values():
-            _collect_observed_semantics(v, observed)
+            _collect_observed_semantics(v, observed, rel)
     elif isinstance(obj, list):
         for v in obj:
-            _collect_observed_semantics(v, observed)
+            _collect_observed_semantics(v, observed, rel)
 
 
 _ALIASED_SOURCE_FIELDS: dict[str, str] = {

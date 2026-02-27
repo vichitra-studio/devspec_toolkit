@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 
 KNOWN_STAGES = {"dev", "ci", "staging", "prod"}
+NFR_ID_PATTERN = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def validate_step_07(instance: dict[str, Any], toolkit_root: str) -> list[str]:
@@ -17,6 +19,16 @@ def validate_step_07(instance: dict[str, Any], toolkit_root: str) -> list[str]:
 
     for i, nfr in enumerate(instance.get("nfrs", [])):
         nfr_id = nfr.get("nfr_id")
+
+        # NFR ID format check
+        if isinstance(nfr_id, str) and not NFR_ID_PATTERN.match(nfr_id):
+            errors.append(f"NFR at index {i} has nfr_id '{nfr_id}' that does not follow 'nfr-<kebab>' convention")
+
+        # Target digit validation (schema requires pattern ^.*\d+.*$)
+        target = nfr.get("target")
+        if target is not None and isinstance(target, str):
+            if not re.search(r"\d", target):
+                errors.append(f"NFR '{nfr_id}' target string contains no digit: '{target}'")
 
         # Duplicate ID check
         if nfr_id in seen_ids:

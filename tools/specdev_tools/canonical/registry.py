@@ -4,6 +4,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,11 +25,13 @@ class CanonicalRegistry:
         aliases: dict[tuple[str, str], set[str]],
         alias_status: dict[tuple[str, str], str],
         load_errors: list[str] | None = None,
+        alias_lifecycle: dict[tuple[str, str], dict] | None = None,
     ):
         self.entries = entries
         self.aliases = aliases
         self.alias_status = alias_status
         self.load_errors = load_errors or []
+        self.alias_lifecycle = alias_lifecycle or {}
 
     @classmethod
     def load(cls, repo_root: str, canon_dir: str = "canon") -> "CanonicalRegistry":
@@ -43,6 +46,7 @@ class CanonicalRegistry:
         entries: dict[str, CanonicalEntry] = {}
         aliases: dict[tuple[str, str], set[str]] = {}
         alias_status: dict[tuple[str, str], str] = {}
+        alias_lifecycle: dict[tuple[str, str], dict] = {}
 
         def register_alias(kind: str, alias_value: str, target_id: str, status: str = "active") -> None:
             if not isinstance(kind, str) or not isinstance(alias_value, str) or not isinstance(target_id, str):
@@ -88,8 +92,11 @@ class CanonicalRegistry:
             if not isinstance(kind, str) or not isinstance(normalized, str) or not isinstance(target_id, str):
                 continue
             register_alias(kind, normalized, target_id, status=alias.get("status", "active"))
+            lc = alias.get("lifecycle")
+            if isinstance(lc, dict):
+                alias_lifecycle[(kind, _norm(normalized))] = lc
 
-        return cls(entries=entries, aliases=aliases, alias_status=alias_status, load_errors=load_errors)
+        return cls(entries=entries, aliases=aliases, alias_status=alias_status, load_errors=load_errors, alias_lifecycle=alias_lifecycle)
 
     def get(self, canonical_id: str) -> CanonicalEntry | None:
         return self.entries.get(canonical_id)
@@ -106,6 +113,22 @@ class CanonicalRegistry:
 
     def alias_is_deprecated(self, kind: str, value: str) -> bool:
         return self.alias_status.get((kind, _norm(value))) == "deprecated"
+
+    def alias_is_sunset(self, kind: str, value: str) -> bool:
+        key = (kind, _norm(value))
+        lc = self.alias_lifecycle.get(key)
+        if not isinstance(lc, dict):
+            return False
+        sd = lc.get("sunset_date")
+        if not isinstance(sd, str):
+            return False
+        try:
+            sunset = datetime.fromisoformat(sd.replace("Z", "+00:00"))
+            if sunset.tzinfo is None:
+                sunset = sunset.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) >= sunset
+        except (ValueError, TypeError):
+            return False
 
     def validate_ref(self, ref: dict[str, Any]) -> list[str]:
         errs: list[str] = []
@@ -132,7 +155,12 @@ class CanonicalRegistry:
             if len(candidates) > 1:
                 errs.append(f"E140 AMBIGUOUS_ALIAS kind={kind} alias={alias_used} candidates={candidates}")
             elif self.alias_is_deprecated(kind, alias_used):
-                errs.append(f"W120 ALIAS_DEPRECATED kind={kind} alias={alias_used}")
+                lc = self.alias_lifecycle.get((kind, _norm(alias_used)), {})
+                replaced_by = lc.get("replaced_by", "")
+                if self.alias_is_sunset(kind, alias_used):
+                    errs.append(f"E125 ALIAS_SUNSET_EXPIRED kind={kind} alias={alias_used} replaced_by={replaced_by}")
+                else:
+                    errs.append(f"W120 ALIAS_DEPRECATED kind={kind} alias={alias_used} replaced_by={replaced_by}")
         return errs
 
 

@@ -169,7 +169,10 @@ def lint_manifest(manifest: dict[str, Any]) -> list[str]:
             entry_alias_targets.setdefault(key, set()).add(target)
         if target and target not in known_ids:
             errs.append(f"E110 UNKNOWN_CANONICAL_ID alias target={target}")
-        if status == "deprecated" and not alias.get("deprecated_since"):
+        has_deprecated_since = alias.get("deprecated_since") or (
+            isinstance(alias.get("lifecycle"), dict) and alias["lifecycle"].get("deprecated_since")
+        )
+        if status == "deprecated" and not has_deprecated_since:
             errs.append(f"E420 INVALID_DEPRECATION_LIFECYCLE alias={normalized} missing deprecated_since")
 
     for key, targets in entry_alias_targets.items():

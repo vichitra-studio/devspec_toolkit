@@ -277,5 +277,84 @@ class CanonicalRegistryTests(unittest.TestCase):
             self.assertTrue(any("entries must be an array" in e for e in reg.load_errors))
 
 
+    def test_alias_lifecycle_stored(self):
+        reg = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "status": "active"}
+                ],
+                "aliases": [
+                    {
+                        "kind": "unit",
+                        "normalized": "millis",
+                        "target_id": "cn:core:unit:ms",
+                        "status": "deprecated",
+                        "lifecycle": {
+                            "deprecated_since": "2026-01-15",
+                            "sunset_date": "2026-06-01",
+                            "replaced_by": "cn:core:unit:ms",
+                        },
+                    }
+                ],
+            }
+        )
+        key = ("unit", "millis")
+        self.assertIn(key, reg.alias_lifecycle)
+        self.assertEqual(reg.alias_lifecycle[key]["replaced_by"], "cn:core:unit:ms")
+
+    def test_sunset_expired_emits_E125(self):
+        reg = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "status": "active"}
+                ],
+                "aliases": [
+                    {
+                        "kind": "unit",
+                        "normalized": "millisec",
+                        "target_id": "cn:core:unit:ms",
+                        "status": "deprecated",
+                        "lifecycle": {
+                            "deprecated_since": "2025-06-01",
+                            "sunset_date": "2025-12-31",
+                            "replaced_by": "cn:core:unit:ms",
+                        },
+                    }
+                ],
+            }
+        )
+        errs = reg.validate_ref(
+            {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "alias_used": "millisec"}
+        )
+        self.assertTrue(any("E125" in e for e in errs), f"Expected E125 in {errs}")
+
+    def test_deprecated_not_sunset_emits_W120_with_replaced_by(self):
+        reg = CanonicalRegistry.from_manifest(
+            {
+                "entries": [
+                    {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "status": "active"}
+                ],
+                "aliases": [
+                    {
+                        "kind": "unit",
+                        "normalized": "millis",
+                        "target_id": "cn:core:unit:ms",
+                        "status": "deprecated",
+                        "lifecycle": {
+                            "deprecated_since": "2026-01-15",
+                            "sunset_date": "2099-12-31",
+                            "replaced_by": "cn:core:unit:ms",
+                        },
+                    }
+                ],
+            }
+        )
+        errs = reg.validate_ref(
+            {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "alias_used": "millis"}
+        )
+        self.assertTrue(any("W120" in e and "replaced_by" in e for e in errs), f"Expected W120 with replaced_by in {errs}")
+        self.assertFalse(any("E125" in e for e in errs), f"Did not expect E125 in {errs}")
+
+
 if __name__ == "__main__":
     unittest.main()

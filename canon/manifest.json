@@ -1265,5 +1265,284 @@
       }
     }
   ],
-  "aliases": []
+  "aliases": [
+    {
+      "kind": "acronym",
+      "normalized": "jwt",
+      "target_id": "cn:core:acronym:jwt",
+      "status": "active"
+    },
+    {
+      "kind": "action",
+      "normalized": "authn",
+      "target_id": "cn:core:action:authenticate",
+      "status": "active"
+    },
+    {
+      "kind": "capability",
+      "normalized": "auth",
+      "target_id": "cn:core:capability:authentication",
+      "status": "active"
+    },
+    {
+      "kind": "capability",
+      "normalized": "authn",
+      "target_id": "cn:core:capability:authentication",
+      "status": "active"
+    },
+    {
+      "kind": "command",
+      "normalized": "python test command",
+      "target_id": "cn:core:command:pytest",
+      "status": "active"
+    },
+    {
+      "kind": "dependency",
+      "normalized": "auth service",
+      "target_id": "cn:core:dependency:auth-service",
+      "status": "active"
+    },
+    {
+      "kind": "entity",
+      "normalized": "account holder",
+      "target_id": "cn:core:entity:user",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "continuous integration",
+      "target_id": "cn:core:environment:ci",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "development",
+      "target_id": "cn:core:environment:dev",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "pre prod",
+      "target_id": "cn:core:environment:staging",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "preproduction",
+      "target_id": "cn:core:environment:staging",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "production",
+      "target_id": "cn:core:environment:prod",
+      "status": "active"
+    },
+    {
+      "kind": "event",
+      "normalized": "auth success",
+      "target_id": "cn:core:event:login-succeeded",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "sec",
+      "target_id": "cn:core:governance_label:security",
+      "status": "active"
+    },
+    {
+      "kind": "id_pattern",
+      "normalized": "commit pattern",
+      "target_id": "cn:core:id_pattern:conventional-commit",
+      "status": "active"
+    },
+    {
+      "kind": "interface",
+      "normalized": "rest json",
+      "target_id": "cn:core:interface:http-json",
+      "status": "active"
+    },
+    {
+      "kind": "metric",
+      "normalized": "failure rate",
+      "target_id": "cn:core:metric:error-rate",
+      "status": "active"
+    },
+    {
+      "kind": "policy",
+      "normalized": "spec driven development",
+      "target_id": "cn:core:policy:spec-first",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "authentication",
+      "target_id": "cn:core:risk_category:authn",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "authorization",
+      "target_id": "cn:core:risk_category:authz",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "privacy",
+      "target_id": "cn:core:risk_category:data-privacy",
+      "status": "active"
+    },
+    {
+      "kind": "role",
+      "normalized": "code reviewer",
+      "target_id": "cn:core:role:reviewer",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "continuous integration",
+      "target_id": "cn:core:stage:ci",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "development",
+      "target_id": "cn:core:stage:dev",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "pre prod",
+      "target_id": "cn:core:stage:staging",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "preproduction",
+      "target_id": "cn:core:stage:staging",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "production",
+      "target_id": "cn:core:stage:prod",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "approved",
+      "target_id": "cn:core:status:verified",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "fail",
+      "target_id": "cn:core:status:red",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "failed",
+      "target_id": "cn:core:status:red",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "not started",
+      "target_id": "cn:core:status:pending",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "pass",
+      "target_id": "cn:core:status:green",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "passed",
+      "target_id": "cn:core:status:green",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "postponed",
+      "target_id": "cn:core:status:deferred",
+      "status": "active"
+    },
+    {
+      "kind": "tag",
+      "normalized": "priority critical",
+      "target_id": "cn:core:tag:critical-path",
+      "status": "active"
+    },
+    {
+      "kind": "tech_stack",
+      "normalized": "py",
+      "target_id": "cn:core:tech_stack:python",
+      "status": "active"
+    },
+    {
+      "kind": "term",
+      "normalized": "java web token",
+      "target_id": "cn:core:term:jwt",
+      "status": "deprecated",
+      "lifecycle": {
+        "deprecated_since": "2026-01-15",
+        "sunset_date": "2026-06-01",
+        "replaced_by": "cn:core:term:jwt"
+      }
+    },
+    {
+      "kind": "term",
+      "normalized": "json web token",
+      "target_id": "cn:core:term:jwt",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "%",
+      "target_id": "cn:core:unit:percent",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "millis",
+      "target_id": "cn:core:unit:ms",
+      "status": "deprecated",
+      "lifecycle": {
+        "deprecated_since": "2026-01-15",
+        "replaced_by": "cn:core:unit:ms"
+      }
+    },
+    {
+      "kind": "unit",
+      "normalized": "millisec",
+      "target_id": "cn:core:unit:ms",
+      "status": "deprecated",
+      "lifecycle": {
+        "deprecated_since": "2025-06-01",
+        "sunset_date": "2025-12-31",
+        "replaced_by": "cn:core:unit:ms"
+      }
+    },
+    {
+      "kind": "unit",
+      "normalized": "milliseconds",
+      "target_id": "cn:core:unit:ms",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "ms",
+      "target_id": "cn:core:unit:ms",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "percent",
+      "target_id": "cn:core:unit:percent",
+      "status": "active"
+    }
+  ]
 }

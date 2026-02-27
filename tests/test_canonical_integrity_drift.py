@@ -46,7 +46,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("E210" in e for e in errs))
+            self.assertTrue(any("E211" in e for e in errs))
 
     def test_generic_ref_value_pair_drift_detected(self):
         with tempfile.TemporaryDirectory() as td:
@@ -97,7 +97,7 @@ class CanonicalIntegrityDriftTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
-            self.assertTrue(any("E210" in e for e in errs))
+            self.assertTrue(any("E211" in e for e in errs))
 
     def test_missing_canonical_refs_used_entry_is_detected(self):
         with tempfile.TemporaryDirectory() as td:

@@ -354,5 +354,68 @@ class CanonicalIntegrityTests(unittest.TestCase):
             self.assertFalse(any("schema_uri_not_registered" in e for e in relaxed))
 
 
+    def test_partial_drift_emits_E211_with_artifact_paths(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir()
+            (root / "spec").mkdir()
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "status": "active", "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"}},
+                            {"id": "cn:core:unit:seconds", "kind": "unit", "version": "1.0.0", "status": "active", "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"}},
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "spec" / "a.json").write_text(
+                json.dumps({"unit": "latency", "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit"}}),
+                encoding="utf-8",
+            )
+            (root / "spec" / "b.json").write_text(
+                json.dumps({"unit": "latency", "unit_ref": {"id": "cn:core:unit:seconds", "kind": "unit"}}),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
+            e211_errs = [e for e in errs if "E211" in e]
+            self.assertTrue(e211_errs, f"Expected E211 in {errs}")
+            # Check artifact paths are included
+            combined = " ".join(e211_errs)
+            self.assertIn("a.json", combined)
+            self.assertIn("b.json", combined)
+
+    def test_single_cid_no_E211(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir()
+            (root / "spec").mkdir()
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [
+                            {"id": "cn:core:unit:ms", "kind": "unit", "version": "1.0.0", "status": "active", "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"}},
+                        ],
+                        "aliases": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "spec" / "a.json").write_text(
+                json.dumps({"unit": "latency", "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit"}}),
+                encoding="utf-8",
+            )
+            (root / "spec" / "b.json").write_text(
+                json.dumps({"unit": "latency", "unit_ref": {"id": "cn:core:unit:ms", "kind": "unit"}}),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
+            self.assertFalse(any("E211" in e for e in errs), f"Did not expect E211 in {errs}")
+
+
 if __name__ == "__main__":
     unittest.main()

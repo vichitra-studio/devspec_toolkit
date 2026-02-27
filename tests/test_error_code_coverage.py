@@ -11,9 +11,11 @@ class ErrorCodeCoverageTests(unittest.TestCase):
         expected = {
             "E110",
             "E120",
+            "E125",
             "E130",
             "E140",
             "E210",
+            "E211",
             "E301",
             "E302",
             "E303",

@@ -18,4 +18,42 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[str]:
         for req in job.get("requires", []):
             if req not in job_ids:
                 errors.append(f"Job '{job.get('job_id')}' requires unknown job '{req}'")
+    # DAG cycle detection
+    graph: dict[str, list[str]] = {}
+    for job in instance.get("jobs", []):
+        jid = job.get("job_id", "")
+        graph[jid] = list(job.get("requires", []))
+    cycle = _has_cycle(graph)
+    if cycle:
+        errors.append(f"Circular dependency detected in job requires graph: {cycle}")
     return errors
+
+
+def _has_cycle(graph: dict[str, list[str]]) -> list[str] | None:
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: dict[str, int] = {n: WHITE for n in graph}
+    path: list[str] = []
+
+    def dfs(node: str) -> list[str] | None:
+        color[node] = GRAY
+        path.append(node)
+        for dep in graph.get(node, []):
+            if dep not in color:
+                continue
+            if color[dep] == GRAY:
+                idx = path.index(dep)
+                return path[idx:]
+            if color[dep] == WHITE:
+                result = dfs(dep)
+                if result is not None:
+                    return result
+        path.pop()
+        color[node] = BLACK
+        return None
+
+    for node in graph:
+        if color[node] == WHITE:
+            result = dfs(node)
+            if result is not None:
+                return result
+    return None
