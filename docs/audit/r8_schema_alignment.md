@@ -12,6 +12,8 @@ This review is the **second layer** of the 4-Layer Determinism Closure. It close
 |---|-----|----------|
 | 6 | 83 schema-prompt misalignments (30 HIGH) across 19 step schemas | CRITICAL |
 | 7 | `additionalProperties:false` schemas reject prompt-required fields (e.g., step_16a `milestone_ref`) | CRITICAL |
+| 8 | Sourcing instructions exist only in prompt prose — schema `description` fields are empty or contain only operational text. Prompts duplicate schema constraints (types, enums, required) creating maintenance drift. No single source of truth for field derivation guidance. | CRITICAL |
+| 9 | `canon/manifest.json` has `source_refs` field on 90+ entries but it's unused. `canonicalRef` schema object exists in `collections.schema.json` but prompts manually say "do not populate" instead of schemas/tooling enforcing this. No canonical contract defines which `*_ref` fields are auto-resolved vs AI-populated. | HIGH |
 
 ### Why R8 Runs After R7
 
@@ -29,6 +31,9 @@ Schemas enforce what prompts demand. R7 finalized prompts (source of truth). R8 
 | Existing spec artifacts (breakage check) | `spec/*.json` |
 | Test fixtures | `tests/fixtures/` |
 | Step validators (limited adjustments) | `tools/specdev_tools/validation/validators/step_*.py` |
+| Canonical registry | `canon/manifest.json` — canonical registry (source_refs population) |
+| Core schemas (extension) | `schema/core/collections.schema.json` — canonicalRef schema extension |
+| Core schemas (extension) | `schema/core/canon.schema.json` — canonical entry schema (source_refs, binding_mode) |
 
 ---
 
@@ -218,7 +223,49 @@ For each prompt change:
 After changes: run pytest tests/test_prompt_schema_sync.py -v
 ```
 
-**Subagent H** (`general-purpose`, isolation: `worktree`) — Validator Adjustments (limited):
+**Subagent H** (`general-purpose`, isolation: `worktree`) — Schema Sourcing via `description`:
+```
+Populate standard JSON Schema `description` fields across all 19 step schemas with sourcing
+guidance extracted from R7a prompt Field-by-Field sections.
+
+`description` is schema metadata (like code comments) — it never appears in output artifacts.
+`prompt_generator.py` already reads these via `FIELD_DESCRIPTION`.
+
+For each step schema:
+1. Read the corresponding R7a-hardened prompt's Field-by-Field section
+2. Extract sourcing guidance (WHERE to get the value, HOW to derive it)
+3. Populate the schema field's `description` with that sourcing text
+4. Keep existing operational descriptions — append sourcing guidance
+
+Example:
+{
+  "fr_id": {
+    "type": "string",
+    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    "description": "Source from 01_capabilities.json → capabilities[].capability_id. Generate using kebab-case from verb+object of the capability statement."
+  }
+}
+
+After all changes: pytest tests/ -k schema -v
+```
+
+**Subagent I** (`general-purpose`, isolation: `worktree`) — Canonical Binding Contract:
+```
+Extend canonical infrastructure with binding mode support:
+
+1. Add `binding_mode` to canonicalRef schema in `schema/core/collections.schema.json`:
+   - "auto" — tooling resolves this ref post-generation
+   - "explicit" — AI must populate this ref during generation
+
+2. Populate `source_refs` in `canon/manifest.json` entries where applicable
+
+3. Schema validation can then enforce: auto-binding refs MUST be empty in AI output
+   (tooling fills them post-generation)
+
+After changes: pytest tests/ -v
+```
+
+**Subagent J** (`general-purpose`, isolation: `worktree`) — Validator Adjustments (limited):
 ```
 After schema tightening, check if any validators reference fields that changed:
 
@@ -236,7 +283,7 @@ After changes: pytest tests/ -v
 
 #### Phase 3 — Integration Test Run
 
-**Subagent I** (`general-purpose`, no isolation) — Full integration verification:
+**Subagent K** (`general-purpose`, no isolation) — Full integration verification:
 ```
 Run the complete validation suite:
 
@@ -252,7 +299,7 @@ All must pass. Report any failures with exact error messages.
 
 #### Phase 4 — Self-Verification
 
-**Subagent J** (`Explore`, no isolation) — Verify R8 goals met:
+**Subagent L** (`Explore`, no isolation) — Verify R8 goals met:
 ```
 After all implementation is complete, verify measurable goals:
 
@@ -272,7 +319,7 @@ Report: per-goal pass/fail with counts.
 
 #### Phase 5 — Findings Report
 
-**Subagent K** (`general-purpose`, no isolation) — Write findings:
+**Subagent M** (`general-purpose`, no isolation) — Write findings:
 ```
 Write findings to docs/audit/findings/r8_findings.md using compact table format.
 
