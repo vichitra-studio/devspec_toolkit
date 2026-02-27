@@ -1,5 +1,38 @@
 # Path Conventions
 
+## Submodule Path Resolution
+
+When the toolkit is vendored as a git submodule at `<host-repo>/devspec_toolkit/`, three distinct directory roots come into play:
+
+| Root | Points to | Used for |
+|------|-----------|----------|
+| `--repo-root` | `devspec_toolkit/` | Schema registry, step_order.json, canon/ |
+| `--spec-root` | `<host-repo>/spec/` | Spec artifact discovery, step existence checks |
+| `--git-root` | `<host-repo>/` | Git diff operations, forward replay checks |
+
+### Why This Matters
+
+In a submodule deployment, `git diff` must run from the host repo's git root, not from the submodule directory (which is typically in detached HEAD state). Similarly, spec files live in the host repo's `spec/` directory, not inside the toolkit.
+
+### Resolution Order
+
+Without explicit flags, the toolkit auto-detects:
+1. `git_root`: Runs `git rev-parse --show-toplevel` from `repo_root`
+2. `spec_root`: Falls back to `repo_root/spec`
+
+### Base Ref Resolution (for forward-replay)
+
+The base ref for diff comparison is resolved in this order:
+1. `SPECDEV_REPLAY_BASE_REF` environment variable
+2. Current branch's upstream tracking branch (`@{upstream}`)
+3. `origin/main` → `origin/master` → `main` → `master`
+4. Current branch name (self-diff)
+5. Fallback: `origin/main`
+
+---
+
+# Path Conventions (Variables & Contexts)
+
 This document defines the canonical path variables used across the DevSpec Toolkit. These conventions apply to prompts, CLI commands, schema references, and CI pipelines.
 
 ## Variable Definitions

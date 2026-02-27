@@ -45,11 +45,15 @@ def main():
     v = sub.add_parser("validate")
     v.add_argument("file")
     v.add_argument("--repo-root", default=".")
+    v.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    v.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     v.add_argument("--json", action="store_true", help="Output results as JSON")
 
     va = sub.add_parser("validate-all")
     va.add_argument("spec_dir")
     va.add_argument("--repo-root", default=".")
+    va.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    va.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
 
     m = sub.add_parser("matrix")
     m.add_argument("spec_dir")
@@ -113,6 +117,8 @@ def main():
 
     frc = sub.add_parser("forward-replay-check")
     frc.add_argument("--repo-root", default=".")
+    frc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    frc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     frc.add_argument("--base-ref", help="Diff base ref (default: auto-resolved in validate-all)")
     frc.add_argument("--diff-error-mode", choices=["error", "ignore"], default="error")
 
@@ -371,11 +377,15 @@ def main():
         from .validation.forward_replay_check import check_forward_replay
         from .validation.validate import _resolve_replay_base_ref
         repo_root = os.path.abspath(args.repo_root)
-        base_ref = args.base_ref or _resolve_replay_base_ref(repo_root)
+        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, 'spec_root', None) else None
+        base_ref = args.base_ref or _resolve_replay_base_ref(Path(git_root or repo_root))
         errs = check_forward_replay(
             repo_root,
             base_ref=base_ref,
             diff_error_mode=args.diff_error_mode,
+            git_root=git_root,
+            spec_root=spec_root,
         )
         _print_and_exit_if_errors(errs)
     elif args.cmd == "governance-check":

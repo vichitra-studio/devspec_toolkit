@@ -23,6 +23,9 @@
   "https://specdev.local/schema/14_roadmap.schema.json": "schema/14_roadmap.schema.json",
   "https://specdev.local/schema/15_scaffold.schema.json": "schema/15_scaffold.schema.json",
   "https://specdev.local/schema/16_impl_context.schema.json": "schema/16_impl_context.schema.json",
+  "https://specdev.local/schema/16a_impl_context.schema.json": "schema/16_impl_context.schema.json",
+  "https://specdev.local/schema/16b_impl_context.schema.json": "schema/16_impl_context.schema.json",
+  "https://specdev.local/schema/16c_impl_context.schema.json": "schema/16_impl_context.schema.json",
   "https://specdev.local/schema/02a_delivery_baseline.schema.json": "schema/02a_delivery_baseline.schema.json",
   "https://specdev.local/schema/seed_manifest.schema.json": "schema/seed_manifest.schema.json"
 }

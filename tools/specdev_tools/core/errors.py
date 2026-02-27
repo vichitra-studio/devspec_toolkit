@@ -59,3 +59,48 @@ def make_error(code: str, message: str, path: Optional[str] = None) -> SpecError
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(code=code, message=message, path=path)
+
+
+class SpecdevError(Exception):
+    """Base exception for specdev toolkit errors."""
+    pass
+
+
+class SubmoduleDetectionError(SpecdevError):
+    """Raised when submodule root detection fails.
+
+    Typical causes:
+    - The toolkit is not checked out as a git submodule
+    - The git working tree is in a detached HEAD state
+    - The --repo-root flag points to the wrong directory
+
+    Resolution: pass --git-root pointing to the host repo's git root,
+    and --spec-root pointing to the spec directory within the host repo.
+    """
+
+    def __init__(self, message: str | None = None):
+        default = (
+            "Could not detect submodule root. "
+            "Pass --git-root (host repo git root) and --spec-root (spec directory) explicitly."
+        )
+        super().__init__(message or default)
+
+
+class SchemaRegistryError(SpecdevError):
+    """Raised when a schema URI cannot be resolved from schema_registry.json.
+
+    Typical causes:
+    - The schema URI is missing from tools/schema_registry.json
+    - The --repo-root flag does not point to the toolkit directory
+    - The schema file referenced in the registry does not exist on disk
+
+    Resolution: check tools/schema_registry.json for the expected URI mapping,
+    and verify that --repo-root points to the devspec_toolkit directory.
+    """
+
+    def __init__(self, uri: str, detail: str | None = None):
+        msg = f"Schema not found for URI '{uri}'. Check tools/schema_registry.json."
+        if detail:
+            msg += f" Detail: {detail}"
+        self.uri = uri
+        super().__init__(msg)

@@ -7,12 +7,24 @@ import sys
 from pathlib import Path
 
 # Template for pre-commit-config.yaml
-PRE_COMMIT_TEMPLATE = """repos:
+def _build_pre_commit_template(rel_toolkit_root: str, is_submodule: bool) -> str:
+    """Build pre-commit config with correct --repo-root, --spec-root, --git-root flags.
+
+    When the toolkit is vendored as a submodule, hooks need --spec-root and --git-root
+    so that forward-replay and other git-dependent checks run from the correct directory.
+    """
+    repo_root_flag = f"--repo-root ./{rel_toolkit_root}" if rel_toolkit_root != "." else "--repo-root ."
+    # Build the flag suffix for submodule deployments
+    if is_submodule:
+        extra_flags = f" --spec-root ./spec --git-root ."
+    else:
+        extra_flags = ""
+    return f"""repos:
   - repo: local
     hooks:
       - id: devspec-validate
         name: DevSpec Validate
-        entry: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+        entry: ./tools/run_specdev.sh validate-all spec {repo_root_flag}{extra_flags}
         language: system
         types: [json]
         files: ^spec/
@@ -21,7 +33,7 @@ PRE_COMMIT_TEMPLATE = """repos:
 
       - id: devspec-fixtures
         name: DevSpec Fixtures Lint
-        entry: ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
+        entry: ./tools/run_specdev.sh fixtures-lint spec {repo_root_flag}{extra_flags}
         language: system
         types: [json]
         files: ^spec/
@@ -30,11 +42,14 @@ PRE_COMMIT_TEMPLATE = """repos:
 
 #  - id: devspec-governance
 #    name: DevSpec Governance Check
-#    entry: ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message
+#    entry: ./tools/run_specdev.sh governance-check spec {repo_root_flag}{extra_flags} --message
 #    language: python
 #    stages: [commit-msg]
 #    # Note: commit-msg hooks require 'pre-commit install --hook-type commit-msg'
 """
+
+# Default template for backward compatibility
+PRE_COMMIT_TEMPLATE = _build_pre_commit_template("devspec_toolkit", is_submodule=True)
 
 CI_WORKFLOW_TEMPLATE = """name: SpecDev CI
 
@@ -263,11 +278,16 @@ def main():
     
     rel_toolkit_root = os.path.relpath(actual_toolkit_root, target_dir).replace("\\", "/")
     
+    # Detect if toolkit is a git submodule
+    is_submodule = os.path.isfile(os.path.join(actual_toolkit_root, ".git")) or (
+        os.path.isdir(os.path.join(target_dir, ".gitmodules"))
+    )
+
     # 5. Hook setup (Pre-commit)
     pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
     if not os.path.exists(pre_commit_file):
         print("Creating .pre-commit-config.yaml...")
-        config_content = PRE_COMMIT_TEMPLATE.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+        config_content = _build_pre_commit_template(rel_toolkit_root, is_submodule)
         with open(pre_commit_file, "w") as f:
             f.write(config_content)
         print("Note: You need to install pre-commit (pip install pre-commit) and run 'pre-commit install'")
@@ -353,6 +373,12 @@ def main():
         print("Creating CI workflow .github/workflows/spec_validation.yml...")
         ci_content = CI_WORKFLOW_TEMPLATE.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
         ci_content = ci_content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+        # Add submodule-aware flags to CI commands
+        if is_submodule:
+            ci_content = ci_content.replace(
+                f"--repo-root ./{rel_toolkit_root}",
+                f"--repo-root ./{rel_toolkit_root} --spec-root ./spec --git-root .",
+            )
         with open(ci_file, "w") as f:
             f.write(ci_content)
     else:

@@ -38,6 +38,9 @@ from .validators import (
     step_14,
     step_15,
     step_16,
+    step_16a,
+    step_16b,
+    step_16c,
 )
 
 STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_")
@@ -234,8 +237,24 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
                 if not mode:
                     in_ci = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
                     mode = "error" if (in_ci or _is_git_repo(root)) else "ignore"
-                base_ref = _resolve_replay_base_ref(root)
-                failures.extend(check_forward_replay(repo_root, base_ref=base_ref, diff_error_mode=mode))
+                if mode == "ignore":
+                    import sys as _sys
+                    print(
+                        "specdev: forward-replay check skipped (not in CI and not a git repo). "
+                        "Set SPECDEV_REPLAY_DIFF_ERROR_MODE=error to force.",
+                        file=_sys.stderr,
+                    )
+                git_root = _detect_git_root(root)
+                base_ref = _resolve_replay_base_ref(git_root)
+                failures.extend(
+                    check_forward_replay(
+                        repo_root,
+                        base_ref=base_ref,
+                        diff_error_mode=mode,
+                        git_root=str(git_root),
+                        spec_root=str(root / "spec"),
+                    )
+                )
     if (root / "schema").exists() and (root / "prompts").exists():
         failures.extend(run_prompt_schema_sync(repo_root))
 
@@ -361,11 +380,9 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root),
     "16": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
-    # TODO: route impl_context files to 16a/16b/16c when sub-step validators diverge.
-    # Currently all three sub-steps use the same step_16 validator, so routing to "16" is correct.
-    "16a": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
-    "16b": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
-    "16c": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
+    "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path")),
+    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path")),
+    "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path")),
 }
 
 
@@ -392,11 +409,44 @@ def _load_step_order(path: Path) -> dict[str, object]:
     return {}
 
 
+def _detect_git_root(repo_root: Path) -> Path:
+    """Detect the host repo git root, which may differ from repo_root in submodule deployments.
+
+    In a submodule layout, ``repo_root`` points to the toolkit directory
+    (e.g. ``host_repo/devspec_toolkit/``) but git operations must run from
+    the host repo root.  This function walks up looking for a non-bare
+    ``.git`` directory (or file, as submodules use ``.git`` files).
+    Falls back to *repo_root* if detection fails.
+    """
+    cmd = ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
+        if result.returncode == 0:
+            detected = Path(result.stdout.strip())
+            if detected.exists():
+                return detected
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        pass
+    return repo_root
+
+
+def _detect_spec_root(repo_root: Path, spec_dir: str | None = None) -> Path:
+    """Resolve the spec directory, preferring an explicit *spec_dir* argument.
+
+    Falls back to ``repo_root / "spec"``.
+    """
+    if spec_dir:
+        return Path(os.path.abspath(spec_dir))
+    return repo_root / "spec"
+
+
 def _is_git_repo(root: Path) -> bool:
     cmd = ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=10)
     except subprocess.TimeoutExpired:
+        import sys as _sys
+        print(f"specdev: git rev-parse timed out for {root}; assuming not a git repo", file=_sys.stderr)
         return False
     except (OSError, ValueError):
         return False
@@ -404,6 +454,16 @@ def _is_git_repo(root: Path) -> bool:
 
 
 def _resolve_replay_base_ref(root: Path) -> str:
+    """Resolve the git base ref for forward-replay checks.
+
+    Resolution order (first match wins):
+    1. ``SPECDEV_REPLAY_BASE_REF`` environment variable (explicit override)
+    2. Current branch's upstream tracking branch (``@{upstream}``)
+    3. Well-known remote defaults: ``origin/main``, ``origin/master``
+    4. Well-known local defaults: ``main``, ``master``
+    5. Current branch name (self-diff — effectively a no-op)
+    6. Fallback: ``origin/main`` (may fail if remote is not configured)
+    """
     explicit = os.getenv("SPECDEV_REPLAY_BASE_REF", "").strip()
     if explicit:
         return explicit

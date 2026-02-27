@@ -156,3 +156,31 @@ Agent protocol metadata lives in `docs/agents/manifest.json`.
 - **Step 15 failures**: `method` must be one of GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD; no duplicate `api_ref`
 - **Glossary failures**: `terms` needs ≥1 item; definitions >20 chars; `domain` is kebab-case; no empty strings
 - **Step 09 failures**: `tech_stack` must be an object (not array); `milestones` need a `deliverables` array
+
+---
+
+## Submodule Deployments
+
+When the toolkit is vendored as a git submodule, pass `--spec-root` and `--git-root` in addition to `--repo-root`:
+
+```bash
+./tools/run_specdev.sh validate-all spec \
+  --repo-root ./devspec_toolkit \
+  --spec-root ./spec \
+  --git-root .
+```
+
+### Base Ref Resolution Order
+
+Forward-replay checks resolve the diff base ref in this order:
+1. `SPECDEV_REPLAY_BASE_REF` env var (explicit override)
+2. Upstream tracking branch (`@{upstream}`)
+3. `origin/main` → `origin/master` → `main` → `master`
+4. Current branch name
+5. Fallback: `origin/main`
+
+### Troubleshooting (Submodule)
+
+- **Forward replay silently disabled**: Pass `--git-root .` to point git operations at the host repo
+- **Spec files not found**: Pass `--spec-root ./spec` to point at the host repo's spec directory
+- **Silent mode="ignore"**: Set `SPECDEV_REPLAY_DIFF_ERROR_MODE=error` or ensure you're in a git repo

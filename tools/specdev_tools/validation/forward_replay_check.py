@@ -17,9 +17,24 @@ def check_forward_replay(
     repo_root: str,
     base_ref: str = "origin/main",
     diff_error_mode: str = "error",
+    git_root: str | None = None,
+    spec_root: str | None = None,
 ) -> list[str]:
+    """Check that all downstream steps are replayed when an upstream step changes.
+
+    Args:
+        repo_root: Path to the devspec toolkit root directory.
+        base_ref: Git ref to diff against (e.g. ``origin/main``).
+        diff_error_mode: ``"error"`` to fail on diff errors, ``"ignore"`` to skip.
+        git_root: Host repo git root for ``git diff``. In submodule deployments
+            this differs from *repo_root*. Defaults to *repo_root*.
+        spec_root: Path to the spec directory. In submodule deployments this
+            may be outside *repo_root*. Defaults to ``repo_root/spec``.
+    """
     root = Path(os.path.abspath(repo_root))
-    changed, diff_error = _changed_files(root, base_ref)
+    effective_git_root = Path(os.path.abspath(git_root)) if git_root else root
+    effective_spec_root = Path(os.path.abspath(spec_root)) if spec_root else root / "spec"
+    changed, diff_error = _changed_files(effective_git_root, base_ref)
     if diff_error:
         if diff_error_mode == "ignore":
             return []
@@ -41,13 +56,13 @@ def check_forward_replay(
     for step in known_changed:
         start = idx[step] + 1
         for downstream in steps[start:]:
-            if _step_exists(root / "spec", downstream) and downstream not in changed_set:
+            if _step_exists(effective_spec_root, downstream) and downstream not in changed_set:
                 errors.append(
                     f"E550 FORWARD_REPLAY_MISSING changed={step} missing_downstream={downstream}"
                 )
                 break
 
-    semantic_errors = _check_semantic_coverage(root, set(known_changed), base_ref)
+    semantic_errors = _check_semantic_coverage(effective_git_root, set(known_changed), base_ref, effective_spec_root)
     
     for err in semantic_errors:
         if err["type"] == "skip":
@@ -56,7 +71,7 @@ def check_forward_replay(
             dropped_str = ",".join(err["dropped_ids"])
             errors.append(f"E550 SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}")
 
-    tc_errors = check_traceability_closure(str(root / "spec"), str(root))
+    tc_errors = check_traceability_closure(str(effective_spec_root), str(root))
     for err in tc_errors:
         if err.startswith("E560"):
             errors.append(err.replace("E560", "W560", 1))
@@ -119,9 +134,14 @@ def _extract_ids_from_spec(path: str) -> set[str]:
     return ids
 
 
-def _check_semantic_coverage(repo_root: Path, changed_steps: set[str], base_ref: str) -> list[dict]:
+def _check_semantic_coverage(
+    repo_root: Path,
+    changed_steps: set[str],
+    base_ref: str,
+    spec_root: Path | None = None,
+) -> list[dict]:
     errors = []
-    spec_dir = repo_root / "spec"
+    spec_dir = spec_root if spec_root else repo_root / "spec"
     
     for step in changed_steps:
         for new_path in spec_dir.glob(f"{step}_*.json"):

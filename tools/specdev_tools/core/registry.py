@@ -40,10 +40,31 @@ class SchemaRegistry:
             return None
         return self._resolve_path(rel) or rel
 
+    def uri_exists(self, uri: str) -> bool:
+        """Check whether a URI is registered and its schema file exists on disk."""
+        path = self.resolve(uri)
+        return path is not None and os.path.exists(path)
+
+    def load_with_fallback(self, uri: str, default: dict | None = None) -> dict:
+        """Load a schema by URI, returning *default* if the URI is unregistered or missing.
+
+        Raises ``FileNotFoundError`` only when *default* is ``None``.
+        """
+        try:
+            return self.load(uri)
+        except FileNotFoundError:
+            if default is not None:
+                return default
+            raise
+
     def load(self, uri: str) -> dict:
         path = self.resolve(uri)
         if not path or not os.path.exists(path):
-            raise FileNotFoundError(f"Schema not found for {uri}: expected {path!r}")
+            raise FileNotFoundError(
+                f"Schema not found for {uri}: expected {path!r}. "
+                "Check tools/schema_registry.json for the correct URI mapping "
+                "and verify --repo-root points to the devspec_toolkit directory."
+            )
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 

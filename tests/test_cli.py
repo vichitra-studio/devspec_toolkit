@@ -1353,11 +1353,13 @@ class CliTests(unittest.TestCase):
                 code, out, err = self._run_cli(["forward-replay-check", "--repo-root", str(repo_root)])
                 self.assertEqual(0, code, msg=err)
                 self.assertIn("OK", out)
-                p_base.assert_called_once_with(os.path.abspath(str(repo_root)))
+                p_base.assert_called_once_with(Path(os.path.abspath(str(repo_root))))
                 p_replay.assert_called_once_with(
                     os.path.abspath(str(repo_root)),
                     base_ref="feature/x",
                     diff_error_mode="error",
+                    git_root=None,
+                    spec_root=None,
                 )
 
     def test_hallucination_lint_fails_when_canon_dir_missing(self):

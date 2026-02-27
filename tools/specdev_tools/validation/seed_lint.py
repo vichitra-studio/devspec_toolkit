@@ -7,8 +7,13 @@ from typing import Dict, List, Set
 from .validate import validate_file
 
 
-def _project_root_from_spec_dir(spec_dir: str) -> str:
+def project_root_from_spec_dir(spec_dir: str) -> str:
+    """Derive the project root from a spec directory path (one level up)."""
     return os.path.abspath(os.path.join(spec_dir, os.pardir))
+
+
+# Keep private alias for backward compatibility within this module
+_project_root_from_spec_dir = project_root_from_spec_dir
 
 
 def _load_manifest(repo_root: str, project_root: str, errors: List[str]) -> Dict:
@@ -73,7 +78,19 @@ def _lint_prompt_manifest_refs(repo_root: str, errors: List[str]) -> None:
             errors.append(f"{path}: missing reference to spec/common/seed_manifest.json")
 
 
-def lint_seeds(repo_root: str, spec_dir: str, project_root: str | None = None) -> List[str]:
+def lint_seeds(
+    repo_root: str,
+    spec_dir: str,
+    project_root: str | None = None,
+    strict_mode: bool = False,
+) -> List[str]:
+    """Lint seed references across spec artifacts.
+
+    Args:
+        strict_mode: When ``True``, a project-root mismatch (spec_dir implies
+            a different root than the canonical root) is treated as a hard
+            error instead of a warning.
+    """
     errors: List[str] = []
     # D20 fix: prefer explicit project_root, then repo_root; warn on spec_dir mismatch
     implicit_root = _project_root_from_spec_dir(spec_dir)
@@ -82,11 +99,15 @@ def lint_seeds(repo_root: str, spec_dir: str, project_root: str | None = None) -
     else:
         project_root = os.path.abspath(project_root)
     if os.path.abspath(implicit_root) != project_root:
-        errors.append(
+        msg = (
             f"spec_dir scope warning: spec_dir '{spec_dir}' implies project root"
             f" '{implicit_root}' but canonical project root is '{project_root}'."
             f" Using canonical root."
         )
+        if strict_mode:
+            errors.append(f"E520 UNRESOLVED_INPUT project_root_mismatch: {msg}")
+            return errors
+        errors.append(msg)
     manifest = _load_manifest(repo_root, project_root, errors)
     if not manifest:
         return errors

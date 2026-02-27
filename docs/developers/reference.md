@@ -1,3 +1,36 @@
+# CLI Reference
+
+## Submodule-Aware Flags
+
+The following flags are available on `validate`, `validate-all`, and `forward-replay-check` commands:
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--repo-root` | Path to devspec_toolkit directory (for schema resolution) | `.` |
+| `--spec-root` | Path to the spec directory (for submodule deployments where spec/ is outside toolkit) | `None` (uses `repo_root/spec`) |
+| `--git-root` | Path to the host repo git root (for submodule deployments where git root differs from toolkit root) | `None` (uses `repo_root`) |
+
+### Examples
+
+```bash
+# Standard (non-submodule) usage
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+
+# Submodule deployment
+./tools/run_specdev.sh validate-all spec \
+  --repo-root ./devspec_toolkit \
+  --spec-root ./spec \
+  --git-root .
+
+# Forward replay check with explicit roots
+./tools/run_specdev.sh forward-replay-check \
+  --repo-root ./devspec_toolkit \
+  --git-root . \
+  --spec-root ./spec
+```
+
+---
+
 # Developer Reference
 
 This reference collects recurring facts that developers need while authoring or reviewing specs. It replaces ad-hoc snippets scattered across multiple documents; other guides intentionally link here for the canonical commands and troubleshooting flow.
