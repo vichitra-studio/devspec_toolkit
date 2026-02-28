@@ -12,7 +12,7 @@ This review is the **first layer** of the 4-Layer Determinism Closure. It audits
 
 | # | Gap | Severity |
 |---|-----|----------|
-| 1 | Prompts don't cover 100% of schema fields — AI must guess ~30% of fields | CRITICAL |
+| 1 | No `## Schema Authority` directive in any prompt — AI has no instruction to read the schema before generating output; structural constraints (types, enums, required markers, patterns, minItems) are undefined or duplicated in prompt text | CRITICAL |
 | 2 | 3 prompts (12, 13, 10) produce schema-failing output | CRITICAL |
 | 3 | No sourcing instructions for free-text fields — AI can fabricate content | CRITICAL |
 | 4 | `## Metadata Contract` missing from all 22 prompts — Output Contract tests skip all real prompts (tests search for `## B4 Metadata Contract` which no prompt has) | CRITICAL |
@@ -41,8 +41,8 @@ Every prompt is audited against these 6 dimensions:
 
 | # | Dimension | Question | Pass Criteria |
 |---|-----------|----------|---------------|
-| 1 | **Completeness** | Does the prompt provide guidance for EVERY schema field? | 100% of schema fields have explicit instructions |
-| 2 | **Correctness** | Do instructions match schema constraints? | required vs optional, enum values, minItems all match schema |
+| 1 | **Completeness** | Does the prompt have a `## Schema Authority` directive AND sourcing instructions for all fields requiring upstream derivation? | (a) Prompt has a dedicated `## Schema Authority` section naming the schema file; (b) all fields whose values must be derived from upstream artifacts have explicit sourcing instructions |
+| 2 | **No Schema Duplication** | Does the prompt avoid repeating schema constraints? | Prompt contains no field type annotations, enum value lists, pattern strings, minItems values, or sub-field definitions — all structural constraints are delegated to the schema via the Schema Authority directive |
 | 3 | **Assumption Prevention** | Does the prompt tell the AI where to source EVERY piece of information? | Every output field traces to a specific upstream artifact + field path |
 | 4 | **Hallucination Prevention** | Does the prompt bind every output field to a specific upstream artifact or seed? | Every free-text field has a sourcing instruction, not just ID fields |
 | 5 | **Semantic Capture** | Does the prompt ensure meaning flows from upstream? | Instructions say "extract the intent and rationale from [field] in [artifact]", not just "copy the ID" |
@@ -66,15 +66,13 @@ Every prompt is audited against these 6 dimensions:
 ```
 For EACH prompt in steps 00-08, perform the 4-point audit:
 
-1. Read the corresponding schema file (schema/NN_*.schema.json)
-2. List EVERY field in the schema (including nested fields in items/properties)
-3. Read the corresponding prompt file (prompts/prompt_NN_*.md)
-4. For each schema field, check:
-   a. Does the prompt mention this field by name? (COMPLETENESS)
-   b. Does the prompt's instruction match schema constraints — required/optional, enum values, minItems? (CORRECTNESS)
-   c. Does the prompt specify WHERE to source this field's value — specific upstream artifact + field path? (ASSUMPTION PREVENTION)
-   d. For free-text fields (descriptions, rationale, notes), does the prompt bind them to upstream content? (HALLUCINATION PREVENTION)
-   e. Does the prompt instruction allow subjective interpretation? Flag vague phrases: "consider", "if appropriate", "as needed", "may include", "such as", "etc" (DETERMINISM)
+1. Read the corresponding prompt file (prompts/prompt_NN_*.md)
+2. Read the corresponding schema file (schema/NN_*.schema.json) for reference only
+3. Audit the prompt on four points:
+   a. Does the prompt have a `## Schema Authority` section naming the schema file and stating it is authoritative? (SCHEMA DELEGATION)
+   b. Does the prompt avoid duplicating schema constraints — no field type annotations, no enum value lists, no pattern strings, no sub-field structure definitions? (NO DUPLICATION)
+   c. For fields whose values must be derived from upstream artifacts (free-text content, IDs generated from upstream data, references), does the prompt specify WHERE to source the value — specific upstream artifact + field path? (ASSUMPTION PREVENTION)
+   d. Does the prompt contain vague language allowing subjective interpretation? Flag: "consider", "if appropriate", "as needed", "may include", "such as", "etc", "prefer", "should" (in binding context) (DETERMINISM)
 
 Prompts to audit:
 - prompts/prompt_00_project_charter.md + schema/00_charter.schema.json
@@ -89,10 +87,13 @@ Prompts to audit:
 - prompts/prompt_08_fixtures.md + schema/08_fixtures.schema.json
 
 Produce a table per prompt:
-| Field Path | In Prompt? | Constraint Match? | Source Specified? | Free-text Bound? | Vague Language? |
-|------------|------------|-------------------|-------------------|-------------------|-----------------|
+Schema Authority section present: Y/N
 
-Summary: total fields, covered fields, coverage %, fields missing sourcing, vague phrases found.
+| Field (needs sourcing) | Sourcing Instruction? | Vague Language? |
+|------------------------|----------------------|-----------------|
+(Only fields requiring upstream derivation need a row — not every schema field.)
+
+Summary: Schema Authority directive present (Y/N); fields missing sourcing instructions (count); vague phrase occurrences (count); schema constraint duplication instances (count, list offending text).
 ```
 
 **Subagent B** (`Explore`, no isolation) — Prompts 09-16c Field Coverage Audit:
@@ -233,24 +234,33 @@ After changes: run pytest tests/test_prompt_contracts.py -v to verify Metadata C
 ```
 Based on Phase 1 Subagent A findings, for each prompt in steps 00-08 with missing field guidance:
 
-1. Add a `## Field-by-Field Specification` section (or augment existing field instructions)
-2. For EVERY schema field not covered by the prompt, add explicit instructions:
-   - Field name and path
-   - Data type and constraints (from schema)
-   - Where to source the value (specific upstream artifact + field path)
-   - For free-text fields: `Source from: spec/NN_name.json → field.path`
-   - For free-text fields: `DO NOT fabricate — derive from [upstream content]`
+1. Add `## Schema Authority` section to each prompt (first section after the prompt header, before any other section):
+   ## Schema Authority
+   The schema at `$SCHEMA_DIR/<step_schema>.schema.json` is the authoritative source for all
+   field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+   MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+   all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+2. For fields whose values must be derived from upstream artifacts (free-text content, IDs, refs):
+   - Add sourcing instruction: specific upstream artifact filename + field path
+   - For free-text: `DO NOT fabricate — derive from [upstream artifact] → [field path]`
+   - Do NOT add field type annotations, enum value lists, or structural constraints — the schema covers those
+
+3. Remove any existing schema constraint duplication found in Phase 1:
+   - Field type annotations ("string, enum: X|Y|Z")
+   - Explicit pattern strings ("^[A-Z0-9]{2,}$")
+   - Sub-field definitions ("required sub-fields: source_url, source_date...")
+   - minItems restatements
 
 Rules:
-- Additions are ADDITIVE — do not remove correct existing content
-- Do not add fields not in the schema
-- Every free-text field must have an explicit sourcing instruction
-- Replace vague phrases found in Phase 1:
-  "consider X" → "MUST include X if [condition]"
+- Additions are ADDITIVE — do not remove correct sourcing/workflow content
+- Never add schema constraint details to the prompt
+- Replace vague phrases:
+  "consider X" → "MUST include X if [specific condition]"
   "may include" → "MUST include"
-  "if appropriate" → "if [specific condition from schema/upstream]"
-  "such as" → explicit enumeration from schema enum or canonical registry
-  "etc" → remove or enumerate
+  "if appropriate" → "if [specific condition from upstream artifact]"
+  "such as" / "e.g." → specify the upstream artifact to read for valid options (do NOT list schema enum values)
+  "etc" → remove or reference upstream artifact
 
 After changes: run pytest tests/ -k prompt -v
 ```
@@ -262,12 +272,13 @@ Same as Subagent F, but for steps 09-16c.
 Based on Phase 1 Subagent B findings, for each prompt in steps 09-16c with missing field guidance:
 
 KNOWN CRITICAL FIXES:
-- prompt_12: Add explicit `environment_ref` field instructions with sourcing
-- prompt_13: Add explicit `governance_label_ref` field instructions with sourcing
+- prompt_12: Add explicit `environment_ref` field instructions with sourcing from 02a_delivery_baseline.json
 - prompt_10: Change "should include pr_rules" → "MUST include pr_rules" (schema requires it)
 - prompt_10: Change "should include versioning" → "MUST include versioning" (schema requires it)
 
-Same rules as Subagent F: additive only, source every free-text field, replace vague language.
+NOTE: `governance_label_ref` in prompt_13 is RESOLVED in current prompt text — do NOT re-add.
+
+Same rules as Subagent F: additive only, source every free-text field, replace vague language. Add `## Schema Authority` section to each prompt. Remove any schema constraint duplication (field type annotations, enum value lists, pattern strings, sub-field structures).
 
 NOTE: prompts 14, 16a, 16c were updated by R4 — read current state first, preserve R4 changes.
 
@@ -335,8 +346,9 @@ All must pass. Report any failures with exact error messages.
 ```
 After all implementation is complete, verify measurable goals:
 
-1. For each of the 22 prompts, count schema fields covered vs total.
-   Report: field coverage % per prompt. Target: 100% for all.
+1. Search all 22 prompts for `## Schema Authority`. Count: target 22/22.
+   Also verify 0 instances of schema constraint duplication (enum value lists, type annotations,
+   regex patterns, sub-field structures, minItems restatements) in prompt text.
 
 2. Search all 22 prompts for `## Metadata Contract`. Count: target 22/22.
 
@@ -346,10 +358,10 @@ After all implementation is complete, verify measurable goals:
 4. For each prompt, count free-text fields without explicit sourcing instructions.
    Target: 0 across all prompts.
 
-5. Verify prompts 10, 12, 13 no longer produce schema-failing output:
-   - prompt_10: pr_rules and versioning are MUST (not should)
-   - prompt_12: environment_ref has explicit instructions
-   - prompt_13: governance_label_ref has explicit instructions
+5. Verify prompts 10 and 12 no longer produce schema-failing output:
+   - prompt_10: pr_rules and versioning are MUST (not should); review_policy has sourcing note
+   - prompt_12: environment_ref has explicit instructions with sourcing
+   - prompt_13: governance_label_ref RESOLVED (already present in current prompt — confirm still present)
 
 Report: per-goal pass/fail with counts.
 ```
@@ -373,7 +385,7 @@ Also update docs/audit/review_index.md to add R7 entry.
 
 ## Key Design Decisions
 
-- Every prompt MUST have a `## Field-by-Field Specification` section covering 100% of schema fields
+- Every prompt MUST have a `## Schema Authority` section directing the LLM to read the schema for all structural constraints. Prompts provide sourcing guidance and workflow constraints — NOT schema field definitions, types, enums, or patterns.
 - Every free-text field MUST have an explicit **sourcing instruction** with upstream artifact + field path
 - Self-Audit Gate score criteria MUST be mechanically derivable from schema `required[]`
 - Prompt updates are **additive** — no removal of correct content, only replace vague with precise
@@ -386,7 +398,8 @@ Also update docs/audit/review_index.md to add R7 entry.
 
 | Metric | Before R7 | After R7 |
 |--------|-----------|----------|
-| Schema field coverage per prompt | ~70% | **100%** |
+| Prompts with ## Schema Authority directive | 0/22 | **22/22** |
+| Schema constraint duplication instances | unknown | **0** |
 | Prompts missing Metadata Contract section | 22/22 | **0/22** |
 | Vague language occurrences | ~120 total | **0** |
 | Free-text fields without sourcing instructions | unknown | **0** |
@@ -397,6 +410,7 @@ Also update docs/audit/review_index.md to add R7 entry.
 ## Anti-Patterns
 
 - Do NOT remove correct prompt content — only replace vague with precise
+- Do NOT add schema field definitions, types, enum values, patterns, minItems, or sub-field structures to prompts — the schema is the authoritative source for all structural constraints
 - Do NOT add fields not in schema — prompt must match schema exactly
 - Do NOT use NLP/semantic matching — sourcing instructions must be structural (artifact + field path)
 - Do NOT modify schemas in R7 — that's R8

@@ -1,6 +1,32 @@
 <review_prompt>
 # Deep Dive System Review: Canonical Drift, Traceability Closure & Prompt Hardening
 
+---
+
+## Review Status Overview (R1–R6)
+
+> **The following table tracks implementation status of each audit area after rounds R1–R6.**
+> Areas 1, 2, 5, 7, 8, 9, 10, 11 are **RESOLVED** — skip during this review pass.
+> Areas 3, 4, 6, 12, 13 are **PARTIALLY ADDRESSED** — focus investigation on the Remaining Gaps subsections only.
+
+| Area | Title | Status | Covered By | Summary |
+|------|-------|--------|-----------|---------|
+| 1 | Seed → Roadmap Traceability | **RESOLVED** | R4 | All 3 verified starting points addressed; E561/562/563 + seed chain validation added |
+| 2 | Roadmap → Impl Completeness | **RESOLVED** | R3 + R4 | Thin validators expanded (R3: steps 06–13a; R6: step 04); E561/562/563 + milestone binding added |
+| 3 | Semantic Drift Across Steps | **PARTIALLY ADDRESSED** | R3 | E211 partial drift + thin validators done; forward replay semantic content remains unverified |
+| 4 | B0-B8 Cleanup & Repo Hygiene | **PARTIALLY ADDRESSED** | R1 | B4 function renames done; `## B4 Metadata Contract` header gap deferred as Known Issue |
+| 5 | Canonical Alias Lifecycle | **RESOLVED** | R3 | E125 sunset, W120 escalation, autofix guard, lifecycle fields all addressed |
+| 6 | Holistic Prompt Hardening | **PARTIALLY ADDRESSED** | R4 + R6 | 16a/16b/16c milestone content (R4); CLI ref + gate threshold added to all 22 prompts (R6); 6a–6e core hardening pending |
+| 7 | Schema Validation Paths | **RESOLVED** | R2 | 16a/16b/16c schemas added; registry error handling improved |
+| 8 | Invariant Engine Soundness | **RESOLVED** | R1 | All 6 bugs fixed; 53 new tests added |
+| 9 | Generation Quality Self-Report | **RESOLVED** | R5 | Reduced to assumptions-only; E511 removed; all fixtures + prompts updated |
+| 10 | Environment-Dependent Validation | **RESOLVED** | R2 | Submodule detection, stderr warnings, replay mode defaults improved |
+| 11 | Submodule Integration | **RESOLVED** | R2 | spec_root/git_root params added; forward_replay_check.py fixed; init_project.py updated |
+| 12 | Toolkit Discovery Deficit | **PARTIALLY ADDRESSED** | R6 | `specdev prompt-context` CLI added; 2-line reference added to all 22 prompts; deep enrichment pending |
+| 13 | Schema–Prompt Contract Alignment | **PARTIALLY ADDRESSED** | R6 | Steps 00 + 04 fixed; 20 remaining step schemas unaudited |
+
+---
+
 ## Context: Goal & Intent of Changes
 **You must evaluate the system against these specific definitions of success:**
 
@@ -121,6 +147,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 
 ### Area 1: Seed → Roadmap Traceability
 
+> **STATUS: RESOLVED — R4**
+> All three verified starting points addressed. E561/E562/E563 error codes added to `traceability_closure.py` for uncovered FRs, orphan milestones, and checklist-roadmap mismatches. Seed chain validation extended to cover `seed-tech-stack` in addition to `seed-overview`. Step 14 validator enforces milestone binding to roadmap items.
+
 **Question**: Do all system requirements from seed documents (`seed_overview.md`, `seed_tech_stack.md`) propagate through every step to the roadmap (step 14) without loss?
 
 **What to examine**:
@@ -142,6 +171,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 ---
 
 ### Area 2: Roadmap → Implementation Completeness
+
+> **STATUS: RESOLVED — R3 + R4**
+> Thin validators for steps 06, 07, 08, 12, 13a expanded (R3 T09–T14a); step 04 semantic checks added (R6 T05/T06). E561/E562/E563 implemented for uncovered FRs, orphan milestones, and checklist-roadmap mismatches (R4). Steps 16a/16b/16c validators enforce roadmap↔implementation binding (R4 A-R4-07/08/09).
 
 **Question**: Does the Trinity Loop (steps 16a/16b/16c) implement ALL roadmap items with deterministic tests and evidence?
 
@@ -167,6 +199,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 
 ### Area 3: Semantic Drift Across Steps
 
+> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> E211 PARTIAL_DRIFT with artifact-level precision added (R3 T07/T08). Thin validators for steps 06, 07, 08, 12, 13a expanded (R3 T09–T14a). Step 04 semantic checks added (R6 T05/T06). Forward replay semantic content validation remains unverified.
+
 **Question**: Does the toolkit detect when the same concept drifts in meaning, naming, or scope as it flows through the pipeline?
 
 **What to examine**:
@@ -182,13 +217,20 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 **Verified Starting Points**:
 | Gap | File | Detail |
 |-----|------|--------|
-| No partial drift detection | `canonical/integrity.py:214-243` | `_collect_observed_semantics` gathers refs but doesn't detect partial updates (2/3 refs updated, 1/3 stale) |
+| ~~No partial drift detection~~ | ~~`canonical/integrity.py:214-243`~~ | ~~`_collect_observed_semantics` gathers refs but doesn't detect partial updates (2/3 refs updated, 1/3 stale) — **RESOLVED R3**~~ |
 | Forward replay may be structural only | `validation/forward_replay_check.py` | Verify whether it checks semantic content or only file existence |
-| Thin validators for complex steps | `validation/validators/step_04.py` (21 LOC) | FR validation with minimal semantic checks |
+| ~~Thin validators for complex steps~~ | ~~`validation/validators/step_04.py` (21 LOC)~~ | ~~FR validation with minimal semantic checks — **RESOLVED R3 + R6**~~ |
+
+### Remaining Gaps
+
+- **Forward replay semantic content** (`validation/forward_replay_check.py`): R2 fixed the path/git-root issues but did not add semantic content validation. The check still verifies file existence and structural schema validity only — it does not detect semantic regressions (e.g., a concept renamed in step 02 that contradicts step 01). This verified starting point was in scope for the original review and remains unresolved. Investigate whether `forward_replay_check.py` runs any semantic comparison or only structural checks post-R2.
 
 ---
 
 ### Area 4: B0-B8 Cleanup & Repo Hygiene
+
+> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> B4 function renames completed in 5 test files (R1 T4a–T4e). The `## B4 Metadata Contract` section header gap was explicitly filed as a Known Issue in R1 and deferred out of scope.
 
 **Question**: Does the test suite contain legacy naming from prior project phases (B0-B8 batch naming) that should be cleaned up?
 
@@ -205,12 +247,19 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 **Verified Starting Points**:
 | Gap | File | Detail |
 |-----|------|--------|
-| B4 naming in schema tests | `tests/test_schema_contracts.py:19` | `test_all_step_schemas_include_b4_top_level_fields` |
-| B4 naming in prompt tests | `tests/test_prompt_contracts.py:17` | `test_output_contract_examples_include_b4_fields` |
+| ~~B4 naming in schema tests~~ | ~~`tests/test_schema_contracts.py:19`~~ | ~~`test_all_step_schemas_include_b4_top_level_fields` — **RESOLVED R1**~~ |
+| ~~B4 naming in prompt tests~~ | ~~`tests/test_prompt_contracts.py:17`~~ | ~~`test_output_contract_examples_include_b4_fields` — **RESOLVED R1**~~ |
+
+### Remaining Gaps
+
+- **`## B4 Metadata Contract` section header missing from all 33 prompt files** (`tests/test_prompt_contracts.py`, `tests/test_prompt_schema_sync.py`): Tests use this string as a delimiter. When it is absent, the test loops hit `continue` and skip silently. **The entire Output Contract validation in the test suite is vacuously passing — zero prompts are actually being tested for their output contract fields.** This was explicitly filed as a Known Issue (out of scope) in R1. The broader hygiene checks (dead test fixtures, duplicate coverage, inconsistent naming conventions beyond B4) were also not performed.
 
 ---
 
 ### Area 5: Canonical Alias Lifecycle
+
+> **STATUS: RESOLVED — R3**
+> E125 sunset enforcement added; W120 warning escalation path added; autofix guard for deprecated aliases implemented; lifecycle fields (`deprecated_since`, `sunset_date`, `replacement`) added to `canon/aliases.json`. Orphan detection added to canonical-lint.
 
 **Question**: Are deprecated canonical aliases enforced with timelines, sunset dates, and orphan detection?
 
@@ -234,6 +283,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 ---
 
 ### Area 6: Holistic Prompt Hardening
+
+> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> Prompts 16a/16b/16c: milestone_ref binding rule, milestone context extraction, deliverable verification added (R4 A-R4-07/08/09). All 22 prompts: `specdev prompt-context <step>` reference added (R6 T09–T30). All 22 prompts: Self-Audit Gate score threshold "If score < 0.9, output clarifying questions only" added (R6 T09–T30). Step 14 seed consumption verified complete (R4 A-R4-10). Core 6a/6b/6c/6d/6e hardening remains pending across all prompts.
 
 **Question**: Does every prompt (00–16c) guarantee complete, correct, assumption-free output that is fully compliant with seed documents, system requirements, and ALL upstream artifacts?
 
@@ -275,11 +327,23 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 |-----|------|--------|
 | Prompts lack exhaustive upstream consumption rules | All `prompts/prompt_*.md` | No systematic enforcement that every declared upstream input is consumed and reflected in output |
 | Thin validators can't enforce prompt contracts | `validation/validators/step_04.py` (21 LOC) etc. | If the prompt requires 20 fields, but the validator only checks 3, the prompt contract is unenforceable |
-| Step 14 seed consumption gap | `prompts/prompt_14_roadmap.md` + `step_order.json:451-459` | Verify whether prompt instructs consumption of all 5 declared upstream artifacts |
+| ~~Step 14 seed consumption gap~~ | ~~`prompts/prompt_14_roadmap.md` + `step_order.json:451-459`~~ | ~~Verify whether prompt instructs consumption of all 5 declared upstream artifacts — **RESOLVED R4 (A-R4-10): consumption verified complete**~~ |
+
+### Remaining Gaps
+
+- **6a (Exhaustive Upstream Input Consumption)**: No prompt explicitly lists all upstream artifacts it must consume *and* what specifically to extract from each, per `step_order.json` dependencies. Adding a 2-line CLI reference is not equivalent to per-artifact extraction instructions.
+- **6b (Deterministic Instructions / Zero-Inference)**: Vague language ("consider", "if appropriate", "as needed", "may include", "where relevant") was not systematically eliminated across all 22 prompts. R6 added the gate threshold but did not audit or remove inference-reliant language.
+- **6c (Seed Document Compliance)**: No prompt (beyond 16a/16b/16c) has explicit: read seed → extract specific fields → reflect in specific output fields → populate `seed_refs`.
+- **6d (Fallback & Escalation)**: No prompt specifies a concrete fallback action when upstream data is missing beyond the generic <0.9 clarification gate. "Use your best judgment" equivalents remain.
+- **6e (Canonical Reference Enforcement)**: Per-prompt canonical enforcement instructions remain minimal outside the generic canonical registry section.
+- **Validator–prompt contract gap**: Thin validators still cannot enforce full prompt field requirements for most steps. A prompt may require 20 fields; the validator checks 3. This remains unresolved for all steps beyond those addressed in R3 and R6.
 
 ---
 
 ### Area 7: Schema Validation Paths
+
+> **STATUS: RESOLVED — R2**
+> JSON Schemas for steps 16a, 16b, 16c added to `schema/`. Schema registry (`tools/schema_registry.json`) updated with entries for all three steps. Registry error handling improved with descriptive error messages for missing or unresolvable schemas. Circular `$ref` detection verified via jsonschema library configuration.
 
 **Question**: Are `$ref` references in JSON Schemas resolved correctly, and are validation paths consistent and robust?
 
@@ -304,6 +368,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 
 ### Area 8: Invariant Engine Soundness
 
+> **STATUS: RESOLVED — R1**
+> All 6 identified bugs fixed: unknown operator now emits a warning instead of silently returning `None`; `TypeError` on `None` comparisons handled with explicit error emission; result dict distinguishes "violated" from "unsupported expression" via a new `evaluable` field; file handle leak fixed with `with` statement; array-form JSONLogic expression support added; unsupported operator pre-validation added. 53 new tests added covering all fixed code paths.
+
 **Question**: Does the invariant evaluation engine (`_tiny_eval`) produce correct, unambiguous results for all supported expressions, and does it fail visibly on unsupported ones?
 
 **What to examine**:
@@ -326,6 +393,9 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 ---
 
 ### Area 9: Generation Quality Self-Report — Write-Only Metadata
+
+> **STATUS: RESOLVED — R5**
+> `generation_quality` block reduced to `assumptions` field only (the one sub-field with demonstrated downstream value via the W571/W572/W573 content scans). All other sub-fields (`preflight_passed`, `evidence_records`, `placeholder_scan`, `unresolved_inputs`, `self_check_results`) removed from schema and prompts. E511 placeholder cross-check removed (superseded by the independent E510 scan). All 22 prompt files and all step fixtures updated to reflect the reduced schema.
 
 **Question**: Is the `generation_quality` block in every spec artifact consumed by any downstream step, tool, or validator — or is it write-only dead weight that costs tokens on every AI invocation and storage in every artifact stored in git?
 
@@ -392,6 +462,9 @@ Note: Option (a) or (b) would be a breaking schema change requiring a v0.4.0 mig
 
 ### Area 10: Environment-Dependent Validation Behavior
 
+> **STATUS: RESOLVED — R2**
+> Submodule detection logic added to `validate.py`. Forward replay mode now defaults to `"warn"` (not `"ignore"`) in non-CI git environments. Stderr warnings emitted when environment-dependent checks are disabled. `SPECDEV_WARNINGS_AS_ERRORS` behavior documented in CLI help output. Base ref resolution order documented and made deterministic.
+
 **Question**: Does the validation pipeline produce consistent, reproducible results across different execution environments (local dev, CI, non-git contexts), or does it silently disable checks based on runtime conditions?
 
 **What to examine**:
@@ -417,6 +490,9 @@ Note: Option (a) or (b) would be a breaking schema change requiring a v0.4.0 mig
 ---
 
 ### Area 11: Submodule Integration Path Integrity
+
+> **STATUS: RESOLVED — R2**
+> `--spec-root` and `--git-root` parameters added to all relevant CLI commands. `forward_replay_check.py` updated to run `git diff` from `git_root` (parent project) rather than `repo_root` (toolkit submodule). Spec existence check updated to use `spec_root` path. `init_project.py` updated to pass the correct flags in generated pre-commit hooks and CI workflows.
 
 **Question**: Do git-aware validators operate against the correct git repository when the toolkit is deployed as a submodule inside a parent project (the primary deployment model)?
 
@@ -446,6 +522,9 @@ Note: Option (a) or (b) would be a breaking schema change requiring a v0.4.0 mig
 ---
 
 ### Area 12: Toolkit Discovery Deficit in Prompts
+
+> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> `specdev prompt-context <step>` CLI command added (R6 T07/T08). 2-line header note referencing the CLI added to all 22 prompts (R6 T09–T30). Inline downstream consumer tables, per-prompt validation gate summaries, and build-time enrichment mechanism remain pending.
 
 **Question**: Do the static prompts (`prompts/prompt_NN_*.md`) give the AI agent sufficient awareness of the toolkit infrastructure — downstream consumers, validation rules, pipeline DAG — to generate artifacts optimized for the full pipeline, or is the AI effectively flying blind past the single prompt it receives?
 
@@ -493,9 +572,18 @@ The data to close this gap already exists in `step_order.json` (step_metadata wi
 | Extraction intent already machine-readable | `tools/step_order.json:309-509` | `step_metadata.extraction_intent` describes what each downstream step extracts from each upstream artifact — this data exists but is never surfaced to prompts |
 | Template rendering infrastructure exists | `tools/specdev_tools/generation/prompt_generator.py` | `render_template()`, `_extract_required_fields()`, and `{{VAR}}` substitution already work for migration prompts; could be extended for static prompt enrichment |
 
+### Remaining Gaps
+
+- **No inline downstream consumer tables**: No prompt lists which steps N+k extract from its output, even though this data exists in `step_order.json` `step_metadata.extraction_intent` for all 22 steps. Adding a 2-line CLI reference is not equivalent — the AI must proactively run the CLI command; inline tables surface the data directly in the prompt context.
+- **No per-prompt validation gate summary**: Error codes that fire on each step's output (e.g., E200, E210, E510, E530, E560 for step 04) are not mentioned in any prompt. The AI cannot optimize its output for checks it doesn't know about.
+- **No build-time enrichment mechanism**: `<!-- TOOLKIT_CONTEXT:...:START/END -->` marker injection via `specdev prompt-enrich` or a pre-commit hook does not exist. `step_metadata.extraction_intent` in `tools/step_order.json` is machine-readable but never surfaced into prompt content at generation time.
+
 ---
 
 ### Area 13: Schema–Prompt Contract Misalignment
+
+> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> `schema/00_charter.schema.json`: `stakeholders` and `user_segments` added to `required[]`; `success_metrics` → `minItems: 2` (R6). `schema/04_fr_list.schema.json`: `trace` added to FR item `required[]`; `acceptance_criteria` → `minItems: 2` (R6). Corresponding fixtures (step_00, step_04) and step_04 validator updated (R6). 20 step schemas (01, 02, 02a, 03, 05–16c) remain unaudited.
 
 **Question**: Does each step's JSON Schema enforce the same requirements that its prompt demands, or is the schema systematically weaker than the prompt contract — allowing artifacts to pass validation while violating prompt instructions?
 
@@ -540,11 +628,18 @@ For each step schema, compare numeric constraints (`minItems`, `minLength`, `min
 **Verified Starting Points**:
 | Gap | File | Detail |
 |-----|------|--------|
-| `stakeholders` optional in schema, mandatory in prompt | `schema/00_charter.schema.json:182-193` | Not in `required` array; prompt Self-Audit Gate treats as mandatory |
-| `user_segments` optional in schema, mandatory in prompt | `schema/00_charter.schema.json:182-193` | Not in `required` array; prompt Self-Audit Gate treats as mandatory |
-| `success_metrics` no minItems, prompt says ≥2 | `schema/00_charter.schema.json:99-150` | Array has no `minItems`; prompt says "≥2 metrics" |
-| `trace` optional on FR items, prompt says mandatory | `schema/04_fr_list.schema.json:89-94` | Not in FR item `required`; prompt Output Rules #7 says "include at least one reference" |
-| `acceptance_criteria` minItems:1, prompt says ≥2 for top FRs | `schema/04_fr_list.schema.json:48` | Schema allows 1; prompt says top FRs should have ≥2 |
+| ~~`stakeholders` optional in schema, mandatory in prompt~~ | ~~`schema/00_charter.schema.json:182-193`~~ | ~~Not in `required` array; prompt Self-Audit Gate treats as mandatory — **RESOLVED R6**~~ |
+| ~~`user_segments` optional in schema, mandatory in prompt~~ | ~~`schema/00_charter.schema.json:182-193`~~ | ~~Not in `required` array; prompt Self-Audit Gate treats as mandatory — **RESOLVED R6**~~ |
+| ~~`success_metrics` no minItems, prompt says ≥2~~ | ~~`schema/00_charter.schema.json:99-150`~~ | ~~Array has no `minItems`; prompt says "≥2 metrics" — **RESOLVED R6**~~ |
+| ~~`trace` optional on FR items, prompt says mandatory~~ | ~~`schema/04_fr_list.schema.json:89-94`~~ | ~~Not in FR item `required`; prompt Output Rules #7 says "include at least one reference" — **RESOLVED R6**~~ |
+| ~~`acceptance_criteria` minItems:1, prompt says ≥2 for top FRs~~ | ~~`schema/04_fr_list.schema.json:48`~~ | ~~Schema allows 1; prompt says top FRs should have ≥2 — **RESOLVED R6**~~ |
+
+### Remaining Gaps
+
+- **13a (Required vs Optional field alignment)**: No prompt-vs-schema comparison done for 20 unaudited steps (01, 02, 02a, 03, 05, 06, 07, 08, 09, 10, 11, 12, 13, 13a, 14, 15, 16, 16a, 16b, 16c). Fields the prompt treats as mandatory that the schema marks optional remain a silent pass risk.
+- **13b (Constraint strength alignment)**: No `minItems`/`minLength`/`pattern`/`enum` comparisons done for the 20 unaudited steps. Prompts may state minimums the schema does not enforce.
+- **13c (Cross-schema consistency)**: `additionalProperties: false` coverage and local type redefinitions not audited beyond the two fixed steps (00 and 04). Inline type definitions that duplicate `schema/core/` atoms remain undetected for 20 steps.
+- **13d (Schema-Validator gap)**: Thin validator analysis (validator checks 3 fields, schema enforces 5, prompt requires 20) not performed for the 16 remaining complex steps. Steps where the validator is thin and the schema is weak are entirely reliant on the AI's honor-system compliance with the prompt.
 
 ---
 
@@ -611,6 +706,10 @@ Produce a sequenced list of implementation tasks with **zero rework** — no tas
 ---
 
 ## Execution Instructions
+
+> **Review Focus for This Pass (R1–R6 complete)**:
+> Areas 1, 2, 5, 7, 8, 9, 10, 11 are **RESOLVED** — skip these during this review pass.
+> Areas 3, 4, 6, 12, 13 require investigation — focus on the **Remaining Gaps** subsections within each of those five areas only.
 
 1. **Read before writing**: Read every file referenced in the Verified Starting Points before making any claims. Use the exact paths provided in the Repository Context section.
 2. **Verify, then extend**: Confirm each starting point, then explore adjacent code for additional gaps.
