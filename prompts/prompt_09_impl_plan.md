@@ -30,17 +30,11 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["09"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - Charter `spec/00_charter.json` (goals/risks), System Sketch `spec/02_system_sketch.json` (components/dependencies).
 - Capabilities `spec/01_capabilities.json` (approved languages/frameworks) - **CRITICAL**: You must strictly adhere to this allowed stack.
 - FRs/APIs `spec/04_fr_list.json`/`spec/05_interface_contracts.json` for scope; NFRs `spec/07_nfrs.json` for performance/reliability constraints.
-- Use governance/CI expectations from required seeds and project policy docs; do not depend on downstream specs.
+- Use governance/CI expectations from upstream charter constraints and governance specs; do not depend on downstream specs.
 - Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
 
 ### Extraction Intent
@@ -54,7 +48,7 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Plan Ledger: tech_stack (language/framework/db/tooling + versions), milestones (id/name/date/risks/spikes), migration plan (if replacing), dependencies (teams/vendors/apis). Do not output it.
 - **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless explicitly justified as a Spike.
-- Align milestones with governance/CI cadence from seeds/project policy docs; add spikes for unknowns.
+- Align milestones with governance/CI cadence from upstream charter constraints and governance specs; add spikes for unknowns.
 - Self-audit; if risks/spikes/dependencies are vague, ask Gap Questions.
 - Rewrite milestones for outcomes and acceptance signals; finalize plan.
 - Emit JSON when the plan is actionable.
@@ -70,6 +64,7 @@ For each upstream artifact ingested, extract the following:
   - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
   - `tech_stack` aligns with `01_capabilities.json`.
   - Dependencies listed for external teams/systems; plan aligns with governance/CI expectations.
+  - If milestone dates, delivery sequencing, or resource constraints cannot be derived from upstream specs, ask Gap Questions — do not invent timeline commitments.
 
 
 ### Coverage Closure
@@ -82,7 +77,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -160,9 +155,7 @@ Before emitting, verify:
   "id": "impl-plan-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "tech_stack": {
     "languages": [

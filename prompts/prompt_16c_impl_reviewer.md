@@ -24,13 +24,6 @@ You are a senior technical reviewer. Your job is to **Audit** the implementation
 
 You output the final version of the JSON, populating the `review` section.
 
-# Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["16c"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-- You must evaluate whether additional context (README maps, tooling docs, architecture guides, ops runbooks) is required for this step. If so, add new seeds to the manifest and update `step_requirements["16c"]` before proceeding.
-
 # Task
 - **Input context:** `spec/impl_context/{step_id}.json` (Plan + Exec), plus the actual Codebase.
 - **Objective:** Verify correctness. If bugs exist, **spawn new remediation tasks**.
@@ -259,7 +252,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
@@ -273,9 +266,7 @@ Before emitting, verify:
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "plan": {
     "status": "active",
@@ -363,9 +354,7 @@ Before emitting, verify:
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "plan": {
     "status": "active",

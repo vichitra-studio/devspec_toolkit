@@ -45,28 +45,60 @@ def _step_from_path(path: str) -> str:
 
 
 def _collect_required_seeds(manifest: Dict, step_id: str) -> Set[str]:
-    global_required = set(manifest.get("global_seed_order", []))
     step_requirements = manifest.get("step_requirements", {})
     if step_id == "16":
+        sub_keys = ("16a", "16b", "16c")
+        if not any(k in step_requirements for k in sub_keys):
+            return set()
         required = set()
-        for key in ("16a", "16b", "16c"):
+        for key in sub_keys:
             required.update(step_requirements.get(key, []))
-        required.update(global_required)
-        return required
-    required = set(step_requirements.get(step_id, []))
+    else:
+        if step_id not in step_requirements:
+            return set()
+        required = set(step_requirements.get(step_id, []))
+    global_required = set(manifest.get("global_seed_order", []))
     required.update(global_required)
     return required
 
 
-def _lint_prompt_manifest_refs(repo_root: str, errors: List[str]) -> None:
+def _extract_step_from_prompt_filename(filename: str) -> str:
+    """Extract step ID from a prompt filename like 'prompt_05_interface_contracts.md' → '05'."""
+    match = _re.match(r"prompt_(\d{2}[a-z]?)_", filename)
+    return match.group(1) if match else "unknown"
+
+
+def _lint_prompt_manifest_refs(
+    repo_root: str, errors: List[str], manifest: Dict | None = None
+) -> None:
     prompts_dir = os.path.join(repo_root, "prompts")
     if not os.path.isdir(prompts_dir):
         errors.append(f"Missing prompts directory: {prompts_dir}")
         return
 
+    # Determine which steps require seeds
+    step_requirements = {}
+    if manifest:
+        step_requirements = manifest.get("step_requirements", {})
+    else:
+        errors.append("W150: seed_manifest not provided — skipping prompt seed-section checks")
+
     for fn in os.listdir(prompts_dir):
         if not fn.startswith("prompt_") or not fn.endswith(".md"):
             continue
+
+        step_id = _extract_step_from_prompt_filename(fn)
+
+        # Only enforce seed sections for steps that have entries in step_requirements
+        requires_seeds = step_id in step_requirements
+        if step_id == "16":
+            requires_seeds = any(
+                k in step_requirements for k in ("16a", "16b", "16c")
+            )
+
+        if not requires_seeds:
+            continue
+
         path = os.path.join(prompts_dir, fn)
         try:
             with open(path, "r", encoding="utf-8") as fh:
@@ -236,7 +268,7 @@ def lint_seeds(
             if sid not in seed_id_set:
                 errors.append(f"step_requirements[{step_id}] references unknown seed_id: {sid}")
 
-    _lint_prompt_manifest_refs(repo_root, errors)
+    _lint_prompt_manifest_refs(repo_root, errors, manifest)
 
     _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
 
@@ -263,7 +295,7 @@ def lint_seeds(
                 errors.append(f"{file_path}: seed_refs must be an array")
                 continue
 
-            used_seed_ids = {ref.get("seed_id") for ref in seed_refs if isinstance(ref, dict)}
+            used_seed_ids = {ref.get("seed_id") for ref in seed_refs if isinstance(ref, dict) and ref.get("seed_id") is not None}
             missing_seed_ids = {sid for sid in used_seed_ids if sid not in seed_id_set}
             for sid in missing_seed_ids:
                 errors.append(f"{file_path}: seed_refs includes unknown seed_id '{sid}'")

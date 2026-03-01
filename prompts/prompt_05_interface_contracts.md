@@ -30,12 +30,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["05"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - FRs `spec/04_fr_list.json` to derive behaviors and acceptance evidence.
 - System Sketch `spec/02_system_sketch.json` for owners and integration points.
@@ -68,6 +62,8 @@ For each upstream artifact ingested, extract the following:
   - For HTTP: route and method set; for gRPC: service/method identified.
   - Request/response schemas known or marked `-tbd` with plan; errors enumerated.
   - Security explicitly chosen and justified; owner set; traces to FRs/capabilities present.
+  - Access control for each interface is defined, or explicitly marked as open/public with rationale.
+  - If access control rules, permission boundaries, or identity model are unclear from upstream specs, ask Gap Questions — do not assume a model.
 
 
 ### Coverage Closure
@@ -80,7 +76,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -165,9 +161,7 @@ Before emitting, verify:
   "id": "interface-contracts-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "apis": [],
   "generation_quality": {

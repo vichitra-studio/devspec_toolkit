@@ -7,8 +7,8 @@ from pathlib import Path
 
 class StepScriptBridgeTests(unittest.TestCase):
     def test_script_style_step_checks_are_executed_under_unittest_discovery(self):
-        repo_root = Path(__file__).resolve().parents[3]
-        toolkit_root = repo_root / "devspec_toolkit"
+        toolkit_root = Path(__file__).resolve().parents[2]
+        repo_root = toolkit_root
         scripts_dir = toolkit_root / "tests" / "integration"
         pythonpath_prefix = str(toolkit_root / "tools")
 

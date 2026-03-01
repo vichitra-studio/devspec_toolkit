@@ -424,7 +424,7 @@
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#seedRef"
       },
-      "minItems": 1
+      "minItems": 0
     },
     "specRefIngested": {
       "$anchor": "specRefIngested",

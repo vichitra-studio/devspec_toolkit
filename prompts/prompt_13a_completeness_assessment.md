@@ -75,7 +75,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 ## Negative Constraints
 - **DO NOT** rate completeness as 10/10 if any "TBD" values exist.
@@ -97,12 +97,6 @@ Before emitting, verify:
   - current: 0-10 score.
   - target: 10.
   - confidence_level: 0.0-1.0 (confidence in this assessment).
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["13a"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
 - Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
@@ -173,9 +167,7 @@ For each upstream artifact ingested, extract the following:
   "id": "assessment-20250101",
   "owner": "system",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "missing_elements": [],
   "completeness_rating": {

@@ -36,15 +36,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["10"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - Charter `spec/00_charter.json` for organizational goals/constraints; Implementation Plan `spec/09_impl_plan.json` for cadence.
-- Use CI expectations from required seeds and current repo automation docs; do not depend on downstream CI-gates spec.
+- Use CI expectations from upstream charter constraints and current repo automation docs; do not depend on downstream CI-gates spec.
 - Current commit conventions (if any) found in repo history or CONTRIBUTING docs.
 - Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
 
@@ -69,6 +63,7 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - Versioning strategy present; spec_first_policy explicit; commit message requirements clear and actionable.
   - PR rules list core validations; reviewers cover necessary disciplines.
+  - If versioning strategy, review process, or release cadence are not derivable from upstream specs, ask Gap Questions for organizational preferences.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
@@ -82,7 +77,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -160,9 +155,7 @@ Before emitting, verify:
   "id": "governance-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "spec_first_policy": true,
   "commit_message_rules": {

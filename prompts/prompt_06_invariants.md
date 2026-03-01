@@ -35,16 +35,10 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["06"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - FRs `spec/04_fr_list.json` to motivate rules.
 - Interface Contracts `spec/05_interface_contracts.json` for request/response constraints.
-- Governance expectations from project policy docs/seeds if rules reflect policies (e.g., commit references, versioning).
+- Governance expectations from upstream charter constraints and governance specs if rules reflect policies (e.g., commit references, versioning).
 - Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
 
 ### Extraction Intent
@@ -54,6 +48,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate invariants with: inv_id, business description, executable expression (jsonlogic/CEL), scope (components/apis), severity, and traces. Do not output it.
+- Beyond FR-derived negative cases, consider: data integrity constraints implied by the domain model (glossary entities), state transition rules for entities with lifecycle stages, access boundary rules from system sketch trust boundaries, and ordering guarantees.
 - Validate expressions against referenced fields in fixtures/schemas to ensure evaluability.
 - Self-audit; if any critical FR/NFR lacks a rule or scope is too broad, ask Gap Questions.
 - Rewrite into executable expressions; constrain scope to reduce false positives; finalize traces.
@@ -70,6 +65,7 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
   - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.
+  - If the glossary defines entities with lifecycle states, verify that state transition invariants exist or ask Gap Questions.
 
 
 ### Coverage Closure
@@ -82,7 +78,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -157,11 +153,7 @@ Before emitting, verify:
   "id": "invariants-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "rules": [
     {

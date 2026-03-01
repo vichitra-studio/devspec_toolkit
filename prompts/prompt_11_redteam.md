@@ -43,12 +43,6 @@ Use the `category` field to classify threats precisely:
 4.  **`transport`**: Data in motion (e.g., MitM, Cleartext logging, weak TLS).
 5.  **`data_privacy`**: Data at rest/leakage (e.g., PII exposure in logs, GDPR violation, unnecessary data collection).
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["11"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 1.  **Attack Surface**: `spec/05_interface_contracts.json` (APIs) and `spec/02_system_sketch.json` (Components).
 2.  **Defenses**: `spec/06_invariants.json` (Security/Safety rules) and `spec/07_nfrs.json` (Security constraints).
@@ -89,6 +83,8 @@ For each upstream artifact ingested, extract the following:
 - [ ] Are all `target_ids` valid IDs from Step 05 (APIs) or Step 02 (Components)?
 - [ ] Are `mitigations` structured objects with types, not just strings?
 - [ ] Are `edge_cases` structured with IDs?
+- If the system operates in a regulated, high-risk, or domain-specific context not evident from upstream specs, ask about domain-specific threat categories before finalizing.
+- If the access control model is not fully specified in upstream interface contracts, ask Gap Questions rather than assuming a threat surface.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
 
 
@@ -102,7 +98,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -186,11 +182,7 @@ Before emitting, verify:
   "id": "redteam-catalog",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "trace": [
     {

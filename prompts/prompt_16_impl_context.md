@@ -15,7 +15,7 @@ Create or update the **canonical Step 16 anchor** at the Step 16 anchor artifact
 This file is the **root reference** for the Trinity Loop and exists alongside per‑milestone execution files in `spec/impl_context/`. It must:
 1. Summarize the current execution scope.
 2. Declare traceable checklist items for the active implementation cycle.
-3. Record documentation impact decisions and seed provenance.
+3. Record documentation impact decisions and spec provenance.
 4. act as the union/root of all active milestone implementation contexts (16a/16b/16c).
 
 ## When To Use This Prompt
@@ -33,13 +33,6 @@ Validate the generated JSON:
 You are a senior software architect producing the Step 16 **Trinity Anchor**.
 Generate a **machine‑checkable JSON artifact** that captures the plan,
 implementation checklist, and review expectations for the *current* execution cycle.
-
-# Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first.
-- Use `step_requirements["16"]` if present. If missing, use the union of `16a/16b/16c`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
 
 # Context To Ingest
 - **Roadmap**: Step sequencing and current milestone selection from `spec/14_roadmap.json`.
@@ -60,7 +53,7 @@ For each upstream artifact ingested, extract the following:
 - **Active impl contexts** (`spec/impl_context/*.json`): Existing milestone context for drift detection
 
 # Operating Flow (MANDATORY)
-1. **Context Review**: Resolve seeds and ingest required sources.
+1. **Context Review**: Ingest required upstream spec artifacts.
 2. **Scope**: Identify the exact execution scope for the current cycle.
 3. **Active Contexts**: List `spec/impl_context/*.json` files in `plan.context.existing_structures`.
 4. **Drift Check**: Verify that the Anchor (Step 16) does not conflict with Milestone contexts (16a/b/c).
@@ -193,7 +186,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
@@ -249,9 +242,7 @@ Before emitting, verify:
   "id": "step-16-example",
   "owner": "system",
   "created_at": "2026-02-08T00:00:00Z",
-  "seed_refs": [
-    { "seed_id": "seed-overview", "path": "docs/seed/seed_overview.md" }
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "plan": {
     "status": "active",

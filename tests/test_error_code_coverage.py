@@ -52,6 +52,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W581",
             "E582",
             "W140",
+            "W150",
             "W561",
             "W562",
             "W563",
