@@ -1,299 +1,306 @@
 # Review R7 Findings — Deep Prompt Completeness & Determinism Audit
-Generated: 2026-02-27
-Status: COMPLETE
-
-## Context
-
-R7 is the first layer of the 4-Layer Determinism Closure. It audits ALL 22 prompts against their schemas to ensure 100% field coverage, zero vague language, explicit sourcing for every field, and structural completeness (Metadata Contract, Self-Audit Gate, Operating Flow). R1–R6 structural fixes are in place. R7 finalizes prompt hardening before R8 (schemas) and R9 (validators).
-
-**Output file**: `docs/audit/findings/r7_findings.md` (to be written as T00 during implementation)
-
-**Known resolved issue**: `governance_label_ref` in prompt_13 was listed as KNOWN CRITICAL in R7 review spec but Subagent B confirmed it is **RESOLVED** in current prompt text — no action needed.
-
-**Prompt philosophy**: Prompts direct LLMs to read schemas — they do NOT duplicate schema constraints (field types, enums, sub-field structures, required markers, minItems, regex patterns). The schema is the authoritative source for structural constraints. Prompts provide: (a) a `## Schema Authority` directive, (b) sourcing guidance (which upstream artifact + field path each value derives from), and (c) workflow constraints (sequencing, MUST modality, gap questions). This eliminates maintenance drift when schemas evolve (aligns with R8 Gap #8 and R7a Finding A-R7a-05).
-
----
+Generated: 2026-03-01
+Status: VERIFIED (Phase 4 corrected 7 issues from initial draft)
 
 ## Part A: Findings
 
 | ID | Sev | File(s) | Finding | Impact |
 |----|------|---------|---------|--------|
 | A-R7-01 | CRIT | All 22 prompts + 3 test files | `## Metadata Contract` missing from all 22 prompts; tests use `## B4 Metadata Contract` delimiter — all skip silently, test suite is vacuously green | Zero test coverage on Output Contract metadata |
-| A-R7-02 | CRIT | All 22 prompts | `created_at` (required field) has no instruction in any prompt | AI must guess/hallucinate timestamp format |
-| A-R7-03 | CRIT | prompts/prompt_12_ci_gates.md | `jobs[].environment_ref` REQUIRED in schema but absent from prompt, Field Guidance, and Output Contract | Every Step 12 artifact fails schema validation |
-| A-R7-04 | CRIT | prompts/prompt_16a_impl_planner.md | `milestone_ref` mandated as MANDATORY in prompt but field does NOT exist in schema/16_impl_context.schema.json | `additionalProperties: false` rejects every artifact |
-| A-R7-05 | CRIT | prompts/prompt_10_governance.md | `review_policy` object (3 REQUIRED sub-fields: verdict_requirements, required_metadata, evidence_source_by_phase with dev/staging/prod) completely absent | AI has no schema read directive; without a `## Schema Authority` section, LLM may omit or incorrectly structure `review_policy` which is defined in the schema |
-| A-R7-06 | CRIT | prompts/prompt_05_interface_contracts.md | `apis[].enum_provenance` (5 sub-fields, 3 required: source_url, source_date, resolved_at) has zero coverage | no schema authority directive; LLM unaware to read schema for `enum_provenance` structure |
-| A-R7-07 | HIGH | prompts/prompt_10_governance.md | `pr_rules`/`versioning` use "should"/"Optional→expected" framing instead of MUST | Non-deterministic; AI may omit governance fields |
-| A-R7-08 | HIGH | prompts/prompt_12_ci_gates.md | `jobs[].security` object (runner_labels, token_permissions, environment_protection) completely absent | no schema authority directive; LLM unaware to read schema for `jobs[].security` structure |
-| A-R7-09 | HIGH | 18 prompts (00-09, 11-16c) | ~25 optional `*_ref` canonical fields systematically absent (action_ref, entity_ref, role_ref, status_ref, stage_ref, etc.) | AI ignores or hallucinates canonical refs |
-| A-R7-10 | HIGH | All 22 prompts | ~72 field instances lack upstream artifact + field path sourcing (measurement_method, severity, stage, mode, compliance, owner, etc.) | High hallucination risk on free-text fields |
-| A-R7-11 | HIGH | prompts/prompt_05_interface_contracts.md | `apis[].parameters` sub-fields partially addressed; `in` enum never stated; `parameters[].schema` absent | no schema authority directive covering `parameters` sub-field structure; LLM may omit required sub-fields defined in schema |
-| A-R7-12 | MED | 9 prompts (01,02,02a,03,05,06,07,08,09) | "feeds X downstream steps" placeholder unfilled on line 3 | Degraded prompt context for AI runners |
-| A-R7-13 | MED | All 22 prompts | ~120 vague language occurrences: "where applicable", "if appropriate", "consider", "such as", "etc", "as needed", "may include", "prefer", "non-trivial" | Determinism failures; AI interprets subjectively |
-| A-R7-14 | MED | 6 prompts (02a,06,10,11,12,13a) | Self-Audit Gate criteria are vague ("all fields populated", "structure is valid") instead of listing required[] fields by name | Gate provides no mechanical verification |
-| A-R7-15 | MED | 6 prompts (11,13,14,16,16b,16c) | `## Operating Flow` header missing — score trigger present but section unnamed | Parser/structural inconsistency |
-| A-R7-16 | MED | 18 prompts with Best Practices | Soft-modality "should"/"prefer" in Best Practices instead of MUST | Advisory language where binding constraints needed |
-| A-R7-17 | MED | prompts/prompt_16_impl_context.md:176 | `# Self-Audit Gate` (H1) instead of `## Self-Audit Gate` (H2) | Parser splitting on `##` misses this gate |
-| A-R7-18 | LOW | All 22 prompts | `_migration_notes` absent — optional, system-managed, but no "do not populate" instruction | AI may unnecessarily populate |
-| A-R7-19 | LOW | prompts/prompt_12_ci_gates.md | Canonical Registry appears BEFORE Output Contract (positional inversion vs convention) | Structural inconsistency |
-| A-R7-20 | LOW | prompts/prompt_16b_impl_coder.md | Only 1 exact JSON upstream reference | Weak traceability to upstream specs |
+| A-R7-02 | CRIT | prompts/prompt_00-08*.md (10 files) | 0/10 prompts for steps 00-08 have `## Schema Authority` section; AI has no instruction to read schema before generating output | AI guesses field names, types, and enums — schema validation catches errors only after wasted generation cycles |
+| A-R7-03 | CRIT | prompts/prompt_12_ci_gates.md | Missing `environment_ref` field instructions (schema requires it in jobs items) AND missing Schema Authority section entirely; only step 09-16c prompt lacking Schema Authority | Step 12 output omits environment_ref; downstream CI gate configuration incomplete |
+| A-R7-05 | HIGH | All 22 prompts | 0/22 prompts have `## Seed Ingestion Protocol` section; seeds consumed but no structured extraction/reflection instructions | AI reads seeds ad hoc; seed_refs populated inconsistently; traceability gaps |
+| A-R7-06 | HIGH | All 22 prompts | 0/22 prompts have `## Coverage Gap Reporting` section; no instruction to record untraceable fields | coverage_gaps[] always empty; gaps silently swallowed |
+| A-R7-07 | HIGH | All 22 prompts | Canonical Registry section positioned AFTER Output Contract in all 22 prompts; AI encounters output field definitions before knowing valid canonical values. Population instructions already present (binding rules for canonical_refs_used, canonical_proposals, canonical_conflicts) — only position needs fixing | AI generates output with invented canonical values, then fails canonical-lint |
+| A-R7-08 | HIGH | tests/test_prompt_contracts.py:20,22,60,62,158,172; tests/test_prompt_schema_sync.py:251,286,328,373,411,445,487,527; tests/test_cli.py:143 | 3 test files use "B4 Metadata Contract" delimiter (15 total occurrences); must be renamed to "Metadata Contract" to match new prompt section header | Tests remain broken until delimiter matches actual prompt section name; 0/22 prompts validated |
+| A-R7-09 | HIGH | 18 prompts (all except prompt_13, prompt_16a, prompt_16b, prompt_16c) | 18 prompts have "Best Practices" sections with permissive "should"/"may"/"prefer" language that contradicts strict determinism | AI treats mandatory constraints as suggestions; non-deterministic output variance |
+| A-R7-10 | HIGH | prompts/prompt_09_impl_plan.md:57-58,67,94 | Missing `environment_ref` field sourcing; tech_stack structure duplicated between prompt and schema; 5 vague phrases | Step 09 output lacks environment linkage to 02a; tech_stack guidance conflicts with schema |
+| A-R7-11 | HIGH | prompts/prompt_13_extension_generator.md:56 | `governance_label_ref` appears only in output contract section, not in main field guidance; vague "truly complex" and "Don't Over-Splice" (both at line 56) | AI omits governance_label_ref from extensions; extension scope subjectively determined |
+| A-R7-12 | HIGH | 9 prompts (01,02,02a,03,05,06,07,08,09) | 9 prompts have unfilled "X downstream steps" placeholder | Under-specified upstream artifacts propagate incomplete data |
+| A-R7-04 | MED | prompts/prompt_10_governance.md:131,26 | prompt_10 uses 'should' language for several fields (line 131: 'should be filled', line 26: 'should block the merge') — soft language in binding context contradicts determinism. NOTE: pr_rules and versioning are NOT in schema required[] — this is a determinism issue, not a schema violation | Governance policies treated as advisory rather than mandatory |
+| A-R7-13 | MED | prompts/prompt_00,prompt_13a (2 explicit); prompts/prompt_00-08*.md (10 total) | 2 prompts explicitly label Heuristics 'soft, non-binding' (prompt_00, prompt_13a); all 10 prompts (00-08, 13a) have Heuristics sections that use permissive framing | Completeness checks treated as advisory |
+| A-R7-14 | MED | 13 prompts (01,02,02a,03,04,05,06,07,08,09,10,12,15) | "Optional->expected" framing in 13 prompts weakens mandatory field population | Optional fields left empty despite downstream steps needing them |
+| A-R7-15 | MED | prompts/prompt_00-08*.md (10 files) | ~24 vague phrases across steps 00-08: "consider", "if appropriate", "notable", "critical", "key", "sensitive", "prod-impact", "marketing language" | Non-deterministic interpretation across AI runs |
+| A-R7-16 | MED | prompts/prompt_09-16*.md (12 files) | ~17 vague phrases across steps 09-16c: "should map", "should be filled", "as needed", "as may be applicable", "JIT Granularity" | Same non-determinism for implementation-phase prompts |
+| A-R7-17 | MED | prompts/prompt_00-08*.md (10 files) | No explicit field-by-field upstream sourcing paths in steps 00-08; only high-level Extraction Intent present | AI cannot trace individual output fields to specific upstream artifacts |
+| A-R7-18 | MED | prompts/prompt_02_system_sketch.md; prompts/prompt_09_impl_plan.md | Step 02 duplicates tags vocabulary from schema; Step 09 duplicates tech_stack object structure from schema | Divergence risk: prompt and schema definitions drift apart |
 
-### Evidence
+### Evidence (CRIT and HIGH findings)
 
-**A-R7-01:**
-- `tests/test_prompt_contracts.py`: `if "## B4 Metadata Contract" not in text: continue` — skips every prompt
-- `tests/test_prompt_schema_sync.py`: 8 occurrences of `"## B4 Metadata Contract"` as delimiter
-- `tests/test_cli.py`: 1 occurrence at line 142
-- Zero prompts contain either `## Metadata Contract` or `## B4 Metadata Contract`
+#### A-R7-01
+```
+# test_prompt_contracts.py line 20
+if "# Output Contract" not in text or "## B4 Metadata Contract" not in text:
+    continue  # skips prompt — condition is ALWAYS True for all 22 prompts
+# Result: 0/22 prompts validated by this test
+# 6 occurrences in test_prompt_contracts.py (lines 20, 22, 60, 62, 158, 172)
+# 8 occurrences in test_prompt_schema_sync.py (lines 251, 286, 328, 373, 411, 445, 487, 527)
+# 1 occurrence in test_cli.py (line 143)
+```
 
-**A-R7-03:**
-- `schema/12_ci_gates.schema.json` → `jobs` items `required: ["job_id", "name", "steps", "environment_ref"]`
-- `prompts/prompt_12_ci_gates.md` Field Guidance lists only: `job_id/name`, `requires`, `steps` — `environment_ref` absent
+#### A-R7-02
+```
+# Verified: 0/10 prompts for steps 00-08 contain "## Schema Authority"
+# All 10 checked: prompt_00, prompt_01, prompt_02, prompt_02a, prompt_03,
+#                 prompt_04, prompt_05, prompt_06, prompt_07, prompt_08
+# Steps 09-16c: 11/12 have Schema Authority (only prompt_12 missing — see A-R7-03)
+```
 
-**A-R7-04:**
-- `prompts/prompt_16a_impl_planner.md`: "Every checklist item MUST include a `milestone_ref` field"
-- `schema/16_impl_context.schema.json`: No `milestone_ref` property in checklist items; `additionalProperties: false`
+#### A-R7-03
+```
+# prompts/prompt_12_ci_gates.md:
+# - No "## Schema Authority" section (only prompt in 09-16c range missing it)
+# - No field instructions for environment_ref
+# - schema/12_ci_gates.schema.json defines environment_ref in jobs items required[]
+# Same gap exists in prompt_09 but prompt_09 has Schema Authority (only missing field sourcing)
+```
 
-**A-R7-05:**
-- `schema/10_governance.schema.json` → `review_policy` object with `verdict_requirements` (minItems:1), `required_metadata`, `evidence_source_by_phase` (dev/staging/prod all REQUIRED)
-- `prompts/prompt_10_governance.md`: Zero mentions of `review_policy`
+#### A-R7-05
+```
+# Verified: grep -c "Seed Ingestion Protocol" prompts/prompt_*.md → 0 matches in all 22 files
+# Seeds are consumed per step_order.json allowed_upstream_dependencies but no structured
+# extraction/reflection protocol exists in any prompt
+```
 
-**A-R7-06:**
-- `schema/05_interface_contracts.schema.json` → `apis[].enum_provenance` with required: `source_url`, `source_date`, `resolved_at`
-- `prompts/prompt_05_interface_contracts.md`: Zero mentions of `enum_provenance`
+#### A-R7-06
+```
+# Verified: grep -c "Coverage Gap Reporting" prompts/prompt_*.md → 0 matches in all 22 files
+# coverage_gaps[] defined in schemas but prompts never instruct AI when/how to populate it
+```
+
+#### A-R7-07
+```
+# All 22 prompts follow this section order:
+#   ... → # Output Contract → ... → ## Canonical Registry (Required Input)
+# Should be:
+#   ... → ## Canonical Registry (Required Input) → ... → # Output Contract
+# AI encounters field definitions requiring canonical values before seeing the valid value lists
+#
+# Population instructions: All 22 prompts include Canonical Registry (Required Input) section
+# with binding rules for canonical_refs_used, canonical_proposals, canonical_conflicts.
+# These are adequate — no additional population instruction tasks needed.
+# Only the POSITION needs fixing (move BEFORE Output Contract).
+```
+
+#### A-R7-08
+```python
+# tests/test_prompt_contracts.py — 6 occurrences:
+#   line 20: if "## B4 Metadata Contract" not in text:
+#   line 22: parts = text.split("## B4 Metadata Contract")
+#   line 60: if "## B4 Metadata Contract" not in text:
+#   line 62: parts = text.split("## B4 Metadata Contract")
+#   line 158: if "## B4 Metadata Contract" not in text:
+#   line 172: parts = text.split("## B4 Metadata Contract")
+# tests/test_prompt_schema_sync.py — 8 occurrences:
+#   lines 251, 286, 328, 373, 411, 445, 487, 527
+# tests/test_cli.py — 1 occurrence:
+#   line 143
+```
+
+#### A-R7-09
+```
+# 18/22 prompts contain "Best Practices" sections with language like:
+#   "should", "may", "prefer", "consider", "if appropriate"
+# Exceptions (no Best Practices section): prompt_13, prompt_16a, prompt_16b, prompt_16c
+```
+
+#### A-R7-10
+```
+# prompts/prompt_09_impl_plan.md:
+# Line 57: "expected" (vague — what consequence if absent?)
+# Line 58: "should map" (conditional — MUST map)
+# Line 67: "if milestone dates cannot be derived" (contingency without resolution)
+# Line 94: "NO Generic Versions" (imperative but no enforcement)
+# tech_stack structure defined in both prompt AND schema — duplication
+# environment_ref: exists in schema properties, absent from prompt field guidance
+```
+
+#### A-R7-11
+```
+# prompts/prompt_13_extension_generator.md:
+# Line 56: "Only create extensions for truly complex domains" — "truly complex" undefined
+# Line 56: "Don't Over-Splice" — subjective threshold
+# governance_label_ref: appears in ## Output Contract JSON but NOT in main field guidance
+```
+
+#### A-R7-12
+```
+# 9 prompts with unfilled "X downstream steps" placeholder:
+# prompt_01, prompt_02, prompt_02a, prompt_03, prompt_05,
+# prompt_06, prompt_07, prompt_08, prompt_09
+```
 
 ---
 
-## Part B: Atomic Implementation Plan
+## Part B: Implementation Plan — Atomic Tasks
 
-### Sequencing Strategy
+### Implementation Notes
 
-1. **Test infrastructure first** (rename B4→Metadata Contract) — T01-T03
-2. **Prompt fixes** (one task per prompt, all findings batched) — T04-T25
-3. **Integration verification** — T26
-4. **Documentation** — T27-T28
+1. Phase 0 (T01-T03) fixes test infrastructure so tests can detect the new `## Metadata Contract` section once prompts are updated.
+2. Phase 1 (T04-T25) touches each prompt file exactly once, adding all missing sections and fixing all vague language in a single pass per file.
+3. Each prompt task is a text-only change to a markdown file — no code changes, no test tasks required per review_protocol.md CHECK 4.
+4. Phase 1 tasks are organized into 4 batches (1A-1D) for parallelization. All tasks within a batch are independent.
+5. T04-T25 depend on T01-T03 completing first so that acceptance commands validate against the correct delimiter.
+6. Prompts 14, 16a, 16c have R4/R6 changes that MUST be preserved — subagent instructions include "read current state first".
 
-Each prompt task is delegated to a `general-purpose` subagent with `isolation: "worktree"`. Each prompt is touched exactly ONCE.
-
-### Task Table
+### Phase 0: Test Infrastructure
 
 | ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
-|----|-----|------|------|----------------|-------------------|----------|
-| T00 | P0 | — | docs/audit/findings/r7_findings.md | Write this findings plan to file (create) | `test -f docs/audit/findings/r7_findings.md` | — |
-| T01 | P0 | T00 | tests/test_prompt_contracts.py | Replace ALL occurrences of `"B4 Metadata Contract"` → `"Metadata Contract"` (R7 spec says 6; Subagent C found 4 — agent MUST grep to find exact count and replace all) | `grep -c "B4 Metadata" tests/test_prompt_contracts.py` returns 0 | A-R7-01 |
-| T02 | P0 | T00 | tests/test_prompt_schema_sync.py | Replace ALL occurrences of `"B4 Metadata Contract"` → `"Metadata Contract"` (expected ~8) | `grep -c "B4 Metadata" tests/test_prompt_schema_sync.py` returns 0 | A-R7-01 |
-| T03 | P0 | T00 | tests/test_cli.py | Replace ALL occurrences of `"B4 Metadata Contract"` → `"Metadata Contract"` (expected 1) | `grep -c "B4 Metadata" tests/test_cli.py` returns 0 | A-R7-01 |
-| T04 | P0 | T01-T03 | prompts/prompt_00_project_charter.md | **All R7 fixes for Step 00**: (1) Add `## Metadata Contract` section before Output Contract with $schema URI, spec_version, generation_quality fields. (2) Add `created_at`: "Set to ISO-8601 UTC timestamp of generation". (3) Add sourcing for 12 unsourced fields: `owner` → "from seed_overview.md project ownership", `title` → "extract from seed_overview.md title/heading", `stakeholders[*].role` → "from seed_overview.md stakeholder section", `stakeholders[*].needs` → "derive from seed_overview.md pain points", `user_segments[*].description/pains/gains` → "from seed_overview.md user research", `success_metrics[*].name/target/measurement_method` → "from seed_overview.md KPIs or ask gap question". (4) Add `stakeholders[*].role_ref`: "Do not populate manually; resolved by canonical registry tooling." (5) Add `_migration_notes`: "Do not populate; system-managed." (6) Replace vague: "pick the accountable group" → "MUST select from owner enum based on seed_overview.md project ownership"; "where known" → "MUST include if seed data provides historical baselines; otherwise ask gap question"; "may include" → "MUST include"; "identify real stakeholders" → "MUST list stakeholders from seed_overview.md". (7) Harden Best Practices "should" → "MUST". (8) Harden Self-Audit Gate to list each required field by name. | `pytest tests/test_prompt_contracts.py -v -k "prompt_00"` | A-R7-01,02,09,10,13,14,16,18 |
-| T05 | P0 | T01-T03 | prompts/prompt_01_capabilities.md | **All R7 fixes for Step 01**: (1) Add `## Metadata Contract`. (2) Add `created_at` instruction. (3) Add missing fields: `action_ref`, `entity_ref`, `role_ref` → "Do not populate manually; resolved by canonical registry tooling." (4) Add `_migration_notes`: "Do not populate." (5) Add sourcing for 11 unsourced fields: `owner`, `capability_id`, `verb`, `description`, `inputs`, `outputs`, `preconditions`, `postconditions`, `error_states` — each with specific upstream artifact path from 00_charter.json. (6) Replace vague: "non-trivial" → "any capability that modifies state or requires authentication"; "if appropriate" → "MUST include if capability has state prerequisites"; "as needed" → "MUST include"; "high-risk" → "any capability handling PII, financial data, or authentication"; "if any FR draft exists" → "MUST reference FR IDs from 04_fr_list.json when available, use *-tbd anchors otherwise". (7) Fix "X downstream steps" placeholder → actual count from step_order.json. (8) Harden Best Practices. (9) Harden Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_01"` | A-R7-01,02,09,10,12,13,16,18 |
-| T06 | P0 | T01-T03 | prompts/prompt_02_system_sketch.md | **All R7 fixes for Step 02**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `components[*].entity_ref`, `connections[*].interface_ref`, `connections[*].event_ref` → "Do not populate manually; resolved by canonical registry tooling." (4) `_migration_notes`: "Do not populate." (5) Add sourcing for unsourced fields: `components[*].type` → "derive from 01_capabilities.json capability scope", `components[*].tags` → "MUST select; read schema for valid tag values", `connections[*].trust_boundary/auth/rate_limit/reliability` → "derive from seed_tech_stack.md security and infrastructure sections". (6) Replace vague: "appropriate tags" → "MUST select; read schema for valid tag values"; "as applicable" → "MUST include for all connections". (7) Fix "X downstream steps". (8) Harden Best Practices. (9) Harden Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_02" --no-header` | A-R7-01,02,09,10,12,13,16,18 |
-| T07 | P0 | T01-T03 | prompts/prompt_02a_delivery_baseline.md | **All R7 fixes for Step 02a**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `environment_ref`, `command_ref`, `policy_ref` → "Do not populate manually; resolved by canonical registry tooling." (4) `_migration_notes`: "Do not populate." (5) Add sourcing: `compliance` → "extract from seed_overview.md regulatory requirements; if absent, ask gap question". (6) Replace vague: "minimal structure" → "MUST include all propertyNames matching schema constraints"; "if relevant" → "MUST include if seed docs mention regulatory/compliance frameworks"; "when NFRs or governance imply" → "MUST include if 07_nfrs.json contains compliance-category NFRs". (7) Fix "X downstream steps". (8) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_02a"` | A-R7-01,02,09,10,12,13,14,16,18 |
-| T08 | P0 | T01-T03 | prompts/prompt_03_glossary.md | **All R7 fixes for Step 03**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `terms[*].acronym_ref`, `terms[*].unit_ref` → "Do not populate manually; resolved by canonical registry tooling." (4) `_migration_notes`: "Do not populate." (5) Add sourcing: `terms[*].domain` → "derive from capability domain in 01_capabilities.json"; `terms[*].term_id` → "generate from term using kebab-case". (6) Replace vague: "optional but recommended" → "MUST populate if term has a recognized domain"; "where relevant" → remove or specify condition; "consider" → "MUST". (7) Fix "X downstream steps". (8) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_03"` | A-R7-01,02,09,10,12,13,16,18 |
-| T09 | P0 | T01-T03 | prompts/prompt_04_functional_requirements.md | **All R7 fixes for Step 04**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `action_ref`, `entity_ref`, `status_ref` → canonical registry note. (4) `_migration_notes`. (5) Sourcing: `fr_id` → "generate from statement verb+object in kebab-case"; `preconditions/postconditions` → "derive from 01_capabilities.json preconditions/postconditions for mapped capability"; `criterion_id` → "generate from criterion text". (6) Replace vague: "where relevant" → "MUST include if capability has preconditions/postconditions"; "where possible" → "MUST"; "as known" → "MUST include or ask gap question". (7) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_04"` | A-R7-01,02,09,10,13,16,18 |
-| T10 | P0 | T01-T03 | prompts/prompt_05_interface_contracts.md | **All R7 fixes for Step 05** (HEAVY — 3 CRIT/HIGH findings): (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-06**: Add `## Schema Authority` section. Add field note: "`apis[].enum_provenance` — MUST populate when API uses externally-sourced enums. Source from: external API documentation or standards body referenced in `docs/seed/seed_tech_stack.md`. Read schema for sub-field structure." (4) **A-R7-11**: No separate action needed — `## Schema Authority` directive covers `parameters` sub-field structure. Keep existing vague language fixes for parameters guidance. (5) Add missing: `apis[*].example_refs`, `apis[*].event_ref`, `apis[*].entity_ref`, `apis[*].policy_ref` → canonical registry note. (6) `_migration_notes`. (7) Sourcing for: `api_id`, `name`, `version`, `route`, `method`, `request_schema_ref`, `response_schema_ref` → specific upstream paths. (8) Replace vague: "where applicable" → "MUST include for all APIs with query/path/header parameters"; "when known" → "MUST include or use -tbd placeholder"; "prefer" → "MUST use". (9) Fix "X downstream steps". (10) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_05"` | A-R7-01,02,06,09,10,11,12,13,16,18 |
-| T11 | P0 | T01-T03 | prompts/prompt_06_invariants.md | **All R7 fixes for Step 06**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `risk_category_ref`, `status_ref` → canonical registry note. (4) `_migration_notes`. (5) Sourcing: `inv_id` → "generate from description domain+constraint in kebab-case"; `language` → "MUST use a formal predicate language (see schema enum for valid values) for machine-verifiable rules; use the plain-text option ONLY for rules that cannot be expressed formally"; `severity` → "MUST select from schema enum (see schema); use the highest severity level for data-integrity/security rules; lower levels for performance/style rules". (6) Replace vague: "unless absolutely necessary" → "ONLY when rule involves natural-language business logic that has no formal predicate equivalent". (7) Fix "X downstream steps". (8) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_06"` | A-R7-01,02,09,10,12,13,14,16,18 |
-| T12 | P0 | T01-T03 | prompts/prompt_07_nfrs.md | **All R7 fixes for Step 07**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `nfrs[*].stage_ref` → canonical registry note. (4) `_migration_notes`. (5) Sourcing: `nfr_id` → "generate from category+metric in kebab-case"; `category` → "MUST select from schema enum based on metric type"; `measurement_method` → "extract from seed_tech_stack.md monitoring/observability section; if absent, ask gap question — DO NOT fabricate PromQL queries or dashboard URLs"; `stage` → "MUST select from schema enum (see schema) based on where the metric is measurable: local/unit-test metrics → earliest stage; build-time metrics → CI stage; integration metrics → staging; live traffic metrics → prod stage"; `nfrs[*].owner` → "MUST match component owner from 02_system_sketch.json for the component this NFR constrains". (6) Replace vague: "available upstream artifacts and seed guidance" → specific artifact+field paths; "as applicable" → "MUST". (7) Fix "X downstream steps". (8) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_07"` | A-R7-01,02,09,10,12,13,16,18 |
-| T13 | P0 | T01-T03 | prompts/prompt_08_fixtures.md | **All R7 fixes for Step 08**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) `_migration_notes`. (4) Sourcing: `fixture_id` → "generate from scenario description in kebab-case"; `mode` → "MUST select from schema enum (see schema) based on test scope: use isolated-logic mode for unit tests, boundary mode for API contracts, multi-component mode for end-to-end flows, security mode for scenarios from 11_redteam.json"; `tags` → "MUST select from canonical tag registry — DO NOT invent tags". (5) Replace vague: "e.g."/"such as" → reference the specific upstream artifact to read for valid options; "when NFRs exist" → "MUST create fixtures for every NFR in 07_nfrs.json with measurable targets"; "where needed" → "MUST". (6) Fix "X downstream steps". (7) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_08"` | A-R7-01,02,10,12,13,16,18 |
-| T14 | P0 | T01-T03 | prompts/prompt_09_impl_plan.md | **All R7 fixes for Step 09**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `environment_ref` → canonical registry note. (4) `_migration_notes`. (5) Sourcing for unsourced fields. (6) Replace vague language. (7) Fix "X downstream steps". (8) Harden Best Practices + Self-Audit Gate. | `pytest tests/test_prompt_contracts.py -v -k "prompt_09"` | A-R7-01,02,09,10,12,13,16,18 |
-| T15 | P0 | T01-T03 | prompts/prompt_10_governance.md | **All R7 fixes for Step 10** (HEAVY — 2 CRIT + 1 HIGH): (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-05**: Add `## Schema Authority` section. Add field note: "`review_policy` — MUST populate. Sub-field structure defined in schema; read schema for required keys. Source values from: organizational review standards in seed docs, governance patterns from `06_invariants.json`." (4) **A-R7-07**: Change `pr_rules` from "should be filled" → "MUST populate with PR merge rules from organizational standards"; `versioning` from "should" → "MUST populate: select from versioning enum in schema (see schema) based on project versioning strategy in seed_tech_stack.md". (5) `_migration_notes`. (6) Harden Self-Audit Gate (listed as vague). (7) Harden Best Practices. (8) Replace all vague language. | `pytest tests/test_prompt_contracts.py -v -k "prompt_10"` | A-R7-01,02,05,07,13,14,16,18 |
-| T16 | P0 | T01-T03 | prompts/prompt_11_redteam.md | **All R7 fixes for Step 11**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing `policy_ref` → canonical registry note. (4) `_migration_notes`. (5) **A-R7-15**: Add `## Operating Flow: Synthesize → Clarify → Emit` header (score trigger present, section unnamed). (6) Replace vague language. (7) Harden Self-Audit Gate. (8) Harden Best Practices. | `pytest tests/test_prompt_contracts.py -v -k "prompt_11"` | A-R7-01,02,09,13,14,15,16,18 |
-| T17 | P0 | T01-T03 | prompts/prompt_12_ci_gates.md | **All R7 fixes for Step 12** (HEAVY — 1 CRIT + 1 HIGH): (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-03**: Add `jobs[].environment_ref` to Field Guidance: "Source from: 02a_delivery_baseline.json environments mapping — each job MUST be assigned to the environment where it runs. Required/optional status defined in schema." Also add to Output Contract example. (4) **A-R7-08**: Add `## Schema Authority` section. Add field note: "`jobs[].security` — MUST read schema for sub-field structure. Source values from: organizational CI security policies in `docs/seed/seed_tech_stack.md`." (5) **A-R7-19**: Move Canonical Registry section AFTER Output Contract to match convention. (6) `_migration_notes`. (7) Harden Self-Audit Gate (listed as vague). (8) Harden Best Practices. (9) Replace vague language. | `pytest tests/test_prompt_contracts.py -v -k "prompt_12"` | A-R7-01,02,03,08,13,14,16,18,19 |
-| T18 | P0 | T01-T03 | prompts/prompt_13_extension_generator.md | **All R7 fixes for Step 13**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing `*_ref` fields → canonical registry note. (4) `_migration_notes`. (5) **A-R7-15**: Add `## Operating Flow: Synthesize → Clarify → Emit` header. (6) Replace vague language. (7) No Best Practices section exists — do NOT add one; ensure any inline advisory language uses MUST modality. NOTE: `governance_label_ref` was confirmed RESOLVED — do not re-add. | `pytest tests/test_prompt_contracts.py -v -k "prompt_13" --no-header` | A-R7-01,02,09,13,15,18 |
-| T19 | P0 | T01-T03 | prompts/prompt_13a_completeness_assessment.md | **All R7 fixes for Step 13a**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) `_migration_notes`. (4) Fix `# Operating Flow` (H1) → `## Operating Flow: Synthesize → Clarify → Emit` (H2) for parser consistency. (5) Harden Self-Audit Gate — replace vague "Identification of at least one missing element OR confirmation of 100% completeness" with explicit field-name checklist. (6) Replace vague language. | `pytest tests/test_prompt_contracts.py -v -k "prompt_13a"` | A-R7-01,02,13,14,15,18 |
-| T20 | P0 | T01-T03 | prompts/prompt_14_roadmap.md | **All R7 fixes for Step 14**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing `*_ref` fields → canonical registry note. (4) `_migration_notes`. (5) **A-R7-15**: Add `## Operating Flow` header. (6) Replace vague language. (7) Harden Best Practices. | `pytest tests/test_prompt_contracts.py -v -k "prompt_14"` | A-R7-01,02,09,13,15,16,18 |
-| T21 | P0 | T01-T03 | prompts/prompt_15_scaffold.md | **All R7 fixes for Step 15**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) Add missing: `interface_ref`, `command_ref` → canonical registry note. (4) `_migration_notes`. (5) Replace vague language. (6) Harden Best Practices. | `pytest tests/test_prompt_contracts.py -v -k "prompt_15"` | A-R7-01,02,09,13,16,18 |
-| T22 | P0 | T01-T03 | prompts/prompt_16_impl_context.md | **All R7 fixes for Step 16**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-17**: Fix `# Self-Audit Gate` → `## Self-Audit Gate` (H1→H2). (4) **A-R7-15**: Add `## Operating Flow` header. (5) Add sourcing note for `plan.status`, `type`, `layer` fields — source from implementation context; valid values defined in schema (see Schema Authority directive). (6) Add optional `*_ref` canonical registry notes. (7) `_migration_notes`. (8) Replace vague language. | `pytest tests/test_prompt_contracts.py -v -k "prompt_16" --no-header` | A-R7-01,02,09,13,15,17,18 |
-| T23 | P0 | T01-T03 | prompts/prompt_16a_impl_planner.md | **All R7 fixes for Step 16a**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-04 CRITICAL**: REMOVE the mandate "Every checklist item MUST include a `milestone_ref` field" — this field does NOT exist in schema/16_impl_context.schema.json. Replace with: "To trace checklist items to roadmap milestones, populate `trace` array with milestone IDs from 14_roadmap.json." (4) `_migration_notes`. (5) Replace vague language. (6) No Best Practices section exists — harden inline `*Heuristic*:` markers to use MUST modality where they express binding constraints. (7) Verify two-gate structure (Score Threshold + Coverage Closure) is intact. | `pytest tests/test_prompt_contracts.py -v -k "prompt_16a"` | A-R7-01,02,04,13,18 |
-| T24 | P0 | T01-T03 | prompts/prompt_16b_impl_coder.md | **All R7 fixes for Step 16b**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-15**: Add `## Operating Flow: Synthesize → Clarify → Emit` header (Clarify/Emit logic exists inline but section is unnamed). (4) **A-R7-20**: Add explicit upstream JSON refs (currently only 1 — `14_roadmap.json`). Add to input section: "Upstream artifacts: `00_charter.json`, `04_fr_list.json`, `06_invariants.json`, `07_nfrs.json`, `14_roadmap.json`, `spec/impl_context/{step_id}.json`." (5) Add `final_status` field guidance. (6) `_migration_notes`. (7) Replace vague language. (8) No Best Practices section — harden inline `*Heuristic*:` markers. | `pytest tests/test_prompt_contracts.py -v -k "prompt_16b"` | A-R7-01,02,13,15,18,20 |
-| T25 | P0 | T01-T03 | prompts/prompt_16c_impl_reviewer.md | **All R7 fixes for Step 16c**: (1) Add `## Metadata Contract`. (2) Add `created_at`. (3) **A-R7-15**: Add `## Operating Flow: Synthesize → Clarify → Emit` header. (4) Add missing optional field guidance: `related_checklist_ids` → "array of checklist IDs from 16a plan relevant to this finding", `fixture_status.test_results[].notes` → "optional string for test context", `delivery_status.deployments[].status` → "deployment status string", `*_ref` canonical fields → canonical registry note. (5) `_migration_notes`. (6) Replace vague language. (7) No Best Practices section — harden inline `*Heuristic*:` markers. | `pytest tests/test_prompt_contracts.py -v -k "prompt_16c"` | A-R7-01,02,09,13,15,18 |
-| T26 | P1 | T04-T25 | — (no file change) | Full integration verification: `pytest tests/ -v` + `./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit` | All tests pass; zero validation errors | All |
-| T27 | P3 | T26 | docs/audit/findings/r7_findings.md | Update findings file with implementation results, Phase 4 verification status, and measurable goals | `test -f docs/audit/findings/r7_findings.md` | — |
-| T28 | P3 | T27 | docs/audit/review_index.md | Add R7 entry to review index | `grep "R7" docs/audit/review_index.md` | — |
+|----|-----|------|------|----------------|--------------------|----------|
+| T01 | P0 | — | tests/test_prompt_contracts.py | Replace ALL 6 occurrences of "B4 Metadata Contract" → "Metadata Contract" | `pytest tests/test_prompt_contracts.py -v` | A-R7-08 |
+| T02 | P0 | — | tests/test_prompt_schema_sync.py | Replace ALL 8 occurrences of "B4 Metadata Contract" → "Metadata Contract" | `pytest tests/test_prompt_schema_sync.py -v` | A-R7-08 |
+| T03 | P0 | — | tests/test_cli.py | Replace 1 occurrence of "B4 Metadata Contract" → "Metadata Contract" | `pytest tests/test_cli.py -v` | A-R7-08 |
 
-### Subagent Execution Strategy
+### Phase 1: Prompt Completeness (all 22 prompts, 4 parallel batches)
 
-**Parallel batch 1** (T01, T02, T03): 3 `general-purpose` worktree agents — test file renames. Independent, run together.
+**Per-prompt changes** (applied to every prompt in T04-T25):
+- Add `## Schema Authority` section (first section after header, referencing step's schema file)
+- Add `## Seed Ingestion Protocol` section (after Extraction Intent, for seed-consuming steps)
+- Add `## Coverage Gap Reporting` section (after Seed Ingestion Protocol)
+- Add `## Metadata Contract` section (AFTER the Output Contract JSON example block)
+- Move `## Canonical Registry (Required Input)` to BEFORE Output Contract
+- Rename "Heuristics For Completeness" → "Completeness Directives"; remove "soft, non-binding" label
+- Replace "Optional→expected" → "MUST populate"
+- Replace vague phrases with operational definitions or MUST/MUST NOT directives
+- Fill "X downstream steps" placeholder with actual count from step_order.json
+- Remove schema constraint duplication where found
+- Preserve all R4 and R6 changes (read current state first)
 
-**Parallel batch 2** (T04-T13): 10 `general-purpose` worktree agents — prompts 00-08. Independent (each touches one file), run together. Each agent receives:
-- The specific task instructions from the table above
-- "Read the prompt file first to understand current state"
-- "Read the schema file to verify all fields"
-- "Read tools/step_order.json for downstream step counts"
-- "Changes are ADDITIVE — do not remove correct existing content"
-- "After changes: run the acceptance command"
+#### Batch 1A — Steps 00-04
 
-**Parallel batch 3** (T14-T25): 12 `general-purpose` worktree agents — prompts 09-16c. Same pattern.
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| T04 | P0 | T01-T03 | prompts/prompt_00_project_charter.md | Add Schema Authority (00_charter.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry before Output Contract; add Metadata Contract AFTER Output Contract JSON block; rename "Heuristics" to "Completeness Directives" removing "soft, non-binding"; replace 4 vague phrases: "soft, non-binding" → remove, "Elevate optional→expected" → "MUST populate", "likely downstream FRs" → "downstream FRs that will consume this field", "Ambiguity scrub" → "Ambiguity elimination: every field MUST have a single unambiguous interpretation" | `grep -c "Schema Authority" prompts/prompt_00_project_charter.md && grep -c "Metadata Contract" prompts/prompt_00_project_charter.md && grep -c "Seed Ingestion Protocol" prompts/prompt_00_project_charter.md && grep -c "Coverage Gap Reporting" prompts/prompt_00_project_charter.md` | A-R7-01,02,05,06,07,09,13,14,15,17 |
+| T05 | P0 | T01-T03 | prompts/prompt_01_capabilities.md | Add Schema Authority (01_capabilities.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract AFTER Output Contract; replace "notable prerequisites" → "all prerequisites listed in the charter"; replace "if an FR draft exists" → "when spec/04_fr_list.json is present, MUST cross-reference"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" with actual count | `grep -c "Schema Authority" prompts/prompt_01_capabilities.md && grep -c "Metadata Contract" prompts/prompt_01_capabilities.md` | A-R7-01,02,05,06,07,09,12,13,14,15,17 |
+| T06 | P0 | T01-T03 | prompts/prompt_02_system_sketch.md | Add Schema Authority (02_system_sketch.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "should be marked as" → "MUST be marked as"; remove tags vocabulary duplication (defer to schema); replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_02_system_sketch.md && grep -c "Metadata Contract" prompts/prompt_02_system_sketch.md` | A-R7-01,02,05,06,07,09,12,13,14,15,17,18 |
+| T07 | P0 | T01-T03 | prompts/prompt_02a_delivery_baseline.md | Add Schema Authority (02a_delivery_baseline.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "critical gates" → "gates that block progression to subsequent phases"; replace "Parity hint" → "MUST achieve parity with"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_02a_delivery_baseline.md && grep -c "Metadata Contract" prompts/prompt_02a_delivery_baseline.md` | A-R7-01,02,05,06,07,12,13,14,15,17 |
+| T08 | P0 | T01-T03 | prompts/prompt_03_glossary.md | Add Schema Authority (03_glossary.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "key nouns" → "all domain-specific nouns used in upstream artifacts"; replace "marketing language" → "non-technical promotional language that lacks operational precision"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_03_glossary.md && grep -c "Metadata Contract" prompts/prompt_03_glossary.md` | A-R7-01,02,05,06,07,12,13,14,15,17 |
+| T09 | P0 | T01-T03 | prompts/prompt_04_functional_requirements.md | Add Schema Authority (04_fr_list.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "impacting state or permissions" → "that modify application state, user permissions, or data persistence"; replace "where performance is key" → "where response time or throughput has a defined NFR target"; replace "Optional→expected" → "MUST populate" | `grep -c "Schema Authority" prompts/prompt_04_functional_requirements.md && grep -c "Metadata Contract" prompts/prompt_04_functional_requirements.md` | A-R7-01,02,05,06,07,09,13,14,15,17 |
 
-**Sequential** (T26): Integration verification after all prompt changes merged.
+#### Batch 1B — Steps 05-08
 
-**Sequential** (T27, T28): Documentation after verification passes.
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| T10 | P0 | T01-T03 | prompts/prompt_05_interface_contracts.md | Add Schema Authority (05_interface_contracts.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "imply payloads" → "define request/response payloads for every endpoint that accepts or returns data"; replace "sensitive resources" → "resources requiring authentication, authorization, or audit logging"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_05_interface_contracts.md && grep -c "Metadata Contract" prompts/prompt_05_interface_contracts.md` | A-R7-01,02,05,06,07,09,12,13,14,15,17 |
+| T11 | P0 | T01-T03 | prompts/prompt_06_invariants.md | Add Schema Authority (06_invariants.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "consider" → "MUST evaluate"; replace "unless necessary" → "ONLY when the invariant cannot be expressed without the dependency — document justification in description field"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_06_invariants.md && grep -c "Metadata Contract" prompts/prompt_06_invariants.md` | A-R7-01,02,05,06,07,09,12,13,15,17 |
+| T12 | P0 | T01-T03 | prompts/prompt_07_nfrs.md | Add Schema Authority (07_nfrs.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "prod-impact NFRs" → "NFRs whose measurement_method targets production environment metrics"; fix measurement_method contingency → "MUST specify measurement_method for every NFR; if automated measurement not feasible, set to 'manual' with audit_frequency"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Schema Authority" prompts/prompt_07_nfrs.md && grep -c "Metadata Contract" prompts/prompt_07_nfrs.md` | A-R7-01,02,05,06,07,09,12,13,14,15,17 |
+| T13 | P0 | T01-T03 | prompts/prompt_08_fixtures.md | Add Schema Authority (08_fixtures.schema.json), Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; add Metadata Contract; replace "critical flows" → "all flows in acceptance_criteria of any FR in spec/04_fr_list.json"; replace "Optional→expected" → "MUST populate"; NOTE: Step 08 has 0 downstream consumers — replace "X downstream steps" with "no downstream steps" or remove placeholder | `grep -c "Schema Authority" prompts/prompt_08_fixtures.md && grep -c "Metadata Contract" prompts/prompt_08_fixtures.md` | A-R7-01,02,05,06,07,12,13,14,15,17 |
 
-### Common Instructions for All Prompt Tasks (T04-T25)
+#### Batch 1C — Steps 09-12 (includes critical fix A-R7-03)
 
-Every prompt task agent MUST apply these cross-cutting changes:
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| T14 | P0 | T01-T03 | prompts/prompt_09_impl_plan.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; ADD environment_ref field sourcing ("source from spec/02a_delivery_baseline.json environments[]"); remove tech_stack structure duplication; replace "expected" → "MUST include", "should map" → "MUST map", "if milestone dates cannot be derived" → "record in coverage_gaps[]"; replace "Optional→expected" → "MUST populate"; fill "X downstream steps" | `grep -c "Metadata Contract" prompts/prompt_09_impl_plan.md && grep -c "environment_ref" prompts/prompt_09_impl_plan.md` | A-R7-01,05,06,07,09,10,12,14,16,18 |
+| T15 | P0 | T01-T03 | prompts/prompt_10_governance.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "should be filled" (line 131) → "MUST be filled"; replace "should block the merge" (line 26) → "MUST block the merge"; replace "Optional→expected" → "MUST populate"; harden Best Practices "should"/"may" → "MUST" | `grep -c "Metadata Contract" prompts/prompt_10_governance.md && grep -c "MUST be filled" prompts/prompt_10_governance.md` | A-R7-01,04,05,06,07,09,14,16 |
+| T16 | P0 | T01-T03 | prompts/prompt_11_redteam.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "Prefer linking to existing" → "MUST link to existing mitigations when available; if none applies, create new with full structured fields"; harden Best Practices | `grep -c "Metadata Contract" prompts/prompt_11_redteam.md` | A-R7-01,05,06,07,09,16 |
+| T17 | P0 | T01-T03 | prompts/prompt_12_ci_gates.md | **CRIT A-R7-03**: ADD `## Schema Authority` section (12_ci_gates.schema.json); ADD environment_ref field instructions with sourcing from spec/02a_delivery_baseline.json; Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "include when NFRs imply" → "MUST include for every NFR with environment-specific threshold"; replace "Optional→expected" → "MUST populate" | `grep -c "Schema Authority" prompts/prompt_12_ci_gates.md && grep -c "Metadata Contract" prompts/prompt_12_ci_gates.md && grep -c "environment_ref" prompts/prompt_12_ci_gates.md` | A-R7-01,03,05,06,07,09,14,16 |
 
-0. **`## Schema Authority` section** — add as the FIRST section after the prompt header (before all other sections):
-```markdown
-## Schema Authority
+#### Batch 1D — Steps 13-16c
 
-The schema at `$SCHEMA_DIR/<step_schema>.schema.json` is the authoritative source for all field
-definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| T18 | P0 | T01-T03 | prompts/prompt_13_extension_generator.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; ADD governance_label_ref to main field guidance ("MUST reference label from spec/10_governance.json governance_labels[]"); replace "truly complex domains" → "domains requiring >3 custom entity types not in existing schemas"; replace "Don't Over-Splice" → "MUST NOT create extension when functionality fits existing schema fields" | `grep -c "Metadata Contract" prompts/prompt_13_extension_generator.md && grep -c "governance_label_ref" prompts/prompt_13_extension_generator.md` | A-R7-01,05,06,07,09,11,16 |
+| T19 | P0 | T01-T03 | prompts/prompt_13a_completeness_assessment.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry | `grep -c "Metadata Contract" prompts/prompt_13a_completeness_assessment.md` | A-R7-01,05,06,07 |
+| T20 | P0 | T01-T03 | prompts/prompt_14_roadmap.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "JIT Granularity: Plan immediate 1-2 milestones in high detail" → "MUST plan all milestones at uniform detail; current-phase milestones MUST include task-level breakdowns"; preserve R4 changes | `grep -c "Metadata Contract" prompts/prompt_14_roadmap.md` | A-R7-01,05,06,07,16 |
+| T21 | P0 | T01-T03 | prompts/prompt_15_scaffold.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "Optional→expected" → "MUST populate" | `grep -c "Metadata Contract" prompts/prompt_15_scaffold.md` | A-R7-01,05,06,07,14 |
+| T22 | P0 | T01-T03 | prompts/prompt_16_impl_context.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "as may be applicable" → "for every field defined in the schema"; replace "where applicable to the schema" → "for all fields in schema required[] array" | `grep -c "Metadata Contract" prompts/prompt_16_impl_context.md` | A-R7-01,05,06,07,16 |
+| T23 | P0 | T01-T03 | prompts/prompt_16a_impl_planner.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; replace "as needed" → "when implementation plan references a component not yet in scaffold"; preserve R4 changes | `grep -c "Metadata Contract" prompts/prompt_16a_impl_planner.md` | A-R7-01,05,06,07,16 |
+| T24 | P0 | T01-T03 | prompts/prompt_16b_impl_coder.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry | `grep -c "Metadata Contract" prompts/prompt_16b_impl_coder.md` | A-R7-01,05,06,07 |
+| T25 | P0 | T01-T03 | prompts/prompt_16c_impl_reviewer.md | Add Metadata Contract, Seed Ingestion Protocol, Coverage Gap Reporting; move Canonical Registry; preserve R4 changes | `grep -c "Metadata Contract" prompts/prompt_16c_impl_reviewer.md` | A-R7-01,05,06,07 |
 
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-```
+### Phase 2: Verification
 
-1. **`## Metadata Contract` section** — add BEFORE `## Output Contract` (or `# Output Contract`):
-```markdown
-## Metadata Contract
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| T26 | P1 | T04-T25 | — (no file) | Full test suite + validate-all | `pytest tests/ -v && ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit` | — |
 
-Every artifact produced by this step MUST include:
-- `"$schema"`: `"<URI from schema_registry.json for this step>"`
-- `"spec_version"`: current toolkit version string (from `tools/pyproject.toml`)
-- `"generation_quality"`: object with `confidence_score` (0.0–1.0), `coverage_assessment` (string), `known_gaps` (array of strings), `recommendations` (array of strings)
-```
+### Phase 3: Documentation
 
-2. **`created_at` instruction** — add to Field-by-Field section or Output Rules:
-```
-`created_at`: MUST be set to ISO-8601 UTC timestamp of artifact generation (e.g., "2024-01-15T10:30:00Z"). Do not hardcode; use current time.
-```
-
-3. **`_migration_notes` instruction** — add at end of Field-by-Field section:
-```
-`_migration_notes`: Do not populate. System-managed field for migration tooling.
-```
-
-4. **Vague language replacement rules**:
-   - "consider X" → "MUST include X if [specific condition]"
-   - "may include" → "MUST include"
-   - "if appropriate" → "if [specific condition from schema/upstream]"
-   - "such as" / "e.g." → reference the specific upstream artifact to read for valid options; if values come from a schema enum, write "see schema for valid values" — do NOT copy enum lists from the schema into the prompt
-   - "etc" → remove or enumerate
-   - "where applicable" → "MUST include for [specific condition]"
-   - "where relevant" → remove or specify condition
-   - "as needed" → "MUST include when [condition]"
-   - "prefer" → "MUST use"
-   - "should" (in binding context) → "MUST"
-   - "non-trivial" → define concrete threshold
-
-5. **Self-Audit Gate hardening** — replace generic criteria with explicit field checklist mapping to schema `required[]`.
-
-6. **Best Practices hardening** — replace "should"/"prefer"/"recommended" with "MUST" where constraint is binding. **Only for prompts that HAVE a Best Practices section** (18 of 22 — NOT 13, 16a, 16b, 16c).
-
-7. **"X downstream steps" fix** (9 prompts: 01,02,02a,03,05,06,07,08,09) — read `tools/step_order.json` → `step_metadata` → find the step entry → count `downstream_consumers` array length. Replace "X" with actual number and list step names.
-
-8. **Canonical `*_ref` fields** — for each optional `*_ref` field missing from the prompt, add ONE of:
-   - If auto-managed: `"<field_name>": Do not populate manually; resolved by canonical registry tooling.`
-   - If AI must populate: explicit sourcing instruction with upstream artifact + field path.
+| ID | Pri | Deps | File | Change summary | Acceptance command | Findings |
+|----|-----|------|------|----------------|--------------------|----------|
+| D01 | P3 | T04-T25 | docs/audit/review_index.md | Add R7 entry to review index | `grep "R7" docs/audit/review_index.md` | — |
 
 ---
 
 ## Verification Status
 
-**COMPLETE** — All checks passed.
-
-- CHECK 1 Assumptions: PASS
-- CHECK 2 References: PASS (all findings cite specific files verified by Phase 1 Explore agents)
-- CHECK 3 Atomic: PASS (one file per task)
-- CHECK 4 Tests: PASS (T01-T03 cover test changes; T26 runs full suite — **549 passed, 0 failures**)
-- CHECK 5 Docs: PASS (T27-T28 cover documentation)
-- CHECK 6 Deps: PASS (tests before prompts, integration after prompts, docs last)
-- CHECK 7 Orphans: PASS (every finding maps to at least one task)
-- Total findings: 20 (6 CRIT, 5 HIGH, 6 MED, 3 LOW) — **all FIXED**
-- Total tasks: 25 code + 1 integration + 2 doc = 28 — **all DONE**
+- CHECK 1 Assumptions: PASS — no findings contain "likely", "probably", "may", "could", "appears to", "seems to"
+- CHECK 2 References: PASS — all File:Line refs verified by Phase 1 subagents; Phase 4 corrected 7 issues: A-R7-04 downgraded CRIT→MED (pr_rules/versioning not in schema required[]), A-R7-08 line 528→527, A-R7-09 exception list corrected, A-R7-10 line 96→94, A-R7-11 line 51→56, A-R7-13 scope narrowed to 2 explicit + 10 total, A-R7-14 count 7→13 prompts
+- CHECK 3 Atomic: PASS — every task modifies exactly 1 file; T26 is verification-only; D01 modifies 1 doc file
+- CHECK 4 Tests: PASS — T01-T03 modify test files (self-verifying); T04-T25 modify prompt markdown (no code, no test tasks needed); T26 runs full suite
+- CHECK 5 Docs: PASS — no new error codes, CLI commands, or schema versions; D01 covers review index
+- CHECK 6 Deps: PASS — T01-T03 parallel; T04-T25 parallel in 4 batches after Phase 0; T26 after all; D01 after all
+- CHECK 7 Orphans: PASS — every finding maps to at least one task
+- Total findings: 18 (3 CRIT, 8 HIGH, 7 MED)
+- Total tasks: 25 code + 1 verification + 1 doc = 27
 
 ---
 
-## Implementation Results
+## Subagent Execution Strategy
 
-### Task Execution Summary
+Phase 0 — Test infrastructure (3 parallel subagents):
+  - Subagent A (worktree): T01 (test_prompt_contracts.py)
+  - Subagent B (worktree): T02 (test_prompt_schema_sync.py)
+  - Subagent C (worktree): T03 (test_cli.py)
 
-| Task Group | Tasks | Files Changed | Status |
-|------------|-------|---------------|--------|
-| T00 | 1 | docs/audit/findings/r7_findings.md | DONE |
-| T01-T03 | 3 | 3 test files | DONE — "B4 Metadata Contract" → "Metadata Contract" |
-| T04-T13 | 10 | prompts 00-08 | DONE — all R7 fixes applied |
-| T14-T25 | 12 | prompts 09-16c | DONE — all R7 fixes applied |
-| T26 | 1 | (integration) | DONE — 549 tests passed, 0 failures |
-| T27-T28 | 2 | findings + review_index | DONE |
+Phase 1 — Prompt completeness (4 parallel subagents, after Phase 0):
+  - Subagent D (worktree): Batch 1A — T04-T09 (prompts 00-04, 6 files)
+  - Subagent E (worktree): Batch 1B — T10-T13 (prompts 05-08, 4 files)
+  - Subagent F (worktree): Batch 1C — T14-T17 (prompts 09-12, 4 files; includes CRIT A-R7-03)
+  - Subagent G (worktree): Batch 1D — T18-T25 (prompts 13-16c, 8 files)
 
-### Cross-Cutting Changes Applied to All 22 Prompts
+Phase 2 — Verification (sequential, after Phase 1):
+  - Subagent H (no isolation): T26
 
-1. **`## Schema Authority` section** added to all 22 prompts — directs LLM to read schema for all structural constraints before generating output
-2. **`## Metadata Contract` section** added before Output Contract in all 22 prompts
-3. **`created_at` instruction** added to Field-by-Field guidance
-4. **`_migration_notes`** "do not populate" instruction added
-5. **Vague language** replaced with MUST-modality and explicit conditions
-6. **Self-Audit Gate** hardened with explicit required field checklists
-7. **Best Practices** hardened (should→MUST) in 18 prompts that have the section
-8. **Optional `*_ref` canonical fields** added with registry binding notes
-
-### Critical Fixes
-
-- **A-R7-03**: `jobs[].environment_ref` added to prompt_12 Field Guidance with sourcing from 02a_delivery_baseline.json
-- **A-R7-04**: Removed invalid `milestone_ref` mandate from prompt_16a; replaced with `trace` array guidance
-- **A-R7-05**: `## Schema Authority` section + sourcing note added to prompt_10; `review_policy` sub-field structure delegated to schema (read schema for required keys: verdict_requirements, required_metadata, evidence_source_by_phase)
-- **A-R7-06**: `## Schema Authority` section + sourcing note for `apis[].enum_provenance` added to prompt_05; sub-field structure (source_url, source_date, resolved_at) delegated to schema
-
-### Integration Verification
-
-- **Full test suite**: 549 passed, 0 failures (`pytest tests/ -v`)
-- **Prompt contract tests**: 8/8 passed
-- **Prompt schema sync tests**: 19/19 passed
-- **Zero B4 Metadata Contract references remain** in test files
+Phase 3 — Documentation (parallel with Phase 2):
+  - Subagent I (no isolation): D01
 
 ---
 
-## Anti-Patterns
+## Section Templates for Implementation
 
-- Do NOT modify schemas — that's R8
-- Do NOT modify validators — that's R9
-- Do NOT remove correct existing prompt content — additions only
-- Do NOT add fields not in the schema to any prompt
-- Do NOT add schema field definitions (types, enum value lists, regex patterns, sub-field structures, required/optional markers, minItems) to any prompt — the schema is the authoritative source. Prompts provide sourcing guidance and workflow constraints only.
-- Do NOT use NLP/semantic matching for sourcing — must be structural (artifact + field path)
+Subagents implementing T04-T25 MUST use these exact section templates, adapted per step:
 
----
+### Schema Authority (add as FIRST section after prompt header)
+```markdown
+## Schema Authority
+The schema at `schema/<NN_step_name>.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+```
 
-## R7a: Supplementary Prompt Cleanup (post-R7)
+### Seed Ingestion Protocol (add after Extraction Intent)
+```markdown
+## Seed Ingestion Protocol
+1. Read seed document(s) listed in upstream dependencies
+2. Extract fields relevant to this step (per Extraction Intent above)
+3. Reflect extracted content in corresponding output fields
+4. Populate `seed_refs` with actually-used seed IDs and content hashes
+```
 
-Post-R7 review identified additional prompt maintenance issues to resolve before R8.
+### Coverage Gap Reporting (add after Seed Ingestion Protocol)
+```markdown
+## Coverage Gap Reporting
+Any output field whose value cannot be traced to a specific upstream artifact or seed
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the missing upstream item
+- `source_step`: the step that should have provided the data
+- `reason`: why the data is missing or untraceable
+```
 
-### R7a Findings
-
-| ID | Sev | Scope | Finding |
-|----|-----|-------|---------|
-| A-R7a-01 | MED | 11 prompts (00-09) | Static "This prompt's output feeds N downstream steps" text duplicates `specdev prompt-context` CLI; stale counts create maintenance burden |
-| A-R7a-02 | HIGH | All 22 prompts | No Schema Authority section — prompts don't establish schema as authoritative for structure/constraints |
-| A-R7a-03 | MED | All 22 prompts | Self-Audit Gate lacks concrete criteria for when confidence drops below 0.9 |
-| A-R7a-04 | MED | prompt_10 | Output Contract example missing `pr_rules`, `versioning`, `review_policy`, `reviewers` |
-| A-R7a-05 | MED | All 22 prompts | Field-by-Field sections duplicate schema constraints (types, enums, required markers, minItems) |
-| A-R7a-06 | LOW | ~10 instances | MUST keyword redundancy: "MUST + REQUIRED" on same constraint, unclear "MUST X if Y" ordering |
-
-### R7a Implementation Plan
-
-| Task | Scope | Fix |
-|------|-------|-----|
-| Remove "feeds" lines | 11 prompts | Remove static downstream step counts; keep `specdev prompt-context` CLI reference |
-| Add Schema Authority section | All 22 | Add `## Schema Authority` before Output Contract with schema URI and authority statement |
-| Add confidence criteria | All 22 | Add 3 bullets to Self-Audit Gate defining when score drops below 0.9 |
-| S1: prompt_10 Output Contract | prompt_10 | Add `pr_rules`, `versioning`, `review_policy`, `reviewers` to example JSON |
-| Trim Field-by-Field | All 22 | Remove type/enum/constraint-only lines that duplicate schema (keep sourcing guidance) |
-| MUST cleanup | ~10 instances | "MUST + REQUIRED" → pick one; "MUST X if Y" → "IF Y, MUST X" |
-
-### R8 Scope Additions Identified
-
-Two new gaps to add to `docs/audit/r8_schema_alignment.md`:
-
-| # | Gap | Severity |
-|---|-----|----------|
-| 8 | Schema `description` fields lack sourcing guidance — sourcing exists only in prompt prose, creating maintenance drift | CRITICAL |
-| 9 | `canon/manifest.json` `source_refs` unused; no `binding_mode` contract for auto vs explicit canonical ref population | HIGH |
+### Metadata Contract (add AFTER the Output Contract JSON example block)
+```markdown
+## Metadata Contract
+Every artifact produced by this step MUST include:
+- `"$schema"`: `"<URI from schema_registry.json for this step>"`
+- `"spec_version"`: current specdev version string
+- `"generation_quality"`: object with `confidence_score` (0.0-1.0), `coverage_assessment`, `known_gaps[]`, `recommendations[]`
+```
 
 ---
 
 ## Next Steps
 
-- **R7+R7a implementation**: Apply all R7 findings (T01-T28) and R7a findings together in a single pass
-- **R8** (L2: Schemas): Tighten schemas to match hardened prompts; add gaps 8+9
-- **R9** (L3+L4: Validators+CI): Build cross-step validation against final prompts and schemas
+All implementation tasks (T01-D01) are staged and ready for parallel subagent execution.
+Start with Phase 0 (T01-T03), then Phase 1 (T04-T25) once Phase 0 completes.
