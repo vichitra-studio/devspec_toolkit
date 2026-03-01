@@ -30,16 +30,10 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["07"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - Success metrics in `spec/00_charter.json` to align business outcomes with technical targets.
 - Glossary `spec/03_glossary.json` for metric names and units; FRs `spec/04_fr_list.json` for performance-critical behaviors.
-- Do not depend on downstream monitoring specs; derive measurement_method from available upstream artifacts and seed guidance.
+- Do not depend on downstream monitoring specs; derive measurement_method from available upstream artifacts.
 - Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
 
 ### Extraction Intent
@@ -52,6 +46,7 @@ For each upstream artifact ingested, extract the following:
 - Build a private Context Ledger of NFRs by category (latency/throughput/availability/etc.), with metric→target→unit→measurement_method, stage, owner, and traces to FRs/APIs/components. Do not output it.
 - Align names/units with glossary; ensure measurement_method is practically measurable via dashboards/queries.
 - Self-audit; if units/methods/owners or stage are missing, ask Gap Questions.
+- If measurement_method cannot be practically implemented with the system's actual infrastructure (as defined in upstream specs), ask for the intended measurement approach rather than inventing one.
 - Rewrite targets to numeric/operational formats; finalize traces.
 - Emit JSON when measurable.
 
@@ -78,7 +73,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -154,11 +149,7 @@ Before emitting, verify:
   "id": "nfrs-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "nfrs": [
     {

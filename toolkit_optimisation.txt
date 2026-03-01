@@ -1984,3 +1984,521 @@
    schema for seed_requirements.json.
 
 ✻ Cogitated for 2m 36s
+
+═══════════════════════════════════════════════════════════════════════════
+  IMPLEMENTATION AUDIT — Current State Assessment
+═══════════════════════════════════════════════════════════════════════════
+
+  Date: 2026-02-28
+  Branch: toolkit_agent_optimisation_claude
+
+  ─────────────────────────────────────────────────────────────────────────
+  1. What Exists Today
+  ─────────────────────────────────────────────────────────────────────────
+
+  tools/specdev_tools/context/
+  └── json_utils.py          (~500 lines, fully functional)
+
+  json_utils.py Capabilities:
+  ┌───────────────────┬──────────────────────────────────────────────────┐
+  │     Category      │                   Operations                     │
+  ├───────────────────┼──────────────────────────────────────────────────┤
+  │ CRUD              │ read (jq filter), patch, insert, delete          │
+  ├───────────────────┼──────────────────────────────────────────────────┤
+  │ Discovery         │ keys (top-level), structure (ASCII tree view)    │
+  ├───────────────────┼──────────────────────────────────────────────────┤
+  │ Schema-Aware      │ schema discovery (navigate schema properties),   │
+  │                   │ registry linkage via $schema URI                 │
+  ├───────────────────┼──────────────────────────────────────────────────┤
+  │ Tracing           │ trace_relationship (ripgrep-based ID search)     │
+  ├───────────────────┼──────────────────────────────────────────────────┤
+  │ Safety            │ Blocks full-file reads (jq filter "." rejected), │
+  │                   │ atomic writes (tempfile + os.replace),           │
+  │                   │ 4-space indent to match repo style               │
+  └───────────────────┴──────────────────────────────────────────────────┘
+
+  Design Patterns:
+  - File discovery via find() — cross-platform, not hardcoded paths
+  - All JSON mutations go through jq for consistency
+  - Crash-safe writes via tempfile + os.replace()
+  - Schema-aware navigation into properties/items via JSONPath-like syntax
+
+  ─────────────────────────────────────────────────────────────────────────
+  2. Supporting Infrastructure Already in Place
+  ─────────────────────────────────────────────────────────────────────────
+
+  ┌──────────────────────────────┬────────┬──────────────────────────────┐
+  │           Component          │ Status │            Notes             │
+  ├──────────────────────────────┼────────┼──────────────────────────────┤
+  │ tools/step_order.json        │  100%  │ Full extraction_intent for   │
+  │                              │        │ all 22 steps. Maps each      │
+  │                              │        │ step to its required_spec_   │
+  │                              │        │ inputs, required_seed_inputs │
+  │                              │        │ and natural-language          │
+  │                              │        │ extraction_intent per input  │
+  ├──────────────────────────────┼────────┼──────────────────────────────┤
+  │ tools/schema_registry.json   │  100%  │ All 31 schema $schema URIs  │
+  │                              │        │ mapped to local paths        │
+  ├──────────────────────────────┼────────┼──────────────────────────────┤
+  │ CLI: prompt-context command  │  100%  │ Shows downstream consumers  │
+  │                              │        │ + extraction intents for a   │
+  │                              │        │ given step (markdown table)  │
+  ├──────────────────────────────┼────────┼──────────────────────────────┤
+  │ tools/trace_matrix.json      │   0%   │ Does NOT exist on disk yet;  │
+  │                              │        │ generated on demand via      │
+  │                              │        │ `specdev matrix` command     │
+  ├──────────────────────────────┼────────┼──────────────────────────────┤
+  │ tools/command_prefixes.json  │  100%  │ CLI sandboxing config        │
+  └──────────────────────────────┴────────┴──────────────────────────────┘
+
+  ─────────────────────────────────────────────────────────────────────────
+  3. What Needs to Be Built
+  ─────────────────────────────────────────────────────────────────────────
+
+  tools/specdev_tools/context/
+  ├── __init__.py              ← package init, public API exports
+  ├── json_utils.py            ← EXISTS (low-level jq wrapper)
+  ├── scope_resolver.py        ← Graph walk: entry ID → full ID set
+  ├── extractor.py             ← Build scoped context from resolved IDs
+  ├── reviewer.py              ← Two-pass review (structural + semantic)
+  ├── seed_indexer.py           ← Extract reqs from prose → seed_reqs.json
+  ├── seed_reviewer.py          ← Pipeline-wide seed coverage check
+  ├── freshness.py              ← Detect stale seed indexes
+  └── structure.py              ← Lightweight agent orientation
+
+  CLI commands to register in cli.py:
+    specdev context scope <spec_dir> --entry <id> [--repo-root .]
+    specdev context extract <spec_dir> --step <NN> --entry <id> [--repo-root .]
+    specdev context review <artifact> --step <NN> --entry <id> [--repo-root .]
+    specdev context structure <spec_dir> --step <NN> [--repo-root .]
+    specdev context index-seeds <seed_dir> --manifest <path>
+    specdev context review-seeds <spec_dir>
+    specdev context check-seed-freshness <spec_dir>
+
+  ─────────────────────────────────────────────────────────────────────────
+  4. Dependency Graph for Build Order
+  ─────────────────────────────────────────────────────────────────────────
+
+  __init__.py ──────────────────────────────────────── (first, no deps)
+       │
+  structure.py ─────────────────────────────────────── (uses step_order.json
+       │                                                + schema_registry)
+       │
+  scope_resolver.py ────────────────────────────────── (uses trace_matrix
+       │                                                + step_order.json)
+       │
+  extractor.py ─────────────────────────────────────── (uses scope_resolver
+       │                                                + json_utils)
+       │
+  reviewer.py ──────────────────────────────────────── (uses scope_resolver
+       │                                                + extractor)
+       │
+  seed_indexer.py ──────────────────────────────────── (standalone, LLM step)
+       │
+  seed_reviewer.py ─────────────────────────────────── (uses seed_indexer
+       │                                                output + reviewer)
+       │
+  freshness.py ─────────────────────────────────────── (uses seed_indexer
+                                                        output + hash check)
+
+  ─────────────────────────────────────────────────────────────────────────
+  5. Key Design Decisions Still Open
+  ─────────────────────────────────────────────────────────────────────────
+
+  a) extraction_intent is natural language only — no field paths.
+     Options:
+     - A: Formalize into tools/extraction_paths.json (manual, explicit)
+     - B: Claude resolves intents at runtime using json_utils structure
+     - C: Hybrid — Claude resolves once, caches to extraction_paths.json
+
+  b) scope_resolver depends on trace_matrix.json which must be
+     pre-generated. Should the context commands auto-generate it,
+     or require it to exist?
+
+  c) seed_indexer requires LLM — should it shell out to Claude,
+     generate a prompt for the user, or be a Claude Code skill?
+
+  d) Review semantic pairs need LLM judgment — how tightly should
+     this couple to Claude Code vs be usable standalone?
+
+═══════════════════════════════════════════════════════════════════════════
+  DESIGN DECISIONS RESOLVED — SDK-Free Architecture
+═══════════════════════════════════════════════════════════════════════════
+
+  Date: 2026-03-01
+  Branch: toolkit_agent_optimisation_claude
+
+  ─────────────────────────────────────────────────────────────────────────
+  1. Core Principle: No Anthropic SDK Dependency
+  ─────────────────────────────────────────────────────────────────────────
+
+  Claude Code IS the LLM in the loop. The toolkit never calls an LLM
+  directly. Instead:
+
+  - Tools output structured data (JSON, tables, prompts)
+  - Claude Code (already running) does the reasoning
+  - Tools validate Claude Code's output
+
+  This means: no API keys, no SDK dependency, no billing beyond the
+  Claude Code session. The toolkit remains pure Python CLI tools.
+
+  ─────────────────────────────────────────────────────────────────────────
+  2. Resolved Design Decisions
+  ─────────────────────────────────────────────────────────────────────────
+
+  Decision (c) — seed_indexer: RESOLVED → Prompt + Validator pattern
+
+    seed_indexer.py does NOT call an LLM. It:
+    1. Reads seed documents (seed_overview.md, seed_tech_stack.md)
+    2. Generates a structured prompt with extraction instructions
+    3. Claude Code (already in session) performs the extraction
+    4. seed_indexer.py validates the output against a schema
+    5. Writes seed_requirements.json
+
+    This matches the existing toolkit philosophy: prompts are contracts,
+    tools validate output. The indexer is a prompt template + validator,
+    not an autonomous extractor.
+
+  Decision (d) — reviewer semantic pairs: RESOLVED → Same pattern
+
+    reviewer.py generates surgical review pairs (source text vs target
+    text + concern). Claude Code judges them. The tool prepares the
+    data and validates the judgment — it never calls an LLM itself.
+
+  Decision (b) — trace_matrix auto-generation: STILL OPEN
+
+    scope_resolver needs trace_matrix.json. Options remain:
+    - Auto-generate on demand (adds latency)
+    - Require pre-built (user runs `specdev matrix` first)
+    - Hybrid: use cached if fresh, regenerate if stale
+
+  Decision (a) — extraction_intent formalization: STILL OPEN
+
+    Natural language intents vs formal field paths. The SDK-free
+    approach actually favours option B (Claude resolves at runtime)
+    since Claude Code is already present.
+
+  ─────────────────────────────────────────────────────────────────────────
+  3. Module Roles Under SDK-Free Architecture
+  ─────────────────────────────────────────────────────────────────────────
+
+  Each module's role now clearly splits into "tool does" vs
+  "Claude Code does":
+
+  ┌───────────────────┬──────────────────────────┬───────────────────────┐
+  │      Module       │       Tool Does          │  Claude Code Does     │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ structure.py      │ Lists files, metadata,   │ Nothing — pure data   │
+  │                   │ step graph orientation   │                       │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ scope_resolver.py │ Graph walk, ID set       │ Nothing — pure data   │
+  │                   │ resolution               │                       │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ extractor.py      │ jq slicing, scoped JSON  │ Nothing — pure data   │
+  │                   │ context assembly         │                       │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ seed_indexer.py   │ Generates extraction     │ Reads prompt, extracts│
+  │                   │ prompt + validates output │ requirements, writes  │
+  │                   │                          │ seed_requirements.json │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ seed_reviewer.py  │ Compares seedreq-* IDs   │ Nothing — pure set    │
+  │                   │ across specs (coverage)  │ comparison            │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ freshness.py      │ Hash comparison, stale   │ Nothing — pure data   │
+  │                   │ detection                │                       │
+  ├───────────────────┼──────────────────────────┼───────────────────────┤
+  │ reviewer.py       │ Structural checks (pure  │ Judges semantic pairs │
+  │                   │ Python) + generates      │ (faithfulness,        │
+  │                   │ semantic review pairs    │ quantifier weakening) │
+  └───────────────────┴──────────────────────────┴───────────────────────┘
+
+  Only 2 modules need Claude Code interaction: seed_indexer (one-time
+  extraction) and reviewer (semantic pair judgment). Everything else
+  is pure Python with zero LLM dependency.
+
+  ─────────────────────────────────────────────────────────────────────────
+  4. The Missing Layer: Skills + Hooks (Claude Code Automation)
+  ─────────────────────────────────────────────────────────────────────────
+
+  The context package is the DATA LAYER. Above it sits the AUTOMATION
+  LAYER using Claude Code's native extension points — no SDK needed:
+
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │  Layer 2: Skills + Hooks (automation)                               │
+  │    Skills = slash commands that prepare context + let Claude act     │
+  │    Hooks  = auto-triggers (post-edit → validate)                    │
+  │    CLAUDE.md = teaches Claude the pipeline graph                    │
+  │                                                                     │
+  │      ↓ consumes                                                     │
+  │                                                                     │
+  │  Context Package (data/scoping)                                     │
+  │    structure, scope_resolver, extractor, reviewer,                  │
+  │    seed_indexer, seed_reviewer, freshness                           │
+  │                                                                     │
+  │      ↓ uses                                                         │
+  │                                                                     │
+  │  Infrastructure (already built)                                     │
+  │    json_utils, step_order.json, schema_registry.json                │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  Skills to build (Claude Code slash commands):
+
+  ┌──────────────────────┬─────────────────────────────────────────────┐
+  │        Skill         │                What It Does                 │
+  ├──────────────────────┼─────────────────────────────────────────────┤
+  │ /specdev-step <NN>   │ Loads prompt_NN, ingests scoped context     │
+  │                      │ (via extractor), follows Clarify→Emit,     │
+  │                      │ writes artifact, validates                  │
+  ├──────────────────────┼─────────────────────────────────────────────┤
+  │ /specdev-validate    │ Runs full validation ritual: validate →    │
+  │                      │ seed-lint → docs-lint → matrix →            │
+  │                      │ fixtures-lint                               │
+  ├──────────────────────┼─────────────────────────────────────────────┤
+  │ /specdev-review <NN> │ Runs context review (structural checks     │
+  │                      │ + semantic pairs), presents findings       │
+  ├──────────────────────┼─────────────────────────────────────────────┤
+  │ /specdev-index-seeds │ Generates seed extraction prompt, Claude   │
+  │                      │ extracts, tool validates output             │
+  ├──────────────────────┼─────────────────────────────────────────────┤
+  │ /specdev-pipeline    │ Runs full pipeline from step NN to MM,     │
+  │                      │ orchestrating step-by-step                  │
+  └──────────────────────┴─────────────────────────────────────────────┘
+
+  Hooks to configure (.claude/settings.json):
+
+  ┌────────────────────────┬──────────────────────────────────────────┐
+  │        Trigger         │               Action                     │
+  ├────────────────────────┼──────────────────────────────────────────┤
+  │ After editing          │ Auto-run: validate + seed-lint +         │
+  │ spec/*.json            │ docs-lint (the validation ritual)        │
+  ├────────────────────────┼──────────────────────────────────────────┤
+  │ After editing          │ Auto-run: check-seed-freshness           │
+  │ docs/seed/*.md         │ (flag stale indexes)                     │
+  ├────────────────────────┼──────────────────────────────────────────┤
+  │ Pre-commit             │ governance-check on commit message       │
+  └────────────────────────┴──────────────────────────────────────────┘
+
+  ─────────────────────────────────────────────────────────────────────────
+  5. Revised Build Order (SDK-Free)
+  ─────────────────────────────────────────────────────────────────────────
+
+  Phase A — Context Package (pure Python, no LLM needed to build/test):
+    1. __init__.py
+    2. structure.py
+    3. scope_resolver.py
+    4. extractor.py
+    5. seed_indexer.py (prompt template + validator only)
+    6. seed_reviewer.py (pure set comparison)
+    7. freshness.py (hash comparison)
+    8. reviewer.py (structural checks + pair generator)
+
+  Phase B — Skills + Hooks (Claude Code automation layer):
+    9. /specdev-step skill
+   10. /specdev-validate skill
+   11. /specdev-review skill
+   12. /specdev-index-seeds skill
+   13. Post-edit hooks for spec/*.json
+   14. Post-edit hooks for docs/seed/*.md
+   15. /specdev-pipeline skill (orchestration)
+
+  Phase C — CLAUDE.md Enhancements:
+   16. Pipeline graph awareness (step dependencies)
+   17. Token budget guidance (use context extract, not full reads)
+   18. Validation ritual automation reference
+
+  ─────────────────────────────────────────────────────────────────────────
+  6. Key Architectural Constraint
+  ─────────────────────────────────────────────────────────────────────────
+
+  The entire system follows one rule:
+
+    Tools prepare data and validate output.
+    Claude Code reasons and generates.
+    No tool ever calls an LLM.
+
+  This keeps the toolkit portable (works with any Claude Code session),
+  testable (all tools are deterministic, unit-testable Python), and
+  free of API/billing dependencies.
+
+  ─────────────────────────────────────────────────────────────────────────
+  7. Seed Template & Propagation Optimization (Implemented)
+  ─────────────────────────────────────────────────────────────────────────
+
+  7.1 Findings
+
+  Analysis of seed templates and pipeline seed propagation revealed three
+  structural issues:
+
+  a) Web-app bias: Both seed templates (seed_overview.md, seed_tech_stack.md)
+     hardcoded web-app concepts (Frontend/Backend/Database layers, WAF/Firewall,
+     Deploy to Dev/Stage/Prod), making them unusable for libraries, frameworks,
+     CLI tools, mobile apps, desktop apps, or embedded systems.
+
+  b) Unnecessary seed propagation: All 22 pipeline steps were told to read raw
+     seed documents, even though Steps 00-04 already distill all seed content
+     into structured JSON specs. Steps 05+ work entirely from upstream specs
+     and should use the Clarify-Emit protocol for any gaps.
+
+  c) Content overlap: seed_overview.md sections 4.2 (NFRs), 4.3 (Security),
+     7.1-7.3 (Tech/Deployment/Observability) overlapped with seed_tech_stack.md,
+     creating conflicting sources of truth.
+
+  7.2 Design Decisions
+
+  D1: Pipeline Role Model — Seeds feed Steps 00-04 only. Steps 05+ derive
+      from structured specs and use Clarify-Emit for gaps. Seeds never flow
+      past Step 04.
+
+  D2: Seed Ownership Boundary — seed_overview owns product intent (problem,
+      users, scenarios, success metrics, scope, domain model, timeline, team).
+      seed_tech_stack owns technical decisions (system type, technology choices,
+      architecture, components, security boundary, distribution, resilience,
+      dependencies). No overlap.
+
+  D3: Seeds Are Not System Specs — Seeds capture design intent accessible to
+      non-developers. Detailed technical decisions are discovered by pipeline
+      steps, not pre-specified in seeds.
+
+  D4: Drop seed_indexer and seed_reviewer — The original build plan proposed
+      these modules for the context package. They are redundant: the existing
+      seed_manifest system handles discovery, pipeline steps distill seeds,
+      and seed-lint validates references.
+
+  D5: [UNKNOWN] Protocol — Templates introduce [UNKNOWN: reason] as a
+      sanctioned marker for genuinely unknown information, replacing the
+      "remove all TBDs" instruction that pressured fabrication.
+
+  D6: System-Type Agnostic Templates — Templates work for any software type
+      with no hardcoded architecture layers, deployment models, or
+      web-specific security.
+
+  7.3 Changes Implemented
+
+  Foundation:
+  - schema/core/collections.schema.json: seedRefArray minItems 1 → 0
+  - spec/common/seed_manifest.json: step_requirements trimmed to 00-04 only
+  - seed_templates/seed_overview.md: Full rewrite (generic product intent)
+  - seed_templates/seed_tech_stack.md: Full rewrite (generic technical decisions)
+
+  Validation Logic:
+  - tools/specdev_tools/validation/seed_lint.py: _collect_required_seeds()
+    returns empty set for steps not in step_requirements; global_seed_order
+    only applies to steps with entries. _lint_prompt_manifest_refs() only
+    enforces seed sections for seed-required steps.
+
+  Prompts (16 files):
+  - Steps 05-16c: Removed "Seed Order & Mandatory Sources" sections and
+    seed file references from "Context To Ingest"
+  - Steps 05-12: Added Clarify-Emit improvements (access control, state
+    transitions, measurement methods, timeline constraints, threat categories,
+    CI thresholds)
+  - Steps 16-16c: Preserved seed_manifest.json management references
+    (for adding new seeds during impl loops)
+
+  Tests:
+  - New tests/test_seed_propagation_trim.py with 8 regression tests
+  - All existing seed tests pass without modification
+
+  7.4 Updated Build Plan
+
+  The following items from Phase A are now COMPLETE and should be removed
+  from the build backlog:
+  - Item 2 (seed_indexer module): Dropped — redundant with existing pipeline
+  - Item 3 (seed_reviewer module): Dropped — redundant with existing pipeline
+
+  The context package (Phase A, items 1 and 4-6) remains as planned.
+  Seed template improvements are now shipped as part of the core toolkit.
+
+  7.5 Prompt Hallucination Vector Cleanup (T13–T18, Completed)
+
+  After T1–T12 shipped, three residual hallucination vectors were found
+  in all 16 prompts for steps 05–16c:
+
+  Vector 1: Output Contract examples showed populated seed_refs
+    e.g. "seed_refs": [{"seed_id": "seed-overview"}]
+    AI models copy examples literally → false provenance in emitted specs.
+
+  Vector 2: Self-Audit Gate said "seed_refs only contains seeds
+    actually referenced in the output" — combined with the populated
+    example, this told AI to verify its populated list rather than
+    leave it empty.
+
+  Vector 3: spec/05_interface_contracts.json had stale seed_refs
+    pointing to both seed documents despite Step 05 no longer reading
+    seeds.
+
+  Changes made:
+
+  T13–T15: All 16 prompt files (05–16c) — 2 edits per file:
+    - Output Contract JSON example: seed_refs → [] (empty array)
+    - Self-Audit Gate: replaced "seed_refs only contains seeds
+      actually referenced" with "seed_refs is [] (this step derives
+      from upstream specs, not seeds)"
+
+  T16: spec/05_interface_contracts.json — seed_refs → []
+
+  T17: Full test suite verified — 523 tests pass, 0 regressions.
+    Key constraint tests confirmed:
+    - test_output_contract_examples_include_metadata_fields (seed_refs
+      key still present)
+    - test_output_contract_examples_validate_against_step_schemas
+      (empty array passes minItems: 0)
+    - test_all_prompts_include_hardening_protocol_block ("seed coverage"
+      string untouched)
+    - test_seed_propagation_trim.py (all 8 regression tests pass)
+
+  T18: seed_update_plan.md updated with completion status.
+
+  Intentionally NOT changed (and rationale):
+    - Hardening Protocol "seed coverage" line: exact string match
+      enforced by test across all prompts. Vacuously true for empty
+      arrays. Harmless.
+    - Test fixtures (tests/fixtures/step_05/ through step_16/):
+      test data, not AI-facing. Schema allows both populated and empty.
+    - 19 step schemas: seed_refs stays in required. Removing it is
+      a breaking v0.4.0 change; empty arrays work fine.
+    - Steps 00–04 prompts: these steps legitimately read seeds, so
+      their populated seed_refs examples and audit lines are correct.
+
+  7.6 Summary: Seed Propagation Is Now Clean
+
+  The full seed propagation chain is now architecturally sound:
+
+  Seeds (prose docs)
+    ↓ read by Steps 00–04 only
+  Structured specs (JSON)
+    ↓ consumed by Steps 05–16c via upstream spec references
+  No seed leakage past Step 04
+
+  All three signal layers are aligned:
+    1. seed_manifest.json step_requirements → only 00–04
+    2. Prompt "Context To Ingest" → no seed references in 05–16c
+    3. Prompt Output Contract examples → seed_refs: [] for 05–16c
+    4. Prompt Self-Audit Gate → explicitly states seed_refs is []
+    5. Schema → seedRefArray minItems: 0 (allows empty)
+    6. Validation → seed_lint step-aware, skips 05–16c
+
+═══════════════════════════════════════════════════════════════════════════
+  NEXT: Context Package Build (Phase A)
+═══════════════════════════════════════════════════════════════════════════
+
+  With seed propagation clean, the next work is building the context
+  package — the toolkit-aware orchestration layer above json_utils.
+
+  Remaining Phase A items:
+    1. __init__.py — package init, public API exports
+    2. structure.py — lightweight orientation (step metadata, shapes)
+    3. scope_resolver.py — graph walk: entry ID → full ID set
+    4. extractor.py — build scoped context from resolved IDs
+    5. reviewer.py — two-pass review (structural + semantic pairs)
+    6. freshness.py — detect stale seed indexes (hash comparison)
+
+  Dropped from original plan:
+    - seed_indexer.py — redundant (existing pipeline distills seeds)
+    - seed_reviewer.py — redundant (seed-lint + pipeline coverage)
+
+  Open design decisions:
+    (a) extraction_intent formalization — natural language vs field paths
+    (b) trace_matrix auto-generation — on-demand vs require pre-built
+
+  These should be resolved before starting scope_resolver.py.

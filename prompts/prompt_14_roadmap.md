@@ -33,12 +33,6 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["14"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - Core Specs: `spec/00_charter.json` through `spec/12_ci_gates.json`.
 - Extension Manifest: `spec/13_extension_manifest.json`.
@@ -82,7 +76,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 **Extraction Mandate**:
 - Every FR ID from `04_functional_requirements.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
@@ -214,9 +208,7 @@ The `$schema` field is required in the output and is stripped before validation 
   "id": "roadmap-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "migration_plan": "none",
   "tech_stack": {

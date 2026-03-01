@@ -32,12 +32,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["15"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
 ## Context To Ingest
 - Interface Contracts `spec/05_interface_contracts.json` for route map; System Sketch `spec/02_system_sketch.json` for component context.
 - FRs `spec/04_fr_list.json` for behavior coverage.
@@ -78,7 +72,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
+- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -151,9 +145,7 @@ Before emitting, verify:
   "id": "scaffold-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
+  "seed_refs": [],
   "spec_refs_ingested": [],
   "service_skeleton": {
     "language": "python"
