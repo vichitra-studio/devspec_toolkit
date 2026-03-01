@@ -306,204 +306,28 @@
       "16b"
     ]
   },
-  "step_metadata": {
-    "00": {
-      "required_spec_inputs": [],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {}
-    },
-    "01": {
-      "required_spec_inputs": ["00_charter.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "00_charter.json": "Extract goals, scope, and success metrics to derive capabilities"
-      }
-    },
-    "02": {
-      "required_spec_inputs": ["01_capabilities.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "01_capabilities.json": "Extract approved capabilities and owners to map to components"
-      }
-    },
-    "02a": {
-      "required_spec_inputs": ["02_system_sketch.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "02_system_sketch.json": "Extract components and external deps for env setup"
-      }
-    },
-    "03": {
-      "required_spec_inputs": ["00_charter.json", "01_capabilities.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "00_charter.json": "Extract business terms, metric names, and units",
-        "01_capabilities.json": "Extract recurring nouns and action verbs for vocabulary"
-      }
-    },
-    "04": {
-      "required_spec_inputs": ["00_charter.json", "01_capabilities.json", "03_glossary.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "00_charter.json": "Extract goals and constraints for FR rationale",
-        "01_capabilities.json": "Extract capability IDs to map each to one or more FRs",
-        "03_glossary.json": "Extract canonical terms to anchor FR language"
-      }
-    },
-    "05": {
-      "required_spec_inputs": ["04_functional_requirements.json", "02_system_sketch.json", "03_glossary.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "04_functional_requirements.json": "Extract FR behaviors and acceptance criteria for API design",
-        "02_system_sketch.json": "Extract component owners and integration points",
-        "03_glossary.json": "Extract resource and action naming conventions"
-      }
-    },
-    "06": {
-      "required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "04_functional_requirements.json": "Extract acceptance criteria to motivate rules",
-        "05_interface_contracts.json": "Extract request/response constraints and error codes"
-      }
-    },
-    "07": {
-      "required_spec_inputs": ["00_charter.json", "03_glossary.json", "04_functional_requirements.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "00_charter.json": "Extract success metrics to align business targets with NFRs",
-        "03_glossary.json": "Extract metric names and units for consistency",
-        "04_functional_requirements.json": "Extract performance-critical behaviors for NFR binding"
-      }
-    },
-    "08": {
-      "required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json", "07_nfrs.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "04_functional_requirements.json": "Extract acceptance criteria to derive fixture scenarios",
-        "05_interface_contracts.json": "Extract API payloads for contract-mode fixtures",
-        "06_invariants.json": "Extract rules for negative-case fixture generation",
-        "07_nfrs.json": "Extract performance targets for load/benchmark fixtures"
-      }
-    },
-    "09": {
-      "required_spec_inputs": ["00_charter.json", "01_capabilities.json", "02_system_sketch.json", "04_functional_requirements.json", "05_interface_contracts.json", "07_nfrs.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "00_charter.json": "Extract goals, risks, and constraints for planning",
-        "01_capabilities.json": "Extract allowed tech stack choices",
-        "02_system_sketch.json": "Extract components and dependencies for sequencing",
-        "04_functional_requirements.json": "Extract FR scope for milestone deliverables",
-        "05_interface_contracts.json": "Extract API scope for milestone deliverables",
-        "07_nfrs.json": "Extract performance and reliability constraints"
-      }
-    },
-    "10": {
-      "required_spec_inputs": ["00_charter.json", "09_impl_plan.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "00_charter.json": "Extract organizational constraints for governance rules",
-        "09_impl_plan.json": "Extract delivery cadence for review and commit policies"
-      }
-    },
-    "11": {
-      "required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "06_invariants.json", "07_nfrs.json", "04_functional_requirements.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "05_interface_contracts.json": "Extract public APIs as attack surface for threat modeling",
-        "02_system_sketch.json": "Extract components and trust boundaries for threats",
-        "06_invariants.json": "Extract security rules to verify enforcement",
-        "07_nfrs.json": "Extract security constraints for threat severity",
-        "04_functional_requirements.json": "Extract business logic for logic-flaw threats"
-      }
-    },
-    "12": {
-      "required_spec_inputs": ["02a_delivery_baseline.json", "10_governance.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "02a_delivery_baseline.json": "Extract environments and required gates for CI jobs",
-        "10_governance.json": "Extract PR rules and validation policies for CI steps"
-      }
-    },
-    "13": {
-      "required_spec_inputs": ["02_system_sketch.json", "07_nfrs.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "02_system_sketch.json": "Identify complex subsystems needing extension specs",
-        "07_nfrs.json": "Identify compliance/security needs requiring deep specs",
-        "01_capabilities.json": "Extract capability scope for extension filtering",
-        "04_functional_requirements.json": "Extract FR scope for extension justification",
-        "05_interface_contracts.json": "Extract interface scope to avoid extension overlap"
-      }
-    },
-    "13a": {
-      "required_spec_inputs": ["00_charter.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json", "13_extension_generator.json"],
-      "required_seed_inputs": ["seed-overview"],
-      "extraction_intent": {
-        "00_charter.json": "Verify charter goals are fully covered by specs",
-        "01_capabilities.json": "Verify all capabilities have downstream coverage",
-        "04_functional_requirements.json": "Verify FR-to-API traceability completeness",
-        "05_interface_contracts.json": "Verify API-to-fixture traceability completeness",
-        "13_extension_generator.json": "Verify all extensions are implemented"
-      }
-    },
-    "14": {
-      "required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {
-        "09_impl_plan.json": "Extract tech stack and milestones for roadmap sequencing",
-        "00_charter.json": "Extract strategic goals for milestone prioritization",
-        "04_functional_requirements.json": "Extract FR IDs for milestone fr_refs binding",
-        "13_extension_generator.json": "Extract extensions to schedule in milestones",
-        "13a_completeness_assessment.json": "Extract gaps to address in roadmap planning"
-      }
-    },
-    "15": {
-      "required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "04_functional_requirements.json"],
-      "required_seed_inputs": ["seed-tech-stack"],
-      "extraction_intent": {
-        "05_interface_contracts.json": "Extract API routes and methods for route_map generation",
-        "02_system_sketch.json": "Extract components for service skeleton modules",
-        "04_functional_requirements.json": "Extract FR behaviors for scaffold coverage"
-      }
-    },
-    "16": {
-      "required_spec_inputs": ["14_roadmap.json", "09_impl_plan.json", "04_functional_requirements.json", "05_interface_contracts.json"],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {
-        "14_roadmap.json": "Extract milestone sequencing and current scope",
-        "09_impl_plan.json": "Extract tech stack and delivery constraints",
-        "04_functional_requirements.json": "Extract FRs for checklist generation",
-        "05_interface_contracts.json": "Extract APIs for checklist generation"
-      }
-    },
-    "16a": {
-      "required_spec_inputs": ["14_roadmap.json", "16_impl_context.json", "04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json"],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {
-        "14_roadmap.json": "Extract active milestone tasks for checklist planning",
-        "16_impl_context.json": "Extract anchor scope for milestone alignment",
-        "04_functional_requirements.json": "Extract FR specs for atomic checklist items",
-        "05_interface_contracts.json": "Extract API contracts for implementation slots",
-        "06_invariants.json": "Extract rules for implementation constraints"
-      }
-    },
-    "16b": {
-      "required_spec_inputs": ["16_impl_context.json", "14_roadmap.json"],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {
-        "16_impl_context.json": "Extract plan checklist and file patterns for execution",
-        "14_roadmap.json": "Extract milestone context for scope validation"
-      }
-    },
-    "16c": {
-      "required_spec_inputs": ["16_impl_context.json", "14_roadmap.json", "04_functional_requirements.json"],
-      "required_seed_inputs": ["seed-overview", "seed-tech-stack"],
-      "extraction_intent": {
-        "16_impl_context.json": "Extract plan and execution for audit verification",
-        "14_roadmap.json": "Extract milestone status for roadmap sync on verdict",
-        "04_functional_requirements.json": "Extract FR IDs for semantic review coverage"
-      }
-    }
+  "downstream_consumers": {
+    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"],
+    "01": ["02", "03", "04", "09", "13", "13a"],
+    "02": ["02a", "05", "09", "11", "13", "15"],
+    "02a": ["12"],
+    "03": ["04", "05", "07"],
+    "04": ["05", "06", "07", "08", "09", "11", "13", "13a", "14", "15", "16", "16a", "16c"],
+    "05": ["06", "08", "09", "11", "13", "13a", "15", "16", "16a"],
+    "06": ["08", "11", "16a"],
+    "07": ["08", "09", "11", "13"],
+    "08": [],
+    "09": ["10", "14", "16"],
+    "10": ["12"],
+    "11": [],
+    "12": [],
+    "13": ["13a", "14"],
+    "13a": ["14"],
+    "14": ["16", "16a", "16b", "16c"],
+    "15": [],
+    "16": ["16a", "16b", "16c"],
+    "16a": [],
+    "16b": [],
+    "16c": []
   }
 }

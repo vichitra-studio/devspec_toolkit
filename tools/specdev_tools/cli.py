@@ -152,9 +152,12 @@ def main():
     al.add_argument("--yes", "-y", action="store_true",
                     help="Skip confirmation prompts (for non-interactive use)")
 
-    pc = sub.add_parser("prompt-context", help="Show downstream consumers and extraction intents for a step")
+    pc = sub.add_parser("prompt-context", help="Show downstream consumers for a step")
     pc.add_argument("step", help="Step ID (e.g., '04', '16c')")
     pc.add_argument("--repo-root", default=".")
+
+    sp_alignment = sub.add_parser("canon-schema-alignment", help="Check canon/schema alignment")
+    sp_alignment.add_argument("--repo-root", default=".")
 
     args = p.parse_args()
 
@@ -629,8 +632,6 @@ def main():
 
     elif args.cmd == "prompt-context":
         repo_root = os.path.abspath(args.repo_root)
-
-        # Load step_order.json
         step_order_path = os.path.join(repo_root, "tools", "step_order.json")
         if not os.path.exists(step_order_path):
             print(f"E520 UNRESOLVED_INPUT missing_step_order {step_order_path}", file=sys.stderr)
@@ -639,123 +640,37 @@ def main():
         with open(step_order_path, "r", encoding="utf-8") as f:
             step_order = json.load(f)
 
-        # Normalize step_id for lookup (e.g., "04" -> "04", "4" -> "04")
         normalized_step = args.step.zfill(2) if args.step.isdigit() else args.step
 
-        # Verify step exists
         if normalized_step not in step_order.get("allowed_upstream_dependencies", {}):
             print(f"Error: Unknown step '{args.step}'", file=sys.stderr)
             sys.exit(1)
 
-        # Find downstream consumers by checking which steps directly require this step's spec as input
-        # We check the required_spec_inputs field to find direct extractors
-        step_metadata = step_order.get("step_metadata", {})
+        downstream_consumers = step_order.get("downstream_consumers", {})
+        consumer_ids = downstream_consumers.get(normalized_step, [])
 
-        # Map step ID to artifact name (e.g., "04" -> "04_functional_requirements.json")
-        step_num = normalized_step
-        step_artifacts = {
-            "00": "00_charter.json",
-            "01": "01_capabilities.json",
-            "02": "02_system_sketch.json",
-            "02a": "02a_delivery_baseline.json",
-            "03": "03_glossary.json",
-            "04": "04_functional_requirements.json",
-            "05": "05_interface_contracts.json",
-            "06": "06_invariants.json",
-            "07": "07_nfrs.json",
-            "08": "08_fixtures.json",
-            "09": "09_impl_plan.json",
-            "10": "10_governance.json",
-            "11": "11_redteam.json",
-            "12": "12_ci_gates.json",
-            "13": "13_extension_generator.json",
-            "13a": "13a_completeness_assessment.json",
-            "14": "14_roadmap.json",
-            "15": "15_scaffold.json",
-            "16": "16_impl_context.json",
-            "16a": "16a_impl_planner.json",
-            "16b": "16b_impl_coder.json",
-            "16c": "16c_impl_reviewer.json",
+        STEP_NAMES = {
+            "00": "Project Charter", "01": "Capabilities", "02": "System Sketch",
+            "02a": "Delivery Baseline", "03": "Glossary", "04": "Functional Requirements",
+            "05": "Interface Contracts", "06": "Invariants", "07": "NFRs",
+            "08": "Fixtures", "09": "Implementation Plan", "10": "Governance",
+            "11": "Red Team", "12": "CI Gates", "13": "Extension Generator",
+            "13a": "Completeness Assessment", "14": "Roadmap", "15": "Scaffold",
+            "16": "Impl Context", "16a": "Impl Planner", "16b": "Impl Coder",
+            "16c": "Impl Reviewer",
         }
 
-        artifact_name = step_artifacts.get(normalized_step)
+        print("| Step | Name |")
+        print("|------|------|")
+        for cid in consumer_ids:
+            name = STEP_NAMES.get(cid, f"Step {cid}")
+            print(f"| {cid} | {name} |")
 
-        downstream_steps = []
-        for step, metadata in step_metadata.items():
-            required_inputs = metadata.get("required_spec_inputs", [])
-            if artifact_name and artifact_name in required_inputs:
-                downstream_steps.append(step)
-
-        downstream_steps.sort(key=lambda x: (int(x.replace("a", "").replace("c", "").replace("b", "")), x))
-
-        # Build markdown table
-        step_metadata = step_order.get("step_metadata", {})
-        print("| Step | Name | Extraction Intent |")
-        print("|------|------|-------------------|")
-
-        for downstream_id in downstream_steps:
-            metadata = step_metadata.get(downstream_id, {})
-            extraction_intent = metadata.get("extraction_intent", {})
-
-            # Map step ID to name (using pattern from step_order.json structure)
-            step_name = f"Step {downstream_id}"
-            if downstream_id == "00":
-                step_name = "Project Charter"
-            elif downstream_id == "01":
-                step_name = "Capabilities"
-            elif downstream_id == "02":
-                step_name = "System Sketch"
-            elif downstream_id == "02a":
-                step_name = "Delivery Baseline"
-            elif downstream_id == "03":
-                step_name = "Glossary"
-            elif downstream_id == "04":
-                step_name = "Functional Requirements"
-            elif downstream_id == "05":
-                step_name = "Interface Contracts"
-            elif downstream_id == "06":
-                step_name = "Invariants"
-            elif downstream_id == "07":
-                step_name = "NFRs"
-            elif downstream_id == "08":
-                step_name = "Fixtures"
-            elif downstream_id == "09":
-                step_name = "Implementation Plan"
-            elif downstream_id == "10":
-                step_name = "Governance"
-            elif downstream_id == "11":
-                step_name = "Red Team"
-            elif downstream_id == "12":
-                step_name = "CI Gates"
-            elif downstream_id == "13":
-                step_name = "Extension Generator"
-            elif downstream_id == "13a":
-                step_name = "Completeness Assessment"
-            elif downstream_id == "14":
-                step_name = "Roadmap"
-            elif downstream_id == "15":
-                step_name = "Scaffold"
-            elif downstream_id == "16":
-                step_name = "Impl Context"
-            elif downstream_id == "16a":
-                step_name = "Impl Planner"
-            elif downstream_id == "16b":
-                step_name = "Impl Coder"
-            elif downstream_id == "16c":
-                step_name = "Impl Reviewer"
-
-            # Collect extraction intents for this downstream step
-            intents = []
-            if isinstance(extraction_intent, dict):
-                for artifact, intent_text in extraction_intent.items():
-                    if intent_text:
-                        intents.append(f"{artifact}: {intent_text}")
-
-            intent_str = "; ".join(intents) if intents else ""
-            # Escape pipes in intent string
-            intent_str = intent_str.replace("|", "\\|")
-
-            print(f"| {downstream_id} | {step_name} | {intent_str} |")
+    elif args.cmd == "canon-schema-alignment":
+        from .validation.canon_schema_alignment import lint_canon_schema_alignment
+        repo_root = os.path.abspath(args.repo_root)
+        errors = lint_canon_schema_alignment(repo_root)
+        _print_and_exit_if_errors(errors)
 
     else:
         p.print_help()

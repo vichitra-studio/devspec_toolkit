@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -1552,7 +1553,7 @@ class CliTests(unittest.TestCase):
             tools_dir = repo_root / "tools"
             tools_dir.mkdir()
 
-            # Write a minimal step_order.json
+            # Write a minimal step_order.json with downstream_consumers
             step_order = {
                 "version": "1.0.0",
                 "allowed_upstream_dependencies": {
@@ -1579,29 +1580,12 @@ class CliTests(unittest.TestCase):
                     "16b": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a"],
                     "16c": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a", "16b"],
                 },
-                "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
-                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
-                    "02": {"required_spec_inputs": ["01_capabilities.json"], "required_seed_inputs": []},
-                    "02a": {"required_spec_inputs": ["02_system_sketch.json"], "required_seed_inputs": []},
-                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": []},
-                    "04": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "03_glossary.json"], "required_seed_inputs": []},
-                    "05": {"required_spec_inputs": ["04_functional_requirements.json", "02_system_sketch.json", "03_glossary.json"], "required_seed_inputs": []},
-                    "06": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "07": {"required_spec_inputs": ["00_charter.json", "03_glossary.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "08": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json", "07_nfrs.json"], "required_seed_inputs": []},
-                    "09": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "02_system_sketch.json", "04_functional_requirements.json", "05_interface_contracts.json", "07_nfrs.json"], "required_seed_inputs": []},
-                    "10": {"required_spec_inputs": ["00_charter.json", "09_impl_plan.json"], "required_seed_inputs": []},
-                    "11": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "06_invariants.json", "07_nfrs.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "12": {"required_spec_inputs": ["02a_delivery_baseline.json", "10_governance.json"], "required_seed_inputs": []},
-                    "13": {"required_spec_inputs": ["02_system_sketch.json", "07_nfrs.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "13a": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json", "13_extension_generator.json"], "required_seed_inputs": []},
-                    "14": {"required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"], "required_seed_inputs": []},
-                    "15": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "16": {"required_spec_inputs": ["14_roadmap.json", "09_impl_plan.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "16a": {"required_spec_inputs": ["14_roadmap.json", "16_impl_context.json", "04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json"], "required_seed_inputs": []},
-                    "16b": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json"], "required_seed_inputs": []},
-                    "16c": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                "downstream_consumers": {
+                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"],
+                    "01": ["02", "03", "04", "09", "13", "13a"],
+                    "02": ["02a", "05", "09", "11", "13", "15"],
+                    "03": ["04", "05", "07"],
+                    "04": ["05", "06", "07", "08", "09", "11", "13", "13a", "14", "15", "16", "16a", "16c"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1626,7 +1610,7 @@ class CliTests(unittest.TestCase):
             tools_dir = repo_root / "tools"
             tools_dir.mkdir()
 
-            # Write a minimal step_order.json
+            # Write a minimal step_order.json with downstream_consumers
             step_order = {
                 "version": "1.0.0",
                 "allowed_upstream_dependencies": {
@@ -1653,29 +1637,8 @@ class CliTests(unittest.TestCase):
                     "16b": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a"],
                     "16c": ["00", "01", "02", "02a", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "13a", "14", "15", "16", "16a", "16b"],
                 },
-                "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
-                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
-                    "02": {"required_spec_inputs": ["01_capabilities.json"], "required_seed_inputs": []},
-                    "02a": {"required_spec_inputs": ["02_system_sketch.json"], "required_seed_inputs": []},
-                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": []},
-                    "04": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "03_glossary.json"], "required_seed_inputs": []},
-                    "05": {"required_spec_inputs": ["04_functional_requirements.json", "02_system_sketch.json", "03_glossary.json"], "required_seed_inputs": []},
-                    "06": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "07": {"required_spec_inputs": ["00_charter.json", "03_glossary.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "08": {"required_spec_inputs": ["04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json", "07_nfrs.json"], "required_seed_inputs": []},
-                    "09": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "02_system_sketch.json", "04_functional_requirements.json", "05_interface_contracts.json", "07_nfrs.json"], "required_seed_inputs": []},
-                    "10": {"required_spec_inputs": ["00_charter.json", "09_impl_plan.json"], "required_seed_inputs": []},
-                    "11": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "06_invariants.json", "07_nfrs.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "12": {"required_spec_inputs": ["02a_delivery_baseline.json", "10_governance.json"], "required_seed_inputs": []},
-                    "13": {"required_spec_inputs": ["02_system_sketch.json", "07_nfrs.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "13a": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json", "04_functional_requirements.json", "05_interface_contracts.json", "13_extension_generator.json"], "required_seed_inputs": []},
-                    "14": {"required_spec_inputs": ["09_impl_plan.json", "00_charter.json", "04_functional_requirements.json", "13_extension_generator.json", "13a_completeness_assessment.json"], "required_seed_inputs": []},
-                    "15": {"required_spec_inputs": ["05_interface_contracts.json", "02_system_sketch.json", "04_functional_requirements.json"], "required_seed_inputs": []},
-                    "16": {"required_spec_inputs": ["14_roadmap.json", "09_impl_plan.json", "04_functional_requirements.json", "05_interface_contracts.json"], "required_seed_inputs": []},
-                    "16a": {"required_spec_inputs": ["14_roadmap.json", "16_impl_context.json", "04_functional_requirements.json", "05_interface_contracts.json", "06_invariants.json"], "required_seed_inputs": []},
-                    "16b": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json"], "required_seed_inputs": []},
-                    "16c": {"required_spec_inputs": ["16_impl_context.json", "14_roadmap.json", "04_functional_requirements.json"], "required_seed_inputs": []},
+                "downstream_consumers": {
+                    "00": ["01", "03", "04", "07", "09", "10", "13a", "14"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1701,9 +1664,8 @@ class CliTests(unittest.TestCase):
                     "00": [],
                     "01": ["00"],
                 },
-                "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
-                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": []},
+                "downstream_consumers": {
+                    "00": ["01"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1726,10 +1688,8 @@ class CliTests(unittest.TestCase):
                     "01": ["00"],
                     "03": ["00", "01", "02", "02a"],
                 },
-                "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
-                    "01": {"required_spec_inputs": ["00_charter.json"], "required_seed_inputs": [], "extraction_intent": {"00_charter.json": "Extract goals"}},
-                    "03": {"required_spec_inputs": ["00_charter.json", "01_capabilities.json"], "required_seed_inputs": [], "extraction_intent": {"00_charter.json": "Extract terms", "01_capabilities.json": "Extract verbs"}},
+                "downstream_consumers": {
+                    "00": ["01", "03"]
                 }
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
@@ -1741,11 +1701,10 @@ class CliTests(unittest.TestCase):
             # Verify structure: header, separator, data rows
             self.assertGreaterEqual(len(lines), 3)
 
-            # Header row must have pipes
+            # Header row must have pipes and 2 columns: Step, Name
             self.assertIn("|", lines[0])
             self.assertIn("Step", lines[0])
             self.assertIn("Name", lines[0])
-            self.assertIn("Extraction Intent", lines[0])
 
             # Separator row must have hyphens
             self.assertIn("|", lines[1])
@@ -1755,6 +1714,87 @@ class CliTests(unittest.TestCase):
             for line in lines[2:]:
                 if line.strip():
                     self.assertIn("|", line)
+
+
+    def test_canon_schema_alignment_runs(self):
+        """Test that canon-schema-alignment command runs and returns results."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+
+            # --- canon kinds ---
+            kinds_dir = root / "canon" / "kinds"
+            kinds_dir.mkdir(parents=True)
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({
+                    "$schema": "https://specdev.local/schema/canon/manifest/1",
+                    "registry_version": "1.0.0",
+                    "entries": [],
+                }),
+                encoding="utf-8",
+            )
+
+            def _canon_kind(kind, values):
+                return json.dumps({
+                    "$schema": "https://specdev.local/schema/canon/kind/1",
+                    "registry_version": "1.0.0",
+                    "kind": kind,
+                    "entries": [
+                        {
+                            "id": f"cn:core:{kind}:{v}",
+                            "kind": kind,
+                            "preferred_label": v,
+                            "definition": f"{v} {kind}",
+                            "version": "1.0.0",
+                            "status": "active",
+                            "owners": ["spec-platform"],
+                            "aliases": [],
+                            "tags": [],
+                            "lifecycle": {"introduced_at": "2026-03-01T00:00:00Z"},
+                        }
+                        for v in values
+                    ],
+                })
+
+            env_values = ["dev", "ci", "staging", "prod"]
+            stage_values = ["dev", "ci", "staging", "prod"]
+            nfr_values = ["latency", "throughput", "availability"]
+
+            (kinds_dir / "environment.json").write_text(_canon_kind("environment", env_values), encoding="utf-8")
+            (kinds_dir / "stage.json").write_text(_canon_kind("stage", stage_values), encoding="utf-8")
+            (kinds_dir / "nfr_category.json").write_text(_canon_kind("nfr_category", nfr_values), encoding="utf-8")
+
+            # --- schema files matching the three _ENUM_CANON_PAIRINGS ---
+            schema_core = root / "schema" / "core"
+            schema_core.mkdir(parents=True)
+            (schema_core / "collections.schema.json").write_text(
+                json.dumps({
+                    "$defs": {
+                        "environmentName": {"enum": env_values},
+                        "stageName": {"enum": stage_values},
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (root / "schema" / "07_nfrs.schema.json").write_text(
+                json.dumps({
+                    "properties": {
+                        "nfrs": {
+                            "items": {
+                                "properties": {
+                                    "category": {"enum": nfr_values},
+                                },
+                            },
+                        },
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            code, stdout, stderr = self._run_cli(
+                ["canon-schema-alignment", "--repo-root", str(root)]
+            )
+            # Should succeed (exit 0) — no E-level errors expected
+            self.assertEqual(code, 0, f"stderr: {stderr}")
 
 
 if __name__ == "__main__":

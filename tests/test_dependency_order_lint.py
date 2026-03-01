@@ -142,6 +142,27 @@ class DependencyOrderLintTests(unittest.TestCase):
             errs = lint_dependency_order(str(root))
             self.assertTrue(any("invalid_step_order" in e for e in errs))
 
+    def test_works_with_downstream_consumers_format(self):
+        """Verify lint works with new step_order.json format (downstream_consumers, no step_metadata)."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "prompts").mkdir()
+            (root / "tools" / "step_order.json").write_text(
+                json.dumps({
+                    "steps": ["00", "01", "02"],
+                    "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]},
+                    "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
+                }),
+                encoding="utf-8",
+            )
+            (root / "prompts" / "prompt_01_test.md").write_text(
+                "Use spec/00_charter.json",
+                encoding="utf-8",
+            )
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs)
+
 
 if __name__ == "__main__":
     unittest.main()

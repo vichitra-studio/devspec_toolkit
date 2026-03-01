@@ -2498,7 +2498,570 @@
     - seed_reviewer.py — redundant (seed-lint + pipeline coverage)
 
   Open design decisions:
-    (a) extraction_intent formalization — natural language vs field paths
-    (b) trace_matrix auto-generation — on-demand vs require pre-built
+    (a) extraction_intent formalization — OPEN (see discussion below)
+    (b) trace_matrix auto-generation — LOCKED (see below)
 
-  These should be resolved before starting scope_resolver.py.
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: Decision (b) — trace_matrix auto-generation
+  ─────────────────────────────────────────────────────────────────────────
+
+  Always regenerate trace_matrix.json at the start of every context command.
+  No staleness checks, no mtime comparisons, no caching logic.
+
+  Rationale:
+  - spec directory is small; matrix generation is a local file walk — fast
+  - always working from latest on-disk state, no edge cases
+  - partial pipeline is handled naturally: steps with no artifact produce
+    no nodes in the graph — correct and complete for authoring step N
+  - pipeline status (which steps have artifacts) is self-describing from
+    the generated matrix
+
+  scope_resolver.py always calls specdev matrix first, then walks the result.
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: step_order.json shape
+  ─────────────────────────────────────────────────────────────────────────
+
+  step_order.json will be THIN. step_metadata entries contain only:
+    downstream_consumers: list of step IDs that consume this step's output
+
+  REMOVED from step_order.json:
+    - required_spec_inputs (was incorrect, now derived)
+    - extraction_intent natural language (removed entirely — was human docs
+      that drifted from reality and was never machine-parsed)
+    - required_seed_inputs (already governed by seed_manifest.json)
+
+  required_spec_inputs at runtime = inversion of downstream_consumers:
+    required_inputs(step N) = all steps S where N ∈ S.downstream_consumers
+
+  Example:
+    step 01 declares downstream_consumers: ["02","02a","03","04","05","07",
+      "09","11","13","13a","14","15","16","16a","16b","16c"]
+    → step 04's required_inputs includes 01 (because "04" ∈ 01.downstream_consumers)
+
+  Governance: downstream_consumers is declared on the PROVIDER side ("who
+  needs my output"). More stable than consumer-side required_spec_inputs
+  ("what do I need"). A linter will validate that every derived
+  required_inputs entry exists in allowed_upstream_dependencies.
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: x-consumed-by schema extension — REJECTED
+  ─────────────────────────────────────────────────────────────────────────
+
+  Rejected. Adding x-consumed-by to individual schema properties requires:
+    - Schema updates whenever step dependencies change
+    - New tooling to parse the extension property
+  This is wrong design — dependency information belongs in step_order.json,
+  not embedded in schema field annotations.
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: Prompt sanitization — "Context To Ingest" sections
+  ─────────────────────────────────────────────────────────────────────────
+
+  Current prompts (steps 05-16c) contain "Context To Ingest:" sections
+  that list raw spec file paths (e.g. "spec/04_functional_requirements.json").
+  This instructs LLMs to read full raw files, defeating context optimization.
+
+  Decision: sanitize ALL prompt files to REMOVE these sections.
+  Context delivery is the skill's job, not the prompt's.
+
+  Work item: NOT YET EXECUTED — pending (prompt audit + edit pass needed).
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: Schema-driven extraction — fully dynamic, no config file needed
+  ─────────────────────────────────────────────────────────────────────────
+
+  Extraction intent is derived from three existing sources — no new
+  config file required:
+    1. tools/step_order.json (downstream_consumers) → which files to open
+    2. schema files + schema_registry.json → how to read each file's payload
+    3. tools/trace_matrix.json (always regenerated) → which specific objects
+
+  NO context_schema_map.json — eliminated. Payload descriptor is computed
+  at runtime by the schema() function in json_utils (to be built), cached
+  per session.
+
+  Key existing asset: tools/specdev_tools/core/trace_types.py
+    TRACE_TYPES = ("fr","api","nfr","inv","invariant","fixture","doc",
+                   "capability","component")
+    CANONICAL_TRACE_TYPE = {"inv": "invariant"}
+    normalize_trace_type("inv") → "invariant"
+  This is the canonical source of truth for trace type resolution.
+
+  Dynamic payload discovery algorithm (deterministic, no LLM):
+    1. Read spec file's $schema URI
+    2. Resolve via schema_registry.json → schema file path
+    3. Load schema, strip boilerplate properties (static known list)
+    4. Remaining properties = payload
+    5. For each array property:
+         - Inspect items.properties for a field ending in _id
+         - Strip _id suffix → prefix string
+         - Call normalize_trace_type(prefix), check against TRACE_TYPES
+         - If in TRACE_TYPES: traceable array (id_field + trace_type set)
+         - If not in TRACE_TYPES: non-traceable array (extract fully)
+    6. Non-array non-object properties = scalars (always extracted)
+    7. Object properties = extracted fully
+
+  Example — step 06 invariants:
+    rules[].inv_id → strip _id → "inv" → normalize → "invariant"
+    "invariant" in TRACE_TYPES → traceable, trace_type = "invariant"
+    (Note: array name "rules" ≠ trace concept "invariant" — explicit
+    schema inspection handles this automatically)
+
+  Example — step 00 charter:
+    success_metrics[].metric_id → "metric" → NOT in TRACE_TYPES → non-traceable
+    stakeholders[] → no _id field → non-traceable
+    user_segments[].segment_id → "segment" → NOT in TRACE_TYPES → non-traceable
+    problem_statement, in_scope, etc. → scalars → always extracted
+
+  Three payload categories (computed, not stored):
+    traceable arrays    → scoped via trace_matrix IDs
+    non-traceable arrays → extracted in required-fields mode
+    scalars + objects   → always extracted fully
+
+  BOILERPLATE FIELDS (global static list, stripped from all extractions):
+    id, owner, created_at, seed_refs, spec_refs_ingested,
+    generation_quality, canonical_refs_used, canonical_proposals,
+    canonical_conflicts, _migration_notes
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: Extraction pipeline (end-to-end)
+  ─────────────────────────────────────────────────────────────────────────
+
+  For authoring step N:
+
+    Step 1 — required inputs
+      Invert step_order.json downstream_consumers → required_inputs(N)
+
+    Step 2 — regenerate trace_matrix (always, no caching)
+      specdev matrix → tools/trace_matrix.json
+
+    Step 3 — for each required input file:
+      a. Load payload descriptor from context_schema_map.json
+      b. For indexed_array kind:
+         - Look up trace_type in trace_matrix → get relevant IDs
+         - jq: .{field}[] | select(.{id_field} ∈ relevant_ids)
+         - Fallback if no IDs found: extract all items (required-fields mode)
+      c. For mixed kind:
+         - Scalars: extract directly (small, no scoping needed)
+         - Arrays with trace_type: scope as per (b)
+         - Arrays without trace_type: extract all items (required-fields mode)
+         - Objects: extract fully (no scoping)
+      d. For holistic kind: extract full payload (no scoping)
+      e. Always strip boilerplate fields from result
+
+    Step 4 — fallback optimization (when no trace_matrix scoping available)
+      Two-tier:
+        Tier 1 — required-fields-only per item: use schema required[] array
+                 to build minimum viable item (strips optional fields like
+                 rationale, preconditions, postconditions, links). ~30-40%
+                 reduction per item.
+        Tier 2 — configurable item limit: if item count > threshold (default
+                 20), include _context_note header and truncate. Escape hatch:
+                 specdev context --step N --full to override.
+
+  ─────────────────────────────────────────────────────────────────────────
+  LOCKED: context_schema_map.json — ELIMINATED
+  ─────────────────────────────────────────────────────────────────────────
+
+  No static config file needed. Payload descriptor is computed dynamically
+  at runtime from schema files + trace_types.py. Schema audit was done to
+  verify the approach; findings confirmed the algorithm works across all
+  observed patterns. No new file, no manual maintenance.
+
+  ─────────────────────────────────────────────────────────────────────────
+  OPEN: step_order.json refactor — not yet executed
+  ─────────────────────────────────────────────────────────────────────────
+
+  The current step_order.json still contains required_spec_inputs and
+  extraction_intent. Needs to be refactored to only contain
+  downstream_consumers per step. This is a mechanical transformation.
+
+  Governance linter also needed: validates that every derived
+  required_inputs entry is a valid member of allowed_upstream_dependencies.
+
+  ─────────────────────────────────────────────────────────────────────────
+  OPEN: Context package build — PENDING
+  ─────────────────────────────────────────────────────────────────────────
+
+  Blocked until context_schema_map.json is populated and step_order.json
+  is refactored.
+
+  Remaining Phase A items:
+    1. __init__.py — package init, public API exports
+    2. json_utils.py — low-level jq wrapper; schema() function reads
+                       schema file for a given artifact (cached per session);
+                       structure() returns field inventory of actual data
+    3. scope_resolver.py — invert downstream_consumers + walk trace_matrix
+    4. extractor.py — dynamic payload discovery (schema() + trace_types.py),
+                      strip boilerplate, scope traceable arrays, extract
+                      non-traceables in required-fields mode, apply limit tier
+    5. reviewer.py — two-pass review (structural + semantic pairs)
+    6. freshness.py — detect stale seed indexes (hash comparison)
+
+  Note: context_schema_map.json eliminated — extractor.py discovers payload
+  shape dynamically via json_utils.schema() + trace_types.py at runtime.
+
+═══════════════════════════════════════════════════════════════════════════
+  GOVERNANCE GAPS & CANON LEVERAGE — Investigation Results
+═══════════════════════════════════════════════════════════════════════════
+
+  Date: 2026-03-01
+  Branch: toolkit_agent_optimisation_claude
+
+  ─────────────────────────────────────────────────────────────────────────
+  1. Three Governance Gaps Discovered
+  ─────────────────────────────────────────────────────────────────────────
+
+  The "Schema-driven extraction" approach (LOCKED above) relies on
+  trace_types.py to determine which schema arrays are traceable. Deep
+  inspection revealed the following governance gaps:
+
+  GAP 1: trace_types.py is 100% HARDCODED
+
+    File: tools/specdev_tools/core/trace_types.py
+
+    TRACE_TYPES = ("fr","api","nfr","inv","invariant","fixture",
+                   "doc","capability","component")
+    CANONICAL_TRACE_TYPE = {"inv": "invariant"}
+
+    This does NOT read from canon/kinds/trace_type.json. If a new trace
+    type is added to canon, trace_types.py must be manually updated.
+    No linter detects the drift.
+
+  GAP 2: matrix.py HARDCODES schema-to-field-to-id mapping
+
+    File: tools/specdev_tools/validation/matrix.py
+    Function: build_trace_matrix()
+
+    The matrix builder explicitly knows which schemas contain which
+    arrays and which _id fields to look for:
+
+      if "04_fr_list" in schema:
+          frs.extend(data.get("functional_requirements", []))
+      if "05_interface_contracts" in schema:
+          for a in data.get("apis", []):
+              apis[a.get("api_id")] = a
+
+    This is hardcoded for steps 04, 05, 07, 08, 11 only. Not all 22
+    steps. Adding a new step requires code changes here.
+
+  GAP 3: No linter validates _id prefix matches canon trace_type
+
+    When a schema author creates a new array with e.g. `widget_id`,
+    nothing enforces that "widget" either:
+      a) exists in canon/kinds/trace_type.json, OR
+      b) is explicitly marked as non-traceable
+
+    The system silently treats unknown prefixes as non-traceable,
+    which could mask bugs where a new trace type was intended but
+    the canon entry was forgotten.
+
+  ─────────────────────────────────────────────────────────────────────────
+  2. Canon Registry: What It Provides Today
+  ─────────────────────────────────────────────────────────────────────────
+
+  canon/manifest.json contains 70+ entries across 25 vocabulary kinds:
+
+  ┌──────────────────────┬──────────────────────────────────────────────┐
+  │        Kind          │                 Purpose                      │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ trace_type           │ Valid trace reference types (fr, api, nfr,   │
+  │                      │ inv, invariant, fixture, doc, capability,    │
+  │                      │ component)                                   │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ owner                │ Artifact owner enum (api, ui, system, ops,   │
+  │                      │ data, product, business, engineering)        │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ nfr_category         │ NFR categories (latency, throughput,         │
+  │                      │ availability, durability, cost, security,    │
+  │                      │ privacy, maintainability, usability,         │
+  │                      │ portability, energy)                         │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ unit, stage,         │ Standard measurement, lifecycle, and         │
+  │ environment, status  │ deployment vocabulary                        │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ id_pattern,          │ Naming conventions and workflow labels        │
+  │ governance_label     │                                              │
+  ├──────────────────────┼──────────────────────────────────────────────┤
+  │ (16 more kinds)      │ action, command, entity, event, interface,   │
+  │                      │ metric, policy, role, tag, tech_stack,       │
+  │                      │ dependency, acronym, completeness_dimension, │
+  │                      │ term, capability, risk_category              │
+  └──────────────────────┴──────────────────────────────────────────────┘
+
+  Enforcement is THREE-TIERED but inconsistent:
+
+  ┌──────────────────────┬──────────────────┬──────────────────────────┐
+  │     Layer            │ Uses Canon?      │  What it checks          │
+  ├──────────────────────┼──────────────────┼──────────────────────────┤
+  │ JSON Schema          │ NO               │ Static enums, patterns   │
+  │ (Draft 2020-12)      │ (hardcoded)      │ types                    │
+  ├──────────────────────┼──────────────────┼──────────────────────────┤
+  │ Hallucination lint   │ MIXED            │ trace.type → hardcoded   │
+  │                      │                  │ units/commands → dynamic │
+  │                      │                  │ (canon.resolve_alias())  │
+  ├──────────────────────┼──────────────────┼──────────────────────────┤
+  │ Canonical integrity  │ YES (full)       │ canonical_refs_used,     │
+  │                      │                  │ unresolved candidates,   │
+  │                      │                  │ alias deprecation/sunset │
+  └──────────────────────┴──────────────────┴──────────────────────────┘
+
+  KEY FINDING: hallucination lint ALREADY loads canon dynamically for
+  units and commands via canon.resolve_alias(). The code pattern for
+  loading trace_types from canon already exists — it just wasn't applied.
+
+  ─────────────────────────────────────────────────────────────────────────
+  3. LOCKED: Fix Governance First (Option A)
+  ─────────────────────────────────────────────────────────────────────────
+
+  Decision: Fix all three governance gaps before building the context
+  package. Rationale: the context package's dynamic extraction depends
+  on trace_types being deterministic and canon-governed. Building on
+  a shaky foundation creates hard-to-debug failures later.
+
+  Fix plan:
+
+  FIX 1: Make trace_types.py load from canon
+
+    trace_types.py should load TRACE_TYPES from canon/kinds/trace_type.json
+    via CanonicalRegistry (same pattern hallucination lint uses for units).
+
+    The code pattern already exists in the codebase:
+      registry = CanonicalRegistry.load(repo_root)
+      registry.resolve_alias("unit", value)  # already works for units
+
+    For trace_types:
+      entries = registry.entries_by_kind("trace_type")
+      TRACE_TYPES = tuple(e.preferred_label for e in entries)
+
+    CANONICAL_TRACE_TYPE alias mapping (e.g. "inv" → "invariant")
+    should also derive from canon aliases.json entries with
+    kind=trace_type.
+
+    Fallback: if canon dir is not available (e.g. running outside
+    toolkit context), fall back to the current hardcoded tuple.
+    This preserves backward compatibility.
+
+  FIX 2: Refactor matrix.py to use shared trace discovery
+
+    Extract the schema→field→id→trace_type mapping from matrix.py
+    into a shared function in trace_types.py (or a new module).
+    This function uses the dynamic payload discovery algorithm
+    (already documented in "Schema-driven extraction" LOCKED section)
+    instead of hardcoded schema name matching.
+
+    Before:
+      if "04_fr_list" in schema:
+          frs.extend(data.get("functional_requirements", []))
+
+    After:
+      payload = discover_payload(schema_path, data)
+      for array_info in payload.traceable_arrays:
+          by_type[array_info.trace_type].extend(array_info.items)
+
+  FIX 3: Add a canon→schema alignment linter
+
+    New linter (or extension to canonical-lint) that:
+      a) Scans all schema files for array properties with _id fields
+      b) Strips _id suffix → prefix string
+      c) Checks: prefix exists in canon/kinds/trace_type.json
+         OR prefix is a known non-traceable type (metric, segment, etc.)
+      d) Reports error if prefix is unknown — forces explicit decision
+
+    This closes the loop: you can't add a new _id pattern to a schema
+    without either adding it to canon or acknowledging it's non-traceable.
+
+  ─────────────────────────────────────────────────────────────────────────
+  4. Canon Leverage: Scope & Limits
+  ─────────────────────────────────────────────────────────────────────────
+
+  Canon SHOULD be leveraged for:
+    - trace_type resolution (FIX 1) — replacing hardcoded trace_types.py
+    - owner validation — already partially dynamic via integrity checks
+    - unit/command validation — already dynamic via hallucination lint
+    - nfr_category validation — currently hardcoded enum in step 07 schema
+
+  Canon should NOT be extended to:
+    - Schema payload structure (which arrays exist in which schema)
+      → that's a schema concern, not vocabulary
+    - Extraction field paths or jq filters
+      → that's computed at runtime from schema structure
+    - Step dependency information
+      → that belongs in step_order.json
+
+  Canon governs VOCABULARY (what values are valid).
+  Schema governs STRUCTURE (what fields exist).
+  step_order.json governs FLOW (what depends on what).
+
+  These three systems are complementary, not overlapping. The governance
+  gap was that trace_types.py was a fourth, redundant source of truth
+  that didn't read from canon. FIX 1 eliminates this redundancy.
+
+  ─────────────────────────────────────────────────────────────────────────
+  5. Updated Dependency Graph for Build Order
+  ─────────────────────────────────────────────────────────────────────────
+
+  Phase 0 — Governance Fixes (NEW, before context package):
+    G1. trace_types.py → load from canon (FIX 1)
+    G2. matrix.py → use shared trace discovery (FIX 2)
+    G3. Canon→schema alignment linter (FIX 3)
+    G4. step_order.json refactor → downstream_consumers only
+    G5. Prompt sanitization → remove "Context To Ingest" sections
+    G6. Documentation → add to repo docs (not CLAUDE.md only)
+
+  Phase A — Context Package (pure Python, after governance):
+    A1. __init__.py
+    A2. structure.py (uses step_order.json + schema_registry)
+    A3. scope_resolver.py (uses trace_matrix + step_order.json)
+    A4. extractor.py (uses scope_resolver + json_utils + trace_types)
+    A5. reviewer.py (structural checks + semantic pair generator)
+    A6. freshness.py (hash comparison for seed indexes)
+
+  Phase B — Skills + Hooks (Claude Code automation layer):
+    B1. /specdev-step skill
+    B2. /specdev-validate skill
+    B3. /specdev-review skill
+    B4. Post-edit hooks for spec/*.json
+    B5. /specdev-pipeline skill (orchestration)
+
+  Phase C — CLAUDE.md + Repo Docs:
+    C1. Pipeline graph awareness
+    C2. Token budget guidance
+    C3. Tool configuration file documentation (in docs/, not CLAUDE.md)
+
+  ─────────────────────────────────────────────────────────────────────────
+  6. Open Items (Remaining)
+  ─────────────────────────────────────────────────────────────────────────
+
+  All items below are OPEN and pending Phase 0 governance fixes:
+
+  - Context package build (Phase A) — blocked on G1-G4
+  - Skills + Hooks (Phase B) — blocked on Phase A
+  - Documentation updates (Phase C) — can proceed in parallel
+  - json_utils.py existence — user mentioned "I have added back the
+    json utils in tools/context/" but file was not found on disk.
+    Verify location and status before Phase A begins.
+
+═══════════════════════════════════════════════════════════════════
+PHASE 0 REFINEMENTS — Pre-Implementation Decisions (2026-03-01)
+═══════════════════════════════════════════════════════════════════
+
+### User Feedback Incorporated
+
+1. THREE-TIERED ENFORCEMENT INCONSISTENCY → Phase 0 scope
+   The inconsistency across enforcement layers must be addressed in Phase 0:
+   - JSON Schema: static enums (correct — schemas must be self-contained for offline validation)
+   - Hallucination lint: MIXED (trace.type hardcoded, units/commands dynamic) → make ALL dynamic
+   - Canonical integrity: fully dynamic (no change needed)
+   Fix: shared canon utility in core/ makes hallucination lint fully dynamic.
+   Canon→schema alignment linter (G3) catches drift between canon and schema enums.
+
+2. DRY PRINCIPLE — no code duplication
+   All canon loading must go through ONE shared utility in core/.
+   No module should independently call CanonicalRegistry.load() or resolve_alias().
+   Pattern: core/trace_types.py exposes functions, internally loads from canon.
+   Every consumer imports from core/trace_types.py — single loading path, single cache.
+
+3. MATRIX.PY — confirmed: remove ALL hardcoded schema-name matching
+   The block `if "04_fr_list" in schema: frs.extend(...)` is replaced with
+   dynamic trace discovery: walk spec JSONs → find _id fields → check against
+   canon trace_types → index by trace_type → follow trace arrays for cross-refs.
+
+### Determinism of Dynamic Trace Discovery — CONFIRMED
+
+The discovery algorithm has exactly TWO governed inputs:
+  Input 1: _id field suffix in schema → governed by JSON Schema (static, versioned)
+  Input 2: valid trace_type values → governed by canon/kinds/trace_type.json
+
+Chain: Canon defines trace_types → Schema enforces _id naming →
+       Discovery reads both → Matrix follows trace arrays
+
+No heuristics, no guessing. Adding a new traceable entity requires:
+  1. Add trace_type to canon
+  2. Add _id field to schema
+  3. Discovery picks it up automatically
+  4. G3 alignment linter catches if step 1 or 2 is missing
+
+Edge case confirmed: Step 06 invariants uses rules[].inv_id (not invariants[]).
+Algorithm handles this correctly: inv_id → strip _id → "inv" → canon alias → "invariant" ✓
+
+What if BOTH canon and schema are missing?
+  → Entity type doesn't exist yet. Correct behavior — nothing to trace.
+  Protection: schema changes require PR review. Workflow is:
+  decide to add entity → add to canon → add to schema → G3 confirms alignment.
+
+### Category B Hardcoded Strings — NOT Phase 0
+
+Validators like step_11.py have business rules: allowed_target_types = {"api", "component"}.
+These are step-specific constraints ("a threat can only target APIs or components"),
+NOT trace type validity checks ("is 'api' a valid trace type?").
+
+  Canon = "what words exist in the vocabulary" (shared, single source of truth)
+  Step validator = "which words are allowed in THIS field" (step-specific rule)
+
+Phase 0 fixes vocabulary governance. Step-specific constraints are regular validation
+logic and can be revisited in a later phase if needed.
+
+### Blast Radius Analysis — 14 Files Total
+
+Category A: Direct trace_types.py importers (6 files) → ZERO impact
+  core/__init__.py, step_01.py, step_10.py, step_11.py, fixtures_lint.py,
+  hallucination_lint.py — all import functions whose API stays identical.
+  Only the data source changes (canon load vs hardcoded tuple).
+
+Category B: Hardcoded trace type strings in validators (5 files) → NOT Phase 0
+  step_02.py, step_11.py, fixtures_lint.py, matrix.py, traceability_closure.py
+  — business rules, not validity checks. Deferred.
+
+Category C: matrix.py consumers (2 files) → ZERO impact
+  cli.py, schema_differ.py — import build_trace_matrix/validate_trace_integrity.
+  Public API unchanged; internal implementation changes only.
+
+Category D: Tests (3 files) → extend + add new
+  test_trace_types.py — extend with canon-backed loading tests
+  test_cli.py — minimal change (mock interface unchanged)
+  integration/test_step_10.py — may need canon fixture data
+
+### Test Strategy — DECIDED
+
+  Approach: extend existing tests + add new test cases
+  - Existing tests verify API contract still works (regression)
+  - New tests verify canon loading mechanism works correctly
+  - New tests verify graceful behavior when canon is unavailable
+
+### Updated Phase 0 Scope (FINAL)
+
+  G1: Shared canon utility in core/trace_types.py (DRY foundation)
+      - Load TRACE_TYPES from canon/kinds/trace_type.json via CanonicalRegistry
+      - Load CANONICAL_TRACE_TYPE aliases from canon entries
+      - Expose same public API: TRACE_TYPES, normalize_trace_type(), is_valid_trace_type()
+      - All 6 consumer files automatically get canon-backed validation
+
+  G2: Refactor matrix.py → dynamic trace discovery
+      - Remove hardcoded if "04_fr_list" in schema blocks
+      - Replace with: walk specs → find _id fields → check canon → index → follow traces
+      - Public API (build_trace_matrix, validate_trace_integrity) unchanged
+
+  G3: Canon→schema alignment linter
+      - Scan schema files for _id fields → validate prefix exists in canon trace_types
+      - Scan canon trace_types → validate each has at least one schema _id field
+      - Reports drift in either direction
+
+  G4: step_order.json → downstream_consumers only
+      - Remove required_spec_inputs, extraction_intent, required_seed_inputs
+      - Add downstream_consumers (mechanical inversion of existing data)
+
+  G5: Prompt sanitization → remove "Context To Ingest" sections
+
+  G6: Documentation → add to repo docs
+
+  G7: Three-tiered enforcement consistency (covered by G1 + G3)
+      - G1 makes hallucination lint fully dynamic (fixes the mixed tier)
+      - G3 catches schema↔canon drift (keeps schema tier aligned)
+      - No separate work item — G1+G3 close the loop
+
+### Open Items (remaining)
+
+  OPEN: json_utils.py location — deferred to Phase A
+  OPEN: Category B hardcoded strings — deferred to post-Phase 0

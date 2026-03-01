@@ -49,8 +49,6 @@ def lint_dependency_order(repo_root: str) -> list[str]:
                         _add_error(errors, seen_errors, str(prompt_path), line_no, step, ref, "forward-edge")
                     elif target < current and ref not in allowed.get(step, []):
                         _add_error(errors, seen_errors, str(prompt_path), line_no, step, ref, "disallowed-upstream")
-    errors.extend(_check_required_spec_inputs(root))
-    errors.extend(_check_required_seed_inputs(root))
     return errors
 
 
@@ -94,85 +92,3 @@ def _add_error(
     )
 
 
-def _check_required_spec_inputs(root: Path) -> list[str]:
-    """Validate that prompts reference all required_spec_inputs from step_order.json."""
-    errors: list[str] = []
-    order_path = root / "tools" / "step_order.json"
-    try:
-        with order_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    step_metadata = data.get("step_metadata", {})
-    prompts_dir = root / "prompts"
-
-    for step_id, meta in step_metadata.items():
-        required_inputs = meta.get("required_spec_inputs", [])
-        if not required_inputs:
-            continue
-
-        prompt_files = sorted(prompts_dir.glob(f"prompt_{step_id}_*.md"))
-        if not prompt_files:
-            continue
-
-        for prompt_path in prompt_files:
-            try:
-                text = prompt_path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-
-            missing = []
-            for spec_file in required_inputs:
-                if spec_file not in text:
-                    missing.append(spec_file)
-
-            if missing:
-                errors.append(
-                    f"E541 MISSING_REQUIRED_SPEC_INPUT {prompt_path.name} "
-                    f"step {step_id} references missing: {missing}"
-                )
-
-    return errors
-
-
-def _check_required_seed_inputs(root: Path) -> list[str]:
-    """Validate that prompts reference all required_seed_inputs from step_order.json."""
-    errors: list[str] = []
-    order_path = root / "tools" / "step_order.json"
-    try:
-        with order_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    step_metadata = data.get("step_metadata", {})
-    prompts_dir = root / "prompts"
-
-    for step_id, meta in step_metadata.items():
-        required_seeds = meta.get("required_seed_inputs", [])
-        if not required_seeds:
-            continue
-
-        prompt_files = sorted(prompts_dir.glob(f"prompt_{step_id}_*.md"))
-        if not prompt_files:
-            continue
-
-        for prompt_path in prompt_files:
-            try:
-                text = prompt_path.read_text(encoding="utf-8")
-            except OSError:
-                continue
-
-            missing = []
-            for seed_id in required_seeds:
-                if seed_id not in text:
-                    missing.append(seed_id)
-
-            if missing:
-                errors.append(
-                    f"E542 MISSING_REQUIRED_SEED_INPUT {prompt_path.name} "
-                    f"step {step_id} references missing: {missing}"
-                )
-
-    return errors

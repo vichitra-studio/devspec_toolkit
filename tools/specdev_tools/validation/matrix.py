@@ -1,6 +1,9 @@
 
 from __future__ import annotations
-import os, json, collections, re
+import collections
+import os, json, re
+
+from ..core.trace_types import normalize_trace_type, is_valid_trace_type
 
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -303,27 +306,31 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
                 except (OSError, json.JSONDecodeError):
                     pass
 
-    # Index core specs
-    frs = []
-    apis = {}
-    fixtures = []
-    nfrs = []
-    threats = []
-    
+    # Dynamic entity indexing: discover entities by _id fields + canon trace type validation
+    entity_index = collections.defaultdict(list)  # normalized_trace_type -> [entity_objects]
+
     for data in artifacts.values():
-        schema = data.get("$schema", "")
-        # Fuzzy matching schemas to be more robust
-        if "04_fr_list" in schema:
-            frs.extend(data.get("functional_requirements", []))
-        if "05_interface_contracts" in schema:
-            for a in data.get("apis", []):
-                apis[a.get("api_id")] = a
-        if "08_fixtures" in schema:
-            fixtures.extend(data.get("fixtures", []))
-        if "07_nfrs" in schema:
-            nfrs.extend(data.get("nfrs", []))
-        if "11_redteam" in schema:
-            threats.extend(data.get("threats", []))
+        for key, value in data.items():
+            if not isinstance(value, list):
+                continue
+            for item in value:
+                if not isinstance(item, dict):
+                    continue
+                for field in item:
+                    if not field.endswith("_id") or not isinstance(item[field], str):
+                        continue
+                    prefix = field[:-3]  # strip "_id"
+                    normalized = normalize_trace_type(prefix)
+                    if is_valid_trace_type(normalized):
+                        entity_index[normalized].append(item)
+                        break  # one entity type per object
+
+    # Bridge to existing variable names (Sections C/D/E unchanged)
+    frs = entity_index.get("fr", [])
+    apis = {a.get("api_id"): a for a in entity_index.get("api", []) if a.get("api_id")}
+    fixtures = entity_index.get("fixture", [])
+    nfrs = entity_index.get("nfr", [])
+    threats = entity_index.get("threat", [])
 
     # Index extension files
     extensions = []

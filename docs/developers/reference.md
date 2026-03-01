@@ -95,6 +95,9 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
 
+# Canon/schema alignment
+./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit
+
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
@@ -181,8 +184,24 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - **Scaffold (Step 15) failures**:
   - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
   - `duplicate api_ref`: Each API Contract can only be mapped once.
+- **Canon/schema alignment failures** (`canon-schema-alignment`):
+  - `E550 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
+  - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
+  - `E552 MISSING_PAIRED_SCHEMA`: Schema file referenced in pairing config not found.
+  - `E553 MISSING_ENUM_PATH`: JSON path referenced in pairing config not found in schema.
+  - `W552 POTENTIAL_UNREGISTERED_PAIRING`: Unregistered schema enum has high overlap (>=80%) with a canon kind; consider adding an explicit pairing.
 
+## Architecture Notes
 
+### `trace_types.py` (dynamic loading)
+`trace_types.py` now loads valid trace types from `canon/kinds/trace_type.json` via `CanonicalRegistry` at import time. If canon loading fails for any reason, it falls back to a hardcoded set of types and aliases. This keeps the canonical registry as the single source of truth while maintaining resilience.
+
+### `step_order.json` schema changes
+- The `step_metadata` field has been **removed**.
+- A `downstream_consumers` field has been **added**. It maps each step ID to a list of step IDs that directly consume its output (e.g., `"04": ["05", "06", ...]`). This replaces the extraction-intent data previously stored in `step_metadata` and is used by the `prompt-context` command.
+
+### `prompt-context` output format
+The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) instead of the previous 3-column format (`Step`, `Name`, `Extraction Intent`). Consumer lists are derived from the `downstream_consumers` field in `step_order.json`.
 
 ## Related Resources
 - [index.md](index.md) — Navigational overview of every document set.

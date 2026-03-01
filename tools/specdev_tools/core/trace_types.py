@@ -1,24 +1,41 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Iterable
 
 
-TRACE_TYPES = (
-    "fr",
-    "api",
-    "nfr",
-    "inv",
-    "invariant",
-    "fixture",
-    "doc",
-    "capability",
-    "component",
+def _load_from_canon() -> tuple[tuple[str, ...], dict[str, str]]:
+    """Load trace types from canon/kinds/trace_type.json via CanonicalRegistry."""
+    try:
+        from ..canonical.registry import CanonicalRegistry
+
+        toolkit_root = str(Path(__file__).resolve().parents[3])
+        registry = CanonicalRegistry.load(toolkit_root)
+        types: set[str] = set()
+        aliases: dict[str, str] = {}
+        for entry in registry.entries.values():
+            if entry.kind != "trace_type":
+                continue
+            label = entry.payload.get("preferred_label", "")
+            if label:
+                types.add(label)
+            for alias in entry.payload.get("aliases", []) or []:
+                if isinstance(alias, str) and alias != label:
+                    aliases[alias] = label
+        if types:
+            return tuple(sorted(types)), aliases
+    except Exception:
+        pass
+    return _FALLBACK_TYPES, _FALLBACK_ALIASES
+
+
+_FALLBACK_TYPES: tuple[str, ...] = (
+    "api", "capability", "component", "doc", "fixture",
+    "fr", "invariant", "nfr", "threat",
 )
+_FALLBACK_ALIASES: dict[str, str] = {"inv": "invariant"}
 
-
-CANONICAL_TRACE_TYPE = {
-    "inv": "invariant"
-}
+TRACE_TYPES, CANONICAL_TRACE_TYPE = _load_from_canon()
 
 
 def normalize_trace_type(value: str) -> str:

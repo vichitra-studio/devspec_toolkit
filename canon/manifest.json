@@ -1013,24 +1013,6 @@
       }
     },
     {
-      "id": "cn:core:trace_type:inv",
-      "kind": "trace_type",
-      "preferred_label": "inv",
-      "definition": "Trace reference type for inv artifacts.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "tracing"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
       "id": "cn:core:trace_type:invariant",
       "kind": "trace_type",
       "preferred_label": "invariant",
@@ -1040,7 +1022,7 @@
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": ["inv"],
       "tags": [
         "tracing"
       ],
@@ -1118,6 +1100,24 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:threat",
+      "kind": "trace_type",
+      "preferred_label": "threat",
+      "definition": "A red-team threat entity from Step 11 (11_redteam.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
       }
     },
     {
