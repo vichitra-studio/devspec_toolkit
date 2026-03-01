@@ -72,7 +72,7 @@ Before emitting, verify:
 - All specs 00–12 have been evaluated for completeness — no step is skipped in the assessment.
 - No extension is marked complete without evidence of the corresponding spec file existing on disk.
 - If any spec file is absent and its absence is ambiguous (skipped vs. not-yet-written): add a gap question (Clarify mode) rather than assuming completion.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
@@ -97,19 +97,6 @@ Before emitting, verify:
   - current: 0-10 score.
   - target: 10.
   - confidence_level: 0.0-1.0 (confidence in this assessment).
-
-## Context To Ingest
-- Specs in `spec/`: `00_charter.json`, `01_capabilities.json`, `02_system_sketch.json`, `02a_delivery_baseline.json`, `03_glossary.json`, `04_fr_list.json`, `05_interface_contracts.json`, `06_invariants.json`, `07_nfrs.json`, `08_fixtures.json`, `09_impl_plan.json`, `10_governance.json`, `11_redteam.json`, `12_ci_gates.json`.
-- Guide: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
-- Shared expectations: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json through 12_ci_gates.json**: Required fields, trace links, and completeness indicators for gap analysis
-- **13_extension_manifest.json**: Extension IDs and filenames to verify physical existence on disk
-- **Traceability matrix**: FR-to-API, API-to-fixture, and invariant-to-FR coverage for completeness scoring
-
-
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).

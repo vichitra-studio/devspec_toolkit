@@ -1,9 +1,43 @@
 
 from __future__ import annotations
 import collections
-import os, json, re
+import os, json, warnings
 
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type
+from .cross_artifact_checks import (
+    collect_capability_ids,
+    collect_glossary_term_ids,
+    check_step_02_integrity,
+    check_step_03_integrity,
+    check_step_04_integrity,
+)
+
+# ---------------------------------------------------------------------------
+# Business-rule trace-type constants for matrix link building
+# ---------------------------------------------------------------------------
+
+# Business rule: the trace matrix connects FRs to APIs, APIs to fixtures and
+# NFRs, and APIs to threats.  Only "api" and "fr" trace types carry meaning
+# in these link-building loops.
+# Rationale: the matrix is a *requirements-to-implementation* cross-reference.
+# An FR traces to an API it exercises; an NFR may trace to an FR it
+# constrains or an API it benchmarks; a fixture targets an API it tests; a
+# threat targets an API it attacks.  Other trace types (doc, capability,
+# component) are structural, not executable, so they do not appear in the
+# matrix linkage.
+_MATRIX_LINK_API_TYPE: str = "api"
+_MATRIX_LINK_FR_TYPE: str = "fr"
+
+_invalid_matrix_link_types = {
+    t for t in (_MATRIX_LINK_API_TYPE, _MATRIX_LINK_FR_TYPE)
+    if not is_valid_trace_type(t)
+}
+if _invalid_matrix_link_types:
+    warnings.warn(
+        f"matrix: link-building trace types contain unknown canon trace types: "
+        f"{_invalid_matrix_link_types}",
+        stacklevel=1,
+    )
 
 def load_json(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -83,7 +117,12 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
 
 
 def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
-    """Check for broken trace references (Generic Implementation)."""
+    """Check for broken trace references (Generic Implementation).
+
+    The function loads all JSON artifacts from *spec_dir*, runs the generic
+    broken-reference scan, then dispatches to per-step cross-artifact checks
+    defined in :mod:`cross_artifact_checks`.
+    """
     artifacts = {}
     for root, _, files in os.walk(spec_dir):
         for fn in files:
@@ -97,195 +136,25 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
 
     known_ids, references = collect_definitions_and_references(artifacts)
 
-    # Validation
-    errors = []
+    # Generic broken-reference check
+    errors: list[str] = []
     for src, tgt in references:
-        # Validate target existence
-        # Allow external refs, file paths, and git refs hacks
         if tgt and tgt not in known_ids and not (
-            tgt.startswith("external:") or 
-            tgt.startswith("file:") or 
+            tgt.startswith("external:") or
+            tgt.startswith("file:") or
             tgt.startswith("refs/")
         ):
-             errors.append(f"Broken Trace in {os.path.basename(src)}: Reference to '{tgt}' not found.")
+            errors.append(f"Broken Trace in {os.path.basename(src)}: Reference to '{tgt}' not found.")
 
-    # Step 02 system sketch checks
-    capability_ids = set()
-    for data in artifacts.values():
-        schema = data.get("$schema", "")
-        if "01_capabilities" in schema:
-            for cap in data.get("capabilities", []):
-                if cap.get("capability_id"):
-                    capability_ids.add(cap["capability_id"])
+    # Collect shared cross-step indexes
+    capability_ids = collect_capability_ids(artifacts)
+    glossary_term_ids = collect_glossary_term_ids(artifacts)
 
-    schema_ref_re = re.compile(r"^(?:-tbd|(file://|https://|glossary:|api:).+)$")
-    for path, data in artifacts.items():
-        schema = data.get("$schema", "")
-        if "02_system_sketch" not in schema:
-            continue
+    # Dispatch to per-step cross-artifact checks
+    errors.extend(check_step_02_integrity(artifacts, capability_ids))
+    errors.extend(check_step_03_integrity(artifacts))
+    errors.extend(check_step_04_integrity(artifacts, glossary_term_ids, capability_ids))
 
-        components = data.get("components", [])
-        connections = data.get("connections", [])
-
-        component_ids = []
-        component_types = {}
-        for comp in components:
-            comp_id = comp.get("component_id")
-            if comp_id:
-                component_ids.append(comp_id)
-                component_types[comp_id] = comp.get("type")
-
-        seen = set()
-        for comp_id in component_ids:
-            if comp_id in seen:
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: Duplicate component_id '{comp_id}'."
-                )
-            seen.add(comp_id)
-
-        component_id_set = set(component_ids)
-        for idx, conn in enumerate(connections):
-            source = conn.get("from")
-            target = conn.get("to")
-            if source and source not in component_id_set:
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: connection[{idx}] from '{source}' not found."
-                )
-            if target and target not in component_id_set:
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: connection[{idx}] to '{target}' not found."
-                )
-
-            schema_ref = conn.get("schema_ref")
-            if schema_ref and not schema_ref_re.match(schema_ref):
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: connection[{idx}] schema_ref '{schema_ref}' is invalid."
-                )
-
-            if (
-                (source and component_types.get(source) == "external")
-                or (target and component_types.get(target) == "external")
-            ):
-                trust_boundary = conn.get("trust_boundary")
-                if trust_boundary == "internal":
-                    errors.append(
-                        f"Step 02 Integrity in {os.path.basename(path)}: connection[{idx}] uses internal trust_boundary with external component."
-                    )
-
-        if capability_ids:
-            traced = set()
-            for comp in components:
-                # Check both trace (standard) and trace_refs (legacy/alt)
-                traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])
-                for trace in traces:
-                    trace_id = trace.get("id")
-                    trace_type = trace.get("type")
-                    if not trace_id:
-                        continue
-                    if trace_type in ("doc", "capability"):
-                        traced.add(trace_id)
-                    elif trace_id in capability_ids:
-                        errors.append(
-                            f"Step 02 Integrity in {os.path.basename(path)}: Capability trace_refs must use type 'doc' or 'capability' for '{trace_id}'."
-                        )
-            missing = sorted(capability_ids - traced)
-            if missing:
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: Missing capability coverage {', '.join(missing)}."
-                )
-
-        for comp in components:
-            if comp.get("type") != "external":
-                continue
-            tags = comp.get("tags", []) or []
-            if "external-dependency" not in tags:
-                errors.append(
-                    f"Step 02 Integrity in {os.path.basename(path)}: external component '{comp.get('component_id')}' lacks external-dependency tag."
-                )
-
-    # Step 03 glossary checks
-    glossary_term_ids = set()
-    for path, data in artifacts.items():
-        schema = data.get("$schema", "")
-        if "03_glossary" not in schema:
-            continue
-        for term in data.get("terms", []):
-            if term.get("term_id"):
-                glossary_term_ids.add(term.get("term_id").lower())
-
-    for path, data in artifacts.items():
-        schema = data.get("$schema", "")
-        
-        # FR Coverage Check against Glossary
-        if "04_fr_list" in schema:
-            for fr in data.get("functional_requirements", []):
-                for trace in fr.get("trace", []) or []:
-                    trace_type = trace.get("type")
-                    trace_id = trace.get("id")
-                    
-                    if not trace_id:
-                        continue
-                        
-                    # explicit glossary trace or implicit ID pattern
-                    if trace_type == "glossary" or trace_id.startswith("term-"):
-                        if trace_id.lower() not in glossary_term_ids:
-                             errors.append(
-                                f"Step 04 Integrity in {os.path.basename(path)}: FR '{fr.get('fr_id')}' references unknown glossary term '{trace_id}'."
-                             )
-                    
-                    # Capability Trace Coverage
-                    if trace_type == "capability":
-                        if trace_id not in capability_ids:
-                             errors.append(
-                                f"Step 04 Integrity in {os.path.basename(path)}: FR '{fr.get('fr_id')}' references unknown capability '{trace_id}'."
-                             )
-
-        if "03_glossary" not in schema:
-            continue
-
-        # Validate glossary integrity
-        terms = data.get("terms", [])
-        
-        # Check for empty terms array
-        if len(terms) == 0:
-            errors.append(f"Step 03 Integrity in {os.path.basename(path)}: Empty terms array")
-        
-        # Check for duplicate term_ids and terms (case-insensitive)
-        seen_term_ids = set()
-        seen_terms = set()
-        
-        for i, term in enumerate(terms):
-            term_id = term.get("term_id")
-            if term_id:
-                term_id_lower = term_id.lower()
-                if term_id_lower in seen_term_ids:
-                    errors.append(
-                        f"Step 03 Integrity in {os.path.basename(path)}: Duplicate term_id '{term_id}' at index {i}"
-                    )
-                seen_term_ids.add(term_id_lower)
-            
-            term_text = term.get("term")
-            if term_text:
-                term_text_lower = term_text.lower()
-                if term_text_lower in seen_terms:
-                    errors.append(
-                        f"Step 03 Integrity in {os.path.basename(path)}: Duplicate term '{term_text}' at index {i}"
-                    )
-                seen_terms.add(term_text_lower)
-            
-            # Check that optional fields are not empty strings
-            domain = term.get("domain")
-            if isinstance(domain, str) and domain == "":
-                errors.append(
-                    f"Step 03 Integrity in {os.path.basename(path)}: Empty domain string at term index {i}"
-                )
-                
-            units = term.get("units")
-            if isinstance(units, str) and units == "":
-                errors.append(
-                    f"Step 03 Integrity in {os.path.basename(path)}: Empty units string at term index {i}"
-                )
-    
     return errors
 
 def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
@@ -325,20 +194,23 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
                         entity_index[normalized].append(item)
                         break  # one entity type per object
 
-    # Bridge to existing variable names (Sections C/D/E unchanged)
-    frs = entity_index.get("fr", [])
-    apis = {a.get("api_id"): a for a in entity_index.get("api", []) if a.get("api_id")}
+    # Bridge to existing variable names (Sections C/D/E unchanged).
+    # "fr" and "api" use the named constants; the remaining keys ("fixture",
+    # "nfr", "threat") are dynamic entity-index lookups keyed by normalized
+    # canon trace type and will be replaced when the matrix is fully dynamic.
+    frs = entity_index.get(_MATRIX_LINK_FR_TYPE, [])
+    apis = {a.get("api_id"): a for a in entity_index.get(_MATRIX_LINK_API_TYPE, []) if a.get("api_id")}
     fixtures = entity_index.get("fixture", [])
     nfrs = entity_index.get("nfr", [])
     threats = entity_index.get("threat", [])
 
     # Index extension files
     extensions = []
-    for data in artifacts.values():
+    for art_key, data in artifacts.items():
         schema = data.get("$schema", "")
-        # Check if this is an extension file (ext_[0-9]{2}_)
-        if "extension_generator" in schema or any(fn.startswith("ext_") for fn in artifacts.keys() if fn.endswith(".json")):
-            # Add extensions to the index
+        # Check if this artifact is an extension file
+        art_basename = os.path.basename(art_key) if os.sep in art_key else art_key
+        if "extension_generator" in schema or art_basename.startswith("ext_"):
             if "extensions" in data:
                 extensions.extend(data.get("extensions", []))
 
@@ -351,25 +223,25 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
 
     for fr in frs:
         for t in fr.get("trace", []):
-            if t.get("type") == "api":
+            if t.get("type") == _MATRIX_LINK_API_TYPE:
                 fr_to_api[fr["fr_id"]].add(t["id"])
 
     for fx in fixtures:
         for t in fx.get("targets", []):
-            if t.get("type") == "api":
+            if t.get("type") == _MATRIX_LINK_API_TYPE:
                 api_to_fixture[t["id"]].add(fx["fixture_id"])
 
     for n in nfrs:
         for t in n.get("trace", []):
-            if t.get("type") == "api":
+            if t.get("type") == _MATRIX_LINK_API_TYPE:
                 api_to_nfr[t["id"]].add(n["nfr_id"])
-            elif t.get("type") == "fr":
+            elif t.get("type") == _MATRIX_LINK_FR_TYPE:
                 fr_to_nfr[t["id"]].add(n["nfr_id"])
 
     # Link Threats to APIs
     for th in threats:
         for t in th.get("target_ids", []):
-            if t.get("type") == "api":
+            if t.get("type") == _MATRIX_LINK_API_TYPE:
                 api_to_threat[t["id"]].add(th["threat_id"])
 
     # Emit matrix

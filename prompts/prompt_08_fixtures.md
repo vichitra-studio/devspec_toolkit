@@ -34,20 +34,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- FRs `spec/04_fr_list.json` for acceptance criteria; Interface Contracts `spec/05_interface_contracts.json` for payloads.
-- Invariants `spec/06_invariants.json` and NFRs `spec/07_nfrs.json` for negative and performance cases.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-- Schema: `$SCHEMA_DIR/08_fixtures.schema.json` for fixture structure, mode enums, and target format.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **04_fr_list.json**: Acceptance criteria to derive happy-path, edge, and failure fixture scenarios; FR IDs for `targets`
-- **05_interface_contracts.json**: Request/response schemas for payload shapes; error definitions for negative fixtures; API IDs for `targets`
-- **06_invariants.json**: Invariant IDs with `severity: error` for negative-case fixtures that verify enforcement
-- **07_nfrs.json**: Performance-critical NFR IDs for benchmark or load-test fixtures
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Coverage Ledger mapping FR acceptance criteria to fixtures: happy-path, edge, and failure, plus contract/e2e/redteam modes. Do not output it.
 - Align inputs/expected with interface schemas; include negative cases for each enumerated error.
@@ -76,7 +62,7 @@ Before emitting, verify:
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
 - All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

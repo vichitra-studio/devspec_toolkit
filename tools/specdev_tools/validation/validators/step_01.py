@@ -1,9 +1,29 @@
 import json
 import os
+import warnings
 from typing import Optional, Set
 from jsonschema import Draft202012Validator
 from ...core.registry import SchemaRegistry
-from ...core.trace_types import normalize_trace_type
+from ...core.trace_types import is_valid_trace_type, normalize_trace_type
+
+# ---------------------------------------------------------------------------
+# Business-rule trace-type constant
+# ---------------------------------------------------------------------------
+
+# Business rule: capability-to-component traceability.
+# Capabilities (Step 01) trace to system-sketch components (Step 02) to show
+# which runtime component(s) realise a given capability.  Only the "component"
+# trace type is valid here because capabilities are mapped to architectural
+# building blocks, not to requirements or test artefacts.
+_CAPABILITY_COMPONENT_TRACE_TYPE: str = "component"
+
+if not is_valid_trace_type(_CAPABILITY_COMPONENT_TRACE_TYPE):
+    warnings.warn(
+        f"step_01: _CAPABILITY_COMPONENT_TRACE_TYPE '{_CAPABILITY_COMPONENT_TRACE_TYPE}' "
+        f"is not a valid canon trace type",
+        stacklevel=1,
+    )
+
 
 def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) -> list:
     """
@@ -15,7 +35,7 @@ def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) 
 
     for cap in instance.get("capabilities", []):
         for trace in cap.get("trace", []):
-            if normalize_trace_type(trace.get("type", "")) == "component":
+            if normalize_trace_type(trace.get("type", "")) == _CAPABILITY_COMPONENT_TRACE_TYPE:
                 target_id = trace.get("id")
                 if target_id not in component_ids:
                     errors.append(f"Capability '{cap.get('capability_id')}' traces to unknown component '{target_id}'")

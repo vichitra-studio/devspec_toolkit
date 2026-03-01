@@ -1,7 +1,38 @@
 from __future__ import annotations
 import json
 import os
+import warnings
 from typing import Any
+
+from ..core.trace_types import is_valid_trace_type, normalize_trace_type
+
+# ---------------------------------------------------------------------------
+# Business-rule trace-type constants for traceability closure chains
+# ---------------------------------------------------------------------------
+
+# Business rule: capabilities trace back to charter goals.
+# Rationale: the charter (Step 00) defines high-level goals. Capabilities
+# (Step 01) prove each goal is decomposed into at least one user-facing
+# capability.  The "charter-goal" trace type links capability -> goal.
+# NOTE: "charter-goal" was added to canon as cn:core:trace_type:charter-goal.
+_CHARTER_GOAL_TRACE_TYPE: str = "charter-goal"
+
+# Business rule: FRs trace back to capabilities.
+# Rationale: each FR (Step 04) must reference at least one capability
+# (Step 01) to show the functional requirement is grounded in a user-facing
+# capability.  The "capability" trace type links FR -> capability.
+_CAPABILITY_TRACE_TYPE: str = "capability"
+
+# Validate at definition time
+for _label, _value in [
+    ("_CHARTER_GOAL_TRACE_TYPE", _CHARTER_GOAL_TRACE_TYPE),
+    ("_CAPABILITY_TRACE_TYPE", _CAPABILITY_TRACE_TYPE),
+]:
+    if not is_valid_trace_type(_value):
+        warnings.warn(
+            f"traceability_closure: {_label} '{_value}' is not a valid canon trace type",
+            stacklevel=1,
+        )
 
 SPEC_FILES = {
     "charter": "00_charter.json",
@@ -58,7 +89,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             cap_traced_goals: set[str] = set()
             for cap in data["capabilities"].get("capabilities", []):
                 for trace_ref in cap.get("trace", []):
-                    if isinstance(trace_ref, dict) and trace_ref.get("type") == "charter-goal" and "id" in trace_ref:
+                    if isinstance(trace_ref, dict) and normalize_trace_type(trace_ref.get("type") or "") == _CHARTER_GOAL_TRACE_TYPE and "id" in trace_ref:
                         cap_traced_goals.add(trace_ref["id"])
 
             for goal_id in sorted(goal_ids - cap_traced_goals):
@@ -71,7 +102,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             if "fr_id" in fr:
                 fr_ids.add(fr["fr_id"])
             for cap_ref in fr.get("trace", []):
-                if isinstance(cap_ref, dict) and cap_ref.get("type") == "capability" and "id" in cap_ref:
+                if isinstance(cap_ref, dict) and normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and "id" in cap_ref:
                     fr_traced_caps.add(cap_ref["id"])
 
     milestone_fr_refs: set[str] = set()

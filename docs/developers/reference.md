@@ -154,7 +154,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 
 ## Two-Phase AI Runner Mode
 - Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
-- Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
+- Agents follow the prompt’s “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing. For seed-phase prompts (Steps 00–04) agents also read the “Context To Ingest” section; Steps 05–16c use “Coverage Closure” instead.
 - Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
 - Operational guidance for agents and runner tips: `docs/agents/agents.md`.
 

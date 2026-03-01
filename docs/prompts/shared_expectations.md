@@ -4,7 +4,7 @@ Use this page as the canonical reference for guidance that applies across every 
 
 ## Definition of Ready (DoR) / Guardrails
 
-Each step's prompt defines its specific Definition of Ready (DoR) within the **Context To Ingest** and **Self-Audit Gate** sections. Treat those rules as non-negotiable.
+Each step's prompt defines its specific Definition of Ready (DoR) within the **Self-Audit Gate** and **Coverage Closure** sections. Seed-phase prompts (Steps 00–04) additionally include a **Context To Ingest** section. Treat those rules as non-negotiable.
 
 ## Working Increment
 

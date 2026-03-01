@@ -28,19 +28,6 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the referenced step schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
 
-## Context To Ingest
-- **System Sketch** (`spec/02_system_sketch.json`): Look for "Database", "AI Engine", "Third Party", or "Infrastructure" bubbles.
-- **NFRs** (`spec/07_nfrs.json`): Look for "Compliance", "Security", or "Scale" constraints that imply deep complexity.
-- **Guide**: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **02_system_sketch.json**: Component types (database, AI engine, external) indicating deep domain complexity
-- **07_nfrs.json**: Compliance, security, and scale constraints implying extension-worthy complexity
-- **01_capabilities.json**: Capability scope for identifying which domains need dedicated specs
-- **04_fr_list.json**: Complex business logic requirements that may need dedicated extension specs
-- **05_interface_contracts.json**: Integration patterns to distinguish standard APIs from deep domain verticals
-
 ## Operating Flow: Analyze → Filter → Plan
 - **Analyze**: Scan the input specs for complex subsystems.
   - *Data Storage*: Does the sketch imply complex schemas (SQL, NoSQL, Vector DB)? -> Needs a Database Spec.
@@ -73,7 +60,7 @@ Before emitting, verify:
 - Each `extension_id` has a `justification` that references a specific `component_id` or `nfr_id` from upstream specs.
 - No identified architectural gap is silently dropped without explicit `out_of_scope` rationale.
 - If any domain complexity is unclear: add a gap question (Clarify mode) rather than generating a speculative extension.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

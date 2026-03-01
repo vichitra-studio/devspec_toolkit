@@ -31,18 +31,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- Interface Contracts `spec/05_interface_contracts.json` for route map; System Sketch `spec/02_system_sketch.json` for component context.
-- FRs `spec/04_fr_list.json` for behavior coverage.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference; any org boilerplate.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **05_interface_contracts.json**: API IDs, routes, methods, and protocols for route_map generation
-- **02_system_sketch.json**: Component IDs and types for service skeleton module mapping
-- **04_fr_list.json**: FR IDs with acceptance criteria requiring specific HTTP endpoints
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Scaffold Ledger: service_skeleton (language/framework/modules) and route_map mapping each public `api_ref` to path/method. Do not output it.
 - Ensure one-to-one mapping to critical APIs; include validators that check spec/code sync.
@@ -69,7 +57,7 @@ Before emitting, verify:
 - Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
 - All `api_ref` values in `route_map` resolve to valid `api_id` entries in `spec/05_interface_contracts.json`.
 - If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

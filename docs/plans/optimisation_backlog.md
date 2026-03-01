@@ -10,12 +10,13 @@ Items deferred from Phase 0 with full context for future implementation.
 
 ## Prioritised Backlog
 
-### OPT-001: Extension Handling Bug in matrix.py (M1)
+### OPT-001: Extension Handling Bug in matrix.py (M1) -- COMPLETED
 
 **Severity**: LOW
 **File**: `tools/specdev_tools/validation/matrix.py:333`
 **Origin**: Phase 0 review finding M1
 **Phase**: Post-Phase 0
+**Status**: COMPLETED (2026-03-01)
 
 #### Problem
 
@@ -42,18 +43,23 @@ artifact_key = path  # or however the current artifact is referenced
 if "extension_generator" in schema or artifact_key.startswith("ext_"):
 ```
 
+#### Resolution
+
+Fixed by checking the current artifact key instead of iterating all artifacts with `any()`. No regressions. 578 tests pass.
+
 #### Dependencies
 
 None — can be fixed independently.
 
 ---
 
-### OPT-002: validate_trace_integrity() Hardcoded Schema Strings (H2)
+### OPT-002: validate_trace_integrity() Hardcoded Schema Strings (H2) -- COMPLETED
 
 **Severity**: MEDIUM
 **File**: `tools/specdev_tools/validation/matrix.py:113,121,207,217,240`
 **Origin**: Phase 0 review finding H2
 **Phase**: Post-Phase 0 (recommended before Phase A)
+**Status**: COMPLETED (2026-03-01)
 
 #### Problem
 
@@ -81,6 +87,10 @@ Extract step-specific validation into per-step validator functions (similar to t
 
 This is a larger refactor and should be paired with the Category B cleanup (OPT-003).
 
+#### Resolution
+
+Extracted step-specific checks into `cross_artifact_checks.py` with 5 exported functions. `validate_trace_integrity()` reduced from ~200 to ~40 lines. Error message format preserved. 578 tests pass.
+
 #### Dependencies
 
 - OPT-003 (should be done together)
@@ -88,7 +98,7 @@ This is a larger refactor and should be paired with the Category B cleanup (OPT-
 
 ---
 
-### OPT-003: Category B Hardcoded Business Rule Strings
+### OPT-003: Category B Hardcoded Business Rule Strings -- COMPLETED
 
 **Severity**: LOW
 **File(s)**:
@@ -98,6 +108,7 @@ This is a larger refactor and should be paired with the Category B cleanup (OPT-
 - `tools/specdev_tools/validation/traceability_closure.py`
 **Origin**: Phase 0 scope boundary decision
 **Phase**: Post-Phase 0
+**Status**: COMPLETED (2026-03-01)
 
 #### Problem
 
@@ -122,6 +133,10 @@ Move these sets into step-specific schema validation rules or a configuration re
 1. Documented with its business justification
 2. Validated against canon trace types (all values must be valid trace types)
 3. Discoverable via tooling
+
+#### Resolution
+
+7 files updated. 12+ hardcoded strings replaced with named frozenset constants, each with business rule documentation and canon drift detection via `warnings.warn()`. Runtime assertion added in `fixtures_lint.py` for pool/frozenset sync. `normalize_trace_type` added to `step_02.py` for consistency. Canon gaps closed: `charter-goal` and `glossary` added to `canon/kinds/trace_type.json` and `canon/manifest.json`.
 
 #### Dependencies
 
@@ -189,11 +204,13 @@ Claude Code skills and hooks for:
 
 ## Priority Matrix
 
-| Item | Severity | Effort | Blocks | Recommended Order |
-|------|----------|--------|--------|-------------------|
-| OPT-005 | HIGH | LARGE | Automation | 1 (Phase A) |
-| OPT-002 | MEDIUM | MEDIUM | OPT-003 | 2 |
-| OPT-003 | LOW | MEDIUM | — | 3 (with OPT-002) |
-| OPT-006 | MEDIUM | LARGE | — | 4 (Phase B) |
-| OPT-001 | LOW | SMALL | — | Any time |
-| OPT-004 | LOW | SMALL | — | Any time |
+| Item | Severity | Effort | Blocks | Recommended Order | Status |
+|------|----------|--------|--------|-------------------|--------|
+| OPT-005 | HIGH | LARGE | Automation | 1 (Phase A) | OPEN |
+| OPT-002 | MEDIUM | MEDIUM | OPT-003 | 2 | COMPLETED (2026-03-01) |
+| OPT-003 | LOW | MEDIUM | — | 3 (with OPT-002) | COMPLETED (2026-03-01) |
+| OPT-006 | MEDIUM | LARGE | — | 4 (Phase B) | OPEN |
+| OPT-001 | LOW | SMALL | — | Any time | COMPLETED (2026-03-01) |
+| OPT-004 | LOW | SMALL | — | Any time | OPEN (deferred to Phase A) |
+
+**Note**: Phase 0 governance goals G5 (prompt sanitization) and G6 (documentation) are also COMPLETED as of 2026-03-01. G5 removed "Context To Ingest" and "Extraction Intent" from 16 prompt files (05-16c). G6 created `docs/architecture/governance_architecture.md` with full coverage of the governance system.

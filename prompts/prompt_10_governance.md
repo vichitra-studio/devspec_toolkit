@@ -35,18 +35,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- Charter `spec/00_charter.json` for organizational goals/constraints; Implementation Plan `spec/09_impl_plan.json` for cadence.
-- Use CI expectations from upstream charter constraints and current repo automation docs; do not depend on downstream CI-gates spec.
-- Current commit conventions (if any) found in repo history or CONTRIBUTING docs.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Organizational constraints and compliance requirements for governance rules
-- **09_impl_plan.json**: Delivery cadence and milestone schedule for review cadence and branching strategy alignment
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Governance Ledger: versioning strategy, PR rules (required validations), spec_first_policy, commit message pattern, reviewers/roles. Do not output it.
 - Validate PR rules cover core spec validations; ensure commit pattern supports traceability.
@@ -74,7 +62,7 @@ Before emitting, verify:
 - The review cadence and branching strategy align with the milestone schedule in `spec/09_impl_plan.json`.
 - No charter-level change-control requirement is silently dropped.
 - If any organizational constraint cannot be expressed as a governance rule: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

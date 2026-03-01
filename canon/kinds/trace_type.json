@@ -164,6 +164,42 @@
       "lifecycle": {
         "introduced_at": "2026-03-01T00:00:00Z"
       }
+    },
+    {
+      "id": "cn:core:trace_type:charter-goal",
+      "kind": "trace_type",
+      "preferred_label": "charter-goal",
+      "definition": "Reference to a charter goal from Step 00 (00_charter.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:glossary",
+      "kind": "trace_type",
+      "preferred_label": "glossary",
+      "definition": "Reference to a glossary term from Step 03 (03_glossary.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
     }
   ]
 }

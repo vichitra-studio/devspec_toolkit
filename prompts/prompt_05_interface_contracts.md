@@ -29,20 +29,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- FRs `spec/04_fr_list.json` to derive behaviors and acceptance evidence.
-- System Sketch `spec/02_system_sketch.json` for owners and integration points.
-- Glossary `spec/03_glossary.json` for resource/action naming.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-- Use example fixtures for payload shapes and error cases; do not depend on downstream fixture artifacts.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **04_fr_list.json**: FR IDs and acceptance criteria to derive API behaviors and trace bindings
-- **02_system_sketch.json**: Component IDs for ownership assignment; connection protocols and trust boundaries for security
-- **03_glossary.json**: Domain terms for resource/action naming in routes and payloads
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of APIs (id, name, version, protocol, route/method, request/response schemas, security, errors, owner, traces). Do not output it.
 - Map APIs to FRs; ensure each FR with external behavior has an interface or rationale for being internal-only.
@@ -73,7 +59,7 @@ Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

@@ -29,19 +29,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- Success metrics in `spec/00_charter.json` to align business outcomes with technical targets.
-- Glossary `spec/03_glossary.json` for metric names and units; FRs `spec/04_fr_list.json` for performance-critical behaviors.
-- Do not depend on downstream monitoring specs; derive measurement_method from available upstream artifacts.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Success metrics with units and targets for alignment with NFR targets
-- **03_glossary.json**: Metric names and canonical units for consistent NFR definitions
-- **04_fr_list.json**: Performance-critical behaviors requiring latency, throughput, or availability targets
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of NFRs by category (latency/throughput/availability/etc.), with metric→target→unit→measurement_method, stage, owner, and traces to FRs/APIs/components. Do not output it.
 - Align names/units with glossary; ensure measurement_method is practically measurable via dashboards/queries.
@@ -70,7 +57,7 @@ Before emitting, verify:
 - All `unit` values resolve to canonical units from `spec/03_glossary.json` or the canon registry — no invented units.
 - All `trace` entries reference valid IDs from `spec/00_charter.json` or `spec/04_functional_requirements.json`.
 - If any success metric cannot be expressed as a measurable NFR: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
