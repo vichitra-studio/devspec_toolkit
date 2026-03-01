@@ -1,4 +1,4 @@
-<review_prompt id="R9" layer="L3+L4" gaps="8,9,10,11,12,13,14,15" runs_after="R7,R8" priority="P0-critical">
+<review_prompt id="R9" layer="L3+L4" gaps="8,9,10,11,12,13,14,15,16,17" runs_after="R7,R8" priority="P0-critical">
 # Review R9: Validator & CI Enforcement Closure
 
 ## Scope
@@ -18,6 +18,8 @@ This review is the **third and final layer** of the 4-Layer Determinism Closure.
 | 13 | Forward replay is ID-only, no downstream content staleness detection | MED | L3 |
 | 14 | FR coverage metrics computed but no thresholds enforced | MED | L3 |
 | 15 | W→E promotion covers only 4 of ~15+ warning codes | MED | L4 |
+| 16 | `required_spec_inputs` incomplete — 4 steps are dead-end producers with zero downstream consumers despite active artifacts | CRITICAL | L3 |
+| 17 | `required_spec_inputs` and `extraction_intent` are hardcoded in `step_order.json` — error-prone during updates, no dynamic derivation | HIGH | L3 |
 
 ### Why R9 Runs Last
 
@@ -57,6 +59,111 @@ After R7 (prompts hardened) and R8 (schemas tightened), these semantic gaps rema
 | Downstream staleness | Schema is per-file, not cross-file temporal | Forward replay extension |
 | Coverage thresholds | Schema validates structure of matrix, not percentages | Threshold enforcement in matrix.py |
 | W→E promotion | Orthogonal to schema validation | Dynamic code pairing in validate.py |
+| `required_spec_inputs` completeness | step_order.json is config data, not schema-enforceable | New audit tooling + validator |
+| Hardcoded dependency metadata | step_order.json is manually maintained, drift-prone | Dynamic derivation from prompts/schemas |
+
+---
+
+## Gap 16+17: `required_spec_inputs` Completeness & Dynamic Derivation
+
+### Problem Statement (Surfaced During R7-Area12 Review)
+
+`step_order.json` contains `required_spec_inputs` and `extraction_intent` for each step. The prompt enricher uses this data to inject downstream consumer tables into prompts. However, this data is **manually maintained** and has **silently drifted** — 4 of 22 steps produce artifacts that no downstream step declares as a required input.
+
+### Evidence: Dead-End Producers
+
+| Step | Artifact | Expected Consumers | Actual Consumers | Impact |
+|------|----------|--------------------|------------------|--------|
+| 08 | `08_fixtures.json` | 12, 15, 16b, 16c | **0** | Fixture scenarios disconnected from CI gates, scaffold, and implementation |
+| 11 | `11_threat_model.json` | 12, 13, 16a, 16c | **0** | Security findings never flow into CI gates, extensions, or implementation review |
+| 12 | `12_ci_gates.json` | 16a, 16b, 16c | **0** | Gate definitions invisible to implementation steps that must satisfy them |
+| 15 | `15_scaffold.json` | 16, 16a, 16b | **0** | Scaffold blueprint ignored by all implementation steps |
+
+**Note**: Step 16c (`16c_impl_review.json`) also has zero consumers but is the terminal step — this is correct.
+
+### Cross-Reference: `allowed_upstream_dependencies` vs `required_spec_inputs`
+
+All 4 dead-end steps ARE listed in `allowed_upstream_dependencies` for downstream steps. The waterfall DAG structure recognizes them as valid upstreams, but no step's `required_spec_inputs` actually references their artifacts. This means:
+
+1. **Prompt enricher** reports "feeds no downstream steps" — AI sees these as isolated outputs
+2. **Forward replay** (`E550`) won't trigger re-validation of downstream steps when these artifacts change
+3. **Traceability matrix** has blind spots — fixture/threat/gate/scaffold coverage is unmeasured
+4. **extraction_intent** is absent for these linkages — even if `required_spec_inputs` were added, the "why" is missing
+
+### Root Cause: Hardcoded Metadata (Gap 17)
+
+`required_spec_inputs` and `extraction_intent` are manually written in `step_order.json`. This is error-prone because:
+
+1. **No validation** — nothing checks that every artifact appears as a `required_spec_input` in at least one downstream step (except terminal steps)
+2. **No derivation** — the data could be partially derived from prompt content (Field-by-Field sections reference upstream artifacts) and schema `$ref` chains
+3. **Silent drift** — when prompts are updated to reference new upstream artifacts, `step_order.json` is not automatically updated
+4. **Manual maintenance burden** — every new step or dependency change requires manual updates to 3 places: `allowed_upstream_dependencies`, `required_spec_inputs`, and `extraction_intent`
+
+### R9 Tasks for Gaps 16+17
+
+#### Phase 1: Audit (Gap 16)
+
+**Task 16-A**: Complete `required_spec_inputs` audit for all 22 steps.
+- For each step, cross-reference its prompt's Field-by-Field section against `required_spec_inputs`
+- Identify every upstream artifact referenced in the prompt but NOT in `required_spec_inputs`
+- Identify every `required_spec_inputs` entry with no corresponding `extraction_intent`
+- Produce a correction table: `| Step | Missing Input | extraction_intent | Source (prompt line) |`
+
+**Task 16-B**: Add missing `required_spec_inputs` and `extraction_intent` entries to `step_order.json`.
+- Steps 08→12, 08→15, 08→16b, 08→16c (fixtures)
+- Steps 11→12, 11→13, 11→16a, 11→16c (threat model)
+- Steps 12→16a, 12→16b, 12→16c (CI gates)
+- Steps 15→16, 15→16a, 15→16b (scaffold)
+- Each entry needs a specific `extraction_intent` explaining WHY the downstream step needs this artifact
+
+**Task 16-C**: Re-run `specdev prompt-enrich --repo-root .` after corrections.
+- Verify all 4 formerly dead-end steps now show downstream consumer tables
+- Verify `--dry-run` shows 0 stale prompts after enrichment
+- Run full test suite to confirm no regressions
+
+#### Phase 2: Tooling (Gap 17)
+
+**Task 17-A**: Evaluate dynamic derivation feasibility.
+- Can `required_spec_inputs` be derived from prompt Field-by-Field sections? (grep for `NN_name.json` references)
+- Can `extraction_intent` be derived from prompt sourcing instructions? (each field says "from X, extract Y")
+- Can `allowed_upstream_dependencies` be derived from `required_spec_inputs` transitively?
+- What is the minimal hardcoded data that CANNOT be derived?
+
+**Task 17-B**: Implement `specdev dag-lint` validator.
+- New CLI command: `specdev dag-lint --repo-root .`
+- Checks:
+  - Every non-terminal step's artifact appears in at least one downstream step's `required_spec_inputs` (E596)
+  - Every `required_spec_inputs` entry has a corresponding `extraction_intent` (E597)
+  - Every `extraction_intent` references an artifact that exists in `STEP_ARTIFACT_MAP` (E598)
+  - `required_spec_inputs` entries are a subset of `allowed_upstream_dependencies` (E599)
+  - No circular dependencies in the DAG
+- Warning codes for advisory checks:
+  - Prompt references upstream artifact not in `required_spec_inputs` (W596)
+  - `extraction_intent` text is vague (< 10 words or contains "relevant", "as needed") (W597)
+
+**Task 17-C**: Add `dag-lint` to pre-commit hook and CI pipeline.
+- Hook runs `dag-lint` when `step_order.json` or any prompt is modified
+- CI gate: `dag-lint` must pass before merge
+
+**Task 17-D**: Evaluate dynamic `required_spec_inputs` generation (stretch goal).
+- Prototype: scan prompt Field-by-Field sections for `NN_*.json` references
+- Compare derived inputs vs hardcoded inputs — measure accuracy
+- If accuracy ≥ 95%, propose replacing hardcoded data with dynamic derivation
+- If < 95%, document the irreducible manual maintenance surface
+
+### Acceptance Criteria (Gaps 16+17)
+
+| Check | Command | Expected |
+|-------|---------|----------|
+| No dead-end producers (except 16c) | `specdev dag-lint --repo-root .` | 0 errors |
+| All extraction_intent entries populated | `specdev dag-lint --repo-root .` | 0 E597 |
+| Enriched prompts reflect corrections | `specdev prompt-enrich --repo-root . --dry-run` | 0 modifications |
+| No stale "feeds no downstream steps" | `grep -r "feeds no" prompts/` | Only prompt_16c |
+| Full test suite passes | `pytest tests/ --tb=short -q` | 0 failures |
+
+### VALIDATION_GATES Completeness (Addendum to Gap 10)
+
+During this investigation, the VALIDATION_GATES enrichment was audited. Finding: gates are **dynamically assembled** from hardcoded lists in `prompt_enricher.py` (not per-prompt). 21 of 71 defined error codes are excluded from gate documentation. Most exclusions are intentional (canonical preflight codes, bootstrap errors, opt-in warnings), but this should be explicitly documented in the enricher source with rationale for each excluded code category.
 
 ---
 
@@ -70,7 +177,7 @@ After R7 (prompts hardened) and R8 (schemas tightened), these semantic gaps rema
 
 ### Subagent Assignment
 
-#### Phase 1 — Investigation (3 Explore subagents, launch together)
+#### Phase 1 — Investigation (4 Explore subagents, launch together)
 
 **Subagent A** (`Explore`, no isolation) — Cross-Step Integrity Audit:
 ```
@@ -168,11 +275,44 @@ Report:
 - CLI command inventory: | Command | Handler | Description |
 ```
 
+**Subagent D** (`Explore`, no isolation) — DAG Completeness & `required_spec_inputs` Audit:
+```
+Audit step_order.json required_spec_inputs completeness and evaluate dynamic derivation.
+
+1. DEAD-END PRODUCER AUDIT:
+   For each of the 22 steps, determine its artifact name from STEP_ARTIFACT_MAP.
+   Then scan ALL other steps' required_spec_inputs to count downstream consumers.
+   Produce table: | Step | Artifact | Consumer Count | Consumers | Dead-End? |
+   Expected dead-ends: 08, 11, 12, 15 (anomalous), 16c (terminal, correct).
+
+2. PROMPT CROSS-REFERENCE:
+   For each dead-end producer (08, 11, 12, 15), read its downstream steps' prompts.
+   Search for references to the artifact filename (e.g., "08_fixtures", "11_threat_model").
+   Determine: does the prompt ACTUALLY reference this artifact even though
+   required_spec_inputs omits it?
+   Produce table: | Dead-End Step | Downstream Prompt | References Artifact? | Prompt Line |
+
+3. DYNAMIC DERIVATION FEASIBILITY:
+   a. Read 5 prompts (04, 08, 11, 15, 16b) — focus on Field-by-Field sections.
+   b. For each field sourcing instruction, extract the upstream artifact reference.
+   c. Compare derived required_spec_inputs vs hardcoded — measure accuracy.
+   d. Assess: can extraction_intent be derived from prompt sourcing text?
+   e. What is the irreducible manual surface (data that CANNOT be derived)?
+
+4. CORRECTION TABLE:
+   For steps 08, 11, 12, 15 — propose specific required_spec_inputs additions
+   and extraction_intent text for each missing link.
+   Format: | From Step | To Step | Artifact | Proposed extraction_intent |
+
+Report: dead-end table, prompt cross-reference, derivation feasibility assessment,
+correction table with proposed extraction_intent values.
+```
+
 #### Phase 2 — Implementation (after Phase 1, sequential by dependency)
 
 **P0 — Error Codes First (everything else references them)**
 
-**Subagent D** (`general-purpose`, isolation: `worktree`) — New error codes:
+**Subagent E** (`general-purpose`, isolation: `worktree`) — New error codes:
 ```
 Add new error/warning codes to tools/specdev_tools/core/errors.py.
 
@@ -200,6 +340,12 @@ New codes to add (using AVAILABLE code numbers — verify no conflicts):
   (heuristic check — W594 by default, E594 exists for optional promotion)
 - E595 / W595: DOWNSTREAM_STALE — upstream content changed but downstream doesn't reflect changes
   (advisory — W595 by default, E595 exists for optional promotion)
+- E596 / W596: DAG_DEAD_END_PRODUCER — non-terminal step's artifact has zero downstream consumers
+  in required_spec_inputs (E596 for confirmed dead-ends, W596 for prompt-references-but-not-declared)
+- E597 / W597: EXTRACTION_INTENT_MISSING — required_spec_inputs entry has no corresponding
+  extraction_intent (E597 hard error, W597 for vague intent < 10 words)
+- E598: EXTRACTION_INTENT_INVALID_REF — extraction_intent references artifact not in STEP_ARTIFACT_MAP
+- E599: DAG_INPUTS_OUTSIDE_ALLOWED — required_spec_inputs entry not in allowed_upstream_dependencies
 
 EVERY new W-code MUST have a corresponding E-code to enable dynamic W→E promotion.
 Even heuristic checks (W594, W595) get E-code pairs — the E-code exists for promotion,
@@ -212,7 +358,7 @@ After changes: pytest tests/ -k error -v (or relevant error code tests)
 
 **P0 — Cross-Step Referential Integrity (8 validators)**
 
-**Subagent E** (`general-purpose`, isolation: `worktree`) — Cross-step checks for steps 05, 06, 08, 09:
+**Subagent F** (`general-purpose`, isolation: `worktree`) — Cross-step checks for steps 05, 06, 08, 09:
 ```
 Add cross-step ID validation to 4 validators that currently have none.
 
@@ -235,11 +381,11 @@ Add cross-step checks WITHOUT removing existing validation logic.
 After changes: pytest tests/ -k "step_05 or step_06 or step_08 or step_09" -v
 ```
 
-**Subagent F** (`general-purpose`, isolation: `worktree`) — Cross-step checks for steps 12, 13, 13a, 15:
+**Subagent G** (`general-purpose`, isolation: `worktree`) — Cross-step checks for steps 12, 13, 13a, 15:
 ```
 Add cross-step ID validation to 4 more validators.
 
-Same pattern as Subagent E:
+Same pattern as Subagent F:
 
 - step_12.py (ci_gates): references FR IDs, NFR IDs from upstream steps
 - step_13.py (extension_generator): references governance labels from step 10
@@ -258,7 +404,7 @@ W590 for missing upstream files, E590 for unresolved IDs.
 After changes: pytest tests/ -k "step_12 or step_13 or step_13a or step_15" -v
 ```
 
-**Subagent G** (`general-purpose`, isolation: `worktree`) — extraction_intent validator:
+**Subagent H** (`general-purpose`, isolation: `worktree`) — extraction_intent validator:
 ```
 Create a new extraction_intent field-presence validator.
 
@@ -283,7 +429,7 @@ After changes: pytest tests/ -v (create new test file tests/test_extraction_inte
 
 **P1 — Semantic Quality Hardening**
 
-**Subagent H** (`general-purpose`, isolation: `worktree`) — Vague language scanner expansion:
+**Subagent I** (`general-purpose`, isolation: `worktree`) — Vague language scanner expansion:
 ```
 Expand spec_quality_lint.py to scan ALL free-text fields, not just assumptions.
 
@@ -301,7 +447,7 @@ Expand spec_quality_lint.py to scan ALL free-text fields, not just assumptions.
 After changes: pytest tests/ -k quality -v
 ```
 
-**Subagent I** (`general-purpose`, isolation: `worktree`) — Content derivation check:
+**Subagent J** (`general-purpose`, isolation: `worktree`) — Content derivation check:
 ```
 Add content derivation checking to hallucination_lint.py.
 
@@ -323,7 +469,7 @@ Add content derivation checking to hallucination_lint.py.
 After changes: pytest tests/ -k hallucination -v
 ```
 
-**Subagent J** (`general-purpose`, isolation: `worktree`) — Forward replay staleness detection:
+**Subagent K** (`general-purpose`, isolation: `worktree`) — Forward replay staleness detection:
 ```
 Extend forward_replay_check.py to detect downstream content staleness.
 
@@ -338,7 +484,7 @@ Extend forward_replay_check.py to detect downstream content staleness.
 After changes: pytest tests/ -k replay -v
 ```
 
-**Subagent K** (`general-purpose`, isolation: `worktree`) — Coverage threshold enforcement:
+**Subagent L** (`general-purpose`, isolation: `worktree`) — Coverage threshold enforcement:
 ```
 Add configurable threshold enforcement to matrix.py.
 
@@ -355,7 +501,7 @@ After changes: pytest tests/ -k matrix -v
 
 **P1 — CI Enforcement Closure**
 
-**Subagent L** (`general-purpose`, isolation: `worktree`) — Dynamic W→E promotion:
+**Subagent M** (`general-purpose`, isolation: `worktree`) — Dynamic W→E promotion:
 ```
 Generalize W→E promotion in validate.py.
 
@@ -372,7 +518,7 @@ Generalize W→E promotion in validate.py.
 After changes: pytest tests/ -k validate -v
 ```
 
-**Subagent M** (`general-purpose`, isolation: `worktree`) — env-check diagnostic command:
+**Subagent N** (`general-purpose`, isolation: `worktree`) — env-check diagnostic command:
 ```
 Add a read-only `specdev env-check` diagnostic command.
 
@@ -391,7 +537,7 @@ After changes: run the command to verify output, pytest tests/ -k cli -v
 
 **P2 — Documentation**
 
-**Subagent N** (`general-purpose`, isolation: `worktree`) — Error code documentation:
+**Subagent O** (`general-purpose`, isolation: `worktree`) — Error code documentation:
 ```
 Create/update docs/developers/error-codes.md with complete error code documentation.
 
@@ -413,7 +559,7 @@ Create/update docs/developers/error-codes.md with complete error code documentat
 After changes: verify no broken links
 ```
 
-**Subagent O** (`general-purpose`, isolation: `worktree`) — Instruction coverage map:
+**Subagent P** (`general-purpose`, isolation: `worktree`) — Instruction coverage map:
 ```
 Create docs/instruction_coverage_map.md documenting the L1→L2→L3 enforcement chain.
 
@@ -430,7 +576,7 @@ the enforcement chain.
 
 #### Phase 3 — Integration Test Run
 
-**Subagent P** (`general-purpose`, no isolation) — Full integration verification:
+**Subagent Q** (`general-purpose`, no isolation) — Full integration verification:
 ```
 Run the complete validation suite:
 
@@ -451,13 +597,22 @@ Test with promotion:
 10. ./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit
     (expect: diagnostic output, no errors)
 
+11. ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
+    (expect: zero E596-E599 errors — all artifacts consumed, all intents populated)
+
+12. ./tools/run_specdev.sh prompt-enrich --repo-root . --dry-run
+    (expect: 0 modifications — all prompts reflect corrected required_spec_inputs)
+
+13. grep -r "feeds no" prompts/
+    (expect: only prompt_16c — all other dead-ends resolved)
+
 All must pass (except promotion tests which may show expected warnings-as-errors).
 Report any failures with exact error messages.
 ```
 
 #### Phase 4 — Self-Verification
 
-**Subagent Q** (`Explore`, no isolation) — Verify R9 goals met:
+**Subagent R** (`Explore`, no isolation) — Verify R9 goals met:
 ```
 After all implementation is complete, verify measurable goals:
 
@@ -489,7 +644,7 @@ Report: per-goal pass/fail.
 
 #### Phase 5 — Findings Report
 
-**Subagent R** (`general-purpose`, no isolation) — Write findings:
+**Subagent S** (`general-purpose`, no isolation) — Write findings:
 ```
 Write findings to docs/audit/findings/r9_findings.md using compact table format.
 
@@ -538,6 +693,9 @@ Include a FINAL CLOSURE SUMMARY:
 | `SPECDEV_WARNINGS_AS_ERRORS=1` coverage | partial | **100%** |
 | `env-check` diagnostic command | absent | **present** |
 | Instruction coverage map | absent | **documented for high-impact steps** |
+| Dead-end producers (excl. terminal 16c) | 4 (steps 08, 11, 12, 15) | **0** — all artifacts consumed by downstream |
+| `required_spec_inputs` ↔ `extraction_intent` alignment | unchecked | **enforced by `dag-lint`** (E596-E599) |
+| DAG completeness validation | absent | **`specdev dag-lint` in CI + pre-commit** |
 
 ---
 
@@ -572,7 +730,8 @@ After R9 completes, the entire 4-layer model must be verified:
 1. L1 (Prompts):  Every prompt covers 100% of schema fields with sourcing ✓ (R7)
 2. L2 (Schemas):  Every required[] matches prompts, zero rejection bugs ✓ (R8)
 3. L3 (Validators): Cross-step IDs, content derivation, vague scanning ✓ (R9)
-4. L4 (CI Gates): Dynamic W→E promotion, 100% coverage ✓ (R9)
+4. L3 (DAG):      Every non-terminal artifact consumed downstream, dag-lint enforced ✓ (R9)
+5. L4 (CI Gates): Dynamic W→E promotion, 100% coverage ✓ (R9)
 
 Final command:
 SPECDEV_WARNINGS_AS_ERRORS=1 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit

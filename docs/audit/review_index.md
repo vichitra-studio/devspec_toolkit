@@ -175,6 +175,8 @@ R1-R6 fixed structural issues. R7-R9 close **semantic gaps** across the 4-layer 
 | 13 | Forward replay is ID-only | MED | L3 | R9 |
 | 14 | Coverage metrics have no thresholds | MED | L3 | R9 |
 | 15 | W→E promotion covers only 4 codes | MED | L4 | R9 |
+| 16 | `required_spec_inputs` incomplete — 4 dead-end producers (08, 11, 12, 15) | CRITICAL | L3 | R9 |
+| 17 | Dependency metadata hardcoded in step_order.json — no dynamic derivation or enforcement | HIGH | L3 | R9 |
 
 ### Cascade Order
 
