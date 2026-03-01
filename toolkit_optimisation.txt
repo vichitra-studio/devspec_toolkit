@@ -3065,3 +3065,63 @@ Category D: Tests (3 files) → extend + add new
 
   OPEN: json_utils.py location — deferred to Phase A
   OPEN: Category B hardcoded strings — deferred to post-Phase 0
+
+═══════════════════════════════════════════════════════════════════════════
+  IMPLEMENTATION STATUS — Session 2026-03-01 (Post-Review)
+═══════════════════════════════════════════════════════════════════════════
+
+  Completed This Session:
+
+  G5: Prompt sanitization — DONE
+      Removed "Context To Ingest" + "Extraction Intent" from 16 prompt
+      files (05–16c). Updated Self-Audit checklist refs. Steps 00-04
+      preserved. 578 tests pass.
+
+  G6: Documentation — DONE
+      Created docs/architecture/governance_architecture.md (7 sections).
+      Reviewed and corrected: line refs, consumer count (6→10), phantom
+      element removed, cross_artifact_checks.py coverage added.
+
+  OPT-001: Extension handling bug — DONE
+      Fixed matrix.py extension indexing: any() across all artifacts →
+      check current artifact only. No regressions.
+
+  OPT-002: validate_trace_integrity() refactor — DONE
+      Extracted step-specific checks into cross_artifact_checks.py.
+      5 exported functions. validate_trace_integrity() reduced from
+      ~200 to ~40 lines. Error message format preserved. 578 tests pass.
+
+  OPT-003: Business rule trace-type constants — DONE
+      7 files: 12+ hardcoded strings → named frozenset constants with
+      business rule docs + canon drift detection via warnings.warn().
+      Runtime assertion in fixtures_lint.py for pool/frozenset sync.
+      normalize_trace_type added to step_02.py for consistency.
+
+  Canon gaps closed:
+      charter-goal and glossary added to canon/kinds/trace_type.json
+      and canon/manifest.json. Import-time warnings resolved.
+
+  ─────────────────────────────────────────────────────────────────────────
+  Remaining Work
+  ─────────────────────────────────────────────────────────────────────────
+
+  Phase A — Context Package (NEXT, fully unblocked):
+    A1. __init__.py — package init, public API exports
+    A2. structure.py — lightweight orientation (step metadata, shapes)
+    A3. scope_resolver.py — graph walk: entry ID → full ID set
+    A4. extractor.py — dynamic payload discovery + scoped extraction
+    A5. reviewer.py — two-pass review (structural + semantic pairs)
+    A6. freshness.py — detect stale seed indexes (hash comparison)
+
+  Phase B — Skills + Hooks (blocked on Phase A):
+    B1. /specdev-step skill
+    B2. /specdev-validate skill
+    B3. /specdev-review skill
+    B4. Post-edit hooks for spec/*.json
+    B5. /specdev-pipeline skill (orchestration)
+
+  Phase C — CLAUDE.md + Repo Docs (can proceed in parallel):
+    C1. Pipeline graph awareness
+    C2. Token budget guidance
+
+  OPT-004: json_utils.py location — deferred to Phase A

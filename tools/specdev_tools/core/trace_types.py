@@ -30,8 +30,8 @@ def _load_from_canon() -> tuple[tuple[str, ...], dict[str, str]]:
 
 
 _FALLBACK_TYPES: tuple[str, ...] = (
-    "api", "capability", "component", "doc", "fixture",
-    "fr", "invariant", "nfr", "threat",
+    "api", "capability", "charter-goal", "component", "doc", "fixture",
+    "fr", "glossary", "invariant", "nfr", "threat",
 )
 _FALLBACK_ALIASES: dict[str, str] = {"inv": "invariant"}
 

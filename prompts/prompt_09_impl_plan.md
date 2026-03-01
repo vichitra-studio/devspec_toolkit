@@ -29,22 +29,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- Charter `spec/00_charter.json` (goals/risks), System Sketch `spec/02_system_sketch.json` (components/dependencies).
-- Capabilities `spec/01_capabilities.json` (approved languages/frameworks) - **CRITICAL**: You must strictly adhere to this allowed stack.
-- FRs/APIs `spec/04_fr_list.json`/`spec/05_interface_contracts.json` for scope; NFRs `spec/07_nfrs.json` for performance/reliability constraints.
-- Use governance/CI expectations from upstream charter constraints and governance specs; do not depend on downstream specs.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Goals, risks, and constraints for milestone planning and risk assessment
-- **01_capabilities.json**: Approved languages/frameworks for tech_stack; capability IDs for milestone scope
-- **02_system_sketch.json**: Component IDs and dependencies for architecture decisions and sequencing
-- **04_fr_list.json / 05_interface_contracts.json**: FR and API scope for milestone deliverables
-- **07_nfrs.json**: Performance/reliability constraints influencing technology choices and spike planning
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Plan Ledger: tech_stack (language/framework/db/tooling + versions), milestones (id/name/date/risks/spikes), migration plan (if replacing), dependencies (teams/vendors/apis). Do not output it.
 - **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless explicitly justified as a Spike.
@@ -74,7 +58,7 @@ Before emitting, verify:
 - Every charter constraint in `spec/00_charter.json` (`constraints`, `risks`) is addressed in milestones, risks, or migration plan.
 - All dependencies between milestones are explicit — no implicit ordering assumptions.
 - If any capability has unclear implementation path: add a gap question (Clarify mode) rather than deferring silently.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

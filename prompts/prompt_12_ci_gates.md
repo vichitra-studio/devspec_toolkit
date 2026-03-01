@@ -29,17 +29,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
-## Context To Ingest
-- Delivery Baseline `spec/02a_delivery_baseline.json` for environments and required gates.
-- Governance `spec/10_governance.json` for policies; existing CI configs if present.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **02a_delivery_baseline.json**: Environment definitions and required CI gate names for job creation
-- **10_governance.json**: PR rules and validation commands that must be implemented as CI job steps
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private CI Ledger: list jobs (id/name), dependencies (`requires`), steps (validators/commands), and optional coverage thresholds. Do not output it.
 - Ensure core validations (schema, fixtures-lint, matrix, invariants, governance) appear in appropriate jobs.
@@ -67,7 +56,7 @@ Before emitting, verify:
 - Every environment stage (`dev`, `ci`, `staging`, `prod`) in the delivery baseline has coverage from ≥1 CI job.
 - All `requires` dependencies between jobs form a valid DAG — no circular dependencies.
 - If any required gate cannot be expressed as a CI job: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

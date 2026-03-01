@@ -1,7 +1,28 @@
 
 from __future__ import annotations
-import os, json
-from ..core.trace_types import normalize_trace_type
+import os, json, warnings
+from ..core.trace_types import is_valid_trace_type, normalize_trace_type
+
+# ---------------------------------------------------------------------------
+# Business-rule trace-type sets for fixture target cross-referencing
+# ---------------------------------------------------------------------------
+
+# Business rule: fixtures validate concrete, testable artifacts.
+# Each trace type listed here triggers a cross-reference check against the
+# corresponding spec file (api -> 05, fr -> 04, invariant -> 06, nfr -> 07).
+# Rationale: only these four artifact kinds have well-defined fixture
+# semantics (input/expected pairs). Other trace types (doc, capability,
+# component, threat) do not carry fixture-testable contracts.
+_FIXTURE_CROSS_REF_TYPES: frozenset[str] = frozenset({"api", "fr", "invariant", "nfr"})
+
+_invalid_fixture_types = {t for t in _FIXTURE_CROSS_REF_TYPES if not is_valid_trace_type(t)}
+if _invalid_fixture_types:
+    warnings.warn(
+        f"fixtures_lint: _FIXTURE_CROSS_REF_TYPES contains unknown canon trace types: "
+        f"{_invalid_fixture_types}",
+        stacklevel=1,
+    )
+
 
 def lint_fixtures(spec_dir: str) -> list[str]:
     errors = []
@@ -42,20 +63,28 @@ def lint_fixtures(spec_dir: str) -> list[str]:
         if not targets:
             errors.append(f"{fid}: missing targets")
             continue
+        # Map each cross-referenceable trace type to (id_pool, display_label).
+        # Keys must stay in sync with _FIXTURE_CROSS_REF_TYPES (asserted below).
+        _cross_ref_pools = {
+            "api": (apis, "API"),
+            "fr": (frs, "FR"),
+            "invariant": (invariants, "Invariant"),
+            "nfr": (nfrs, "NFR"),
+        }
+        assert set(_cross_ref_pools.keys()) == _FIXTURE_CROSS_REF_TYPES, (
+            "cross_ref_pools keys must match _FIXTURE_CROSS_REF_TYPES"
+        )
         for t in targets:
             # Check if target is a proper traceRef object before accessing its properties
             if isinstance(t, dict):
                 tid = t.get("id", "")
-                ttype = t.get("type", "")
-                
-                if ttype == "api" and tid not in apis:
-                    errors.append(f"{fid}: targets unknown API '{tid}'")
-                elif ttype == "fr" and tid not in frs:
-                    errors.append(f"{fid}: targets unknown FR '{tid}'")
-                elif normalize_trace_type(ttype) == "invariant" and tid not in invariants:
-                    errors.append(f"{fid}: targets unknown Invariant '{tid}'")
-                elif ttype == "nfr" and tid not in nfrs:
-                    errors.append(f"{fid}: targets unknown NFR '{tid}'")
+                ttype = normalize_trace_type(t.get("type", ""))
+
+                pool_entry = _cross_ref_pools.get(ttype)
+                if pool_entry is not None:
+                    pool, label = pool_entry
+                    if tid not in pool:
+                        errors.append(f"{fid}: targets unknown {label} '{tid}'")
         expected = fx.get("expected")
         if "input" not in fx or expected is None:
             errors.append(f"{fid}: missing input/expected")

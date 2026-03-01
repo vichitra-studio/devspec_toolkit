@@ -30,12 +30,6 @@ You output the final version of the JSON, populating the `review` section.
 - **Output Artifact:** A modified version of the input JSON, sorted into `spec/impl_context/{step_id}.json`.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **spec/impl_context/{step_id}.json (Plan + Execution)**: Checklist items, implementation evidence, and execution results for audit
-- **Actual codebase**: Source files for verification that implementation matches plan
-- **plan.review_requirements.test_commands**: Test commands to verify against execution results
-
 Before marking a milestone complete, verify all deliverables listed in `14_roadmap.json` for that milestone are satisfied by `execution_results`. A milestone with unverified deliverables MUST NOT be marked `done`.
 
 ## Crucial Side Effect (Roadmap Sync)
@@ -249,7 +243,7 @@ Before emitting, verify:
 - Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
 - No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
 - If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

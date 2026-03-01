@@ -34,24 +34,6 @@ You are a senior software architect producing the Step 16 **Trinity Anchor**.
 Generate a **machine‑checkable JSON artifact** that captures the plan,
 implementation checklist, and review expectations for the *current* execution cycle.
 
-# Context To Ingest
-- **Roadmap**: Step sequencing and current milestone selection from `spec/14_roadmap.json`.
-- **Implementation Plan**: Tech stack and constraints from `spec/09_impl_plan.json`.
-- **Core Specs**: Relevant FRs (04), APIs (05), Invariants (06), NFRs (07), Fixtures (08).
-- **Active Impl Contexts**: Enumerate any active files in `spec/impl_context/` (16a/b/c).
-- **Documentation Map**: `README.md` and `docs/README.md` for current doc surface.
-- **Guide**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **14_roadmap.json**: Current milestone scope, task IDs, and sequencing for checklist creation
-- **09_impl_plan.json**: Tech stack and constraints for solution architecture
-- **04_fr_list.json**: FR IDs and acceptance criteria for checklist spec_ref bindings
-- **05_interface_contracts.json**: API IDs for checklist items covering endpoint implementation
-- **06_invariants.json**: Invariant IDs for validation checklist items
-- **07_nfrs.json**: NFR IDs for performance and reliability checklist items
-- **Active impl contexts** (`spec/impl_context/*.json`): Existing milestone context for drift detection
-
 # Operating Flow (MANDATORY)
 1. **Context Review**: Ingest required upstream spec artifacts.
 2. **Scope**: Identify the exact execution scope for the current cycle.
@@ -183,7 +165,7 @@ Before emitting, verify:
 - Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
 - No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
 - If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

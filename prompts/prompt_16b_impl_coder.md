@@ -36,13 +36,6 @@ Instead of outputting code directly to the user, you:
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
 
-### Extraction Intent
-From `14_roadmap.json`: Extract the active `milestone_id` and its deliverables list. Each execution result should include `milestone_ref` to trace back to the roadmap milestone.
-
-For each upstream artifact ingested, extract the following:
-- **spec/impl_context/{step_id}.json (The Plan)**: Checklist items with implementation actions, target file patterns, and test expectations
-- **plan.context.coding_examples**: Ground-truth code patterns for implementation style
-- **plan.review_requirements.test_commands**: Commands to execute for verification evidence
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -197,7 +190,7 @@ Before emitting, verify:
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
 - No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
 - If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

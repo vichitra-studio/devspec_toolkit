@@ -1,8 +1,10 @@
 import json
 import os
+import warnings
 from typing import Optional, Set
 from jsonschema import Draft202012Validator
 from ...core.registry import SchemaRegistry
+from ...core.trace_types import is_valid_trace_type, normalize_trace_type
 
 def check_component_ids(components: list[dict]) -> list[str]:
     errors = []
@@ -62,21 +64,48 @@ def check_external_trust_boundaries(components: list[dict], connections: list[di
             )
     return errors
 
+# ---------------------------------------------------------------------------
+# Business-rule trace-type constant
+# ---------------------------------------------------------------------------
+
+# Business rule: component capability coverage accepts "doc" and "capability"
+# trace types.
+# Rationale: when a system-sketch component (Step 02) traces to a capability
+# ID (from Step 01), it may use type "doc" (legacy convention: the component
+# *documents* the capability) or type "capability" (explicit trace).  Both
+# are accepted for backwards compatibility.  Mirrors the identical constant
+# in cross_artifact_checks.py so the per-file validator and the matrix check
+# agree on what is valid.
+_CAPABILITY_COVERAGE_TYPES: frozenset[str] = frozenset({"doc", "capability"})
+
+_invalid_capability_types = {t for t in _CAPABILITY_COVERAGE_TYPES if not is_valid_trace_type(t)}
+if _invalid_capability_types:
+    warnings.warn(
+        f"step_02: _CAPABILITY_COVERAGE_TYPES contains unknown canon trace types: "
+        f"{_invalid_capability_types}",
+        stacklevel=1,
+    )
+
+
 def check_capability_coverage(components: list[dict], capability_ids: set[str]) -> list[str]:
     if not capability_ids:
         return []
     traced = set()
     errors = []
+    accepted = sorted(_CAPABILITY_COVERAGE_TYPES)
     for comp in components:
-        for trace in comp.get("trace", []):
+        traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])
+        for trace in traces:
             trace_id = trace.get("id")
-            trace_type = trace.get("type")
+            trace_type = normalize_trace_type(trace.get("type", ""))
             if not trace_id:
                 continue
-            if trace_type == "doc":
+            if trace_type in _CAPABILITY_COVERAGE_TYPES:
                 traced.add(trace_id)
             elif trace_id in capability_ids:
-                errors.append(f"Capability trace must use type 'doc': {trace_id}")
+                errors.append(
+                    f"Capability trace must use one of {accepted}: {trace_id}"
+                )
     missing = sorted(capability_ids - traced)
     if missing:
         errors.append(f"Missing capability coverage: {', '.join(missing)}")

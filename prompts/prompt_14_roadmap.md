@@ -33,23 +33,6 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
 
-## Context To Ingest
-- Core Specs: `spec/00_charter.json` through `spec/12_ci_gates.json`.
-- Extension Manifest: `spec/13_extension_manifest.json`.
-- Extension Specs: All `spec/ext_*.json` files defined in the manifest.
-- Charter: `spec/00_charter.json` for strategic goals.
-- Completeness: `spec/13a_completeness_assessment.json`.
-- Guide: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
-
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Strategic goals and success metrics for milestone alignment
-- **09_impl_plan.json**: Tech stack decisions and milestone IDs for `source_milestones` binding
-- **13_extension_manifest.json**: Extension IDs and areas of concern for scheduling extension work
-- **13a_completeness_assessment.json**: High-priority missing elements to schedule as remediation milestones
-- **04_fr_list.json**: FR IDs for `fr_refs` binding on milestones
-- **01_capabilities.json**: Capability IDs for `capability_refs` binding on milestones
-
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
 - **Ingest**: Scan all `spec/` artifacts (Steps 00-13) to understand the complete scope.
 - **Synthesize**: Identify every distinct feature, capability, and dependency across all specs.
@@ -69,11 +52,11 @@ For each upstream artifact ingested, extract the following:
 
 ### Coverage Closure
 Before emitting, verify:
-- Every upstream requirement referenced in "Context To Ingest" is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
+- Every upstream requirement from ingested context is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
 - No upstream capability, FR, or milestone ID is silently dropped.
 - All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
 - If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)

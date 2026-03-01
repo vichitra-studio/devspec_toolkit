@@ -100,7 +100,7 @@ Before writing formal specs, you must define the "Seed" of your project using th
 1. Locate the matching prompt in [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
-   - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
+   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” for seed-phase prompts 00–04; “Coverage Closure” for Steps 05–16c), and outputs only a short bulleted list of targeted questions if critical info is missing.
    - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
 4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
