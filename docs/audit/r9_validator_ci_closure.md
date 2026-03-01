@@ -1,4 +1,4 @@
-<review_prompt id="R9" layer="L3+L4" gaps="8,9,10,11,12,13,14,15,16,17" runs_after="R7,R8" priority="P0-critical">
+<review_prompt id="R9" layer="L3+L4" gaps="8,9,10,11,12,13,14,15,16,17,18" runs_after="R7,R8" priority="P0-critical">
 # Review R9: Validator & CI Enforcement Closure
 
 ## Scope
@@ -12,14 +12,15 @@ This review is the **third and final layer** of the 4-Layer Determinism Closure.
 |---|-----|----------|-------|
 | 8 | 8 of 16 validators have zero cross-step ID validation | CRITICAL | L3 |
 | 9 | Content propagation absent — zero checks downstream content relates to upstream | CRITICAL | L3 |
-| 10 | `extraction_intent` in step_order.json is inert — no validator reads it | HIGH | L3 |
+| 10 | **RESOLVED** — `extraction_intent` was removed from `step_order.json` per `toolkit_optimisation.txt`. Extraction intent is now inline in all 22 prompts as `### Extraction Intent` sections. Remaining gap: validate that each prompt's `### Extraction Intent` section covers all entries in `allowed_upstream_dependencies` | HIGH | L3 |
 | 11 | Vague language scanning only covers `assumptions`, not free-text fields | HIGH | L3 |
 | 12 | hallucination_lint checks enum/ID only, not content derivation | HIGH | L3 |
 | 13 | Forward replay is ID-only, no downstream content staleness detection | MED | L3 |
 | 14 | FR coverage metrics computed but no thresholds enforced | MED | L3 |
 | 15 | W→E promotion covers only 4 of ~15+ warning codes | MED | L4 |
-| 16 | `required_spec_inputs` incomplete — 4 steps are dead-end producers with zero downstream consumers despite active artifacts | CRITICAL | L3 |
-| 17 | `required_spec_inputs` and `extraction_intent` are hardcoded in `step_order.json` — error-prone during updates, no dynamic derivation | HIGH | L3 |
+| 16 | `downstream_consumers` incomplete — 4 steps are dead-end producers with zero downstream consumers in `allowed_upstream_dependencies` despite active artifacts | CRITICAL | L3 |
+| 17 | `allowed_upstream_dependencies` and `downstream_consumers` are hardcoded in `step_order.json`; `### Extraction Intent` sections are inline in prompts — error-prone during updates, no dynamic derivation or cross-validation | HIGH | L3 |
+| 18 | **SUPERSEDED** — `specdev prompt-enrich` proposed but conflicts with locked architectural direction from `toolkit_optimisation.txt`. Context delivery is the runtime context package's job (scope_resolver.py, extractor.py), not build-time static prompt injection. Deferred to runtime context package implementation. | DEFERRED | L4 |
 
 ### Why R9 Runs Last
 
@@ -53,22 +54,22 @@ After R7 (prompts hardened) and R8 (schemas tightened), these semantic gaps rema
 |-----|----------------------------|--------------------|
 | Cross-step ID references | Schema validates structure, not cross-file references | Load upstream file, resolve IDs |
 | Content propagation | Schema validates types, not semantic derivation | Token co-occurrence check |
-| extraction_intent | Metadata in step_order.json, not in schema | New validator reads intent metadata |
+| extraction_intent | Now inline in prompts as `### Extraction Intent` sections (removed from step_order.json) | Validator checks prompt `### Extraction Intent` sections cover all `allowed_upstream_dependencies` |
 | Vague language in free-text | Schema validates string type, not content quality | Regex scan on all free-text fields |
 | Content-based hallucination | Schema validates enum/ID, not content origin | Token overlap with upstream |
 | Downstream staleness | Schema is per-file, not cross-file temporal | Forward replay extension |
 | Coverage thresholds | Schema validates structure of matrix, not percentages | Threshold enforcement in matrix.py |
 | W→E promotion | Orthogonal to schema validation | Dynamic code pairing in validate.py |
-| `required_spec_inputs` completeness | step_order.json is config data, not schema-enforceable | New audit tooling + validator |
-| Hardcoded dependency metadata | step_order.json is manually maintained, drift-prone | Dynamic derivation from prompts/schemas |
+| `downstream_consumers` completeness | step_order.json is config data, not schema-enforceable | New audit tooling + validator using `downstream_consumers` and `allowed_upstream_dependencies` |
+| Hardcoded dependency metadata | step_order.json (`allowed_upstream_dependencies`, `downstream_consumers`) and inline prompt `### Extraction Intent` sections are manually maintained, drift-prone | Dynamic derivation from prompts/schemas; cross-validation between DAG fields and prompt extraction intent sections |
 
 ---
 
-## Gap 16+17: `required_spec_inputs` Completeness & Dynamic Derivation
+## Gap 16+17: `downstream_consumers` Completeness & Dynamic Derivation
 
 ### Problem Statement (Surfaced During R7-Area12 Review)
 
-`step_order.json` contains `required_spec_inputs` and `extraction_intent` for each step. The prompt enricher uses this data to inject downstream consumer tables into prompts. However, this data is **manually maintained** and has **silently drifted** — 4 of 22 steps produce artifacts that no downstream step declares as a required input.
+`step_order.json` contains `allowed_upstream_dependencies` and `downstream_consumers` for each step. Extraction intent is now inline in prompts as `### Extraction Intent` sections (previously in `step_order.json`, removed per `toolkit_optimisation.txt`). This data is **manually maintained** and has **silently drifted** — 4 of 22 steps produce artifacts that no downstream step declares as a consumer.
 
 ### Evidence: Dead-End Producers
 
@@ -81,74 +82,74 @@ After R7 (prompts hardened) and R8 (schemas tightened), these semantic gaps rema
 
 **Note**: Step 16c (`16c_impl_review.json`) also has zero consumers but is the terminal step — this is correct.
 
-### Cross-Reference: `allowed_upstream_dependencies` vs `required_spec_inputs`
+### Cross-Reference: `allowed_upstream_dependencies` vs `downstream_consumers`
 
-All 4 dead-end steps ARE listed in `allowed_upstream_dependencies` for downstream steps. The waterfall DAG structure recognizes them as valid upstreams, but no step's `required_spec_inputs` actually references their artifacts. This means:
+All 4 dead-end steps ARE listed in `allowed_upstream_dependencies` for downstream steps. The waterfall DAG structure recognizes them as valid upstreams, but no step's `downstream_consumers` actually references their artifacts. This means:
 
-1. **Prompt enricher** reports "feeds no downstream steps" — AI sees these as isolated outputs
-2. **Forward replay** (`E550`) won't trigger re-validation of downstream steps when these artifacts change
-3. **Traceability matrix** has blind spots — fixture/threat/gate/scaffold coverage is unmeasured
-4. **extraction_intent** is absent for these linkages — even if `required_spec_inputs` were added, the "why" is missing
+1. **Forward replay** (`E550`) won't trigger re-validation of downstream steps when these artifacts change
+2. **Traceability matrix** has blind spots — fixture/threat/gate/scaffold coverage is unmeasured
+3. **`### Extraction Intent`** sections in downstream prompts may not reference these linkages — even if `downstream_consumers` were corrected, the "why" may be missing from the inline prompt sections
 
 ### Root Cause: Hardcoded Metadata (Gap 17)
 
-`required_spec_inputs` and `extraction_intent` are manually written in `step_order.json`. This is error-prone because:
+`allowed_upstream_dependencies` and `downstream_consumers` are manually written in `step_order.json`. `### Extraction Intent` sections are manually maintained inline in each prompt. This is error-prone because:
 
-1. **No validation** — nothing checks that every artifact appears as a `required_spec_input` in at least one downstream step (except terminal steps)
+1. **No validation** — nothing checks that every artifact appears in at least one downstream step's `downstream_consumers` (except terminal steps)
 2. **No derivation** — the data could be partially derived from prompt content (Field-by-Field sections reference upstream artifacts) and schema `$ref` chains
-3. **Silent drift** — when prompts are updated to reference new upstream artifacts, `step_order.json` is not automatically updated
-4. **Manual maintenance burden** — every new step or dependency change requires manual updates to 3 places: `allowed_upstream_dependencies`, `required_spec_inputs`, and `extraction_intent`
+3. **Silent drift** — when prompts are updated to reference new upstream artifacts, `step_order.json` is not automatically updated, and `### Extraction Intent` sections may not be updated either
+4. **Manual maintenance burden** — every new step or dependency change requires manual updates to 2 places in `step_order.json` (`allowed_upstream_dependencies`, `downstream_consumers`) plus the inline `### Extraction Intent` section in the prompt
 
 ### R9 Tasks for Gaps 16+17
 
 #### Phase 1: Audit (Gap 16)
 
-**Task 16-A**: Complete `required_spec_inputs` audit for all 22 steps.
-- For each step, cross-reference its prompt's Field-by-Field section against `required_spec_inputs`
-- Identify every upstream artifact referenced in the prompt but NOT in `required_spec_inputs`
-- Identify every `required_spec_inputs` entry with no corresponding `extraction_intent`
-- Produce a correction table: `| Step | Missing Input | extraction_intent | Source (prompt line) |`
+**Task 16-A**: Complete `downstream_consumers` audit for all 22 steps.
+- For each step, cross-reference its prompt's Field-by-Field section against `allowed_upstream_dependencies` and `downstream_consumers`
+- Identify every upstream artifact referenced in the prompt but NOT in `allowed_upstream_dependencies`
+- Identify every `allowed_upstream_dependencies` entry with no corresponding `### Extraction Intent` coverage in the downstream prompt
+- Produce a correction table: `| Step | Missing Dependency | Extraction Intent Gap | Source (prompt line) |`
 
-**Task 16-B**: Add missing `required_spec_inputs` and `extraction_intent` entries to `step_order.json`.
+**Task 16-B**: Add missing `downstream_consumers` entries to `step_order.json` and ensure `### Extraction Intent` coverage in prompts.
 - Steps 08→12, 08→15, 08→16b, 08→16c (fixtures)
 - Steps 11→12, 11→13, 11→16a, 11→16c (threat model)
 - Steps 12→16a, 12→16b, 12→16c (CI gates)
 - Steps 15→16, 15→16a, 15→16b (scaffold)
-- Each entry needs a specific `extraction_intent` explaining WHY the downstream step needs this artifact
+- Each downstream prompt's `### Extraction Intent` section needs a specific entry explaining WHY this step consumes that upstream artifact
 
-**Task 16-C**: Re-run `specdev prompt-enrich --repo-root .` after corrections.
-- Verify all 4 formerly dead-end steps now show downstream consumer tables
-- Verify `--dry-run` shows 0 stale prompts after enrichment
+**Task 16-C**: Verify corrections via runtime context system.
+- **NOTE**: Static prompt enrichment via `specdev prompt-enrich` has been superseded by the runtime context package architecture (scope_resolver.py, extractor.py) per `toolkit_optimisation.txt`. Context delivery is handled at runtime, not build-time.
+- Verify all 4 formerly dead-end steps now appear in `downstream_consumers` in `step_order.json`
+- Verify downstream prompts' `### Extraction Intent` sections reference the corrected upstream artifacts
 - Run full test suite to confirm no regressions
 
 #### Phase 2: Tooling (Gap 17)
 
 **Task 17-A**: Evaluate dynamic derivation feasibility.
-- Can `required_spec_inputs` be derived from prompt Field-by-Field sections? (grep for `NN_name.json` references)
-- Can `extraction_intent` be derived from prompt sourcing instructions? (each field says "from X, extract Y")
-- Can `allowed_upstream_dependencies` be derived from `required_spec_inputs` transitively?
+- Can `allowed_upstream_dependencies` be derived from prompt Field-by-Field sections? (grep for `NN_name.json` references)
+- Can `### Extraction Intent` sections be validated against prompt sourcing instructions? (each field says "from X, extract Y")
+- Can `downstream_consumers` be derived from `allowed_upstream_dependencies` inversely?
 - What is the minimal hardcoded data that CANNOT be derived?
 
 **Task 17-B**: Implement `specdev dag-lint` validator.
 - New CLI command: `specdev dag-lint --repo-root .`
 - Checks:
-  - Every non-terminal step's artifact appears in at least one downstream step's `required_spec_inputs` (E596)
-  - Every `required_spec_inputs` entry has a corresponding `extraction_intent` (E597)
-  - Every `extraction_intent` references an artifact that exists in `STEP_ARTIFACT_MAP` (E598)
-  - `required_spec_inputs` entries are a subset of `allowed_upstream_dependencies` (E599)
+  - Every non-terminal step's artifact appears in at least one downstream step's `downstream_consumers` (E596)
+  - Every `allowed_upstream_dependencies` entry has a corresponding `### Extraction Intent` section in the downstream prompt (E597)
+  - Every `### Extraction Intent` reference points to an artifact that exists in `STEP_ARTIFACT_MAP` (E598)
+  - `downstream_consumers` entries are consistent with `allowed_upstream_dependencies` (E599)
   - No circular dependencies in the DAG
 - Warning codes for advisory checks:
-  - Prompt references upstream artifact not in `required_spec_inputs` (W596)
-  - `extraction_intent` text is vague (< 10 words or contains "relevant", "as needed") (W597)
+  - Prompt references upstream artifact not in `allowed_upstream_dependencies` (W596)
+  - `### Extraction Intent` text is vague (< 10 words or contains "relevant", "as needed") (W597)
 
 **Task 17-C**: Add `dag-lint` to pre-commit hook and CI pipeline.
 - Hook runs `dag-lint` when `step_order.json` or any prompt is modified
 - CI gate: `dag-lint` must pass before merge
 
-**Task 17-D**: Evaluate dynamic `required_spec_inputs` generation (stretch goal).
+**Task 17-D**: Evaluate dynamic `allowed_upstream_dependencies` generation (stretch goal).
 - Prototype: scan prompt Field-by-Field sections for `NN_*.json` references
-- Compare derived inputs vs hardcoded inputs — measure accuracy
-- If accuracy ≥ 95%, propose replacing hardcoded data with dynamic derivation
+- Compare derived dependencies vs hardcoded `allowed_upstream_dependencies` — measure accuracy
+- If accuracy >= 95%, propose replacing hardcoded data with dynamic derivation
 - If < 95%, document the irreducible manual maintenance surface
 
 ### Acceptance Criteria (Gaps 16+17)
@@ -156,10 +157,22 @@ All 4 dead-end steps ARE listed in `allowed_upstream_dependencies` for downstrea
 | Check | Command | Expected |
 |-------|---------|----------|
 | No dead-end producers (except 16c) | `specdev dag-lint --repo-root .` | 0 errors |
-| All extraction_intent entries populated | `specdev dag-lint --repo-root .` | 0 E597 |
-| Enriched prompts reflect corrections | `specdev prompt-enrich --repo-root . --dry-run` | 0 modifications |
+| All `### Extraction Intent` sections cover `allowed_upstream_dependencies` | `specdev dag-lint --repo-root .` | 0 E597 |
+| Runtime context package handles context delivery | Verify scope_resolver.py, extractor.py exist per `toolkit_optimisation.txt` | Present and functional |
 | No stale "feeds no downstream steps" | `grep -r "feeds no" prompts/` | Only prompt_16c |
 | Full test suite passes | `pytest tests/ --tb=short -q` | 0 failures |
+
+### Gap 18: Build-Time Prompt Enrichment Mechanism — **SUPERSEDED**
+
+**Status**: Deferred to runtime context package implementation. Static prompt enrichment conflicts with locked architectural direction: "context delivery is the skill's job, not the prompt's" (`toolkit_optimisation.txt`).
+
+The original proposal was to build `specdev prompt-enrich` as a build-time CLI command that injects upstream manifests, downstream consumer tables, and validation gate summaries into prompt files. This approach has been **superseded** by the runtime context package architecture defined in `toolkit_optimisation.txt`, which delivers context at runtime via `scope_resolver.py` and `extractor.py`. The runtime approach is preferred because:
+
+1. **No stale prompts** — context is assembled at invocation time, not baked into static files
+2. **Scope-aware** — the runtime resolver can tailor context to the specific task being performed
+3. **Single source of truth** — `step_order.json` DAG data (`allowed_upstream_dependencies`, `downstream_consumers`) is consumed directly at runtime rather than being duplicated into prompt marker blocks
+
+The R7→R9 feedback loop is closed by the runtime context system rather than by build-time prompt injection. The `downstream_consumers` and `allowed_upstream_dependencies` corrections from Gap 16 feed directly into the runtime resolver.
 
 ### VALIDATION_GATES Completeness (Addendum to Gap 10)
 
@@ -193,10 +206,10 @@ Audit all 16 step validators for cross-step ID checking capability.
    - MISSING cross-step checks (the 8 gap validators)
    - N/A (step has no upstream ID dependencies per step_order.json)
 
-3. Read tools/step_order.json → step_metadata section:
-   a. For each step, list extraction_intent entries
-   b. Classify each extraction_intent as: ID-resolution | field-presence | semantic
-   c. For step 00: note it may have empty extraction_intent — flag if so
+3. Read each prompt's `### Extraction Intent` section (extraction_intent was removed from step_order.json):
+   a. For each step, list `### Extraction Intent` entries from its prompt
+   b. Classify each extraction intent as: ID-resolution | field-presence | semantic
+   c. For step 00: note it may have empty/missing extraction intent — flag if so
 
 4. Read tools/specdev_tools/validation/matrix.py:
    a. Does it compute coverage percentages?
@@ -205,7 +218,7 @@ Audit all 16 step validators for cross-step ID checking capability.
 
 Produce tables:
 - Validator cross-step status: | Step | Has Cross-Step? | Upstream Files | IDs Checked | Error Codes |
-- extraction_intent classification: | Step | Intent | Classification |
+- Extraction intent classification (from prompt sections): | Step | Intent | Classification |
 - matrix.py: coverage computation status, threshold feasibility
 ```
 
@@ -275,13 +288,13 @@ Report:
 - CLI command inventory: | Command | Handler | Description |
 ```
 
-**Subagent D** (`Explore`, no isolation) — DAG Completeness & `required_spec_inputs` Audit:
+**Subagent D** (`Explore`, no isolation) — DAG Completeness & `downstream_consumers` Audit:
 ```
-Audit step_order.json required_spec_inputs completeness and evaluate dynamic derivation.
+Audit step_order.json downstream_consumers completeness and evaluate dynamic derivation.
 
 1. DEAD-END PRODUCER AUDIT:
    For each of the 22 steps, determine its artifact name from STEP_ARTIFACT_MAP.
-   Then scan ALL other steps' required_spec_inputs to count downstream consumers.
+   Then scan ALL other steps' downstream_consumers to count consumers.
    Produce table: | Step | Artifact | Consumer Count | Consumers | Dead-End? |
    Expected dead-ends: 08, 11, 12, 15 (anomalous), 16c (terminal, correct).
 
@@ -289,23 +302,52 @@ Audit step_order.json required_spec_inputs completeness and evaluate dynamic der
    For each dead-end producer (08, 11, 12, 15), read its downstream steps' prompts.
    Search for references to the artifact filename (e.g., "08_fixtures", "11_threat_model").
    Determine: does the prompt ACTUALLY reference this artifact even though
-   required_spec_inputs omits it?
+   downstream_consumers omits it?
    Produce table: | Dead-End Step | Downstream Prompt | References Artifact? | Prompt Line |
 
 3. DYNAMIC DERIVATION FEASIBILITY:
    a. Read 5 prompts (04, 08, 11, 15, 16b) — focus on Field-by-Field sections.
    b. For each field sourcing instruction, extract the upstream artifact reference.
-   c. Compare derived required_spec_inputs vs hardcoded — measure accuracy.
-   d. Assess: can extraction_intent be derived from prompt sourcing text?
+   c. Compare derived allowed_upstream_dependencies vs hardcoded — measure accuracy.
+   d. Assess: can ### Extraction Intent sections be validated against prompt sourcing text?
    e. What is the irreducible manual surface (data that CANNOT be derived)?
 
 4. CORRECTION TABLE:
-   For steps 08, 11, 12, 15 — propose specific required_spec_inputs additions
-   and extraction_intent text for each missing link.
-   Format: | From Step | To Step | Artifact | Proposed extraction_intent |
+   For steps 08, 11, 12, 15 — propose specific downstream_consumers additions
+   and ### Extraction Intent text for each missing link.
+   Format: | From Step | To Step | Artifact | Proposed Extraction Intent |
 
 Report: dead-end table, prompt cross-reference, derivation feasibility assessment,
-correction table with proposed extraction_intent values.
+correction table with proposed extraction intent values.
+```
+
+**Subagent D2** (`Explore`, no isolation) — Gap 18: `prompt-enrich` Supersession Verification:
+```
+Verify that the runtime context package approach (scope_resolver.py, extractor.py) from
+toolkit_optimisation.txt is the accepted replacement for static prompt enrichment.
+
+NOTE: `specdev prompt-enrich` investigation is SUPERSEDED. The locked architectural direction
+from toolkit_optimisation.txt specifies that context delivery is the runtime context package's
+job (scope_resolver.py, extractor.py), not build-time static prompt injection.
+
+1. Read toolkit_optimisation.txt — confirm the runtime context package architecture is
+   documented and specifies scope_resolver.py and extractor.py as the context delivery mechanism.
+
+2. Search tools/specdev_tools/ for scope_resolver.py and extractor.py:
+   a. If present: document their current capabilities and confirm they replace the need
+      for static prompt enrichment.
+   b. If not yet implemented: document the planned architecture and confirm it supersedes
+      the `specdev prompt-enrich` proposal.
+
+3. Verify that step_order.json DAG fields (`allowed_upstream_dependencies`,
+   `downstream_consumers`) are the data source the runtime resolver will consume —
+   confirming that Gap 16 corrections feed the runtime system directly.
+
+4. Confirm no remaining references to `specdev prompt-enrich` as a required command
+   (update any that exist to reference the runtime context package instead).
+
+Report: supersession confirmation, runtime context package status, remaining references
+to clean up.
 ```
 
 #### Phase 2 — Implementation (after Phase 1, sequential by dependency)
@@ -341,11 +383,11 @@ New codes to add (using AVAILABLE code numbers — verify no conflicts):
 - E595 / W595: DOWNSTREAM_STALE — upstream content changed but downstream doesn't reflect changes
   (advisory — W595 by default, E595 exists for optional promotion)
 - E596 / W596: DAG_DEAD_END_PRODUCER — non-terminal step's artifact has zero downstream consumers
-  in required_spec_inputs (E596 for confirmed dead-ends, W596 for prompt-references-but-not-declared)
-- E597 / W597: EXTRACTION_INTENT_MISSING — required_spec_inputs entry has no corresponding
-  extraction_intent (E597 hard error, W597 for vague intent < 10 words)
+  in `downstream_consumers` (E596 for confirmed dead-ends, W596 for prompt-references-but-not-declared)
+- E597 / W597: EXTRACTION_INTENT_MISSING — `allowed_upstream_dependencies` entry has no corresponding
+  `### Extraction Intent` section in the downstream prompt (E597 hard error, W597 for vague intent < 10 words)
 - E598: EXTRACTION_INTENT_INVALID_REF — extraction_intent references artifact not in STEP_ARTIFACT_MAP
-- E599: DAG_INPUTS_OUTSIDE_ALLOWED — required_spec_inputs entry not in allowed_upstream_dependencies
+- E599: DAG_CONSUMERS_OUTSIDE_ALLOWED — `downstream_consumers` entry not consistent with `allowed_upstream_dependencies`
 
 EVERY new W-code MUST have a corresponding E-code to enable dynamic W→E promotion.
 Even heuristic checks (W594, W595) get E-code pairs — the E-code exists for promotion,
@@ -390,8 +432,8 @@ Same pattern as Subagent F:
 - step_12.py (ci_gates): references FR IDs, NFR IDs from upstream steps
 - step_13.py (extension_generator): references governance labels from step 10
 - step_13a.py (completeness): performs traceability verification — checks FR-to-API and
-  API-to-fixture coverage against upstream. NOTE: step_13a's extraction_intent in
-  step_order.json says "Verify FR-to-API traceability" and "Verify all capabilities" —
+  API-to-fixture coverage against upstream. NOTE: step_13a's `### Extraction Intent`
+  section in its prompt says "Verify FR-to-API traceability" and "Verify all capabilities" —
   this is VERIFICATION, not direct ID extraction. The cross-step check here should verify
   that referenced IDs exist upstream, but the primary function is coverage/completeness
   assessment. Use the same _load_*_ids() pattern for ID resolution, but be aware the
@@ -408,21 +450,22 @@ After changes: pytest tests/ -k "step_12 or step_13 or step_13a or step_15" -v
 ```
 Create a new extraction_intent field-presence validator.
 
-1. Read tools/step_order.json → step_metadata → extraction_intent for each step
+1. Read each prompt's `### Extraction Intent` section to determine expected fields per step
 2. Create tools/specdev_tools/validation/extraction_intent_check.py:
-   - For each step with extraction_intent entries:
+   - For each step with a `### Extraction Intent` section in its prompt:
      a. Parse the intent to determine which fields should be present
-     b. Load the step's artifact from spec/
-     c. Check that the expected fields exist and are non-empty
-     d. Emit E591 when a required field (per extraction_intent) is missing or empty
+     b. Cross-reference against `allowed_upstream_dependencies` from step_order.json
+     c. Load the step's artifact from spec/
+     d. Check that the expected fields exist and are non-empty
+     e. Emit E591 when a required field (per extraction intent) is missing or empty
    - This is FIELD-PRESENCE only — not semantic matching
    - Deterministic, zero false positives
 
 3. Wire into tools/specdev_tools/validation/validate.py:
    - Add extraction_intent_check to the validation pipeline
-   - Make it optional (skip if step_order.json doesn't have extraction_intent for the step)
+   - Make it optional (skip if prompt doesn't have a ### Extraction Intent section)
 
-4. Populate step 00's extraction_intent in step_order.json if empty
+4. Ensure step 00's prompt has a ### Extraction Intent section (even if minimal)
 
 After changes: pytest tests/ -v (create new test file tests/test_extraction_intent.py)
 ```
@@ -535,6 +578,29 @@ Add a read-only `specdev env-check` diagnostic command.
 After changes: run the command to verify output, pytest tests/ -k cli -v
 ```
 
+**P1 — Gap 18: Prompt Enrichment Command — SUPERSEDED**
+
+**Subagent T** (`general-purpose`, isolation: `worktree`) — **SUPERSEDED**:
+```
+SUPERSEDED: Static prompt enrichment via `specdev prompt-enrich` has been superseded by the
+runtime context package architecture. This subagent's scope is deferred to the context
+package implementation phase.
+
+The runtime context package (scope_resolver.py, extractor.py) from toolkit_optimisation.txt
+replaces the need for build-time static prompt injection. Context delivery is the skill's
+job at runtime, not a build-time prompt modification step.
+
+IF the runtime context package implementation phase requires validation tooling:
+1. Verify scope_resolver.py reads `allowed_upstream_dependencies` and `downstream_consumers`
+   from step_order.json
+2. Verify extractor.py assembles upstream artifact manifests, downstream consumer tables,
+   and validation gate summaries at invocation time
+3. Verify the runtime system is idempotent and scope-aware
+
+This subagent does NOT implement `specdev prompt-enrich`. That command is not needed
+under the runtime context architecture.
+```
+
 **P2 — Documentation**
 
 **Subagent O** (`general-purpose`, isolation: `worktree`) — Error code documentation:
@@ -600,8 +666,9 @@ Test with promotion:
 11. ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
     (expect: zero E596-E599 errors — all artifacts consumed, all intents populated)
 
-12. ./tools/run_specdev.sh prompt-enrich --repo-root . --dry-run
-    (expect: 0 modifications — all prompts reflect corrected required_spec_inputs)
+12. Verify runtime context package (scope_resolver.py, extractor.py) reads corrected
+    downstream_consumers and allowed_upstream_dependencies from step_order.json
+    (expect: runtime system delivers context equivalent to what static enrichment would have)
 
 13. grep -r "feeds no" prompts/
     (expect: only prompt_16c — all other dead-ends resolved)
@@ -638,6 +705,11 @@ After all implementation is complete, verify measurable goals:
 6. Verify env-check command exists:
    Read cli.py. Is env-check registered?
    Target: yes, read-only.
+
+7. Verify Gap 18 supersession decision:
+   Confirm that toolkit_optimisation.txt runtime context architecture
+   (scope_resolver.py, extractor.py) makes static prompt enrichment unnecessary.
+   Check that no remaining workflow depends on `specdev prompt-enrich` existing.
 
 Report: per-goal pass/fail.
 ```
@@ -694,8 +766,9 @@ Include a FINAL CLOSURE SUMMARY:
 | `env-check` diagnostic command | absent | **present** |
 | Instruction coverage map | absent | **documented for high-impact steps** |
 | Dead-end producers (excl. terminal 16c) | 4 (steps 08, 11, 12, 15) | **0** — all artifacts consumed by downstream |
-| `required_spec_inputs` ↔ `extraction_intent` alignment | unchecked | **enforced by `dag-lint`** (E596-E599) |
+| `allowed_upstream_dependencies` ↔ `### Extraction Intent` alignment | unchecked | **enforced by `dag-lint`** (E596-E599) |
 | DAG completeness validation | absent | **`specdev dag-lint` in CI + pre-commit** |
+| Runtime context package replaces static enrichment | No | **Deferred** — superseded by runtime context package (scope_resolver.py, extractor.py) per `toolkit_optimisation.txt` |
 
 ---
 

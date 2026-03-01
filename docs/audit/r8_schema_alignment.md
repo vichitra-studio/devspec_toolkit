@@ -1,4 +1,4 @@
-<review_prompt id="R8" layer="L2" gaps="6,7" runs_after="R7" priority="P0-critical">
+<review_prompt id="R8" layer="L2" gaps="6,7,8,9,10" runs_after="R7" priority="P0-critical">
 # Review R8: Schema Tightening — Full Alignment with Hardened Prompts
 
 ## Scope
@@ -14,6 +14,7 @@ This review is the **second layer** of the 4-Layer Determinism Closure. It close
 | 7 | `additionalProperties:false` schemas reject prompt-required fields (e.g., step_16a `milestone_ref`) | CRITICAL |
 | 8 | Sourcing instructions exist only in prompt prose — schema `description` fields are empty or contain only operational text. Prompts duplicate schema constraints (types, enums, required) creating maintenance drift. No single source of truth for field derivation guidance. | CRITICAL |
 | 9 | `canon/manifest.json` has `source_refs` field on 90+ entries but it's unused. `canonicalRef` schema object exists in `collections.schema.json` but prompts manually say "do not populate" instead of schemas/tooling enforcing this. No canonical contract defines which `*_ref` fields are auto-resolved vs AI-populated. | HIGH |
+| 10 | `coverage_gaps` is currently optional or absent in most step schemas. It must be required with `minItems: 0` (empty array allowed) and each entry must have a structured format: `{upstream_item_id: string, source_step: string, reason: string}` with `additionalProperties: false`. This is explicitly called out in the pending 13-extra review as "an R8 change" but was not included in the original R8 specification. | HIGH |
 
 ### Why R8 Runs After R7
 
@@ -66,6 +67,8 @@ Schema and prompt are tightly coupled. R7 runs first (prompt is source of truth)
 
 After R8 completes, re-run R7's `test_prompt_contracts.py` and `test_prompt_schema_sync.py` to confirm bidirectional coherence.
 
+R7 adds `## Coverage Gap Reporting` instructions to all prompts. R8 must ensure every step schema has `coverage_gaps` in `required[]` with the matching structured entry format. The prompt instructs population; the schema enforces structure.
+
 ---
 
 ## Subagent Protocol (MANDATORY)
@@ -105,6 +108,8 @@ Produce a table per schema:
 |------------|-------------|-------------|----------|---------------|--------|
 
 Summary: total gaps, HIGH gaps, breakage risks.
+
+Additional investigation: Audit all 19 step schemas for presence and structure of `coverage_gaps`. Record which schemas have it, which don't, and whether existing definitions match the target structure: `{upstream_item_id: string, source_step: string, reason: string}` with `additionalProperties: false`.
 ```
 
 **Subagent B** (`Explore`, no isolation) — Steps 09-16c Schema-Prompt Comparison:
@@ -281,6 +286,33 @@ This subagent may have nothing to do if schema tightening only added to required
 After changes: pytest tests/ -v
 ```
 
+**Subagent J2** (`general-purpose`, isolation: `worktree`) — `coverage_gaps` Schema Enforcement (Gap #10):
+```
+Add `coverage_gaps` to every step schema's `required[]` array with `minItems: 0`.
+Define the array item schema as:
+{
+  "type": "object",
+  "required": ["upstream_item_id", "source_step", "reason"],
+  "properties": {
+    "upstream_item_id": { "type": "string" },
+    "source_step": { "type": "string", "pattern": "^[0-9]{2}[a-c]?$" },
+    "reason": { "type": "string", "minLength": 10 }
+  },
+  "additionalProperties": false
+}
+
+Steps:
+1. Check if `schema/core/collections.schema.json` already defines a reusable `coverageGap`
+   type. If so, use `$ref` to it. If not, define it in `schema/core/collections.schema.json`
+   first, then reference it from all step schemas.
+2. For each of the 19 step schemas, add `coverage_gaps` to `properties` (as an array of
+   the above item schema with `minItems: 0`) and to `required[]`.
+3. Validate: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+4. Update test fixtures in tests/fixtures/ to include `coverage_gaps: []` where missing.
+
+After all changes: pytest tests/ -v
+```
+
 #### Phase 3 — Integration Test Run
 
 **Subagent K** (`general-purpose`, no isolation) — Full integration verification:
@@ -356,6 +388,7 @@ Update CHANGELOG with schema tightening changes (fields promoted to required, ad
 | Fields required by prompt but rejected by schema | 2+ | **0** |
 | Existing spec/ artifacts pass validate-all | yes | **yes** |
 | Prompt↔schema sync tests pass | unknown | **yes** |
+| Schemas with required coverage_gaps (minItems: 0) | unknown/19 | **19/19** |
 
 ---
 

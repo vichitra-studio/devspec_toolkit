@@ -1,4 +1,4 @@
-<review_prompt id="R7" layer="L1" gaps="1,2,3,4,5" runs_after="R1,R2,R3,R4,R5,R6" priority="P0-critical">
+<review_prompt id="R7" layer="L1" gaps="1,2,3,4,5,7,8,9" runs_after="R1,R2,R3,R4,R5,R6" priority="P0-critical">
 # Review R7: Deep Prompt Completeness & Determinism Audit
 
 ## Scope
@@ -17,6 +17,9 @@ This review is the **first layer** of the 4-Layer Determinism Closure. It audits
 | 3 | No sourcing instructions for free-text fields — AI can fabricate content | CRITICAL |
 | 4 | `## Metadata Contract` missing from all 22 prompts — Output Contract tests skip all real prompts (tests search for `## B4 Metadata Contract` which no prompt has) | CRITICAL |
 | 5 | 5 cross-cutting boilerplate issues affect 17+ prompts | HIGH |
+| 7 | No prompt (beyond 16a/16b/16c) specifies the explicit 4-step seed protocol: (1) read seed document, (2) extract specific fields relevant to this step, (3) reflect extracted content in specific output fields, (4) populate `seed_refs` with actually-used seed IDs and content hashes. Seed document references are derivable from each prompt's `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in `step_order.json` | HIGH |
+| 8 | No prompt specifies when and how to populate `coverage_gaps[]` — when upstream data is missing or content cannot be traced to an upstream artifact, the AI has no instruction to route untraceable content into `coverage_gaps[]` with `upstream_item_id`, `source_step`, and `reason`. Distinct from Clarify→Emit: ambiguous requirements trigger clarification; untraceable content triggers `coverage_gaps[]` population | HIGH |
+| 9 | Canonical enforcement in prompts is limited to position checking of the generic canonical registry section. No prompt audits whether canonical output fields (`canonical_refs_used`, `canonical_proposals`, `canonical_conflicts`) are instructed | HIGH |
 
 ### Why R7 Runs First
 
@@ -159,7 +162,11 @@ Audit cross-cutting patterns across ALL 22 prompts. This is NOT per-field — it
    - For each prompt, does it reference upstream artifacts by exact filename?
    - Or does it use vague references ("the charter", "previous specs")?
 
-5. BOILERPLATE ISSUES (check all 22 prompts):
+5. CANONICAL OUTPUT FIELDS:
+   - Grep all step schemas for `canonical_refs_used`, `canonical_proposals`, `canonical_conflicts` in their `required[]` arrays. For each schema that requires these fields, check if the corresponding prompt has population instructions.
+   - Report: how many prompts have schemas with these fields but lack population instructions?
+
+6. BOILERPLATE ISSUES (check all 22 prompts):
    a. Generic Task Preamble — does it contain "You can work on any step" or similar
       contradiction with strict waterfall ordering? Count occurrences.
    b. "X downstream steps" placeholder — find prompts with unfilled placeholders.
@@ -252,6 +259,15 @@ Based on Phase 1 Subagent A findings, for each prompt in steps 00-08 with missin
    - Sub-field definitions ("required sub-fields: source_url, source_date...")
    - minItems restatements
 
+4. For every prompt that consumes seed documents (check the prompt's existing
+   `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in
+   `step_order.json` for seed document references), add a `## Seed Ingestion Protocol`
+   section with the 4-step protocol: read → extract → reflect → populate seed_refs.
+
+5. Add `## Coverage Gap Reporting` section to every prompt instructing the AI: any output
+   field whose value cannot be traced to a specific upstream artifact or seed MUST be
+   recorded in `coverage_gaps[]` with `{upstream_item_id, source_step, reason}`.
+
 Rules:
 - Additions are ADDITIVE — do not remove correct sourcing/workflow content
 - Never add schema constraint details to the prompt
@@ -280,6 +296,15 @@ NOTE: `governance_label_ref` in prompt_13 is RESOLVED in current prompt text —
 
 Same rules as Subagent F: additive only, source every free-text field, replace vague language. Add `## Schema Authority` section to each prompt. Remove any schema constraint duplication (field type annotations, enum value lists, pattern strings, sub-field structures).
 
+ADDITIONAL TASKS (Gaps 7-8):
+- For every prompt that consumes seed documents (check the prompt's existing
+  `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in
+  `step_order.json` for seed document references), add a `## Seed Ingestion Protocol`
+  section with the 4-step protocol: read → extract → reflect → populate seed_refs.
+- Add `## Coverage Gap Reporting` section to every prompt instructing the AI: any output
+  field whose value cannot be traced to a specific upstream artifact or seed MUST be
+  recorded in `coverage_gaps[]` with `{upstream_item_id, source_step, reason}`.
+
 NOTE: prompts 14, 16a, 16c were updated by R4 — read current state first, preserve R4 changes.
 
 After changes: run pytest tests/ -k prompt -v
@@ -295,8 +320,8 @@ Based on Phase 1 Subagent C findings, fix cross-cutting issues in ALL 22 prompts
    (e.g., "You can work on any step"), replace with step-specific context:
    "This is Step NN in a strict forward-only waterfall. It depends on [list upstream steps]."
 
-2. UNFILLED PLACEHOLDERS: Replace "X downstream steps" with actual step names from
-   tools/step_order.json → step_metadata → downstream_consumers.
+2. UNFILLED PLACEHOLDERS: Replace "X downstream steps" with actual step names derived
+   by traversing `allowed_upstream_dependencies` in reverse from `tools/step_order.json`.
 
 3. CANONICAL REGISTRY POSITION: If Canonical Registry instructions appear AFTER Output Contract,
    move them BEFORE Output Contract (AI needs to know the registry before producing output).
@@ -307,6 +332,10 @@ Based on Phase 1 Subagent C findings, fix cross-cutting issues in ALL 22 prompts
 
 5. SELF-AUDIT GATE: Harden criteria to map 1:1 to schema required[] fields.
    Generic "all fields populated" → explicit checklist of each required field by name.
+
+6. CANONICAL OUTPUT FIELDS (Gap #9): For prompts whose schemas include `canonical_refs_used`,
+   `canonical_proposals`, or `canonical_conflicts`, add explicit population instructions
+   referencing `canon/manifest.json`.
 
 After changes: run pytest tests/ -k prompt -v
 ```
@@ -404,6 +433,9 @@ Also update docs/audit/review_index.md to add R7 entry.
 | Vague language occurrences | ~120 total | **0** |
 | Free-text fields without sourcing instructions | unknown | **0** |
 | CRITICAL prompts that produce schema-failing output | 3 | **0** |
+| Prompts with ## Seed Ingestion Protocol | 0/N | **N/N** (where N = prompts with seed inputs) |
+| Prompts with ## Coverage Gap Reporting | 0/22 | **22/22** |
+| Prompts with canonical output field instructions | 0/N | **N/N** (where N = prompts with canonical schema fields) |
 
 ---
 

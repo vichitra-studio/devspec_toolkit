@@ -13,9 +13,9 @@
 | Area | Title | Status | Covered By | Summary |
 |------|-------|--------|-----------|---------|
 | 3 | Semantic Drift Across Steps | **PARTIALLY ADDRESSED** | R3 | Forward replay semantic content remains structural-only post-R2 |
-| 4 | B0-B8 Cleanup & Repo Hygiene | **PARTIALLY ADDRESSED** | R1 | `## B4 Metadata Contract` header absent from all 33 prompts silently voids Output Contract test suite; broader hygiene not done |
-| 6 | Holistic Prompt Hardening | **PARTIALLY ADDRESSED** | R4 + R6 | 6a–6e core hardening pending across all 22 prompts |
-| 12 | Toolkit Discovery Deficit | **PARTIALLY ADDRESSED** | R6 | Inline consumer tables, validation gate summaries, enrichment mechanism pending |
+| 4 | B0-B8 Cleanup & Repo Hygiene | **PARTIALLY ADDRESSED** | R1 | `## B4 Metadata Contract` header absent from all 22 prompt files silently voids Output Contract test suite; broader hygiene not done |
+| 6 | Holistic Prompt Hardening | **PARTIALLY ADDRESSED** | R4 + R6 | 6a–6f core hardening pending across all 22 prompts |
+| 12 | Toolkit Discovery Deficit | **DISMISSED** | R6 | Inline consumer tables, validation gate summaries, enrichment mechanism pending |
 | 13 | Schema–Prompt Contract Alignment | **PARTIALLY ADDRESSED** | R6 | 20 step schemas (01, 02, 02a, 03, 05–16c) unaudited |
 
 ---
@@ -129,7 +129,7 @@ The workflow is a **strict forward-only waterfall**. Any upstream change require
 - **Review 02 (Tooling)**: CLI commands, validators, linters, canonical tools, generation/migration
 - **Review 03 (Documentation)**: Docs coverage, audience clarity, context preservation
 - **This Review (04)**: Cross-cutting structural integrity — traceability, drift, prompts, hygiene, engine soundness, self-report trust, environment determinism, submodule integration, toolkit discovery, schema-prompt alignment
-- **This Review (R7 — Pending)**: Continuation of Review 04. Five areas remain: semantic drift (forward replay only), test hygiene (B4 Metadata Contract header), prompt hardening (6a–6e), toolkit discovery (consumer tables/enrichment), schema-prompt alignment (20 unaudited steps).
+- **This Review (R7 — Pending)**: Continuation of Review 04. Five areas remain: semantic drift (forward replay only), test hygiene (B4 Metadata Contract header), prompt hardening (6a–6f), toolkit discovery (consumer tables/enrichment), schema-prompt alignment (20 unaudited steps).
 
 ---
 
@@ -166,6 +166,8 @@ You must investigate and report on the **five remaining areas** below. For each 
 
 - **Forward replay semantic content** (`validation/forward_replay_check.py`): R2 fixed the path/git-root issues but did not add semantic content validation. The check still verifies file existence and structural schema validity only — it does not detect semantic regressions (e.g., a concept renamed in step 02 that contradicts step 01). This verified starting point was in scope for the original review and remains unresolved. Investigate whether `forward_replay_check.py` runs any semantic comparison or only structural checks post-R2.
 
+→ Distilled to: R9 Gap 13 (FULLY COVERED)
+
 ---
 
 ### Area 4: B0-B8 Cleanup & Repo Hygiene
@@ -191,14 +193,16 @@ You must investigate and report on the **five remaining areas** below. For each 
 
 ### Remaining Gaps
 
-- **`## B4 Metadata Contract` section header missing from all 33 prompt files** (`tests/test_prompt_contracts.py`, `tests/test_prompt_schema_sync.py`): Tests use this string as a delimiter. When it is absent, the test loops hit `continue` and skip silently. **The entire Output Contract validation in the test suite is vacuously passing — zero prompts are actually being tested for their output contract fields.** R7 resolves the B4-specific gap: rename `## B4 Metadata Contract` → `## Metadata Contract` in 3 test files (tests/test_prompt_contracts.py: 6 occurrences, tests/test_prompt_schema_sync.py: 8 occurrences, tests/test_cli.py: 1 occurrence) AND add `## Metadata Contract` section to all 22 prompt files. Reference R7 Subagents D and E for implementation. The broader hygiene checks (dead test fixtures, duplicate coverage, inconsistent naming conventions beyond B4) remain unresolved.
+- **`## B4 Metadata Contract` section header missing from all 22 prompt files** (`tests/test_prompt_contracts.py`, `tests/test_prompt_schema_sync.py`): Tests use this string as a delimiter. When it is absent, the test loops hit `continue` and skip silently. **The entire Output Contract validation in the test suite is vacuously passing — zero prompts are actually being tested for their output contract fields.** R7 resolves the B4-specific gap: rename `## B4 Metadata Contract` → `## Metadata Contract` in 3 test files (tests/test_prompt_contracts.py: 6 occurrences, tests/test_prompt_schema_sync.py: 8 occurrences, tests/test_cli.py: 1 occurrence) AND add `## Metadata Contract` section to all 22 prompt files. Reference R7 Subagents D and E for implementation. The broader hygiene checks (dead test fixtures, duplicate coverage, inconsistent naming conventions beyond B4) remain unresolved.
+
+→ Distilled to: R7 Gaps 4 (Subagents D+E) (FULLY COVERED)
 
 ---
 
 ### Area 6: Holistic Prompt Hardening
 
 > **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
-> Prompts 16a/16b/16c: milestone_ref binding rule, milestone context extraction, deliverable verification added (R4 A-R4-07/08/09). All 22 prompts: `specdev prompt-context <step>` reference added (R6 T09–T30). All 22 prompts: Self-Audit Gate score threshold "If score < 0.9, output clarifying questions only" added (R6 T09–T30). Step 14 seed consumption verified complete (R4 A-R4-10). Core 6a/6b/6c/6d/6e hardening remains pending across all prompts.
+> Prompts 16a/16b/16c: milestone_ref binding rule, milestone context extraction, deliverable verification added (R4 A-R4-07/08/09). All 22 prompts: `specdev prompt-context <step>` reference added (R6 T09–T30). All 22 prompts: Self-Audit Gate score threshold "If score < 0.9, output clarifying questions only" added (R6 T09–T30). Step 14 seed consumption verified complete (R4 A-R4-10). Core 6a/6b/6c/6d/6e/6f hardening remains pending across all prompts.
 
 **Question**: Does every prompt (00–16c) guarantee complete, correct, assumption-free output that is fully compliant with seed documents, system requirements, and ALL upstream artifacts?
 
@@ -258,11 +262,18 @@ You must investigate and report on the **five remaining areas** below. For each 
 - **Validator–prompt contract gap**: Under R7/R8/R9, schema (R8) enforces structural requirements; validators (R9) enforce semantic requirements (cross-step ID resolution E590, content derivation W594, vague language W593). The residual gap is thin validators for complex steps — addressed in R9, not a prompt-validator framing issue.
 - **coverage_gaps prompt enforcement**: No prompt currently specifies when and how to populate `coverage_gaps`. The instruction must be explicit across all prompts: "For every upstream item from the coverage manifest that your output does not address, you MUST add an entry to `coverage_gaps[]` with the upstream item ID, source step, and reason. Do NOT silently omit uncovered items. Do NOT include items you cannot trace." See Area 13 for schema-side enforcement.
 
+→ 6a: RESOLVED — Upstream extraction intent is now inline in all 22 prompts (### Extraction Intent sections). R9 Gap 10 validates prompt coverage against allowed_upstream_dependencies. Original R7 Gap 6 was dropped (Area 12 dismissed; data source removed from step_order.json).
+→ 6b: Distilled to: R7 Gaps 1+5 (FULLY COVERED)
+→ 6c: Distilled to: R7 Gap 7 (seed ingestion protocol)
+→ 6d: Distilled to: R7 Gap 8 (coverage_gaps prompt instructions) + R8 Gap 10 (coverage_gaps schema enforcement)
+→ 6e: Distilled to: R7 Gap 9 (canonical output fields)
+→ 6f: Distilled to: R7+R8+R9 (FULLY COVERED across layers)
+
 ---
 
 ### Area 12: Toolkit Discovery Deficit in Prompts
 
-> **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
+> **STATUS: DISMISSED — See Distillation Status**
 > `specdev prompt-context <step>` CLI command added (R6 T07/T08). 2-line header note referencing the CLI added to all 22 prompts (R6 T09–T30). Inline downstream consumer tables, per-prompt validation gate summaries, and build-time enrichment mechanism remain pending.
 
 **Question**: Do the static prompts (`prompts/prompt_NN_*.md`) give the AI agent sufficient awareness of the toolkit infrastructure — downstream consumers, validation rules, pipeline DAG — to generate artifacts optimized for the full pipeline, or is the AI effectively flying blind past the single prompt it receives?
@@ -288,11 +299,11 @@ The data to close this gap already exists in `step_order.json` (step_metadata wi
 
 #### 12b. Validation Awareness
 - For each prompt, check whether it describes the specific validation checks that will run on the output:
-  - Does it mention the error codes (E200, E210, E510, E530, E560) that apply to this step's output?
+  - Does it mention the error codes (E210, E510, E530, E560; schema validation is handled by the jsonschema library, not a custom error code) that apply to this step's output?
   - Does it describe what each validator checks in concrete terms?
   - Or does it just say "run validate" without specifying what the validator will look for?
 - Cross-reference: For each step, map the validators that fire on its output (from `validate.py` routing logic) and compare against what the prompt tells the AI about validation.
-- Example: Step 04's output is checked by schema validation (E200), canonical drift (E210), placeholder scan (E510), hallucination lint (E530), and traceability closure (E560). Does `prompt_04_functional_requirements.md` mention these? (Expected: it mentions "run validate" but not the specific checks.)
+- Example: Step 04's output is checked by schema validation (handled by the jsonschema library, not a custom error code), canonical drift (E210), placeholder scan (E510), hallucination lint (E530), and traceability closure (E560). Does `prompt_04_functional_requirements.md` mention these? (Expected: it mentions "run validate" but not the specific checks.)
 
 #### 12c. Enrichment Mechanism Feasibility
 - `tools/specdev_tools/generation/prompt_generator.py` — Already has `{{VAR}}` template rendering, `_extract_required_fields()`, and context injection for migration prompts. Assess whether this infrastructure can be extended for static prompt enrichment.
@@ -307,7 +318,7 @@ The data to close this gap already exists in `step_order.json` (step_metadata wi
 | Gap | File | Detail |
 |-----|------|--------|
 | Zero downstream consumer awareness | All `prompts/prompt_*.md` | No prompt tells the AI which steps consume its output or what they extract; `step_order.json` step_metadata has this data for all 22 steps |
-| Validation described as "run validate" only | All `prompts/prompt_*.md` | Prompts say to run the validator but don't describe the ~6 specific checks (E200, E210, E510, E530, E560, etc.) that apply to each step's output |
+| Validation described as "run validate" only | All `prompts/prompt_*.md` | Prompts say to run the validator but don't describe the ~6 specific checks (E210, E510, E530, E560, etc.; schema validation is handled by the jsonschema library, not a custom error code) that apply to each step's output |
 | Extraction intent already machine-readable | `tools/step_order.json:309-509` | `step_metadata.extraction_intent` describes what each downstream step extracts from each upstream artifact — this data exists but is never surfaced to prompts |
 | Template rendering infrastructure exists | `tools/specdev_tools/generation/prompt_generator.py` | `render_template()`, `_extract_required_fields()`, and `{{VAR}}` substitution already work for migration prompts; could be extended for static prompt enrichment |
 
@@ -315,8 +326,12 @@ The data to close this gap already exists in `step_order.json` (step_metadata wi
 
 - **No inline downstream consumer tables**: No prompt lists which steps N+k extract from its output, even though this data exists in `step_order.json` `step_metadata.extraction_intent` for all 22 steps. Adding a 2-line CLI reference is not equivalent — the AI must proactively run the CLI command; inline tables surface the data directly in the prompt context.
 - **extraction_intent injection (mechanism for 12a/12c)**: `step_metadata.extraction_intent` in `tools/step_order.json` already declares what each downstream step extracts from upstream. Injecting this into each prompt at build time gives the AI both upstream consumption instructions (resolving 6a) and downstream awareness (resolving 12a) simultaneously. The `extraction_intent` entries should be extended with `synthesis_requirements` per synthesis field — declaring what the AI must address in each synthesis field. This becomes the single source of truth readable by both prompt generation tooling and validators (E591).
-- **No per-prompt validation gate summary**: Error codes that fire on each step's output (e.g., E200, E210, E510, E530, E560 for step 04) are not mentioned in any prompt. The AI cannot optimize its output for checks it doesn't know about.
+- **No per-prompt validation gate summary**: Error codes that fire on each step's output (e.g., E210, E510, E530, E560 for step 04; schema validation is handled by the jsonschema library, not a custom error code) are not mentioned in any prompt. The AI cannot optimize its output for checks it doesn't know about.
 - **No build-time enrichment mechanism**: `<!-- TOOLKIT_CONTEXT:...:START/END -->` marker injection via `specdev prompt-enrich` or a pre-commit hook does not exist. `step_metadata.extraction_intent` in `tools/step_order.json` is machine-readable but never surfaced into prompt content at generation time.
+
+→ 12a: DROPPED: Upstream extraction intent is now inline in all 22 prompts. Downstream dependencies derivable at runtime via traversal of allowed_upstream_dependencies in step_order.json.
+→ 12b: DROPPED: Validation error codes are surfaced by tooling at validation time. Adding them to prompts increases token cost without proportional benefit. Better handled by runtime context system.
+→ 12c: DROPPED / SUPERSEDED: toolkit_optimisation.txt explicitly rejects static prompt enrichment. Runtime context package (scope_resolver + extractor) is the locked architectural direction.
 
 ---
 
@@ -383,6 +398,12 @@ For each step schema, compare numeric constraints (`minItems`, `minLength`, `min
 - **13c (Cross-schema consistency)**: `additionalProperties: false` coverage and local type redefinitions not audited beyond the two fixed steps (00 and 04). Inline type definitions that duplicate `schema/core/` atoms remain undetected for 20 steps.
 - **13d (Schema-Validator gap)**: Thin validator analysis (validator checks 3 fields, schema enforces 5, prompt requires 20) not performed for the 16 remaining complex steps. Steps where the validator is thin and the schema is weak are entirely reliant on the AI's honor-system compliance with the prompt.
 - **coverage_gaps schema enforcement**: `coverage_gaps` is currently optional or absent in most step schemas, or loosely defined. Schema must: (a) mark `coverage_gaps` as required with `minItems: 0` (empty array valid, absent is not), (b) define each entry structure with `upstream_item_id` (string, required), `source_step` (string, required), `reason` (string, required), `additionalProperties: false`. Without schema enforcement, the 6d prompt instruction for coverage_gaps is honor-system only. This is an R8 change.
+
+→ 13a: Distilled to: R8 Phase 1 Subagents A+B (FULLY COVERED)
+→ 13b: Distilled to: R8 Phase 1 Subagents A+B (FULLY COVERED)
+→ 13c: Distilled to: R8 Gap 7, Subagent C (FULLY COVERED)
+→ 13d: Distilled to: R9 Gap 8, Subagents F+G (FULLY COVERED)
+→ 13-extra (coverage_gaps): Distilled to: R8 Gap 10 (NEW — was missing from R8)
 
 ---
 
@@ -478,7 +499,7 @@ Produce a sequenced list of implementation tasks with **zero rework** — no tas
 3. **Cross-reference prompts ↔ validators ↔ schemas**: For every step, compare what the prompt requires, what the validator checks, and what the schema enforces. Gaps between these three are findings.
 4. **Check `step_order.json` against prompts**: For every step, verify that the prompt's upstream input instructions match the step's declared dependencies.
 5. **Run the tools if possible**: Execute `./tools/run_specdev.sh validate-all spec --repo-root .` and `./tools/run_specdev.sh canonical-integrity spec --repo-root .` to see current state.
-6. **Be exhaustive on Area 6 (Prompt Hardening) AND Area 13 (Schema–Prompt Alignment)**: These are the highest-impact areas. Area 6: every prompt must be reviewed individually for 6a–6e — do not sample or skip. Area 13: every unaudited schema (20 steps: 01, 02, 02a, 03, 05–16c) must be compared against its corresponding prompt for 13a–13d.
+6. **Be exhaustive on Area 6 (Prompt Hardening) AND Area 13 (Schema–Prompt Alignment)**: These are the highest-impact areas. Area 6: every prompt must be reviewed individually for 6a–6f — do not sample or skip. Area 13: every unaudited schema (20 steps: 01, 02, 02a, 03, 05–16c) must be compared against its corresponding prompt for 13a–13d.
 
 ---
 
@@ -491,5 +512,19 @@ Produce a sequenced list of implementation tasks with **zero rework** — no tas
 - **Do not treat warnings as acceptable**: Any warning-level finding with no escalation path is effectively permission to ignore that class of problem indefinitely.
 - **Do not assume the AI knows the toolkit**: The AI generating an artifact sees only the prompt, the schema, and upstream artifacts it is told to read. It has no awareness of downstream consumers, validation rules, error codes, or the pipeline DAG unless the prompt explicitly surfaces this information. If data exists in `step_order.json` that would improve artifact quality, it should be in the prompt.
 - **Do not assume schema validation catches prompt requirements**: If a prompt says "include ≥2 acceptance criteria" but the schema only enforces `minItems: 1`, the requirement is unenforceable by automation. Prompt requirements without schema backing are honor-system rules. Audit every prompt requirement against its schema constraint.
+
+---
+
+## Distillation Status
+
+All pending items have been distilled into R7, R8, and R9 review specifications.
+
+- **8 items FULLY COVERED** by existing R7/R8/R9 content
+- **3 items PARTIALLY COVERED** — missing details added to R7 (Gaps 7-9). 2 original partially-covered items (R7 Gaps 6, 11) were dropped when Area 12 was dismissed.
+- **1 item added as new gap**: R8 Gap 10 (coverage_gaps schema). **2 items DROPPED**: R7 Gap 10 (validation gates — tooling handles this), R9 Gap 18 (prompt-enrich — superseded by runtime context architecture)
+- **Area 12 fully dismissed** — upstream extraction intent already inline in prompts, downstream derivable at runtime, validation gates handled by tooling, build-time enrichment superseded by runtime context architecture
+- **2 corrections applied**: E200 hallucinated error code removed, "33 prompts" → "22 prompts"
+
+No further pending items remain. This document is now fully resolved.
 
 </review_prompt>
