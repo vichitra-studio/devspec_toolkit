@@ -36,7 +36,7 @@ Each review assumes all prior reviews have been completed and their changes comm
 
 | Order | ID | File | Layer | Gaps Closed | Priority | Est. Tasks | Notes |
 |-------|----|------|-------|-------------|----------|-----------|-------|
-| 7 | R7 | `r7_prompt_completeness.md` | L1 (Prompts) | 1-5 | P0-critical | 30-35 | 6-dimension audit, Metadata Contract, sourcing, vague→precise |
+| 7 | R7 | `r7_prompt_completeness.md` | L1 (Prompts) | 1,2,4,5,7,8 | P0-critical | 28 | **COMPLETE** — 11 findings (4 CRIT, 6 HIGH, 1→R8); Gap 3 deferred to R8; Gap 9 verified non-issue; 583/583 tests pass |
 | 8 | R8 | `r8_schema_alignment.md` | L2 (Schemas) | 6-7 | P0-critical | 20-25 | 83 schema-prompt gaps → 0, additionalProperties fixes |
 | 9 | R9 | `r9_validator_ci_closure.md` | L3+L4 (Validators+CI) | 8-15 | P0-critical | 30-35 | Cross-step IDs, extraction_intent, content derivation, W→E promotion |
 
@@ -197,7 +197,7 @@ Each layer is finalized before the next begins. Zero rework. ~80-95 total tasks.
 | Prompt files | 22 | `prompts/prompt_00_*.md` through `prompts/prompt_16c_*.md` |
 | Step schema files | 19 | `schema/00_charter.schema.json` through `schema/16_impl_context.schema.json`; steps 16a/16b/16c share `16_impl_context` |
 | Total schema files | 20 | 19 step schemas + `schema/seed_manifest.schema.json` |
-| B4 Metadata Contract refs | 15 | 3 test files: `test_prompt_contracts.py` (6), `test_prompt_schema_sync.py` (8), `test_cli.py` (1) |
+| B4 Metadata Contract refs | 0 | Renamed to "Metadata Contract" by R7 (T01-T03): `test_prompt_contracts.py` (6), `test_prompt_schema_sync.py` (8), `test_cli.py` (1) — all 15 replaced |
 | Existing error codes (E) | 22 | E110-E582 |
 | Existing warning codes (W) | 15 | W110-W581, W140 |
 | New R9 error codes | 12 | E590-E595 + W590-W595 |

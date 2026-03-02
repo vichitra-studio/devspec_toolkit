@@ -13,13 +13,13 @@ This review is the **first layer** of the 4-Layer Determinism Closure. It audits
 | # | Gap | Severity |
 |---|-----|----------|
 | 1 | No `## Schema Authority` directive in any prompt — AI has no instruction to read the schema before generating output; structural constraints (types, enums, required markers, patterns, minItems) are undefined or duplicated in prompt text | CRITICAL |
-| 2 | 3 prompts (12, 13, 10) produce schema-failing output | CRITICAL |
-| 3 | No sourcing instructions for free-text fields — AI can fabricate content | CRITICAL |
+| 2 | 2 prompts (12, 13) produce schema-failing output. ~~prompt_10 was originally listed but verified: `pr_rules`/`versioning` are OPTIONAL in schema (not in `required[]`)~~ | CRITICAL |
+| ~~3~~ | ~~No sourcing instructions for free-text fields — AI can fabricate content~~ — **Deferred to R8**: R8 adds `description` fields to schemas with sourcing guidance extracted from prompt Field-by-Field sections. `prompt_generator.py` reads these via `FIELD_DESCRIPTION`. Free-text sourcing is a schema concern, not a prompt concern. | ~~CRITICAL~~ → R8 |
 | 4 | `## Metadata Contract` missing from all 22 prompts — Output Contract tests skip all real prompts (tests search for `## B4 Metadata Contract` which no prompt has) | CRITICAL |
 | 5 | 5 cross-cutting boilerplate issues affect 17+ prompts | HIGH |
-| 7 | No prompt (beyond 16a/16b/16c) specifies the explicit 4-step seed protocol: (1) read seed document, (2) extract specific fields relevant to this step, (3) reflect extracted content in specific output fields, (4) populate `seed_refs` with actually-used seed IDs and content hashes. Seed document references are derivable from each prompt's `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in `step_order.json` | HIGH |
+| 7 | No prompt (beyond 16a/16b/16c) specifies a formal `## Seed Ingestion Protocol`. Authority: `spec/common/seed_manifest.json` → `step_requirements` defines which seeds each step consumes. Only steps 00–04 have seed requirements; steps 05–16c must set `seed_refs=[]`. Steps 00–04 have partial `### Extraction Intent` sections but lack the formal 4-step protocol (read manifest → ingest seeds → extract fields → populate seed_refs) | HIGH |
 | 8 | No prompt specifies when and how to populate `coverage_gaps[]` — when upstream data is missing or content cannot be traced to an upstream artifact, the AI has no instruction to route untraceable content into `coverage_gaps[]` with `upstream_item_id`, `source_step`, and `reason`. Distinct from Clarify→Emit: ambiguous requirements trigger clarification; untraceable content triggers `coverage_gaps[]` population | HIGH |
-| 9 | Canonical enforcement in prompts is limited to position checking of the generic canonical registry section. No prompt audits whether canonical output fields (`canonical_refs_used`, `canonical_proposals`, `canonical_conflicts`) are instructed | HIGH |
+| ~~9~~ | ~~Canonical enforcement in prompts is limited to position checking~~ — **Verified Non-Issue**: Phase 1 investigation confirmed ALL 22 prompts have explicit `canonical_refs_used`, `canonical_proposals`, `canonical_conflicts` population instructions (e.g., prompt_04 lines 208–220). `toolkit_optimisation.txt` confirms prompt-level canonical enforcement is handled. Remaining issues (trace_types hardcoding, enforcement layer inconsistency) are tooling/governance concerns for later reviews. | ~~HIGH~~ → N/A |
 
 ### Why R7 Runs First
 
@@ -46,8 +46,8 @@ Every prompt is audited against these 6 dimensions:
 |---|-----------|----------|---------------|
 | 1 | **Completeness** | Does the prompt have a `## Schema Authority` directive AND sourcing instructions for all fields requiring upstream derivation? | (a) Prompt has a dedicated `## Schema Authority` section naming the schema file; (b) all fields whose values must be derived from upstream artifacts have explicit sourcing instructions |
 | 2 | **No Schema Duplication** | Does the prompt avoid repeating schema constraints? | Prompt contains no field type annotations, enum value lists, pattern strings, minItems values, or sub-field definitions — all structural constraints are delegated to the schema via the Schema Authority directive |
-| 3 | **Assumption Prevention** | Does the prompt tell the AI where to source EVERY piece of information? | Every output field traces to a specific upstream artifact + field path |
-| 4 | **Hallucination Prevention** | Does the prompt bind every output field to a specific upstream artifact or seed? | Every free-text field has a sourcing instruction, not just ID fields |
+| 3 | **Assumption Prevention** | Does the prompt tell the AI where to source EVERY piece of information? | Schema Authority directive + upstream artifact references in prompt. Per-field sourcing in schema `description` (R8). |
+| 4 | **Hallucination Prevention** | Does the prompt bind every output field to a specific upstream artifact or seed? | Schema Authority directive binds to schema; per-field sourcing via schema `description` (R8); seed binding via Seed Ingestion Protocol (steps 00–04) |
 | 5 | **Semantic Capture** | Does the prompt ensure meaning flows from upstream? | Instructions say "extract the intent and rationale from [field] in [artifact]", not just "copy the ID" |
 | 6 | **Determinism** | Given identical inputs, would two different AIs produce structurally identical output? | Fields with subjective interpretation identified and constrained |
 
@@ -126,7 +126,7 @@ need to split this schema or add conditional validation.
 KNOWN CRITICAL ISSUES to verify:
 - prompt_12: `environment_ref` missing from prompt but required by schema
 - prompt_13: `governance_label_ref` missing from prompt but required by schema
-- prompt_10: treats `pr_rules`/`versioning` as optional ("should") but schema requires them
+- prompt_10: ~~treats `pr_rules`/`versioning` as optional ("should") but schema requires them~~ — **Verified**: `pr_rules` and `versioning` are OPTIONAL in schema (not in `required[]`). The "should" language is appropriate. NOT a gap.
 
 Produce same table format as Subagent A.
 
@@ -213,24 +213,14 @@ For each of the 22 prompt files (prompts/prompt_00_*.md through prompts/prompt_1
 1. Check if `## Metadata Contract` section already exists
 2. If missing, add it BEFORE the `## Output Contract` section (or at end if no Output Contract)
 
-The Metadata Contract section must contain:
-- $schema URI for this step
-- spec_version field requirement
-- generation_quality fields (if applicable to this step)
-- Any step-specific metadata fields from the schema
+The Metadata Contract section is a pure delegation to the schema — it MUST NOT restate field names, types, enum values, or structural constraints. Those belong in the schema (enforced by Schema Authority). The section exists as a structural anchor for test infrastructure and as a reminder to consult the schema's `required[]` array.
 
 Template:
 ```markdown
 ## Metadata Contract
 
-Every artifact produced by this step MUST include:
-- `"$schema"`: `"<URI from schema registry for this step>"`
-- `"spec_version"`: current specdev version string
-- `"generation_quality"`: object with `confidence_score` (0.0-1.0), `coverage_assessment`, `known_gaps[]`, `recommendations[]`
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 ```
-
-Adapt per step based on what the schema actually requires for metadata fields.
-Read the schema for each step to get the correct $schema URI and metadata fields.
 
 After changes: run pytest tests/test_prompt_contracts.py -v to verify Metadata Contract detection.
 ```
@@ -248,10 +238,7 @@ Based on Phase 1 Subagent A findings, for each prompt in steps 00-08 with missin
    MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
    all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-2. For fields whose values must be derived from upstream artifacts (free-text content, IDs, refs):
-   - Add sourcing instruction: specific upstream artifact filename + field path
-   - For free-text: `DO NOT fabricate — derive from [upstream artifact] → [field path]`
-   - Do NOT add field type annotations, enum value lists, or structural constraints — the schema covers those
+2. **Free-text field sourcing**: Deferred to R8 (schema `description` fields). Do NOT add per-field sourcing instructions to prompts.
 
 3. Remove any existing schema constraint duplication found in Phase 1:
    - Field type annotations ("string, enum: X|Y|Z")
@@ -259,10 +246,10 @@ Based on Phase 1 Subagent A findings, for each prompt in steps 00-08 with missin
    - Sub-field definitions ("required sub-fields: source_url, source_date...")
    - minItems restatements
 
-4. For every prompt that consumes seed documents (check the prompt's existing
-   `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in
-   `step_order.json` for seed document references), add a `## Seed Ingestion Protocol`
-   section with the 4-step protocol: read → extract → reflect → populate seed_refs.
+4. For prompts whose steps are listed in `spec/common/seed_manifest.json` → `step_requirements`
+   (steps 00–04 ONLY), formalize the existing `### Extraction Intent` section into a
+   `## Seed Ingestion Protocol` with the 4-step protocol: read manifest → ingest seeds →
+   extract fields → populate seed_refs. Steps 05–08 have NO seed requirements — enforce seed_refs=[].
 
 5. Add `## Coverage Gap Reporting` section to every prompt instructing the AI: any output
    field whose value cannot be traced to a specific upstream artifact or seed MUST be
@@ -289,18 +276,16 @@ Based on Phase 1 Subagent B findings, for each prompt in steps 09-16c with missi
 
 KNOWN CRITICAL FIXES:
 - prompt_12: Add explicit `environment_ref` field instructions with sourcing from 02a_delivery_baseline.json
-- prompt_10: Change "should include pr_rules" → "MUST include pr_rules" (schema requires it)
-- prompt_10: Change "should include versioning" → "MUST include versioning" (schema requires it)
+- ~~prompt_10: Change "should include pr_rules" → "MUST include pr_rules" (schema requires it)~~ — **Verified**: `pr_rules` and `versioning` are OPTIONAL in schema (not in `required[]`). The "should" language is appropriate. Do NOT change to MUST.
+- ~~prompt_10: Change "should include versioning" → "MUST include versioning" (schema requires it)~~ — **Verified**: See above.
 
 NOTE: `governance_label_ref` in prompt_13 is RESOLVED in current prompt text — do NOT re-add.
 
-Same rules as Subagent F: additive only, source every free-text field, replace vague language. Add `## Schema Authority` section to each prompt. Remove any schema constraint duplication (field type annotations, enum value lists, pattern strings, sub-field structures).
+Same rules as Subagent F: additive only, replace vague language. Free-text field sourcing deferred to R8. Add `## Schema Authority` section to each prompt. Remove any schema constraint duplication (field type annotations, enum value lists, pattern strings, sub-field structures).
 
 ADDITIONAL TASKS (Gaps 7-8):
-- For every prompt that consumes seed documents (check the prompt's existing
-  `### Extraction Intent` section and the step's `allowed_upstream_dependencies` in
-  `step_order.json` for seed document references), add a `## Seed Ingestion Protocol`
-  section with the 4-step protocol: read → extract → reflect → populate seed_refs.
+- For prompts whose steps are listed in `spec/common/seed_manifest.json` → `step_requirements`
+  (NO steps 09–16c have seed requirements), enforce seed_refs=[]. Do NOT add Seed Ingestion Protocol.
 - Add `## Coverage Gap Reporting` section to every prompt instructing the AI: any output
   field whose value cannot be traced to a specific upstream artifact or seed MUST be
   recorded in `coverage_gaps[]` with `{upstream_item_id, source_step, reason}`.
@@ -320,8 +305,9 @@ Based on Phase 1 Subagent C findings, fix cross-cutting issues in ALL 22 prompts
    (e.g., "You can work on any step"), replace with step-specific context:
    "This is Step NN in a strict forward-only waterfall. It depends on [list upstream steps]."
 
-2. UNFILLED PLACEHOLDERS: Replace "X downstream steps" with actual step names derived
-   by traversing `allowed_upstream_dependencies` in reverse from `tools/step_order.json`.
+2. UNFILLED PLACEHOLDERS: Replace "X downstream steps" with the DIRECT downstream consumer
+   count from `tools/step_order.json` → `downstream_consumers` field (NOT the transitive closure
+   from `allowed_upstream_dependencies`). Steps 00 and 04 already have correct values (8 and 13).
 
 3. CANONICAL REGISTRY POSITION: If Canonical Registry instructions appear AFTER Output Contract,
    move them BEFORE Output Contract (AI needs to know the registry before producing output).
@@ -333,9 +319,10 @@ Based on Phase 1 Subagent C findings, fix cross-cutting issues in ALL 22 prompts
 5. SELF-AUDIT GATE: Harden criteria to map 1:1 to schema required[] fields.
    Generic "all fields populated" → explicit checklist of each required field by name.
 
-6. CANONICAL OUTPUT FIELDS (Gap #9): For prompts whose schemas include `canonical_refs_used`,
-   `canonical_proposals`, or `canonical_conflicts`, add explicit population instructions
-   referencing `canon/manifest.json`.
+6. CANONICAL OUTPUT FIELDS (Gap #9 — Verified Non-Issue): All 22 prompts already have explicit
+   population instructions for `canonical_refs_used`, `canonical_proposals`, `canonical_conflicts`.
+   No action needed. Remaining canonical concerns (position of ## Canonical Registry section)
+   are addressed by item 3 above.
 
 After changes: run pytest tests/ -k prompt -v
 ```
@@ -384,8 +371,8 @@ After all implementation is complete, verify measurable goals:
 3. Search all 22 prompts for vague phrases: "consider", "if appropriate", "as needed",
    "may include", "such as", "etc". Count: target 0.
 
-4. For each prompt, count free-text fields without explicit sourcing instructions.
-   Target: 0 across all prompts.
+4. ~~For each prompt, count free-text fields without explicit sourcing instructions.~~
+   Deferred to R8 — schema `description` fields provide per-field sourcing guidance.
 
 5. Verify prompts 10 and 12 no longer produce schema-failing output:
    - prompt_10: pr_rules and versioning are MUST (not should); review_policy has sourcing note
@@ -415,7 +402,7 @@ Also update docs/audit/review_index.md to add R7 entry.
 ## Key Design Decisions
 
 - Every prompt MUST have a `## Schema Authority` section directing the LLM to read the schema for all structural constraints. Prompts provide sourcing guidance and workflow constraints — NOT schema field definitions, types, enums, or patterns.
-- Every free-text field MUST have an explicit **sourcing instruction** with upstream artifact + field path
+- Free-text field sourcing is handled by R8 via schema `description` fields + `FIELD_DESCRIPTION` in `prompt_generator.py`. R7 ensures Schema Authority directive exists; R8 ensures per-field sourcing guidance exists in schema.
 - Self-Audit Gate score criteria MUST be mechanically derivable from schema `required[]`
 - Prompt updates are **additive** — no removal of correct content, only replace vague with precise
 - `## Metadata Contract` replaces legacy `## B4 Metadata Contract` in all test files (3 files, 15 occurrences) and is added to all 22 prompts
@@ -430,12 +417,12 @@ Also update docs/audit/review_index.md to add R7 entry.
 | Prompts with ## Schema Authority directive | 0/22 | **22/22** |
 | Schema constraint duplication instances | unknown | **0** |
 | Prompts missing Metadata Contract section | 22/22 | **0/22** |
-| Vague language occurrences | ~120 total | **0** |
-| Free-text fields without sourcing instructions | unknown | **0** |
-| CRITICAL prompts that produce schema-failing output | 3 | **0** |
-| Prompts with ## Seed Ingestion Protocol | 0/N | **N/N** (where N = prompts with seed inputs) |
+| Vague language occurrences | ~73 total (per Phase 1 evidence) | **0** |
+| Free-text fields without sourcing instructions | ~~unknown~~ | ~~**0**~~ — **Deferred to R8** (schema `description` fields) |
+| CRITICAL prompts that produce schema-failing output | 2 (prompts 12, 13) | **0** |
+| Prompts with ## Seed Ingestion Protocol | 0/5 | **5/5** (steps 00–04 per `seed_manifest.json`; steps 05–16c enforce seed_refs=[]) |
 | Prompts with ## Coverage Gap Reporting | 0/22 | **22/22** |
-| Prompts with canonical output field instructions | 0/N | **N/N** (where N = prompts with canonical schema fields) |
+| Prompts with canonical output field instructions | **22/22** (already present) | **22/22** — Verified Non-Issue |
 
 ---
 

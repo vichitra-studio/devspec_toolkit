@@ -1,6 +1,24 @@
 # Step 06 · Invariants & Rules
 
-Run `specdev prompt-context 06` to see downstream consumers. This prompt's output feeds X downstream steps.
+Run `specdev prompt-context 06` to see downstream consumers. This prompt's output feeds 3 downstream steps.
+
+## Schema Authority
+
+The schema at `schema/06_invariants.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
 
 ## Path Variables
 | Variable | Description |
@@ -36,14 +54,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate invariants with: inv_id, business description, executable expression (jsonlogic/CEL), scope (components/apis), severity, and traces. Do not output it.
-- Beyond FR-derived negative cases, consider: data integrity constraints implied by the domain model (glossary entities), state transition rules for entities with lifecycle stages, access boundary rules from system sketch trust boundaries, and ordering guarantees.
+- Beyond FR-derived negative cases, MUST include: data integrity constraints implied by entities in `spec/03_glossary.json`, state transition rules for entities with lifecycle stages defined in the glossary, access boundary rules from trust boundaries in `spec/02_system_sketch.json`, and ordering guarantees identified in `spec/04_functional_requirements.json` preconditions/postconditions.
 - Validate expressions against referenced fields in fixtures/schemas to ensure evaluability.
 - Self-audit; if any critical FR/NFR lacks a rule or scope is too broad, ask Gap Questions.
 - Rewrite into executable expressions; constrain scope to reduce false positives; finalize traces.
 - Emit JSON when rules are enforceable.
 
 ## Heuristics For Completeness
-- Optional→expected: use `jsonlogic` for data predicates and `cel` for field-level logic; set `severity=error` for hard guarantees.
+- MUST use `jsonlogic` for data predicates and `cel` for field-level logic when the constraint is automatable; MUST set `severity=error` for invariants derived from FR acceptance criteria with error conditions or from security boundaries in `spec/02_system_sketch.json`.
 - Scope discipline: enumerate only affected components/APIs; avoid global rules unless necessary.
 - Ambiguity scrub: translate narrative policies into boolean/evaluable forms.
 
@@ -53,7 +71,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Gating items:
   - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
   - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.
-  - If the glossary defines entities with lifecycle states, verify that state transition invariants exist or ask Gap Questions.
+  - MUST verify: if `spec/03_glossary.json` defines entities with lifecycle states, state transition invariants MUST exist for each such entity or Gap Questions MUST be raised.
 
 
 ### Coverage Closure
@@ -86,9 +104,9 @@ Before emitting, verify:
 - Avoid purely textual rules unless automation is truly not feasible.
 
 ## Field-by-Field Guidance
-- inv_id: kebab-case; prefer `invariant-<domain>-<constraint>`.
+- inv_id: kebab-case; MUST use `invariant-<domain>-<constraint>` naming pattern.
 - description: business-readable statement of the invariant.
-- language: `jsonlogic`, `cel`, or `text`; prefer executable forms.
+- language: `jsonlogic`, `cel`, or `text`; MUST use `jsonlogic` or `cel` when the constraint can be expressed as a boolean/evaluable expression.
 - expression: the actual rule; test for syntactic validity.
 - scope.components/apis: k-ID lists to constrain where the rule applies. Example: `{"components": ["auth-service"], "apis": ["api-login"]}`.
 - severity: `warn` or `error` based on impact.
@@ -135,6 +153,24 @@ Before emitting, verify:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -179,17 +215,3 @@ Before emitting, verify:
   "canonical_conflicts": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

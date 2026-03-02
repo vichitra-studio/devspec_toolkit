@@ -2,6 +2,24 @@
 
 Run `specdev prompt-context 16` to see downstream consumers.
 
+## Schema Authority
+
+The schema at `schema/16_impl_context.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -38,7 +56,7 @@ implementation checklist, and review expectations for the *current* execution cy
 1. **Context Review**: Ingest required upstream spec artifacts.
 2. **Scope**: Identify the exact execution scope for the current cycle.
 3. **Active Contexts**: List `spec/impl_context/*.json` files in `plan.context.existing_structures`.
-4. **Drift Check**: Verify that the Anchor (Step 16) does not conflict with Milestone contexts (16a/b/c).
+4. **Drift Check**: MUST verify that no `checklist[].id`, `scope_in`, or `scope_out` value in this Anchor contradicts the corresponding values in any active Milestone context (16a/b/c) under `spec/impl_context/`.
 5. **Checklist**: Convert relevant spec requirements into atomic checklist items.
 6. **Docs Impact**: Decide whether docs updates are required and list impacted docs.
 7. **Roadmap Sync**: If you identify that milestones are fully completed based on the ingested context, you MUST update:
@@ -146,7 +164,7 @@ implementation checklist, and review expectations for the *current* execution cy
 2. **Every `spec_ref` has a valid 40-char SHA commit_hash** (no placeholders or zeros).
 3. **`target_file_patterns` use explicit globs** (avoid `**/*` or empty arrays unless deferred).
 4. **`docs_impact.status` is `required` if any non-doc file is in `target_file_patterns`**.
-5. **Anchor (Step 16) does not conflict with Milestone contexts (16a/b/c)** (check for drift).
+5. **Anchor (Step 16) MUST NOT contradict any `checklist[].id`, `scope_in`, or `scope_out` value in active Milestone contexts (16a/b/c)** — run drift comparison against each `spec/impl_context/*.json`.
 
 # Self-Audit Gate
 Before emitting the Step 16 anchor artifact, verify:
@@ -217,6 +235,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -409,16 +445,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

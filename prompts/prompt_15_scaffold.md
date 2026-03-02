@@ -2,6 +2,24 @@
 
 Run `specdev prompt-context 15` to see downstream consumers.
 
+## Schema Authority
+
+The schema at `schema/15_scaffold.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -83,7 +101,7 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - `service_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
 - `route_map` covers all in-scope APIs (Step 5) with path/method and `api_ref` links.
-- `validators` list includes code or config checks needed to keep generated code aligned with specs.
+- `validators` MUST include at least one schema validation command (e.g., `specdev-tools validate-all spec --repo-root .`) and one type-check or lint command per language in `service_skeleton.language`.
 - `build_status` reflects build health; default to `pending` until CI succeeds.
 
 ## Field-by-Field Guidance
@@ -127,6 +145,24 @@ Before emitting, verify:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -153,16 +189,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

@@ -140,7 +140,7 @@ class CliTests(unittest.TestCase):
                     "```json\n"
                     "{\"id\":\"charter\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )

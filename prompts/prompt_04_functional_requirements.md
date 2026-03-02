@@ -1,6 +1,13 @@
 # Step 04 · Functional Requirements
 
-Run `specdev prompt-context 04` to see downstream consumers. This step has 13 downstream consumers — see `specdev prompt-context 04`. This prompt's output feeds 13 downstream steps.
+Run `specdev prompt-context 04` to see downstream consumers. This prompt's output feeds 13 downstream steps.
+
+## Schema Authority
+
+The schema at `schema/04_fr_list.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
 ## Path Variables
 | Variable | Description |
@@ -48,6 +55,26 @@ For each upstream artifact ingested, extract the following:
 - **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs
 - **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria
 
+## Seed Ingestion Protocol
+
+This step's seed requirements are defined in `spec/common/seed_manifest.json` -> `step_requirements`.
+
+1. **Read**: Read `spec/common/seed_manifest.json` and identify seeds listed under this step's `step_requirements`
+2. **Ingest**: Read each required seed document at its `path` listed in the manifest's `seeds[]` array, in the order defined by `global_seed_order`
+3. **Extract**: Extract the specific fields relevant to this step's output as described in the `### Extraction Intent` section
+4. **Populate**: Populate `seed_refs[]` with actually-used seed IDs and content hashes
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate FRs (one behavior each) mapped from capabilities; include rationale, pre/postconditions, and ≥2 acceptance criteria candidates with measurable outcomes. Do not output it.
 - Propose `fixture_ref` names aligned to Step 8 naming; propose `trace` to capabilities/APIs/NFRs.
@@ -56,7 +83,7 @@ For each upstream artifact ingested, extract the following:
 - Emit JSON when all FRs are falsifiable and traceable.
 
 ## Heuristics For Completeness
-- Optional→expected: include pre/postconditions for FRs impacting state or permissions; include fixture_ref suggestions for high-priority FRs.
+- MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope); MUST include `fixture_ref` for every FR with `priority: high` in the capabilities.
 - Auto-trace: link FRs to capability and any API that delivers the behavior; include NFR trace where performance is key.
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
@@ -98,13 +125,13 @@ Before emitting, verify:
 - FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
 - Each FR includes preconditions and postconditions where relevant to bound the behavior.
 - Every FR has at least one acceptance criterion with a stable `criterion_id` and specific, measurable text.
-- Where possible, acceptance criteria reference a `fixture_ref` that can be authored in Step 8.
-- `trace` links map FRs to capabilities, APIs, NFRs, or governance where applicable.
+- MUST include a `fixture_ref` for every acceptance criterion whose behavior is automatable in Step 8; use `fixture-*-tbd` if the fixture does not yet exist.
+- `trace` links MUST map every FR to its originating capability from `spec/01_capabilities.json`; MUST also map to APIs, NFRs, or governance IDs when those IDs exist in the corresponding upstream spec files.
 - IDs are stable and descriptive (avoid renaming once referenced downstream).
 
 ## Field-by-Field Guidance
 - functional_requirements[*].fr_id: `fr-<behavior>`; one behavior per FR.
-- statement: outcome-oriented phrasing; avoid implementation details and multiple behaviors.
+- statement: MUST use outcome-oriented phrasing; MUST NOT include implementation details (function names, DB tables, internal method signatures) or multiple behaviors.
 - rationale: why this FR exists (tie to business value or risk).
 - preconditions/postconditions: set when environment or state boundaries exist.
 - acceptance_criteria[*].text: exact observable outcome; include inputs and expected outputs/state changes.
@@ -122,7 +149,7 @@ Before emitting, verify:
 - **Bundling**: Bundling multiple behaviors into one FR, making it impossible to prove completeness.
 - **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
 - **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
-- **Implementation**: Embedding implementation details (e.g., method names) instead of outcomes, limiting design options.
+- **Implementation**: Embedding implementation details (function names, DB tables, internal method signatures) instead of outcomes, limiting design options.
 
 ## Negative Constraints
 - **DO NOT** use implementation details (function names, DB tables) in statements.
@@ -154,6 +181,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -204,17 +249,3 @@ Before emitting, verify:
   "canonical_conflicts": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

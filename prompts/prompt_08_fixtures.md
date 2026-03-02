@@ -1,6 +1,24 @@
 # Step 08 · Test Plan & Fixtures
 
-Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds X downstream steps.
+Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds 2 downstream steps.
+
+## Schema Authority
+
+The schema at `schema/08_fixtures.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
 
 ## Path Variables
 | Variable | Description |
@@ -42,7 +60,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Emit JSON when coverage is representative.
 
 ## Heuristics For Completeness
-- Optional→expected: add targets to FRs/APIs/invariants; add `smoke` tags for critical flows and `load` where NFRs exist.
+- MUST add `targets` referencing every `fr_id`, `api_id`, `inv_id`, or `nfr_id` that the fixture exercises (as identified in `spec/04_functional_requirements.json`, `spec/05_interface_contracts.json`, `spec/06_invariants.json`, `spec/07_nfrs.json`); MUST add `smoke` tag for fixtures covering FRs listed as high-priority in capabilities; MUST add `load` tag for fixtures covering NFRs with `category: latency` or `category: throughput`.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -95,14 +113,14 @@ Before emitting, verify:
 - targets: Array of traceRef objects `{"type": "...", "id": "..."}` that reference `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.
 - mode: `unit`, `contract`, `e2e`, or `redteam`.
   - **contract**: usage requires `expected` to have `status`, `body`, and optionally `headers`.
-- input: minimal JSON payload or setup state; prefer explicit fields over narrative.
-- expected: precise expected payload/state; include error shapes for negative cases.
+- input: minimal JSON payload or setup state; MUST use explicit field names and values (not narrative descriptions).
+- expected: MUST contain the exact expected payload fields and values as defined by the `response_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 - tags: optional labels for grouping and CI selection (e.g. `smoke`, `security`).
 
 ## Best Practices
 - **Coverage**: Cover happy-path, edge, and failure scenarios by mixing `mode` values (unit, contract, e2e, redteam).
 - **Trace**: Use `targets` to reference FRs, APIs, NFRs, or invariants so coverage reports stay accurate.
-- **Minimalism**: Keep `input` and `expected` payloads minimal but sufficient to prove the requirement, reusing glossary terms.
+- **Minimalism**: Keep `input` and `expected` payloads to the minimum fields required to prove the requirement (only fields referenced in the FR acceptance criteria or API request/response schemas), reusing `term_id` values from `spec/03_glossary.json`.
 - **Gating**: Tag fixtures (e.g., `smoke`, `load`) to guide CI gating and spec-to-impl planning.
 
 ## Common Pitfalls
@@ -112,7 +130,7 @@ Before emitting, verify:
 - **Drift**: Forgetting to update fixtures when interface contracts version, causing format mismatches.
 
 ## Quick Reference
-- ID Format: `fixture-<scenario>`; remain stable across revisions.
+- ID Format: `fixture-<scenario>`; MUST NOT be renamed once referenced by downstream steps.
 - Required Fields: `fixture_id`, `mode`, `input`, `expected`, and `targets`.
 - Mode Choices: `unit`, `contract`, `e2e`, `redteam`; use multiple to cover layers.
 - Trace Hooks: populate `targets` with IDs like `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.
@@ -133,6 +151,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -178,17 +214,3 @@ Before emitting, verify:
   "canonical_conflicts": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

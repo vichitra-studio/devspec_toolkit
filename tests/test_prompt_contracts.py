@@ -17,9 +17,9 @@ class PromptContractsTests(unittest.TestCase):
     def test_output_contract_examples_include_metadata_fields(self):
         for path in sorted(self.prompt_dir.glob("prompt_*.md")):
             text = path.read_text(encoding="utf-8")
-            if "# Output Contract" not in text or "## B4 Metadata Contract" not in text:
+            if "# Output Contract" not in text or "## Metadata Contract" not in text:
                 continue
-            section = text.split("# Output Contract", 1)[1].split("## B4 Metadata Contract", 1)[0]
+            section = text.split("# Output Contract", 1)[1].split("## Metadata Contract", 1)[0]
             blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
             self.assertTrue(blocks, msg=path.name)
             parsed = []
@@ -57,9 +57,9 @@ class PromptContractsTests(unittest.TestCase):
                 continue
 
             text = path.read_text(encoding="utf-8")
-            if "# Output Contract" not in text or "## B4 Metadata Contract" not in text:
+            if "# Output Contract" not in text or "## Metadata Contract" not in text:
                 continue
-            section = text.split("# Output Contract", 1)[1].split("## B4 Metadata Contract", 1)[0]
+            section = text.split("# Output Contract", 1)[1].split("## Metadata Contract", 1)[0]
             blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
             self.assertTrue(blocks, msg=f"{path.name} missing output-contract JSON block")
 
@@ -155,7 +155,7 @@ class PromptContractsTests(unittest.TestCase):
         ):
             path = self.prompt_dir / file_name
             text = path.read_text(encoding="utf-8")
-            section = text.split("# Output Contract", 1)[1].split("## B4 Metadata Contract", 1)[0]
+            section = text.split("# Output Contract", 1)[1].split("## Metadata Contract", 1)[0]
             blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
             self.assertTrue(blocks, msg=f"{file_name} missing output-contract JSON block")
             payload = json.loads(blocks[-1])
@@ -169,7 +169,7 @@ class PromptContractsTests(unittest.TestCase):
         for file_name in ("prompt_16b_impl_coder.md", "prompt_16c_impl_reviewer.md"):
             path = self.prompt_dir / file_name
             text = path.read_text(encoding="utf-8")
-            section = text.split("# Output Contract (Update Logic)", 1)[1].split("## B4 Metadata Contract", 1)[0]
+            section = text.split("# Output Contract (Update Logic)", 1)[1].split("## Metadata Contract", 1)[0]
             blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
             self.assertGreaterEqual(len(blocks), 2, msg=f"{file_name} requires input/output JSON examples")
             input_payload = json.loads(blocks[0])

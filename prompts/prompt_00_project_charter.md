@@ -2,6 +2,13 @@
 
 Run `specdev prompt-context 00` to see downstream consumers. This prompt's output feeds 8 downstream steps.
 
+## Schema Authority
+
+The schema at `schema/00_charter.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -37,7 +44,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
-- **Primary Source:** `docs/seed/seed_overview.md` (required) for high-level scoping.
+- **Primary Source:** `docs/seed/seed_overview.md` (required) for project scope boundaries, business objectives, target users, and success criteria.
 - **Constraints Source:** `docs/seed/seed_tech_stack.md` (required) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
 - Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
 - Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
@@ -51,17 +58,37 @@ For each upstream artifact ingested, extract the following:
 - **03_glossary.json** (if present): Domain terms and metric units for consistent naming in `success_metrics`
 - **07_nfrs.json** (if present): Metric names and units to align `success_metrics` terminology
 
+## Seed Ingestion Protocol
+
+This step's seed requirements are defined in `spec/common/seed_manifest.json` -> `step_requirements`.
+
+1. **Read**: Read `spec/common/seed_manifest.json` and identify seeds listed under this step's `step_requirements`
+2. **Ingest**: Read each required seed document at its `path` listed in the manifest's `seeds[]` array, in the order defined by `global_seed_order`
+3. **Extract**: Extract the specific fields relevant to this step's output as described in the `### Extraction Intent` section
+4. **Populate**: Populate `seed_refs[]` with actually-used seed IDs and content hashes
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger containing: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics (metric→unit→target→method). Do not output it.
-- Cross-check metrics against any NFRs/monitoring references to align names and units; align segments with Glossary terms.
+- Cross-check metrics against seed documents to align metric names and units; align segment terminology with seed document terminology.
 - Self-audit against the checklist; if scope, metrics, or stakeholders are unclear, ask Gap Questions instead of guessing; wait for answers.
 - Rewrite for measurability: ensure problem statement and metrics have explicit units, targets, and measurement methods; propose `links` to anticipated FRs/NFRs where obvious.
 - Emit a single JSON artifact only after the above is satisfied.
 
 ## Heuristics For Completeness (soft, non-binding)
-- Elevate optional→expected: include baselines and measurement_method for success_metrics when historical data or dashboards are referenced; include stakeholders and user_segments that materially affect scope.
-- Auto-link seeds: add `links` to likely downstream FRs (`fr-*` once known) and NFR categories inferred from metrics (e.g., latency, cost).
-- Ambiguity scrub: remove “improve/optimize/user-friendly/fast”; replace with quantifiable targets and timeframes.
+- MUST include baselines and measurement_method for success_metrics when `docs/seed/seed_overview.md` or `docs/seed/seed_tech_stack.md` references historical data or dashboards; MUST include stakeholders and user_segments that materially affect scope as identified in the seed documents.
+- Auto-link seeds: add `links` to downstream FRs (`fr-*` once known) and NFR categories derived from `success_metrics` units (read `canon/manifest.json` for valid NFR category values).
+- Ambiguity scrub: MUST replace any instance of “improve”, “optimize”, “user-friendly”, or “fast” with a quantifiable target (numeric value + unit + timeframe) derived from `docs/seed/seed_overview.md` success criteria or `docs/seed/seed_tech_stack.md` constraints.
 
 ## Self-Audit Gate (do not output)
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
@@ -101,7 +128,7 @@ Before emitting, verify:
 - Scope is explicit: at least 3–5 in-scope items and 3–5 out-of-scope items; avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
 - Stakeholders list covers decision-makers and operators; each stakeholder has a role and specific needs that drive requirements or success metrics.
 - User segments are distinct; each includes jobs-to-be-done, pains, and gains that map to capabilities and FRs.
-- Success metrics: each metric includes metric_id, name, unit, target, measurement_method, and—where known—baseline grounded in existing data.
+- Success metrics: each metric MUST include metric_id, name, unit, target, measurement_method, and — when `docs/seed/seed_overview.md` or product briefs contain historical values — baseline sourced from that data.
 - Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
 - Owner is set based on who will maintain the charter and is not just a default.
 
@@ -124,7 +151,7 @@ Before emitting, verify:
 - links: trace to FRs/NFRs/governance ids when known; use temporary `*-tbd` anchors if not yet defined.
 
 ## Best Practices
-- **Problem Statement**: Write a crisp statement grounded in user pain and measurable outcomes, avoiding solutioneering.
+- **Problem Statement**: Write a statement of 1-3 sentences that names the affected users, their pain, the measurable business impact, and hard constraints — sourced from `docs/seed/seed_overview.md`. Avoid solutioneering.
 - **Success Metrics**: Pair each `success_metric` with a realistic baseline, target, unit, and measurement method.
 - **Scope**: Define in/out of scope explicitly to prevent creep; capture at least 3 items each.
 - **Users**: Describe each `user_segment` with jobs-to-be-done, pains, and gains to map requirements to value.
@@ -165,6 +192,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -221,16 +266,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

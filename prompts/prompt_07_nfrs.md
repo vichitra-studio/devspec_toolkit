@@ -1,6 +1,24 @@
 # Step 07 · Non‑Functional Requirements
 
-Run `specdev prompt-context 07` to see downstream consumers. This prompt's output feeds X downstream steps.
+Run `specdev prompt-context 07` to see downstream consumers. This prompt's output feeds 5 downstream steps.
+
+## Schema Authority
+
+The schema at `schema/07_nfrs.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
 
 ## Path Variables
 | Variable | Description |
@@ -31,14 +49,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of NFRs by category (latency/throughput/availability/etc.), with metric→target→unit→measurement_method, stage, owner, and traces to FRs/APIs/components. Do not output it.
-- Align names/units with glossary; ensure measurement_method is practically measurable via dashboards/queries.
+- Align names/units with `spec/03_glossary.json`; MUST ensure measurement_method references a specific tool, query, or dashboard endpoint (not generic phrases like "automated monitoring").
 - Self-audit; if units/methods/owners or stage are missing, ask Gap Questions.
-- If measurement_method cannot be practically implemented with the system's actual infrastructure (as defined in upstream specs), ask for the intended measurement approach rather than inventing one.
+- If measurement_method cannot be implemented with the system's infrastructure as defined in `spec/02_system_sketch.json` components and `spec/02a_delivery_baseline.json` environments, MUST ask Gap Questions for the intended measurement approach rather than inventing one.
 - Rewrite targets to numeric/operational formats; finalize traces.
 - Emit JSON when measurable.
 
 ## Heuristics For Completeness
-- Optional→expected: include stage and owner for all prod-impact NFRs; include measurement_method that is queryable.
+- MUST include `stage` and `owner` for every NFR where `stage` is `prod` or `staging`; MUST include `measurement_method` that specifies a concrete query, tool, or dashboard URL.
 - Auto-trace: connect latency/throughput to public APIs; availability/durability to services and data stores; cost to components/pipelines.
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
@@ -98,10 +116,10 @@ Before emitting, verify:
 - **Measurement Verification**: Ensure `measurement_method` is a verifiable query or URL (e.g., "PromQL: ...", "Grafana dashboard: ...").
 
 ## Common Pitfalls
-- **Qualitative**: Writing qualitative statements (e.g., "fast") instead of measurable targets.
+- **Qualitative**: Writing qualitative statements ("fast", "secure", "reliable") instead of measurable targets with numeric values and units.
 - **Immeasurable**: Targets that cannot be measured with existing tooling or missing measurement methods.
 - **Prod-Only**: Using prod-only targets without staging or dev expectations, making regressions invisible until go-live.
-- **Orphans**: No owner assigned or missing traces, causing untracked regressions.
+- **Orphans**: Every NFR MUST have an `owner` assigned and at least one `trace` entry; NFRs without both are invalid and cause untracked regressions.
 - **Duplicates**: Duplicating NFR IDs across categories, which breaks coverage tooling.
 
 ## Negative Constraints
@@ -129,6 +147,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -183,17 +219,3 @@ Before emitting, verify:
   "canonical_conflicts": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

@@ -2,6 +2,24 @@
 
 Run `specdev prompt-context 10` to see downstream consumers.
 
+## Schema Authority
+
+The schema at `schema/10_governance.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -23,7 +41,7 @@ To enforce the governance policies defined here (specifically commit messages), 
 ```bash
 ./tools/run_specdev.sh governance-check <spec_dir> --message "commit message"
 ```
-Failures here should block the merge.
+Failures here MUST block the merge.
 
 # Role
 You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 10 · Governance & Change Control** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
@@ -43,7 +61,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Emit JSON when enforceable.
 
 ## Heuristics For Completeness
-- Optional→expected: include commit pattern if `require_spec_ids=true`; include PR rules invoking `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`.
+- MUST populate `commit_message_rules.pattern` with a valid regex when `require_spec_ids=true`. SHOULD populate `pr_rules` with at least `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check` when `spec_first_policy=true`.
 - Ambiguity scrub: make each rule testable (yes/no), not advisory.
 
 ## Self-Audit Gate
@@ -80,7 +98,7 @@ Before emitting, verify:
 ## Negative Constraints
 - Do not output text-only logic where regex patterns could be used (e.g., "must include spec IDs" instead of "require spec IDs").
 - Do not omit spec IDs in commit message patterns when `require_spec_ids` is true.
-- Do not use lazy policies (e.g., `spec_first_policy: false` without justification).
+- Do not set `spec_first_policy: false` unless `spec/00_charter.json` explicitly states a non-spec-first workflow; if set to `false`, MUST include a rationale in `generation_quality.assumptions`.
 - Do not create invalid regex patterns in `commit_message_rules.pattern`.
 - Do not omit required fields that are present in the schema.
 
@@ -104,7 +122,7 @@ Before emitting, verify:
 - **Versioning**: Document the `versioning` strategy (calendar, semver, spec revision) so downstream tooling can bump versions consistently.
 - **Friendly Errors**: In `error_message`, explicitly list the valid `type` enums (e.g. `feat, fix, chore`) so the user knows what to type without reading regex.
 - **Gates**: Encode `pr_rules` that require spec diffs before implementation merges, including checklist items for validation commands.
-- **Spec-First**: Flip `spec_first_policy` to true and describe when, if ever, exceptions are granted.
+- **Spec-First**: MUST set `spec_first_policy` to `true` when `spec/00_charter.json` defines spec-driven workflow constraints; document exceptions in `pr_rules` if any are granted.
 - **Traceability**: Configure `commit_message_rules` with regex patterns and spec ID requirements to maintain traceability.
 - **Reviewers**: List accountable `reviewers` with rotation notes or escalation paths to avoid approval bottlenecks.
 
@@ -117,7 +135,7 @@ Before emitting, verify:
 ## Quick Reference
 - ID Format: `governance-<descriptor>`; owner commonly `ops` or `system`.
 - Required Fields: must declare `spec_first_policy`; other sections should be filled for practical governance.
-- Commit Rules: `require_spec_ids` should align with ID formats like `fr-*`, `api-*`, `fixture-*`.
+- Commit Rules: `require_spec_ids` MUST align with ID formats like `fr-*`, `api-*`, `fixture-*`.
 - Reviewer List: maintain stable names or roles; update when ownership shifts.
 
 # Clarification Questions
@@ -136,6 +154,24 @@ Before emitting, verify:
 - No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
+
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
@@ -159,16 +195,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

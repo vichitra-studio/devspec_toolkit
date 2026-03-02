@@ -2,6 +2,24 @@
 
 Run `specdev prompt-context 11` to see downstream consumers.
 
+## Schema Authority
+
+The schema at `schema/11_redteam.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -33,7 +51,7 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
-- **Constraint:** EVERY mitigation must link to a requirement (NFR, Inv, FR) or be a clear directive.
+- **Constraint:** EVERY mitigation MUST link to an existing requirement ID (`nfr-*`, `inv-*`, `fr-*`) from upstream specs using the `traceRef` structure. If no existing ID applies, MUST define a new capability entry with `type: capability` and a concrete action in `note`.
 
 ## Taxonomy of Threats
 Use the `category` field to classify threats precisely:
@@ -47,7 +65,7 @@ Use the `category` field to classify threats precisely:
 1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
 2.  **Categorize**: Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.
 3.  **Trace**: Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY.
-4.  **Mitigate**: Define mitigations. Prefer linking to existing `inv-*` or `nfr-*` IDs using the `traceRef` structure. If a new control is needed, specify it clearly.
+4.  **Mitigate**: Define mitigations. MUST link to existing `inv-*` or `nfr-*` IDs from `spec/06_invariants.json` or `spec/07_nfrs.json` using the `traceRef` structure when a matching control exists. If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
 5.  **Edge Cases**: Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
 
 ## Examples: Weak vs. Strong
@@ -59,7 +77,7 @@ Use the `category` field to classify threats precisely:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `target_ids: [{type: api, id: api-user-profile}]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every `public` API in Step 05 should have at least one mapped threat (e.g., AuthZ bypass, Rate Limit abuse).
+- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector).
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If you list a mitigation "Enforce Role Check", link it to the actual invariant `inv-authz-admin-only`.
 
@@ -162,6 +180,24 @@ Before emitting, verify:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -223,16 +259,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

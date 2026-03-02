@@ -2,6 +2,24 @@
 
 Run `specdev prompt-context 12` to see downstream consumers.
 
+## Schema Authority
+
+The schema at `schema/12_ci_gates.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -37,13 +55,13 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Emit JSON when DAG and steps are explicit.
 
 ## Heuristics For Completeness
-- Optional→expected: include governance check and invariants evaluation; add coverage thresholds when NFRs imply them.
+- MUST include a `governance-check` job step when `spec/10_governance.json` defines `pr_rules`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric.
 - Ambiguity scrub: make pipeline DAG explicit; avoid implicit sequencing.
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - Gating items:
-  - All core validations present; dependencies declared; steps named clearly.
+  - All core validations (`validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`) present as job steps; all inter-job dependencies declared in `requires`; every step has a non-empty `command` field.
   - Coverage thresholds stated or explicitly deferred with rationale.
 - If coverage thresholds or CI runner infrastructure preferences are not derivable from upstream specs, ask Gap Questions — do not assume default thresholds.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
@@ -85,17 +103,6 @@ Available CLI tools include:
 - `./tools/run_specdev.sh seed-lint --repo-root ./devspec_toolkit` - Validate seed requirements
 - `./tools/run_specdev.sh docs-lint --repo-root ./devspec_toolkit` - Enforce docs policy
 
-## Canonical Registry (Required Input)
-- Load `canon/manifest.json` — the authoritative registry of all canonical terms.
-- Load `canon/aliases.json` — the alias resolution table.
-- For every semantic field you populate, search the manifest for a matching entry by `kind` + `preferred_label` or alias.
-- If a match exists: populate the corresponding `*_ref` field with `{id, kind}` at minimum.
-- If no match exists: add an entry to `canonical_proposals` with `temp_id`, `kind`, `proposed_label`, `definition`, and `source_field`.
-- If multiple matches exist or the match is ambiguous: add an entry to `canonical_conflicts`.
-- NEVER leave a `*_ref` field empty when a matching canonical entry exists.
-- NEVER use a deprecated canonical without checking `replaced_by` first.
-
-
 ## Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
@@ -116,6 +123,7 @@ Available CLI tools include:
 - jobs[*].job_id/name: stable identifiers; names are human-readable.
 - jobs[*].requires: upstream job IDs to create a DAG; omit or empty for roots.
 - jobs[*].steps: structured objects with `id`, `name`, and `command` fields.
+- jobs[*].environment_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) sourced from `spec/02a_delivery_baseline.json` -> `environments[]`. Each job MUST reference the environment it targets (e.g., `ci`, `staging`, `prod`). Look up the environment ID in `canon/manifest.json` to resolve the canonical ref. If the environment is not in the canonical registry, add it to `canonical_proposals`.
 - coverage_thresholds: set lines/branches numbers between 0 and 100.
 
 ## Best Practices
@@ -151,6 +159,27 @@ Available CLI tools include:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+- Load `canon/manifest.json` — the authoritative registry of all canonical terms.
+- Load `canon/aliases.json` — the alias resolution table.
+- For every semantic field you populate, search the manifest for a matching entry by `kind` + `preferred_label` or alias.
+- If a match exists: populate the corresponding `*_ref` field with `{id, kind}` at minimum.
+- If no match exists: add an entry to `canonical_proposals` with `temp_id`, `kind`, `proposed_label`, `definition`, and `source_field`.
+- If multiple matches exist or the match is ambiguous: add an entry to `canonical_conflicts`.
+- NEVER leave a `*_ref` field empty when a matching canonical entry exists.
+- NEVER use a deprecated canonical without checking `replaced_by` first.
+
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -159,7 +188,24 @@ Available CLI tools include:
   "created_at": "2025-01-01T00:00:00Z",
   "seed_refs": [],
   "spec_refs_ingested": [],
-  "jobs": [],
+  "jobs": [
+    {
+      "job_id": "validate-specs",
+      "name": "Validate All Spec Artifacts",
+      "requires": ["inv-schema-valid"],
+      "steps": [
+        {
+          "id": "step-validate-all",
+          "name": "Run schema validation",
+          "command": "./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit"
+        }
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
+    }
+  ],
   "generation_quality": {
     "assumptions": []
   },
@@ -169,10 +215,3 @@ Available CLI tools include:
 
 }
 ```
-
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

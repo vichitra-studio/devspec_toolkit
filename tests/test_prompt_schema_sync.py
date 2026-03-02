@@ -248,7 +248,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"type\":\"object\",\"properties\":{},\"required\":[]}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                     "- Include `generation_quality` in the output artifact.\n"
                 ),
                 encoding="utf-8",
@@ -283,7 +283,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"id\":\"INVALID_ID\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -325,7 +325,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"$schema\":\"https://specdev.local/schema/wrong.schema.json\",\"id\":\"charter\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -370,7 +370,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -408,7 +408,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"plan\":{}}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -442,7 +442,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"id\":\"charter\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -484,7 +484,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )
@@ -524,7 +524,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```json\n"
                     "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
                     "```\n\n"
-                    "## B4 Metadata Contract\n"
+                    "## Metadata Contract\n"
                 ),
                 encoding="utf-8",
             )

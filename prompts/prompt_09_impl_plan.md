@@ -1,6 +1,24 @@
 # Step 09 · Implementation Plan
 
-Run `specdev prompt-context 09` to see downstream consumers. This prompt's output feeds X downstream steps.
+Run `specdev prompt-context 09` to see downstream consumers. This prompt's output feeds 3 downstream steps.
+
+## Schema Authority
+
+The schema at `schema/09_impl_plan.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
 
 ## Path Variables
 | Variable | Description |
@@ -31,14 +49,14 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Plan Ledger: tech_stack (language/framework/db/tooling + versions), milestones (id/name/date/risks/spikes), migration plan (if replacing), dependencies (teams/vendors/apis). Do not output it.
-- **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless explicitly justified as a Spike.
+- **Cross-Check**: Verify your `tech_stack` selection against `spec/01_capabilities.json`. Do not introduce technologies not listed in capabilities unless a corresponding Spike entry exists in `milestones[*].spikes` with explicit rationale referencing the capability gap.
 - Align milestones with governance/CI cadence from upstream charter constraints and governance specs; add spikes for unknowns.
-- Self-audit; if risks/spikes/dependencies are vague, ask Gap Questions.
+- Self-audit; if any risk lacks a measurable impact statement, any spike lacks a success criterion, or any dependency lacks an owner and timeline, ask Gap Questions.
 - Rewrite milestones for outcomes and acceptance signals; finalize plan.
 - Emit JSON when the plan is actionable.
 
 ## Heuristics For Completeness
-- Optional→expected: include target_date when sequencing matters; include migration plan for any deprecation/replacement.
+- MUST populate `target_date` when milestones have ordering dependencies (i.e., one milestone's `deliverables` are consumed by another milestone). MUST include `migration_plan` when any `component_id` in `spec/02_system_sketch.json` has `status: deprecated` or is being replaced.
 - Ambiguity scrub: milestones should map to delivered FRs/APIs and passing CI gates.
 
 ## Self-Audit Gate
@@ -48,7 +66,7 @@ You are a senior specification author and validator. Your job is to emit a singl
   - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
   - `tech_stack` aligns with `01_capabilities.json`.
   - Dependencies listed for external teams/systems; plan aligns with governance/CI expectations.
-  - If milestone dates, delivery sequencing, or resource constraints cannot be derived from upstream specs, ask Gap Questions — do not invent timeline commitments.
+  - If milestone dates are not stated in `spec/00_charter.json` constraints, delivery sequencing is ambiguous, or resource constraints are not specified in any upstream artifact, ask Gap Questions — do not invent timeline commitments.
 
 
 ### Coverage Closure
@@ -133,6 +151,24 @@ Before emitting, verify:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -212,16 +248,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

@@ -1,6 +1,13 @@
 # Step 02a · Delivery Baseline
 
-Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds X downstream steps.
+Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
+
+## Schema Authority
+
+The schema at `schema/02a_delivery_baseline.schema.json` is the authoritative source for all
+field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
+MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
+all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
 ## Path Variables
 | Variable | Description |
@@ -47,6 +54,26 @@ For each upstream artifact ingested, extract the following:
 - **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure
 - **docs/seed/seed_tech_stack.md**: Runtime versions, cloud providers, and infrastructure constraints for environment definitions
 
+## Seed Ingestion Protocol
+
+This step's seed requirements are defined in `spec/common/seed_manifest.json` -> `step_requirements`.
+
+1. **Read**: Read `spec/common/seed_manifest.json` and identify seeds listed under this step's `step_requirements`
+2. **Ingest**: Read each required seed document at its `path` listed in the manifest's `seeds[]` array, in the order defined by `global_seed_order`
+3. **Extract**: Extract the specific fields relevant to this step's output as described in the `### Extraction Intent` section
+4. **Populate**: Populate `seed_refs[]` with actually-used seed IDs and content hashes
+
+## Coverage Gap Reporting
+
+Any output field whose value cannot be traced to a specific upstream artifact or seed document
+MUST be recorded in `coverage_gaps[]` with:
+- `upstream_item_id`: the ID of the upstream item that should have provided the data
+- `source_step`: the step number where the data was expected
+- `reason`: why the value could not be traced
+
+This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
+questions; untraceable content triggers `coverage_gaps[]` population.
+
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
 - Cross-check gates against required command list and seed constraints; add missing core checks.
@@ -55,9 +82,9 @@ For each upstream artifact ingested, extract the following:
 - Emit JSON once consistent.
 
 ## Heuristics For Completeness
-- Optional→expected: include secrets required by external systems in the sketch; include compliance labels when NFRs or governance imply policies.
-- Parity hint: staging **MUST** mirror prod critical gates and environment traits to ensure valid testing.
-- Ambiguity scrub: map gates to `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`.
+- MUST include secrets (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external`; MUST include compliance labels when `spec/00_charter.json` constraints or `docs/seed/seed_tech_stack.md` reference regulatory frameworks.
+- Parity rule: staging MUST include every `ci_gates` entry that prod includes, and MUST match prod's `region`, `runtime`, and `cluster` values (or explicitly document deviations with rationale).
+- Ambiguity scrub: MUST map every `ci_gates` entry to one of the known gate commands: `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`. Do NOT invent gate names not in this list.
 
 ## Self-Audit Gate
 - Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
@@ -89,7 +116,7 @@ Before emitting, verify:
 5. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
 6. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
 7. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-- Do not output 'TBD' or placeholders.
+- MUST NOT output 'TBD', 'TODO', 'FIXME', 'XXX', or any placeholder tokens; every field MUST contain a concrete value derived from upstream artifacts.
 - Do not invent compliance standards not present in upstream context.
 - Do not include secret values.
 - Do not include manual review steps in ci_gates.
@@ -108,7 +135,7 @@ Before emitting, verify:
 - **DO NOT** include manual review steps in `ci_gates` (these belong in governance).
 
 ## Field-by-Field Guidance
-- environments.dev/ci/staging/prod: include minimal structure describing infra/tooling expectations (e.g., cloud, region, cluster, runners).
+- environments.dev/ci/staging/prod: each environment object MUST include at least `runtime` and `region` (or `runner` for ci) as defined in `docs/seed/seed_tech_stack.md`; read `schema/02a_delivery_baseline.schema.json` for the full set of allowed keys.
 - ci_gates: ordered list of gate names as strings.
 - secrets: namespaced identifiers (e.g., `PAYMENTS_API_KEY`), not values.
 - compliance: list of applicable labels/policies (e.g., `gdpr-data-exportable`).
@@ -150,6 +177,24 @@ Before emitting, verify:
 - Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
 - blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
+## Canonical Registry (Required Input)
+
+Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
+1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
+2. Resolve aliases via `canon/aliases.json`
+3. Propose new entries in `canonical_proposals` when no match exists
+4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
+## Canonical Binding Rules
+1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
+2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
+5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+
+## Metadata Contract
+
+This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
+
 # Output Contract
 ```json
 {
@@ -176,16 +221,3 @@ Before emitting, verify:
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
