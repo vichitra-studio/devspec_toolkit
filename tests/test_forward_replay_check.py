@@ -186,6 +186,120 @@ class ForwardReplayCheckTests(unittest.TestCase):
                     
             self.assertTrue(any("W550 SEMANTIC_COVERAGE_SKIP" in e for e in errs))
 
+    def test_status_only_change_is_exempted(self):
+        """T1: A change to only milestones[].status in an exempted step should not trigger E550."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            step_order = {
+                "steps": ["09", "10"],
+                "policy": {
+                    "status_write_exemptions": {
+                        "09": ["milestones[].status"]
+                    }
+                }
+            }
+            (root / "tools" / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+            new_spec = {"milestones": [{"milestone_id": "m1", "status": "done", "name": "Alpha"}]}
+            (root / "spec" / "09_impl_plan.json").write_text(json.dumps(new_spec), encoding="utf-8")
+            (root / "spec" / "10_governance.json").write_text("{}", encoding="utf-8")
+            old_spec = {"milestones": [{"milestone_id": "m1", "status": "pending", "name": "Alpha"}]}
+
+            def mock_run(cmd, **kwargs):
+                class Result:
+                    returncode = 0
+                    stdout = json.dumps(old_spec)
+                    stderr = ""
+                return Result()
+
+            with patch("specdev_tools.validation.forward_replay_check._changed_files",
+                       return_value=(["spec/09_impl_plan.json"], None)):
+                with patch("subprocess.run", side_effect=mock_run):
+                    errs = check_forward_replay(str(root), base_ref="origin/main")
+            self.assertFalse(any("E550" in e for e in errs))
+
+    def test_status_plus_other_change_is_not_exempted(self):
+        """T2: A change that also modifies non-exempt fields should still trigger E550."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            step_order = {
+                "steps": ["09", "10"],
+                "policy": {
+                    "status_write_exemptions": {
+                        "09": ["milestones[].status"]
+                    }
+                }
+            }
+            (root / "tools" / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+            new_spec = {"milestones": [{"milestone_id": "m1", "status": "done", "name": "Beta"}]}
+            (root / "spec" / "09_impl_plan.json").write_text(json.dumps(new_spec), encoding="utf-8")
+            (root / "spec" / "10_governance.json").write_text("{}", encoding="utf-8")
+            old_spec = {"milestones": [{"milestone_id": "m1", "status": "pending", "name": "Alpha"}]}
+
+            def mock_run(cmd, **kwargs):
+                class Result:
+                    returncode = 0
+                    stdout = json.dumps(old_spec)
+                    stderr = ""
+                return Result()
+
+            with patch("specdev_tools.validation.forward_replay_check._changed_files",
+                       return_value=(["spec/09_impl_plan.json"], None)):
+                with patch("subprocess.run", side_effect=mock_run):
+                    errs = check_forward_replay(str(root), base_ref="origin/main")
+            self.assertTrue(any("E550" in e for e in errs))
+
+    def test_no_exemptions_configured_preserves_behavior(self):
+        """T3: Without status_write_exemptions, original E550 behavior is preserved."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "step_order.json").write_text(
+                json.dumps({"steps": ["09", "10"]}), encoding="utf-8"
+            )
+            (root / "spec" / "09_impl_plan.json").write_text("{}", encoding="utf-8")
+            (root / "spec" / "10_governance.json").write_text("{}", encoding="utf-8")
+            with patch("specdev_tools.validation.forward_replay_check._changed_files",
+                       return_value=(["spec/09_impl_plan.json"], None)):
+                errs = check_forward_replay(str(root), base_ref="origin/main")
+            self.assertTrue(any("E550" in e for e in errs))
+
+    def test_exempted_step_with_git_show_failure_not_exempted(self):
+        """T4: If git show fails, conservative fallback means the step is NOT exempted."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            step_order = {
+                "steps": ["09", "10"],
+                "policy": {
+                    "status_write_exemptions": {
+                        "09": ["milestones[].status"]
+                    }
+                }
+            }
+            (root / "tools" / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
+            new_spec = {"milestones": [{"milestone_id": "m1", "status": "done", "name": "Alpha"}]}
+            (root / "spec" / "09_impl_plan.json").write_text(json.dumps(new_spec), encoding="utf-8")
+            (root / "spec" / "10_governance.json").write_text("{}", encoding="utf-8")
+
+            def mock_run(cmd, **kwargs):
+                class Result:
+                    returncode = 128
+                    stdout = ""
+                    stderr = "fatal: bad revision"
+                return Result()
+
+            with patch("specdev_tools.validation.forward_replay_check._changed_files",
+                       return_value=(["spec/09_impl_plan.json"], None)):
+                with patch("subprocess.run", side_effect=mock_run):
+                    errs = check_forward_replay(str(root), base_ref="origin/main")
+            self.assertTrue(any("E550" in e for e in errs))
+
     def test_traceability_gaps_surfaced_as_warnings(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
