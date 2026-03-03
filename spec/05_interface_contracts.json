@@ -75,5 +75,7 @@
         }
     ],
     "canonical_proposals": [],
-    "canonical_conflicts": []
+    "canonical_conflicts": [],
+    "spec_refs_ingested": [],
+    "coverage_gaps": []
 }

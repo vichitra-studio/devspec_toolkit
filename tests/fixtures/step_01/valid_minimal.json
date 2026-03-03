@@ -59,7 +59,13 @@
       "capability_ref": {
         "id": "cn:ops:capability:archive-user",
         "kind": "capability"
-      }
+      },
+      "trace": [
+        {
+          "type": "capability",
+          "id": "cap-archive-tbd"
+        }
+      ]
     }
   ],
   "generation_quality": {
@@ -93,5 +99,6 @@
       "suggested_namespace": "ops"
     }
   ],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 }

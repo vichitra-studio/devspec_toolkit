@@ -30,7 +30,13 @@
             "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
           },
           "category": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "traceability",
+              "completeness",
+              "quality",
+              "ambiguity"
+            ]
           },
           "description": {
             "type": "string"
@@ -56,13 +62,13 @@
             }
           },
           "risk_category_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           },
           "completeness_dimension_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           },
           "tag_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
         "required": [
@@ -70,7 +76,8 @@
           "category",
           "description",
           "priority",
-          "impact_on_completeness"
+          "impact_on_completeness",
+          "specification_source"
         ]
       }
     },
@@ -101,24 +108,27 @@
       ]
     },
     "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
     },
     "canonical_proposals": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
       "default": []
     },
     "canonical_conflicts": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
       },
       "default": []
+    },
+    "coverage_gaps": {
+      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
     },
     "_migration_notes": {
       "type": "string",
@@ -136,6 +146,7 @@
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",
-    "canonical_conflicts"
+    "canonical_conflicts",
+    "coverage_gaps"
   ]
 }

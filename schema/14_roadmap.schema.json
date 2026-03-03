@@ -23,7 +23,7 @@
     "tech_stack": {
       "allOf": [
         {
-          "$ref": "https://specdev.local/schema/core/collections/1#/$defs/techStack"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStack"
         },
         {
           "required": [
@@ -34,7 +34,7 @@
       ]
     },
     "tech_stack_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "milestones": {
       "type": "array",
@@ -142,13 +142,13 @@
                   ]
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 },
                 "environment_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 },
                 "metric_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 },
                 "depends_on": {
                   "type": "array",
@@ -161,7 +161,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "minLength": 15
+                    "minLength": 10
                   },
                   "description": "Assumptions that must hold for this task to succeed."
                 },
@@ -176,8 +176,7 @@
               },
               "required": [
                 "task_id",
-                "description",
-                "acceptance_criteria"
+                "description"
               ]
             },
             "description": "Atomic sub-tasks required to complete the user story."
@@ -195,7 +194,7 @@
             "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
           },
           "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
         "required": [
@@ -216,10 +215,10 @@
       "minLength": 1
     },
     "dependencies": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyObjectList"
+      "$ref": "https://specdev.local/schema/core/collections/1#dependencyObjectList"
     },
     "dependency_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "trace": {
       "type": "array",
@@ -228,24 +227,27 @@
       }
     },
     "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
     },
     "canonical_proposals": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
       "default": []
     },
     "canonical_conflicts": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
       },
       "default": []
+    },
+    "coverage_gaps": {
+      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
     },
     "_migration_notes": {
       "type": "string",
@@ -263,6 +265,7 @@
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",
-    "canonical_conflicts"
+    "canonical_conflicts",
+    "coverage_gaps"
   ]
 }

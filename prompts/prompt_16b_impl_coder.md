@@ -309,7 +309,8 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 }
 ```
 
@@ -399,7 +400,8 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 }
 ```
 

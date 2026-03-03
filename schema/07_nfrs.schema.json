@@ -68,7 +68,7 @@
             "type": "string"
           },
           "stage": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/stageName"
+            "$ref": "https://specdev.local/schema/core/collections/1#stageName"
           },
           "owner": {
             "$ref": "https://specdev.local/schema/core/atoms/1#owner"
@@ -80,16 +80,16 @@
             }
           },
           "metric_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           },
           "unit_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           },
           "stage_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           },
           "environment_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
         "required": [
@@ -103,29 +103,33 @@
           "environment_ref",
           "measurement_method",
           "stage",
-          "owner"
+          "owner",
+          "trace"
         ]
       }
     },
     "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
     },
     "canonical_proposals": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
       "default": []
     },
     "canonical_conflicts": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
       },
       "default": []
+    },
+    "coverage_gaps": {
+      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
     },
     "_migration_notes": {
       "type": "string",
@@ -142,6 +146,7 @@
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",
-    "canonical_conflicts"
+    "canonical_conflicts",
+    "coverage_gaps"
   ]
 }

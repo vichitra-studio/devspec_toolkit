@@ -220,7 +220,13 @@ This step's output artifact MUST include every field listed in the schema's `req
       "capability_ref": {
         "id": "cn:core:capability:example",
         "kind": "capability"
-      }
+      },
+      "trace": [
+        {
+          "type": "capability",
+          "id": "capability-authentication"
+        }
+      ]
     }
   ],
   "generation_quality": {
@@ -233,7 +239,8 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 }
 ```
 

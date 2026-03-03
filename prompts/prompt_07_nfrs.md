@@ -195,7 +195,13 @@ This step's output artifact MUST include every field listed in the schema's `req
       },
       "measurement_method": "automated monitoring",
       "stage": "prod",
-      "owner": "api"
+      "owner": "api",
+      "trace": [
+        {
+          "type": "fr",
+          "id": "fr-auth-login"
+        }
+      ]
     }
   ],
   "generation_quality": {
@@ -216,6 +222,7 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 }
 ```

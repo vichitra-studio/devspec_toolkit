@@ -331,6 +331,7 @@ This step's output artifact MUST include every field listed in the schema's `req
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
+          "milestone_ref": "milestone-auth",
           "nfr_refs": ["nfr-availability-uptime"],
           "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
@@ -364,7 +365,8 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_conflicts": [],
+  "coverage_gaps": []
 
 }
 ```

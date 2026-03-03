@@ -10,11 +10,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
     def test_repo_prompt_schema_sync_is_clean(self):
         repo_root = Path(__file__).resolve().parents[1]
         errs = run_prompt_schema_sync(str(repo_root))
-        # W580 SUBSTEP_DRIFT warnings are expected for 16b/16c prompts that
-        # intentionally include cross-domain keys (plan, execution) for
-        # full-context review.  Filter them out for this assertion.
-        hard_errors = [e for e in errs if not e.startswith("W580")]
-        self.assertEqual([], hard_errors, msg=f"Repo prompt/schema drift detected: {hard_errors}")
+        self.assertEqual([], errs, msg=f"Repo prompt/schema drift detected: {errs}")
 
     def test_detects_missing_required(self):
         with tempfile.TemporaryDirectory() as td:
@@ -615,6 +611,44 @@ class PromptSchemaSyncTests(unittest.TestCase):
             self.assertEqual(
                 w580_errs, [],
                 f"Did not expect W580 errors. Got: {w580_errs}"
+            )
+
+
+    def test_substep_upstream_keys_no_drift(self):
+        """No W580 when sub-step output contract contains upstream domain keys."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            (root / "schema" / "16_impl_context.schema.json").write_text(
+                json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {
+                            "plan": {"type": "object"},
+                            "execution": {"type": "object"},
+                            "review": {"type": "object"},
+                        },
+                        "required": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # 16b prompt with "plan" (upstream from 16a) — should be allowed
+            (root / "prompts" / "prompt_16b_impl_coder.md").write_text(
+                (
+                    "# Output Contract\n"
+                    "```json\n"
+                    '{"plan": {"status": "active"}, "execution": {"files": []}}\n'
+                    "```\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            w580_errs = [e for e in errs if "W580" in e]
+            self.assertEqual(
+                w580_errs, [],
+                f"Upstream keys should not trigger W580. Got: {w580_errs}"
             )
 
 

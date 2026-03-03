@@ -23,7 +23,7 @@
     "tech_stack": {
       "allOf": [
         {
-          "$ref": "https://specdev.local/schema/core/collections/1#/$defs/techStack"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStack"
         },
         {
           "required": [
@@ -36,7 +36,7 @@
       ]
     },
     "tech_stack_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "milestones": {
       "type": "array",
@@ -77,12 +77,14 @@
             }
           },
           "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
         "required": [
           "milestone_id",
-          "name"
+          "name",
+          "deliverables",
+          "status"
         ]
       }
     },
@@ -90,13 +92,13 @@
       "type": "string"
     },
     "dependencies": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyList"
+      "$ref": "https://specdev.local/schema/core/collections/1#dependencyList"
     },
     "dependency_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "environment_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "trace": {
       "type": "array",
@@ -105,24 +107,27 @@
       }
     },
     "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
     },
     "canonical_proposals": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
       "default": []
     },
     "canonical_conflicts": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
       },
       "default": []
+    },
+    "coverage_gaps": {
+      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
     },
     "_migration_notes": {
       "type": "string",
@@ -136,10 +141,12 @@
     "seed_refs",
     "spec_refs_ingested",
     "tech_stack",
+    "milestones",
     "trace",
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",
-    "canonical_conflicts"
+    "canonical_conflicts",
+    "coverage_gaps"
   ]
 }

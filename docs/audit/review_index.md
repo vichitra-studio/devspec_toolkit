@@ -37,7 +37,7 @@ Each review assumes all prior reviews have been completed and their changes comm
 | Order | ID | File | Layer | Gaps Closed | Priority | Est. Tasks | Notes |
 |-------|----|------|-------|-------------|----------|-----------|-------|
 | 7 | R7 | `r7_prompt_completeness.md` | L1 (Prompts) | 1,2,4,5,7,8 | P0-critical | 28 | **COMPLETE** — 11 findings (4 CRIT, 6 HIGH, 1→R8); Gap 3 deferred to R8; Gap 9 verified non-issue; 583/583 tests pass |
-| 8 | R8 | `r8_schema_alignment.md` | L2 (Schemas) | 6-7 | P0-critical | 20-25 | 83 schema-prompt gaps → 0, additionalProperties fixes |
+| 8 | R8 | `r8_findings.md` | L2 (Schemas) | 6-7 | P0-critical | 20-25 | **COMPLETE** — 14 findings (2 CRIT, 2 HIGH, 8 G-series, 2 post-R8 cleanup); `coverage_gaps` added to all 19 step schemas; `trace` required in Steps 01/07; 189 `$ref` URIs normalized to anchor syntax; W580 forward-only drift; 584/584 tests pass |
 | 9 | R9 | `r9_validator_ci_closure.md` | L3+L4 (Validators+CI) | 8-15 | P0-critical | 30-35 | Cross-step IDs, extraction_intent, content derivation, W→E promotion |
 
 ---

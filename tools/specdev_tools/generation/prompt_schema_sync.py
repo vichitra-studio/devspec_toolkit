@@ -352,12 +352,18 @@ def _validate_output_contracts(
         payload = dict(output_payload)
         payload.pop("$schema", None)
         errors.extend(_validate_output_payload(prompt_path, line_no, payload, schema, registry))
-        # W580 — sub-step domain drift detection
+        # W580 — sub-step domain drift detection (forward-only)
+        # Trinity Loop steps accumulate upstream sections:
+        # 16a writes plan; 16b reads plan + writes execution;
+        # 16c reads plan+execution + writes review.
+        # Only warn about keys from LATER steps (forward drift).
         if step in _SUBSTEP_EXPECTED_KEYS and isinstance(output_payload, dict):
             payload_keys = set(output_payload.keys()) - {"$schema"}
+            step_idx = _SUBSTEP_ORDER.index(step)
             for other_step, other_keys in _SUBSTEP_EXPECTED_KEYS.items():
-                if other_step == step:
-                    continue
+                other_idx = _SUBSTEP_ORDER.index(other_step)
+                if other_idx <= step_idx:
+                    continue  # upstream or self — allowed
                 foreign_keys = payload_keys & other_keys
                 if foreign_keys:
                     errors.append(
@@ -379,6 +385,8 @@ _SUBSTEP_EXPECTED_KEYS = {
     "16b": {"execution", "implementation", "evidence"},
     "16c": {"review", "verdict", "semantic_review"},
 }
+
+_SUBSTEP_ORDER = ["16a", "16b", "16c"]
 
 
 def _step_from_prompt_name(name: str) -> str | None:

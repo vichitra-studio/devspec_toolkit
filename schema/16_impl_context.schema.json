@@ -222,7 +222,7 @@
               }
             },
             "status_ref": {
-              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
             }
           },
           "required": [
@@ -237,7 +237,7 @@
                     "const": "required"
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                   }
                 }
               },
@@ -356,6 +356,10 @@
                   "fixture_ref": {
                     "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
                   },
+                  "milestone_ref": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                  },
                   "implementation": {
                     "type": "object",
                     "description": "Atomic work definition for this specific requirement.",
@@ -405,7 +409,7 @@
                               "$ref": "#/$defs/evidenceObject"
                             },
                             "command_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                             }
                           },
                           "required": [
@@ -452,7 +456,7 @@
                                     "minLength": 1
                                   },
                                   "command_ref": {
-                                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                                   }
                                 }
                               }
@@ -461,7 +465,7 @@
                         }
                       },
                       "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                       }
                     },
                     "required": [
@@ -476,7 +480,7 @@
                               "const": "verified"
                             },
                             "status_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                             }
                           },
                           "required": ["status"]
@@ -611,7 +615,7 @@
                 ]
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             },
             "required": [
@@ -757,7 +761,7 @@
                         "type": "string"
                       },
                       "command_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                       }
                     },
                     "required": [
@@ -785,7 +789,7 @@
                       "type": "string"
                     },
                     "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                     }
                   }
                 }
@@ -818,7 +822,7 @@
                   "type": "string"
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -853,7 +857,7 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -876,7 +880,7 @@
                   "type": "string"
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -918,7 +922,7 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -940,7 +944,7 @@
                   "type": "string"
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -1002,7 +1006,7 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -1024,7 +1028,7 @@
                   "type": "string"
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -1088,7 +1092,7 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                 }
               },
               "required": [
@@ -1168,7 +1172,7 @@
           ]
         },
         "status_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
         }
       },
       "required": [
@@ -1185,7 +1189,7 @@
                 "const": "deferred"
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             }
           },
@@ -1317,7 +1321,7 @@
                     "type": "string"
                   },
                   "command_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                   }
                 },
                 "required": [
@@ -1327,10 +1331,10 @@
                 ]
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               },
               "command_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             },
             "required": [
@@ -1348,7 +1352,7 @@
                       "const": "passed"
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                     }
                   }
                 },
@@ -1428,7 +1432,7 @@
                 "type": "string"
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             },
             "required": [
@@ -1661,7 +1665,7 @@
                     "type": "string"
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                   }
                 },
                 "required": [
@@ -1704,7 +1708,7 @@
                   "env": {
                     "allOf": [
                       {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentName"
+                        "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
                       },
                       {
                         "enum": [
@@ -1727,7 +1731,7 @@
                     ]
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                   }
                 },
                 "required": [
@@ -1815,30 +1819,33 @@
       ]
     },
     "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "risk_category_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
     },
     "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
     },
     "canonical_proposals": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
       "default": []
     },
     "canonical_conflicts": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
       },
       "default": []
+    },
+    "coverage_gaps": {
+      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
     },
     "_migration_notes": {
       "type": "string",
@@ -1855,6 +1862,7 @@
     "generation_quality",
     "canonical_refs_used",
     "canonical_proposals",
-    "canonical_conflicts"
+    "canonical_conflicts",
+    "coverage_gaps"
   ]
 }

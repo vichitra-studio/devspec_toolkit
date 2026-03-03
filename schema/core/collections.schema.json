@@ -381,6 +381,9 @@
       "$anchor": "generationQuality",
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "assumptions"
+      ],
       "properties": {
         "assumptions": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
@@ -456,6 +459,37 @@
       "items": {
         "$ref": "https://specdev.local/schema/core/collections/1#specRefIngested"
       }
+    },
+    "coverageGap": {
+      "$anchor": "coverageGap",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "upstream_item_id",
+        "source_step",
+        "reason"
+      ],
+      "properties": {
+        "upstream_item_id": {
+          "type": "string"
+        },
+        "source_step": {
+          "type": "string",
+          "pattern": "^[0-9]{2}[a-c]?$"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "coverageGapsArray": {
+      "$anchor": "coverageGapsArray",
+      "type": "array",
+      "items": {
+        "$ref": "https://specdev.local/schema/core/collections/1#coverageGap"
+      },
+      "minItems": 0
     },
     "anyJson": {
       "$anchor": "anyJson",

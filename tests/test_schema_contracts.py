@@ -72,22 +72,22 @@ class SchemaContractsTests(unittest.TestCase):
     def test_d022_targeted_schemas_reuse_shared_environment_stage_and_dependency_anchors(self):
         expected_refs = {
             "02a_delivery_baseline.schema.json": {
-                "#/$defs/environmentName",
-                "#/$defs/environmentConfig",
+                "#environmentName",
+                "#environmentConfig",
             },
             "07_nfrs.schema.json": {
-                "#/$defs/stageName",
+                "#stageName",
             },
             "09_impl_plan.schema.json": {
-                "#/$defs/techStack",
-                "#/$defs/dependencyList",
+                "#techStack",
+                "#dependencyList",
             },
             "14_roadmap.schema.json": {
-                "#/$defs/techStack",
-                "#/$defs/dependencyObjectList",
+                "#techStack",
+                "#dependencyObjectList",
             },
             "16_impl_context.schema.json": {
-                "#/$defs/environmentName",
+                "#environmentName",
             },
         }
         for file_name, refs in expected_refs.items():
