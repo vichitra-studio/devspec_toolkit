@@ -15,8 +15,10 @@ from ..canonical.integrity import validate_canonical_integrity, validate_canonic
 from ..canonical.lint import lint_canon_dir
 from .dependency_order_lint import lint_dependency_order
 from .forward_replay_check import check_forward_replay
+from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
+from ..core.errors import PROMOTABLE_PAIRS
 from ..core.registry import SchemaRegistry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
@@ -258,19 +260,31 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
     if (root / "schema").exists() and (root / "prompts").exists():
         failures.extend(run_prompt_schema_sync(repo_root))
 
-    # Honor SPECDEV_WARNINGS_AS_ERRORS for any W-coded traceability gaps,
-    # and deduplicate divergent error signals (duplicate reporting of gaps)
+    # R9/T26: Extraction intent validation (prompts vs step_order.json)
+    if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
+        failures.extend(check_extraction_intent(repo_root))
+
+    # R9/T26: Dynamic W→E promotion using PROMOTABLE_PAIRS from errors.py
+    # SPECDEV_WARNINGS_AS_ERRORS=1 promotes all; SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively
     warn_as_error = os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
-    
-    warn_promote_pairs = [("W560", "E560"), ("W561", "E561"), ("W562", "E562"), ("W563", "E563")]
+    promote_codes_env = os.getenv("SPECDEV_PROMOTE_CODES", "").strip()
+
     if warn_as_error:
-        for w_code, e_code in warn_promote_pairs:
+        # Promote ALL codes in PROMOTABLE_PAIRS
+        for w_code, e_code in PROMOTABLE_PAIRS.items():
             failures = [f.replace(w_code, e_code, 1) if f.startswith(w_code) else f for f in failures]
+    elif promote_codes_env:
+        # Selective promotion: only the specified W-codes
+        selected = {c.strip() for c in promote_codes_env.split(",") if c.strip()}
+        for w_code in selected:
+            e_code = PROMOTABLE_PAIRS.get(w_code)
+            if e_code:
+                failures = [f.replace(w_code, e_code, 1) if f.startswith(w_code) else f for f in failures]
 
     failures = list(dict.fromkeys(failures))
 
-    if not warn_as_error:
-        for w_code, e_code in warn_promote_pairs:
+    if not warn_as_error and not promote_codes_env:
+        for w_code, e_code in PROMOTABLE_PAIRS.items():
             e_bases = {f.replace(e_code, w_code, 1) for f in failures if f.startswith(e_code)}
             failures = [f for f in failures if not (f.startswith(w_code) and f in e_bases)]
 

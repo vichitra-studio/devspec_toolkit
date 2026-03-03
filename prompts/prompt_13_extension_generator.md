@@ -46,6 +46,23 @@ You are a Principal Software Architect and Technical Program Manager. Your goal 
 - **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the referenced step schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Project scope boundaries and high-level domain context used to constrain which extension domains are in-scope versus out-of-scope
+- **01_capabilities.json**: Capability IDs and descriptions identifying complex functional areas that may require dedicated extension specifications beyond core step coverage
+- **02_system_sketch.json**: Component IDs, subsystem boundaries, and architectural patterns (event sourcing, CQRS, multi-tenancy) evaluated for extension spec necessity
+- **02a_delivery_baseline.json**: Deployment topology and environment constraints that influence whether infrastructure-specific extensions are warranted
+- **03_glossary.json**: Domain-specific terminology and bounded-context definitions used to identify domain verticals requiring dedicated specification treatment
+- **04_fr_list.json**: Functional requirement IDs and complexity indicators that signal domains with sufficient depth to justify a standalone extension specification
+- **05_interface_contracts.json**: API endpoint definitions used to verify that proposed extensions do not duplicate routes already covered by core interface contracts
+- **06_invariants.json**: System invariant rules that may require dedicated extension specifications when they span complex cross-cutting concerns like data consistency or transactional guarantees
+- **07_nfrs.json**: Non-functional requirement IDs, categories (security, compliance, performance), and thresholds evaluated for extension necessity when complexity exceeds core NFR coverage
+- **08_fixtures.json**: Test fixture targets and coverage patterns used to confirm that proposed extensions have testable surface area and are not purely theoretical
+- **09_implementation_plan.json**: Technology stack decisions and milestone structure consulted to ensure proposed extensions align with chosen frameworks and implementation sequencing
+- **10_governance.json**: Governance label definitions and canonical refs used to bind each extension entry to a required governance_label_ref value
+- **11_redteam.json**: Threat model findings and attack surface analysis evaluated for security or compliance domains that warrant dedicated extension specifications
+- **12_ci_gates.json**: CI gate definitions and quality thresholds reviewed to confirm that proposed extensions can be validated within the existing continuous integration pipeline
+
 ## Operating Flow: Analyze → Filter → Plan
 - **Analyze**: Scan the input specs for complex subsystems.
   - *Data Storage*: Does the sketch imply complex schemas (SQL, NoSQL, Vector DB)? -> Needs a Database Spec.

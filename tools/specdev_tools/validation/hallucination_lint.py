@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 from ..canonical.lint import lint_canon_dir
@@ -68,6 +69,7 @@ def lint_hallucinations(
         errors.extend(_check_linked_test_expectations(rel, data, root))
         if nfr_ids is not None:
             errors.extend(_check_nfr_refs(rel, data, nfr_ids))
+        errors.extend(_check_content_derivation(rel, data, spec_dir, root))
         _collect_ids_and_refs(data, rel, known_ids, refs)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
@@ -285,6 +287,117 @@ def _check_nfr_refs(rel: str, data: Any, nfr_ids: set[str]) -> list[str]:
     for ref in refs:
         if ref not in nfr_ids:
             errs.append(f"E530 UNRESOLVED_NFR_REF {rel} nfr_ref={ref}")
+    return errs
+
+
+# R9/T20: Content derivation check
+_DERIVATION_STOPWORDS = {
+    "that", "this", "with", "from", "have", "will", "been", "were", "they",
+    "their", "than", "each", "which", "when", "what", "there", "about",
+    "would", "make", "like", "into", "only", "also", "most", "some",
+    "could", "should", "does", "must", "shall", "true", "false", "null",
+    "http", "https", "schema", "json", "spec", "step",
+}
+_DERIVATION_FREE_TEXT_FIELDS = {
+    "description", "statement", "rationale", "justification", "notes",
+    "narrative", "definition", "postconditions", "preconditions",
+}
+
+
+def _tokenize(text: str) -> set[str]:
+    """Extract significant tokens: 4+ char words, no stopwords."""
+    return {
+        w for w in re.findall(r"[a-z][a-z0-9_-]{3,}", text.lower())
+        if w not in _DERIVATION_STOPWORDS
+    }
+
+
+def _extract_free_text_tokens(obj: Any) -> set[str]:
+    """Extract tokens from all free-text fields in a spec artifact."""
+    tokens: set[str] = set()
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in _DERIVATION_FREE_TEXT_FIELDS and isinstance(v, str):
+                tokens |= _tokenize(v)
+            elif isinstance(v, (dict, list)):
+                tokens |= _extract_free_text_tokens(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            tokens |= _extract_free_text_tokens(item)
+    return tokens
+
+
+def _check_content_derivation(
+    rel: str,
+    data: Any,
+    spec_dir: str,
+    repo_root: str,
+    threshold: int = 5,
+) -> list[str]:
+    """R9/T20: Check that downstream content derives from upstream artifacts."""
+    errs: list[str] = []
+    # Load step_order.json to find upstream dependencies
+    step_order_path = os.path.join(repo_root, "tools", "step_order.json")
+    if not os.path.isfile(step_order_path):
+        return errs
+
+    # Determine current step from filename
+    basename = os.path.basename(rel)
+    step_match = re.match(r"^(\d{2}[a-z]?)_", basename)
+    if not step_match:
+        return errs
+    step_id = step_match.group(1)
+
+    try:
+        with open(step_order_path, "r", encoding="utf-8") as f:
+            order_data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return errs
+
+    upstream_deps = order_data.get("allowed_upstream_dependencies", {}).get(step_id, [])
+    if not upstream_deps:
+        return errs
+
+    # Extract tokens from downstream (current artifact)
+    downstream_tokens = _extract_free_text_tokens(data)
+    if not downstream_tokens:
+        return errs
+
+    # Load and tokenize upstream artifacts
+    upstream_tokens: set[str] = set()
+    missing_upstreams: list[str] = []
+    for dep_step in upstream_deps:
+        found = False
+        if os.path.isdir(spec_dir):
+            for fn in os.listdir(spec_dir):
+                if fn.startswith(f"{dep_step}_") and fn.endswith(".json"):
+                    dep_path = os.path.join(spec_dir, fn)
+                    try:
+                        with open(dep_path, "r", encoding="utf-8") as f:
+                            dep_data = json.load(f)
+                        upstream_tokens |= _extract_free_text_tokens(dep_data)
+                        found = True
+                    except (OSError, json.JSONDecodeError):
+                        pass
+                    break
+        if not found:
+            missing_upstreams.append(dep_step)
+
+    for dep in missing_upstreams:
+        errs.append(f"W590 CROSS_STEP_UPSTREAM_MISSING upstream step {dep} artifact not found; skipping derivation check")
+
+    if not upstream_tokens:
+        return errs
+
+    # Count overlap
+    overlap = downstream_tokens & upstream_tokens
+    if len(overlap) < threshold:
+        errs.append(
+            f"W594 CONTENT_DERIVATION_LOW_OVERLAP {rel} "
+            f"overlap={len(overlap)} threshold={threshold} "
+            f"(downstream has {len(downstream_tokens)} tokens, upstream has {len(upstream_tokens)} tokens)"
+        )
+
     return errs
 
 

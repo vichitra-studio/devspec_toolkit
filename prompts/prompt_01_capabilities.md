@@ -53,7 +53,7 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_overview.md**: Scope boundaries, user persona definitions, and high-level feature expectations
+- **docs/seed/seed_overview.md**: Scope boundaries, user persona definitions, high-level feature expectations, and product vision for capability derivation
 - **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries
 
 ## Seed Ingestion Protocol

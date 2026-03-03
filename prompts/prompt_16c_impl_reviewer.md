@@ -196,6 +196,30 @@ You must **VERIFY** that the Coder respected these high-fidelity fields.
         *   `source`: Where did you find this issue? (e.g. "Manual Audit", "CI Log").
         *   `impact`: What is the risk? (e.g. "Data Loss", "Security Bypass").
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product vision, success criteria, and stakeholder constraints used to verify that implemented behavior serves the declared product goals without scope drift
+- **01_capabilities.json**: Capability identifiers and descriptions used to verify that every implemented feature traces back to a declared capability with no hallucinated features
+- **02_system_sketch.json**: Component topology and integration boundaries used to verify that modified files and data flows respect the declared architectural boundaries
+- **02a_delivery_baseline.json**: Environment definitions and deployment targets used to verify that delivery_status deployments and config_validation entries match declared infrastructure
+- **03_glossary.json**: Canonical term definitions used to audit that code identifiers, documentation text, and review findings use consistent domain vocabulary
+- **04_fr_list.json**: Functional requirement identifiers and acceptance criteria used to populate semantic_review.fr_coverage entries and verify satisfied/unsatisfied status with evidence
+- **05_interface_contracts.json**: API endpoint definitions, method constraints, and response schemas used to verify that implemented endpoints match their declared interface contracts exactly
+- **06_invariants.json**: System invariant constraint rules used to verify that implementation enforces all declared data integrity rules and guard conditions
+- **07_nfrs.json**: Non-functional requirement thresholds and severity levels used to verify that performance budgets, alert rules, and monitoring dashboards match declared NFR targets
+- **08_fixtures.json**: Test fixture identifiers, scenario definitions, and expected assertions used to verify that fixture_status test_results align with declared fixture specifications
+- **09_implementation_plan.json**: Milestone definitions and status fields used to verify roadmap sync side-effects and update milestone statuses to done when verdict is verified
+- **10_governance.json**: Commit message patterns and approval rules used to verify that implementation commits and PR metadata conform to the declared governance policy
+- **11_redteam.json**: Threat identifiers, attack vectors, and mitigation requirements used to verify that security_status reflects complete coverage of all declared threat mitigations
+- **12_ci_gates.json**: CI pipeline gate definitions and required checks used to verify that ci_status accurately reflects whether all mandatory pipeline gates have passed
+- **13_extension_generator.json**: Extension point declarations used to verify that any extensibility-related implementation correctly follows the declared plugin interface contracts
+- **13a_completeness_assessment.json**: Coverage gap analysis and completeness scores used to verify that identified gaps from the assessment have been addressed by the implementation
+- **14_roadmap.json**: Milestone identifiers, deliverables, and acceptance criteria used to verify milestone completion status and drive the roadmap sync side-effect on verified verdict
+- **15_scaffold.json**: Directory layout and file structure conventions used to verify that implementation files conform to the declared scaffold structure without unauthorized paths
+- **16_impl_context.json**: Trinity Anchor scope boundaries and master checklist used to verify that the implementation cycle does not violate root-level scope constraints
+- **16a_impl_planner.json**: The complete implementation plan including checklist items, spec_refs, and review_requirements used as the primary audit baseline for plan-vs-execution comparison
+- **16b_impl_coder.json**: The execution results, files_touched, critical_evidence, and emergent_ambiguities that constitute the primary input for the evidence-based review audit
+
 # Operating Flow: Evidence-Based Audit
 
 ## Audit Checklist (Mandatory)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+import json
+import os
+from typing import Any, Optional, Set
 
 
 def validate_step_05(instance: dict[str, Any], toolkit_root: str) -> list[str]:
@@ -25,6 +27,25 @@ def validate_step_05(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                 f"E310 MISSING_ENUM_PROVENANCE api '{api_id or i}' has enum values "
                 f"but no enum_provenance for reproducibility tracking"
             )
+
+    # Cross-step FR reference validation
+    fr_ids = _load_fr_ids(toolkit_root)
+    if fr_ids is None:
+        errors.append(
+            "W590 CROSS_STEP_UPSTREAM_MISSING 04_fr_list.json not found; "
+            "skipping FR reference validation"
+        )
+    else:
+        for api in instance.get("apis", []):
+            api_id = api.get("api_id", "<unknown>")
+            fr_refs = _extract_fr_refs(api)
+            for fr_ref in fr_refs:
+                if fr_ref not in fr_ids:
+                    errors.append(
+                        f"E590 CROSS_STEP_ID_NOT_FOUND api '{api_id}' references "
+                        f"unknown FR '{fr_ref}' (not in 04_fr_list.json)"
+                    )
+
     return errors
 
 
@@ -42,4 +63,43 @@ def _has_enum_values(api: dict[str, Any]) -> bool:
             if isinstance(param, dict) and "enum" in param:
                 return True
     return False
+
+
+def _extract_fr_refs(api: dict[str, Any]) -> list[str]:
+    """Extract all FR references from an API contract.
+
+    Collects FR IDs from the ``trace`` array — traceRef objects where
+    ``id`` starts with ``fr-``.
+    """
+    refs: list[str] = []
+    trace = api.get("trace", [])
+    if isinstance(trace, list):
+        for entry in trace:
+            if isinstance(entry, dict):
+                trace_id = entry.get("id")
+                if isinstance(trace_id, str) and trace_id.startswith("fr-"):
+                    refs.append(trace_id)
+    return refs
+
+
+def _load_fr_ids(toolkit_root: str) -> Optional[Set[str]]:
+    """Load FR IDs from step 04 if available.
+
+    Returns a set of fr_id strings, or None if the upstream file is not found.
+    """
+    spec_dir = os.path.join(toolkit_root, "spec")
+    for fn in os.listdir(spec_dir) if os.path.isdir(spec_dir) else []:
+        if fn.startswith("04_") and fn.endswith(".json"):
+            path = os.path.join(spec_dir, fn)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return {
+                    fr.get("fr_id")
+                    for fr in data.get("functional_requirements", [])
+                    if isinstance(fr, dict) and fr.get("fr_id")
+                }
+            except (OSError, json.JSONDecodeError):
+                pass
+    return None
 

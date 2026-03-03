@@ -53,6 +53,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Business terms from `goals`, metric names and units from `success_metrics`, persona names from `user_segments`
 - **01_capabilities.json**: Recurring nouns and action verbs from capability names and descriptions for domain vocabulary
+- **02_system_sketch.json**: Component names, protocol terms, and architectural patterns for technical vocabulary alignment
+- **02a_delivery_baseline.json**: Environment names, CI pipeline terminology, and infrastructure concepts for deployment domain terms
 
 ## Seed Ingestion Protocol
 

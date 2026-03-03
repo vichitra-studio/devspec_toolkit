@@ -61,6 +61,21 @@ Use the `category` field to classify threats precisely:
 4.  **`transport`**: Data in motion (e.g., MitM, Cleartext logging, weak TLS).
 5.  **`data_privacy`**: Data at rest/leakage (e.g., PII exposure in logs, GDPR violation, unnecessary data collection).
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product scope boundaries, compliance posture, and regulatory constraints that define which threat categories are mandatory and which data sensitivity levels apply
+- **01_capabilities.json**: Capability IDs, priority rankings, and scope definitions to assess which capabilities carry the highest business impact if compromised or degraded
+- **02_system_sketch.json**: Component IDs, trust boundary crossings, inter-component communication paths, and external integration points to map every threat to a concrete target_ids entry
+- **02a_delivery_baseline.json**: Deployment environment definitions and infrastructure topology to identify environment-specific attack surfaces and operational failure modes per stage
+- **03_glossary.json**: Domain term definitions and entity relationships to write threat descriptions and vectors using precise, unambiguous domain language rather than generic security jargon
+- **04_fr_list.json**: Functional requirement IDs, business logic workflows, preconditions, and postconditions to identify business logic abuse scenarios and link mitigations via traceRef
+- **05_interface_contracts.json**: API IDs, HTTP methods, authentication modes, request/response schemas, and error states to enumerate per-endpoint threat vectors and ensure every public API has coverage
+- **06_invariants.json**: Invariant IDs and enforcement conditions to link threat mitigations to existing invariant controls via traceRef and verify every security invariant has a corresponding threat test
+- **07_nfrs.json**: NFR IDs, performance thresholds, and availability targets to define resource exhaustion thresholds, link mitigations via traceRef, and scope edge case trigger conditions
+- **08_fixtures.json**: Test fixture scenarios and boundary value definitions to identify edge case failure modes and ensure fixture coverage aligns with threat mitigation validation
+- **09_impl_plan.json**: Technology stack selections, framework versions, and infrastructure choices to identify technology-specific vulnerability classes and attack vectors unique to the chosen stack
+- **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
+
 ## Operating Flow: Attack → Trace → Mitigate
 1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
 2.  **Categorize**: Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.

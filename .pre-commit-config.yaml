@@ -1,0 +1,20 @@
+# Pre-commit hooks for the DevSpec Toolkit.
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+repos:
+  - repo: local
+    hooks:
+      - id: dag-lint
+        name: DAG completeness lint
+        entry: python -m specdev_tools.cli dag-lint --repo-root .
+        language: system
+        pass_filenames: false
+        files: (tools/step_order\.json|prompts/prompt_.*\.md)$
+        types: [file]
+      - id: extraction-intent-check
+        name: Extraction intent validation
+        entry: python -m specdev_tools.cli extraction-intent-check --repo-root .
+        language: system
+        pass_filenames: false
+        files: (tools/step_order\.json|prompts/prompt_.*\.md)$
+        types: [file]

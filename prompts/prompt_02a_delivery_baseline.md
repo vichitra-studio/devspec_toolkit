@@ -51,6 +51,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Deployment targets, compliance requirements, and operational constraints for environment scoping
+- **01_capabilities.json**: Capability owners and operational modes to determine environment tier requirements and CI pipeline stages
 - **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure
 - **docs/seed/seed_tech_stack.md**: Runtime versions, cloud providers, and infrastructure constraints for environment definitions
 

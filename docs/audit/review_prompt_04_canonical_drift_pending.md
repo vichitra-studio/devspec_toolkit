@@ -322,7 +322,7 @@ The data to close this gap already exists in `step_order.json` (step_metadata wi
 | Extraction intent already machine-readable | `tools/step_order.json:309-509` | `step_metadata.extraction_intent` describes what each downstream step extracts from each upstream artifact — this data exists but is never surfaced to prompts |
 | Template rendering infrastructure exists | `tools/specdev_tools/generation/prompt_generator.py` | `render_template()`, `_extract_required_fields()`, and `{{VAR}}` substitution already work for migration prompts; could be extended for static prompt enrichment |
 
-### Remaining Gaps
+### Remaining Gaps (R7 Closure)
 
 - **No inline downstream consumer tables**: No prompt lists which steps N+k extract from its output, even though this data exists in `step_order.json` `step_metadata.extraction_intent` for all 22 steps. Adding a 2-line CLI reference is not equivalent — the AI must proactively run the CLI command; inline tables surface the data directly in the prompt context.
 - **extraction_intent injection (mechanism for 12a/12c)**: `step_metadata.extraction_intent` in `tools/step_order.json` already declares what each downstream step extracts from upstream. Injecting this into each prompt at build time gives the AI both upstream consumption instructions (resolving 6a) and downstream awareness (resolving 12a) simultaneously. The `extraction_intent` entries should be extended with `synthesis_requirements` per synthesis field — declaring what the AI must address in each synthesis field. This becomes the single source of truth readable by both prompt generation tooling and validators (E591).

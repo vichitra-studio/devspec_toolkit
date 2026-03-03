@@ -51,8 +51,10 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Project scope boundaries and success criteria for FR rationale
+- **00_charter.json**: Project scope boundaries, success criteria, and constraints for grounding FR rationale and priority decisions
 - **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs
+- **02_system_sketch.json**: Component IDs and trust boundaries for mapping FRs to responsible system components and integration points
+- **02a_delivery_baseline.json**: Environment definitions and deployment stages for determining FR acceptance criteria feasibility constraints
 - **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria
 
 ## Seed Ingestion Protocol

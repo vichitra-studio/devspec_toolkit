@@ -56,6 +56,15 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
 
+# DAG completeness lint (validates downstream_consumers consistency)
+./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
+
+# Extraction intent validation (prompts vs step_order.json)
+./tools/run_specdev.sh extraction-intent-check --repo-root ./devspec_toolkit
+
+# Environment diagnostic (read-only — prints active SPECDEV_* config)
+./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit
+
 # Prompt workflow reminder
 ./tools/run_specdev.sh ai-help --step 04
 
@@ -87,7 +96,18 @@ pytest tests/test_canonical_integrity.py
 pytest tests/integration/ -v
 ```
 
-Set `SPECDEV_WARNINGS_AS_ERRORS=1` to promote warning-level messages to errors.
+### Environment Variables
+
+| Variable | Effect |
+|----------|--------|
+| `SPECDEV_WARNINGS_AS_ERRORS=1` | Promotes all 18 warning codes with E-code counterparts to errors |
+| `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion — only the listed W-codes are promoted to their E-code counterparts |
+| `SPECDEV_MATRIX_STRICT=1` | Makes matrix coverage errors fatal (exit non-zero) |
+| `SPECDEV_REPLAY_BASE_REF=<ref>` | Override the base ref for forward-replay diff detection |
+| `SPECDEV_REPLAY_DIFF_ERROR_MODE=error` | Make replay diff failures fatal |
+| `SPECDEV_STALENESS_THRESHOLD=N` | Minimum new upstream tokens required before W595 fires (default: 3) |
+
+Use `env-check` to inspect the active configuration: `./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit`
 
 ---
 

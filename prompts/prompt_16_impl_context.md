@@ -52,6 +52,27 @@ You are a senior software architect producing the Step 16 **Trinity Anchor**.
 Generate a **machine‑checkable JSON artifact** that captures the plan,
 implementation checklist, and review expectations for the *current* execution cycle.
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
+- **01_capabilities.json**: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
+- **02_system_sketch.json**: Component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
+- **02a_delivery_baseline.json**: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
+- **03_glossary.json**: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
+- **04_fr_list.json**: Functional requirement identifiers, acceptance criteria, and priority levels that directly populate checklist spec_ref entries and linked_test_expectations
+- **05_interface_contracts.json**: API endpoint definitions, request/response schemas, and method constraints used to bind checklist items to concrete interface contracts
+- **06_invariants.json**: System invariant rules and constraint definitions that inform checklist validation items and drift check targets
+- **07_nfrs.json**: Non-functional requirement identifiers, thresholds, and measurement units that populate nfr_refs in checklist items and drive delivery alert rules
+- **08_fixtures.json**: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
+- **09_implementation_plan.json**: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
+- **10_governance.json**: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
+- **11_redteam.json**: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
+- **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
+- **13_extension_generator.json**: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
+- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to populate coverage_gaps and inform scope boundary decisions
+- **14_roadmap.json**: Milestone identifiers, deliverables, scheduling, and status fields used to drive checklist coverage mapping and roadmap sync updates
+- **15_scaffold.json**: Generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
+
 # Operating Flow (MANDATORY)
 1. **Context Review**: Ingest required upstream spec artifacts.
 2. **Scope**: Identify the exact execution scope for the current cycle.

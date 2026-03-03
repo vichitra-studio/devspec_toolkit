@@ -81,7 +81,7 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
             self.assertEqual(errors, [])
 
     # ------------------------------------------------------------------
-    # 2. Canon has more entries than schema enum -> E550
+    # 2. Canon has more entries than schema enum -> E554
     # ------------------------------------------------------------------
     def test_canon_enum_drift(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,9 +101,9 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
             with patch(f"{_MODULE}._ENUM_CANON_PAIRINGS", pairings):
                 errors = lint_canon_schema_alignment(tmp)
 
-            e550 = [e for e in errors if e.startswith("E550")]
-            self.assertEqual(len(e550), 1)
-            self.assertIn("d", e550[0])
+            e554 = [e for e in errors if e.startswith("E554")]
+            self.assertEqual(len(e554), 1)
+            self.assertIn("d", e554[0])
 
     # ------------------------------------------------------------------
     # 3. Schema enum has values not in canon -> E551

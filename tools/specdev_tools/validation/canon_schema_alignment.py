@@ -57,7 +57,7 @@ def lint_canon_schema_alignment(repo_root: str) -> list[str]:
 
         if missing:
             errors.append(
-                f"E550 CANON_ENUM_DRIFT {schema_rel}:{path_str} "
+                f"E554 CANON_ENUM_DRIFT {schema_rel}:{path_str} "
                 f"missing canon {kind} entries: {missing}"
             )
         if extra:

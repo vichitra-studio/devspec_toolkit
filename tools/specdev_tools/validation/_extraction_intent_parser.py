@@ -1,0 +1,124 @@
+"""Shared extraction intent parser for prompt files.
+
+Consolidates the extraction intent parsing logic previously duplicated
+in ``dag_lint.py`` and ``extraction_intent_check.py`` into a single
+module consumed by both validators.
+
+Exports:
+    INTENT_ENTRY_RE — regex matching extraction intent bullet entries
+    ARTIFACT_STEP_RE — regex extracting step numbers from artifact filenames
+    SEED_ENTRY_RE — regex matching seed document references
+    ParsedIntent — dataclass holding parsed extraction intent data
+    parse_extraction_intent — function to parse a prompt file's intent section
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+# Matches extraction intent bullet entries like:
+#   - **00_charter.json**: Project scope boundaries ...
+#   - **docs/seed/seed_overview.md**: Scope boundaries ...
+#   - **03_glossary.json** (optional): Domain terms ...
+INTENT_ENTRY_RE = re.compile(
+    r"^\s*-\s+\*\*(?:docs/seed/)?(\d{2}[a-z]?_[a-z0-9_]+\.\w+|seed_\w+\.md)\*\*"
+    r"(?:\s*\([^)]*\))?\s*:\s*(.+)",
+    re.IGNORECASE,
+)
+
+# Extracts the step number from an artifact filename like "04_fr_list.json" -> "04"
+ARTIFACT_STEP_RE = re.compile(r"^(\d{2}[a-z]?)_")
+
+# Matches seed document references (not step dependencies):
+#   - **docs/seed/seed_overview.md**: ...
+#   - **seed_tech_stack.md**: ...
+SEED_ENTRY_RE = re.compile(
+    r"^\s*-\s+\*\*(?:docs/(?:seed/)?)?seed_\w+\.md\*\*",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class ParsedIntent:
+    """Parsed extraction intent section from a prompt file."""
+
+    prompt_path: Path
+    step_entries: dict[str, str] = field(default_factory=dict)
+    referenced_steps: set[str] = field(default_factory=set)
+    has_seed_entries: bool = False
+
+
+def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
+    """Parse the ``### Extraction Intent`` section from a prompt file.
+
+    Uses dag_lint's section boundary logic: stops at ``## `` or a subsequent
+    ``### `` header (more correct than stopping at any ``#``).
+
+    Returns ``None`` if the file cannot be read or the section is not found.
+    """
+    try:
+        text = prompt_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    # Find the ### Extraction Intent header
+    lines = text.splitlines()
+    intent_start = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("### Extraction Intent"):
+            intent_start = i + 1
+            break
+
+    if intent_start is None:
+        return None
+
+    # Collect lines until the next ## or ### header or end of file
+    intent_lines: list[str] = []
+    for i in range(intent_start, len(lines)):
+        line = lines[i]
+        stripped = line.strip()
+        # Stop at the next section header (## or ###)
+        if stripped.startswith("## ") or (
+            stripped.startswith("### ") and i > intent_start
+        ):
+            break
+        intent_lines.append(line)
+
+    # Parse individual intent entries
+    step_entries: dict[str, str] = {}
+    referenced_steps: set[str] = set()
+    has_seed_entries: bool = False
+
+    for line in intent_lines:
+        # Check for seed document references first
+        if SEED_ENTRY_RE.match(line):
+            has_seed_entries = True
+            continue
+
+        match = INTENT_ENTRY_RE.match(line)
+        if not match:
+            continue
+        artifact_name = match.group(1)
+        description = match.group(2).strip()
+
+        # Check if this is a seed doc (matched by INTENT_ENTRY_RE but not SEED_ENTRY_RE)
+        if artifact_name.startswith("seed_"):
+            has_seed_entries = True
+            continue
+
+        # Extract step number from artifact filename (e.g., "04_fr_list.json" -> "04")
+        step_match = ARTIFACT_STEP_RE.match(artifact_name)
+        if step_match:
+            step_number = step_match.group(1)
+            step_entries[step_number] = description
+            referenced_steps.add(step_number)
+
+    return ParsedIntent(
+        prompt_path=prompt_path,
+        step_entries=step_entries,
+        referenced_steps=referenced_steps,
+        has_seed_entries=has_seed_entries,
+    )

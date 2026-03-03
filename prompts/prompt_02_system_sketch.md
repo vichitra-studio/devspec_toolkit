@@ -51,7 +51,8 @@ You are a senior specification author and validator. Your job is to emit a singl
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_tech_stack.md**: Architecture patterns, technology constraints, and infrastructure decisions
+- **docs/seed/seed_tech_stack.md**: Architecture patterns, technology constraints, infrastructure decisions, and deployment topology for component design
+- **00_charter.json**: Scope boundaries, system context, integration points, and deployment constraints for component identification
 - **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set
 
 ## Seed Ingestion Protocol

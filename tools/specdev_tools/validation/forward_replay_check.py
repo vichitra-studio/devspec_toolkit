@@ -83,14 +83,25 @@ def check_forward_replay(
                 )
                 break
 
-    semantic_errors = _check_semantic_coverage(effective_git_root, set(known_changed), base_ref, effective_spec_root)
+    staleness_threshold = int(os.environ.get("SPECDEV_STALENESS_THRESHOLD", "3"))
+    semantic_errors = _check_semantic_coverage(
+        effective_git_root, set(known_changed), base_ref, effective_spec_root,
+        staleness_threshold=staleness_threshold,
+        repo_root=root,
+    )
     
     for err in semantic_errors:
         if err["type"] == "skip":
             errors.append(f"W550 SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={err['path']}")
         elif err["type"] == "regression":
             dropped_str = ",".join(err["dropped_ids"])
-            errors.append(f"E550 SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}")
+            errors.append(f"E555 SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}")
+        elif err["type"] == "staleness":
+            errors.append(
+                f"W595 CONTENT_STALENESS upstream={err['upstream_step']} "
+                f"downstream={err['downstream_step']} "
+                f"new_tokens={err['new_token_count']} reflected=0"
+            )
 
     tc_errors = check_traceability_closure(str(effective_spec_root), str(root))
     for err in tc_errors:
@@ -223,6 +234,8 @@ def _check_semantic_coverage(
     changed_steps: set[str],
     base_ref: str,
     spec_root: Path | None = None,
+    staleness_threshold: int = 3,
+    repo_root: Path | None = None,
 ) -> list[dict]:
     errors = []
     spec_dir = spec_root if spec_root else git_root / "spec"
@@ -276,5 +289,97 @@ def _check_semantic_coverage(
                     "path": rel_path,
                     "dropped_ids": dropped
                 })
-                
+
+            # R9/T22: Content staleness — detect upstream text changes not reflected downstream
+            new_tokens = _extract_content_tokens(str(new_path))
+            old_tokens = set()
+            tmp_fd_2, tmp_path_2 = tempfile.mkstemp(suffix=".json")
+            try:
+                with os.fdopen(tmp_fd_2, "w", encoding="utf-8") as tmp2:
+                    tmp2.write(result.stdout)
+                old_tokens = _extract_content_tokens(tmp_path_2)
+            except (OSError, json.JSONDecodeError):
+                pass
+            finally:
+                try:
+                    os.remove(tmp_path_2)
+                except OSError:
+                    pass
+            added_tokens = new_tokens - old_tokens
+            if added_tokens:
+                # Check if downstream steps reflect these new tokens
+                downstream_steps = _get_downstream_steps(step, spec_root if spec_root else git_root / "spec", repo_root=repo_root)
+                for ds_step in downstream_steps:
+                    for ds_path in (spec_root if spec_root else git_root / "spec").glob(f"{ds_step}_*.json"):
+                        ds_tokens = _extract_content_tokens(str(ds_path))
+                        overlap = added_tokens & ds_tokens
+                        if len(overlap) == 0 and len(added_tokens) >= staleness_threshold:
+                            errors.append({
+                                "type": "staleness",
+                                "upstream_step": step,
+                                "downstream_step": ds_step,
+                                "path": rel_path,
+                                "new_token_count": len(added_tokens),
+                            })
+                            break  # One staleness warning per downstream step is enough
+
     return errors
+
+
+_CONTENT_STOPWORDS = {
+    "that", "this", "with", "from", "have", "will", "been", "were", "they",
+    "their", "than", "each", "which", "when", "what", "there", "about",
+    "would", "make", "like", "into", "only", "also", "most", "some",
+    "could", "should", "does", "must", "shall", "true", "false", "null",
+    "http", "https", "schema", "json", "spec", "step",
+}
+
+# Free-text fields to scan — aligned with hallucination_lint._DERIVATION_FREE_TEXT_FIELDS
+_CONTENT_FREE_TEXT_FIELDS = {
+    "description", "statement", "rationale", "justification", "notes",
+    "narrative", "definition", "postconditions", "preconditions",
+}
+
+
+def _extract_content_tokens(path: str) -> set[str]:
+    """Extract significant tokens (4+ chars, no stopwords) from free-text fields.
+
+    Scans only named free-text fields (not IDs, schema URIs, or enums) to avoid
+    polluting token overlap calculations with structural metadata.
+    Stopword set aligned with hallucination_lint._DERIVATION_STOPWORDS.
+    """
+    tokens: set[str] = set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return tokens
+
+    def _crawl(obj: object) -> None:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in _CONTENT_FREE_TEXT_FIELDS and isinstance(v, str):
+                    for word in re.findall(r"[a-z][a-z0-9_-]{3,}", v.lower()):
+                        if word not in _CONTENT_STOPWORDS:
+                            tokens.add(word)
+                elif isinstance(v, (dict, list)):
+                    _crawl(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _crawl(item)
+
+    _crawl(data)
+    return tokens
+
+
+def _get_downstream_steps(step: str, spec_dir: Path, repo_root: Path | None = None) -> list[str]:
+    """Get downstream steps from step_order.json."""
+    order_path = (repo_root or spec_dir.parent) / "tools" / "step_order.json"
+    if not order_path.exists():
+        return []
+    try:
+        with order_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("downstream_consumers", {}).get(step, [])
+    except (OSError, json.JSONDecodeError):
+        return []

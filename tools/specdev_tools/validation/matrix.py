@@ -13,6 +13,12 @@ from .cross_artifact_checks import (
 )
 
 # ---------------------------------------------------------------------------
+# Sentinel & default constants for coverage threshold logic (BUG-2 fix)
+# ---------------------------------------------------------------------------
+_MISSING_FILE = object()  # sentinel: step_order.json absent or malformed
+_DEFAULT_COVERAGE_THRESHOLDS = {"fr_coverage": 80, "mode": "warn"}
+
+# ---------------------------------------------------------------------------
 # Business-rule trace-type constants for matrix link building
 # ---------------------------------------------------------------------------
 
@@ -286,5 +292,62 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
     integrity_errors = validate_trace_integrity(repo_root, spec_dir)
     if integrity_errors:
         result["integrity_errors"] = integrity_errors
-    
+
+    # R9/T24: Configurable coverage threshold enforcement
+    threshold_errors = _check_coverage_thresholds(coverage, repo_root)
+    if threshold_errors:
+        result.setdefault("integrity_errors", []).extend(threshold_errors)
+
     return result
+
+
+def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[str]:
+    """R9/T24: Enforce coverage thresholds from step_order.json."""
+    errors: list[str] = []
+    config = _load_coverage_thresholds(repo_root)
+    if config is _MISSING_FILE:
+        # No step_order.json (or malformed) — graceful skip, no errors
+        return errors
+    if config is None:
+        # File exists but coverage_thresholds key absent — apply defaults
+        config = _DEFAULT_COVERAGE_THRESHOLDS
+
+    mode = config.get("mode", "warn")
+    fr_total = coverage.get("fr_total", 0)
+    if fr_total == 0:
+        return errors
+
+    checks = [
+        ("fr_coverage", coverage.get("fr_with_api", 0)),
+    ]
+    for check_name, actual_count in checks:
+        threshold = config.get(check_name)
+        if threshold is None:
+            continue
+        pct = (actual_count / fr_total) * 100
+        if pct < threshold:
+            code = "E592" if mode == "error" else "W592"
+            semantic = "COVERAGE_THRESHOLD_BREACH" if mode == "error" else "COVERAGE_THRESHOLD_WARN"
+            errors.append(
+                f"{code} {semantic} {check_name}={pct:.1f}% below threshold={threshold}%"
+            )
+    return errors
+
+
+def _load_coverage_thresholds(repo_root: str) -> dict | None | object:
+    """Load coverage_thresholds from step_order.json.
+
+    Returns:
+        _MISSING_FILE  – file absent or malformed JSON (graceful skip).
+        None           – file exists but ``coverage_thresholds`` key absent.
+        dict           – the configured thresholds verbatim.
+    """
+    path = os.path.join(repo_root, "tools", "step_order.json")
+    if not os.path.exists(path):
+        return _MISSING_FILE
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("coverage_thresholds")
+    except (OSError, json.JSONDecodeError):
+        return _MISSING_FILE

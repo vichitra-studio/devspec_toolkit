@@ -4,10 +4,14 @@ from pathlib import Path
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
+# Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
+WARNING_CODE_PREFIXED_RE = re.compile(r"^[^\s]*:\s*W\d{3}\b")
 
 
 def _is_warning_message(message: str) -> bool:
-    return bool(WARNING_CODE_RE.match(message or ""))
+    if not message:
+        return False
+    return bool(WARNING_CODE_RE.match(message) or WARNING_CODE_PREFIXED_RE.match(message))
 
 
 def _warnings_as_errors() -> bool:
@@ -158,6 +162,16 @@ def main():
 
     sp_alignment = sub.add_parser("canon-schema-alignment", help="Check canon/schema alignment")
     sp_alignment.add_argument("--repo-root", default=".")
+
+    # R9: New commands
+    ec = sub.add_parser("env-check", help="Diagnostic: show active validation config")
+    ec.add_argument("--repo-root", default=".")
+
+    dgl = sub.add_parser("dag-lint", help="Validate DAG completeness in step_order.json")
+    dgl.add_argument("--repo-root", default=".")
+
+    eic = sub.add_parser("extraction-intent-check", help="Validate extraction intent sections against step_order.json")
+    eic.add_argument("--repo-root", default=".")
 
     args = p.parse_args()
 
@@ -671,6 +685,70 @@ def main():
         repo_root = os.path.abspath(args.repo_root)
         errors = lint_canon_schema_alignment(repo_root)
         _print_and_exit_if_errors(errors)
+
+    elif args.cmd == "env-check":
+        # R9/T28: Read-only diagnostic — prints all SPECDEV_* env vars and active config
+        from .core.errors import PROMOTABLE_PAIRS
+        repo_root = os.path.abspath(args.repo_root)
+        print("=== SPECDEV Environment Check ===")
+        print()
+        # SPECDEV_* env vars
+        specdev_vars = {k: v for k, v in sorted(os.environ.items()) if k.startswith("SPECDEV_")}
+        if specdev_vars:
+            print("Active SPECDEV_* environment variables:")
+            for k, v in specdev_vars.items():
+                print(f"  {k}={v}")
+        else:
+            print("No SPECDEV_* environment variables set.")
+        print()
+        # W→E promotion status
+        warn_as_error = os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
+        promote_codes = os.getenv("SPECDEV_PROMOTE_CODES", "").strip()
+        if warn_as_error:
+            print(f"W→E Promotion: ALL ({len(PROMOTABLE_PAIRS)} pairs)")
+        elif promote_codes:
+            selected = [c.strip() for c in promote_codes.split(",") if c.strip()]
+            print(f"W→E Promotion: SELECTIVE ({len(selected)} codes: {', '.join(selected)})")
+        else:
+            print("W→E Promotion: OFF (no promotion active)")
+        print(f"Promotable pairs registered: {len(PROMOTABLE_PAIRS)}")
+        print()
+        # Spec dir and replay base ref
+        spec_dir = os.path.join(repo_root, "spec")
+        print(f"Repo root: {repo_root}")
+        print(f"Spec dir: {spec_dir} ({'exists' if os.path.isdir(spec_dir) else 'NOT FOUND'})")
+        step_order_path = os.path.join(repo_root, "tools", "step_order.json")
+        print(f"Step order: {step_order_path} ({'exists' if os.path.isfile(step_order_path) else 'NOT FOUND'})")
+        # Coverage thresholds
+        if os.path.isfile(step_order_path):
+            try:
+                with open(step_order_path, "r", encoding="utf-8") as f:
+                    so_data = json.load(f)
+                ct = so_data.get("coverage_thresholds")
+                if ct:
+                    print(f"Coverage thresholds: {json.dumps(ct)}")
+                else:
+                    print("Coverage thresholds: not configured")
+            except (OSError, json.JSONDecodeError):
+                print("Coverage thresholds: error reading step_order.json")
+        replay_base = os.getenv("SPECDEV_REPLAY_BASE_REF", "")
+        print(f"Replay base ref: {replay_base or '(auto-resolved)'}")
+        matrix_strict = os.getenv("SPECDEV_MATRIX_STRICT", "")
+        print(f"Matrix strict mode: {matrix_strict or 'OFF'}")
+        print()
+        print("=== End Environment Check ===")
+
+    elif args.cmd == "dag-lint":
+        from .validation.dag_lint import lint_dag
+        repo_root = os.path.abspath(args.repo_root)
+        errs = lint_dag(repo_root)
+        _print_and_exit_if_errors(errs)
+
+    elif args.cmd == "extraction-intent-check":
+        from .validation.extraction_intent_check import check_extraction_intent
+        repo_root = os.path.abspath(args.repo_root)
+        errs = check_extraction_intent(repo_root)
+        _print_and_exit_if_errors(errs)
 
     else:
         p.print_help()

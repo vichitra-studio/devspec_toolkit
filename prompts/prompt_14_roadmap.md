@@ -51,6 +51,25 @@ You are a senior program manager and architect. Your job is to emit a single JSO
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Project scope, timeline constraints, and success criteria used to bound roadmap milestones and validate that no out-of-scope work is scheduled
+- **01_capabilities.json**: Capability IDs used to populate milestone-level capability_refs ensuring every capability is scheduled for delivery in at least one milestone
+- **02_system_sketch.json**: Component architecture and subsystem dependencies used to determine milestone sequencing so infrastructure precedes dependent application layers
+- **02a_delivery_baseline.json**: Deployment environment specifications and release cadence constraints incorporated into milestone target dates and infrastructure task planning
+- **03_glossary.json**: Canonical domain terminology used to ensure consistent naming of milestones, tasks, and deliverables across the roadmap artifact
+- **04_fr_list.json**: All functional requirement IDs extracted and distributed across milestones via fr_refs to guarantee complete FR coverage with no orphaned requirements
+- **05_interface_contracts.json**: API endpoint definitions and dependencies used to sequence API implementation tasks and verify deliverable traceability to specific contract IDs
+- **06_invariants.json**: System invariant rules incorporated as task constraints and acceptance criteria to ensure milestone completion preserves data integrity guarantees
+- **07_nfrs.json**: Performance thresholds, security requirements, and compliance constraints incorporated as milestone risks and acceptance criteria for non-functional validation
+- **08_fixtures.json**: Test fixture definitions used to bind milestone acceptance criteria to concrete fixture references ensuring each deliverable has verifiable test coverage
+- **09_implementation_plan.json**: Technology stack (languages, frameworks, infrastructure, tools) copied into the roadmap tech_stack; milestones decomposed from Step 09 milestone IDs via source_milestones
+- **10_governance.json**: Commit conventions and PR rules used to ensure roadmap tasks align with governance-compliant delivery workflows and labeling requirements
+- **11_redteam.json**: Identified threats and mitigations used to populate milestone risks and inform task prioritization for security-critical implementation sequences
+- **12_ci_gates.json**: CI pipeline gate definitions used to ensure roadmap milestones include validation tasks that satisfy all required continuous integration quality checks
+- **13_extension_generator.json**: Extension manifest entries used to schedule extension implementation work as dedicated milestones with proper dependency ordering after core infrastructure
+- **13a_completeness_assessment.json**: High-priority missing elements and gap findings used to schedule remediation tasks and validate that all critical gaps are addressed before implementation begins
+
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
 - **Ingest**: Scan all `spec/` artifacts (Steps 00-13) to understand the complete scope.
 - **Synthesize**: Identify every distinct feature, capability, and dependency across all specs.

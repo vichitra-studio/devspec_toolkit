@@ -55,8 +55,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 For each upstream artifact ingested, extract the following:
 - **docs/seed/seed_overview.md**: Project scope boundaries, business objectives, target users, and high-level success criteria
 - **docs/seed/seed_tech_stack.md**: Hardware/legacy constraints for `out_of_scope` or `assumptions`; technology constraints informing `risks`
-- **03_glossary.json** (if present): Domain terms and metric units for consistent naming in `success_metrics`
-- **07_nfrs.json** (if present): Metric names and units to align `success_metrics` terminology
 
 ## Seed Ingestion Protocol
 

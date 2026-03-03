@@ -10,7 +10,20 @@ PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder|<[^>]+>)\b", re.
 STEP_ARTIFACT_RE = re.compile(r"^\d{2}[a-z]?_[a-z0-9_]+\.json$")
 ASSUMPTION_ID_RE = re.compile(r"\b((?:fr|api|cap|nfr|inv|fix|comp|job|step|role|env|unit|stage|owner|trace|gov)-[a-z0-9]+(?:-[a-z0-9]+)*)\b")
 # Spec baseline: few|some|many|several|various — extended with safe additions: fast|reliable|easy|hard|quick
-VAGUE_QUANTIFIER_RE = re.compile(r"\b(few|some|many|several|various|fast|reliable|easy|hard|quick)\b", re.IGNORECASE)
+# R9: additional vague terms: appropriate|adequate|sufficient|reasonable|significant|typical|generally|usually
+VAGUE_QUANTIFIER_RE = re.compile(
+    r"\b(few|some|many|several|various|fast|reliable|easy|hard|quick"
+    r"|appropriate|adequate|sufficient|reasonable|significant|typical|generally|usually)\b",
+    re.IGNORECASE,
+)
+# Free-text fields to scan for vague language (beyond assumptions)
+_VAGUE_SCAN_FIELDS = {
+    "description", "statement", "rationale", "justification", "notes",
+    "narrative", "postconditions", "preconditions", "risks", "spikes",
+    "migration_plan", "definition",
+}
+# Metadata fields that should NOT be scanned
+_METADATA_FIELDS = {"$schema", "id", "owner", "created_at", "specdev_version"}
 STEP_SCHEMA_URI_RE = re.compile(r"^https://specdev\.local/schema/\d{2}[a-z]?_[a-z0-9_]+\.schema\.json$")
 CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfrs", "fixtures", "milestones", "jobs", "threats"}
 
@@ -35,6 +48,7 @@ def lint_spec_quality(spec_dir: str) -> list[str]:
         placeholder_errs, _ = _check_placeholders(rel, data)
         errors.extend(placeholder_errs)
         errors.extend(_check_critical_arrays(rel, data))
+        errors.extend(_check_free_text_vague(rel, data))
         _collect_ids_and_refs(data, rel, known_ids, refs)
 
     # Second pass: assumption checks with full cross-artifact known_ids
@@ -81,6 +95,7 @@ def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[str]:
     placeholder_errs, _ = _check_placeholders(rel, data)
     errs.extend(placeholder_errs)
     errs.extend(_check_critical_arrays(rel, data))
+    errs.extend(_check_free_text_vague(rel, data))
     # Intra-artifact assumption check (single-file mode: no cross-artifact IDs)
     single_ids: set[str] = set()
     single_refs: list[tuple[str, str, str]] = []
@@ -113,8 +128,7 @@ def _scan_assumption_value(rel: str, value: Any, known_ids: set[str], path: str)
     if isinstance(value, str):
         if PLACEHOLDER_RE.search(value):
             errs.append(f"E512 ASSUMPTION_HAS_PLACEHOLDER {rel}:{path} value={value}")
-        for m in VAGUE_QUANTIFIER_RE.finditer(value):
-            token = m.group(1)
+        for token in _scan_for_vague_language(value):
             errs.append(f"W571 ASSUMPTION_VAGUE_QUANTIFIER {rel}:{path} ref={token}")
         for m in ASSUMPTION_ID_RE.finditer(value):
             token = m.group(1)
@@ -123,6 +137,30 @@ def _scan_assumption_value(rel: str, value: Any, known_ids: set[str], path: str)
     elif isinstance(value, list):
         for i, item in enumerate(value):
             errs.extend(_scan_assumption_value(rel, item, known_ids, f"{path}[{i}]"))
+    return errs
+
+
+def _scan_for_vague_language(text: str) -> list[str]:
+    """Extract vague terms from a text string. Returns list of matched tokens."""
+    return [m.group(1) for m in VAGUE_QUANTIFIER_RE.finditer(text)]
+
+
+def _check_free_text_vague(rel: str, data: Any, path: str = "") -> list[str]:
+    """R9/T18: Scan all free-text fields (not assumptions) for vague language."""
+    errs: list[str] = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            if k in _METADATA_FIELDS:
+                continue
+            p = f"{path}.{k}" if path else k
+            if k in _VAGUE_SCAN_FIELDS and isinstance(v, str):
+                for token in _scan_for_vague_language(v):
+                    errs.append(f"W593 VAGUE_LANGUAGE_FREE_TEXT {rel}:{p} ref={token}")
+            elif k != "assumptions":
+                errs.extend(_check_free_text_vague(rel, v, p))
+    elif isinstance(data, list):
+        for i, v in enumerate(data):
+            errs.extend(_check_free_text_vague(rel, v, f"{path}[{i}]"))
     return errs
 
 

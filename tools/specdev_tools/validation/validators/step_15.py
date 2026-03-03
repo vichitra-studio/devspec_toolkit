@@ -1,5 +1,7 @@
-from typing import List, Dict, Any
+import json
+import os
 import re
+from typing import List, Dict, Any, Optional, Set
 
 def validate_step_15(instance: Dict[str, Any], toolkit_root: str) -> List[str]:
     """
@@ -60,4 +62,41 @@ def validate_step_15(instance: Dict[str, Any], toolkit_root: str) -> List[str]:
             if method and method not in valid_methods:
                 errors.append(f"route_map[{i}].method '{method}' is invalid. Must be one of {sorted(valid_methods)}")
 
+    # Cross-step validation: verify api_ref values exist in 05_interface_contracts.json
+    api_ids = _load_api_ids(toolkit_root)
+    if api_ids is None:
+        errors.append("W590 CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation")
+    elif "route_map" in instance:
+        route_map = instance["route_map"]
+        for entry in route_map:
+            if not isinstance(entry, dict):
+                continue
+            api_ref = entry.get("api_ref")
+            if api_ref and api_ref not in api_ids:
+                errors.append(f"E590 CROSS_STEP_ID_NOT_FOUND route_map api_ref '{api_ref}' not found in 05_interface_contracts.json")
+
     return errors
+
+
+def _load_api_ids(toolkit_root: str) -> Optional[Set[str]]:
+    """Load API IDs from step 05 (interface contracts) if available."""
+    spec_dir = os.path.join(toolkit_root, "spec")
+    if not os.path.isdir(spec_dir):
+        return None
+
+    for fn in os.listdir(spec_dir):
+        if fn.startswith("05_") and fn.endswith(".json"):
+            path = os.path.join(spec_dir, fn)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                # Support both "apis" (primary) and "contracts" (alternative) array keys
+                items = data.get("apis", data.get("contracts", []))
+                return {
+                    item.get("api_id")
+                    for item in items
+                    if isinstance(item, dict) and item.get("api_id")
+                }
+            except (OSError, json.JSONDecodeError):
+                pass
+    return None

@@ -137,6 +137,29 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 *   **Contextual Metadata**:
     *   `source` / `impact`: Use this to understand the *why* and *risk* profile of the task.
 
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product vision and success criteria used to validate that implementation behavior aligns with the declared product goals
+- **01_capabilities.json**: Capability identifiers and descriptions used to verify that implemented code maps to declared product capabilities without scope creep
+- **02_system_sketch.json**: Component topology and integration boundaries used to validate that file modifications stay within the declared architectural component boundaries
+- **02a_delivery_baseline.json**: Environment variable definitions, secret references, and deployment configurations consumed when implementing delivery or config-related checklist actions
+- **03_glossary.json**: Canonical term definitions used to ensure variable names, function names, and code comments use the project's established domain vocabulary
+- **04_fr_list.json**: Functional requirement acceptance criteria text used to verify that implemented behavior satisfies the exact conditions stated in each requirement
+- **05_interface_contracts.json**: API endpoint method signatures, request/response payload schemas, and status code definitions used as the ground truth for implementing API handler code
+- **06_invariants.json**: System invariant constraint rules used to implement validation logic and guard conditions that enforce data integrity across operations
+- **07_nfrs.json**: Non-functional requirement thresholds and measurement units used to implement performance budgets, timeout values, and resource limits in code
+- **08_fixtures.json**: Test fixture scenario definitions, input payloads, and expected output assertions used to write and validate test implementations against concrete data
+- **09_implementation_plan.json**: Tech stack declarations and dependency versions used to verify that imported libraries and runtime dependencies match the declared implementation plan
+- **10_governance.json**: Commit message conventions and branch rules used to format implementation commits according to the project's governance policy
+- **11_redteam.json**: Threat identifiers and attack vectors used to implement security mitigations, input validation, and hardening measures in affected code paths
+- **12_ci_gates.json**: CI pipeline check commands and gate thresholds used to verify that implemented test commands match the expected CI gate verification steps
+- **13_extension_generator.json**: Extension point interface contracts used when implementing plugin hooks or extensibility patterns declared in the extension specification
+- **13a_completeness_assessment.json**: Coverage gap findings used to verify that the implementation addresses all identified specification gaps without introducing new omissions
+- **14_roadmap.json**: Milestone deliverable definitions and acceptance criteria used to verify that each implemented checklist item satisfies its parent roadmap task requirements
+- **15_scaffold.json**: Generated file paths and directory structure used to verify that created and modified files conform to the scaffold layout conventions
+- **16_impl_context.json**: Trinity Anchor scope boundaries and checklist master list used to verify this implementation does not violate the root anchor's scope constraints
+- **16a_impl_planner.json**: The complete implementation plan including checklist items, implementation action slots, target_file_patterns, and review_requirements that directly drive all coding actions
+
 # Operating Flow: Requirement-First Execution
 
 ## New Model (v2.0)

@@ -102,6 +102,15 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
 
+# DAG completeness lint (validates downstream_consumers consistency)
+./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
+
+# Extraction intent validation (prompts vs step_order.json)
+./tools/run_specdev.sh extraction-intent-check --repo-root ./devspec_toolkit
+
+# Environment diagnostic (read-only — prints active config)
+./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit
+
 # Prompt workflow reminders
 ./tools/run_specdev.sh ai-help --step 04
 
@@ -110,6 +119,44 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh changelog --version 0.3.0 --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate 0.3.0 --repo-root ./devspec_toolkit
 ```
+
+### DAG & Extraction Intent Commands
+
+#### `dag-lint`
+
+Validates the completeness and consistency of the dependency DAG defined in `tools/step_order.json`. This is a standalone command — it is **not** included in `validate-all`.
+
+**What it checks:**
+- Every non-terminal step has at least one `downstream_consumers` entry (E596 DAG_DEAD_END_PRODUCER). Step 16c is exempt as the terminal step.
+- Every `downstream_consumers` entry is consistent with `allowed_upstream_dependencies` (E599 DAG_CONSUMER_INCONSISTENCY). If step X lists Y as a consumer, Y must list X as an allowed upstream.
+- No circular dependencies in `allowed_upstream_dependencies` (E585 DAG_CIRCULAR_DEPENDENCY).
+- Prompt extraction intent entries reference only declared upstream dependencies (W596 UNDECLARED_UPSTREAM_REF).
+
+**When to run:** After modifying `tools/step_order.json` or any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
+
+#### `extraction-intent-check`
+
+Validates that each prompt's `### Extraction Intent` section is consistent with `allowed_upstream_dependencies` declared in `tools/step_order.json`.
+
+**What it checks:**
+- Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).
+- Extraction intent entries reference valid steps (E598 EXTRACTION_INTENT_INVALID_REF).
+- Intent text is specific (W597 EXTRACTION_INTENT_VAGUE — fewer than 10 words or contains weasel words).
+- Extraction intent sections are non-empty when present (E591 EXTRACTION_INTENT_EMPTY).
+
+**When to run:** After adding or modifying `### Extraction Intent` sections in prompts.
+
+#### `env-check`
+
+Read-only diagnostic that prints the active validation configuration. Modifies no state.
+
+**What it displays:**
+- All active `SPECDEV_*` environment variables and their values.
+- W→E promotion status: ALL (18 pairs via `SPECDEV_WARNINGS_AS_ERRORS=1`), SELECTIVE (per-code via `SPECDEV_PROMOTE_CODES`), or OFF.
+- Forward-replay base ref resolution (explicit, upstream tracking, or fallback).
+- Spec directory and step_order.json paths.
+
+**When to run:** When troubleshooting CI failures related to W→E promotion, replay base ref, or configuration issues.
 
 ### Alignment & Migration
 ```bash
@@ -185,7 +232,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
   - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
   - `duplicate api_ref`: Each API Contract can only be mapped once.
 - **Canon/schema alignment failures** (`canon-schema-alignment`):
-  - `E550 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
+  - `E554 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
   - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
   - `E552 MISSING_PAIRED_SCHEMA`: Schema file referenced in pairing config not found.
   - `E553 MISSING_ENUM_PATH`: JSON path referenced in pairing config not found in schema.

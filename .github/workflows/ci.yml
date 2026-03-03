@@ -56,6 +56,8 @@ jobs:
         run: python -m specdev_tools.cli docs-lint spec --repo-root .
       - name: Dependency order lint
         run: python -m specdev_tools.cli dependency-order-lint --repo-root .
+      - name: DAG lint
+        run: python -m specdev_tools.cli dag-lint --repo-root .
       - name: Forward replay check
         run: |
           BASE_REF="origin/main"

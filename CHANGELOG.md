@@ -15,7 +15,7 @@ All detailed version records are stored in the [`changelog/`](./changelog/) dire
 
 | Version | Release Date | Documentation | Migration Spec | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Unreleased** | — | — | — | E561/E562/E563 differentiated traceability codes, W140 seed content overlap check, W581/E582 milestone_ref binding, seed-tech-stack required for step 14, **R8 Schema Tightening**: `coverage_gaps` field added to all 19 step schemas; `milestone_ref` added to Step 16 checklist item properties; `trace` promoted to required in Steps 01 and 07; `milestones` promoted to required in Step 09 with `deliverables`+`status` required on milestone items; `acceptance_criteria` removed from Step 14 task required; Step 14 assumptions minLength 15→10; Step 13a category enum added + `specification_source` promoted to required; `generationQuality.assumptions` promoted to required in shared definition; **Post-R8 cleanup**: 189 cross-schema `$ref` URIs normalized from JSON Pointer (`#/$defs/`) to anchor (`#`) syntax; W580 SUBSTEP_DRIFT validator updated to forward-only drift detection |
+| **Unreleased** | — | [unreleased.md](changelog/unreleased.md) | — | R8 Schema Tightening + R9 Validator & CI Enforcement (4-Layer Determinism Closure) |
 | **[0.3.0]** | 2026-02-26 | [v0.3.0.md](changelog/v0.3.0.md) | [v0.3.0.yaml](changelog/v0.3.0.yaml) | ✅ Migration Hardening & Reorg |
 | **[0.2.1]** | 2026-02-07 | [v0.2.1.md](changelog/v0.2.1.md) | [v0.2.1.yaml](changelog/v0.2.1.yaml) | ⚠️ **Breaking** |
 | **[0.2.0]** | 2026-01-17 | [v0.2.0.md](changelog/v0.2.0.md) | [v0.2.0.yaml](changelog/v0.2.0.yaml) | ⚠️ **Breaking** (Schema Hardening) |

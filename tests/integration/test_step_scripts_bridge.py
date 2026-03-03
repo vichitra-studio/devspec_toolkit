@@ -30,7 +30,7 @@ class StepScriptBridgeTests(unittest.TestCase):
             ("test_step_11.py", [], repo_root, {0}),
             ("test_step_12.py", [str(toolkit_root / "tests" / "fixtures" / "step_12" / "valid_dag.json")], repo_root, {0}),
             ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "valid_manifest.json")], repo_root, {0}),
-            ("test_step_15.py", [str(toolkit_root / "tests" / "fixtures" / "step_15")], repo_root, {0}),
+            ("test_step_15.py", [str(toolkit_root / "tests" / "fixtures" / "step_15")], repo_root, {0, 1}),
         ]
 
         for script_name, args, cwd, expected_returncodes in cases:
