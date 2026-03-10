@@ -8,13 +8,13 @@ Phase: 1 of 4 (Audit)
 
 ### In
 - **Full audit of `tools/`** — all contents:
-  - `specdev_tools/` package (56 modules, 13,228 LOC across 6 subpackages: `core/`, `validation/`, `generation/`, `canonical/`, `migration/`, plus root `cli.py`)
+  - `specdev_tools/` package (53 modules, 13,228 LOC across 5 subpackages (`core/`, `validation/`, `generation/`, `canonical/`, `migration/`) plus root `cli.py`)
   - Config/registry files: `schema_registry.json`, `step_order.json`, `command_prefixes.json`
   - Packaging: `pyproject.toml`, `setup.py`, `requirements.txt`
   - `context/` placeholder directory
   - `__init__.py` deprecation bridge (33 re-exports with warnings)
 - **Full audit of `tests/`** — 73 files, 17,709 LOC:
-  - 51 main test files (including 10 `test_r9_*.py` files added by R9 audit)
+  - 50 main test files (including 10 `test_r9_*.py` files added by R9 audit)
   - 22 integration tests in `tests/integration/`
   - `tests/fixtures/` (~130 JSON files organized by step)
   - `conftest.py` hierarchy (root + integration)
@@ -58,7 +58,7 @@ Phase: 1 of 4 (Audit)
 - `tools/specdev_tools/validation/` — 17 linter modules + `validators/` with 21 step-specific validators (6,418 LOC total)
 - `tools/specdev_tools/canonical/` — 4 modules (1,827 LOC): registry, lint, integrity, autofix
 - `tools/specdev_tools/generation/` — 3 modules (2,645 LOC): `schema_differ.py` (1,331 LOC — largest module), `prompt_generator.py`, `prompt_schema_sync.py`
-- `tools/specdev_tools/migration/` — planner, runner, strip script (723 LOC)
+- `tools/specdev_tools/migration/` — planner, runner, strip script (804 LOC)
 - `tests/fixtures/` — ~130 JSON files organized per step (step_00/ through step_16/)
 - `spec/` — only `05_interface_contracts.json` + `.gitkeep` + `common/seed_manifest.json` (confirmed test artifacts — verified via grep: tests reference spec/ directly, no production code depends on it, CI uses it as demo data)
 - `scripts/templates/run_specdev.sh` — wrapper template copied to host repos by `init_project.py`
