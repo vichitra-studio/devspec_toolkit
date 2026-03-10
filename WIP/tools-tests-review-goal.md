@@ -12,7 +12,7 @@ Phase: 1 of 4 (Audit)
   - Config/registry files: `schema_registry.json`, `step_order.json`, `command_prefixes.json`
   - Packaging: `pyproject.toml`, `setup.py`, `requirements.txt`
   - `context/` placeholder directory
-  - `__init__.py` deprecation bridge (33 re-exports with warnings)
+  - `__init__.py` deprecation bridge (24 re-exports with warnings)
 - **Full audit of `tests/`** — 73 files, 17,709 LOC:
   - 50 main test files (including 10 `test_r9_*.py` files added by R9 audit)
   - 22 integration tests in `tests/integration/`
@@ -22,7 +22,7 @@ Phase: 1 of 4 (Audit)
 - **`scripts/`** — `init_project.py`, `setup_devspec_env.sh`, `templates/run_specdev.sh`, `analyze_schema_usage.py`, `generate_fixtures_02a.py`
 - **`run_specdev.sh`** — current placement at `scripts/templates/`, wiring to `cli.py`, host-repo template generation
 - **Cross-cutting analysis**:
-  - CLI structure (757-line monolithic `cli.py` with 35+ subcommands)
+  - CLI structure (757-line monolithic `cli.py` with 25 subcommands)
   - Cross-step validator DRY (8 validators each reimplementing ID resolution)
   - Validation error collection patterns (fail-fast vs collect-all)
   - Test redundancy (R9 duplicate test files)
@@ -85,12 +85,12 @@ Each review produced working code but accumulated technical debt through layerin
 
 | # | Criterion | Industry Standard | What to Check |
 |---|-----------|-------------------|---------------|
-| A1 | Command dispatch | Command groups with lazy loading or `add_command()`. One module per group. | Is `cli.py` (757 LOC) monolithic? Are all 35+ subcommands in one file? |
+| A1 | Command dispatch | Command groups with lazy loading or `add_command()`. One module per group. | Is `cli.py` (757 LOC) monolithic? Are all 25 subcommands in one file? |
 | A2 | Separation of concerns | CLI layer (thin: parse args) → service layer (orchestration) → domain (pure logic) | Does `cli.py` mix parsing, validation logic, and output formatting? |
-| A3 | Package layout | `src/` layout or at minimum domain/adapters/entrypoints separation | Is `validation/` flat with 18 modules? Is there a clear core/service/CLI split? |
+| A3 | Package layout | `src/` layout or at minimum domain/adapters/entrypoints separation | Is `validation/` flat with 17 modules? Is there a clear core/service/CLI split? |
 | A4 | Configuration centralization | All env vars read in one config module | Are `SPECDEV_*` env vars scattered across modules with `os.getenv()`? |
 | A5 | Entry point & wrapper | `pyproject.toml` entry point + self-locating shell wrapper in toolkit | Is `run_specdev.sh` a template? Does it self-locate? Is the entry point wired? |
-| A6 | Import hygiene | No circular imports, clean `__init__.py` exports, lazy imports for performance | Does the deprecation bridge in `__init__.py` (33 re-exports) cause issues? |
+| A6 | Import hygiene | No circular imports, clean `__init__.py` exports, lazy imports for performance | Does the deprecation bridge in `__init__.py` (24 re-exports) cause issues? |
 | A7 | Dependency management | Pinned requirements, reproducible installs | Are deps pinned? Is `setup.py` + `pyproject.toml` dual config justified? |
 | A8 | Error handling & propagation | Clear exception hierarchy, consistent error propagation from validators to CLI | Are exceptions caught and re-raised consistently? Is there a custom exception hierarchy? |
 | A9 | Logging | `logging` module with configurable levels, not scattered `print()` | Does the CLI use print() vs logging inconsistently? |
@@ -161,7 +161,7 @@ Each review produced working code but accumulated technical debt through layerin
 - `generation/schema_differ.py` (1,331 LOC) is the largest module — may warrant focused sub-audit within Phase 1
 - R9 test consolidation findings need to verify whether R9 tests have unique assertions or are truly redundant before recommending merge
 - Some "hardcoded values" may be intentional design decisions from R1-R9 — audit must distinguish bugs from deliberate choices
-- `__init__.py` deprecation bridge (33 re-exports) may be actively used by host repos — need to verify before recommending removal
+- `__init__.py` deprecation bridge (24 re-exports) may be actively used by host repos — need to verify before recommending removal
 - `tools/context/` is an empty placeholder — may indicate incomplete feature or dead code; needs investigation
 - Fixture count (~130) and test file count (73) are approximate — auditor should verify exact counts during execution
 
