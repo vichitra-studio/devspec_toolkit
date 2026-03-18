@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import json
-import os
 import re
 from typing import Any, Optional, Set
+
+from ...core.errors import make_error, SpecError
+from ...core.loaders import load_upstream_ids
+from ...validation.linter_utils import check_no_duplicates
 
 
 # Pattern to match FR and NFR IDs in string values
@@ -11,21 +13,19 @@ _FR_ID_RE = re.compile(r"^fr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NFR_ID_RE = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[str]:
-    errors: list[str] = []
-    job_ids = set()
-    for i, job in enumerate(instance.get("jobs", [])):
+def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+    errors: list[SpecError] = []
+    check_no_duplicates(instance.get("jobs", []), "job_id", "job_id", errors)
+    job_ids = {j["job_id"] for j in instance.get("jobs", []) if isinstance(j, dict) and isinstance(j.get("job_id"), str)}
+    for job in instance.get("jobs", []):
         job_id = job.get("job_id")
-        if job_id in job_ids:
-            errors.append(f"Duplicate job_id '{job_id}' at index {i}")
-        job_ids.add(job_id)
         for step in job.get("steps", []):
             if not step.get("id") or not step.get("command"):
-                errors.append(f"Job '{job_id}' has step missing id/command")
+                errors.append(make_error("E520", f"Job '{job_id}' has step missing id/command"))
     for job in instance.get("jobs", []):
         for req in job.get("requires", []):
             if req not in job_ids:
-                errors.append(f"Job '{job.get('job_id')}' requires unknown job '{req}'")
+                errors.append(make_error("E590", f"Job '{job.get('job_id')}' requires unknown job '{req}'"))
     # DAG cycle detection
     graph: dict[str, list[str]] = {}
     for job in instance.get("jobs", []):
@@ -33,13 +33,13 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[str]:
         graph[jid] = list(job.get("requires", []))
     cycle = _has_cycle(graph)
     if cycle:
-        errors.append(f"Circular dependency detected in job requires graph: {cycle}")
+        errors.append(make_error("E141", f"Circular dependency detected in job requires graph: {cycle}"))
 
     # Cross-step FR/NFR reference validation
-    fr_ids = _load_fr_ids(toolkit_root)
-    nfr_ids = _load_nfr_ids(toolkit_root)
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
+    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id")
 
-    upstream_map: dict[str, tuple[Optional[Set[str]], str, str]] = {
+    upstream_map: dict[str, tuple[set[str] | None, str, str]] = {
         "fr-": (fr_ids, "04_fr_list.json", "FR"),
         "nfr-": (nfr_ids, "07_nfrs.json", "NFR"),
     }
@@ -49,8 +49,8 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[str]:
     for prefix, (id_set, filename, type_label) in upstream_map.items():
         if id_set is None and filename not in warned_missing:
             errors.append(
-                f"W590 CROSS_STEP_UPSTREAM_MISSING {filename} not found; "
-                f"skipping {type_label} reference validation"
+                make_error("W590", f"CROSS_STEP_UPSTREAM_MISSING {filename} not found; "
+                f"skipping {type_label} reference validation")
             )
             warned_missing.add(filename)
 
@@ -80,9 +80,9 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                 if ref.startswith(prefix):
                     if id_set is not None and ref not in id_set:
                         errors.append(
-                            f"E590 CROSS_STEP_ID_NOT_FOUND job '{job_id}' "
+                            make_error("E590", f"CROSS_STEP_ID_NOT_FOUND job '{job_id}' "
                             f"references unknown {_type_label} '{ref}' "
-                            f"(not in {filename})"
+                            f"(not in {filename})")
                         )
                     break
 
@@ -119,65 +119,22 @@ def _has_cycle(graph: dict[str, list[str]]) -> list[str] | None:
     return None
 
 
-def _load_fr_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load FR IDs from step 04 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("04_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                items = data.get("functional_requirements", [])
-                return {
-                    req.get("fr_id")
-                    for req in items
-                    if isinstance(req, dict) and req.get("fr_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
-
-
-def _load_nfr_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load NFR IDs from step 07 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("07_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return {
-                    nfr.get("nfr_id")
-                    for nfr in data.get("nfrs", [])
-                    if isinstance(nfr, dict) and nfr.get("nfr_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
 
 
 def _check_ref(
     ref: str,
     source_label: str,
-    upstream_map: dict[str, tuple[Optional[Set[str]], str, str]],
-    errors: list[str],
+    upstream_map: dict[str, tuple[set[str] | None, str, str]],
+    errors: list[SpecError],
 ) -> None:
     """Check a single reference string against the upstream ID sets."""
     for prefix, (id_set, filename, type_label) in upstream_map.items():
         if ref.startswith(prefix):
             if id_set is not None and ref not in id_set:
                 errors.append(
-                    f"E590 CROSS_STEP_ID_NOT_FOUND {source_label} "
+                    make_error("E590", f"CROSS_STEP_ID_NOT_FOUND {source_label} "
                     f"references unknown {type_label} '{ref}' "
-                    f"(not in {filename})"
+                    f"(not in {filename})")
                 )
             break
 

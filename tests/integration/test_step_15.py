@@ -51,7 +51,7 @@ def validate_route_map(data):
     
     errors = validate_step_15(data, ".")
     if errors:
-        return False, "; ".join(errors)
+        return False, "; ".join(e.render() if hasattr(e, 'render') else str(e) for e in errors)
 
     return True, "Logic valid"
 

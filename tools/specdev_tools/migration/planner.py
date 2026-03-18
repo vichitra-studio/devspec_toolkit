@@ -24,6 +24,7 @@ from ..generation.schema_differ import (
     StepDiff,
 )
 from ..core.changelog_parser import compare_versions, get_changes_between
+from ..core.constants import STEP_TO_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -31,31 +32,8 @@ logger = logging.getLogger(__name__)
 # Constants — step-based template mapping
 # -----------------------------------------------------------------------------
 
-# Maps pipeline step number prefixes to step-based template filenames
-# in prompts/migration/.  The DiffType is recorded in MigrationStep.action
-# for the runner to know what kind of change to apply, but the *template*
-# is determined by the step context.
-_STEP_TO_TEMPLATE: Dict[str, str] = {
-    "00": "template_charter.md",
-    "01": "template_capabilities.md",
-    "02": "template_system_sketch.md",
-    "02a": "template_delivery_baseline.md",
-    "03": "template_glossary.md",
-    "04": "template_frs.md",
-    "05": "template_interfaces.md",
-    "06": "template_invariants.md",
-    "07": "template_nfrs.md",
-    "08": "template_fixtures.md",
-    "09": "template_impl_plan.md",
-    "10": "template_governance.md",
-    "11": "template_redteam.md",
-    "12": "template_ci_gates.md",
-    "13": "template_extension_generator.md",
-    "13a": "template_completeness_assessment.md",
-    "14": "template_roadmap.md",
-    "15": "template_scaffold.md",
-    "16": "template_impl_context.md",
-}
+# Re-exported from core.constants (FIX-028); local alias kept for backward compat.
+_STEP_TO_TEMPLATE = STEP_TO_TEMPLATE
 
 
 # -----------------------------------------------------------------------------

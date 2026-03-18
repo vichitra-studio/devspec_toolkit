@@ -17,6 +17,7 @@ import os
 import re
 from pathlib import Path
 
+from ..core.errors import SpecError, make_error
 from ._extraction_intent_parser import parse_extraction_intent
 from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE
 
@@ -28,27 +29,27 @@ _PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 _TERMINAL_STEPS = frozenset({"16c"})
 
 
-def lint_dag(repo_root: str) -> list[str]:
+def lint_dag(repo_root: str) -> list[SpecError]:
     """Validate DAG completeness in step_order.json.
 
     Args:
         repo_root: Path to the toolkit root directory.
 
     Returns:
-        List of error/warning strings (E520, E585, E596, E599, W596).
+        List of SpecError objects (E520, E585, E596, E599, W596).
     """
-    errors: list[str] = []
+    errors: list[SpecError] = []
     root = Path(os.path.abspath(repo_root))
     step_order_path = root / "tools" / "step_order.json"
 
     if not step_order_path.is_file():
-        return ["E520 UNRESOLVED_INPUT step_order.json not found"]
+        return [make_error("E520", "UNRESOLVED_INPUT step_order.json not found")]
 
     try:
         with step_order_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
-        return [f"E520 UNRESOLVED_INPUT step_order.json parse error: {exc}"]
+        return [make_error("E520", f"UNRESOLVED_INPUT step_order.json parse error: {exc}")]
 
     steps: list[str] = data.get("steps", [])
     downstream_consumers: dict[str, list[str]] = data.get("downstream_consumers", {})
@@ -64,10 +65,11 @@ def lint_dag(repo_root: str) -> list[str]:
             continue
         consumers = downstream_consumers.get(step, [])
         if len(consumers) == 0:
-            errors.append(
-                f"E596 DAG_DEAD_END_PRODUCER step '{step}' has zero "
-                f"downstream consumers"
-            )
+            errors.append(make_error(
+                "E596",
+                f"DAG_DEAD_END_PRODUCER step '{step}' has zero "
+                f"downstream consumers",
+            ))
 
     # ---------------------------------------------------------------
     # Check 4: Consumer consistency (E599)
@@ -77,19 +79,21 @@ def lint_dag(repo_root: str) -> list[str]:
     for step, consumers in downstream_consumers.items():
         for consumer in consumers:
             if consumer not in step_set:
-                errors.append(
-                    f"E599 DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
+                errors.append(make_error(
+                    "E599",
+                    f"DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
                     f"'{consumer}' as consumer but '{consumer}' is not a "
-                    f"recognized step"
-                )
+                    f"recognized step",
+                ))
                 continue
             consumer_deps = allowed_deps.get(consumer, [])
             if step not in consumer_deps:
-                errors.append(
-                    f"E599 DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
+                errors.append(make_error(
+                    "E599",
+                    f"DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
                     f"'{consumer}' as consumer but '{consumer}' does not list "
-                    f"'{step}' as upstream dependency"
-                )
+                    f"'{step}' as upstream dependency",
+                ))
 
     # ---------------------------------------------------------------
     # Check 5: Circular dependencies
@@ -114,7 +118,7 @@ def lint_dag(repo_root: str) -> list[str]:
 def _check_circular_dependencies(
     steps: list[str],
     allowed_deps: dict[str, list[str]],
-    errors: list[str],
+    errors: list[SpecError],
 ) -> None:
     """Detect circular dependencies in the upstream dependency graph.
 
@@ -145,10 +149,11 @@ def _check_circular_dependencies(
             _dfs(step, [])
 
     for cycle in cycles_found:
-        errors.append(
-            f"E585 DAG_CIRCULAR_DEPENDENCY cycle detected: "
-            f"{' -> '.join(cycle)}"
-        )
+        errors.append(make_error(
+            "E585",
+            f"DAG_CIRCULAR_DEPENDENCY cycle detected: "
+            f"{' -> '.join(cycle)}",
+        ))
 
 
 def _check_extraction_intents(
@@ -157,7 +162,7 @@ def _check_extraction_intents(
     step_set: set[str],
     allowed_deps: dict[str, list[str]],
     downstream_consumers: dict[str, list[str]],
-    errors: list[str],
+    errors: list[SpecError],
 ) -> None:
     """Check for undeclared upstream refs in extraction intent sections (W596).
 
@@ -187,9 +192,10 @@ def _check_extraction_intents(
         upstream_deps = set(allowed_deps.get(step, []))
         for ref_step in intent.referenced_steps:
             if ref_step in step_set and ref_step not in upstream_deps:
-                errors.append(
-                    f"W596 UNDECLARED_UPSTREAM_REF prompt for step '{step}' "
+                errors.append(make_error(
+                    "W596",
+                    f"UNDECLARED_UPSTREAM_REF prompt for step '{step}' "
                     f"({intent.prompt_path.name}) references artifact for "
                     f"step '{ref_step}' which is not in "
-                    f"allowed_upstream_dependencies"
-                )
+                    f"allowed_upstream_dependencies",
+                ))

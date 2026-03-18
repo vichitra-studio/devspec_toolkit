@@ -3,8 +3,22 @@
 import importlib as _importlib
 import warnings as _warnings
 
+__version__ = "0.4.0"
+
 __all__: list[str] = []
 
+# Backward-compatibility lazy-import registry (AUDIT-061 design decision).
+#
+# The _MOVED dict maps 22 top-level attribute names (e.g.
+# ``specdev_tools.validate``) to their current fully-qualified module paths
+# inside the reorganised subpackages (``specdev_tools.validation.validate``).
+# ``__getattr__`` intercepts accesses to these names, emits a
+# DeprecationWarning, and returns the real module.
+#
+# This shim prevents circular imports at module load time and maintains
+# backward compatibility while nudging consumers toward canonical import
+# paths.  Removing it would break any external code using the old flat
+# import style.  Kept intentionally.
 _MOVED = {
     "validate": "specdev_tools.validation.validate",
     "errors": "specdev_tools.core.errors",

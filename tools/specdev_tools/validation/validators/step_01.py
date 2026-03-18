@@ -1,9 +1,8 @@
-import json
-import os
+from __future__ import annotations
+
 import warnings
 from typing import Optional, Set
-from jsonschema import Draft202012Validator
-from ...core.registry import SchemaRegistry
+from ...core.errors import make_error, SpecError
 from ...core.trace_types import is_valid_trace_type, normalize_trace_type
 
 # ---------------------------------------------------------------------------
@@ -17,19 +16,16 @@ from ...core.trace_types import is_valid_trace_type, normalize_trace_type
 # building blocks, not to requirements or test artefacts.
 _CAPABILITY_COMPONENT_TRACE_TYPE: str = "component"
 
-if not is_valid_trace_type(_CAPABILITY_COMPONENT_TRACE_TYPE):
-    warnings.warn(
-        f"step_01: _CAPABILITY_COMPONENT_TRACE_TYPE '{_CAPABILITY_COMPONENT_TRACE_TYPE}' "
-        f"is not a valid canon trace type",
-        stacklevel=1,
-    )
+# Deferred trace-type validation: performed once on first validate call,
+# not at import time, to avoid noisy warnings during simple imports.
+_TRACE_TYPE_VALIDATED: bool = False
 
 
-def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) -> list:
+def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) -> list[SpecError]:
     """
     Validates that capabilities trace to known components in the System Sketch.
     """
-    errors = []
+    errors: list[SpecError] = []
     if component_ids is None:
         return errors
 
@@ -38,44 +34,35 @@ def validate_trace_integrity(instance: dict, component_ids: Optional[Set[str]]) 
             if normalize_trace_type(trace.get("type", "")) == _CAPABILITY_COMPONENT_TRACE_TYPE:
                 target_id = trace.get("id")
                 if target_id not in component_ids:
-                    errors.append(f"Capability '{cap.get('capability_id')}' traces to unknown component '{target_id}'")
+                    errors.append(make_error("E590", f"Capability '{cap.get('capability_id')}' traces to unknown component '{target_id}'"))
     return errors
 
 def validate_step_01(
-    instance: dict, 
+    instance: dict,
     repo_root: str,
     component_ids: Optional[Set[str]] = None
-) -> list[str]:
+) -> list[SpecError]:
     """
-    Validation logic for Step 01 (Capabilities).
-    Includes Schema Validation + Trace Integrity.
+    Deep validation logic for Step 01 (Capabilities).
+
+    Schema validation is handled by the orchestrator (validate.py) before
+    this function is called.  This function performs trace integrity checks.
     """
-    errors = []
-    
-    # 1. Schema Validation
-    registry = SchemaRegistry(repo_root)
-    schema = registry.load("https://specdev.local/schema/01_capabilities.schema.json")
+    global _TRACE_TYPE_VALIDATED
+    if not _TRACE_TYPE_VALIDATED:
+        _TRACE_TYPE_VALIDATED = True
+        if not is_valid_trace_type(_CAPABILITY_COMPONENT_TRACE_TYPE):
+            warnings.warn(
+                f"step_01: _CAPABILITY_COMPONENT_TRACE_TYPE '{_CAPABILITY_COMPONENT_TRACE_TYPE}' "
+                f"is not a valid canon trace type",
+                stacklevel=2,
+            )
 
-    
-    # Strip $schema if present
-    data_for_validation = dict(instance)
-    data_for_validation.pop("$schema", None)
-    
-    # Construct referencing Registry from the store
-    from referencing import Registry, Resource
-    registry_obj = Registry().with_resources([
-        (uri, Resource.from_contents(content)) 
-        for uri, content in registry.store.items()
-    ])
+    errors: list[SpecError] = []
 
-    validator = Draft202012Validator(schema, registry=registry_obj)
-    for err in validator.iter_errors(data_for_validation):
-
-        errors.append(f"Schema Error: {err.message}")
-
-    # 2. Trace Integrity (if component_ids provided)
+    # Trace Integrity (if component_ids provided)
     if component_ids:
         custom_errors = validate_trace_integrity(instance, component_ids)
         errors.extend(custom_errors)
-        
+
     return errors

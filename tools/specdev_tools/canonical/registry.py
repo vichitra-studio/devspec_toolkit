@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..core.errors import SpecError, make_error
+
 
 @dataclass(frozen=True)
 class CanonicalEntry:
@@ -24,13 +26,13 @@ class CanonicalRegistry:
         entries: dict[str, CanonicalEntry],
         aliases: dict[tuple[str, str], set[str]],
         alias_status: dict[tuple[str, str], str],
-        load_errors: list[str] | None = None,
+        load_errors: list[SpecError] | None = None,
         alias_lifecycle: dict[tuple[str, str], dict] | None = None,
     ):
         self.entries = entries
         self.aliases = aliases
         self.alias_status = alias_status
-        self.load_errors = load_errors or []
+        self.load_errors: list[SpecError] = load_errors or []
         self.alias_lifecycle = alias_lifecycle or {}
 
     @classmethod
@@ -42,7 +44,7 @@ class CanonicalRegistry:
         return cls.from_manifest(manifest, load_errors=load_errors)
 
     @classmethod
-    def from_manifest(cls, manifest: dict[str, Any], load_errors: list[str] | None = None) -> "CanonicalRegistry":
+    def from_manifest(cls, manifest: dict[str, Any], load_errors: list[SpecError] | None = None) -> "CanonicalRegistry":
         entries: dict[str, CanonicalEntry] = {}
         aliases: dict[tuple[str, str], set[str]] = {}
         alias_status: dict[tuple[str, str], str] = {}
@@ -130,8 +132,8 @@ class CanonicalRegistry:
         except (ValueError, TypeError):
             return False
 
-    def validate_ref(self, ref: dict[str, Any]) -> list[str]:
-        errs: list[str] = []
+    def validate_ref(self, ref: dict[str, Any]) -> list[SpecError]:
+        errs: list[SpecError] = []
         cid = ref.get("id")
         kind = ref.get("kind")
         version = ref.get("version")
@@ -140,27 +142,27 @@ class CanonicalRegistry:
             return errs
         entry = self.get(cid)
         if not entry:
-            errs.append(f"E110 UNKNOWN_CANONICAL_ID {cid}")
+            errs.append(make_error("E110", f"UNKNOWN_CANONICAL_ID {cid}"))
             return errs
         if kind and entry.kind != kind:
-            errs.append(f"E120 CANONICAL_KIND_MISMATCH {cid} expected={entry.kind} got={kind}")
+            errs.append(make_error("E120", f"CANONICAL_KIND_MISMATCH {cid} expected={entry.kind} got={kind}"))
         if version and not _version_matches(entry.version, version):
-            errs.append(f"E130 CANONICAL_VERSION_MISMATCH {cid} expected={version} got={entry.version}")
+            errs.append(make_error("E130", f"CANONICAL_VERSION_MISMATCH {cid} expected={version} got={entry.version}"))
         if not version:
-            errs.append(f"W130 CANONICAL_REF_VERSION_OMITTED {cid}")
+            errs.append(make_error("W130", f"CANONICAL_REF_VERSION_OMITTED {cid}"))
         if entry.status == "deprecated":
-            errs.append(f"W110 DEPRECATED_CANONICAL_USED {cid}")
+            errs.append(make_error("W110", f"DEPRECATED_CANONICAL_USED {cid}"))
         if kind and alias_used:
             candidates = self.alias_candidates(kind, alias_used)
             if len(candidates) > 1:
-                errs.append(f"E140 AMBIGUOUS_ALIAS kind={kind} alias={alias_used} candidates={candidates}")
+                errs.append(make_error("E140", f"AMBIGUOUS_ALIAS kind={kind} alias={alias_used} candidates={candidates}"))
             elif self.alias_is_deprecated(kind, alias_used):
                 lc = self.alias_lifecycle.get((kind, _norm(alias_used)), {})
                 replaced_by = lc.get("replaced_by", "")
                 if self.alias_is_sunset(kind, alias_used):
-                    errs.append(f"E125 ALIAS_SUNSET_EXPIRED kind={kind} alias={alias_used} replaced_by={replaced_by}")
+                    errs.append(make_error("E125", f"ALIAS_SUNSET_EXPIRED kind={kind} alias={alias_used} replaced_by={replaced_by}"))
                 else:
-                    errs.append(f"W120 ALIAS_DEPRECATED kind={kind} alias={alias_used} replaced_by={replaced_by}")
+                    errs.append(make_error("W120", f"ALIAS_DEPRECATED kind={kind} alias={alias_used} replaced_by={replaced_by}"))
         return errs
 
 
@@ -179,8 +181,8 @@ def _version_matches(actual: str, expected: str) -> bool:
     return False
 
 
-def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | None, list[str]]:
-    load_errors: list[str] = []
+def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | None, list[SpecError]]:
+    load_errors: list[SpecError] = []
     manifest_path = root / canon_dir / "manifest.json"
     manifest = _read_json_file(manifest_path, load_errors, "invalid_manifest") if manifest_path.exists() else None
     modular = _load_modular_manifest(root / canon_dir, load_errors)
@@ -193,7 +195,7 @@ def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | 
     return _merge_manifest_data(manifest, modular), load_errors
 
 
-def _load_modular_manifest(canon_root: Path, load_errors: list[str]) -> dict[str, Any] | None:
+def _load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:
     aliases_path = canon_root / "aliases.json"
     aliases_doc = _read_json_file(aliases_path, load_errors, "invalid_aliases") if aliases_path.exists() else None
 
@@ -215,15 +217,15 @@ def _load_modular_manifest(canon_root: Path, load_errors: list[str]) -> dict[str
             registry_version = kind_doc["registry_version"]
         kind = kind_doc.get("kind")
         if not isinstance(kind, str) or not kind:
-            load_errors.append(f"E520 UNRESOLVED_INPUT invalid_kind_file {kind_file} missing kind")
+            load_errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} missing kind"))
             continue
         raw_entries = kind_doc.get("entries")
         if not isinstance(raw_entries, list):
-            load_errors.append(f"E520 UNRESOLVED_INPUT invalid_kind_file {kind_file} entries must be an array")
+            load_errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries must be an array"))
             continue
         for idx, raw in enumerate(raw_entries):
             if not isinstance(raw, dict):
-                load_errors.append(f"E520 UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] must be an object")
+                load_errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] must be an object"))
                 continue
             entry = dict(raw)
             entry_kind = entry.get("kind")
@@ -231,7 +233,7 @@ def _load_modular_manifest(canon_root: Path, load_errors: list[str]) -> dict[str
                 entry["kind"] = kind
             elif not isinstance(entry_kind, str) or entry_kind != kind:
                 load_errors.append(
-                    f"E520 UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] kind mismatch expected={kind} got={entry_kind}"
+                    make_error("E520", f"UNRESOLVED_INPUT invalid_kind_file {kind_file} entries[{idx}] kind mismatch expected={kind} got={entry_kind}")
                 )
                 continue
             entries.append(entry)
@@ -242,11 +244,11 @@ def _load_modular_manifest(canon_root: Path, load_errors: list[str]) -> dict[str
             registry_version = aliases_doc["registry_version"]
         raw_aliases = aliases_doc.get("aliases")
         if not isinstance(raw_aliases, list):
-            load_errors.append(f"E520 UNRESOLVED_INPUT invalid_aliases {aliases_path} aliases must be an array")
+            load_errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_aliases {aliases_path} aliases must be an array"))
             raw_aliases = []
         for idx, raw_alias in enumerate(raw_aliases):
             if not isinstance(raw_alias, dict):
-                load_errors.append(f"E520 UNRESOLVED_INPUT invalid_aliases {aliases_path} aliases[{idx}] must be an object")
+                load_errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_aliases {aliases_path} aliases[{idx}] must be an object"))
                 continue
             aliases.append(raw_alias)
 
@@ -289,15 +291,15 @@ def _merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> d
     return merged
 
 
-def _read_json_file(path: Path, load_errors: list[str], error_kind: str) -> dict[str, Any] | None:
+def _read_json_file(path: Path, load_errors: list[SpecError], error_kind: str) -> dict[str, Any] | None:
     try:
         with path.open("r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
-        load_errors.append(f"E520 UNRESOLVED_INPUT {error_kind} {path} {exc}")
+        load_errors.append(make_error("E520", f"UNRESOLVED_INPUT {error_kind} {path} {exc}"))
         return None
     if not isinstance(data, dict):
-        load_errors.append(f"E520 UNRESOLVED_INPUT {error_kind} {path} root must be an object")
+        load_errors.append(make_error("E520", f"UNRESOLVED_INPUT {error_kind} {path} root must be an object"))
         return None
     return data
 

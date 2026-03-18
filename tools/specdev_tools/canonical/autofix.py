@@ -5,13 +5,15 @@ import os
 import re
 import shutil
 import tempfile
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from .lint import lint_canon_dir
 from .registry import CanonicalRegistry
+from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
 
 
@@ -21,10 +23,10 @@ def canonical_autofix(
     write: bool = False,
     canon_dir: str = "canon",
     require_manifest_schema_registration: bool = True,
-) -> dict[str, list[str]]:
+) -> dict[str, list[str | SpecError]]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
-        return {spec_dir_abs: [f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}"]}
+        return {spec_dir_abs: [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]}
     preflight_errors = lint_canon_dir(
         repo_root,
         canon_dir=canon_dir,
@@ -35,10 +37,11 @@ def canonical_autofix(
         return {canon_root: _uniq(preflight_errors)}
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
     schema_registry, schema_registry_error = _load_schema_registry(repo_root)
-    changes: dict[str, list[str]] = {}
+    changes: dict[str, list[str | SpecError]] = {}
     if registry.load_errors:
         canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
-        changes[canon_root] = sorted(set(registry.load_errors))
+        sorted_errs = sorted(set(registry.load_errors), key=lambda e: e.render())
+        changes[canon_root] = cast(list[str | SpecError], sorted_errs)
         return changes
     pending_writes: dict[str, Any] = {}
     for path in _iter_json(spec_dir_abs):
@@ -46,13 +49,13 @@ def canonical_autofix(
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
-            changes[path] = [f"E520 UNRESOLVED_INPUT {path} invalid_json {str(exc)}"]
+            changes[path] = [make_error("E520", f"UNRESOLVED_INPUT {path} invalid_json {str(exc)}")]
             continue
         schema_validator, schema_error = _build_schema_validator(schema_registry, data, schema_registry_error)
         if schema_error:
-            changes[path] = [f"E520 UNRESOLVED_INPUT {path} {schema_error}"]
+            changes[path] = [make_error("E520", f"UNRESOLVED_INPUT {path} {schema_error}")]
             continue
-        file_changes: list[str] = []
+        file_changes: list[str | SpecError] = []
         _autofix_node(data, registry, file_changes, data, schema_validator)
         _sync_canonical_refs_used(data, registry, file_changes)
         if file_changes:
@@ -63,7 +66,7 @@ def canonical_autofix(
         if _has_errors(changes):
             for path in sorted(pending_writes):
                 changes.setdefault(path, []).append(
-                    f"E520 UNRESOLVED_INPUT {path} write_aborted_due_to_errors"
+                    make_error("E520", f"UNRESOLVED_INPUT {path} write_aborted_due_to_errors")
                 )
             return changes
         _apply_writes_atomically(pending_writes, changes)
@@ -73,7 +76,7 @@ def canonical_autofix(
 def _autofix_node(
     node: Any,
     registry: CanonicalRegistry,
-    file_changes: list[str],
+    file_changes: list[str | SpecError],
     root_data: Any,
     schema_validator: Draft202012Validator | None,
     path: str = "",
@@ -106,7 +109,7 @@ def _try_infer_ref(
     target_ref_field: str,
     kind: str,
     registry: CanonicalRegistry,
-    file_changes: list[str],
+    file_changes: list[str | SpecError],
     root_data: Any,
     schema_validator: Draft202012Validator | None,
     path: str,
@@ -135,7 +138,7 @@ def _try_infer_ref(
         lc = registry.alias_lifecycle.get((kind, normalized), {})
         replaced_by = lc.get("replaced_by", "")
         file_changes.append(
-            f"WARN {path or '$'} skipped autofix for deprecated alias {source_field}='{value}' replaced_by={replaced_by}"
+            make_error("W570", f"GRACEFUL_SKIP {path or '$'} skipped autofix for deprecated alias {source_field}='{value}' replaced_by={replaced_by}")
         )
         return
     candidate_ref = {"id": resolved, "kind": kind}
@@ -219,15 +222,20 @@ def _apply_if_schema_valid(
     return True
 
 
-def _has_errors(changes: dict[str, list[str]]) -> bool:
-    return any(item.startswith("E") for entries in changes.values() for item in entries)
+def _has_errors(changes: dict[str, list[str | SpecError]]) -> bool:
+    return any(
+        (isinstance(item, SpecError) and item.code.startswith("E"))
+        or (isinstance(item, str) and item.startswith("E"))
+        for entries in changes.values()
+        for item in entries
+    )
 
 
-def _uniq(messages: list[str]) -> list[str]:
+def _uniq(messages: Sequence[str | SpecError]) -> list[str | SpecError]:
     return list(dict.fromkeys(messages))
 
 
-def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, list[str]]) -> None:
+def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, list[str | SpecError]]) -> None:
     temp_outputs: dict[str, str] = {}
     backup_outputs: dict[str, str] = {}
     applied: list[str] = []
@@ -242,7 +250,7 @@ def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, 
                     f.write("\n")
             except (OSError, ValueError, TypeError) as exc:
                 changes.setdefault(path, []).append(
-                    f"E520 UNRESOLVED_INPUT {path} temp_write_failed {str(exc)}"
+                    make_error("E520", f"UNRESOLVED_INPUT {path} temp_write_failed {str(exc)}")
                 )
                 try:
                     os.unlink(tmp_path)
@@ -260,7 +268,7 @@ def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, 
                 shutil.copy2(path, backup_path)
             except OSError as exc:
                 changes.setdefault(path, []).append(
-                    f"E520 UNRESOLVED_INPUT {path} backup_failed {str(exc)}"
+                    make_error("E520", f"UNRESOLVED_INPUT {path} backup_failed {str(exc)}")
                 )
                 try:
                     os.unlink(backup_path)
@@ -276,7 +284,7 @@ def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, 
                 applied.append(path)
             except OSError as exc:
                 changes.setdefault(path, []).append(
-                    f"E520 UNRESOLVED_INPUT {path} write_failed {str(exc)}"
+                    make_error("E520", f"UNRESOLVED_INPUT {path} write_failed {str(exc)}")
                 )
                 # Best-effort rollback for already-applied files.
                 for applied_path in reversed(applied):
@@ -287,7 +295,7 @@ def _apply_writes_atomically(pending_writes: dict[str, Any], changes: dict[str, 
                         os.replace(backup_path, applied_path)
                     except OSError as rollback_exc:
                         changes.setdefault(applied_path, []).append(
-                            f"E520 UNRESOLVED_INPUT {applied_path} rollback_failed {str(rollback_exc)}"
+                            make_error("E520", f"UNRESOLVED_INPUT {applied_path} rollback_failed {str(rollback_exc)}")
                         )
                 return
     finally:
@@ -320,7 +328,7 @@ def _validation_error_fingerprints(validator: Draft202012Validator, root_data: A
         return None
 
 
-def _sync_canonical_refs_used(data: Any, registry: CanonicalRegistry, file_changes: list[str]) -> None:
+def _sync_canonical_refs_used(data: Any, registry: CanonicalRegistry, file_changes: list[str | SpecError]) -> None:
     if not isinstance(data, dict):
         return
     declared = data.get("canonical_refs_used")

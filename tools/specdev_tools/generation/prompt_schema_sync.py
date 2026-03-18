@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import _WrappedReferencingError
+from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from referencing import Registry, Resource
 
+from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
 
 FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
@@ -30,11 +31,11 @@ DRIFT_SENSITIVE_FIELDS = (
 )
 
 
-def run_prompt_schema_sync(repo_root: str) -> list[str]:
+def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     schema_dir = root / "schema"
     prompt_dir = root / "prompts"
-    errors: list[str] = []
+    errors: list[SpecError] = []
     schema_contracts: dict[str, tuple[str, dict[str, Any], list[str], dict[str, Any]]] = {}
     registry_map, registry_map_error = _schema_registry_map(root)
 
@@ -46,7 +47,7 @@ def run_prompt_schema_sync(repo_root: str) -> list[str]:
         try:
             schema_required, schema_props, schema = _load_contract(schema_file)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
-            errors.append(f"E520 UNRESOLVED_INPUT invalid_schema {schema_file} {exc}")
+            errors.append(make_error("E520", f"UNRESOLVED_INPUT invalid_schema {schema_file} {exc}"))
             continue
         schema_contracts[step] = (schema_file, schema, schema_required, schema_props)
         prompt_candidates = _prompt_candidates(prompt_dir, step)
@@ -69,17 +70,18 @@ def run_prompt_schema_sync(repo_root: str) -> list[str]:
             prompt_required, prompt_props, prompt_schema, line_no = _extract_prompt_contract(prompt_path)
             if prompt_required is None:
                 if schema_ref is None:
-                    errors.append(
-                        f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-                        "missing JSON contract block and schema reference"
-                    )
+                    errors.append(make_error(
+                        "E310",
+                        f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+                        "missing JSON contract block and schema reference",
+                    ))
                 continue
             missing = sorted(set(schema_required) - set(prompt_required))
             extra = sorted(set(prompt_required) - set(schema_required))
             if missing:
-                errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing required {missing}")
+                errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing required {missing}"))
             if extra:
-                errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} extra required {extra}")
+                errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} extra required {extra}"))
             errors.extend(
                 _drift_sensitive_property_errors(
                     prompt_path,
@@ -178,10 +180,10 @@ def _schema_reference_errors(
     registry_map: dict[str, str] | None,
     registry_map_error: str | None,
     repo_root: Path,
-) -> list[str]:
-    errors: list[str] = []
+) -> list[SpecError]:
+    errors: list[SpecError] = []
     if schema_ref is None:
-        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema reference section")
+        errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema reference section"))
         return errors
 
     uri = schema_ref.get("uri", "").strip()
@@ -192,42 +194,47 @@ def _schema_reference_errors(
     ).as_posix()
 
     if not uri:
-        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema URI reference")
+        errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema URI reference"))
     elif isinstance(expected_uri, str) and expected_uri.strip() and uri != expected_uri:
-        errors.append(
-            f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-            f"schema_uri_mismatch expected='{expected_uri}' got='{uri}'"
-        )
+        errors.append(make_error(
+            "E310",
+            f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            f"schema_uri_mismatch expected='{expected_uri}' got='{uri}'",
+        ))
 
     if not rel_file:
-        errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema file reference")
+        errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing schema file reference"))
     elif Path(rel_file).as_posix() != expected_rel_file:
-        errors.append(
-            f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-            f"schema_file_mismatch expected='{expected_rel_file}' got='{Path(rel_file).as_posix()}'"
-        )
+        errors.append(make_error(
+            "E310",
+            f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            f"schema_file_mismatch expected='{expected_rel_file}' got='{Path(rel_file).as_posix()}'",
+        ))
 
     if registry_map is None:
         detail = registry_map_error or "unknown"
-        errors.append(
-            f"E520 UNRESOLVED_INPUT {prompt_path}:{line_no} "
-            f"schema_registry_bootstrap_failed detail={detail}"
-        )
+        errors.append(make_error(
+            "E520",
+            f"UNRESOLVED_INPUT {prompt_path}:{line_no} "
+            f"schema_registry_bootstrap_failed detail={detail}",
+        ))
         return errors
 
     if uri:
         mapped = registry_map.get(uri)
         if not mapped:
-            errors.append(
-                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-                f"schema_uri_not_registered uri='{uri}'"
-            )
+            errors.append(make_error(
+                "E310",
+                f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+                f"schema_uri_not_registered uri='{uri}'",
+            ))
         elif rel_file and Path(mapped).as_posix() != Path(rel_file).as_posix():
-            errors.append(
-                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            errors.append(make_error(
+                "E310",
+                f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
                 f"schema_registry_path_mismatch uri='{uri}' registry='{Path(mapped).as_posix()}' "
-                f"prompt='{Path(rel_file).as_posix()}'"
-            )
+                f"prompt='{Path(rel_file).as_posix()}'",
+            ))
 
     return errors
 
@@ -237,25 +244,25 @@ def _drift_sensitive_property_errors(
     line_no: int,
     schema_props: dict[str, object],
     prompt_props: dict[str, object],
-) -> list[str]:
+) -> list[SpecError]:
     fields = DRIFT_SENSITIVE_FIELDS
-    errors: list[str] = []
+    errors: list[SpecError] = []
     for field in fields:
         schema_prop = schema_props.get(field)
         prompt_prop = prompt_props.get(field)
         if schema_prop is None:
             continue
         if prompt_prop is None:
-            errors.append(
-                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing property field='{field}'"
-            )
+            errors.append(make_error(
+                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} missing property field='{field}'"
+            ))
             continue
         if not (isinstance(schema_prop, dict) and isinstance(prompt_prop, dict)):
             continue
         if _canonical_json(schema_prop) != _canonical_json(prompt_prop):
-            errors.append(
-                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} property_drift field='{field}'"
-            )
+            errors.append(make_error(
+                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} property_drift field='{field}'"
+            ))
     return errors
 
 
@@ -268,7 +275,7 @@ def _required_canonical_ref_errors(
     line_no: int,
     schema: dict[str, Any],
     prompt_schema: dict[str, Any],
-) -> list[str]:
+) -> list[SpecError]:
     expected = _collect_required_canonical_ref_paths(schema)
     if not expected:
         return []
@@ -276,10 +283,11 @@ def _required_canonical_ref_errors(
     missing = sorted(expected - actual)
     if not missing:
         return []
-    return [
-        f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-        f"missing_required_canonical_refs {missing}"
-    ]
+    return [make_error(
+        "E310",
+        f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+        f"missing_required_canonical_refs {missing}",
+    )]
 
 
 def _collect_required_canonical_ref_paths(node: Any, path: str = "$") -> set[str]:
@@ -319,14 +327,15 @@ def _validate_output_contracts(
     prompt_dir: Path,
     schema_contracts: dict[str, tuple[str, dict[str, Any], list[str], dict[str, Any]]],
     repo_root: Path,
-) -> list[str]:
-    errors: list[str] = []
+) -> list[SpecError]:
+    errors: list[SpecError] = []
     registry, registry_error = _schema_registry(repo_root)
     if registry_error:
-        errors.append(
-            f"E520 UNRESOLVED_INPUT {repo_root / 'tools' / 'schema_registry.json'} "
-            f"schema_registry_bootstrap_failed {registry_error}"
-        )
+        errors.append(make_error(
+            "E520",
+            f"UNRESOLVED_INPUT {repo_root / 'tools' / 'schema_registry.json'} "
+            f"schema_registry_bootstrap_failed {registry_error}",
+        ))
     for prompt_path in sorted(glob.glob(str(prompt_dir / "prompt_*.md"))):
         step = _step_from_prompt_name(Path(prompt_path).name)
         if not step:
@@ -338,16 +347,16 @@ def _validate_output_contracts(
         _, schema, _, _ = contract
         output_payload, line_no, parse_error = _extract_output_contract(prompt_path)
         if parse_error:
-            errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} {parse_error}")
+            errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} {parse_error}"))
             continue
         if not isinstance(output_payload, dict):
-            errors.append(
-                f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} output_contract_must_be_json_object"
-            )
+            errors.append(make_error(
+                "E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} output_contract_must_be_json_object"
+            ))
             continue
         schema_uri_error = _validate_output_schema_uri(output_payload, schema)
         if schema_uri_error:
-            errors.append(f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} {schema_uri_error}")
+            errors.append(make_error("E310", f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} {schema_uri_error}"))
             continue
         payload = dict(output_payload)
         payload.pop("$schema", None)
@@ -366,11 +375,12 @@ def _validate_output_contracts(
                     continue  # upstream or self — allowed
                 foreign_keys = payload_keys & other_keys
                 if foreign_keys:
-                    errors.append(
-                        f"W580 SUBSTEP_DRIFT {prompt_path}:{line_no} "
+                    errors.append(make_error(
+                        "W580",
+                        f"SUBSTEP_DRIFT {prompt_path}:{line_no} "
                         f"sub-step '{step}' output contract contains keys "
-                        f"from '{other_step}' domain: {sorted(foreign_keys)}"
-                    )
+                        f"from '{other_step}' domain: {sorted(foreign_keys)}",
+                    ))
     return errors
 
 
@@ -453,7 +463,7 @@ def _validate_output_payload(
     payload: dict[str, Any],
     schema: dict[str, Any],
     registry: Registry | None,
-) -> list[str]:
+) -> list[SpecError]:
     try:
         if registry is None:
             validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
@@ -465,22 +475,25 @@ def _validate_output_payload(
             )
         validation_errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
     except _WrappedReferencingError as exc:
-        return [
-            f"E520 UNRESOLVED_INPUT {prompt_path}:{line_no} "
-            f"output_contract_schema_resolution_failed {exc}"
-        ]
+        return [make_error(
+            "E520",
+            f"UNRESOLVED_INPUT {prompt_path}:{line_no} "
+            f"output_contract_schema_resolution_failed {exc}",
+        )]
     except Exception as exc:
-        return [
-            f"E521 VALIDATOR_RUNTIME {prompt_path}:{line_no} "
-            f"output_contract_schema_validation_runtime_error {type(exc).__name__}: {exc}"
-        ]
-    errors: list[str] = []
+        return [make_error(
+            "E521",
+            f"VALIDATOR_RUNTIME {prompt_path}:{line_no} "
+            f"output_contract_schema_validation_runtime_error {type(exc).__name__}: {exc}",
+        )]
+    errors: list[SpecError] = []
     for err in validation_errors[:5]:
         path = f"/{'/'.join(map(str, err.path))}" if err.path else "$"
-        errors.append(
-            f"E310 PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
-            f"output_contract_schema_error path='{path}' {err.message}"
-        )
+        errors.append(make_error(
+            "E310",
+            f"PROMPT_SCHEMA_DRIFT {prompt_path}:{line_no} "
+            f"output_contract_schema_error path='{path}' {err.message}",
+        ))
     return errors
 
 
@@ -491,7 +504,7 @@ def main() -> int:
     errs = run_prompt_schema_sync(args.repo_root)
     if errs:
         for err in errs:
-            print(err)
+            print(err.render())
         return 1
     print("OK")
     return 0

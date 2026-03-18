@@ -45,7 +45,7 @@ class Step14IntegrationTests(unittest.TestCase):
             tmp_path.write_text(json.dumps(fixture), encoding="utf-8")
             errors = validate_file(str(self.repo_root), str(tmp_path))
             self.assertTrue(
-                any("unknown source_milestone" in e for e in errors),
+                any("unknown source_milestone" in e.render() for e in errors),
                 msg=f"Expected unknown source_milestone error, got: {errors}",
             )
         finally:
@@ -56,7 +56,7 @@ class Step14IntegrationTests(unittest.TestCase):
         errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "invalid_depends_on_cycle.json"))
         self.assertTrue(errors, "Cycle fixture should fail validation")
         self.assertTrue(
-            any("E141" in e for e in errors),
+            any(e.code == "E141" for e in errors),
             f"Expected E141 TASK_DEPENDENCY_CYCLE error. Got: {errors}",
         )
 
@@ -81,7 +81,7 @@ class Step14IntegrationTests(unittest.TestCase):
             errors = validate_file(str(self.repo_root), str(tmp_fixture))
         self.assertTrue(errors, "Fixture with unknown fr_ref should fail validation")
         self.assertTrue(
-            any("fr-does-not-exist" in e for e in errors),
+            any("fr-does-not-exist" in e.render() for e in errors),
             f"Expected unknown fr_ref error. Got: {errors}",
         )
 
@@ -121,7 +121,7 @@ class Step14IntegrationTests(unittest.TestCase):
             (tmp_dir / "09_impl_plan.json").write_text(json.dumps(step09), encoding="utf-8")
             errors = validate_file(str(self.repo_root), str(tmp_fixture))
         self.assertTrue(
-            any("E142" in e for e in errors),
+            any(e.code == "E142" for e in errors),
             f"Expected E142 TECH_STACK_MISMATCH error. Got: {errors}",
         )
 
@@ -133,7 +133,7 @@ class Step14IntegrationTests(unittest.TestCase):
             tmp_path.write_text(json.dumps(fixture), encoding="utf-8")
             errors = validate_file(str(self.repo_root), str(tmp_path))
             self.assertTrue(
-                any("Missing Step 09 artifact required for source_milestone integrity" in e for e in errors),
+                any("Missing Step 09 artifact required for source_milestone integrity" in e.render() for e in errors),
                 msg=f"Expected missing Step 09 artifact error, got: {errors}",
             )
 

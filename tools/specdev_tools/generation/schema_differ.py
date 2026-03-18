@@ -1,6 +1,10 @@
 """Schema differ for DevSpec Toolkit migration system.
 
 Compares user spec files against toolkit schemas to identify migration gaps.
+At ~1300 LOC this is the largest module in the toolkit; a future refactor
+could split it into core diff logic, report formatters, and apply/backup
+helpers (see AUDIT-020).
+
 See: docs/developers/workflows/migration_system_spec.md
 """
 from __future__ import annotations
@@ -493,7 +497,7 @@ def detect_paradigm_shifts(
                         source_path,
                         target_path,
                         change.description or "Paradigm shift",
-                        prompt,
+                        prompt or "",
                     ))
     
     for source, target, description, prompt in paradigm_checks:
@@ -796,13 +800,15 @@ def format_plan_report(diff: MigrationDiff) -> str:
         if step.status == "needs_rename" and step.action == MigrationAction.AUTO:
             field_diff = next((fd for fd in step.field_diffs if fd.diff_type == DiffType.RENAME_CANDIDATE), None)
             new_name = field_diff.expected if field_diff else f"{step.step_id}.json"
-            mechanical_ops.append(f"Rename {step.source_file.name} → {new_name}")
+            src_name = step.source_file.name if step.source_file else step.step_id
+            mechanical_ops.append(f"Rename {src_name} → {new_name}")
 
     # 2. Mechanical (Auto) - Metadata
     for step in diff.steps:
         for fd in step.field_diffs:
             if fd.diff_type == DiffType.SCHEMA_REF_OUTDATED and fd.action == MigrationAction.AUTO:
-                mechanical_ops.append(f"Update $schema in {step.source_file.name}")
+                src_name = step.source_file.name if step.source_file else step.step_id
+                mechanical_ops.append(f"Update $schema in {src_name}")
 
     # 3. Semantic (AI) - Paradigm Shifts
     for shift in diff.paradigm_shifts:
@@ -890,6 +896,7 @@ def validate_pre_migration(spec_dir: Path, toolkit_root: Path) -> ValidationResu
                 cwd=spec_dir.parent,
                 capture_output=True,
                 text=True,
+                timeout=10,
             )
             if result.stdout.strip():
                 warnings.append("Git working tree has uncommitted changes")
@@ -968,16 +975,18 @@ def create_backup(spec_dir: Path, target_version: str) -> BackupResult:
         try:
             # First ensure we have a commit to branch from
             subprocess.run(
-                ["git", "add", "-A"],
+                ["git", "add", str(spec_dir)],
                 cwd=spec_dir.parent,
                 capture_output=True,
                 check=False,
+                timeout=10,
             )
             subprocess.run(
                 ["git", "commit", "-m", f"Pre-migration snapshot for v{target_version}"],
                 cwd=spec_dir.parent,
                 capture_output=True,
                 check=False,
+                timeout=10,
             )
             # Create branch at current HEAD
             subprocess.run(
@@ -985,6 +994,7 @@ def create_backup(spec_dir: Path, target_version: str) -> BackupResult:
                 cwd=spec_dir.parent,
                 capture_output=True,
                 check=False,
+                timeout=10,
             )
             git_branch = branch_name
         except Exception:
@@ -1265,9 +1275,10 @@ def validate_post_migration(
 
     # 2. Trace Integrity
     from ..validation.matrix import validate_trace_integrity
+    from ..core.errors import render_errors as _render_errors
     trace_errors = validate_trace_integrity(str(toolkit_root), str(spec_dir))
     if trace_errors:
-        errors.extend(trace_errors)
+        errors.extend(_render_errors(trace_errors))
     
     # 3. Migration Notes Check
     notes_file = spec_dir / "_migration_notes.md"

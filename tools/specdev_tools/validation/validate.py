@@ -1,3 +1,12 @@
+"""Central validation orchestrator for the DevSpec Toolkit.
+
+This module is intentionally the single entry point for both single-file
+(``validate_file``) and full-directory (``validate_dir``) validation.
+``validate_dir`` further orchestrates quality lint, canonical integrity,
+forward-replay, dependency-order, extraction-intent, and prompt-schema-sync
+checks.  A future refactor could split ``validate_dir`` into a dedicated
+``orchestrator.py`` module (see AUDIT-004).
+"""
 from __future__ import annotations
 
 import json
@@ -8,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import _WrappedReferencingError
+from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from referencing import Registry, Resource
 
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
@@ -18,7 +27,9 @@ from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
-from ..core.errors import PROMOTABLE_PAIRS
+from ..core.config import get_config, reset_config
+from ..core.errors import PROMOTABLE_PAIRS, SpecError, make_error
+from ..core.loaders import load_json_artifact, load_sibling_artifact
 from ..core.registry import SchemaRegistry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
@@ -44,6 +55,7 @@ from .validators import (
     step_16b,
     step_16c,
 )
+
 
 STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_")
 STEP_DIR_RE = re.compile(r"^step_(\d{2}[a-z]?)$")
@@ -88,38 +100,44 @@ def validate_file(
     path: str,
     include_quality_lint: bool = True,
     include_canonical_integrity: bool = True,
-) -> list[str]:
+) -> list[SpecError]:
     try:
         registry = SchemaRegistry(repo_root)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
-        return [f"E520 UNRESOLVED_INPUT {path}: schema_registry_bootstrap_failed detail={str(e)}"]
+        return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e)}")]
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
             return [
-                f"E520 UNRESOLVED_INPUT {path}: invalid_document_root_type "
-                f"expected=object got={type(data).__name__}"
+                make_error(
+                    "E520",
+                    f"{path}: invalid_document_root_type "
+                    f"expected=object got={type(data).__name__}",
+                )
             ]
 
         schema_uri = data.get("$schema")
         if schema_uri is None:
-            return [f"E520 UNRESOLVED_INPUT {path}: missing_schema_uri"]
+            return [make_error("E520", f"{path}: missing_schema_uri")]
         if not isinstance(schema_uri, str):
             return [
-                f"E520 UNRESOLVED_INPUT {path}: invalid_schema_uri_type "
-                f"expected=str got={type(schema_uri).__name__}"
+                make_error(
+                    "E520",
+                    f"{path}: invalid_schema_uri_type "
+                    f"expected=str got={type(schema_uri).__name__}",
+                )
             ]
         schema_uri = schema_uri.strip()
         if not schema_uri:
-            return [f"E520 UNRESOLVED_INPUT {path}: missing_schema_uri"]
+            return [make_error("E520", f"{path}: missing_schema_uri")]
 
         try:
             schema = registry.load(schema_uri)
         except FileNotFoundError as e:
-            return [f"E520 UNRESOLVED_INPUT {path}: schema_not_found uri={schema_uri} detail={str(e)}"]
+            return [make_error("E520", f"{path}: schema_not_found uri={schema_uri} detail={str(e)}")]
         except json.JSONDecodeError as e:
-            return [f"E520 UNRESOLVED_INPUT {path}: schema_json_decode_failed uri={schema_uri} detail={str(e)}"]
+            return [make_error("E520", f"{path}: schema_json_decode_failed uri={schema_uri} detail={str(e)}")]
 
         # Exclude $schema from validation payload because many step schemas disallow unknown keys
         data_for_validation = dict(data)
@@ -135,27 +153,30 @@ def validate_file(
         try:
             errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
         except _WrappedReferencingError as e:
-            return [f"E520 UNRESOLVED_INPUT {path}: schema_reference_resolution_failed {str(e)}"]
+            return [make_error("E520", f"{path}: schema_reference_resolution_failed {str(e)}")]
         except Exception as e:
-            return [f"E521 VALIDATOR_RUNTIME {path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}"]
-        
+            return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}")]
+
         # Enhance error messages with context
-        enhanced_errors = []
+        enhanced_errors: list[SpecError] = []
         for e in errors:
             error_msg = f"{path}:{'/'.join(map(str, e.path))}: {e.message}"
-            
+
             # Add context about what to do next
             step = _get_step_from_path(path)
             if step != "unknown":
                 prompt_path = _get_prompt_path(path)
                 error_msg += f"\n  See: {prompt_path} for guidance on requirements"
-            
-            enhanced_errors.append(error_msg)
-            
+
+            enhanced_errors.append(make_error("E520", error_msg))
+
         step = _get_step_from_path(path)
         deep_errors = _run_deep_validation(step, data, repo_root, path)
         if deep_errors:
-            enhanced_errors.extend([f"{path}: {e}" for e in deep_errors])
+            for de in deep_errors:
+                enhanced_errors.append(
+                    SpecError(code=de.code, message=f"{path}: {de.message}", path=de.path)
+                )
 
         if include_quality_lint:
             quality_errors = lint_spec_quality_file(path, spec_dir=os.path.dirname(path))
@@ -171,15 +192,31 @@ def validate_file(
             if canonical_errors:
                 enhanced_errors.extend(canonical_errors)
 
+        # W->E promotion for single-file validation (mirrors validate_dir logic)
+        enhanced_errors = _apply_we_promotion(enhanced_errors)
+
         return enhanced_errors
     except FileNotFoundError as e:
-        return [f"E520 UNRESOLVED_INPUT {path}: input_file_not_found detail={str(e)}"]
+        return [make_error("E520", f"{path}: input_file_not_found detail={str(e)}")]
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
-        return [f"E520 UNRESOLVED_INPUT {path}: validation_input_error {type(e).__name__}: {str(e)}"]
+        return [make_error("E520", f"{path}: validation_input_error {type(e).__name__}: {str(e)}")]
 
-def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
-    failures = []
-    canonical_preflight_errors = list(
+def validate_dir(repo_root: str, spec_dir: str) -> list[SpecError]:
+    # Reset config to pick up any env var changes since last call
+    reset_config()
+
+    # Early exit: no JSON files in spec dir means nothing to validate
+    if os.path.isdir(spec_dir) and not any(
+        fn.endswith(".json")
+        for fn in os.listdir(spec_dir)
+        if os.path.isfile(os.path.join(spec_dir, fn))
+    ):
+        import sys as _sys
+        print(f"specdev: {spec_dir} contains no .json files; nothing to validate.", file=_sys.stderr)
+        return []
+
+    failures: list[SpecError] = []
+    canonical_preflight_errors: list[SpecError] = list(
         dict.fromkeys(
             lint_canon_dir(
                 repo_root,
@@ -226,7 +263,7 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
         from .traceability_closure import check_traceability_closure
         tc_errors = check_traceability_closure(spec_dir, repo_root)
         # Only propagate hard errors (E-codes); W-codes are informational
-        failures.extend(e for e in tc_errors if not e.startswith("W"))
+        failures.extend(e for e in tc_errors if not e.code.startswith("W"))
 
     root = Path(os.path.abspath(repo_root))
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
@@ -234,8 +271,9 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
         dep_errors = lint_dependency_order(repo_root)
         failures.extend(dep_errors)
         if step_order.get("require_full_forward_replay_on_change", True):
-            if not any("invalid_step_order" in e for e in dep_errors):
-                mode = os.getenv("SPECDEV_REPLAY_DIFF_ERROR_MODE", "").strip().lower()
+            if not any("invalid_step_order" in e.message for e in dep_errors):
+                cfg = get_config()
+                mode = cfg.replay_diff_error_mode
                 if not mode:
                     in_ci = os.getenv("CI", "").strip().lower() in {"1", "true", "yes"}
                     mode = "error" if (in_ci or _is_git_repo(root)) else "ignore"
@@ -257,106 +295,127 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[str]:
                         spec_root=str(root / "spec"),
                     )
                 )
-    if (root / "schema").exists() and (root / "prompts").exists():
-        failures.extend(run_prompt_schema_sync(repo_root))
-
     # R9/T26: Extraction intent validation (prompts vs step_order.json)
     if (root / "tools" / "step_order.json").exists() and (root / "prompts").exists():
         failures.extend(check_extraction_intent(repo_root))
 
-    # R9/T26: Dynamic W→E promotion using PROMOTABLE_PAIRS from errors.py
-    # SPECDEV_WARNINGS_AS_ERRORS=1 promotes all; SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively
-    warn_as_error = os.getenv("SPECDEV_WARNINGS_AS_ERRORS", "").strip().lower() in {"1", "true", "yes"}
-    promote_codes_env = os.getenv("SPECDEV_PROMOTE_CODES", "").strip()
+    # Prompt-schema sync validation
+    failures.extend(run_prompt_schema_sync(repo_root))
 
-    if warn_as_error:
-        # Promote ALL codes in PROMOTABLE_PAIRS
-        for w_code, e_code in PROMOTABLE_PAIRS.items():
-            failures = [f.replace(w_code, e_code, 1) if f.startswith(w_code) else f for f in failures]
-    elif promote_codes_env:
-        # Selective promotion: only the specified W-codes
-        selected = {c.strip() for c in promote_codes_env.split(",") if c.strip()}
-        for w_code in selected:
-            e_code = PROMOTABLE_PAIRS.get(w_code)
-            if e_code:
-                failures = [f.replace(w_code, e_code, 1) if f.startswith(w_code) else f for f in failures]
-
-    failures = list(dict.fromkeys(failures))
-
-    if not warn_as_error and not promote_codes_env:
-        for w_code, e_code in PROMOTABLE_PAIRS.items():
-            e_bases = {f.replace(e_code, w_code, 1) for f in failures if f.startswith(e_code)}
-            failures = [f for f in failures if not (f.startswith(w_code) and f in e_bases)]
+    failures = _apply_we_promotion(failures)
 
     return failures
 
 
-def _has_canonical_bootstrap_failure(errors: list[str]) -> bool:
+def _apply_we_promotion(failures: list[SpecError]) -> list[SpecError]:
+    """Apply W->E code promotion and dedup to a list of SpecError objects.
+
+    Uses field-based code swapping instead of regex, which is both more
+    correct and more efficient.
+    """
+    cfg = get_config()
+    warn_as_error = cfg.warnings_as_errors
+    promote_codes_cfg = cfg.promote_codes
+
+    if warn_as_error:
+        codes_to_promote = set(PROMOTABLE_PAIRS.keys())
+    elif promote_codes_cfg:
+        codes_to_promote = set(promote_codes_cfg) & set(PROMOTABLE_PAIRS.keys())
+    else:
+        codes_to_promote = set()
+
+    promoted: list[SpecError] = []
+    for err in failures:
+        if err.code in codes_to_promote:
+            new_code = PROMOTABLE_PAIRS[err.code]
+            promoted.append(SpecError(code=new_code, message=err.message, path=err.path))
+        else:
+            promoted.append(err)
+
+    # Dedup preserving order
+    seen: set[tuple[str, str, str | None]] = set()
+    deduped: list[SpecError] = []
+    for err in promoted:
+        key = (err.code, err.message, err.path)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(err)
+
+    # Drop redundant W-codes when NOT in full warn-as-error mode.
+    # In partial-promotion mode, non-promoted W-codes that happen to have
+    # a matching E-code counterpart already present should still be cleaned up.
+    if not warn_as_error:
+        e_messages: set[tuple[str, str, str | None]] = {
+            (err.code, err.message, err.path)
+            for err in deduped
+            if err.code.startswith("E")
+        }
+        deduped = [
+            err for err in deduped
+            if not (
+                err.code.startswith("W")
+                and err.code in PROMOTABLE_PAIRS
+                and (PROMOTABLE_PAIRS[err.code], err.message, err.path) in e_messages
+            )
+        ]
+
+    return deduped
+
+
+def _has_canonical_bootstrap_failure(errors: list[SpecError]) -> bool:
     bootstrap_tokens = (
         "missing_schema_registry",
         "schema_uri_not_registered",
         "schema_registry_bootstrap_failed",
     )
-    return any(any(token in err for token in bootstrap_tokens) for err in errors)
-
-
-def _load_json_artifact(repo_root: str, file_path: str, filename: str) -> dict[str, Any] | None:
-    candidates: list[str] = []
-    if file_path:
-        candidates.append(os.path.join(os.path.dirname(file_path), filename))
-    candidates.append(os.path.join(repo_root, "spec", filename))
-
-    seen: set[str] = set()
-    for candidate in candidates:
-        candidate = os.path.abspath(candidate)
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if not os.path.exists(candidate):
-            continue
-        try:
-            with open(candidate, "r", encoding="utf-8") as f:
-                loaded = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            continue
-        if isinstance(loaded, dict):
-            return loaded
-    return None
+    return any(any(token in e.message for token in bootstrap_tokens) for e in errors)
 
 
 def _load_component_ids(repo_root: str, file_path: str) -> set[str] | None:
-    sketch = _load_json_artifact(repo_root, file_path, "02_system_sketch.json")
-    if not isinstance(sketch, dict):
-        return None
-    components = sketch.get("components", [])
-    if not isinstance(components, list):
-        return None
-    return {c.get("component_id") for c in components if isinstance(c, dict) and c.get("component_id")}
+    """Thin wrapper: adapts ``load_sibling_artifact`` return to ``None``-on-empty
+    (AUDIT-019: kept because ``_build_validation_context`` needs ``None`` to signal
+    "upstream file absent" vs "upstream file present but empty")."""
+    ids = load_sibling_artifact(file_path, "02", "components", "component_id", fallback_root=repo_root)
+    return ids if ids else None
 
 
 def _load_capability_ids(repo_root: str, file_path: str) -> set[str] | None:
-    caps = _load_json_artifact(repo_root, file_path, "01_capabilities.json")
-    if not isinstance(caps, dict):
-        return None
-    capability_items = caps.get("capabilities", [])
-    if not isinstance(capability_items, list):
-        return None
-    return {
-        cap.get("capability_id")
-        for cap in capability_items
-        if isinstance(cap, dict) and cap.get("capability_id")
-    }
+    """Thin wrapper: see ``_load_component_ids`` rationale (AUDIT-019)."""
+    ids = load_sibling_artifact(file_path, "01", "capabilities", "capability_id", fallback_root=repo_root)
+    return ids if ids else None
 
 
 def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
-    return _load_json_artifact(repo_root, file_path, "07_nfrs.json")
+    """Load full NFR data dict (not just IDs) for step_03 cross-ref validation.
+
+    Cannot use ``load_upstream_ids`` because step_03 needs the entire JSON dict,
+    not a set of IDs (AUDIT-019)."""
+    # Try sibling first, then fallback to spec/
+    for prefix in ("07",):
+        artifact_dir = os.path.dirname(file_path) if file_path else ""
+        for d in (artifact_dir, os.path.join(repo_root, "spec")):
+            if not d or not os.path.isdir(d):
+                continue
+            for fn in os.listdir(d):
+                if fn.startswith(f"{prefix}_") and fn.endswith(".json"):
+                    data = load_json_artifact(os.path.join(d, fn))
+                    if data:
+                        return data
+    return None
 
 
 def _load_monitoring_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
-    for filename in ("16_impl_context.json", "16_delivery_monitoring.json"):
-        loaded = _load_json_artifact(repo_root, file_path, filename)
-        if isinstance(loaded, dict):
-            return loaded
+    """Load full monitoring data dict for step_03 cross-ref validation (AUDIT-019)."""
+    for prefix in ("16",):
+        artifact_dir = os.path.dirname(file_path) if file_path else ""
+        for d in (artifact_dir, os.path.join(repo_root, "spec")):
+            if not d or not os.path.isdir(d):
+                continue
+            for fn in os.listdir(d):
+                if fn.startswith(f"{prefix}_") and fn.endswith(".json"):
+                    data = load_json_artifact(os.path.join(d, fn))
+                    if data:
+                        return data
     return None
 
 
@@ -370,9 +429,13 @@ def _build_validation_context(repo_root: str, path: str) -> dict[str, Any]:
     }
 
 
-DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[str]]
+DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[SpecError]]
 
 
+# Hardcoded step→validator mapping.  A future enhancement could auto-discover
+# validators via an entry-point or a naming convention scan of the validators/
+# package, but the explicit dict keeps startup predictable and avoids import
+# side-effects.  See AUDIT-043 for the auto-discovery proposal.
 DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root, ctx.get("component_ids")),
     "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("capability_ids")),
@@ -403,7 +466,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
 }
 
 
-def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> list[str]:
+def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> list[SpecError]:
     validator = DEEP_VALIDATORS.get(step)
     if validator is None:
         return []
@@ -411,7 +474,7 @@ def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> li
     try:
         return validator(data, repo_root, context)
     except Exception as e:
-        return [f"Deep Validation Critical Error: {str(e)}"]
+        return [make_error("E521", f"Deep Validation Critical Error: {str(e)}")]
 
 
 def _load_step_order(path: Path) -> dict[str, object]:
@@ -447,16 +510,6 @@ def _detect_git_root(repo_root: Path) -> Path:
     return repo_root
 
 
-def _detect_spec_root(repo_root: Path, spec_dir: str | None = None) -> Path:
-    """Resolve the spec directory, preferring an explicit *spec_dir* argument.
-
-    Falls back to ``repo_root / "spec"``.
-    """
-    if spec_dir:
-        return Path(os.path.abspath(spec_dir))
-    return repo_root / "spec"
-
-
 def _is_git_repo(root: Path) -> bool:
     cmd = ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"]
     try:
@@ -481,7 +534,7 @@ def _resolve_replay_base_ref(root: Path) -> str:
     5. Current branch name (self-diff — effectively a no-op)
     6. Fallback: ``origin/main`` (may fail if remote is not configured)
     """
-    explicit = os.getenv("SPECDEV_REPLAY_BASE_REF", "").strip()
+    explicit = get_config().replay_base_ref
     if explicit:
         return explicit
     upstream = _git_upstream_branch(root)

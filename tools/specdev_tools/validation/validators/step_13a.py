@@ -1,38 +1,38 @@
 from __future__ import annotations
 
-import json
-import os
-import re
-from typing import Any, Optional, Set
+from typing import Any
 
-ELEMENT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+from ...core.errors import make_error, SpecError
+from ...core.loaders import load_upstream_ids, KEBAB_ID_RE
+
+ELEMENT_ID_PATTERN = KEBAB_ID_RE
 
 
-def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[str]:
-    errors: list[str] = []
+def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+    errors: list[SpecError] = []
     for item in instance.get("missing_elements", []):
         element_id = item.get("element_id")
         if isinstance(element_id, str) and not ELEMENT_ID_PATTERN.match(element_id):
-            errors.append(f"Element has element_id '{element_id}' that does not follow kebab-case convention")
+            errors.append(make_error("E530", f"Element has element_id '{element_id}' that does not follow kebab-case convention"))
         score = item.get("impact_score")
         if isinstance(score, (int, float)) and not (0 <= score <= 100):
-            errors.append(f"Invalid impact_score for '{element_id}': {score}")
+            errors.append(make_error("E520", f"Invalid impact_score for '{element_id}': {score}"))
     summary = instance.get("summary", {})
     if isinstance(summary, dict):
         completeness = summary.get("completeness")
         if isinstance(completeness, (int, float)) and not (0 <= completeness <= 100):
-            errors.append(f"Invalid summary.completeness: {completeness}")
+            errors.append(make_error("E520", f"Invalid summary.completeness: {completeness}"))
         if isinstance(completeness, (int, float)) and completeness < 100:
             missing = instance.get("missing_elements", [])
             if not missing:
-                errors.append(f"summary.completeness is {completeness} (< 100) but missing_elements is empty")
+                errors.append(make_error("E520", f"summary.completeness is {completeness} (< 100) but missing_elements is empty"))
 
     # Cross-step ID validation against upstream FR and API artifacts
-    fr_ids = _load_fr_ids(toolkit_root)
-    api_ids = _load_api_ids(toolkit_root)
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id")
 
     # Map: prefix -> (loaded set or None, upstream filename, type label)
-    upstream_map: dict[str, tuple[Optional[Set[str]], str, str]] = {
+    upstream_map: dict[str, tuple[set[str] | None, str, str]] = {
         "fr-": (fr_ids, "04_fr_list.json", "FR"),
         "api-": (api_ids, "05_interface_contracts.json", "API"),
     }
@@ -42,8 +42,8 @@ def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[str]:
     for prefix, (id_set, filename, type_label) in upstream_map.items():
         if id_set is None and filename not in warned_missing:
             errors.append(
-                f"W590 CROSS_STEP_UPSTREAM_MISSING {filename} not found; "
-                f"skipping {type_label} reference validation"
+                make_error("W590", f"CROSS_STEP_UPSTREAM_MISSING {filename} not found; "
+                f"skipping {type_label} reference validation")
             )
             warned_missing.add(filename)
 
@@ -58,9 +58,9 @@ def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                 if ref.startswith(prefix):
                     if id_set is not None and ref not in id_set:
                         errors.append(
-                            f"E590 CROSS_STEP_ID_NOT_FOUND element "
+                            make_error("E590", f"CROSS_STEP_ID_NOT_FOUND element "
                             f"'{element_id}' references unknown {type_label} "
-                            f"'{ref}' (not in {filename})"
+                            f"'{ref}' (not in {filename})")
                         )
                     break
 
@@ -96,47 +96,3 @@ def _collect_spec_refs(item: dict[str, Any]) -> list[str]:
                         refs.append(v)
 
     return refs
-
-
-def _load_fr_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load FR IDs from step 04 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("04_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return {
-                    req.get("fr_id")
-                    for req in data.get("functional_requirements", [])
-                    if isinstance(req, dict) and req.get("fr_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
-
-
-def _load_api_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load API IDs from step 05 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("05_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return {
-                    api.get("api_id")
-                    for api in data.get("apis", [])
-                    if isinstance(api, dict) and api.get("api_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None

@@ -6,6 +6,7 @@ from collections import defaultdict
 from glob import glob
 
 from ..canonical.registry import CanonicalRegistry
+from ..core.errors import SpecError, make_error
 
 
 # Declarative enum↔canon pairings: (schema_rel_path, json_path_segments, canon_kind)
@@ -17,9 +18,9 @@ _ENUM_CANON_PAIRINGS = [
 ]
 
 
-def lint_canon_schema_alignment(repo_root: str) -> list[str]:
+def lint_canon_schema_alignment(repo_root: str) -> list[SpecError]:
     """Check alignment between canon kinds and JSON Schema enum constraints."""
-    errors: list[str] = []
+    errors: list[SpecError] = []
     schema_dir = os.path.join(repo_root, "schema")
 
     # Load canon kinds → {kind: set_of_preferred_labels}
@@ -38,7 +39,7 @@ def lint_canon_schema_alignment(repo_root: str) -> list[str]:
 
         schema_path = os.path.join(schema_dir, schema_rel)
         if not os.path.exists(schema_path):
-            errors.append(f"E552 MISSING_PAIRED_SCHEMA {schema_rel}")
+            errors.append(make_error("E552", f"MISSING_PAIRED_SCHEMA {schema_rel}"))
             continue
 
         with open(schema_path, "r", encoding="utf-8") as f:
@@ -46,7 +47,7 @@ def lint_canon_schema_alignment(repo_root: str) -> list[str]:
 
         enum_values = _resolve_json_path(data, json_path)
         if enum_values is None:
-            errors.append(f"E553 MISSING_ENUM_PATH {schema_rel}:{path_str}")
+            errors.append(make_error("E553", f"MISSING_ENUM_PATH {schema_rel}:{path_str}"))
             continue
 
         enum_set = set(enum_values)
@@ -56,15 +57,17 @@ def lint_canon_schema_alignment(repo_root: str) -> list[str]:
         extra = sorted(enum_set - canon_labels)
 
         if missing:
-            errors.append(
-                f"E554 CANON_ENUM_DRIFT {schema_rel}:{path_str} "
-                f"missing canon {kind} entries: {missing}"
-            )
+            errors.append(make_error(
+                "E554",
+                f"CANON_ENUM_DRIFT {schema_rel}:{path_str} "
+                f"missing canon {kind} entries: {missing}",
+            ))
         if extra:
-            errors.append(
-                f"E551 SCHEMA_ENUM_EXTRA {schema_rel}:{path_str} "
-                f"has values not in canon {kind}: {extra}"
-            )
+            errors.append(make_error(
+                "E551",
+                f"SCHEMA_ENUM_EXTRA {schema_rel}:{path_str} "
+                f"has values not in canon {kind}: {extra}",
+            ))
 
     # Category B exclusions: enums that are intentional subsets of a canon kind
     _EXCLUDED_DISCOVERY_ENUMS = {
@@ -88,10 +91,11 @@ def lint_canon_schema_alignment(repo_root: str) -> list[str]:
             for kind, labels in canon_kinds.items():
                 overlap = len(enum_set & labels)
                 if overlap >= 3 and overlap / len(enum_set) >= 0.8:
-                    errors.append(
-                        f"W552 POTENTIAL_UNREGISTERED_PAIRING {rel}:{path_str} "
-                        f"overlaps {overlap}/{len(enum_set)} with canon kind '{kind}'"
-                    )
+                    errors.append(make_error(
+                        "W552",
+                        f"POTENTIAL_UNREGISTERED_PAIRING {rel}:{path_str} "
+                        f"overlaps {overlap}/{len(enum_set)} with canon kind '{kind}'",
+                    ))
     return errors
 
 

@@ -5,6 +5,8 @@ import os
 import re
 from pathlib import Path
 
+from ..core.errors import SpecError, make_error
+
 
 PROMPT_STEP_RE = re.compile(r"prompt_(\d{2}[a-z]?)_")
 STEP_REF_RE = re.compile(
@@ -17,16 +19,16 @@ EXAMPLE_SPEC_RE = re.compile(
 )
 
 
-def lint_dependency_order(repo_root: str) -> list[str]:
+def lint_dependency_order(repo_root: str) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     try:
         order, allowed, policy = _load_order(root / "tools" / "step_order.json")
     except (OSError, json.JSONDecodeError, ValueError, TypeError, KeyError) as exc:
-        return [f"E520 UNRESOLVED_INPUT invalid_step_order {root / 'tools' / 'step_order.json'} {exc}"]
+        return [make_error("E520", f"UNRESOLVED_INPUT invalid_step_order {root / 'tools' / 'step_order.json'} {exc}")]
     index = {step: i for i, step in enumerate(order)}
     allow_self = bool(policy.get("allow_self_dependency", False))
     allow_forward = bool(policy.get("allow_forward_dependency", False))
-    errors: list[str] = []
+    errors: list[SpecError] = []
     seen_errors: set[tuple[str, int, str, str, str]] = set()
 
     for prompt_path in sorted((root / "prompts").glob("prompt_*.md")):
@@ -75,7 +77,7 @@ def _extract_step_refs(line: str) -> list[str]:
 
 
 def _add_error(
-    errors: list[str],
+    errors: list[SpecError],
     seen_errors: set[tuple[str, int, str, str, str]],
     prompt_path: str,
     line_no: int,
@@ -87,8 +89,8 @@ def _add_error(
     if key in seen_errors:
         return
     seen_errors.add(key)
-    errors.append(
-        f"E540 SELF_OR_FORWARD_DEPENDENCY {prompt_path}:{line_no} {step}->{ref} {violation_type}"
-    )
+    errors.append(make_error(
+        "E540", f"SELF_OR_FORWARD_DEPENDENCY {prompt_path}:{line_no} {step}->{ref} {violation_type}"
+    ))
 
 

@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 import os, json, warnings
+from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 
 # ---------------------------------------------------------------------------
@@ -24,8 +25,8 @@ if _invalid_fixture_types:
     )
 
 
-def lint_fixtures(spec_dir: str) -> list[str]:
-    errors = []
+def lint_fixtures(spec_dir: str) -> list[SpecError]:
+    errors: list[SpecError] = []
     apis = set()
     frs = set()
     invariants = set()
@@ -61,7 +62,7 @@ def lint_fixtures(spec_dir: str) -> list[str]:
         fid = fx.get("fixture_id","<unknown>")
         targets = fx.get("targets", [])
         if not targets:
-            errors.append(f"{fid}: missing targets")
+            errors.append(make_error("E520", f"{fid}: missing targets"))
             continue
         # Map each cross-referenceable trace type to (id_pool, display_label).
         # Keys must stay in sync with _FIXTURE_CROSS_REF_TYPES (asserted below).
@@ -84,26 +85,26 @@ def lint_fixtures(spec_dir: str) -> list[str]:
                 if pool_entry is not None:
                     pool, label = pool_entry
                     if tid not in pool:
-                        errors.append(f"{fid}: targets unknown {label} '{tid}'")
+                        errors.append(make_error("E590", f"{fid}: targets unknown {label} '{tid}'"))
         expected = fx.get("expected")
         if "input" not in fx or expected is None:
-            errors.append(f"{fid}: missing input/expected")
+            errors.append(make_error("E520", f"{fid}: missing input/expected"))
             continue
         if isinstance(expected, dict):
             mode = fx.get("mode")
             status = expected.get("status")
             if mode == "contract":
                 if not isinstance(status, int) or status < 100 or status > 599:
-                    errors.append(f"{fid}: expected.status must be an HTTP status (100-599) for mode 'contract'")
+                    errors.append(make_error("E520", f"{fid}: expected.status must be an HTTP status (100-599) for mode 'contract'"))
             body = expected.get("body")
             if body is not None and not isinstance(body, (dict, list, str, int, bool, float)):
-                errors.append(f"{fid}: expected.body must be JSON serializable")
+                errors.append(make_error("E520", f"{fid}: expected.body must be JSON serializable"))
             headers = expected.get("headers")
             if headers is not None and not isinstance(headers, dict):
-                errors.append(f"{fid}: expected.headers must be an object")
+                errors.append(make_error("E520", f"{fid}: expected.headers must be an object"))
         else:
             # Add warning if mode is contract or api but expected is not a dictionary
             mode = fx.get("mode")
             if mode in ["contract", "api"]:
-                errors.append(f"{fid}: expected should be a dictionary for mode '{mode}' but got {type(expected).__name__}")
+                errors.append(make_error("E520", f"{fid}: expected should be a dictionary for mode '{mode}' but got {type(expected).__name__}"))
     return errors

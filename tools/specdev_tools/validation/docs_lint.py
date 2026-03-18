@@ -4,21 +4,23 @@ import json
 import os
 from typing import Dict, List
 
+from ..core.errors import SpecError, make_error
+
 
 def _project_root_from_spec_dir(spec_dir: str) -> str:
     return os.path.abspath(os.path.join(spec_dir, os.pardir))
 
 
-def _load_manifest(project_root: str, errors: List[str]) -> Dict:
+def _load_manifest(project_root: str, errors: List[SpecError]) -> Dict:
     manifest_path = os.path.join(project_root, "spec", "common", "seed_manifest.json")
     if not os.path.exists(manifest_path):
-        errors.append(f"Missing seed manifest: {manifest_path}")
+        errors.append(make_error("E520", f"Missing seed manifest: {manifest_path}"))
         return {}
     try:
         with open(manifest_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        errors.append(f"Failed to read seed manifest: {manifest_path} ({e})")
+        errors.append(make_error("E520", f"Failed to read seed manifest: {manifest_path} ({e})"))
         return {}
 
 
@@ -34,8 +36,8 @@ def _is_excluded(rel_path: str, exclusions: List[str]) -> bool:
     return False
 
 
-def lint_docs(spec_dir: str) -> List[str]:
-    errors: List[str] = []
+def lint_docs(spec_dir: str) -> List[SpecError]:
+    errors: List[SpecError] = []
     project_root = _project_root_from_spec_dir(spec_dir)
     manifest = _load_manifest(project_root, errors)
     if not manifest:
@@ -56,7 +58,7 @@ def lint_docs(spec_dir: str) -> List[str]:
     if root_readme_required:
         root_readme = os.path.join(project_root, "README.md")
         if not os.path.exists(root_readme):
-            errors.append(f"Missing root README.md at {root_readme}")
+            errors.append(make_error("E520", f"Missing root README.md at {root_readme}"))
 
     if not readme_required:
         return errors
@@ -88,7 +90,7 @@ def lint_docs(spec_dir: str) -> List[str]:
             if scope_entry.rstrip("/") == "devspec_toolkit" and os.path.basename(project_root) == "devspec_toolkit":
                 scope_path = project_root
             else:
-                errors.append(f"Docs scope not found: {scope_path}")
+                errors.append(make_error("E520", f"Docs scope not found: {scope_path}"))
                 continue
 
         for root, dirs, files in os.walk(scope_path):
@@ -106,7 +108,7 @@ def lint_docs(spec_dir: str) -> List[str]:
             depth = 0 if suffix == "" else len([p for p in suffix.split("/") if p])
 
             if depth <= depth_limit and "README.md" not in files:
-                errors.append(f"Missing README.md in {root}")
+                errors.append(make_error("E520", f"Missing README.md in {root}"))
 
             # Prune excluded subdirectories from traversal
             pruned = []

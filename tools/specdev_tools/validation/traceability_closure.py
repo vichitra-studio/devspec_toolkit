@@ -4,6 +4,7 @@ import os
 import warnings
 from typing import Any
 
+from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 
 # ---------------------------------------------------------------------------
@@ -43,8 +44,8 @@ SPEC_FILES = {
 }
 
 
-def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[str]:
-    errors: list[str] = []
+def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
+    errors: list[SpecError] = []
 
     # Resolve spec_dir relative to repo_root if it's a relative path
     if repo_root and not os.path.isabs(spec_dir):
@@ -62,7 +63,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         if not os.path.isfile(path):
             if key == "charter":
                 continue  # Charter is optional for backwards compat
-            errors.append(f"W570 GRACEFUL_SKIP missing_spec_file {filename}")
+            errors.append(make_error("W570", f"GRACEFUL_SKIP missing_spec_file {filename}"))
             continue
         try:
             with open(path, encoding="utf-8") as f:
@@ -70,7 +71,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         except (OSError, json.JSONDecodeError):
             if key == "charter":
                 continue
-            errors.append(f"W570 GRACEFUL_SKIP unreadable_spec_file {filename}")
+            errors.append(make_error("W570", f"GRACEFUL_SKIP unreadable_spec_file {filename}"))
             continue
 
     capability_ids: set[str] = set()
@@ -93,7 +94,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                         cap_traced_goals.add(trace_ref["id"])
 
             for goal_id in sorted(goal_ids - cap_traced_goals):
-                errors.append(f"E560 TRACEABILITY_GAP charter_goal_without_capability {goal_id}")
+                errors.append(make_error("E560", f"TRACEABILITY_GAP charter_goal_without_capability {goal_id}"))
 
     fr_traced_caps: set[str] = set()
     fr_ids: set[str] = set()
@@ -133,20 +134,20 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     if "capabilities" in data and "frs" in data:
         for cap_id in sorted(capability_ids - fr_traced_caps):
-            errors.append(f"E560 TRACEABILITY_GAP capability_without_fr {cap_id}")
+            errors.append(make_error("E560", f"TRACEABILITY_GAP capability_without_fr {cap_id}"))
 
     if "frs" in data and "roadmap" in data:
         for fr_id in sorted(fr_ids - milestone_fr_refs):
-            errors.append(f"W561 UNCOVERED_FR {fr_id}")
+            errors.append(make_error("W561", f"UNCOVERED_FR {fr_id}"))
 
     if "roadmap" in data and "impl_planner" in data:
         for ms_id in sorted(milestone_ids - checklist_milestone_refs):
-            errors.append(f"W562 ORPHAN_MILESTONE {ms_id}")
+            errors.append(make_error("W562", f"ORPHAN_MILESTONE {ms_id}"))
 
         # Task-level traceability: each task should be referenced by at least one checklist item
         for ms_id, tasks in milestone_task_ids.items():
             for task_id in tasks:
                 if task_id not in checklist_task_refs:
-                    errors.append(f"W563 CHECKLIST_ROADMAP_MISMATCH {task_id} (milestone: {ms_id})")
+                    errors.append(make_error("W563", f"CHECKLIST_ROADMAP_MISMATCH {task_id} (milestone: {ms_id})"))
 
     return errors

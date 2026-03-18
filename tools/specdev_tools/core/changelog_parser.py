@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from .errors import SpecError, make_error
+
 
 # -----------------------------------------------------------------------------
 # Data Classes
@@ -272,45 +274,51 @@ def get_changes_between(
     return all_changes
 
 
-def validate_changelog(changelog_dir: Path, version: str) -> List[str]:
+def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     """Validate a version changelog against the format schema.
-    
+
     Args:
         changelog_dir: Path to the changelog/ directory
         version: Version string to validate
-        
+
     Returns:
-        List of validation error messages (empty if valid)
+        List of SpecError objects (empty if valid)
     """
-    errors: List[str] = []
-    
+    errors: List[SpecError] = []
+
     try:
         fmt = load_format(changelog_dir)
     except (FileNotFoundError, ValueError) as e:
-        errors.append(f"Cannot load format: {e}")
+        errors.append(make_error("E520", f"Cannot load format: {e}"))
         return errors
-    
+
     try:
         changelog = load_version(changelog_dir, version)
     except (FileNotFoundError, ValueError) as e:
-        errors.append(f"Cannot load changelog: {e}")
+        errors.append(make_error("E520", f"Cannot load changelog: {e}"))
         return errors
-    
+
     # Validate change types
     for i, change in enumerate(changelog.changes):
         if change.type not in fmt.change_types:
             errors.append(
-                f"Change {i}: Invalid type '{change.type}'. "
-                f"Valid types: {fmt.change_types}"
+                make_error(
+                    "E520",
+                    f"Change {i}: Invalid type '{change.type}'. "
+                    f"Valid types: {fmt.change_types}",
+                )
             )
-        
+
         # Validate migration action if present
         if change.migration and change.migration.action not in fmt.migration_actions:
             errors.append(
-                f"Change {i}: Invalid migration action '{change.migration.action}'. "
-                f"Valid actions: {fmt.migration_actions}"
+                make_error(
+                    "E520",
+                    f"Change {i}: Invalid migration action '{change.migration.action}'. "
+                    f"Valid actions: {fmt.migration_actions}",
+                )
             )
-    
+
     return errors
 
 
@@ -329,7 +337,7 @@ def get_toolkit_version(repo_root: Path) -> Optional[str]:
     
     # Try using tomllib (Python 3.11+) for robust parsing
     try:
-        import tomllib
+        import tomllib  # type: ignore[import-not-found]
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
         return data.get("project", {}).get("version")

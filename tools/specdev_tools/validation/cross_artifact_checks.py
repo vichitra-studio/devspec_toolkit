@@ -13,6 +13,7 @@ import re
 import warnings
 from typing import Any
 
+from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 
 # ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ _SCHEMA_REF_RE = re.compile(r"^(?:-tbd|(file://|https://|glossary:|api:).+)$")
 def check_step_02_integrity(
     artifacts: dict[str, Any],
     capability_ids: set[str],
-) -> list[str]:
+) -> list[SpecError]:
     """Validate system-sketch cross-artifact integrity.
 
     Checks:
@@ -87,7 +88,7 @@ def check_step_02_integrity(
     - Capability coverage across components
     - External-dependency tag requirement
     """
-    errors: list[str] = []
+    errors: list[SpecError] = []
 
     for path, data in artifacts.items():
         schema = data.get("$schema", "")
@@ -111,9 +112,10 @@ def check_step_02_integrity(
         seen: set[str] = set()
         for comp_id in component_ids:
             if comp_id in seen:
-                errors.append(
-                    f"Step 02 Integrity in {basename}: Duplicate component_id '{comp_id}'."
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"Step 02 Integrity in {basename}: Duplicate component_id '{comp_id}'.",
+                ))
             seen.add(comp_id)
 
         # Connection endpoint validation
@@ -122,20 +124,23 @@ def check_step_02_integrity(
             source = conn.get("from")
             target = conn.get("to")
             if source and source not in component_id_set:
-                errors.append(
-                    f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found."
-                )
+                errors.append(make_error(
+                    "E590",
+                    f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found.",
+                ))
             if target and target not in component_id_set:
-                errors.append(
-                    f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found."
-                )
+                errors.append(make_error(
+                    "E590",
+                    f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found.",
+                ))
 
             # schema_ref format
             schema_ref = conn.get("schema_ref")
             if schema_ref and not _SCHEMA_REF_RE.match(schema_ref):
-                errors.append(
-                    f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid."
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid.",
+                ))
 
             # Trust boundary vs external component
             if (
@@ -144,9 +149,10 @@ def check_step_02_integrity(
             ):
                 trust_boundary = conn.get("trust_boundary")
                 if trust_boundary == "internal":
-                    errors.append(
-                        f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component."
-                    )
+                    errors.append(make_error(
+                        "E520",
+                        f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component.",
+                    ))
 
         # Capability coverage
         if capability_ids:
@@ -161,14 +167,16 @@ def check_step_02_integrity(
                     if trace_type in _CAPABILITY_COVERAGE_TYPES:
                         traced.add(trace_id)
                     elif trace_id in capability_ids:
-                        errors.append(
-                            f"Step 02 Integrity in {basename}: Capability trace_refs must use type 'doc' or 'capability' for '{trace_id}'."
-                        )
+                        errors.append(make_error(
+                            "E520",
+                            f"Step 02 Integrity in {basename}: Capability trace_refs must use type 'doc' or 'capability' for '{trace_id}'.",
+                        ))
             missing = sorted(capability_ids - traced)
             if missing:
-                errors.append(
-                    f"Step 02 Integrity in {basename}: Missing capability coverage {', '.join(missing)}."
-                )
+                errors.append(make_error(
+                    "E590",
+                    f"Step 02 Integrity in {basename}: Missing capability coverage {', '.join(missing)}.",
+                ))
 
         # External-dependency tag
         for comp in components:
@@ -176,9 +184,10 @@ def check_step_02_integrity(
                 continue
             tags = comp.get("tags", []) or []
             if "external-dependency" not in tags:
-                errors.append(
-                    f"Step 02 Integrity in {basename}: external component '{comp.get('component_id')}' lacks external-dependency tag."
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"Step 02 Integrity in {basename}: external component '{comp.get('component_id')}' lacks external-dependency tag.",
+                ))
 
     return errors
 
@@ -200,7 +209,7 @@ def collect_glossary_term_ids(artifacts: dict[str, Any]) -> set[str]:
     return glossary_term_ids
 
 
-def check_step_03_integrity(artifacts: dict[str, Any]) -> list[str]:
+def check_step_03_integrity(artifacts: dict[str, Any]) -> list[SpecError]:
     """Validate glossary-specific integrity within artifacts.
 
     Checks:
@@ -209,7 +218,7 @@ def check_step_03_integrity(artifacts: dict[str, Any]) -> list[str]:
     - Duplicate term text (case-insensitive)
     - Empty optional string fields (domain, units)
     """
-    errors: list[str] = []
+    errors: list[SpecError] = []
 
     for path, data in artifacts.items():
         schema = data.get("$schema", "")
@@ -220,7 +229,10 @@ def check_step_03_integrity(artifacts: dict[str, Any]) -> list[str]:
         terms = data.get("terms", [])
 
         if len(terms) == 0:
-            errors.append(f"Step 03 Integrity in {basename}: Empty terms array")
+            errors.append(make_error(
+                "E520",
+                f"Step 03 Integrity in {basename}: Empty terms array",
+            ))
 
         seen_term_ids: set[str] = set()
         seen_terms: set[str] = set()
@@ -230,31 +242,35 @@ def check_step_03_integrity(artifacts: dict[str, Any]) -> list[str]:
             if term_id:
                 term_id_lower = term_id.lower()
                 if term_id_lower in seen_term_ids:
-                    errors.append(
-                        f"Step 03 Integrity in {basename}: Duplicate term_id '{term_id}' at index {i}"
-                    )
+                    errors.append(make_error(
+                        "E520",
+                        f"Step 03 Integrity in {basename}: Duplicate term_id '{term_id}' at index {i}",
+                    ))
                 seen_term_ids.add(term_id_lower)
 
             term_text = term.get("term")
             if term_text:
                 term_text_lower = term_text.lower()
                 if term_text_lower in seen_terms:
-                    errors.append(
-                        f"Step 03 Integrity in {basename}: Duplicate term '{term_text}' at index {i}"
-                    )
+                    errors.append(make_error(
+                        "E520",
+                        f"Step 03 Integrity in {basename}: Duplicate term '{term_text}' at index {i}",
+                    ))
                 seen_terms.add(term_text_lower)
 
             domain = term.get("domain")
             if isinstance(domain, str) and domain == "":
-                errors.append(
-                    f"Step 03 Integrity in {basename}: Empty domain string at term index {i}"
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"Step 03 Integrity in {basename}: Empty domain string at term index {i}",
+                ))
 
             units = term.get("units")
             if isinstance(units, str) and units == "":
-                errors.append(
-                    f"Step 03 Integrity in {basename}: Empty units string at term index {i}"
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"Step 03 Integrity in {basename}: Empty units string at term index {i}",
+                ))
 
     return errors
 
@@ -267,14 +283,14 @@ def check_step_04_integrity(
     artifacts: dict[str, Any],
     glossary_term_ids: set[str],
     capability_ids: set[str],
-) -> list[str]:
+) -> list[SpecError]:
     """Validate FR-to-glossary and FR-to-capability trace references.
 
     Checks:
     - FR traces referencing unknown glossary terms
     - FR traces referencing unknown capabilities
     """
-    errors: list[str] = []
+    errors: list[SpecError] = []
 
     for path, data in artifacts.items():
         schema = data.get("$schema", "")
@@ -293,15 +309,17 @@ def check_step_04_integrity(
                 # Glossary trace check
                 if trace_type == _GLOSSARY_TRACE_TYPE or trace_id.startswith("term-"):
                     if trace_id.lower() not in glossary_term_ids:
-                        errors.append(
-                            f"Step 04 Integrity in {basename}: FR '{fr.get('fr_id')}' references unknown glossary term '{trace_id}'."
-                        )
+                        errors.append(make_error(
+                            "E590",
+                            f"Step 04 Integrity in {basename}: FR '{fr.get('fr_id')}' references unknown glossary term '{trace_id}'.",
+                        ))
 
                 # Capability trace check
                 if trace_type == _CAPABILITY_TRACE_TYPE:
                     if trace_id not in capability_ids:
-                        errors.append(
-                            f"Step 04 Integrity in {basename}: FR '{fr.get('fr_id')}' references unknown capability '{trace_id}'."
-                        )
+                        errors.append(make_error(
+                            "E590",
+                            f"Step 04 Integrity in {basename}: FR '{fr.get('fr_id')}' references unknown capability '{trace_id}'.",
+                        ))
 
     return errors

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Optional
 
@@ -23,6 +25,8 @@ ERROR_CODES = {
     "E125": "ALIAS_SUNSET_EXPIRED",
     "E130": "CANONICAL_VERSION_MISMATCH",
     "E140": "AMBIGUOUS_ALIAS",
+    "E141": "TASK_DEPENDENCY_CYCLE",
+    "E142": "TECH_STACK_MISMATCH",
     "E150": "SEED_MANIFEST_NOT_PROVIDED",
     "W110": "DEPRECATED_CANONICAL_USED",
     "W120": "ALIAS_DEPRECATED",
@@ -41,6 +45,8 @@ ERROR_CODES = {
     "E306": "SEMANTIC_REVIEW_FR_MISMATCH",
     "E307": "BEHAVIOR_VALIDATION_PAIRING",
     "E310": "PROMPT_SCHEMA_DRIFT",
+    "E311": "MISSING_ENUM_PROVENANCE",
+    "E320": "STEP13_EXTENSION_ERROR",
     # Canonical registry (4xx)
     "E410": "CANONICAL_ALIAS_COLLISION",
     "E420": "INVALID_DEPRECATION_LIFECYCLE",
@@ -70,6 +76,7 @@ ERROR_CODES = {
     "E582": "MILESTONE_REF_MISMATCH",
     "E585": "DAG_CIRCULAR_DEPENDENCY",
     "W550": "SEMANTIC_COVERAGE_SKIP",
+    "W551": "UNDECLARED_SEED",
     "W552": "POTENTIAL_UNREGISTERED_PAIRING",
     "W560": "TRACEABILITY_GAP",
     "W561": "UNCOVERED_FR",
@@ -139,6 +146,44 @@ def make_error(code: str, message: str, path: Optional[str] = None) -> SpecError
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
     return SpecError(code=code, message=message, path=path)
+
+
+def render_errors(errors: list[SpecError]) -> list[str]:
+    """Convert SpecError list to string list for backward compat."""
+    return [e.render() for e in errors]
+
+
+_RE_THREE_PART = re.compile(r"^([EW]\d{3})\s+(\S+)\s+(.*)")
+_RE_TWO_PART = re.compile(r"^([EW]\d{3})\s+(.*)")
+
+
+def ensure_spec_errors(items: Sequence[str | SpecError]) -> list[SpecError]:
+    """Parse string errors into SpecError objects during transition.
+
+    Parsing heuristics (applied in order):
+    1. If item is already a SpecError, pass through unchanged.
+    2. If item is a string matching ``^([EW]\\d{3})\\s+(\\S+)\\s+(.*)``:
+       code=group(1), message=f"{group(2)} {group(3)}"
+    3. If item is a string matching ``^([EW]\\d{3})\\s+(.*)``:
+       code=group(1), message=group(2)
+    4. Fallback: SpecError(code="E521", message=str(item))
+    """
+    result: list[SpecError] = []
+    for item in items:
+        if isinstance(item, SpecError):
+            result.append(item)
+            continue
+        s = str(item)
+        m = _RE_THREE_PART.match(s)
+        if m:
+            result.append(SpecError(code=m.group(1), message=f"{m.group(2)} {m.group(3)}"))
+            continue
+        m = _RE_TWO_PART.match(s)
+        if m:
+            result.append(SpecError(code=m.group(1), message=m.group(2)))
+            continue
+        result.append(SpecError(code="E521", message=s))
+    return result
 
 
 class SpecdevError(Exception):

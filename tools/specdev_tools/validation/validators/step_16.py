@@ -1,11 +1,27 @@
+from __future__ import annotations
+
 from typing import List, Dict, Any, Optional
+import hashlib
 import json
 import os
 from pathlib import Path
 
+from ...core.errors import make_error, SpecError
+
+# Checklist type and layer enums — currently hardcoded.  These values mirror the
+# enum constraints in schema/16_scaffold.schema.json (``checklist[].type`` and
+# ``checklist[].layer``).  Loading them dynamically from canon/kinds/ is not
+# practical: the values are schema-level enums, not canonical vocabulary entries,
+# and the schema is the single source of truth.  See AUDIT-023.
 VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security", "config"})
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
+
+# Cache for step_16 validation results by content hash.  When step_16a, 16b,
+# and 16c each call validate_step_16(), the first call computes the result and
+# subsequent calls for the same artifact return cached results.  This prevents
+# the triple execution overhead without changing the public API (AUDIT-029).
+_step16_cache: Dict[str, list[SpecError]] = {}
 
 def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional[str]:
     if spec_path:
@@ -25,7 +41,7 @@ def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional
     return None
 
 
-def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: List[str]) -> None:
+def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every roadmap task, ensure at least one behavior and one validation item.
 
     Groups non-deferred checklist items by their spec_ref.id (roadmap task)
@@ -57,63 +73,69 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
             missing.append("validation")
         if missing:
             errors.append(
-                f"E307 BEHAVIOR_VALIDATION_PAIRING: roadmap task '{ref_id}' "
-                f"is missing checklist item(s) of type: {', '.join(missing)}"
+                make_error("E307", f"BEHAVIOR_VALIDATION_PAIRING: roadmap task '{ref_id}' "
+                f"is missing checklist item(s) of type: {', '.join(missing)}")
             )
 
 
-def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> List[str]:
+def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
     """
     Deep validation for Step 16 (Implementation Context).
-    
+
     Args:
         data: The parsed JSON content of the step file.
         toolkit_root: The root directory of the toolkit (for resolving references).
-        
+
     Returns:
-        List of error messages. Empty list if valid.
+        List of SpecError objects. Empty list if valid.
     """
-    errors = []
-    
+    # Cache lookup: hash data + spec_path to detect identical invocations from 16a/16b/16c
+    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "")
+    cache_key = hashlib.md5(cache_input.encode()).hexdigest()
+    if cache_key in _step16_cache:
+        return list(_step16_cache[cache_key])  # Return a copy
+
+    errors: list[SpecError] = []
+
     plan = data.get("plan", {})
     checklist = plan.get("spec_alignment", {}).get("checklist", [])
     docs_impact = plan.get("docs_impact")
-    
+
     for item in checklist:
         impl = item.get("implementation", {})
         status = impl.get("status")
         item_id = item.get("id", "unknown")
         checklist_status = item.get("checklist_status", "active")
-        
+
         # Logic Check: New checklist types and layers
         item_type = item.get("type", "")
         item_layer = item.get("layer", "")
-        
+
         if item_type not in VALID_CHECKLIST_TYPES:
-            errors.append(f"Checklist item '{item_id}' has invalid type '{item_type}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_TYPES))}")
+            errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid type '{item_type}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_TYPES))}"))
 
         if item_layer not in VALID_CHECKLIST_LAYERS:
-            errors.append(f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}")
-        
+            errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}"))
+
         # Logic Check: New checklist fields (nfr_refs, fixture_ref) required for non-deferred items
         # Only types that have measurable NFR/fixture associations require proof; types like
         # docs, metadata, logging, and config legitimately have no NFR or fixture link.
         if checklist_status != "deferred" and item_type in TYPES_REQUIRING_PROOF:
             nfr_refs = item.get("nfr_refs", [])
             if not nfr_refs:
-                errors.append(f"Checklist item '{item_id}' is not deferred but has no nfr_refs")
+                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no nfr_refs"))
 
             fixture_ref = item.get("fixture_ref")
             if not fixture_ref:
-                errors.append(f"Checklist item '{item_id}' is not deferred but has no fixture_ref")
-        
+                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no fixture_ref"))
+
         # Logic Check: Verified/In-Progress items must have actions
         if status in ["verified", "in_progress"]:
             actions = impl.get("actions", [])
             if not actions and status == "verified":
                  # Strict check: Verified items must have actions documenting what was done
-                 errors.append(f"Checklist item '{item_id}' is 'verified' but has no actions.")
-             
+                 errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but has no actions."))
+
             # Logic Check: Verified items must have evidence for at least one action if actions exist
             if status == "verified" and actions:
                 has_evidence = False
@@ -122,11 +144,11 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                         has_evidence = True
                         break
                 if not has_evidence:
-                    errors.append(f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action.")
+                    errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
 
     # Logic Check: Ensure target_file_patterns cover touched files
     summary_patterns = set(plan.get("summary", {}).get("target_file_patterns", []))
-    
+
     # Collect all files touched in actions
     actually_touched = set()
     for item in checklist:
@@ -134,27 +156,19 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         if impl.get("status") in ["in_progress", "verified"]:
             for f in impl.get("files_touched", []):
                 actually_touched.add(f)
-                
+
     # Logic: Warn if files are touched but not in target_file_patterns
-    # For now, we won't implement complex glob matching in this audit step because we don't want to add fnmatch overhead
-    # But we can check for direct matches if patterns are simple paths
-    # Or just skip this check if we want to be lenient.
-    # Let's implement a simple check: if the file is NOT in the patterns list EXACTLY, we flag it.
-    # This encourages specific file listing or explicit patterns.
-    # Note: This is a strict interpretation. If users rely on patterns like "*.py", this strict check will fail.
-    # So we probably should skip this strict check unless we import fnmatch.
-    
     import fnmatch
-    
+
     for f in actually_touched:
         matched = False
         for pattern in summary_patterns:
             if fnmatch.fnmatch(f, pattern):
                 matched = True
                 break
-        
+
         if not matched:
-            errors.append(f"File '{f}' is touched by implementation but not covered by target_file_patterns.")
+            errors.append(make_error("E520", f"File '{f}' is touched by implementation but not covered by target_file_patterns."))
 
     manifest_path = _find_seed_manifest(spec_path, toolkit_root)
     doc_patterns: List[str] = []
@@ -166,11 +180,11 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             doc_patterns = manifest.get("docs_policy", {}).get("doc_paths", []) or []
             doc_patterns_valid = isinstance(doc_patterns, list) and len(doc_patterns) > 0
             if not doc_patterns_valid:
-                errors.append("seed_manifest.json missing docs_policy.doc_paths; cannot validate docs_impact doc paths.")
+                errors.append(make_error("W570", "seed_manifest.json missing docs_policy.doc_paths; cannot validate docs_impact doc paths."))
         except Exception:
-            errors.append("Failed to read seed_manifest.json; cannot validate docs_impact doc paths.")
+            errors.append(make_error("W570", "Failed to read seed_manifest.json; cannot validate docs_impact doc paths."))
     else:
-        errors.append("seed_manifest.json not found; cannot validate docs_impact doc paths.")
+        errors.append(make_error("W570", "seed_manifest.json not found; cannot validate docs_impact doc paths."))
 
     def is_doc_path(path: str) -> bool:
         if not path:
@@ -194,24 +208,24 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
 
     if code_change_targets:
         if not isinstance(docs_impact, dict):
-            errors.append("plan.docs_impact is required when code changes are present.")
+            errors.append(make_error("E520", "plan.docs_impact is required when code changes are present."))
         else:
             status = docs_impact.get("status")
             if status != "required":
-                errors.append("plan.docs_impact.status must be 'required' when code changes are present.")
+                errors.append(make_error("E520", "plan.docs_impact.status must be 'required' when code changes are present."))
             docs_touched = docs_impact.get("docs_touched", [])
             if not docs_touched:
-                errors.append("plan.docs_impact.docs_touched must be provided when code changes are present.")
+                errors.append(make_error("E520", "plan.docs_impact.docs_touched must be provided when code changes are present."))
             elif doc_patterns_valid:
                 for doc_path in docs_touched:
                     if not is_doc_path(doc_path):
-                        errors.append(f"plan.docs_impact.docs_touched contains non-doc path: {doc_path}")
+                        errors.append(make_error("E520", f"plan.docs_impact.docs_touched contains non-doc path: {doc_path}"))
 
-    # E307: Behavior→validation pairing — every roadmap task must have at least one
+    # E307: Behavior->validation pairing -- every roadmap task must have at least one
     # checklist item of type "behavior" and one of type "validation"
     _check_behavior_validation_pairing(checklist, errors)
 
-    # D22: Command-to-proof linkage — active plans must prove test commands passed
+    # D22: Command-to-proof linkage -- active plans must prove test commands passed
     plan_status = plan.get("status")
     review_reqs = plan.get("review_requirements", {})
     test_commands = review_reqs.get("test_commands", []) if isinstance(review_reqs, dict) else []
@@ -229,8 +243,8 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         for cmd in test_commands:
             if isinstance(cmd, str) and cmd.strip() not in passed_commands:
                 errors.append(
-                    f"E301 MISSING_PROOF_CLOSURE test command '{cmd}' required "
-                    f"by review_requirements but not found in execution_results with status=passed"
+                    make_error("E301", f"MISSING_PROOF_CLOSURE test command '{cmd}' required "
+                    f"by review_requirements but not found in execution_results with status=passed")
                 )
 
     # D23: Verified review without proof closure
@@ -239,13 +253,13 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
     if verdict == "verified":
         if not execution or not isinstance(execution, dict):
             errors.append(
-                "E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
-                "but no execution section exists"
+                make_error("E302", "UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                "but no execution section exists")
             )
         elif not execution_results:
             errors.append(
-                "E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
-                "but execution_results is empty"
+                make_error("E302", "UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                "but execution_results is empty")
             )
 
         # All test commands must be proven
@@ -256,8 +270,8 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             ]
             if unproven:
                 errors.append(
-                    f"E302 UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
-                    f"but {len(unproven)} test command(s) lack proof: {unproven}"
+                    make_error("E302", f"UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
+                    f"but {len(unproven)} test command(s) lack proof: {unproven}")
                 )
 
         # Check critical_evidence consistency
@@ -268,31 +282,31 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             for cmd in test_commands:
                 if isinstance(cmd, str) and cmd.strip() not in declared_set:
                     errors.append(
-                        f"E302 UNPROVEN_VERIFIED_REVIEW test command '{cmd}' "
-                        f"not listed in critical_evidence.passed_test_commands"
+                        make_error("E302", f"UNPROVEN_VERIFIED_REVIEW test command '{cmd}' "
+                        f"not listed in critical_evidence.passed_test_commands")
                     )
 
-    # E303 — ci_status gate
+    # E303 -- ci_status gate
     fixture_status = review.get("fixture_status") if isinstance(review, dict) else None
     ci_status_val = fixture_status.get("ci_status") if isinstance(fixture_status, dict) else None
     if verdict == "verified" and (ci_status_val is None or ci_status_val == "red"):
         if ci_status_val is None:
             errors.append(
-                "E303 CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
-                "review.fixture_status.ci_status is missing — set ci_status to 'green' or change verdict"
+                make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
+                "review.fixture_status.ci_status is missing -- set ci_status to 'green' or change verdict")
             )
         else:
             errors.append(
-                "E303 CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is 'red' — "
-                "set fixture_status.ci_status to 'green' or change verdict"
+                make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is 'red' -- "
+                "set fixture_status.ci_status to 'green' or change verdict")
             )
 
-    # E304 — roadmap-to-checklist coverage
+    # E304 -- roadmap-to-checklist coverage
     if spec_path:
         artifact_path = Path(spec_path)
         roadmap_path = artifact_path.parent / "14_roadmap.json"
         if not roadmap_path.exists():
-            pass  # Roadmap is optional in pre-roadmap phases — skip E304 silently
+            pass  # Roadmap is optional in pre-roadmap phases -- skip E304 silently
         else:
             try:
                 roadmap_data = json.loads(roadmap_path.read_text())
@@ -312,18 +326,18 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                 unmapped = roadmap_task_ids - checklist_refs
                 for task_id in sorted(unmapped):
                     errors.append(
-                        f"E304 ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' has no checklist item with matching spec_ref.id"
+                        make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' has no checklist item with matching spec_ref.id")
                     )
             except (OSError, json.JSONDecodeError) as exc:
                 errors.append(
-                    f"E304 ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}"
+                    make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}")
                 )
             except (KeyError, TypeError) as exc:
                 errors.append(
-                    f"E304 ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}"
+                    make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
                 )
 
-    # W581 — milestone_ref binding validation
+    # W581 -- milestone_ref binding validation
     if spec_path:
         artifact_path_ms = Path(spec_path)
         roadmap_path_ms = artifact_path_ms.parent / "14_roadmap.json"
@@ -349,18 +363,18 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                         spec_ref_id = item["spec_ref"].get("id")
 
                     if milestone_ref is None:
-                        errors.append(f"W581 MILESTONE_REF_MISSING item={item_id}")
+                        errors.append(make_error("W581", f"MILESTONE_REF_MISSING item={item_id}"))
                     elif spec_ref_id and spec_ref_id in task_to_milestone:
                         expected_ms = task_to_milestone[spec_ref_id]
                         if milestone_ref != expected_ms:
                             errors.append(
-                                f"E582 MILESTONE_REF_MISMATCH milestone_ref mismatch item={item_id} "
-                                f"expected={expected_ms} got={milestone_ref}"
+                                make_error("E582", f"MILESTONE_REF_MISMATCH milestone_ref mismatch item={item_id} "
+                                f"expected={expected_ms} got={milestone_ref}")
                             )
             except (OSError, json.JSONDecodeError, KeyError, TypeError):
                 pass  # Roadmap parse errors already handled by E304
 
-    # E305 — planned-vs-executed diff
+    # E305 -- planned-vs-executed diff
     final_status = data.get("execution", {}).get("final_status", {}) if isinstance(data.get("execution"), dict) else {}
     if final_status and final_status.get("ci_status") == "green":
         planned_ids = {
@@ -382,10 +396,10 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             test_hint = item.get("linked_test_expectation")
             suffix = f" (expected test: {test_hint})" if test_hint else ""
             errors.append(
-                f"E305 PLANNED_UNEXECUTED: checklist item '{item_id}' is active but not in satisfied_checklist_ids{suffix}"
+                make_error("E305", f"PLANNED_UNEXECUTED: checklist item '{item_id}' is active but not in satisfied_checklist_ids{suffix}")
             )
 
-    # E306 — semantic_review.fr_coverage cross-ref against Step 04
+    # E306 -- semantic_review.fr_coverage cross-ref against Step 04
     if spec_path and isinstance(review, dict):
         semantic_review = review.get("semantic_review")
         if isinstance(semantic_review, dict):
@@ -406,11 +420,12 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                                 fr_id = entry.get("fr_id")
                                 if isinstance(fr_id, str) and fr_id not in known_fr_ids:
                                     errors.append(
-                                        f"E306 SEMANTIC_REVIEW_FR_MISMATCH: "
+                                        make_error("E306", f"SEMANTIC_REVIEW_FR_MISMATCH: "
                                         f"fr_coverage references '{fr_id}' "
-                                        f"not found in 04_fr_list.json"
+                                        f"not found in 04_fr_list.json")
                                     )
                     except (OSError, json.JSONDecodeError):
-                        pass  # Step 04 unreadable — skip E306
+                        pass  # Step 04 unreadable -- skip E306
 
+    _step16_cache[cache_key] = list(errors)  # Cache a copy
     return errors

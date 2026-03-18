@@ -155,9 +155,10 @@ def execute_single_step(
                 spec_dir=spec_dir,
                 toolkit_root=toolkit_root,
             )
+            fixed_count = len(result.operations)
             message = (
                 f"{step_desc}: auto-fix applied "
-                f"({result.fixed_count} fix(es), {result.skipped_count} skipped)"
+                f"({fixed_count} fix(es))"
             )
             log_operation(spec_dir, f"auto_fix:{step.step_id}", "success")
             return (True, message)
@@ -315,7 +316,7 @@ def execute_plan(
 
     # Pre-migration validation
     pre_result = validate_pre_migration(spec_dir, toolkit_root)
-    if not pre_result.valid:
+    if not pre_result.can_proceed:
         tx.operations_failed.append(
             f"Pre-migration validation failed: {'; '.join(pre_result.errors)}"
         )
@@ -375,8 +376,8 @@ def execute_plan(
 
     # Post-migration validation (only if not dry run and not rolled back)
     if not dry_run and not tx.rolled_back:
-        post_result = validate_post_migration(spec_dir, toolkit_root)
-        if not post_result.valid:
+        post_result = validate_post_migration(spec_dir, toolkit_root, plan.target_version)
+        if not post_result.can_proceed:
             warnings = "; ".join(post_result.errors)
             tx.operations_completed.append(
                 f"Post-migration validation warnings: {warnings}"

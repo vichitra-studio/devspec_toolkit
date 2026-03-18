@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **AI Spec Driven Development Toolkit** is a schema-first, AI-assisted workflow that turns spec → implementation into a deterministic pipeline. It is typically vendored as a git submodule at `<product-repo>/devspec_toolkit/` beside the host repo's live `spec/` directory.
 
-Current version: **0.3.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
+Current version: **0.4.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
 
 ---
 
@@ -68,10 +68,29 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 # Prompt workflow reminder
 ./tools/run_specdev.sh ai-help --step 04
 
+# Canonical autofix (apply canonical corrections to spec files)
+./tools/run_specdev.sh canonical-autofix spec --repo-root ./devspec_toolkit --dry-run
+./tools/run_specdev.sh canonical-autofix spec --repo-root ./devspec_toolkit --write
+
+# Traceability closure check
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --json
+
+# Prompt context (show downstream consumers for a step)
+./tools/run_specdev.sh prompt-context 04 --repo-root ./devspec_toolkit
+
+# Canon-schema alignment check
+./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit
+
+# Prompt-schema sync validation
+./tools/run_specdev.sh prompt-sync spec --repo-root ./devspec_toolkit
+
 # Changelog
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --validate 0.3.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --validate 0.4.0 --repo-root ./devspec_toolkit
 ```
+
+> **JSON output**: All CLI commands accept `--json` for structured JSON output with `status`, `error_count`, `warning_count`, and `errors` array. Example: `./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit --json`
 
 ### Alignment & Migration
 
@@ -130,7 +149,7 @@ Artifacts live in `spec/NN_name.json`; human guides in `spec/NN_name.guide.md`. 
 - `schema/` — JSON Schemas for every step plus `schema/core/` (atoms, collections, errors shared across steps)
 - `canon/` — Canonical registry (`manifest.json`, `aliases.json`) for shared vocabulary: units, stages, environments, roles, NFR categories, trace types, owners, etc. Referenced by canonical-lint and canonical-integrity checks.
 - `tools/specdev_tools/` — Python CLI package; entry point at `cli.py`, organized into subpackages:
-  - `core/` — errors, registry, trace_types, changelog_parser
+  - `core/` — errors, json_output, registry, trace_types, changelog_parser, config, constants, loaders
   - `validation/` — validate, validators/, linters (fixtures, seed, docs, quality, hallucination, dependency, forward-replay, traceability, invariants, governance, matrix)
   - `generation/` — prompt_generator, prompt_schema_sync, schema_differ
   - `canonical/` — autofix, integrity, lint, registry

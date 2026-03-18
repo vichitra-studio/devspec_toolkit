@@ -84,7 +84,7 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E303 fixture should fail validation")
         self.assertTrue(
-            any("E303" in e for e in errors),
+            any(e.code == "E303" for e in errors),
             f"Expected E303 error. Got: {errors}"
         )
 
@@ -94,7 +94,7 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E305 fixture should fail validation")
         self.assertTrue(
-            any("E305" in e for e in errors),
+            any(e.code == "E305" for e in errors),
             f"Expected E305 error. Got: {errors}"
         )
 
@@ -116,7 +116,7 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Verified with no fixture_status should fail E303")
         self.assertTrue(
-            any("E303" in e for e in errors),
+            any(e.code == "E303" for e in errors),
             f"Expected E303 error for absent fixture_status. Got: {errors}"
         )
 
@@ -126,7 +126,7 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E304 fixture should fail validation")
         self.assertTrue(
-            any("E304" in e for e in errors),
+            any(e.code == "E304" for e in errors),
             f"Expected E304 error. Got: {errors}"
         )
 
@@ -166,7 +166,7 @@ class TestStep16(unittest.TestCase):
             errors = validate_file(self.repo_root, str(fixture_path))
 
         self.assertTrue(
-            any("E306" in e for e in errors),
+            any(e.code == "E306" for e in errors),
             f"Expected E306 error for non-existent fr_id. Got: {errors}"
         )
 
@@ -197,7 +197,7 @@ class TestStep16(unittest.TestCase):
 
             errors = validate_file(self.repo_root, str(fixture_path))
 
-        e306_errors = [e for e in errors if "E306" in e]
+        e306_errors = [e for e in errors if e.code == "E306"]
         self.assertEqual(e306_errors, [], f"Did not expect E306 errors. Got: {e306_errors}")
 
     def test_e304_malformed_roadmap_reports_error(self):
@@ -244,7 +244,7 @@ class TestStep16(unittest.TestCase):
             errors2 = validate_file(self.repo_root, str(fixture_path2))
 
         self.assertTrue(
-            any("E304" in e for e in errors2),
+            any(e.code == "E304" for e in errors2),
             f"Expected E304 error for malformed roadmap JSON. Got: {errors2}"
         )
 
@@ -292,7 +292,7 @@ class TestStep16(unittest.TestCase):
             errors = validate_file(self.repo_root, str(fixture_path))
 
         self.assertTrue(
-            any("E307" in e for e in errors),
+            any(e.code == "E307" for e in errors),
             f"Expected E307 BEHAVIOR_VALIDATION_PAIRING error. Got: {errors}"
         )
 
@@ -374,7 +374,7 @@ class TestStep16(unittest.TestCase):
             errors = validate_file(self.repo_root, path)
 
         self.assertTrue(
-            any("W581" in e for e in errors),
+            any(e.code == "W581" for e in errors),
             f"Expected W581 MILESTONE_REF_MISSING. Got: {errors}"
         )
 
@@ -409,8 +409,8 @@ class TestStep16(unittest.TestCase):
             path = self._make_milestone_ref_fixture(td, checklist, milestones)
             errors = validate_file(self.repo_root, path)
 
-        w581 = [e for e in errors if "W581" in e]
-        e582 = [e for e in errors if "E582" in e]
+        w581 = [e for e in errors if e.code == "W581"]
+        e582 = [e for e in errors if e.code == "E582"]
         self.assertEqual(w581, [], f"Did not expect W581. Got: {w581}")
         self.assertEqual(e582, [], f"Did not expect E582. Got: {e582}")
 
@@ -446,7 +446,7 @@ class TestStep16(unittest.TestCase):
             errors = validate_file(self.repo_root, path)
 
         self.assertTrue(
-            any("E582" in e for e in errors),
+            any(e.code == "E582" for e in errors),
             f"Expected E582 milestone_ref mismatch. Got: {errors}"
         )
 

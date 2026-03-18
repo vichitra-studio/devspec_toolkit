@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import os, json, warnings
 
+from ..core.errors import SpecError, make_error, render_errors
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type
 from .cross_artifact_checks import (
     collect_capability_ids,
@@ -122,7 +123,7 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
     return known_ids, references
 
 
-def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
+def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
     """Check for broken trace references (Generic Implementation).
 
     The function loads all JSON artifacts from *spec_dir*, runs the generic
@@ -143,14 +144,17 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[str]:
     known_ids, references = collect_definitions_and_references(artifacts)
 
     # Generic broken-reference check
-    errors: list[str] = []
+    errors: list[SpecError] = []
     for src, tgt in references:
         if tgt and tgt not in known_ids and not (
             tgt.startswith("external:") or
             tgt.startswith("file:") or
             tgt.startswith("refs/")
         ):
-            errors.append(f"Broken Trace in {os.path.basename(src)}: Reference to '{tgt}' not found.")
+            errors.append(make_error(
+                "E590",
+                f"Broken Trace in {os.path.basename(src)}: Reference to '{tgt}' not found.",
+            ))
 
     # Collect shared cross-step indexes
     capability_ids = collect_capability_ids(artifacts)
@@ -291,19 +295,19 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
 
     integrity_errors = validate_trace_integrity(repo_root, spec_dir)
     if integrity_errors:
-        result["integrity_errors"] = integrity_errors
+        result["integrity_errors"] = render_errors(integrity_errors)
 
     # R9/T24: Configurable coverage threshold enforcement
     threshold_errors = _check_coverage_thresholds(coverage, repo_root)
     if threshold_errors:
-        result.setdefault("integrity_errors", []).extend(threshold_errors)
+        result.setdefault("integrity_errors", []).extend(render_errors(threshold_errors))
 
     return result
 
 
-def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[str]:
+def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[SpecError]:
     """R9/T24: Enforce coverage thresholds from step_order.json."""
-    errors: list[str] = []
+    errors: list[SpecError] = []
     config = _load_coverage_thresholds(repo_root)
     if config is _MISSING_FILE:
         # No step_order.json (or malformed) — graceful skip, no errors
@@ -312,6 +316,7 @@ def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[str]:
         # File exists but coverage_thresholds key absent — apply defaults
         config = _DEFAULT_COVERAGE_THRESHOLDS
 
+    assert isinstance(config, dict)
     mode = config.get("mode", "warn")
     fr_total = coverage.get("fr_total", 0)
     if fr_total == 0:
@@ -328,9 +333,10 @@ def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[str]:
         if pct < threshold:
             code = "E592" if mode == "error" else "W592"
             semantic = "COVERAGE_THRESHOLD_BREACH" if mode == "error" else "COVERAGE_THRESHOLD_WARN"
-            errors.append(
-                f"{code} {semantic} {check_name}={pct:.1f}% below threshold={threshold}%"
-            )
+            errors.append(make_error(
+                code,
+                f"{semantic} {check_name}={pct:.1f}% below threshold={threshold}%",
+            ))
     return errors
 
 

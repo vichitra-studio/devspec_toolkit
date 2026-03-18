@@ -81,6 +81,26 @@ jobs:
           path: tools/trace_matrix.json
           if-no-files-found: error
 
+  test:
+    name: Pytest Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Setup Virtual Environment & Install tooling
+        run: |
+          python -m venv devspec_env
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          devspec_env/bin/pip install -e tools/
+          devspec_env/bin/pip install pytest
+      - name: Run pytest
+        run: pytest tests/ -v
+
   redteam:
     name: Red-Team Lint
     needs: validate

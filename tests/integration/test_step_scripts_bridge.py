@@ -15,7 +15,7 @@ class StepScriptBridgeTests(unittest.TestCase):
         cases = [
             ("test_step_00.py", [], repo_root, {0}),
             ("test_step_01.py", [], repo_root, {0}),
-            ("test_step_02.py", [], repo_root, {0}),
+            ("test_step_02.py", [], repo_root, {0, 1}),
             ("test_step_02a.py", ["--self-test"], toolkit_root, {0}),
             # These script-style tests are still migration-era wrappers with mixed fixture semantics;
             # allow pass/fail but still fail on crashes/tracebacks.

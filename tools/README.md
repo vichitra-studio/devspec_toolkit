@@ -1,4 +1,4 @@
-# AI Spec Driven Development CLI (v3 Full)
+# AI Spec Driven Development CLI (v0.4.0)
 
 Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit.
 

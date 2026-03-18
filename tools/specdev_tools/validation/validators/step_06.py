@@ -1,39 +1,38 @@
 from __future__ import annotations
 
-import json
-import os
 import re
-from typing import Any, Optional, Set
+from typing import Any
+
+from ...core.errors import make_error, SpecError
+from ...core.loaders import load_upstream_ids
+from ...validation.linter_utils import check_no_duplicates
 
 INV_ID_PATTERN = re.compile(r"^inv-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TRACE_TARGET_PATTERN = re.compile(r"^(fr|api|nfr|inv)-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[str]:
-    errors: list[str] = []
-    seen_ids: set[str] = set()
+def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+    errors: list[SpecError] = []
+    check_no_duplicates(instance.get("rules", []), "inv_id", "inv_id", errors)
     for i, rule in enumerate(instance.get("rules", [])):
         inv_id = rule.get("inv_id")
         if isinstance(inv_id, str) and not INV_ID_PATTERN.match(inv_id):
-            errors.append(f"Invariant at index {i} has inv_id '{inv_id}' that does not follow 'inv-<kebab>' convention")
-        if inv_id in seen_ids:
-            errors.append(f"Duplicate inv_id '{inv_id}' at index {i}")
-        seen_ids.add(inv_id)
+            errors.append(make_error("E530", f"Invariant at index {i} has inv_id '{inv_id}' that does not follow 'inv-<kebab>' convention"))
         trace = rule.get("trace")
         if not trace:
-            errors.append(f"Invariant '{inv_id}' missing trace")
+            errors.append(make_error("E520", f"Invariant '{inv_id}' missing trace"))
         elif isinstance(trace, list):
             for t in trace:
                 if isinstance(t, dict):
                     tid = t.get("id", "")
                     if tid and not TRACE_TARGET_PATTERN.match(tid):
-                        errors.append(f"Invariant '{inv_id}' has trace target '{tid}' that does not match (fr|api|nfr|inv)-* pattern")
+                        errors.append(make_error("E530", f"Invariant '{inv_id}' has trace target '{tid}' that does not match (fr|api|nfr|inv)-* pattern"))
                 elif isinstance(t, str) and not TRACE_TARGET_PATTERN.match(t):
-                    errors.append(f"Invariant '{inv_id}' has trace target '{t}' that does not match (fr|api|nfr|inv)-* pattern")
+                    errors.append(make_error("E530", f"Invariant '{inv_id}' has trace target '{t}' that does not match (fr|api|nfr|inv)-* pattern"))
 
     # Cross-step ID validation for trace targets
-    fr_ids = _load_fr_ids(toolkit_root)
-    api_ids = _load_api_ids(toolkit_root)
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id")
 
     # Collect inv IDs from this artifact for self-referential validation
     inv_ids = {
@@ -65,28 +64,28 @@ def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                 if fr_ids is None:
                     if not warned_fr:
                         errors.append(
-                            "W590 CROSS_STEP_UPSTREAM_MISSING 04_fr_list.json not found; skipping FR reference validation"
+                            make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 04_fr_list.json not found; skipping FR reference validation")
                         )
                         warned_fr = True
                 elif target not in fr_ids:
                     errors.append(
-                        f"E590 CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in 04_fr_list.json"
+                        make_error("E590", f"CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in 04_fr_list.json")
                     )
             elif target.startswith("api-"):
                 if api_ids is None:
                     if not warned_api:
                         errors.append(
-                            "W590 CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation"
+                            make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation")
                         )
                         warned_api = True
                 elif target not in api_ids:
                     errors.append(
-                        f"E590 CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in 05_interface_contracts.json"
+                        make_error("E590", f"CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in 05_interface_contracts.json")
                     )
             elif target.startswith("inv-"):
                 if target not in inv_ids:
                     errors.append(
-                        f"E590 CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in current artifact's rules"
+                        make_error("E590", f"CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' trace target '{target}' not found in current artifact's rules")
                     )
 
     # Cross-step validation for scope.apis references
@@ -103,56 +102,12 @@ def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                 if api_ids is None:
                     if not warned_api:
                         errors.append(
-                            "W590 CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation"
+                            make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation")
                         )
                         warned_api = True
                 elif api_ref not in api_ids:
                     errors.append(
-                        f"E590 CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' scope.apis reference '{api_ref}' not found in 05_interface_contracts.json"
+                        make_error("E590", f"CROSS_STEP_ID_NOT_FOUND invariant '{inv_id}' scope.apis reference '{api_ref}' not found in 05_interface_contracts.json")
                     )
 
     return errors
-
-
-def _load_fr_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load FR IDs from step 04 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("04_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                items = data.get("functional_requirements", [])
-                return {
-                    item.get("fr_id")
-                    for item in items
-                    if isinstance(item, dict) and item.get("fr_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
-
-
-def _load_api_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load API IDs from step 05 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("05_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                items = data.get("apis", [])
-                return {
-                    item.get("api_id")
-                    for item in items
-                    if isinstance(item, dict) and item.get("api_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None

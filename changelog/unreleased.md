@@ -22,6 +22,15 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 - **26 new error/warning codes** registered (E150, E554, E555, E571-E573, E580-E581, E590-E599, W590-W597).
 - **4 previously unregistered codes** now registered (E551, E552, E553, W552).
 
+### P7: Structured Error Output (2026-03-19)
+
+- **`SpecError` dataclass** (`core/errors.py`): All 41 error-producing modules now return structured `SpecError(code, message, path)` objects instead of plain strings. ~370 `make_error()` call sites.
+- **Helper functions**: `make_error()` (validates code exists in ERROR_CODES), `render_errors()` (SpecError → string list), `ensure_spec_errors()` (string → SpecError bridge for transition).
+- **`core/json_output.py`**: New module with `format_errors_json()` for deterministic JSON output envelopes.
+- **`--json` CLI flag**: Added to all 25 subcommands. Produces JSON with `status` (PASS/WARN/FAIL), `error_count`, `warning_count`, and `errors` array.
+- **`_apply_we_promotion()` rewrite**: W→E code promotion in `validate.py` rewritten from regex-based string manipulation to field-based `SpecError.code` swapping.
+- **Test count**: 1271 (up from 997 pre-P7, 830 at original baseline).
+
 ### Prompt Updates
 
 - **Extraction Intent sections** added to all 16 remaining prompts (05, 06, 07, 08, 09, 10, 11, 12, 13, 13a, 14, 15, 16, 16a, 16b, 16c). Each lists upstream artifacts consumed and what is extracted.

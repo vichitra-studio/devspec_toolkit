@@ -5,6 +5,7 @@ import os
 import re as _re
 from typing import Dict, List, Set
 
+from ..core.errors import SpecError, ensure_spec_errors, make_error
 from .validate import validate_file
 
 
@@ -17,21 +18,21 @@ def project_root_from_spec_dir(spec_dir: str) -> str:
 _project_root_from_spec_dir = project_root_from_spec_dir
 
 
-def _load_manifest(repo_root: str, project_root: str, errors: List[str]) -> Dict:
+def _load_manifest(repo_root: str, project_root: str, errors: List[SpecError]) -> Dict:
     manifest_path = os.path.join(project_root, "spec", "common", "seed_manifest.json")
     if not os.path.exists(manifest_path):
-        errors.append(f"Missing seed manifest: {manifest_path}")
+        errors.append(make_error("E520", f"Missing seed manifest: {manifest_path}"))
         return {}
 
     schema_errors = validate_file(repo_root, manifest_path)
     if schema_errors:
-        errors.extend(schema_errors)
+        errors.extend(ensure_spec_errors(schema_errors))
 
     try:
         with open(manifest_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        errors.append(f"Failed to read seed manifest: {manifest_path} ({e})")
+        errors.append(make_error("E520", f"Failed to read seed manifest: {manifest_path} ({e})"))
         return {}
 
 
@@ -69,11 +70,11 @@ def _extract_step_from_prompt_filename(filename: str) -> str:
 
 
 def _lint_prompt_manifest_refs(
-    repo_root: str, errors: List[str], manifest: Dict | None = None
+    repo_root: str, errors: List[SpecError], manifest: Dict | None = None
 ) -> None:
     prompts_dir = os.path.join(repo_root, "prompts")
     if not os.path.isdir(prompts_dir):
-        errors.append(f"Missing prompts directory: {prompts_dir}")
+        errors.append(make_error("E520", f"Missing prompts directory: {prompts_dir}"))
         return
 
     # Determine which steps require seeds
@@ -81,7 +82,7 @@ def _lint_prompt_manifest_refs(
     if manifest:
         step_requirements = manifest.get("step_requirements", {})
     else:
-        errors.append("W150: seed_manifest not provided — skipping prompt seed-section checks")
+        errors.append(make_error("W150", "seed_manifest not provided — skipping prompt seed-section checks"))
 
     for fn in os.listdir(prompts_dir):
         if not fn.startswith("prompt_") or not fn.endswith(".md"):
@@ -104,12 +105,12 @@ def _lint_prompt_manifest_refs(
             with open(path, "r", encoding="utf-8") as fh:
                 text = fh.read()
         except Exception as e:
-            errors.append(f"Failed to read prompt: {path} ({e})")
+            errors.append(make_error("E520", f"Failed to read prompt: {path} ({e})"))
             continue
         if "Seed Order & Mandatory Sources" not in text:
-            errors.append(f"{path}: missing 'Seed Order & Mandatory Sources' section")
+            errors.append(make_error("E520", f"{path}: missing 'Seed Order & Mandatory Sources' section"))
         if "spec/common/seed_manifest.json" not in text:
-            errors.append(f"{path}: missing reference to spec/common/seed_manifest.json")
+            errors.append(make_error("E520", f"{path}: missing reference to spec/common/seed_manifest.json"))
 
 
 _STOP_WORDS = frozenset({
@@ -126,7 +127,7 @@ def _tokenize(text: str) -> set:
 
 
 def _check_seed_content_overlap(
-    spec_dir: str, manifest: Dict, project_root: str, errors: List[str]
+    spec_dir: str, manifest: Dict, project_root: str, errors: List[SpecError]
 ) -> None:
     seed_paths: Dict[str, str] = {}
     for seed in manifest.get("seeds", []):
@@ -164,9 +165,9 @@ def _check_seed_content_overlap(
                 seed_tokens = _tokenize(seed_text)
                 shared = len(spec_tokens & seed_tokens)
                 if shared < 3:
-                    errors.append(
-                        f"W140 SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={fn} shared_tokens={shared}"
-                    )
+                    errors.append(make_error(
+                        "W140", f"SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={fn} shared_tokens={shared}"
+                    ))
 
 
 def lint_seeds(
@@ -174,7 +175,7 @@ def lint_seeds(
     spec_dir: str,
     project_root: str | None = None,
     strict_mode: bool = False,
-) -> List[str]:
+) -> List[SpecError]:
     """Lint seed references across spec artifacts.
 
     Args:
@@ -182,7 +183,7 @@ def lint_seeds(
             a different root than the canonical root) is treated as a hard
             error instead of a warning.
     """
-    errors: List[str] = []
+    errors: List[SpecError] = []
     # D20 fix: prefer explicit project_root, then repo_root; warn on spec_dir mismatch
     implicit_root = _project_root_from_spec_dir(spec_dir)
     if project_root is None:
@@ -196,16 +197,16 @@ def lint_seeds(
             f" Using canonical root."
         )
         if strict_mode:
-            errors.append(f"E520 UNRESOLVED_INPUT project_root_mismatch: {msg}")
+            errors.append(make_error("E520", f"UNRESOLVED_INPUT project_root_mismatch: {msg}"))
             return errors
-        errors.append(msg)
+        errors.append(make_error("W570", f"GRACEFUL_SKIP project_root_mismatch: {msg}"))
     manifest = _load_manifest(repo_root, project_root, errors)
     if not manifest:
         return errors
 
     seed_ids = [s.get("seed_id") for s in manifest.get("seeds", []) if isinstance(s, dict)]
     if len(seed_ids) != len(set(seed_ids)):
-        errors.append("Seed manifest has duplicate seed_id values.")
+        errors.append(make_error("E410", "CANONICAL_ALIAS_COLLISION Seed manifest has duplicate seed_id values."))
 
     # D19 fix: validate that each seed path exists on disk and doesn't escape project root
     for seed in manifest.get("seeds", []):
@@ -214,26 +215,27 @@ def lint_seeds(
         seed_id = seed.get("seed_id", "unknown")
         seed_path = seed.get("path")
         if not seed_path:
-            errors.append(f"Seed '{seed_id}' is missing 'path' field.")
+            errors.append(make_error("E520", f"Seed '{seed_id}' is missing 'path' field."))
             continue
         resolved = os.path.normpath(os.path.join(project_root, seed_path))
         if not os.path.isfile(resolved):
-            errors.append(
+            errors.append(make_error(
+                "E520",
                 f"Seed '{seed_id}' path '{seed_path}' does not exist or is not readable"
-                f" (resolved: {resolved})"
-            )
+                f" (resolved: {resolved})",
+            ))
         try:
             common = os.path.commonpath(
                 [os.path.abspath(project_root), os.path.abspath(resolved)]
             )
             if common != os.path.abspath(project_root):
-                errors.append(
-                    f"Seed '{seed_id}' path '{seed_path}' escapes project root"
-                )
+                errors.append(make_error(
+                    "E520", f"Seed '{seed_id}' path '{seed_path}' escapes project root"
+                ))
         except ValueError:
-            errors.append(
-                f"Seed '{seed_id}' path '{seed_path}' escapes project root (different drive)"
-            )
+            errors.append(make_error(
+                "E520", f"Seed '{seed_id}' path '{seed_path}' escapes project root (different drive)"
+            ))
 
     # G5: Reverse check — detect on-disk seeds not declared in manifest
     declared_paths = set()
@@ -249,24 +251,24 @@ def lint_seeds(
                 continue
             on_disk_path = os.path.normpath(os.path.join(seed_dir_abs, fn))
             if on_disk_path not in declared_paths:
-                errors.append(
-                    f"W550 UNDECLARED_SEED on-disk seed '{fn}' not declared in seed_manifest.json"
-                )
+                errors.append(make_error(
+                    "W551", f"UNDECLARED_SEED on-disk seed '{fn}' not declared in seed_manifest.json"
+                ))
 
     seed_id_set = set(seed_ids)
     for sid in manifest.get("global_seed_order", []):
         if sid not in seed_id_set:
-            errors.append(f"global_seed_order references unknown seed_id: {sid}")
+            errors.append(make_error("E520", f"global_seed_order references unknown seed_id: {sid}"))
 
     for layer in manifest.get("nested_order", []):
         for sid in layer.get("seed_ids", []):
             if sid not in seed_id_set:
-                errors.append(f"nested_order references unknown seed_id: {sid}")
+                errors.append(make_error("E520", f"nested_order references unknown seed_id: {sid}"))
 
     for step_id, reqs in manifest.get("step_requirements", {}).items():
         for sid in reqs:
             if sid not in seed_id_set:
-                errors.append(f"step_requirements[{step_id}] references unknown seed_id: {sid}")
+                errors.append(make_error("E520", f"step_requirements[{step_id}] references unknown seed_id: {sid}"))
 
     _lint_prompt_manifest_refs(repo_root, errors, manifest)
 
@@ -292,19 +294,20 @@ def lint_seeds(
 
             seed_refs = instance.get("seed_refs", [])
             if not isinstance(seed_refs, list):
-                errors.append(f"{file_path}: seed_refs must be an array")
+                errors.append(make_error("E520", f"{file_path}: seed_refs must be an array"))
                 continue
 
             used_seed_ids = {ref.get("seed_id") for ref in seed_refs if isinstance(ref, dict) and ref.get("seed_id") is not None}
             missing_seed_ids = {sid for sid in used_seed_ids if sid not in seed_id_set}
             for sid in missing_seed_ids:
-                errors.append(f"{file_path}: seed_refs includes unknown seed_id '{sid}'")
+                errors.append(make_error("E520", f"{file_path}: seed_refs includes unknown seed_id '{sid}'"))
 
             required = _collect_required_seeds(manifest, step_id)
             missing_required = sorted(required - used_seed_ids)
             if missing_required:
-                errors.append(
-                    f"{file_path}: missing required seed_refs for step {step_id}: {', '.join(missing_required)}"
-                )
+                errors.append(make_error(
+                    "E520",
+                    f"{file_path}: missing required seed_refs for step {step_id}: {', '.join(missing_required)}",
+                ))
 
     return errors

@@ -8,6 +8,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from ..core.config import get_config
+from ..core.errors import SpecError, make_error
+from .linter_utils import CONTENT_STOPWORDS, tokenize_free_text
 from .traceability_closure import check_traceability_closure
 
 SPEC_FILE_RE = re.compile(r"spec/(\d{2}[a-z]?)_[a-z0-9_]+\.json$")
@@ -20,7 +23,7 @@ def check_forward_replay(
     diff_error_mode: str = "error",
     git_root: str | None = None,
     spec_root: str | None = None,
-) -> list[str]:
+) -> list[SpecError]:
     """Check that all downstream steps are replayed when an upstream step changes.
 
     Args:
@@ -41,9 +44,9 @@ def check_forward_replay(
             return []
         if diff_error_mode != "error":
             return [
-                f"E550 FORWARD_REPLAY_MISSING invalid_diff_error_mode={diff_error_mode} expected=error|ignore"
+                make_error("E550", f"FORWARD_REPLAY_MISSING invalid_diff_error_mode={diff_error_mode} expected=error|ignore")
             ]
-        return [f"E550 FORWARD_REPLAY_MISSING unable_to_compute_diff base_ref={base_ref} reason={diff_error}"]
+        return [make_error("E550", f"FORWARD_REPLAY_MISSING unable_to_compute_diff base_ref={base_ref} reason={diff_error}")]
     steps, exemptions = _load_steps_and_exemptions(root / "tools" / "step_order.json")
     idx = {s: i for i, s in enumerate(steps)}
     changed_steps = {m.group(1) for p in changed if (m := SPEC_FILE_RE.search(p))}
@@ -69,21 +72,21 @@ def check_forward_replay(
 
     known_changed = sorted([s for s in changed_steps if s in idx], key=lambda x: idx[x])
     changed_set = set(known_changed)
-    errors: list[str] = []
+    errors: list[SpecError] = []
 
     for step in sorted(changed_steps - changed_set):
-        errors.append(f"E550 FORWARD_REPLAY_MISSING unknown_step_in_diff={step}")
+        errors.append(make_error("E550", f"FORWARD_REPLAY_MISSING unknown_step_in_diff={step}"))
 
     for step in known_changed:
         start = idx[step] + 1
         for downstream in steps[start:]:
             if _step_exists(effective_spec_root, downstream) and downstream not in changed_set:
-                errors.append(
-                    f"E550 FORWARD_REPLAY_MISSING changed={step} missing_downstream={downstream}"
-                )
+                errors.append(make_error(
+                    "E550", f"FORWARD_REPLAY_MISSING changed={step} missing_downstream={downstream}"
+                ))
                 break
 
-    staleness_threshold = int(os.environ.get("SPECDEV_STALENESS_THRESHOLD", "3"))
+    staleness_threshold = get_config().staleness_threshold
     semantic_errors = _check_semantic_coverage(
         effective_git_root, set(known_changed), base_ref, effective_spec_root,
         staleness_threshold=staleness_threshold,
@@ -92,23 +95,24 @@ def check_forward_replay(
     
     for err in semantic_errors:
         if err["type"] == "skip":
-            errors.append(f"W550 SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={err['path']}")
+            errors.append(make_error("W550", f"SEMANTIC_COVERAGE_SKIP unable_to_read_base base_ref={err['base_ref']} path={err['path']}"))
         elif err["type"] == "regression":
             dropped_str = ",".join(err["dropped_ids"])
-            errors.append(f"E555 SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}")
+            errors.append(make_error("E555", f"SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}"))
         elif err["type"] == "staleness":
-            errors.append(
-                f"W595 CONTENT_STALENESS upstream={err['upstream_step']} "
+            errors.append(make_error(
+                "W595",
+                f"CONTENT_STALENESS upstream={err['upstream_step']} "
                 f"downstream={err['downstream_step']} "
-                f"new_tokens={err['new_token_count']} reflected=0"
-            )
+                f"new_tokens={err['new_token_count']} reflected=0",
+            ))
 
     tc_errors = check_traceability_closure(str(effective_spec_root), str(root))
-    for err in tc_errors:
-        if err.startswith("E560"):
-            errors.append(err.replace("E560", "W560", 1))
+    for tc_err in tc_errors:
+        if tc_err.code == "E560":
+            errors.append(SpecError(code="W560", message=tc_err.message, path=tc_err.path))
         else:
-            errors.append(err)
+            errors.append(tc_err)
 
     return errors
 
@@ -326,14 +330,6 @@ def _check_semantic_coverage(
     return errors
 
 
-_CONTENT_STOPWORDS = {
-    "that", "this", "with", "from", "have", "will", "been", "were", "they",
-    "their", "than", "each", "which", "when", "what", "there", "about",
-    "would", "make", "like", "into", "only", "also", "most", "some",
-    "could", "should", "does", "must", "shall", "true", "false", "null",
-    "http", "https", "schema", "json", "spec", "step",
-}
-
 # Free-text fields to scan — aligned with hallucination_lint._DERIVATION_FREE_TEXT_FIELDS
 _CONTENT_FREE_TEXT_FIELDS = {
     "description", "statement", "rationale", "justification", "notes",
@@ -359,9 +355,7 @@ def _extract_content_tokens(path: str) -> set[str]:
         if isinstance(obj, dict):
             for k, v in obj.items():
                 if k in _CONTENT_FREE_TEXT_FIELDS and isinstance(v, str):
-                    for word in re.findall(r"[a-z][a-z0-9_-]{3,}", v.lower()):
-                        if word not in _CONTENT_STOPWORDS:
-                            tokens.add(word)
+                    tokens.update(tokenize_free_text(v, stopwords=CONTENT_STOPWORDS))
                 elif isinstance(v, (dict, list)):
                     _crawl(v)
         elif isinstance(obj, list):

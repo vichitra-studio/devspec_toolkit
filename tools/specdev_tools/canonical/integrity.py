@@ -1,3 +1,17 @@
+"""Canonical integrity checker — cross-artifact drift detection.
+
+Scans spec artifacts for canonical references (``cn:`` IDs, ``*_ref``
+objects) and verifies they resolve against the canonical registry.  Also
+detects unresolved semantic candidates that should have a ``*_ref``
+companion and flags partial-drift when the same semantic value maps to
+different canonical IDs across files.
+
+Coupling with ``lint.py``: this module calls ``lint_canon_dir`` as a
+preflight step.  If the canonical directory itself is structurally invalid
+the integrity check short-circuits with those errors.  Once the registry
+passes structural lint, ``integrity.py`` loads it via
+``CanonicalRegistry`` and walks every spec JSON file.
+"""
 from __future__ import annotations
 
 import json
@@ -9,6 +23,7 @@ from urllib.parse import urldefrag, urljoin
 
 from .lint import lint_canon_dir
 from .registry import CanonicalRegistry
+from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
 
 
@@ -18,10 +33,10 @@ def validate_canonical_integrity(
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
-) -> list[str]:
+) -> list[SpecError]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
-        return [f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}"]
+        return [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]
     preflight_errors = lint_canon_dir(
         repo_root,
         canon_dir=canon_dir,
@@ -30,7 +45,7 @@ def validate_canonical_integrity(
     if preflight_errors:
         return _uniq(preflight_errors)
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
-    errors: list[str] = list(registry.load_errors)
+    errors: list[SpecError] = list(registry.load_errors)
     schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
     observed: dict[tuple[str, str], dict[str, list[str]]] = {}
     for path in _iter_json_files(spec_dir_abs):
@@ -39,7 +54,7 @@ def validate_canonical_integrity(
                 data = json.load(f)
         except (OSError, json.JSONDecodeError) as exc:
             rel = os.path.relpath(path, repo_root)
-            errors.append(f"E520 UNRESOLVED_INPUT {rel} invalid_json {exc}")
+            errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
         rel = os.path.relpath(path, repo_root)
         schema, schema_uri, schema_error = _load_document_schema(schema_registry, data, rel, schema_registry_error)
@@ -63,7 +78,7 @@ def validate_canonical_integrity(
         if len(cid_paths) > 1:
             detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                f"E211 PARTIAL_DRIFT kind={kind} value='{value}' {detail}"
+                make_error("E211", f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}")
             )
     return errors
 
@@ -74,7 +89,7 @@ def validate_canonical_integrity_file(
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
-) -> list[str]:
+) -> list[SpecError]:
     preflight_errors = lint_canon_dir(
         repo_root,
         canon_dir=canon_dir,
@@ -83,13 +98,13 @@ def validate_canonical_integrity_file(
     if preflight_errors:
         return _uniq(preflight_errors)
     registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
-    errors: list[str] = list(registry.load_errors)
+    errors: list[SpecError] = list(registry.load_errors)
     schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
-        return [f"E520 UNRESOLVED_INPUT {path} invalid_json {exc}"]
+        return [make_error("E520", f"UNRESOLVED_INPUT {path} invalid_json {exc}")]
 
     schema, schema_uri, schema_error = _load_document_schema(schema_registry, data, path, schema_registry_error)
     if schema_error:
@@ -112,7 +127,7 @@ def validate_canonical_integrity_file(
         if len(cid_paths) > 1:
             detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                f"E211 PARTIAL_DRIFT kind={kind} value='{value}' {detail}"
+                make_error("E211", f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}")
             )
     return errors
 
@@ -124,7 +139,7 @@ def _iter_json_files(spec_dir: str):
                 yield os.path.join(root, fn)
 
 
-def _uniq(messages: list[str]) -> list[str]:
+def _uniq(messages: list[SpecError]) -> list[SpecError]:
     return list(dict.fromkeys(messages))
 
 
@@ -151,12 +166,12 @@ def _validate_document_integrity(
     schema_uri: str | None = None,
     schema_registry: SchemaRegistry | None = None,
     enforce_unresolved_semantics: bool = True,
-) -> list[str]:
-    errors: list[str] = []
+) -> list[SpecError]:
+    errors: list[SpecError] = []
     for ref_path, ref in _collect_canonical_refs(data):
         ref_errors = registry.validate_ref(ref)
         for err in ref_errors:
-            errors.append(f"{err} {rel}:{ref_path}")
+            errors.append(SpecError(code=err.code, message=f"{err.message} {rel}:{ref_path}"))
 
     declared_ids = _collect_declared_canonical_refs(data)
     observed_ids = _collect_used_canonical_ref_ids(data)
@@ -164,11 +179,11 @@ def _validate_document_integrity(
     extra_ids = sorted(declared_ids - observed_ids)
     if missing_ids:
         errors.append(
-            f"E210 CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids}"
+            make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids}")
         )
     if extra_ids:
         errors.append(
-            f"E210 CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids}"
+            make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids}")
         )
     if enforce_unresolved_semantics:
         errors.extend(
@@ -278,12 +293,12 @@ def _validate_unresolved_candidates(
     schema: dict[str, Any] | None = None,
     schema_uri: str | None = None,
     schema_registry: SchemaRegistry | None = None,
-) -> list[str]:
+) -> list[SpecError]:
     if not isinstance(data, dict):
         return []
     proposals = _proposal_index(data.get("canonical_proposals"))
     conflicts = _conflict_index(data.get("canonical_conflicts"))
-    errors: list[str] = []
+    errors: list[SpecError] = []
     for field_path, kind, value in _collect_unresolved_candidates(
         data,
         schema=schema,
@@ -298,7 +313,7 @@ def _validate_unresolved_candidates(
         if (field_path, kind, label) in proposals:
             continue
         errors.append(
-            f"E210 CROSS_ARTIFACT_DRIFT unresolved_canonical_semantic {rel} field={field_path} kind={kind} value={value!r}"
+            make_error("E210", f"CROSS_ARTIFACT_DRIFT unresolved_canonical_semantic {rel} field={field_path} kind={kind} value={value!r}")
         )
     return errors
 
@@ -464,26 +479,26 @@ def _load_document_schema(
     data: Any,
     rel: str,
     schema_registry_error: str | None,
-) -> tuple[dict[str, Any] | None, str | None, str | None]:
+) -> tuple[dict[str, Any] | None, str | None, SpecError | None]:
     if not isinstance(data, dict):
         return None, None, None
     schema_uri = data.get("$schema")
     if schema_uri is None:
         return None, None, None
     if not isinstance(schema_uri, str) or not schema_uri.strip():
-        return None, None, f"E520 UNRESOLVED_INPUT {rel} invalid_schema_uri"
+        return None, None, make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_schema_uri")
     normalized_schema_uri = schema_uri.strip()
     if schema_registry is None:
         detail = schema_registry_error or "unknown"
-        return None, normalized_schema_uri, f"E520 UNRESOLVED_INPUT {rel} schema_registry_bootstrap_failed uri={normalized_schema_uri} detail={detail}"
+        return None, normalized_schema_uri, make_error("E520", f"UNRESOLVED_INPUT {rel} schema_registry_bootstrap_failed uri={normalized_schema_uri} detail={detail}")
     try:
         schema = schema_registry.load(normalized_schema_uri)
     except FileNotFoundError as exc:
-        return None, normalized_schema_uri, f"E520 UNRESOLVED_INPUT {rel} schema_not_found uri={normalized_schema_uri} detail={exc}"
+        return None, normalized_schema_uri, make_error("E520", f"UNRESOLVED_INPUT {rel} schema_not_found uri={normalized_schema_uri} detail={exc}")
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
-        return None, normalized_schema_uri, f"E520 UNRESOLVED_INPUT {rel} schema_load_failed uri={normalized_schema_uri} detail={exc}"
+        return None, normalized_schema_uri, make_error("E520", f"UNRESOLVED_INPUT {rel} schema_load_failed uri={normalized_schema_uri} detail={exc}")
     if not isinstance(schema, dict):
-        return None, normalized_schema_uri, f"E520 UNRESOLVED_INPUT {rel} schema_invalid_root uri={normalized_schema_uri}"
+        return None, normalized_schema_uri, make_error("E520", f"UNRESOLVED_INPUT {rel} schema_invalid_root uri={normalized_schema_uri}")
     return schema, normalized_schema_uri, None
 
 

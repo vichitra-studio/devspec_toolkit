@@ -1,36 +1,35 @@
 from __future__ import annotations
 
-import json
-import os
 from datetime import date
-from typing import Any, Optional, Set
+from typing import Any
+
+from ...core.errors import make_error, SpecError
+from ...core.loaders import load_upstream_ids
+from ...validation.linter_utils import check_no_duplicates
 
 
-def validate_step_09(instance: dict[str, Any], toolkit_root: str) -> list[str]:
-    errors: list[str] = []
-    seen_milestones: set[str] = set()
+def validate_step_09(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+    errors: list[SpecError] = []
+    check_no_duplicates(instance.get("milestones", []), "milestone_id", "milestone_id", errors)
     dates: list[tuple[str, str]] = []
-    for i, milestone in enumerate(instance.get("milestones", [])):
+    for milestone in instance.get("milestones", []):
         milestone_id = milestone.get("milestone_id")
-        if milestone_id in seen_milestones:
-            errors.append(f"Duplicate milestone_id '{milestone_id}' at index {i}")
-        seen_milestones.add(milestone_id)
         target_date = milestone.get("target_date")
         if isinstance(target_date, str):
             try:
                 date.fromisoformat(target_date)
                 dates.append((target_date, milestone_id))
             except ValueError:
-                errors.append(f"Invalid target_date '{target_date}' in milestone '{milestone_id}'")
+                errors.append(make_error("E520", f"Invalid target_date '{target_date}' in milestone '{milestone_id}'"))
     if dates != sorted(dates, key=lambda x: x[0]):
-        errors.append("Milestone target_date values are not ordered")
+        errors.append(make_error("E520", "Milestone target_date values are not ordered"))
 
     # Cross-step capability reference validation
-    capability_ids = _load_capability_ids(toolkit_root)
+    capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id")
     if capability_ids is None:
         errors.append(
-            "W590 CROSS_STEP_UPSTREAM_MISSING 01_capabilities.json not found; "
-            "skipping capability reference validation"
+            make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 01_capabilities.json not found; "
+            "skipping capability reference validation")
         )
     else:
         for milestone in instance.get("milestones", []):
@@ -41,31 +40,9 @@ def validate_step_09(instance: dict[str, Any], toolkit_root: str) -> list[str]:
                     cap_ref = ref_obj.get("id")
                     if isinstance(cap_ref, str) and cap_ref not in capability_ids:
                         errors.append(
-                            f"E590 CROSS_STEP_ID_NOT_FOUND milestone "
+                            make_error("E590", f"CROSS_STEP_ID_NOT_FOUND milestone "
                             f"'{milestone_id}' references unknown capability "
-                            f"'{cap_ref}' (not in 01_capabilities.json)"
+                            f"'{cap_ref}' (not in 01_capabilities.json)")
                         )
 
     return errors
-
-
-def _load_capability_ids(toolkit_root: str) -> Optional[Set[str]]:
-    """Load capability IDs from step 01 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("01_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return {
-                    cap.get("capability_id")
-                    for cap in data.get("capabilities", [])
-                    if isinstance(cap, dict) and cap.get("capability_id")
-                }
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
