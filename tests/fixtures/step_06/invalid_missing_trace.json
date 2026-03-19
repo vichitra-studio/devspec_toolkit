@@ -3,15 +3,6 @@
   "id": "invariants-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
   "rules": [
     {
       "inv_id": "invariant-user-authentication",
@@ -30,11 +21,5 @@
       "severity": "error"
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

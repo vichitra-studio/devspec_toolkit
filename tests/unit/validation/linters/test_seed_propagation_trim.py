@@ -1,4 +1,4 @@
-"""Tests for seed propagation trim: seeds feed Steps 00-04 only."""
+"""Tests for seed propagation trim: manifest, prompt, and helper validation."""
 
 from __future__ import annotations
 
@@ -82,108 +82,7 @@ def _make_project(
 
 
 class TestSeedPropagationTrim(unittest.TestCase):
-    """Verify that seed requirements only apply to Steps 00-04."""
-
-    def test_steps_00_04_require_seeds(self):
-        """Steps 00-04 with missing seed_refs should produce errors."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {
-                "00": ["seed-overview", "seed-tech-stack"],
-                "01": ["seed-overview"],
-                "04": ["seed-overview"],
-            }
-            spec_files = {
-                # Step 00 artifact missing required seed_refs
-                "00_charter.json": {
-                    "seed_refs": [],
-                    "goals": [{"goal_id": "goal-alpha"}],
-                },
-            }
-            spec_dir, _ = _make_project(
-                tmpdir, step_requirements=step_reqs, spec_files=spec_files
-            )
-            errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
-            missing = [e for e in render_errors(errors) if "missing required seed_refs" in e and "step 00" in e]
-            self.assertTrue(
-                len(missing) > 0,
-                f"Expected missing seed_refs error for step 00. Got: {errors}",
-            )
-
-    def test_steps_05_plus_no_seed_requirement(self):
-        """Steps 05+ with empty seed_refs should produce NO errors."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {
-                "00": ["seed-overview", "seed-tech-stack"],
-                "01": ["seed-overview"],
-            }
-            spec_files = {
-                "05_interface_contracts.json": {
-                    "seed_refs": [],
-                    "interfaces": [],
-                },
-                "07_nfrs.json": {
-                    "seed_refs": [],
-                    "nfrs": [],
-                },
-                "09_impl_plan.json": {
-                    "seed_refs": [],
-                    "milestones": [],
-                },
-            }
-            spec_dir, _ = _make_project(
-                tmpdir, step_requirements=step_reqs, spec_files=spec_files
-            )
-            errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
-            seed_errors = [
-                e
-                for e in render_errors(errors)
-                if "missing required seed_refs" in e
-                and any(s in e for s in ("step 05", "step 07", "step 09"))
-            ]
-            self.assertEqual(
-                seed_errors,
-                [],
-                f"Steps 05+ should not require seeds. Got: {seed_errors}",
-            )
-
-    def test_global_seed_order_only_applies_to_required_steps(self):
-        """global_seed_order should only be enforced for steps in step_requirements."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {"00": ["seed-overview"]}
-            spec_files = {
-                # Step 05 with empty seed_refs — should be fine
-                "05_interface_contracts.json": {
-                    "seed_refs": [],
-                    "interfaces": [],
-                },
-                # Step 00 without seed-overview — should error
-                "00_charter.json": {
-                    "seed_refs": [],
-                    "goals": [{"goal_id": "goal-alpha"}],
-                },
-            }
-            spec_dir, _ = _make_project(
-                tmpdir,
-                step_requirements=step_reqs,
-                global_seed_order=["seed-overview"],
-                spec_files=spec_files,
-            )
-            errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
-            step_05_errors = [
-                e for e in render_errors(errors) if "missing required seed_refs" in e and "step 05" in e
-            ]
-            step_00_errors = [
-                e for e in render_errors(errors) if "missing required seed_refs" in e and "step 00" in e
-            ]
-            self.assertEqual(
-                step_05_errors,
-                [],
-                f"Step 05 should not require seeds. Got: {step_05_errors}",
-            )
-            self.assertTrue(
-                len(step_00_errors) > 0,
-                f"Step 00 should require seeds. Got: {errors}",
-            )
+    """Verify seed manifest and prompt lint functionality."""
 
     def test_lint_prompt_refs_step_aware(self):
         """Prompt lint should only enforce seed sections for seed-required steps."""
@@ -247,32 +146,6 @@ class TestSeedPropagationTrim(unittest.TestCase):
         self.assertIn("seed-overview", result)
         self.assertIn("seed-tech-stack", result)
 
-    def test_empty_seed_refs_valid_in_spec_artifact(self):
-        """Spec artifacts with empty seed_refs should not trigger seed_refs errors."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {"00": ["seed-overview"]}
-            spec_files = {
-                "05_interface_contracts.json": {
-                    "seed_refs": [],
-                    "description": "testing empty seed refs",
-                },
-            }
-            spec_dir, _ = _make_project(
-                tmpdir, step_requirements=step_reqs, spec_files=spec_files
-            )
-            errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
-            seed_ref_errors = [
-                e
-                for e in render_errors(errors)
-                if "seed_refs" in e and "05_interface" in e
-            ]
-            self.assertEqual(
-                seed_ref_errors,
-                [],
-                f"Empty seed_refs for step 05 should be valid. Got: {seed_ref_errors}",
-            )
-
-
     def test_step_16_no_sub_steps_in_requirements(self):
         """Step 16 with no 16a/16b/16c in step_requirements should require no seeds."""
         manifest = {
@@ -281,27 +154,6 @@ class TestSeedPropagationTrim(unittest.TestCase):
         }
         result = _collect_required_seeds(manifest, "16")
         self.assertEqual(result, set(), f"Step 16 should have no required seeds. Got: {result}")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {"00": ["seed-overview"]}
-            spec_files = {
-                "16_impl_context.json": {
-                    "seed_refs": [],
-                    "context": [],
-                },
-            }
-            spec_dir, _ = _make_project(
-                tmpdir, step_requirements=step_reqs, spec_files=spec_files
-            )
-            errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
-            step_16_errors = [
-                e for e in render_errors(errors) if "missing required seed_refs" in e and "step 16" in e
-            ]
-            self.assertEqual(
-                step_16_errors,
-                [],
-                f"Step 16 should not require seeds when 16a/16b/16c absent. Got: {step_16_errors}",
-            )
 
     def test_lint_prompt_refs_manifest_none(self):
         """_lint_prompt_manifest_refs with manifest=None emits warning, not seed errors."""
@@ -360,39 +212,6 @@ class TestSeedPropagationTrim(unittest.TestCase):
                 len(step_00_errors) > 0,
                 f"Expected error about missing seed section for step 00 prompt. Got: {errors}",
             )
-
-    def test_empty_seed_refs_passes_json_schema(self):
-        """An empty seed_refs array should pass JSON Schema validation against seedRefArray."""
-        from pathlib import Path
-
-        from jsonschema import Draft202012Validator
-
-        from specdev_tools.core.registry import SchemaRegistry
-        from specdev_tools.validation.validate import _registry_for
-
-        repo_root = Path(__file__).resolve().parents[4]
-        registry = SchemaRegistry(str(repo_root))
-        jsonschema_registry = _registry_for(registry)
-
-        collections_path = repo_root / "schema" / "core" / "collections.schema.json"
-        with collections_path.open("r", encoding="utf-8") as f:
-            collections_schema = json.load(f)
-
-        seed_ref_array_schema = collections_schema["$defs"]["seedRefArray"]
-        # Resolve relative to the parent schema $id
-        seed_ref_array_schema.setdefault("$id", collections_schema["$id"] + "#seedRefArray")
-
-        validator = Draft202012Validator(
-            seed_ref_array_schema,
-            registry=jsonschema_registry,
-        )
-        # Empty array should validate without error
-        errors = list(validator.iter_errors([]))
-        self.assertEqual(
-            errors,
-            [],
-            f"Empty seed_refs should pass seedRefArray validation. Got: {errors}",
-        )
 
 
 if __name__ == "__main__":

@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -69,7 +58,7 @@ For each upstream artifact ingested, extract the following:
 - **11_redteam.json**: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
 - **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
 - **13_extension_generator.json**: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
-- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to populate coverage_gaps and inform scope boundary decisions
+- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
 - **14_roadmap.json**: Milestone identifiers, deliverables, scheduling, and status fields used to drive checklist coverage mapping and roadmap sync updates
 - **15_scaffold.json**: Generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
 
@@ -207,7 +196,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
@@ -266,10 +254,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -281,24 +268,37 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "step-16-example",
   "owner": "system",
   "created_at": "2026-02-08T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
       "functional_summary": "Implement Core Authentication flow.",
-      "scope_in": ["Login", "Logout", "Session Management"],
-      "scope_out": ["OAuth", "MFA"],
-      "target_file_patterns": ["src/auth/*.py", "tests/auth/*.py"]
+      "scope_in": [
+        "Login",
+        "Logout",
+        "Session Management"
+      ],
+      "scope_out": [
+        "OAuth",
+        "MFA"
+      ],
+      "target_file_patterns": [
+        "src/auth/*.py",
+        "tests/auth/*.py"
+      ]
     },
     "docs_impact": {
       "status": "required",
       "rationale": "New auth module requires API documentation updates.",
-      "docs_touched": ["docs/api/auth.md"]
+      "docs_touched": [
+        "docs/api/auth.md"
+      ]
     },
     "spec_alignment": {
       "requirements_summary": [
-        { "theme": "Security", "summary": "Implement JWT handling" }
+        {
+          "theme": "Security",
+          "summary": "Implement JWT handling"
+        }
       ],
       "checklist": [
         {
@@ -311,12 +311,16 @@ This step's output artifact MUST include every field listed in the schema's `req
           },
           "description": "User can login with valid credentials.",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_login_success",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
           "implementation": {
             "status": "pending",
-            "files_touched": ["src/auth/login.py"],
+            "files_touched": [
+              "src/auth/login.py"
+            ],
             "actions": [
               {
                 "type": "file_create",
@@ -335,29 +339,48 @@ This step's output artifact MUST include every field listed in the schema's `req
         "source": "spec",
         "severity": "non_blocking",
         "mitigation": "Default to in-memory for MVP, Redis for production",
-        "impact": ["session-management"],
+        "impact": [
+          "session-management"
+        ],
         "status": "resolved"
       }
     ],
     "solution": {
       "architecture_sketch": "Flask Blueprint with JWT extended.",
-      "sequence_of_concerns": ["Models", "Views", "Tests"],
-      "risks": ["Token leakage in logs"]
+      "sequence_of_concerns": [
+        "Models",
+        "Views",
+        "Tests"
+      ],
+      "risks": [
+        "Token leakage in logs"
+      ]
     },
     "context": {
       "existing_structures": [
-         { "signature": "class User(db.Model)", "source_file": "src/models.py", "line_range": "L1-L50" }
+        {
+          "signature": "class User(db.Model)",
+          "source_file": "src/models.py",
+          "line_range": "L1-L50"
+        }
       ]
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/auth"]
+      "test_commands": [
+        "pytest tests/auth"
+      ]
     },
     "security": {
       "status": "planned",
-      "new_fixtures": ["fix-auth-token-leak"],
+      "new_fixtures": [
+        "fix-auth-token-leak"
+      ],
       "spec_mutations": [
         {
-          "ref": { "type": "nfr", "id": "nfr-sec-01" },
+          "ref": {
+            "type": "nfr",
+            "id": "nfr-sec-01"
+          },
           "change": "Add token rotation requirement",
           "reason": "Mitigate token replay attacks"
         }
@@ -381,7 +404,10 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   },
   "execution": {
-    "files_touched": ["src/auth/login.py", "tests/auth/test_login.py"],
+    "files_touched": [
+      "src/auth/login.py",
+      "tests/auth/test_login.py"
+    ],
     "execution_results": [
       {
         "status": "passed",
@@ -399,8 +425,12 @@ This step's output artifact MUST include every field listed in the schema's `req
       }
     ],
     "critical_evidence": {
-      "satisfied_checklist_ids": ["CHK_AUTH_01"],
-      "passed_test_commands": ["pytest tests/auth"]
+      "satisfied_checklist_ids": [
+        "CHK_AUTH_01"
+      ],
+      "passed_test_commands": [
+        "pytest tests/auth"
+      ]
     }
   },
   "review": {
@@ -416,7 +446,9 @@ This step's output artifact MUST include every field listed in the schema's `req
           "commit_hash": "b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4"
         },
         "description": "API documentation missing error response codes",
-        "related_checklist_ids": ["CHK_AUTH_01"],
+        "related_checklist_ids": [
+          "CHK_AUTH_01"
+        ],
         "metadata": {
           "source": "reviewer",
           "impact": "Documentation completeness"
@@ -438,14 +470,18 @@ This step's output artifact MUST include every field listed in the schema's `req
           "fr_id": "fr-auth-login",
           "satisfied": true,
           "evidence_summary": "Login handler implemented with JWT token generation and validation, confirmed by passing pytest tests/auth/test_login.py::test_login_success",
-          "checklist_ids": ["chk-auth-01"]
+          "checklist_ids": [
+            "chk-auth-01"
+          ]
         }
       ],
       "hallucinated_features": [],
       "scope_delta": "No scope creep detected; implementation matches plan exactly."
     },
     "fixture_status": {
-      "implemented_endpoints": ["api-auth-login"],
+      "implemented_interfaces": [
+        "api-auth-login"
+      ],
       "test_results": [
         {
           "fixture_ref": "fix-auth-login-success",
@@ -456,14 +492,7 @@ This step's output artifact MUST include every field listed in the schema's `req
       "ci_status": "green"
     }
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
-
+  "canonical_refs_used": []
 }
 ```
 

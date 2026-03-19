@@ -3,12 +3,6 @@
   "id": "step-impl-verified-no-fixture-status",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -92,11 +86,5 @@
       "scope_delta": "No scope changes detected"
     }
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

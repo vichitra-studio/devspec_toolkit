@@ -2,137 +2,109 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/01_capabilities.schema.json",
   "title": "01_capabilities",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "capabilities": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "capability_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "verb": {
-            "type": "string",
-            "minLength": 2
-          },
-          "description": {
-            "type": "string"
-          },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "in",
-              "out",
-              "future"
+    {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "description": "Array of system capabilities derived from the charter, each with scope and traceability.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single capability describing what the system can do, with inputs, outputs, and error states.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "capability_id": {
+                "description": "Unique kebab-case identifier for this capability (e.g., 'cap-user-login').",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "verb": {
+                "description": "Action verb describing the capability (e.g., 'authenticate', 'create').",
+                "type": "string",
+                "minLength": 2
+              },
+              "description": {
+                "description": "Human-readable explanation of what this capability does.",
+                "type": "string"
+              },
+              "scope": {
+                "description": "Whether this capability is in-scope, out-of-scope, or planned for future delivery.",
+                "type": "string",
+                "enum": [
+                  "in",
+                  "out",
+                  "future"
+                ]
+              },
+              "owner": {
+                "description": "Team or domain responsible for implementing this capability.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+              },
+              "inputs": {
+                "description": "Data or signals required to exercise this capability.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "outputs": {
+                "description": "Data or effects produced when this capability executes successfully.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "preconditions": {
+                "description": "Conditions that must be true before this capability can execute.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "postconditions": {
+                "description": "Conditions guaranteed to be true after successful execution of this capability.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "error_states": {
+                "description": "Possible error conditions that may arise during capability execution.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/errors/1#errorState"
+                }
+              },
+              "trace": {
+                "description": "Traceability links back to upstream artifacts (e.g., charter segments, stakeholders).",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                }
+              },
+              "capability_ref": {
+                "description": "Canonical reference linking this capability to the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "action_ref": {
+                "description": "Canonical reference to the action verb used in this capability.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the primary entity this capability operates on.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "role_ref": {
+                "description": "Canonical reference to the role that exercises this capability.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              }
+            },
+            "required": [
+              "capability_id",
+              "verb",
+              "scope",
+              "capability_ref",
+              "trace"
             ]
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "inputs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "outputs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "preconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "postconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "error_states": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/errors/1#errorState"
-            }
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "capability_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "action_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "role_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
-        },
-        "required": [
-          "capability_id",
-          "verb",
-          "scope",
-          "capability_ref",
-          "trace"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "capabilities"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "capabilities",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

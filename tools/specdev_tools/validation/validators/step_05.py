@@ -14,7 +14,7 @@ def validate_step_05(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     for i, api in enumerate(instance.get("apis", [])):
         api_id = api.get("api_id")
         method = api.get("method")
-        route = api.get("route") or api.get("path")  # schema uses 'route'; fallback for backward compat
+        route = api.get("path") or api.get("route")  # schema uses 'path'; fallback for backward compat
         if method and route:
             key = (method, route)
             if key in seen_method_route:

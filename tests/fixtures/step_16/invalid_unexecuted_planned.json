@@ -3,12 +3,6 @@
   "id": "step-impl-unexecuted-planned",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -86,11 +80,5 @@
       "satisfied_checklist_ids": []
     }
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

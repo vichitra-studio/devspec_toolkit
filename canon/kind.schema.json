@@ -7,20 +7,24 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "JSON Schema URI identifying the schema this kind registry file conforms to."
     },
     "registry_version": {
-      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver"
+      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver",
+      "description": "Semantic version of the canonical registry format for this kind file."
     },
     "kind": {
       "type": "string",
-      "pattern": "^[a-z_][a-z0-9_]*$"
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "description": "Lowercase identifier for the canonical kind category defined in this file (e.g., unit, owner, stage)."
     },
     "entries": {
       "type": "array",
       "items": {
         "$ref": "https://specdev.local/schema/core/canon/1#/$defs/entry"
-      }
+      },
+      "description": "Array of canonical entries belonging to this kind, each validated against the core canon entry schema."
     }
   },
   "required": [

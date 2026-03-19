@@ -2,270 +2,251 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/14_roadmap.schema.json",
   "title": "14_roadmap",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "tech_stack": {
-      "allOf": [
-        {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStack"
-        },
-        {
-          "required": [
-            "languages",
-            "frameworks"
+    {
+      "type": "object",
+      "properties": {
+        "tech_stack": {
+          "description": "Technology stack for the roadmap, at minimum specifying languages and frameworks.",
+          "allOf": [
+            {
+              "$ref": "https://specdev.local/schema/core/collections/1#techStack"
+            },
+            {
+              "required": [
+                "languages",
+                "frameworks"
+              ]
+            }
           ]
-        }
-      ]
-    },
-    "tech_stack_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "milestones": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "milestone_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "target_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "in_progress",
-              "done",
-              "deferred"
-            ],
-            "default": "pending"
-          },
-          "risk_status": {
-            "type": "string",
-            "enum": [
-              "low",
-              "medium",
-              "high",
-              "critical"
-            ],
-            "default": "low"
-          },
-          "user_story": {
-            "type": "string",
-            "description": "The specific user story this milestone addresses."
-          },
-          "source_milestones": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
-            "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
-          },
-          "fr_refs": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^fr-[a-z0-9-]+$"
-            },
-            "description": "FR IDs from spec/04_fr_list.json that this milestone delivers."
-          },
-          "capability_refs": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^cap-[a-z0-9-]+$"
-            },
-            "description": "Capability IDs from spec/01_capabilities.json that this milestone implements."
-          },
-          "tasks": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "task_id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "description": {
+        },
+        "tech_stack_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the technology stack in the registry."
+        },
+        "milestones": {
+          "type": "array",
+          "description": "Ordered roadmap milestones with user stories, tasks, and deliverables.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "milestone_id": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "description": "Unique kebab-case identifier for this milestone."
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable name of the milestone."
+              },
+              "target_date": {
+                "type": "string",
+                "format": "date",
+                "description": "Planned completion date for this milestone (ISO 8601 date)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "done",
+                  "deferred"
+                ],
+                "default": "pending",
+                "description": "Current progress status of the milestone."
+              },
+              "risk_status": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ],
+                "default": "low",
+                "description": "Risk level associated with this milestone."
+              },
+              "user_story": {
+                "type": "string",
+                "description": "The specific user story this milestone addresses."
+              },
+              "source_milestones": {
+                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
+              },
+              "fr_refs": {
+                "type": "array",
+                "items": {
                   "type": "string",
-                  "pattern": "^\\S+\\s+\\S+.*$"
+                  "pattern": "^fr-[a-z0-9-]+$"
                 },
-                "acceptance_criteria": {
-                  "type": "array",
-                  "minItems": 1,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "criterion_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "description": "FR IDs from spec/04_fr_list.json that this milestone delivers."
+              },
+              "capability_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^cap-[a-z0-9-]+$"
+                },
+                "description": "Capability IDs from spec/01_capabilities.json that this milestone implements."
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "task_id": {
+                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                      "description": "Unique kebab-case identifier for this task."
+                    },
+                    "description": {
+                      "type": "string",
+                      "pattern": "^\\S+\\s+\\S+.*$",
+                      "description": "Description of the task (must contain at least two words)."
+                    },
+                    "acceptance_criteria": {
+                      "type": "array",
+                      "description": "Criteria that must be met for this task to be considered complete.",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "criterion_id": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "Unique kebab-case identifier for this acceptance criterion."
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 15,
+                            "description": "Full text of the acceptance criterion (minimum 15 characters)."
+                          },
+                          "fixture_ref": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "Reference to a fixture that validates this criterion."
+                          }
+                        },
+                        "required": [
+                          "criterion_id",
+                          "text"
+                        ]
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "in_progress",
+                        "done"
+                      ],
+                      "description": "Current progress status of the task."
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the status value in the registry."
+                    },
+                    "environment_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the target environment of this task."
+                    },
+                    "metric_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the metric used to measure task completion."
+                    },
+                    "depends_on": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
                       },
-                      "text": {
+                      "description": "task_ids this task depends on (within same milestone). Must not create cycles."
+                    },
+                    "assumptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 10
+                      },
+                      "description": "Assumptions that must hold for this task to succeed."
+                    },
+                    "exit_conditions": {
+                      "type": "array",
+                      "items": {
                         "type": "string",
                         "minLength": 15
                       },
-                      "fixture_ref": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                      }
-                    },
-                    "required": [
-                      "criterion_id",
-                      "text"
-                    ]
-                  }
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "pending",
-                    "in_progress",
-                    "done"
+                      "description": "Conditions that definitively mark this task complete."
+                    }
+                  },
+                  "required": [
+                    "task_id",
+                    "description"
                   ]
                 },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                },
-                "environment_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                },
-                "metric_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                },
-                "depends_on": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "task_ids this task depends on (within same milestone). Must not create cycles."
-                },
-                "assumptions": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 10
-                  },
-                  "description": "Assumptions that must hold for this task to succeed."
-                },
-                "exit_conditions": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 15
-                  },
-                  "description": "Conditions that definitively mark this task complete."
+                "description": "Atomic sub-tasks required to complete the user story."
+              },
+              "deliverables": {
+                "type": "array",
+                "description": "Trace references to artifacts this milestone will produce.",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
                 }
               },
-              "required": [
-                "task_id",
-                "description"
-              ]
+              "risks": {
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "description": "Known risks that could delay or block this milestone."
+              },
+              "spikes": {
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "description": "Technical spikes or investigations required before work can proceed."
+              },
+              "status_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the milestone status in the registry."
+              }
             },
-            "description": "Atomic sub-tasks required to complete the user story."
-          },
-          "deliverables": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "risks": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "spikes": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+            "required": [
+              "milestone_id",
+              "name",
+              "target_date",
+              "user_story",
+              "source_milestones",
+              "tasks",
+              "deliverables",
+              "fr_refs",
+              "capability_refs"
+            ]
           }
         },
-        "required": [
-          "milestone_id",
-          "name",
-          "target_date",
-          "user_story",
-          "source_milestones",
-          "tasks",
-          "deliverables",
-          "fr_refs",
-          "capability_refs"
-        ]
-      }
-    },
-    "migration_plan": {
-      "type": "string",
-      "minLength": 1
-    },
-    "dependencies": {
-      "$ref": "https://specdev.local/schema/core/collections/1#dependencyObjectList"
-    },
-    "dependency_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        "migration_plan": {
+          "type": "string",
+          "minLength": 1,
+          "description": "High-level strategy for migrating from existing systems or data."
+        },
+        "dependencies": {
+          "$ref": "https://specdev.local/schema/core/collections/1#dependencyObjectList",
+          "description": "External or internal dependencies required by the roadmap."
+        },
+        "dependency_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the dependency list in the registry."
+        },
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting this roadmap to related artifacts.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+          }
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "tech_stack",
+        "milestones"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "tech_stack",
-    "milestones",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

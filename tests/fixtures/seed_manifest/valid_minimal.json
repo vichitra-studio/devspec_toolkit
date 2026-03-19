@@ -7,14 +7,6 @@
   "global_seed_order": [
     "seed-overview"
   ],
-  "nested_order": [
-    {
-      "level_id": "foundation",
-      "seed_ids": [
-        "seed-overview"
-      ]
-    }
-  ],
   "seeds": [
     {
       "seed_id": "seed-overview",
@@ -29,25 +21,5 @@
       "seed-overview"
     ]
   },
-  "docs_policy": {
-    "readme_required": true,
-    "root_readme_required": true,
-    "scope": [
-      "devspec_toolkit/"
-    ],
-    "exclusions": [
-      "devspec_toolkit/node_modules/"
-    ],
-    "doc_paths": [
-      "docs/**",
-      "README.md",
-      "CHANGELOG.md"
-    ]
-  },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }

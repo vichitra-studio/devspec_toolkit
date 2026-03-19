@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -92,14 +81,12 @@ For each upstream artifact ingested, extract the following:
   - **Rationale Fields**: Must be populated for all `tech_stack` choices and `roadmap` items. Empty rationale = incomplete.
 
 ## Self-Audit Gate (do not output)
-- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - Gating items:
   - Can read at least 00, 01, 04, 05.
   - Identification of at least one missing element OR confirmation of 100% completeness.
   - Ratings provided for current implementation state.
 - **Extension Check**: Ensure all extensions in manifest are present.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
-
 
 ### Coverage Closure
 Before emitting, verify:
@@ -111,7 +98,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 ## Negative Constraints
 - **DO NOT** rate completeness as 10/10 if any "TBD" values exist.
@@ -149,8 +135,6 @@ Before emitting, verify:
 - Missing elements array is exhaustive based on the review.
 - Priority and impact are assigned to every missing element.
 - Completeness rating reflects the calculated reality.
-
-
 
 ## Best Practices
 - **Recommendations**: Provide specific, actionable recommendations for each missing element (what to add, where).
@@ -193,10 +177,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -208,22 +191,13 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "assessment-20250101",
   "owner": "system",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "missing_elements": [],
   "completeness_rating": {
     "current": 10,
     "target": 10,
     "confidence_level": 1.0
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
-
+  "canonical_refs_used": []
 }
 ```
 

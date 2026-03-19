@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -87,7 +76,6 @@ For each upstream artifact ingested, extract the following:
 - **Ignoring Flow**: Extensions are for domain-specific verticals that require dedicated data models (AI/ML pipelines, complex data schemas, compliance frameworks), not horizontal layers (Frontend, Backend) already covered by core specs.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
 
-
 ### Coverage Closure
 Before emitting, verify:
 - Every complex domain identified in `spec/02_system_sketch.json` components (event sourcing, CQRS, multi-tenancy, etc.) has been evaluated for whether an extension spec is needed.
@@ -98,7 +86,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 ## Negative Constraints
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
@@ -138,10 +125,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -153,8 +139,6 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "13-extension-manifest",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "extensions": [
     {
       "extension_id": "ext-01-database",
@@ -175,18 +159,12 @@ This step's output artifact MUST include every field listed in the schema's `req
       }
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:governance_label:mandatory",
       "kind": "governance_label"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }
 ```
 

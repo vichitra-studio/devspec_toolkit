@@ -135,7 +135,7 @@ Defined in `spec/common/seed_manifest.json`.
 | `03` | `seed-overview` |
 | `04` | `seed-overview` |
 
-Steps not listed (05-16c) have no seed requirements. Prompts and spec schemas for those steps enforce `seed_refs: []` -- the `seed-lint` command validates this constraint.
+Steps not listed (05-16c) have no seed requirements. The `seed-lint` command validates that only steps within the seed boundary (00-04) reference seed documents.
 
 **Seed inventory:**
 
@@ -190,7 +190,7 @@ The required sequence after any spec edit:
 
 ```
 1. validate          -- JSON Schema validation of the changed artifact
-2. seed-lint         -- verify seed_refs match seed_manifest step_requirements
+2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
 3. docs-lint         -- check README coverage per docs_policy
 4. matrix            -- regenerate trace_matrix.json (if traceability changed)
 5. fixtures-lint     -- verify fixture targets resolve (after matrix rebuild)

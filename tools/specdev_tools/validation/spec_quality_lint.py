@@ -176,11 +176,7 @@ def _check_required_top_level(rel: str, data: dict[str, Any]) -> list[SpecError]
         "id",
         "owner",
         "created_at",
-        "seed_refs",
-        "generation_quality",
         "canonical_refs_used",
-        "canonical_proposals",
-        "canonical_conflicts",
     ):
         if key not in data:
             errs.append(make_error("E520", f"UNRESOLVED_INPUT {rel} missing top-level '{key}'"))

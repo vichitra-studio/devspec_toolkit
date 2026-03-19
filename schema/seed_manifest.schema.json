@@ -6,20 +6,25 @@
   "additionalProperties": false,
   "properties": {
     "seed_manifest_id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+      "description": "Unique kebab-case identifier for this seed manifest instance."
     },
     "version": {
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the seed manifest format."
     },
     "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp",
+      "description": "ISO 8601 timestamp when this seed manifest was initially created."
     },
     "last_updated": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp",
+      "description": "ISO 8601 timestamp when this seed manifest was last modified."
     },
     "global_seed_order": {
-      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+      "description": "Ordered array of seed IDs defining the default ingestion sequence across all pipeline steps."
     },
     "nested_order": {
       "type": "array",
@@ -29,20 +34,25 @@
         "additionalProperties": false,
         "properties": {
           "level_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "description": "Kebab-case identifier for this nesting level (e.g., foundation, domain, detail)."
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable description of what seeds at this level provide."
           },
           "seed_ids": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+            "description": "Ordered array of seed IDs belonging to this nesting level."
           }
         },
         "required": [
           "level_id",
           "seed_ids"
-        ]
-      }
+        ],
+        "description": "A nesting level defining a group of seeds at a specific hierarchy tier."
+      },
+      "description": "Hierarchical ordering of seeds into named levels for multi-tier ingestion."
     },
     "seeds": {
       "type": "array",
@@ -52,18 +62,22 @@
         "additionalProperties": false,
         "properties": {
           "seed_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "description": "Unique kebab-case identifier for this seed document."
           },
           "path": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "File path to the seed document relative to the repository root."
           },
           "description": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Human-readable summary of what this seed document contains."
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether this seed document must be present for pipeline execution."
           },
           "source_type": {
             "type": "string",
@@ -72,7 +86,8 @@
               "spec",
               "config",
               "other"
-            ]
+            ],
+            "description": "Category of the seed source: doc (documentation), spec (specification), config (configuration), or other."
           }
         },
         "required": [
@@ -81,52 +96,64 @@
           "description",
           "required",
           "source_type"
-        ]
-      }
+        ],
+        "description": "A seed document definition with path, source type, and required flag."
+      },
+      "description": "Array of seed document definitions, each describing a source document available for ingestion."
     },
     "step_requirements": {
       "type": "object",
       "patternProperties": {
         "^(\\d{2}[a-z]?)$": {
+          "description": "Array of seed IDs required for this pipeline step.",
           "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Map from pipeline step numbers to arrays of seed IDs required for that step."
     },
     "docs_policy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "readme_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether README files are required in scoped directories."
         },
         "root_readme_required": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether a root-level README file is required in the repository."
         },
         "readme_depth_default": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Default directory depth at which README requirements apply (0 = root only)."
         },
         "readme_depth_by_scope": {
           "type": "object",
           "patternProperties": {
             "^.+/$": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "README depth override for this directory scope (0 = root only)."
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "description": "Per-scope overrides for README depth requirements, keyed by directory path suffix."
         },
         "scope": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-          "minItems": 1
+          "minItems": 1,
+          "description": "Array of directory paths that are in scope for documentation coverage checks."
         },
         "exclusions": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "description": "Array of directory paths or patterns excluded from documentation coverage checks."
         },
         "doc_paths": {
           "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-          "minItems": 1
+          "minItems": 1,
+          "description": "Array of paths where documentation files are expected to be found."
         }
       },
       "required": [
@@ -137,7 +164,8 @@
         "scope",
         "exclusions",
         "doc_paths"
-      ]
+      ],
+      "description": "Policy configuration for documentation coverage enforcement (README requirements, scoping, exclusions)."
     }
   },
   "required": [
@@ -146,9 +174,7 @@
     "created_at",
     "last_updated",
     "global_seed_order",
-    "nested_order",
     "seeds",
-    "step_requirements",
-    "docs_policy"
+    "step_requirements"
   ]
 }

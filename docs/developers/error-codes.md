@@ -16,7 +16,7 @@
 
 ### E511 PLACEHOLDER_SCAN_MISMATCH
 
-**Removed in v0.4.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The `placeholder_scan` sub-field of `generation_quality` has been removed.
+**Removed in v0.4.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
 
 ### E561 / W561 UNCOVERED_FR
 
@@ -44,17 +44,17 @@
 
 ### E150 / W150 SEED_MANIFEST_NOT_PROVIDED
 
-**Trigger**: A spec artifact's `seed_refs` section is empty or absent, but the step's prompt requires seed document references.
+**Trigger**: A step listed in `seed_manifest.json`'s `step_requirements` has no corresponding seed documents available, or a step outside the seed boundary (05+) incorrectly references seeds.
 
-**Resolution**: Add the appropriate `seed_refs` entries pointing to seed documents consumed by the artifact.
+**Resolution**: Ensure the step's required seeds (as declared in `spec/common/seed_manifest.json` → `step_requirements`) are present and accessible.
 
 **Promotable**: W150 → E150.
 
 ### W140 SEED_CONTENT_OVERLAP_LOW
 
-**Trigger**: A spec artifact declares a `seed_ref` but shares fewer than 3 content tokens with the referenced seed document.
+**Trigger**: A spec artifact for a seed-consuming step (00–04) shares fewer than 3 content tokens with the seed documents required by `seed_manifest.json`.
 
-**Resolution**: Either use content from the referenced seed in the artifact or remove the unused `seed_ref`.
+**Resolution**: Either incorporate content from the required seed documents into the artifact or review whether the step truly depends on those seeds.
 
 ### E581 / W581 MILESTONE_REF_MISSING
 

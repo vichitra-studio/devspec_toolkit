@@ -9,7 +9,8 @@ from specdev_tools.validation.seed_lint import lint_seeds
 from specdev_tools.core.errors import render_errors
 
 
-def _make_project(tmpdir, spec_data=None, seed_text="", seed_id="seed-overview"):
+def _make_project(tmpdir, spec_data=None, seed_text="", seed_id="seed-overview",
+                  step_requirements=None):
     """Create a minimal project structure for seed lint testing."""
     spec_dir = os.path.join(tmpdir, "spec")
     os.makedirs(os.path.join(spec_dir, "common"), exist_ok=True)
@@ -27,7 +28,7 @@ def _make_project(tmpdir, spec_data=None, seed_text="", seed_id="seed-overview")
         ],
         "global_seed_order": [seed_id],
         "nested_order": [],
-        "step_requirements": {},
+        "step_requirements": step_requirements or {},
         "docs_policy": {"doc_paths": ["README.md"]},
     }
     with open(os.path.join(spec_dir, "common", "seed_manifest.json"), "w", encoding="utf-8") as f:
@@ -44,12 +45,14 @@ class TestSeedContentOverlap(unittest.TestCase):
     def test_seed_overlap_below_threshold_emits_W140(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_data = {
-                "seed_refs": [{"seed_id": "seed-overview"}],
                 "goals": [{"goal_id": "goal-alpha"}],
             }
             seed_text = "completely unrelated document about weather patterns"
-            spec_dir = _make_project(tmpdir, spec_data=spec_data, seed_text=seed_text)
-            # Use tmpdir as both repo_root and project_root
+            # Map step 00 to require seed-overview via step_requirements
+            spec_dir = _make_project(
+                tmpdir, spec_data=spec_data, seed_text=seed_text,
+                step_requirements={"00": ["seed-overview"]},
+            )
             errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
             w140 = [e for e in render_errors(errors) if "W140" in e]
             self.assertTrue(len(w140) > 0, f"Expected W140 warning. Got: {errors}")
@@ -57,23 +60,26 @@ class TestSeedContentOverlap(unittest.TestCase):
     def test_seed_overlap_sufficient_no_warning(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_data = {
-                "seed_refs": [{"seed_id": "seed-overview"}],
                 "description": "authentication login endpoint validation security",
             }
             seed_text = "This document covers authentication login endpoint validation security testing"
-            spec_dir = _make_project(tmpdir, spec_data=spec_data, seed_text=seed_text)
+            spec_dir = _make_project(
+                tmpdir, spec_data=spec_data, seed_text=seed_text,
+                step_requirements={"00": ["seed-overview"]},
+            )
             errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
             w140 = [e for e in render_errors(errors) if "W140" in e]
             self.assertEqual(w140, [], f"Did not expect W140. Got: {w140}")
 
-    def test_seed_overlap_no_seed_refs_skips(self):
+    def test_seed_overlap_no_step_requirements_skips(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_data = {"goals": [{"goal_id": "goal-alpha"}]}
             seed_text = "some seed content"
+            # No step_requirements for step 00 — overlap check should be skipped
             spec_dir = _make_project(tmpdir, spec_data=spec_data, seed_text=seed_text)
             errors = lint_seeds(repo_root=tmpdir, spec_dir=spec_dir, project_root=tmpdir)
             w140 = [e for e in render_errors(errors) if "W140" in e]
-            self.assertEqual(w140, [], f"Did not expect W140 for no seed_refs. Got: {w140}")
+            self.assertEqual(w140, [], f"Did not expect W140 for no step_requirements. Got: {w140}")
 
 
 if __name__ == "__main__":

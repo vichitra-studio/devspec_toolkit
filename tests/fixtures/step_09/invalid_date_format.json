@@ -3,15 +3,6 @@
   "id": "impl-plan-invalid-date-format",
   "owner": "api",
   "created_at": "2025-10-22T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
   "tech_stack": {
     "languages": [
       {
@@ -50,11 +41,5 @@
   ],
   "migration_plan": "No migration required.",
   "dependencies": [],
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

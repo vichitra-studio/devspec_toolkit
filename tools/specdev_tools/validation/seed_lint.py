@@ -146,16 +146,14 @@ def _check_seed_content_overlap(
                     instance = json.load(fh)
             except Exception:
                 continue
-            seed_refs = instance.get("seed_refs", [])
-            if not isinstance(seed_refs, list):
+            step_id = _step_from_path(file_path)
+            required_seeds = _collect_required_seeds(manifest, step_id)
+            if not required_seeds:
                 continue
             spec_text = json.dumps(instance)
             spec_tokens = _tokenize(spec_text)
-            for ref in seed_refs:
-                if not isinstance(ref, dict):
-                    continue
-                sid = ref.get("seed_id")
-                if not sid or sid not in seed_paths:
+            for sid in required_seeds:
+                if sid not in seed_paths:
                     continue
                 try:
                     with open(seed_paths[sid], "r", encoding="utf-8") as fh:
@@ -273,41 +271,5 @@ def lint_seeds(
     _lint_prompt_manifest_refs(repo_root, errors, manifest)
 
     _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
-
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if not fn.endswith(".json"):
-                continue
-            file_path = os.path.join(root, fn)
-            if os.path.normpath(file_path).endswith(os.path.normpath(os.path.join("spec", "common", "seed_manifest.json"))):
-                continue
-
-            step_id = _step_from_path(file_path)
-            if step_id == "unknown":
-                continue
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as fh:
-                    instance = json.load(fh)
-            except Exception:
-                continue
-
-            seed_refs = instance.get("seed_refs", [])
-            if not isinstance(seed_refs, list):
-                errors.append(make_error("E520", f"{file_path}: seed_refs must be an array"))
-                continue
-
-            used_seed_ids = {ref.get("seed_id") for ref in seed_refs if isinstance(ref, dict) and ref.get("seed_id") is not None}
-            missing_seed_ids = {sid for sid in used_seed_ids if sid not in seed_id_set}
-            for sid in missing_seed_ids:
-                errors.append(make_error("E520", f"{file_path}: seed_refs includes unknown seed_id '{sid}'"))
-
-            required = _collect_required_seeds(manifest, step_id)
-            missing_required = sorted(required - used_seed_ids)
-            if missing_required:
-                errors.append(make_error(
-                    "E520",
-                    f"{file_path}: missing required seed_refs for step {step_id}: {', '.join(missing_required)}",
-                ))
 
     return errors

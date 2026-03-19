@@ -3,12 +3,6 @@
   "id": "roadmap-cycle-test",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
-  "spec_refs_ingested": [],
   "tech_stack": {
     "languages": [
       {
@@ -64,11 +58,5 @@
     }
   ],
   "dependencies": [],
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

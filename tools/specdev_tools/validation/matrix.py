@@ -69,7 +69,7 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
 
     # Contexts where 'id' is a REFERENCE, not a definition
     REFERENCE_CONTEXTS = {
-        "trace", "targets", "deliverables", "links", "spec_refs", "seed_refs", "ref", "refs"
+        "trace", "targets", "deliverables", "links", "spec_refs", "ref", "refs"
     }
 
     def scan_obj(obj, source_file, path="", parent_key=None):

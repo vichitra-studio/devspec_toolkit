@@ -2,150 +2,112 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/15_scaffold.schema.json",
   "title": "15_scaffold",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "service_skeleton": {
+    {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
-        "language": {
-          "type": "string",
-          "description": "Programming language (e.g., python, typescript, go). Use lowercase/kebab-case."
+        "project_skeleton": {
+          "type": "object",
+          "description": "Project skeleton definition specifying language, framework, and module layout.",
+          "additionalProperties": false,
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "Programming language (e.g., python, typescript, go). Use lowercase/kebab-case."
+            },
+            "framework": {
+              "type": "string",
+              "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
+            },
+            "modules": {
+              "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+              "description": "List of top-level modules or packages in the project skeleton."
+            }
+          },
+          "required": [
+            "language"
+          ]
         },
-        "framework": {
-          "type": "string",
-          "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
+        "interface_map": {
+          "type": "array",
+          "description": "Mapping of API interfaces to their HTTP methods and paths.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "interface_ref": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "description": "Reference to the interface definition in the API contracts spec."
+              },
+              "path": {
+                "type": "string",
+                "description": "URL path for this interface (e.g., '/api/v1/users')."
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "DELETE",
+                  "PATCH",
+                  "OPTIONS",
+                  "HEAD"
+                ],
+                "description": "HTTP method for this interface route."
+              }
+            },
+            "required": [
+              "interface_ref",
+              "path",
+              "method"
+            ],
+            "description": "An API interface mapping binding an interface reference to an HTTP method and path."
+          }
         },
-        "modules": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        "validators": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "description": "List of validation checks that have been run against the scaffold."
+        },
+        "command_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the scaffold CLI command."
+        },
+        "build_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "green",
+            "red"
+          ],
+          "description": "Current build status of the scaffold: pending (not built), green (passing), or red (failing)."
+        },
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting this scaffold to related artifacts.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for this scaffold."
+          }
+        },
+        "links": {
+          "type": "array",
+          "description": "External links to related scaffold resources or documentation.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "description": "An external link related to this scaffold."
+          }
         }
       },
       "required": [
-        "language"
+        "project_skeleton",
+        "validators",
+        "build_status"
       ]
     },
-    "route_map": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "api_ref": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "path": {
-            "type": "string"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "GET",
-              "POST",
-              "PUT",
-              "DELETE",
-              "PATCH",
-              "OPTIONS",
-              "HEAD"
-            ]
-          },
-          "interface_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          }
-        },
-        "required": [
-          "api_ref",
-          "path",
-          "method"
-        ]
-      }
-    },
-    "validators": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "command_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "build_status": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "green",
-        "red"
-      ]
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "service_skeleton",
-    "route_map",
-    "validators",
-    "build_status",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ],
-  "allOf": [
     {
       "if": {
         "properties": {
@@ -165,5 +127,6 @@
         ]
       }
     }
-  ]
+  ],
+  "unevaluatedProperties": false
 }

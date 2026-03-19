@@ -34,7 +34,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
    - Write the JSON artifact directly to disk and validate against the referenced step schema; do not return fenced JSON as primary output.
-   - Populate `seed_refs` with the seeds actually used.
+   - Ensure the artifact conforms to the seed requirements declared in `spec/common/seed_manifest.json`.
 5. **Persist Artifact**
    - Replace the contents of `spec/NN_name.json` with the generated block.
    - Preserve the `$schema` field already present in the file.

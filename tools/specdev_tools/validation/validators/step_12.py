@@ -54,7 +54,7 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
             )
             warned_missing.add(filename)
 
-    # Collect and validate spec references from trace, coverage_gaps, and jobs
+    # Collect and validate spec references from trace and jobs
     # 1. Top-level trace references
     for trace_entry in instance.get("trace", []):
         if not isinstance(trace_entry, dict):
@@ -63,15 +63,7 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
         if isinstance(trace_id, str):
             _check_ref(trace_id, "trace", upstream_map, errors)
 
-    # 2. Coverage gaps upstream_item_id references
-    for gap in instance.get("coverage_gaps", []):
-        if not isinstance(gap, dict):
-            continue
-        item_id = gap.get("upstream_item_id", "")
-        if isinstance(item_id, str):
-            _check_ref(item_id, "coverage_gaps", upstream_map, errors)
-
-    # 3. Deep-scan jobs for string values matching fr-* or nfr-* patterns
+    # 2. Deep-scan jobs for string values matching fr-* or nfr-* patterns
     for job in instance.get("jobs", []):
         job_id = job.get("job_id", "<unknown>")
         refs = _collect_refs_from_value(job)

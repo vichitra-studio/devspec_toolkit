@@ -21,19 +21,19 @@ def validate_structure(data):
     if not isinstance(data, dict):
         return False, "Root must be an object"
     
-    required_fields = ["id", "owner", "created_at", "service_skeleton", "route_map", "validators", "build_status"]
+    required_fields = ["id", "owner", "created_at", "project_skeleton", "interface_map", "validators", "build_status"]
     for field in required_fields:
         if field not in data:
             return False, f"Missing required field: {field}"
             
     # basic types check
-    if not isinstance(data['service_skeleton'], dict):
-        return False, "service_skeleton must be an object"
-    if 'language' not in data['service_skeleton']:
-        return False, "service_skeleton.language is required"
+    if not isinstance(data['project_skeleton'], dict):
+        return False, "project_skeleton must be an object"
+    if 'language' not in data['project_skeleton']:
+        return False, "project_skeleton.language is required"
         
-    if not isinstance(data['route_map'], list):
-        return False, "route_map must be an array"
+    if not isinstance(data['interface_map'], list):
+        return False, "interface_map must be an array"
         
     if not isinstance(data['validators'], list):
         return False, "validators must be an array"
@@ -43,9 +43,9 @@ def validate_structure(data):
         
     return True, "Structure valid"
 
-def validate_route_map(data):
+def validate_interface_map(data):
     """
-    Validate route_map items using extracted validator.
+    Validate interface_map items using extracted validator.
     """
     from specdev_tools.validation.validators.step_15 import validate_step_15
     
@@ -68,7 +68,7 @@ def validate_fixture(fixture_path):
         return False, msg
         
     # Route Map Logic (passed the whole data object now)
-    ok, msg = validate_route_map(data)
+    ok, msg = validate_interface_map(data)
     if not ok:
         return False, msg
         

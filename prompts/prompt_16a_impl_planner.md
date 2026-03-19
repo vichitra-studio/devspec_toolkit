@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -243,7 +232,7 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
     *   *Rule*: Spec changes (including `spec/common/seed_manifest.json` and any `spec/*.json`) count as code changes and therefore REQUIRE docs updates.
     *   *Rule*: If you add or modify step requirements in the seed manifest, you MUST include the relevant documentation map(s) (e.g., `README.md`, `docs/README.md`, tooling docs) in `docs_touched` to reflect the new required context.
     *   *Rule*: Every doc path must appear in `plan.summary.target_file_patterns`.
-    *   *Rule*: If new directories are introduced or renamed, update `spec/common/seed_manifest.json` to set `docs_policy.readme_depth_by_scope` for those paths, and include that file in `plan.summary.target_file_patterns`.
+    *   *Rule*: If new directories are introduced or renamed, include `spec/common/seed_manifest.json` in `plan.summary.target_file_patterns`.
 
 ## 12. Advanced Schema Fields
 Use these fields to capture high-fidelity context that doesn't fit into standard columns.
@@ -288,7 +277,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 **Extraction Mandate**:
 - Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
@@ -313,10 +301,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -328,68 +315,78 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
-       "functional_summary": "Implement core API login",
-       "scope_in": ["Login", "Logout"],
-       "scope_out": ["OAuth login"],
-       "target_file_patterns": ["src/auth/*.py"]
+      "functional_summary": "Implement core API login",
+      "scope_in": [
+        "Login",
+        "Logout"
+      ],
+      "scope_out": [
+        "OAuth login"
+      ],
+      "target_file_patterns": [
+        "src/auth/*.py"
+      ]
     },
     "spec_alignment": {
       "requirements_summary": [
-          { "theme": "Auth", "summary": "Implement JWT-based Login/Logout" }
+        {
+          "theme": "Auth",
+          "summary": "Implement JWT-based Login/Logout"
+        }
       ],
       "checklist": [
         {
           "id": "CHK_AUTH_01",
           "spec_ref": {
-             "type": "api",
-             "id": "api-auth-login",
-             "line_range": "L12-L15",
-             "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
+            "type": "api",
+            "id": "api-auth-login",
+            "line_range": "L12-L15",
+            "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
           "milestone_ref": "milestone-auth",
-          "nfr_refs": ["nfr-availability-uptime"],
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
           "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
           "implementation": {
-             "status": "pending",
-             "actions": [
-                 {
-                    "type": "file_create",
-                    "target": "src/auth/routes.py",
-                    "description": "Create login endpoint"
-                 }
-             ]
+            "status": "pending",
+            "actions": [
+              {
+                "type": "file_create",
+                "target": "src/auth/routes.py",
+                "description": "Create login endpoint"
+              }
+            ]
           }
         }
       ]
     },
     "context": {
-       "existing_structures": [{ "signature": "class User", "source_file": "src/models.py" }]
+      "existing_structures": [
+        {
+          "signature": "class User",
+          "source_file": "src/models.py"
+        }
+      ]
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/auth/"]
+      "test_commands": [
+        "pytest tests/auth/"
+      ]
     }
-  },
-  "generation_quality": {
-    "assumptions": []
   },
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
       "kind": "unit"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
-
+  ]
 }
 ```
 

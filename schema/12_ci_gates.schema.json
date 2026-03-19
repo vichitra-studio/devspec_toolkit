@@ -2,183 +2,154 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/12_ci_gates.schema.json",
   "title": "12_ci_gates",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "jobs": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "job_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "requires": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-          },
-          "steps": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "command": {
-                  "type": "string"
-                },
-                "command_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "command"
-              ]
-            }
-          },
-          "environment_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "role_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "security": {
+    {
+      "type": "object",
+      "properties": {
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting this CI gates spec to related artifacts.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "description": "CI/CD job definitions with steps, dependencies, and security configuration.",
+          "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "CI security primitives for this job.",
             "properties": {
-              "runner_labels": {
+              "job_id": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "description": "Unique kebab-case identifier for this CI job."
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable name of the CI job."
+              },
+              "requires": {
+                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                "description": "Job IDs that must complete before this job runs."
+              },
+              "steps": {
                 "type": "array",
+                "description": "Ordered list of steps within this CI job.",
                 "items": {
-                  "type": "string"
-                },
-                "description": "Runner isolation labels (e.g. 'self-hosted', 'ubuntu-latest')."
-              },
-              "token_permissions": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string",
-                  "enum": [
-                    "read",
-                    "write",
-                    "none"
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                      "description": "Unique kebab-case identifier for this step within the job."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Human-readable name of the CI step."
+                    },
+                    "command": {
+                      "type": "string",
+                      "description": "Shell command to execute for this step."
+                    },
+                    "command_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the command in the registry."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "command"
                   ]
-                },
-                "description": "Token permission scopes (e.g. {'contents': 'read', 'packages': 'write'})."
+                }
               },
-              "environment_protection": {
+              "environment_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the execution environment."
+              },
+              "role_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the role that owns this job."
+              },
+              "security": {
                 "type": "object",
                 "additionalProperties": false,
+                "description": "CI security primitives for this job.",
                 "properties": {
-                  "required_reviewers": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "Number of required approvers before deployment."
+                  "runner_labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Runner isolation labels (e.g. 'self-hosted', 'ubuntu-latest')."
                   },
-                  "wait_timer_minutes": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "Delay in minutes before deployment proceeds."
+                  "token_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "none"
+                      ]
+                    },
+                    "description": "Token permission scopes (e.g. {'contents': 'read', 'packages': 'write'})."
+                  },
+                  "environment_protection": {
+                    "type": "object",
+                    "description": "Environment protection rules for deployment gates.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "required_reviewers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Number of required approvers before deployment."
+                      },
+                      "wait_timer_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Delay in minutes before deployment proceeds."
+                      }
+                    }
                   }
                 }
               }
-            }
+            },
+            "required": [
+              "job_id",
+              "name",
+              "steps",
+              "environment_ref"
+            ]
           }
         },
-        "required": [
-          "job_id",
-          "name",
-          "steps",
-          "environment_ref"
-        ]
-      }
-    },
-    "coverage_thresholds": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "lines": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
-        },
-        "branches": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
+        "coverage_thresholds": {
+          "type": "object",
+          "description": "Minimum code coverage thresholds that CI enforces.",
+          "additionalProperties": false,
+          "properties": {
+            "lines": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Minimum line coverage percentage required."
+            },
+            "branches": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Minimum branch coverage percentage required."
+            }
+          }
         }
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "jobs"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "jobs",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

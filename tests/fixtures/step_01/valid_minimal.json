@@ -3,15 +3,6 @@
   "id": "capabilities-catalog",
   "owner": "product",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
   "capabilities": [
     {
       "capability_id": "capability-search-products",
@@ -68,9 +59,6 @@
       ]
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:product:capability:search-products",
@@ -80,25 +68,5 @@
       "id": "cn:ops:capability:archive-user",
       "kind": "capability"
     }
-  ],
-  "canonical_proposals": [
-    {
-      "temp_id": "search-products",
-      "kind": "capability",
-      "proposed_label": "search-products",
-      "definition": "Ability to search the product catalog by keyword and pagination.",
-      "source_field": "capabilities[0].capability_ref",
-      "suggested_namespace": "product"
-    },
-    {
-      "temp_id": "archive-user",
-      "kind": "capability",
-      "proposed_label": "archive-user",
-      "definition": "Ability to archive a user account, removing it from active use.",
-      "source_field": "capabilities[1].capability_ref",
-      "suggested_namespace": "ops"
-    }
-  ],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }

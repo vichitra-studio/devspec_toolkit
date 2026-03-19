@@ -3,11 +3,10 @@
   "$id": "https://specdev.local/schema/16_impl_context.schema.json",
   "title": "16_impl_context",
   "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
-  "type": "object",
-  "additionalProperties": false,
   "$defs": {
     "specRef": {
       "type": "object",
+      "description": "A reference to a spec artifact with precise code location binding.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -20,24 +19,29 @@
             "fixture",
             "doc",
             "code"
-          ]
+          ],
+          "description": "The artifact type being referenced: functional requirement, API, NFR, invariant, fixture, doc, or code."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Kebab-case identifier of the referenced artifact."
         },
         "note": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional contextual note about this reference."
         },
         "line_range": {
           "type": "string",
-          "pattern": "^L\\d+-L\\d+$"
+          "pattern": "^L\\d+-L\\d+$",
+          "description": "Line range in the source file (e.g., 'L10-L25')."
         },
         "commit_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$",
           "not": {
             "pattern": "^0{40}$"
-          }
+          },
+          "description": "Full 40-character git commit hash pinning this reference. Must not be all zeros."
         }
       },
       "required": [
@@ -54,7 +58,8 @@
         "medium",
         "high",
         "critical"
-      ]
+      ],
+      "description": "Severity classification from low to critical."
     },
     "executionStatus": {
       "type": "string",
@@ -63,10 +68,12 @@
         "failed",
         "blocked",
         "partial"
-      ]
+      ],
+      "description": "Execution outcome: passed, failed, blocked, or partially completed."
     },
     "evidenceObject": {
       "type": "object",
+      "description": "Evidence proving that a requirement or check was satisfied.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -76,21 +83,26 @@
             "snippet",
             "screenshot",
             "reference"
-          ]
+          ],
+          "description": "The form of evidence: log output, code snippet, screenshot, or external reference."
         },
         "content": {
           "type": "string",
           "minLength": 20,
-          "pattern": "\\S"
+          "pattern": "\\S",
+          "description": "The evidence content itself (minimum 20 characters, must contain non-whitespace)."
         },
         "evidence_ref": {
-          "type": "string"
+          "type": "string",
+          "description": "External reference or URI pointing to the evidence source."
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "File path where the evidence was captured."
         },
         "section": {
-          "type": "string"
+          "type": "string",
+          "description": "Section or function name within the file where evidence was found."
         }
       },
       "required": [
@@ -99,1770 +111,2011 @@
       ]
     }
   },
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
-      "description": "The Step ID from the Roadmap (e.g., step-api-core)."
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "extensions": {
+    {
       "type": "object",
-      "description": "Structured extensions for domain-specific data.",
-      "additionalProperties": false,
       "properties": {
-        "review_state": {
+        "extensions": {
           "type": "object",
+          "description": "Structured extensions for domain-specific data.",
           "additionalProperties": false,
           "properties": {
-            "outcome": {
-              "type": "string"
-            },
-            "verified_by": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "outcome"
-          ]
-        },
-        "execution_context": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "command_overrides": {
+            "review_state": {
               "type": "object",
-              "additionalProperties": {
-                "type": "string"
+              "description": "Extension tracking the current review state of this implementation context.",
+              "additionalProperties": false,
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "description": "The outcome of the review (e.g., approved, rejected, needs-revision)."
+                },
+                "verified_by": {
+                  "type": "string",
+                  "description": "Identity of the person or system that verified the review."
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            },
+            "execution_context": {
+              "type": "object",
+              "description": "Extension for execution-time overrides and configuration.",
+              "additionalProperties": false,
+              "properties": {
+                "command_overrides": {
+                  "type": "object",
+                  "description": "Map of command names to override values for execution.",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
-        }
-      }
-    },
-    "plan": {
-      "type": "object",
-      "additionalProperties": false,
-      "description": "Trinity loop plan (scope, checklist, review requirements, and documentation impact).",
-      "properties": {
-        "status": {
-          "type": "string",
-          "enum": [
-            "active",
-            "deferred"
-          ]
         },
-        "deferred_reason": {
-          "type": "string"
-        },
-        "summary": {
+        "plan": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {
-            "functional_summary": {
-              "type": "string"
-            },
-            "scope_in": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "scope_out": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "target_file_patterns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Explicit list of files/directories to modify or create."
-            }
-          },
-          "required": [
-            "functional_summary",
-            "scope_in",
-            "scope_out",
-            "target_file_patterns"
-          ]
-        },
-        "docs_impact": {
-          "type": "object",
-          "additionalProperties": false,
-          "description": "Documentation impact assessment. Required when any non-doc file is modified.",
+          "description": "Trinity loop plan (scope, checklist, review requirements, and documentation impact).",
           "properties": {
             "status": {
               "type": "string",
               "enum": [
-                "required",
-                "not_required"
+                "active",
+                "deferred"
+              ],
+              "description": "Whether this plan is actively being worked on or deferred."
+            },
+            "deferred_reason": {
+              "type": "string",
+              "description": "Explanation for why this plan was deferred."
+            },
+            "summary": {
+              "type": "object",
+              "description": "High-level scope summary including what is in and out of scope.",
+              "additionalProperties": false,
+              "properties": {
+                "functional_summary": {
+                  "type": "string",
+                  "description": "Concise summary of the functional changes being implemented."
+                },
+                "scope_in": {
+                  "type": "array",
+                  "description": "Items explicitly included in the scope of this plan.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "scope_out": {
+                  "type": "array",
+                  "description": "Items explicitly excluded from the scope of this plan.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "target_file_patterns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Explicit list of files/directories to modify or create."
+                }
+              },
+              "required": [
+                "functional_summary",
+                "scope_in",
+                "scope_out",
+                "target_file_patterns"
               ]
             },
-            "rationale": {
-              "type": "string",
-              "minLength": 10
-            },
-            "docs_touched": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "status_ref": {
-              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-            }
-          },
-          "required": [
-            "status",
-            "rationale"
-          ],
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "status": {
-                    "const": "required"
+            "docs_impact": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Documentation impact assessment. Required when any non-doc file is modified.",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "required",
+                    "not_required"
+                  ],
+                  "description": "Whether documentation updates are required for this change."
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 10,
+                  "description": "Explanation of why documentation is or is not required (minimum 10 characters)."
+                },
+                "docs_touched": {
+                  "type": "array",
+                  "description": "List of documentation files that need to be updated.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "status_ref": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                  "description": "Canonical reference for the docs impact status in the registry."
+                }
+              },
+              "required": [
+                "status",
+                "rationale"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "required"
+                      },
+                      "status_ref": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                      }
+                    }
                   },
-                  "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                  "then": {
+                    "required": [
+                      "docs_touched"
+                    ],
+                    "properties": {
+                      "docs_touched": {
+                        "minItems": 1
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "spec_alignment": {
+              "type": "object",
+              "description": "Alignment of the plan with upstream spec requirements and checklist items.",
+              "additionalProperties": false,
+              "properties": {
+                "requirements_summary": {
+                  "type": "array",
+                  "description": "Thematic grouping of requirements.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "theme": {
+                        "type": "string",
+                        "description": "Thematic label grouping related requirements."
+                      },
+                      "summary": {
+                        "type": "string",
+                        "description": "Summary of the requirements in this theme."
+                      },
+                      "spec_refs": {
+                        "type": "array",
+                        "description": "Spec references that belong to this thematic group.",
+                        "items": {
+                          "$ref": "#/$defs/specRef",
+                          "description": "A spec artifact reference within this thematic group."
+                        }
+                      }
+                    },
+                    "required": [
+                      "theme",
+                      "summary"
+                    ],
+                    "description": "A thematic grouping of related spec requirements with optional references."
+                  }
+                },
+                "checklist": {
+                  "type": "array",
+                  "description": "Checklist items that must be satisfied for spec compliance.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId",
+                        "description": "Unique SCREAMING_SNAKE_CASE identifier for this checklist item."
+                      },
+                      "spec_ref": {
+                        "$ref": "#/$defs/specRef",
+                        "description": "Reference to the spec artifact this checklist item traces to."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Description of what this checklist item requires."
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "behavior",
+                          "constraint",
+                          "validation",
+                          "metadata",
+                          "perf",
+                          "logging",
+                          "docs",
+                          "security"
+                        ],
+                        "description": "Classification of the checklist item: behavior, constraint, validation, metadata, performance, logging, docs, or security."
+                      },
+                      "layer": {
+                        "type": "string",
+                        "enum": [
+                          "db",
+                          "model",
+                          "service",
+                          "api",
+                          "integration",
+                          "tests",
+                          "docs",
+                          "config",
+                          "security"
+                        ],
+                        "description": "Architecture layer this checklist item applies to."
+                      },
+                      "checklist_status": {
+                        "type": "string",
+                        "enum": [
+                          "active",
+                          "deferred"
+                        ],
+                        "default": "active",
+                        "description": "Whether this checklist item is actively required or deferred."
+                      },
+                      "linked_test_expectation": {
+                        "description": "Test expectation(s) that validate this checklist item. Can be a single string or array of strings.",
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "A single test expectation string."
+                          },
+                          {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "A single test expectation string (non-empty)."
+                            },
+                            "description": "An array of test expectation strings."
+                          }
+                        ]
+                      },
+                      "nfr_refs": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                        "description": "NFR IDs that this checklist item satisfies."
+                      },
+                      "fixture_ref": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "description": "Fixture ID that validates this checklist item."
+                      },
+                      "milestone_ref": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "description": "Milestone ID from the roadmap that this checklist item belongs to."
+                      },
+                      "implementation": {
+                        "type": "object",
+                        "description": "Atomic work definition for this specific requirement.",
+                        "additionalProperties": false,
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "in_progress",
+                              "verified",
+                              "deferred"
+                            ],
+                            "description": "Current implementation status of this checklist item."
+                          },
+                          "files_touched": {
+                            "type": "array",
+                            "description": "Files modified or created to implement this checklist item.",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "actions": {
+                            "type": "array",
+                            "description": "Ordered list of implementation actions to satisfy this checklist item.",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "file_create",
+                                    "file_edit",
+                                    "run_command",
+                                    "manual_verification"
+                                  ],
+                                  "description": "The kind of action: create a file, edit a file, run a command, or verify manually."
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "description": "Description of what this action does."
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "description": "Target file path for file_create or file_edit actions."
+                                },
+                                "command": {
+                                  "type": "string",
+                                  "description": "Shell command to execute for run_command actions."
+                                },
+                                "evidence": {
+                                  "$ref": "#/$defs/evidenceObject",
+                                  "description": "Evidence proving this action was completed successfully."
+                                },
+                                "command_ref": {
+                                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                                  "description": "Canonical reference for the command in the registry."
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "description"
+                              ],
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "type": {
+                                        "enum": [
+                                          "file_create",
+                                          "file_edit"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "target"
+                                    ],
+                                    "properties": {
+                                      "target": {
+                                        "minLength": 1
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "type": {
+                                        "const": "run_command"
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "command"
+                                    ],
+                                    "properties": {
+                                      "command": {
+                                        "minLength": 1
+                                      },
+                                      "command_ref": {
+                                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "description": "An atomic implementation action (file create/edit, command, or manual verification)."
+                            }
+                          },
+                          "status_ref": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                            "description": "Canonical reference for the implementation status in the registry."
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "actions"
+                        ],
+                        "allOf": [
+                          {
+                            "if": {
+                              "properties": {
+                                "status": {
+                                  "const": "verified"
+                                },
+                                "status_ref": {
+                                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                                }
+                              },
+                              "required": [
+                                "status"
+                              ]
+                            },
+                            "then": {
+                              "properties": {
+                                "actions": {
+                                  "items": {
+                                    "required": [
+                                      "evidence"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "spec_ref",
+                      "description",
+                      "linked_test_expectation"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "not": {
+                            "properties": {
+                              "checklist_status": {
+                                "const": "deferred"
+                              }
+                            },
+                            "required": [
+                              "checklist_status"
+                            ]
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "implementation"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "not": {
+                            "properties": {
+                              "checklist_status": {
+                                "const": "deferred"
+                              }
+                            },
+                            "required": [
+                              "checklist_status"
+                            ]
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "nfr_refs",
+                            "fixture_ref"
+                          ]
+                        }
+                      }
+                    ],
+                    "description": "A single checklist item binding a spec requirement to its implementation, tests, and evidence."
                   }
                 }
               },
-              "then": {
-                "required": [
-                  "docs_touched"
-                ],
-                "properties": {
-                  "docs_touched": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          ]
-        },
-        "spec_alignment": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "requirements_summary": {
-              "type": "array",
-              "description": "Thematic grouping of requirements.",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "theme": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "spec_refs": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/$defs/specRef"
-                    }
-                  }
-                },
-                "required": [
-                  "theme",
-                  "summary"
-                ]
-              }
+              "required": [
+                "checklist"
+              ]
             },
-            "checklist": {
+            "ambiguities": {
               "type": "array",
+              "description": "Spec ambiguities discovered during planning that need resolution or tracking.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
-                  },
-                  "spec_ref": {
-                    "$ref": "#/$defs/specRef"
+                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "description": "Unique kebab-case identifier for this ambiguity."
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Description of the ambiguity and its potential impact."
                   },
-                  "type": {
+                  "source": {
                     "type": "string",
                     "enum": [
-                      "behavior",
-                      "constraint",
-                      "validation",
-                      "metadata",
-                      "perf",
-                      "logging",
-                      "docs",
-                      "security"
-                    ]
-                  },
-                  "layer": {
-                    "type": "string",
-                    "enum": [
-                      "db",
-                      "model",
-                      "service",
-                      "api",
-                      "integration",
-                      "tests",
-                      "docs",
-                      "config",
-                      "security"
-                    ]
-                  },
-                  "checklist_status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "deferred"
+                      "spec",
+                      "code",
+                      "plan",
+                      "mixed",
+                      "review"
                     ],
-                    "default": "active"
+                    "description": "Where the ambiguity originated: spec, code, plan, mixed sources, or review."
                   },
-                  "linked_test_expectation": {
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "blocking",
+                      "non_blocking"
+                    ],
+                    "description": "Whether this ambiguity blocks progress or can be worked around."
+                  },
+                  "impact": {
+                    "type": "array",
+                    "description": "List of areas or artifacts affected by this ambiguity.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "proposed_assumption": {
+                    "type": "string",
+                    "description": "Proposed assumption to resolve the ambiguity if no authoritative answer is available."
+                  },
+                  "mitigation": {
+                    "type": "string",
+                    "minLength": 10,
+                    "description": "Mitigation strategy for non-blocking ambiguities (minimum 10 characters)."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "resolved",
+                      "tracking",
+                      "deferred",
+                      "blocked"
+                    ],
+                    "description": "Current resolution status of this ambiguity."
+                  },
+                  "decision": {
+                    "type": "string",
+                    "description": "The decision made to resolve this ambiguity, if resolved."
+                  },
+                  "resolved": {
+                    "description": "Resolution indicator -- a string explanation or boolean flag.",
                     "oneOf": [
                       {
-                        "type": "string",
-                        "minLength": 1
+                        "type": "string"
                       },
                       {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1
-                        }
+                        "type": "boolean"
                       }
                     ]
                   },
-                  "nfr_refs": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-                  },
-                  "fixture_ref": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                  },
-                  "milestone_ref": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-                  },
-                  "implementation": {
-                    "type": "object",
-                    "description": "Atomic work definition for this specific requirement.",
-                    "additionalProperties": false,
-                    "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "pending",
-                          "in_progress",
-                          "verified",
-                          "deferred"
-                        ]
-                      },
-                      "files_touched": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "actions": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "type": {
-                              "type": "string",
-                              "enum": [
-                                "file_create",
-                                "file_edit",
-                                "run_command",
-                                "manual_verification"
-                              ]
-                            },
-                            "description": {
-                              "type": "string"
-                            },
-                            "target": {
-                              "type": "string"
-                            },
-                            "command": {
-                              "type": "string"
-                            },
-                            "evidence": {
-                              "$ref": "#/$defs/evidenceObject"
-                            },
-                            "command_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                            }
-                          },
-                          "required": [
-                            "type",
-                            "description"
-                          ],
-                          "allOf": [
-                            {
-                              "if": {
-                                "properties": {
-                                  "type": {
-                                    "enum": [
-                                      "file_create",
-                                      "file_edit"
-                                    ]
-                                  }
-                                }
-                              },
-                              "then": {
-                                "required": [
-                                  "target"
-                                ],
-                                "properties": {
-                                  "target": {
-                                    "minLength": 1
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              "if": {
-                                "properties": {
-                                  "type": {
-                                    "const": "run_command"
-                                  }
-                                }
-                              },
-                              "then": {
-                                "required": [
-                                  "command"
-                                ],
-                                "properties": {
-                                  "command": {
-                                    "minLength": 1
-                                  },
-                                  "command_ref": {
-                                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                                  }
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                      }
-                    },
-                    "required": [
-                      "status",
-                      "actions"
-                    ],
-                    "allOf": [
-                      {
-                        "if": {
-                          "properties": {
-                            "status": {
-                              "const": "verified"
-                            },
-                            "status_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                            }
-                          },
-                          "required": ["status"]
-                        },
-                        "then": {
-                          "properties": {
-                            "actions": {
-                              "items": {
-                                "required": [
-                                  "evidence"
-                                ]
-                              }
-                            }
-                          }
-                        }
-                      }
-                    ]
+                  "status_ref": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "description": "Canonical reference for the ambiguity status in the registry."
                   }
                 },
                 "required": [
                   "id",
-                  "spec_ref",
                   "description",
-                  "linked_test_expectation"
+                  "severity"
                 ],
                 "allOf": [
                   {
                     "if": {
-                      "not": {
-                        "properties": {
-                          "checklist_status": {
-                            "const": "deferred"
-                          }
-                        },
-                        "required": ["checklist_status"]
+                      "properties": {
+                        "severity": {
+                          "const": "non_blocking"
+                        }
                       }
                     },
                     "then": {
                       "required": [
-                        "implementation"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "not": {
-                        "properties": {
-                          "checklist_status": {
-                            "const": "deferred"
-                          }
-                        },
-                        "required": ["checklist_status"]
-                      }
-                    },
-                    "then": {
-                      "required": [
-                        "nfr_refs",
-                        "fixture_ref"
+                        "mitigation"
                       ]
                     }
                   }
-                ]
-              }
-            }
-          },
-          "required": [
-            "checklist"
-          ]
-        },
-        "ambiguities": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-              },
-              "description": {
-                "type": "string"
-              },
-              "source": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "code",
-                  "plan",
-                  "mixed",
-                  "review"
-                ]
-              },
-              "severity": {
-                "type": "string",
-                "enum": [
-                  "blocking",
-                  "non_blocking"
-                ]
-              },
-              "impact": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "proposed_assumption": {
-                "type": "string"
-              },
-              "mitigation": {
-                "type": "string",
-                "minLength": 10
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "resolved",
-                  "tracking",
-                  "deferred",
-                  "blocked"
-                ]
-              },
-              "decision": {
-                "type": "string"
-              },
-              "resolved": {
-                "oneOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "boolean"
-                  }
-                ]
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                ],
+                "description": "A spec ambiguity discovered during planning with severity, impact, and resolution tracking."
               }
             },
-            "required": [
-              "id",
-              "description",
-              "severity"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "severity": {
-                      "const": "non_blocking"
-                    }
+            "solution": {
+              "type": "object",
+              "description": "High-level solution architecture and risk assessment.",
+              "additionalProperties": false,
+              "properties": {
+                "architecture_sketch": {
+                  "type": "string",
+                  "description": "Textual description of the solution architecture."
+                },
+                "sequence_of_concerns": {
+                  "type": "array",
+                  "description": "Ordered list of concerns to address during implementation.",
+                  "items": {
+                    "type": "string"
                   }
                 },
-                "then": {
-                  "required": [
-                    "mitigation"
-                  ]
-                }
-              }
-            ]
-          }
-        },
-        "solution": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "architecture_sketch": {
-              "type": "string"
-            },
-            "sequence_of_concerns": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "risks": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "architecture_sketch"
-          ]
-        },
-        "context": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "existing_structures": {
-              "type": "array",
-              "description": "Known code or non-code structures. Strings may reference non-code artifacts; objects must cite real code signatures.",
-              "items": {
-                "oneOf": [
-                  {
+                "risks": {
+                  "type": "array",
+                  "description": "Risks identified in the proposed solution.",
+                  "items": {
                     "type": "string"
-                  },
-                  {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "signature": {
+                  }
+                }
+              },
+              "required": [
+                "architecture_sketch"
+              ]
+            },
+            "context": {
+              "type": "object",
+              "description": "Existing codebase context and coding examples relevant to this implementation.",
+              "additionalProperties": false,
+              "properties": {
+                "existing_structures": {
+                  "type": "array",
+                  "description": "Known code or non-code structures. Strings may reference non-code artifacts; objects must cite real code signatures.",
+                  "items": {
+                    "oneOf": [
+                      {
                         "type": "string"
                       },
-                      "source_file": {
-                        "type": "string",
-                        "pattern": "^[^/].*\\.(py|ts|js|go|rs)$"
-                      },
-                      "line_range": {
-                        "type": "string",
-                        "pattern": "^L\\d+-L\\d+$"
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "signature": {
+                            "type": "string",
+                            "description": "Function or class signature in the existing codebase."
+                          },
+                          "source_file": {
+                            "type": "string",
+                            "pattern": "^[^/].*\\.(py|ts|js|go|rs)$",
+                            "description": "Relative path to the source file containing this structure."
+                          },
+                          "line_range": {
+                            "type": "string",
+                            "pattern": "^L\\d+-L\\d+$",
+                            "description": "Line range where the structure is defined (e.g., 'L10-L25')."
+                          }
+                        },
+                        "required": [
+                          "signature",
+                          "source_file"
+                        ],
+                        "description": "A typed code signature referencing a specific function or class in the codebase."
                       }
-                    },
-                    "required": [
-                      "signature",
-                      "source_file"
-                    ]
-                  }
-                ]
-              }
-            },
-            "coding_examples": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "title": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "code": {
-                    "type": "string"
+                    ],
+                    "description": "An existing codebase structure -- either a free-text reference or a typed code signature with file location."
                   }
                 },
-                "required": [
-                  "title",
-                  "code"
-                ]
-              }
-            }
-          }
-        },
-        "review_requirements": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "guidelines": {
-              "type": "string"
-            },
-            "test_commands": {
-              "type": "array",
-              "items": {
-                "oneOf": [
-                  {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  {
+                "coding_examples": {
+                  "type": "array",
+                  "description": "Code examples demonstrating patterns to follow in this implementation.",
+                  "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
-                      "command": {
+                      "title": {
                         "type": "string",
-                        "minLength": 1
-                      },
-                      "expected_exit_code": {
-                        "type": "integer",
-                        "default": 0
-                      },
-                      "timeout_seconds": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 3600
+                        "description": "Title describing the coding example."
                       },
                       "description": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Explanation of the pattern or technique demonstrated."
                       },
-                      "command_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                      "code": {
+                        "type": "string",
+                        "description": "The example code itself."
                       }
                     },
                     "required": [
-                      "command"
-                    ]
+                      "title",
+                      "code"
+                    ],
+                    "description": "A coding example with title, optional description, and code content."
                   }
-                ]
+                }
               }
             },
-            "nfr_measurement_methods": {
+            "review_requirements": {
               "type": "object",
+              "description": "Requirements for reviewing the implementation, including test commands and measurement methods.",
               "additionalProperties": false,
-              "patternProperties": {
-                "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+              "properties": {
+                "guidelines": {
+                  "type": "string",
+                  "description": "Free-text review guidelines for the reviewer."
+                },
+                "test_commands": {
+                  "type": "array",
+                  "description": "Commands to run to verify the implementation.",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A simple shell command string."
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "command": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Shell command to execute for verification."
+                          },
+                          "expected_exit_code": {
+                            "type": "integer",
+                            "default": 0,
+                            "description": "Expected exit code from the command (default: 0 for success)."
+                          },
+                          "timeout_seconds": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3600,
+                            "description": "Maximum time in seconds before the command is killed."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Human-readable description of what this test command verifies."
+                          },
+                          "command_ref": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                            "description": "Canonical reference for the command in the registry."
+                          }
+                        },
+                        "required": [
+                          "command"
+                        ],
+                        "description": "A structured test command with expected exit code, timeout, and optional description."
+                      }
+                    ],
+                    "description": "A test command -- either a simple string or a structured object with expected exit code and timeout."
+                  }
+                },
+                "nfr_measurement_methods": {
+                  "type": "object",
+                  "description": "Methods for measuring NFR compliance, keyed by NFR ID.",
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+                      "type": "object",
+                      "description": "Measurement method for a specific NFR.",
+                      "additionalProperties": false,
+                      "properties": {
+                        "command": {
+                          "type": "string",
+                          "description": "Command to run to measure this NFR."
+                        },
+                        "expected": {
+                          "type": "string",
+                          "description": "Expected output or threshold for the NFR measurement."
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "Description of how this NFR is measured."
+                        },
+                        "command_ref": {
+                          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                          "description": "Canonical reference for the measurement command."
+                        }
+                      }
+                    }
+                  }
+                },
+                "timeout_constants": {
+                  "type": "object",
+                  "description": "Named timeout constants (SCREAMING_SNAKE_CASE keys, integer millisecond values).",
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^[A-Z][A-Z0-9_]*$": {
+                      "type": "integer",
+                      "description": "Timeout value in milliseconds."
+                    }
+                  }
+                }
+              },
+              "required": [
+                "test_commands"
+              ]
+            },
+            "docs": {
+              "description": "Documentation plan: either not applicable with a reason, or planned with required updates.",
+              "oneOf": [
+                {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
-                    "command": {
-                      "type": "string"
+                    "status": {
+                      "const": "not_applicable",
+                      "description": "Indicates documentation updates are not applicable."
                     },
-                    "expected": {
-                      "type": "string"
+                    "reason": {
+                      "type": "string",
+                      "description": "Reason why documentation updates are not applicable."
                     },
-                    "description": {
-                      "type": "string"
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the docs status."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reason"
+                  ],
+                  "description": "Documentation status when updates are not applicable."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "planned",
+                      "description": "Indicates documentation updates are planned."
                     },
-                    "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                    "required_updates": {
+                      "type": "array",
+                      "description": "List of documentation files that need updating.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "description": "File path of the documentation to update."
+                          },
+                          "update_summary": {
+                            "type": "string",
+                            "description": "Summary of the changes needed in this document."
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "update_summary"
+                        ],
+                        "description": "A documentation file that needs updating, with path and change summary."
+                      }
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the docs status."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "required_updates"
+                  ],
+                  "description": "Documentation status when updates are planned, with required update details."
+                }
+              ]
+            },
+            "security": {
+              "description": "Security plan: either not applicable with a reason, or planned with fixtures and spec mutations.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "not_applicable",
+                      "description": "Indicates security changes are not applicable."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "Reason why security changes are not applicable."
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the security status."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reason"
+                  ],
+                  "description": "Security status when changes are not applicable."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "planned",
+                      "description": "Indicates security changes are planned."
+                    },
+                    "new_fixtures": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                      "description": "IDs of new security fixtures to create."
+                    },
+                    "spec_mutations": {
+                      "type": "array",
+                      "description": "Planned mutations to security-related spec artifacts.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "ref": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                            "description": "Trace reference to the spec artifact being mutated."
+                          },
+                          "change": {
+                            "type": "string",
+                            "description": "Description of the change to make."
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "Reason for the security-related spec mutation."
+                          }
+                        },
+                        "required": [
+                          "ref",
+                          "change",
+                          "reason"
+                        ],
+                        "description": "A planned security-related mutation to a spec artifact."
+                      }
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the security status."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "description": "Security status when changes are planned, with fixtures and spec mutations."
+                }
+              ]
+            },
+            "delivery": {
+              "description": "Delivery observability plan: either not applicable, or planned with dashboards and alerts.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "not_applicable",
+                      "description": "Indicates delivery observability is not applicable."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "Reason why delivery observability is not applicable."
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the delivery status."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reason"
+                  ],
+                  "description": "Delivery observability status when not applicable."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "planned",
+                      "description": "Indicates delivery observability is planned."
+                    },
+                    "dashboards": {
+                      "type": "array",
+                      "description": "Monitoring dashboards to create or update.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "dashboard_id": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "Unique kebab-case identifier for this dashboard."
+                          },
+                          "nfr_refs": {
+                            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                            "description": "NFR IDs this dashboard monitors."
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "URL of the dashboard."
+                          }
+                        },
+                        "required": [
+                          "dashboard_id"
+                        ],
+                        "description": "A monitoring dashboard definition with NFR references and optional URL."
+                      }
+                    },
+                    "alerts": {
+                      "type": "array",
+                      "description": "Alert rules to create for observability.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "alert_id": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "Unique kebab-case identifier for this alert."
+                          },
+                          "nfr_ref": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "NFR ID this alert monitors."
+                          },
+                          "rule": {
+                            "type": "string",
+                            "description": "Alert rule expression or condition."
+                          },
+                          "severity": {
+                            "$ref": "#/$defs/severityLevel",
+                            "description": "Severity level of the alert."
+                          }
+                        },
+                        "required": [
+                          "alert_id",
+                          "rule"
+                        ],
+                        "description": "An alert rule definition with severity and NFR binding."
+                      }
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the delivery status."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "description": "Delivery observability status when planned, with dashboards and alerts."
+                }
+              ]
+            },
+            "drift": {
+              "description": "Drift detection plan: either not applicable, or planned with scheduled checks.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "not_applicable",
+                      "description": "Indicates drift detection is not applicable."
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "Reason why drift detection is not applicable."
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the drift status."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "reason"
+                  ],
+                  "description": "Drift detection status when not applicable."
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "const": "planned",
+                      "description": "Indicates drift detection checks are planned."
+                    },
+                    "checks": {
+                      "type": "array",
+                      "description": "Scheduled drift detection checks.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "check_id": {
+                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "description": "Unique kebab-case identifier for this drift check."
+                          },
+                          "target": {
+                            "type": "string",
+                            "enum": [
+                              "api",
+                              "schema",
+                              "nfr",
+                              "invariant",
+                              "fixture",
+                              "config"
+                            ],
+                            "description": "The type of artifact being checked for drift."
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "runtime-sample",
+                              "log-diff",
+                              "schema-diff",
+                              "trace-replay"
+                            ],
+                            "description": "Detection method: runtime sampling, log comparison, schema diff, or trace replay."
+                          },
+                          "schedule": {
+                            "type": "string",
+                            "pattern": "^(hourly|daily|weekly|monthly|@(annually|monthly|weekly|daily|hourly)|([0-9*/,-]+ ){4}[0-9*/,-]+)$",
+                            "description": "Named interval (hourly/daily/weekly/monthly) or cron expression"
+                          },
+                          "severity": {
+                            "$ref": "#/$defs/severityLevel",
+                            "description": "Severity level when drift is detected."
+                          },
+                          "remediation_policy": {
+                            "type": "string",
+                            "description": "Policy for remediating detected drift."
+                          }
+                        },
+                        "required": [
+                          "check_id",
+                          "target",
+                          "method"
+                        ],
+                        "description": "A scheduled drift detection check targeting a specific artifact type."
+                      }
+                    },
+                    "status_ref": {
+                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "description": "Canonical reference for the drift status."
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "description": "Drift detection status when planned, with scheduled checks."
+                }
+              ]
+            },
+            "coverage_status": {
+              "type": "object",
+              "description": "Summary counts of checklist item states.",
+              "additionalProperties": false,
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Total number of checklist items."
+                },
+                "verified": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of checklist items that have been verified."
+                },
+                "deferred": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of checklist items that have been deferred."
+                },
+                "pending": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Number of checklist items still pending."
+                }
+              },
+              "required": [
+                "total",
+                "verified",
+                "deferred",
+                "pending"
+              ]
+            },
+            "scope_validation": {
+              "type": "object",
+              "description": "Validation that implementation stayed within declared scope.",
+              "additionalProperties": false,
+              "properties": {
+                "in_scope": {
+                  "type": "array",
+                  "description": "Items confirmed as within scope during implementation.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "out_of_scope": {
+                  "type": "array",
+                  "description": "Items confirmed as out of scope during implementation.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "acknowledged": {
+                  "type": "boolean",
+                  "description": "Whether scope boundaries have been explicitly acknowledged."
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "out_of_scope": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "acknowledged"
+                    ],
+                    "properties": {
+                      "acknowledged": {
+                        "const": true
+                      }
                     }
                   }
                 }
-              }
+              ]
             },
-            "timeout_constants": {
-              "type": "object",
-              "additionalProperties": false,
-              "patternProperties": {
-                "^[A-Z][A-Z0-9_]*$": {
-                  "type": "integer"
-                }
-              }
+            "status_ref": {
+              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+              "description": "Canonical reference for the plan status in the registry."
             }
           },
           "required": [
-            "test_commands"
-          ]
-        },
-        "docs": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "not_applicable"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status",
-                "reason"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "planned"
-                },
-                "required_updates": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "path": {
-                        "type": "string"
-                      },
-                      "update_summary": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "path",
-                      "update_summary"
-                    ]
-                  }
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status",
-                "required_updates"
-              ]
-            }
-          ]
-        },
-        "security": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "not_applicable"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status",
-                "reason"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "planned"
-                },
-                "new_fixtures": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-                },
-                "spec_mutations": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-                      },
-                      "change": {
-                        "type": "string"
-                      },
-                      "reason": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "ref",
-                      "change",
-                      "reason"
-                    ]
-                  }
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status"
-              ]
-            }
-          ]
-        },
-        "delivery": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "not_applicable"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status",
-                "reason"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "planned"
-                },
-                "dashboards": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "dashboard_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                      },
-                      "nfr_refs": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-                      },
-                      "url": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "dashboard_id"
-                    ]
-                  }
-                },
-                "alerts": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "alert_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                      },
-                      "nfr_ref": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                      },
-                      "rule": {
-                        "type": "string"
-                      },
-                      "severity": {
-                        "$ref": "#/$defs/severityLevel"
-                      }
-                    },
-                    "required": [
-                      "alert_id",
-                      "rule"
-                    ]
-                  }
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status"
-              ]
-            }
-          ]
-        },
-        "drift": {
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "not_applicable"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status",
-                "reason"
-              ]
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "status": {
-                  "const": "planned"
-                },
-                "checks": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "check_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                      },
-                      "target": {
-                        "type": "string",
-                        "enum": [
-                          "api",
-                          "schema",
-                          "nfr",
-                          "invariant",
-                          "fixture",
-                          "config"
-                        ]
-                      },
-                      "method": {
-                        "type": "string",
-                        "enum": [
-                          "runtime-sample",
-                          "log-diff",
-                          "schema-diff",
-                          "trace-replay"
-                        ]
-                      },
-                      "schedule": {
-                        "type": "string",
-                        "pattern": "^(hourly|daily|weekly|monthly|@(annually|monthly|weekly|daily|hourly)|([0-9*/,-]+ ){4}[0-9*/,-]+)$",
-                        "description": "Named interval (hourly/daily/weekly/monthly) or cron expression"
-                      },
-                      "severity": {
-                        "$ref": "#/$defs/severityLevel"
-                      },
-                      "remediation_policy": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "check_id",
-                      "target",
-                      "method"
-                    ]
-                  }
-                },
-                "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-                }
-              },
-              "required": [
-                "status"
-              ]
-            }
-          ]
-        },
-        "coverage_status": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "total": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "verified": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "deferred": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "pending": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "total",
-            "verified",
-            "deferred",
-            "pending"
-          ]
-        },
-        "scope_validation": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "in_scope": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "out_of_scope": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "acknowledged": {
-              "type": "boolean"
-            }
-          },
+            "status"
+          ],
           "allOf": [
             {
               "if": {
+                "required": [
+                  "status"
+                ],
                 "properties": {
-                  "out_of_scope": {
-                    "minItems": 1
+                  "status": {
+                    "const": "deferred"
+                  },
+                  "status_ref": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
                   }
                 }
               },
               "then": {
                 "required": [
-                  "acknowledged"
+                  "deferred_reason"
                 ],
                 "properties": {
-                  "acknowledged": {
-                    "const": true
+                  "summary": {
+                    "properties": {
+                      "target_file_patterns": {
+                        "maxItems": 0
+                      }
+                    }
+                  },
+                  "review_requirements": {
+                    "properties": {
+                      "test_commands": {
+                        "maxItems": 0
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "summary": {
+                    "properties": {
+                      "target_file_patterns": {
+                        "minItems": 1
+                      }
+                    }
+                  },
+                  "review_requirements": {
+                    "properties": {
+                      "test_commands": {
+                        "minItems": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "active"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "review_requirements"
+                ],
+                "properties": {
+                  "review_requirements": {
+                    "required": [
+                      "test_commands"
+                    ],
+                    "properties": {
+                      "test_commands": {
+                        "minItems": 1
+                      }
+                    }
                   }
                 }
               }
             }
           ]
         },
-        "status_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-        }
-      },
-      "required": [
-        "status"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "const": "deferred"
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "deferred_reason"
-            ],
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "maxItems": 0
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "maxItems": 0
-                  }
-                }
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "minItems": 1
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": {
-                "const": "active"
+        "execution": {
+          "type": "object",
+          "description": "Global execution summary.",
+          "additionalProperties": false,
+          "properties": {
+            "files_touched": {
+              "type": "array",
+              "description": "All files modified or created during execution.",
+              "items": {
+                "type": "string"
               }
             },
-            "required": [
-              "status"
-            ]
-          },
-          "then": {
-            "required": [
-              "review_requirements"
-            ],
-            "properties": {
-              "review_requirements": {
-                "required": [
-                  "test_commands"
-                ],
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    "execution": {
-      "type": "object",
-      "description": "Global execution summary.",
-      "additionalProperties": false,
-      "properties": {
-        "files_touched": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "execution_results": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "status": {
-                "$ref": "#/$defs/executionStatus"
-              },
-              "outcome_description": {
-                "type": "string"
-              },
-              "reasoning": {
-                "type": "string"
-              },
-              "command": {
-                "type": "string"
-              },
-              "evidence": {
-                "type": "string",
-                "minLength": 20
-              },
-              "evidence_ref": {
-                "type": "string"
-              },
-              "evidence_binding": {
+            "execution_results": {
+              "type": "array",
+              "description": "Results from running test and verification commands.",
+              "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "timestamp": {
-                    "type": "string",
-                    "format": "date-time"
+                  "status": {
+                    "$ref": "#/$defs/executionStatus",
+                    "description": "Outcome status of this execution result."
                   },
-                  "sha256": {
+                  "outcome_description": {
                     "type": "string",
-                    "pattern": "^[a-f0-9]{64}$"
+                    "description": "Human-readable description of the execution outcome."
                   },
-                  "exit_code": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255
+                  "reasoning": {
+                    "type": "string",
+                    "description": "Explanation of why this outcome occurred."
                   },
                   "command": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The command that was executed."
+                  },
+                  "evidence": {
+                    "type": "string",
+                    "minLength": 20,
+                    "description": "Raw evidence output from the command execution (minimum 20 characters)."
+                  },
+                  "evidence_ref": {
+                    "type": "string",
+                    "description": "External reference or URI pointing to the evidence source."
+                  },
+                  "evidence_binding": {
+                    "type": "object",
+                    "description": "Cryptographic binding proving evidence authenticity.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "ISO 8601 timestamp of when the evidence was captured."
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "description": "SHA-256 hash of the evidence content."
+                      },
+                      "exit_code": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255,
+                        "description": "Exit code returned by the command."
+                      },
+                      "command": {
+                        "type": "string",
+                        "description": "The command that produced this evidence."
+                      },
+                      "command_ref": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "description": "Canonical reference for the command in the registry."
+                      }
+                    },
+                    "required": [
+                      "timestamp",
+                      "sha256",
+                      "exit_code"
+                    ]
+                  },
+                  "status_ref": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "description": "Canonical reference for the execution status."
                   },
                   "command_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "description": "Canonical reference for the command in the registry."
                   }
                 },
                 "required": [
-                  "timestamp",
-                  "sha256",
-                  "exit_code"
-                ]
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-              },
-              "command_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-              }
-            },
-            "required": [
-              "status",
-              "outcome_description",
-              "reasoning",
-              "command",
-              "evidence"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "status": {
-                      "const": "passed"
+                  "status",
+                  "outcome_description",
+                  "reasoning",
+                  "command",
+                  "evidence"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "status": {
+                          "const": "passed"
+                        },
+                        "status_ref": {
+                          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                        }
+                      }
                     },
-                    "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                    "then": {
+                      "required": [
+                        "evidence_ref",
+                        "evidence_binding"
+                      ],
+                      "properties": {
+                        "evidence": {
+                          "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
+                        }
+                      }
                     }
+                  }
+                ],
+                "description": "Result from running a single test or verification command during execution."
+              }
+            },
+            "critical_evidence": {
+              "type": "object",
+              "description": "Summary of critical evidence linking checklist items to test outcomes.",
+              "additionalProperties": false,
+              "properties": {
+                "satisfied_checklist_ids": {
+                  "type": "array",
+                  "description": "Checklist item IDs that have been satisfied with evidence.",
+                  "items": {
+                    "type": "string"
                   }
                 },
-                "then": {
-                  "required": [
-                    "evidence_ref",
-                    "evidence_binding"
-                  ],
-                  "properties": {
-                    "evidence": {
-                      "pattern": "(PASSED|passed|OK|SUCCESS|\u2713|0 (errors|failures?|failed)|\\d+ passed)"
-                    }
+                "passed_test_commands": {
+                  "type": "array",
+                  "description": "Test commands that passed during execution.",
+                  "items": {
+                    "type": "string"
                   }
                 }
               }
-            ]
-          }
-        },
-        "critical_evidence": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "satisfied_checklist_ids": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
             },
-            "passed_test_commands": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "config_validation": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "dashboard_links_valid": {
-              "type": "boolean"
-            },
-            "alert_rules_valid": {
-              "type": "boolean"
-            },
-            "drift_schedules_valid": {
-              "type": "boolean"
-            },
-            "notes": {
-              "type": "string"
-            }
-          }
-        },
-        "emergent_ambiguities": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-              },
-              "description": {
-                "type": "string"
-              },
-              "severity": {
-                "type": "string"
-              },
-              "impact": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+            "config_validation": {
+              "type": "object",
+              "description": "Validation status of configuration artifacts (dashboards, alerts, drift schedules).",
+              "additionalProperties": false,
+              "properties": {
+                "dashboard_links_valid": {
+                  "type": "boolean",
+                  "description": "Whether all dashboard links are valid and reachable."
+                },
+                "alert_rules_valid": {
+                  "type": "boolean",
+                  "description": "Whether all alert rules are syntactically valid."
+                },
+                "drift_schedules_valid": {
+                  "type": "boolean",
+                  "description": "Whether all drift detection schedules are valid cron expressions."
+                },
+                "notes": {
+                  "type": "string",
+                  "description": "Additional notes about configuration validation results."
                 }
-              },
-              "status": {
-                "type": "string"
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             },
-            "required": [
-              "id",
-              "description",
-              "severity"
-            ]
-          }
-        },
-        "final_status": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "test_results": {
+            "emergent_ambiguities": {
               "type": "array",
+              "description": "Ambiguities discovered during execution that were not anticipated in planning.",
               "items": {
-                "type": "object"
-              }
-            },
-            "ci_status": {
-              "type": "string",
-              "enum": [
-                "green",
-                "red"
-              ]
-            }
-          }
-        }
-      }
-    },
-    "review": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "findings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-              },
-              "type": {
-                "type": "string",
-                "enum": [
-                  "bug",
-                  "gap",
-                  "scope_creep",
-                  "style",
-                  "design",
-                  "tests",
-                  "docs"
-                ]
-              },
-              "severity": {
-                "type": "string",
-                "enum": [
-                  "blocking",
-                  "major",
-                  "minor",
-                  "nit"
-                ]
-              },
-              "spec_ref": {
-                "$ref": "#/$defs/specRef"
-              },
-              "description": {
-                "type": "string"
-              },
-              "related_checklist_ids": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "remediation_task": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "task_id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                  "id": {
+                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "description": "Unique kebab-case identifier for this emergent ambiguity."
                   },
-                  "summary": {
-                    "type": "string"
+                  "description": {
+                    "type": "string",
+                    "description": "Description of the ambiguity discovered during execution."
                   },
-                  "files_to_touch": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "checklist_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "task_id",
-                  "summary",
-                  "files_to_touch",
-                  "checklist_ids"
-                ]
-              },
-              "metadata": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "source": {
-                    "type": "string"
+                  "severity": {
+                    "type": "string",
+                    "description": "Severity of the emergent ambiguity."
                   },
                   "impact": {
-                    "type": "string"
+                    "type": "array",
+                    "description": "Areas or artifacts affected by this ambiguity.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Current resolution status of this emergent ambiguity."
+                  },
+                  "status_ref": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "description": "Canonical reference for the ambiguity status."
                   }
                 },
                 "required": [
-                  "source",
-                  "impact"
-                ]
+                  "id",
+                  "description",
+                  "severity"
+                ],
+                "description": "An ambiguity discovered during execution that was not anticipated in planning."
               }
             },
-            "required": [
-              "id",
-              "type",
-              "severity",
-              "spec_ref",
-              "description",
-              "metadata"
-            ],
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "severity": {
-                      "enum": [
-                        "blocking",
-                        "major"
+            "final_status": {
+              "type": "object",
+              "description": "Final execution status summarizing test results and CI outcome.",
+              "additionalProperties": false,
+              "properties": {
+                "test_results": {
+                  "type": "array",
+                  "description": "Summary of test results from execution.",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "ci_status": {
+                  "type": "string",
+                  "enum": [
+                    "green",
+                    "red"
+                  ],
+                  "description": "Overall CI status: green (all passing) or red (failures present)."
+                }
+              }
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "description": "Review phase: findings, ratings, verdict, and fixture/deployment status.",
+          "additionalProperties": false,
+          "properties": {
+            "findings": {
+              "type": "array",
+              "description": "Issues found during review with severity and remediation plans.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "description": "Unique kebab-case identifier for this finding."
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "bug",
+                      "gap",
+                      "scope_creep",
+                      "style",
+                      "design",
+                      "tests",
+                      "docs"
+                    ],
+                    "description": "Category of the finding: bug, gap, scope creep, style, design, tests, or docs."
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": [
+                      "blocking",
+                      "major",
+                      "minor",
+                      "nit"
+                    ],
+                    "description": "Severity of the finding from blocking (must fix) to nit (optional)."
+                  },
+                  "spec_ref": {
+                    "$ref": "#/$defs/specRef",
+                    "description": "Reference to the spec artifact related to this finding."
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Detailed description of the finding."
+                  },
+                  "related_checklist_ids": {
+                    "type": "array",
+                    "description": "Checklist item IDs related to this finding.",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "remediation_task": {
+                    "type": "object",
+                    "description": "Task definition for remediating this finding (required for blocking/major).",
+                    "additionalProperties": false,
+                    "properties": {
+                      "task_id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "description": "Unique kebab-case identifier for the remediation task."
+                      },
+                      "summary": {
+                        "type": "string",
+                        "description": "Summary of the remediation work required."
+                      },
+                      "files_to_touch": {
+                        "type": "array",
+                        "description": "Files that need to be modified for remediation.",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "checklist_ids": {
+                        "type": "array",
+                        "description": "Checklist item IDs that the remediation must satisfy.",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "task_id",
+                      "summary",
+                      "files_to_touch",
+                      "checklist_ids"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "Additional metadata about the finding's source and impact.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "source": {
+                        "type": "string",
+                        "description": "Where the finding was discovered (e.g., code review, test run)."
+                      },
+                      "impact": {
+                        "type": "string",
+                        "description": "Description of the impact if this finding is not addressed."
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "impact"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "severity",
+                  "spec_ref",
+                  "description",
+                  "metadata"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "severity": {
+                          "enum": [
+                            "blocking",
+                            "major"
+                          ]
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "remediation_task"
                       ]
                     }
                   }
+                ],
+                "description": "A review finding with type, severity, spec reference, and optional remediation task."
+              }
+            },
+            "ratings": {
+              "type": "object",
+              "description": "Quality ratings across five dimensions (0-5 scale).",
+              "additionalProperties": false,
+              "properties": {
+                "spec_completeness": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "description": "Rating of how completely the spec requirements were implemented (0-5)."
                 },
-                "then": {
-                  "required": [
-                    "remediation_task"
-                  ]
+                "code_quality": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "description": "Rating of overall code quality (0-5)."
+                },
+                "tests_completeness": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "description": "Rating of test coverage completeness (0-5)."
+                },
+                "docs_completeness": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "description": "Rating of documentation completeness (0-5)."
+                },
+                "metadata_usage": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 5,
+                  "description": "Rating of how well metadata and canonical references are used (0-5)."
                 }
-              }
-            ]
-          }
-        },
-        "ratings": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "spec_completeness": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 5
+              },
+              "required": [
+                "spec_completeness",
+                "code_quality",
+                "tests_completeness",
+                "docs_completeness",
+                "metadata_usage"
+              ]
             },
-            "code_quality": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 5
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "deferred",
+                "rejected"
+              ],
+              "description": "Final review verdict: verified (approved), deferred, or rejected."
             },
-            "tests_completeness": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 5
+            "next_actions": {
+              "type": "string",
+              "description": "Free-text description of what should happen next after this review."
             },
-            "docs_completeness": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 5
-            },
-            "metadata_usage": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 5
-            }
-          },
-          "required": [
-            "spec_completeness",
-            "code_quality",
-            "tests_completeness",
-            "docs_completeness",
-            "metadata_usage"
-          ]
-        },
-        "verdict": {
-          "type": "string",
-          "enum": [
-            "verified",
-            "deferred",
-            "rejected"
-          ]
-        },
-        "next_actions": {
-          "type": "string"
-        },
-        "fixture_status": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "implemented_endpoints": {
-              "type": "array",
-              "items": {
-                "$ref": "https://specdev.local/schema/core/collections/1#traceId"
-              }
-            },
-            "test_results": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "fixture_ref": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pass",
-                      "fail",
-                      "skip"
-                    ]
-                  },
-                  "notes": {
-                    "type": "string"
-                  },
-                  "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+            "fixture_status": {
+              "type": "object",
+              "description": "Status of fixture test results and CI for implemented interfaces.",
+              "additionalProperties": false,
+              "properties": {
+                "implemented_interfaces": {
+                  "type": "array",
+                  "description": "Trace IDs of interfaces that have been implemented.",
+                  "items": {
+                    "$ref": "https://specdev.local/schema/core/collections/1#traceId",
+                    "description": "Trace ID of an implemented interface."
                   }
                 },
-                "required": [
-                  "fixture_ref",
-                  "status"
-                ]
-              }
+                "test_results": {
+                  "type": "array",
+                  "description": "Per-fixture test outcomes.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "fixture_ref": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "description": "Fixture ID being tested."
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pass",
+                          "fail",
+                          "skip"
+                        ],
+                        "description": "Test result: pass, fail, or skip."
+                      },
+                      "notes": {
+                        "type": "string",
+                        "description": "Additional notes about this test result."
+                      },
+                      "status_ref": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "description": "Canonical reference for the test status."
+                      }
+                    },
+                    "required": [
+                      "fixture_ref",
+                      "status"
+                    ],
+                    "description": "Per-fixture test result with pass/fail/skip status."
+                  }
+                },
+                "ci_status": {
+                  "type": "string",
+                  "enum": [
+                    "green",
+                    "red"
+                  ],
+                  "description": "CI status for fixture tests: green (all passing) or red (failures)."
+                }
+              },
+              "required": [
+                "implemented_interfaces",
+                "test_results",
+                "ci_status"
+              ]
             },
-            "ci_status": {
+            "security_status": {
               "type": "string",
               "enum": [
                 "green",
                 "red"
-              ]
-            }
-          },
-          "required": [
-            "implemented_endpoints",
-            "test_results",
-            "ci_status"
-          ]
-        },
-        "security_status": {
-          "type": "string",
-          "enum": [
-            "green",
-            "red"
-          ]
-        },
-        "delivery_status": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "deployments": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "env": {
-                    "allOf": [
-                      {
-                        "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
-                      },
-                      {
-                        "enum": [
-                          "dev",
-                          "staging",
-                          "prod"
+              ],
+              "description": "Security review status: green (no issues) or red (issues present)."
+            },
+            "delivery_status": {
+              "type": "object",
+              "description": "Deployment status across environments.",
+              "additionalProperties": false,
+              "properties": {
+                "deployments": {
+                  "type": "array",
+                  "description": "List of deployments with their environment and status.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "env": {
+                        "description": "Target deployment environment.",
+                        "allOf": [
+                          {
+                            "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
+                          },
+                          {
+                            "enum": [
+                              "dev",
+                              "staging",
+                              "prod"
+                            ]
+                          }
                         ]
+                      },
+                      "build_id": {
+                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "description": "Unique kebab-case identifier for this build/deployment."
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "success",
+                          "failed"
+                        ],
+                        "description": "Deployment status: pending, success, or failed."
+                      },
+                      "status_ref": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "description": "Canonical reference for the deployment status."
                       }
-                    ]
+                    },
+                    "required": [
+                      "env",
+                      "build_id"
+                    ],
+                    "description": "A deployment record with environment, build ID, and status."
+                  }
+                }
+              }
+            },
+            "semantic_review": {
+              "type": "object",
+              "description": "Semantic review checking FR coverage, hallucinated features, and scope delta.",
+              "properties": {
+                "fr_coverage": {
+                  "type": "array",
+                  "description": "Per-FR coverage assessment with evidence.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "fr_id": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "description": "Functional requirement ID being assessed."
+                      },
+                      "satisfied": {
+                        "type": "boolean",
+                        "description": "Whether this FR has been satisfied by the implementation."
+                      },
+                      "evidence_summary": {
+                        "type": "string",
+                        "minLength": 20,
+                        "description": "Summary of evidence showing how the FR was satisfied (minimum 20 characters)."
+                      },
+                      "checklist_ids": {
+                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                        "description": "Checklist item IDs that provide evidence for this FR."
+                      }
+                    },
+                    "required": [
+                      "fr_id",
+                      "satisfied",
+                      "evidence_summary",
+                      "checklist_ids"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Per-FR coverage assessment with satisfaction status and evidence summary."
                   },
-                  "build_id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                  },
-                  "status": {
+                  "minItems": 1
+                },
+                "hallucinated_features": {
+                  "type": "array",
+                  "description": "Features implemented that were not specified in the spec (scope creep detection).",
+                  "items": {
                     "type": "string",
-                    "enum": [
-                      "pending",
-                      "success",
-                      "failed"
-                    ]
-                  },
-                  "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                    "minLength": 10,
+                    "description": "Description of a feature implemented without spec backing (minimum 10 characters)."
                   }
                 },
-                "required": [
-                  "env",
-                  "build_id"
-                ]
-              }
-            }
-          }
-        },
-        "semantic_review": {
-          "type": "object",
-          "properties": {
-            "fr_coverage": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "fr_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-                  "satisfied": { "type": "boolean" },
-                  "evidence_summary": { "type": "string", "minLength": 20 },
-                  "checklist_ids": { "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray" }
-                },
-                "required": ["fr_id", "satisfied", "evidence_summary", "checklist_ids"],
-                "additionalProperties": false
+                "scope_delta": {
+                  "type": "string",
+                  "description": "Free-text summary of any scope creep or unplanned features detected"
+                }
               },
-              "minItems": 1
-            },
-            "hallucinated_features": {
-              "type": "array",
-              "items": { "type": "string", "minLength": 10 }
-            },
-            "scope_delta": {
-              "type": "string",
-              "description": "Free-text summary of any scope creep or unplanned features detected"
+              "required": [
+                "fr_coverage",
+                "hallucinated_features"
+              ],
+              "additionalProperties": false
             }
           },
-          "required": ["fr_coverage", "hallucinated_features"],
-          "additionalProperties": false
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "verdict"
-            ],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "fixture_status"
-            ],
-            "properties": {
-              "fixture_status": {
-                "properties": {
-                  "ci_status": {
-                    "const": "green"
-                  }
-                },
+          "allOf": [
+            {
+              "if": {
                 "required": [
-                  "ci_status"
+                  "verdict"
+                ],
+                "properties": {
+                  "verdict": {
+                    "const": "verified"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "fixture_status"
+                ],
+                "properties": {
+                  "fixture_status": {
+                    "properties": {
+                      "ci_status": {
+                        "const": "green"
+                      }
+                    },
+                    "required": [
+                      "ci_status"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": [
+                  "verdict"
+                ],
+                "properties": {
+                  "verdict": {
+                    "const": "verified"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "semantic_review"
                 ]
               }
             }
-          }
+          ]
         },
-        {
-          "if": {
-            "required": ["verdict"],
-            "properties": {
-              "verdict": {
-                "const": "verified"
-              }
-            }
-          },
-          "then": {
-            "required": ["semantic_review"]
-          }
+        "policy_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the governance policy governing this implementation."
+        },
+        "risk_category_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the risk category of this implementation."
         }
+      },
+      "required": [
+        "plan"
       ]
-    },
-    "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "risk_category_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during version upgrades."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "plan",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

@@ -19,7 +19,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "schema").mkdir()
             (root / "prompts").mkdir()
             (root / "schema" / "00_charter.schema.json").write_text(
-                json.dumps({"required": ["id", "seed_refs"]}),
+                json.dumps({"required": ["id", "owner"]}),
                 encoding="utf-8",
             )
             (root / "prompts" / "prompt_00_project_charter.md").write_text(
@@ -156,8 +156,8 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     {
                         "type": "object",
                         "properties": {
-                            "generation_quality": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+                            "canonical_refs_used": {
+                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
                             }
                         },
                         "required": [],
@@ -175,7 +175,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("missing property field='generation_quality'" in e for e in render_errors(errs)))
+            self.assertTrue(any("missing property field='canonical_refs_used'" in e for e in render_errors(errs)))
 
     def test_detects_missing_required_nested_canonical_refs(self):
         with tempfile.TemporaryDirectory() as td:
@@ -230,8 +230,8 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     {
                         "type": "object",
                         "properties": {
-                            "generation_quality": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
+                            "canonical_refs_used": {
+                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
                             }
                         },
                         "required": [],
@@ -246,12 +246,12 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "{\"type\":\"object\",\"properties\":{},\"required\":[]}\n"
                     "```\n\n"
                     "## Metadata Contract\n"
-                    "- Include `generation_quality` in the output artifact.\n"
+                    "- Include `canonical_refs_used` in the output artifact.\n"
                 ),
                 encoding="utf-8",
             )
             errs = run_prompt_schema_sync(str(root))
-            self.assertTrue(any("missing property field='generation_quality'" in e for e in render_errors(errs)))
+            self.assertTrue(any("missing property field='canonical_refs_used'" in e for e in render_errors(errs)))
 
     def test_detects_output_contract_schema_violation(self):
         with tempfile.TemporaryDirectory() as td:

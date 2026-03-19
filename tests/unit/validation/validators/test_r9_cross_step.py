@@ -5,10 +5,10 @@ Tests all 8 validators that perform cross-step reference validation:
 - step_06: FR + API refs in invariant trace targets
 - step_08: FR + API + INV + NFR refs in fixture targets
 - step_09: Capability refs in milestone deliverables/capability_refs
-- step_12: FR + NFR refs in CI job trace/coverage_gaps
+- step_12: FR + NFR refs in CI job trace
 - step_13: Governance label refs in extensions
 - step_13a: FR + API refs in missing_elements spec_refs/related_ids
-- step_15: API refs in scaffold route_map
+- step_15: API refs in scaffold interface_map
 
 Each test class covers three scenarios:
 (a) Valid upstream refs pass with no W590/E590
@@ -76,7 +76,7 @@ class TestStep05CrossStep(unittest.TestCase):
                     {
                         "api_id": "api-auth",
                         "method": "POST",
-                        "route": "/auth/login",
+                        "path": "/auth/login",
                         "trace": [
                             {"type": "fr", "id": "fr-login"},
                             {"type": "fr", "id": "fr-logout"},
@@ -98,7 +98,7 @@ class TestStep05CrossStep(unittest.TestCase):
                     {
                         "api_id": "api-auth",
                         "method": "POST",
-                        "route": "/auth/login",
+                        "path": "/auth/login",
                         "trace": [{"type": "fr", "id": "fr-login"}],
                     }
                 ]
@@ -125,7 +125,7 @@ class TestStep05CrossStep(unittest.TestCase):
                     {
                         "api_id": "api-auth",
                         "method": "POST",
-                        "route": "/auth/login",
+                        "path": "/auth/login",
                         "trace": [{"type": "fr", "id": "fr-nonexistent"}],
                     }
                 ]
@@ -567,9 +567,6 @@ class TestStep12CrossStep(unittest.TestCase):
                 "trace": [
                     {"type": "fr", "id": "fr-login"},
                 ],
-                "coverage_gaps": [
-                    {"upstream_item_id": "nfr-latency", "reason": "pending"},
-                ],
             }
             errors = validate_step_12(instance, tmp)
             self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
@@ -589,9 +586,6 @@ class TestStep12CrossStep(unittest.TestCase):
                 ],
                 "trace": [
                     {"type": "fr", "id": "fr-login"},
-                ],
-                "coverage_gaps": [
-                    {"upstream_item_id": "nfr-latency", "reason": "pending"},
                 ],
             }
             errors = validate_step_12(instance, tmp)
@@ -620,9 +614,7 @@ class TestStep12CrossStep(unittest.TestCase):
                 ],
                 "trace": [
                     {"type": "fr", "id": "fr-phantom"},
-                ],
-                "coverage_gaps": [
-                    {"upstream_item_id": "nfr-ghost", "reason": "pending"},
+                    {"type": "nfr", "id": "nfr-ghost"},
                 ],
             }
             errors = validate_step_12(instance, tmp)
@@ -886,11 +878,11 @@ class TestStep13aCrossStep(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Step 15 — API refs in scaffold route_map
+# Step 15 — API refs in scaffold interface_map
 # ---------------------------------------------------------------------------
 
 class TestStep15CrossStep(unittest.TestCase):
-    """Cross-step validation: step_15 checks route_map api_ref against 05_interface_contracts.json."""
+    """Cross-step validation: step_15 checks interface_map interface_ref against 05_interface_contracts.json."""
 
     def test_valid_upstream_refs_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -906,10 +898,10 @@ class TestStep15CrossStep(unittest.TestCase):
                 "id": "scaffold-main",
                 "owner": "api",
                 "created_at": "2026-03-01",
-                "service_skeleton": {"language": "python"},
-                "route_map": [
-                    {"api_ref": "api-auth", "method": "POST", "path": "/auth"},
-                    {"api_ref": "api-users", "method": "GET", "path": "/users"},
+                "project_skeleton": {"language": "python"},
+                "interface_map": [
+                    {"interface_ref": "api-auth", "method": "POST", "path": "/auth"},
+                    {"interface_ref": "api-users", "method": "GET", "path": "/users"},
                 ],
                 "validators": [{"id": "v1", "command": "pytest"}],
                 "build_status": "green",
@@ -927,9 +919,9 @@ class TestStep15CrossStep(unittest.TestCase):
                 "id": "scaffold-main",
                 "owner": "api",
                 "created_at": "2026-03-01",
-                "service_skeleton": {"language": "python"},
-                "route_map": [
-                    {"api_ref": "api-auth", "method": "POST", "path": "/auth"},
+                "project_skeleton": {"language": "python"},
+                "interface_map": [
+                    {"interface_ref": "api-auth", "method": "POST", "path": "/auth"},
                 ],
                 "validators": [{"id": "v1", "command": "pytest"}],
                 "build_status": "green",
@@ -953,16 +945,16 @@ class TestStep15CrossStep(unittest.TestCase):
                 "id": "scaffold-main",
                 "owner": "api",
                 "created_at": "2026-03-01",
-                "service_skeleton": {"language": "python"},
-                "route_map": [
-                    {"api_ref": "api-nonexistent", "method": "POST", "path": "/ghost"},
+                "project_skeleton": {"language": "python"},
+                "interface_map": [
+                    {"interface_ref": "api-nonexistent", "method": "POST", "path": "/ghost"},
                 ],
                 "validators": [{"id": "v1", "command": "pytest"}],
                 "build_status": "green",
             }
             errors = validate_step_15(instance, tmp)
             e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken api_ref")
+            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken interface_ref")
             self.assertTrue(
                 any("api-nonexistent" in msg for msg in e),
                 f"E590 should mention the broken ref: {e}"
@@ -1039,8 +1031,8 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
                 "id": "scaffold-x",
                 "owner": "api",
                 "created_at": "2026-03-01",
-                "service_skeleton": {},
-                "route_map": [{"api_ref": "api-x", "method": "GET", "path": "/x"}],
+                "project_skeleton": {},
+                "interface_map": [{"interface_ref": "api-x", "method": "GET", "path": "/x"}],
                 "validators": [{"id": "v1", "command": "pytest"}],
                 "build_status": "green",
             }

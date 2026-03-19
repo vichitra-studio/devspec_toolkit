@@ -8,7 +8,8 @@
       "type": "object",
       "patternProperties": {
         "^[a-zA-Z0-9_]+$": {
-          "type": "string"
+          "type": "string",
+          "description": "A metadata value string keyed by alphanumeric/underscore name."
         }
       },
       "additionalProperties": false,
@@ -18,6 +19,7 @@
       "$anchor": "kebabId",
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Lowercase kebab-case identifier used as the universal ID format across all spec artifacts (e.g., 'fr-user-login', 'api-session-create').",
       "examples": [
         "fr-user-login",
         "api-login",
@@ -28,6 +30,7 @@
       "$anchor": "timestamp",
       "type": "string",
       "format": "date-time",
+      "description": "ISO 8601 date-time string used for artifact creation and modification timestamps.",
       "examples": [
         "2025-10-16T22:06:04.202593Z"
       ]
@@ -36,17 +39,19 @@
       "$anchor": "owner",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]*$",
-      "description": "Artifact owner \u2014 validated against canon/kinds/owner.json entries."
+      "description": "Artifact owner — validated against canon/kinds/owner.json entries."
     },
     "tag": {
       "$anchor": "tag",
       "type": "string",
-      "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+      "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+      "description": "Short alphanumeric label used for categorization and filtering of canonical entries (max 64 chars)."
     },
     "screamingSnakeId": {
       "$anchor": "screamingSnakeId",
       "type": "string",
       "pattern": "^[A-Z0-9_]+$",
+      "description": "SCREAMING_SNAKE_CASE identifier used for constants and task identifiers in implementation artifacts.",
       "examples": [
         "TASK_01_INIT",
         "FR_USER_LOGIN"

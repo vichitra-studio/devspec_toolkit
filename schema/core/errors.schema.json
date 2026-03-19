@@ -9,10 +9,12 @@
       "additionalProperties": false,
       "properties": {
         "code": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Kebab-case error code identifying the specific validation failure (e.g., missing-field, invalid-ref)."
         },
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "Human-readable description of the error or warning."
         },
         "severity": {
           "type": "string",
@@ -21,13 +23,15 @@
             "warn",
             "error",
             "fatal"
-          ]
+          ],
+          "description": "Severity level of the diagnostic: info (advisory), warn (non-blocking), error (blocking), or fatal (pipeline halt)."
         }
       },
       "required": [
         "code",
         "message"
-      ]
+      ],
+      "description": "Structured error or diagnostic state emitted by validators and linters during pipeline execution."
     }
   }
 }

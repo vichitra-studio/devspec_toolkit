@@ -22,7 +22,6 @@ Each step's prompt defines its specific Definition of Ready (DoR) within the **S
 - Reuse canonicals first: when a known domain term/entity/role/metric/state/policy matches an existing canonical entry, use the corresponding `*_ref` object and include it in `canonical_refs_used`.
 - Do not invent parallel definitions for existing canonicals. If input text conflicts with canonical meaning, add a `canonical_conflicts` entry with `field_path`, `input_value`, candidate ids, and reason.
 - If no canonical can be matched with confidence, add a `canonical_proposals` entry instead of guessing.
-- Keep generation evidence explicit in `generation_quality`: record sources (`seed_ref`, `canonical_ref`, `upstream_ref`) and list unresolved inputs/assumptions.
 - Any value with both `<field>` and `<field>_ref` must remain semantically consistent; CI may fail on mismatches.
 
 ## Canonical Resolution Protocol
@@ -35,7 +34,7 @@ Each step's prompt defines its specific Definition of Ready (DoR) within the **S
 ## one-go Quality Protocol (fail-closed)
 
 - Preflight: before writing output JSON, verify required inputs, allowed enums, and all referenced artifact IDs.
-- Evidence Ledger: every non-trivial decision must be traceable to seed input, upstream artifact evidence, or canonical registry evidence in `generation_quality`.
+- Evidence Ledger: every non-trivial decision must be traceable to seed input, upstream artifact evidence, or canonical registry evidence.
 - Completeness Closure: run an explicit final pass that checks required sections, reference closure, and semantic consistency between `<field>` and `<field>_ref`.
 - fail-closed blockers: if any required evidence is missing, any ambiguity is unresolved, or any downstream dependency is unknown, stop and emit a blocker report instead of guessing.
 

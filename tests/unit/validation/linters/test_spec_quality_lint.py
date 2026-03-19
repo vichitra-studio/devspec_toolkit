@@ -18,8 +18,8 @@ class SpecQualityLintTests(unittest.TestCase):
                         "id": "charter",
                         "owner": "system",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [],
-                        "generation_quality": {"assumptions": []},
+
+
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -62,17 +62,17 @@ class SpecQualityLintTests(unittest.TestCase):
                         "id": "capabilities-test",
                         "owner": "system",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [],
+
                         "capabilities": [{"capability_id": "cap-one"}],
                     }
                 ),
                 encoding="utf-8",
             )
             errs = lint_spec_quality(str(root / "spec"))
-            self.assertTrue(any("missing top-level 'generation_quality'" in e for e in render_errors(errs)))
             self.assertTrue(any("missing top-level 'canonical_refs_used'" in e for e in render_errors(errs)))
-            self.assertTrue(any("missing top-level 'canonical_proposals'" in e for e in render_errors(errs)))
-            self.assertTrue(any("missing top-level 'canonical_conflicts'" in e for e in render_errors(errs)))
+            self.assertFalse(any("missing top-level 'generation_quality'" in e for e in render_errors(errs)))
+            self.assertFalse(any("missing top-level 'canonical_proposals'" in e for e in render_errors(errs)))
+            self.assertFalse(any("missing top-level 'canonical_conflicts'" in e for e in render_errors(errs)))
 
     def test_schema_uri_drives_step_detection_for_nonstandard_filename(self):
         with tempfile.TemporaryDirectory() as td:
@@ -85,14 +85,15 @@ class SpecQualityLintTests(unittest.TestCase):
                         "id": "capabilities-test",
                         "owner": "system",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [],
+
                         "capabilities": [{"capability_id": "cap-one"}],
                     }
                 ),
                 encoding="utf-8",
             )
             errs = lint_spec_quality(str(root / "spec"))
-            self.assertTrue(any("artifact.json missing top-level 'generation_quality'" in e for e in render_errors(errs)))
+            self.assertTrue(any("artifact.json missing top-level 'canonical_refs_used'" in e for e in render_errors(errs)))
+            self.assertFalse(any("artifact.json missing top-level 'generation_quality'" in e for e in render_errors(errs)))
 
     def test_detects_assumption_vague_quantifier(self):
         from specdev_tools.validation.spec_quality_lint import _check_assumptions
@@ -115,26 +116,6 @@ class SpecQualityLintTests(unittest.TestCase):
         errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]}, set())
         self.assertTrue(any("W572 ASSUMPTION_COUNT_HIGH" in e for e in render_errors(errs)))
 
-    def test_simplified_generation_quality_accepted(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "spec").mkdir()
-            (root / "spec" / "00_charter.json").write_text(
-                json.dumps({
-                    "id": "charter",
-                    "owner": "system",
-                    "created_at": "2026-01-01T00:00:00Z",
-                    "seed_refs": [],
-                    "generation_quality": {"assumptions": []},
-                    "canonical_refs_used": [],
-                    "canonical_proposals": [],
-                    "canonical_conflicts": [],
-                }),
-                encoding="utf-8",
-            )
-            errs = lint_spec_quality(str(root / "spec"))
-            gq_errs = [e for e in render_errors(errs) if "generation_quality" in e]
-            self.assertEqual(gq_errs, [])
 
 
 if __name__ == "__main__":

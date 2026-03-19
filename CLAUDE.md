@@ -172,7 +172,7 @@ Artifacts live in `spec/NN_name.json`; human guides in `spec/NN_name.guide.md`. 
 
 Prompts support **Clarify → Emit**:
 1. **Clarify**: if `Self-Audit Gate` score < 0.9, output only short bulleted gap questions (no JSON, no code fences). Group by field/topic. Stop and wait.
-2. **Emit**: write artifact JSON directly to `spec/NN_name.json`. Do not return fenced JSON as primary output. Populate `seed_refs` from actually-used seeds.
+2. **Emit**: write artifact JSON directly to `spec/NN_name.json`. Do not return fenced JSON as primary output. Seed associations are derived from `seed_manifest.json` `step_requirements` — no per-artifact `seed_refs` field is needed.
 
 Agent protocol metadata lives in `docs/agents/manifest.json`.
 
@@ -192,7 +192,7 @@ Agent protocol metadata lives in `docs/agents/manifest.json`.
 - **Unknown Target in fixtures**: ensure the target ID (`fr-*`, `api-*`, `nfr-*`, `inv-*`) exists in its spec file
 - **Governance rejection**: match commit pattern from Step 10; `pr_rules` must use allowed enum values
 - **Step 11 failures**: `target_ids` must target an API or Component; `mitigations` must be structured objects, not strings
-- **Step 15 failures**: `method` must be one of GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD; no duplicate `api_ref`
+- **Step 15 failures**: `method` must be one of GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD; no duplicate `interface_ref`
 - **Glossary failures**: `terms` needs ≥1 item; definitions >20 chars; `domain` is kebab-case; no empty strings
 - **Step 09 failures**: `tech_stack` must be an object (not array); `milestones` need a `deliverables` array
 

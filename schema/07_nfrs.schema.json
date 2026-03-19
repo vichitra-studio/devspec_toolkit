@@ -2,151 +2,121 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/07_nfrs.schema.json",
   "title": "07_nfrs",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "nfrs": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "nfr_id": {
-            "type": "string",
-            "pattern": "^nfr-[a-z0-9]+-[a-z0-9-]+$"
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "latency",
-              "throughput",
-              "availability",
-              "durability",
-              "cost",
-              "security",
-              "privacy",
-              "maintainability",
-              "usability",
-              "portability",
-              "energy"
-            ]
-          },
-          "metric": {
-            "type": "string"
-          },
-          "target": {
-            "oneOf": [
-              {
-                "type": "number"
-              },
-              {
+    {
+      "type": "object",
+      "properties": {
+        "nfrs": {
+          "description": "Array of non-functional requirements specifying measurable quality attributes for the system.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single non-functional requirement with category, metric target, measurement method, and traceability.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "nfr_id": {
+                "description": "Unique identifier for this NFR in the format 'nfr-<category>-<name>' (e.g., 'nfr-latency-api-response').",
                 "type": "string",
-                "pattern": "^.*\\d+.*$"
+                "pattern": "^nfr-[a-z0-9]+-[a-z0-9-]+$"
+              },
+              "category": {
+                "description": "Quality attribute category: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, or energy.",
+                "type": "string",
+                "enum": [
+                  "latency",
+                  "throughput",
+                  "availability",
+                  "durability",
+                  "cost",
+                  "security",
+                  "privacy",
+                  "maintainability",
+                  "usability",
+                  "portability",
+                  "energy"
+                ]
+              },
+              "metric": {
+                "description": "Name of the metric being measured (e.g., 'p99 response time', 'uptime percentage').",
+                "type": "string"
+              },
+              "target": {
+                "description": "Target value for this NFR metric, either numeric or a string containing a number.",
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^.*\\d+.*$"
+                  }
+                ]
+              },
+              "unit": {
+                "description": "Unit of measurement for the metric (e.g., 'ms', 'percent', 'req/s').",
+                "type": "string"
+              },
+              "measurement_method": {
+                "description": "How this NFR will be measured or verified (e.g., 'synthetic monitoring', 'load test').",
+                "type": "string"
+              },
+              "stage": {
+                "description": "Delivery stage at which this NFR must be met (e.g., 'mvp', 'ga').",
+                "$ref": "https://specdev.local/schema/core/collections/1#stageName"
+              },
+              "owner": {
+                "description": "Team or domain responsible for meeting this NFR.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+              },
+              "trace": {
+                "description": "Traceability links back to upstream requirements, components, or APIs.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                }
+              },
+              "metric_ref": {
+                "description": "Canonical reference to the metric definition in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "unit_ref": {
+                "description": "Canonical reference to the unit of measurement in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "stage_ref": {
+                "description": "Canonical reference to the delivery stage in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "environment_ref": {
+                "description": "Canonical reference to the environment where this NFR is measured.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
+            },
+            "required": [
+              "nfr_id",
+              "category",
+              "metric",
+              "target",
+              "unit",
+              "metric_ref",
+              "unit_ref",
+              "environment_ref",
+              "measurement_method",
+              "stage",
+              "owner",
+              "trace"
             ]
-          },
-          "unit": {
-            "type": "string"
-          },
-          "measurement_method": {
-            "type": "string"
-          },
-          "stage": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stageName"
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "metric_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "unit_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "stage_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "environment_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
-        },
-        "required": [
-          "nfr_id",
-          "category",
-          "metric",
-          "target",
-          "unit",
-          "metric_ref",
-          "unit_ref",
-          "environment_ref",
-          "measurement_method",
-          "stage",
-          "owner",
-          "trace"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "nfrs"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "nfrs",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

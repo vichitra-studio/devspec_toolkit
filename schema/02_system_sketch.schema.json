@@ -2,292 +2,273 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/02_system_sketch.schema.json",
   "title": "02_system_sketch",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "components": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "component_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "service",
-              "db",
-              "queue",
-              "cache",
-              "job",
-              "ui",
-              "lib",
-              "external"
-            ]
-          },
-          "responsibilities": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-            "minItems": 3,
-            "maxItems": 6
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "critical-path",
-                "supporting",
-                "external-dependency",
-                "shared-platform",
-                "stateful",
-                "stateless",
-                "realtime",
-                "batch",
-                "latency-sensitive",
-                "throughput-sensitive",
-                "pii",
-                "phi",
-                "pci",
-                "confidential",
-                "public-data",
-                "multi-tenant",
-                "single-tenant",
-                "experimental",
-                "legacy",
-                "deprecated"
-              ]
-            }
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            },
-            "minItems": 1
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          }
-        },
-        "required": [
-          "component_id",
-          "type",
-          "responsibilities",
-          "owner",
-          "trace"
-        ]
-      }
-    },
-    "connections": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "from": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "to": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "http",
-              "grpc",
-              "event",
-              "rpc",
-              "db",
-              "file"
-            ]
-          },
-          "trust_boundary": {
-            "type": "string",
-            "enum": [
-              "internal",
-              "partner",
-              "public"
-            ]
-          },
-          "schema_ref": {
-            "type": "string",
-            "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
-          },
-          "auth": {
-            "type": "string",
-            "enum": [
-              "none",
-              "basic",
-              "oauth2",
-              "jwt",
-              "mTLS",
-              "key"
-            ]
-          },
-          "rate_limit": {
+    {
+      "type": "object",
+      "properties": {
+        "components": {
+          "description": "Array of system components forming the architecture, each with type, responsibilities, and trace links.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single architectural component (service, database, queue, etc.) in the system sketch.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "rps": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 100000
+              "component_id": {
+                "description": "Unique kebab-case identifier for this component (e.g., 'comp-auth-service').",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
               },
-              "burst": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 200000
-              },
-              "window_s": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 3600
-              },
-              "scope": {
+              "type": {
+                "description": "The architectural type of this component: service, db, queue, cache, job, ui, lib, or external.",
                 "type": "string",
                 "enum": [
-                  "ip",
-                  "client",
-                  "token",
-                  "global"
+                  "service",
+                  "db",
+                  "queue",
+                  "cache",
+                  "job",
+                  "ui",
+                  "lib",
+                  "external"
                 ]
+              },
+              "responsibilities": {
+                "description": "List of 3-6 responsibilities this component handles within the system.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "minItems": 3,
+                "maxItems": 6
+              },
+              "owner": {
+                "description": "Team or domain responsible for this component.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+              },
+              "tags": {
+                "description": "Classification tags for this component (e.g., critical-path, stateful, pii).",
+                "type": "array",
+                "items": {
+                  "description": "A tag classifying the component by criticality, data sensitivity, tenancy, or lifecycle stage.",
+                  "type": "string",
+                  "enum": [
+                    "critical-path",
+                    "supporting",
+                    "external-dependency",
+                    "shared-platform",
+                    "stateful",
+                    "stateless",
+                    "realtime",
+                    "batch",
+                    "latency-sensitive",
+                    "throughput-sensitive",
+                    "pii",
+                    "phi",
+                    "pci",
+                    "confidential",
+                    "public-data",
+                    "multi-tenant",
+                    "single-tenant",
+                    "experimental",
+                    "legacy",
+                    "deprecated"
+                  ]
+                }
+              },
+              "trace": {
+                "description": "Traceability links back to upstream capabilities or charter items.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this component."
+                },
+                "minItems": 1
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the entity this component represents in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
               }
             },
             "required": [
-              "rps",
-              "scope"
+              "component_id",
+              "type",
+              "responsibilities",
+              "owner",
+              "trace"
             ]
-          },
-          "reliability": {
-            "type": "string",
-            "enum": [
-              "best-effort",
-              "at-least-once",
-              "exactly-once"
-            ]
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            },
-            "minItems": 1
-          },
-          "interface_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "event_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "trust_boundary": {
-                  "enum": [
-                    "partner",
-                    "public"
+        "connections": {
+          "description": "Array of connections between components describing protocols, trust boundaries, and data flow.",
+          "type": "array",
+          "items": {
+            "description": "A connection between two components specifying protocol, trust boundary, and optional rate limiting.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "description": "Component ID of the connection source.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "to": {
+                "description": "Component ID of the connection destination.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "protocol": {
+                "description": "Communication protocol used for this connection: http, grpc, event, rpc, db, or file.",
+                "type": "string",
+                "enum": [
+                  "http",
+                  "grpc",
+                  "event",
+                  "rpc",
+                  "db",
+                  "file"
+                ]
+              },
+              "trust_boundary": {
+                "description": "Trust boundary classification: internal (same trust zone), partner (B2B), or public (internet-facing).",
+                "type": "string",
+                "enum": [
+                  "internal",
+                  "partner",
+                  "public"
+                ]
+              },
+              "schema_ref": {
+                "description": "Reference to the schema governing data exchanged over this connection.",
+                "type": "string",
+                "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
+              },
+              "auth": {
+                "description": "Authentication mechanism required for this connection: none, basic, oauth2, jwt, mTLS, or key.",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "basic",
+                  "oauth2",
+                  "jwt",
+                  "mTLS",
+                  "key"
+                ]
+              },
+              "rate_limit": {
+                "description": "Rate limiting configuration for this connection, required for partner/public trust boundaries.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rps": {
+                    "description": "Maximum requests per second allowed through this connection.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100000
+                  },
+                  "burst": {
+                    "description": "Maximum burst size allowed above the steady-state rate.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200000
+                  },
+                  "window_s": {
+                    "description": "Time window in seconds over which the rate limit is measured.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3600
+                  },
+                  "scope": {
+                    "description": "Scope at which the rate limit is applied: per-ip, per-client, per-token, or globally.",
+                    "type": "string",
+                    "enum": [
+                      "ip",
+                      "client",
+                      "token",
+                      "global"
+                    ]
+                  }
+                },
+                "required": [
+                  "rps",
+                  "scope"
+                ]
+              },
+              "reliability": {
+                "description": "Message delivery guarantee for event-based connections: best-effort, at-least-once, or exactly-once.",
+                "type": "string",
+                "enum": [
+                  "best-effort",
+                  "at-least-once",
+                  "exactly-once"
+                ]
+              },
+              "trace": {
+                "description": "Traceability links back to upstream artifacts for this connection.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this connection."
+                },
+                "minItems": 1
+              },
+              "interface_ref": {
+                "description": "Canonical reference to the interface this connection implements.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "event_ref": {
+                "description": "Canonical reference to the event type carried by this connection.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "trust_boundary": {
+                      "enum": [
+                        "partner",
+                        "public"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "auth",
+                    "rate_limit"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "protocol": {
+                      "enum": [
+                        "event"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "reliability"
                   ]
                 }
               }
-            },
-            "then": {
-              "required": [
-                "auth",
-                "rate_limit"
-              ]
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "protocol": {
-                  "enum": [
-                    "event"
-                  ]
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "reliability"
-              ]
-            }
+            ],
+            "required": [
+              "from",
+              "to",
+              "protocol",
+              "trust_boundary",
+              "trace"
+            ]
           }
-        ],
-        "required": [
-          "from",
-          "to",
-          "protocol",
-          "trust_boundary",
-          "trace"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
+      "required": [
+        "components"
+      ]
     },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
-    }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "components",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ],
-  "allOf": [
     {
       "if": {
         "properties": {
@@ -307,25 +288,7 @@
           }
         }
       }
-    },
-    {
-      "if": {
-        "properties": {
-          "connections": {
-            "type": "array",
-            "minItems": 1
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "connections": {
-            "items": {
-              "allOf": []
-            }
-          }
-        }
-      }
     }
-  ]
+  ],
+  "unevaluatedProperties": false
 }

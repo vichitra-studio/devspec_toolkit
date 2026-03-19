@@ -2,151 +2,120 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
   "title": "13a_completeness_assessment",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "missing_elements": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "element_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "traceability",
-              "completeness",
-              "quality",
-              "ambiguity"
+    {
+      "type": "object",
+      "properties": {
+        "missing_elements": {
+          "type": "array",
+          "description": "Elements missing from the spec suite that affect completeness.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "element_id": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "description": "Unique kebab-case identifier for this missing element."
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "traceability",
+                  "completeness",
+                  "quality",
+                  "ambiguity"
+                ],
+                "description": "The dimension of completeness affected: traceability, completeness, quality, or ambiguity."
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what is missing and why it matters."
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ],
+                "description": "Priority level for addressing this gap."
+              },
+              "impact_on_completeness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fractional impact on overall completeness score (0 = none, 1 = maximum)."
+              },
+              "specification_source": {
+                "type": "array",
+                "description": "Spec files where this element should have been defined.",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
+                }
+              },
+              "risk_category_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the risk category of this gap."
+              },
+              "completeness_dimension_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the completeness dimension in the registry."
+              },
+              "tag_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the tag associated with this element."
+              }
+            },
+            "required": [
+              "element_id",
+              "category",
+              "description",
+              "priority",
+              "impact_on_completeness",
+              "specification_source"
             ]
-          },
-          "description": {
-            "type": "string"
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "high",
-              "medium",
-              "low"
-            ]
-          },
-          "impact_on_completeness": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 1
-          },
-          "specification_source": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
-            }
-          },
-          "risk_category_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "completeness_dimension_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "tag_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
           }
         },
-        "required": [
-          "element_id",
-          "category",
-          "description",
-          "priority",
-          "impact_on_completeness",
-          "specification_source"
-        ]
-      }
-    },
-    "completeness_rating": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "current": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "target": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 10
-        },
-        "confidence_level": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
+        "completeness_rating": {
+          "type": "object",
+          "description": "Overall completeness rating of the spec suite.",
+          "additionalProperties": false,
+          "properties": {
+            "current": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "description": "Current completeness score on a 0-10 scale."
+            },
+            "target": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "description": "Target completeness score to achieve."
+            },
+            "confidence_level": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Confidence in the accuracy of the current rating (0 = no confidence, 1 = certain)."
+            }
+          },
+          "required": [
+            "current",
+            "target",
+            "confidence_level"
+          ]
         }
       },
       "required": [
-        "current",
-        "target",
-        "confidence_level"
+        "missing_elements",
+        "completeness_rating"
       ]
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "missing_elements",
-    "completeness_rating",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

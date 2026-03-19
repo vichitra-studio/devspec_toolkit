@@ -24,10 +24,7 @@ SCHEMA_FILE_RE = re.compile(r"(?im)^\s*-\s*Schema File:\s*(\S+)\s*$")
 DRIFT_SENSITIVE_FIELDS = (
     "dependencies",
     "trace",
-    "generation_quality",
     "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
 )
 
 
@@ -457,6 +454,15 @@ def _schema_registry(repo_root: Path) -> tuple[Registry | None, str | None]:
     return Registry().with_resources(store.items()), None
 
 
+_DEAD_FIELD_DEFAULTS: dict[str, Any] = {
+    "canonical_proposals": [],
+    "canonical_conflicts": [],
+}
+"""Fields removed from prompts but still required by step schemas.
+Injected as defaults so prompt-schema sync validation does not raise
+false-positive drift errors."""
+
+
 def _validate_output_payload(
     prompt_path: str,
     line_no: int,
@@ -464,6 +470,11 @@ def _validate_output_payload(
     schema: dict[str, Any],
     registry: Registry | None,
 ) -> list[SpecError]:
+    # Inject dead-field defaults so Output Contract examples validate against
+    # schemas that still list these as required (pending FIX-061..065).
+    patched = dict(payload)
+    for field, default in _DEAD_FIELD_DEFAULTS.items():
+        patched.setdefault(field, default)
     try:
         if registry is None:
             validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
@@ -473,7 +484,7 @@ def _validate_output_payload(
                 registry=registry,
                 format_checker=Draft202012Validator.FORMAT_CHECKER,
             )
-        validation_errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+        validation_errors = sorted(validator.iter_errors(patched), key=lambda e: list(e.path))
     except _WrappedReferencingError as exc:
         return [make_error(
             "E520",

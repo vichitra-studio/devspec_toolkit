@@ -5,6 +5,7 @@
   "https://specdev.local/schema/canon/kind/1": "canon/kind.schema.json",
   "https://specdev.local/schema/core/collections/1": "schema/core/collections.schema.json",
   "https://specdev.local/schema/core/errors/1": "schema/core/errors.schema.json",
+  "https://specdev.local/schema/core/step_base/1": "schema/core/step_base.schema.json",
   "https://specdev.local/schema/00_charter.schema.json": "schema/00_charter.schema.json",
   "https://specdev.local/schema/01_capabilities.schema.json": "schema/01_capabilities.schema.json",
   "https://specdev.local/schema/02_system_sketch.schema.json": "schema/02_system_sketch.schema.json",

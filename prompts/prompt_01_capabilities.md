@@ -36,11 +36,9 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
 - **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
-
 ## Seed Order & Mandatory Sources
 - Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["01"]`.
 - Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## Context To Ingest
@@ -56,26 +54,6 @@ For each upstream artifact ingested, extract the following:
 - **docs/seed/seed_overview.md**: Scope boundaries, user persona definitions, high-level feature expectations, and product vision for capability derivation
 - **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries
 
-## Seed Ingestion Protocol
-
-This step's seed requirements are defined in `spec/common/seed_manifest.json` -> `step_requirements`.
-
-1. **Read**: Read `spec/common/seed_manifest.json` and identify seeds listed under this step's `step_requirements`
-2. **Ingest**: Read each required seed document at its `path` listed in the manifest's `seeds[]` array, in the order defined by `global_seed_order`
-3. **Extract**: Extract the specific fields relevant to this step's output as described in the `### Extraction Intent` section
-4. **Populate**: Populate `seed_refs[]` with actually-used seed IDs and content hashes
-
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
 - **Cross-Check**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in `docs/seed/seed_overview.md`. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question.
@@ -88,14 +66,12 @@ questions; untraceable content triggers `coverage_gaps[]` population.
 - Naming: MUST use `capability-<verb>-<noun>` format when a matching term exists in `spec/00_charter.json` goals or `docs/seed/seed_overview.md`; MUST NOT use UI-screen or database-table names as capability identifiers.
 
 ## Self-Audit Gate
-- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - All in-scope charter goals map to at least one capability.
   - Each capability contains a clear verb, scope, owner (if not external), and minimal inputs/outputs.
   - Non-trivial capabilities include either pre/postconditions or error_states.
   - No duplicate or overlapping capabilities (glossary-normalized).
-
 
 ### Coverage Closure
 Before emitting, verify:
@@ -106,7 +82,6 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` only contains seeds actually referenced in the output
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -191,10 +166,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -206,12 +180,6 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "capabilities-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
-  "spec_refs_ingested": [],
   "capabilities": [
     {
       "capability_id": "capability-authentication",
@@ -229,18 +197,12 @@ This step's output artifact MUST include every field listed in the schema's `req
       ]
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:capability:example",
       "kind": "capability"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }
 ```
 

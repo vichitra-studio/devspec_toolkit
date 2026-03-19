@@ -304,8 +304,6 @@ class TestStep16(unittest.TestCase):
             "id": "step-ms-ref-test",
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
-            "seed_refs": [{"seed_id": "seed-overview"}, {"seed_id": "seed-tech-stack"}],
-            "spec_refs_ingested": [],
             "plan": {
                 "status": "active",
                 "summary": {
@@ -325,7 +323,6 @@ class TestStep16(unittest.TestCase):
                 },
                 "review_requirements": {"test_commands": ["pytest tests/"]}
             },
-            "generation_quality": {"assumptions": []},
             "canonical_refs_used": [],
             "canonical_proposals": [],
             "canonical_conflicts": []

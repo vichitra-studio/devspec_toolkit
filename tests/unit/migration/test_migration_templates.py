@@ -88,14 +88,11 @@ class TestTemplateContentValidation:
 
     @pytest.mark.parametrize("template_name", EXPECTED_TEMPLATES)
     def test_templates_include_metadata_fields(self, templates_dir, template_name):
-        """Each template mentions generation_quality and canonical_refs_used."""
+        """Each template mentions canonical_refs_used."""
         path = templates_dir / template_name
         if not path.exists():
             pytest.skip(f"{template_name} does not exist")
         content = path.read_text(encoding="utf-8")
-        assert "generation_quality" in content, (
-            f"{template_name} does not mention generation_quality"
-        )
         assert "canonical_refs_used" in content, (
             f"{template_name} does not mention canonical_refs_used"
         )

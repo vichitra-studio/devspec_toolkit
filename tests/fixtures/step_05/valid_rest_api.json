@@ -3,25 +3,16 @@
   "id": "interface-contracts-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
   "apis": [
     {
       "api_id": "api-user-login",
       "name": "User Login",
       "version": "v1",
       "protocol": "http",
-      "route": "/login",
+      "path": "/login",
       "method": "POST",
-      "request_schema_ref": "schemas/payloads/login-request.json",
-      "response_schema_ref": "schemas/payloads/login-response.json",
+      "input_schema_ref": "schemas/payloads/login-request.json",
+      "output_schema_ref": "schemas/payloads/login-response.json",
       "errors": [
         {
           "code": "invalid-credentials",
@@ -62,10 +53,10 @@
       "name": "User Profile",
       "version": "v1",
       "protocol": "http",
-      "route": "/users/{id}",
+      "path": "/users/{id}",
       "method": "GET",
-      "request_schema_ref": "-tbd",
-      "response_schema_ref": "schemas/payloads/user-profile.json",
+      "input_schema_ref": "-tbd",
+      "output_schema_ref": "schemas/payloads/user-profile.json",
       "errors": [
         {
           "code": "user-not-found",
@@ -91,11 +82,5 @@
       ]
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

@@ -2,113 +2,79 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/03_glossary.schema.json",
   "title": "03_glossary",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "terms": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "term_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "term": {
-            "type": "string",
-            "minLength": 2
-          },
-          "acronym": {
-            "type": "string",
-            "pattern": "^[A-Z0-9]{2,}$"
-          },
-          "definition": {
-            "type": "string",
-            "minLength": 20
-          },
-          "domain": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[a-z]+(?:-[a-z]+)*$"
-          },
-          "units": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9/]+$"
-          },
-          "term_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "acronym_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "unit_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+    {
+      "type": "object",
+      "properties": {
+        "terms": {
+          "description": "Array of domain-specific terms with definitions, used to establish shared vocabulary across specs.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single glossary term with its definition, domain classification, and canonical references.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "term_id": {
+                "description": "Unique kebab-case identifier for this glossary term (e.g., 'term-session-token').",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "term": {
+                "description": "The glossary term as it appears in natural language, minimum 2 characters.",
+                "type": "string",
+                "minLength": 2
+              },
+              "acronym": {
+                "description": "Optional uppercase acronym for this term (e.g., 'JWT', 'API').",
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,}$"
+              },
+              "definition": {
+                "description": "Precise definition of the term in the project context, minimum 20 characters.",
+                "type": "string",
+                "minLength": 20
+              },
+              "domain": {
+                "description": "Knowledge domain this term belongs to, in kebab-case (e.g., 'authentication', 'data-storage').",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-z]+(?:-[a-z]+)*$"
+              },
+              "units": {
+                "description": "Unit of measurement if this term represents a measurable quantity (e.g., 'ms', 'MB/s').",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9/]+$"
+              },
+              "term_ref": {
+                "description": "Canonical reference linking this term to the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "acronym_ref": {
+                "description": "Canonical reference for the acronym in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "unit_ref": {
+                "description": "Canonical reference for the unit of measurement in the canonical registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              }
+            },
+            "required": [
+              "term_id",
+              "term",
+              "definition",
+              "term_ref"
+            ]
           }
-        },
-        "required": [
-          "term_id",
-          "term",
-          "definition",
-          "term_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "terms"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "terms",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

@@ -2,16 +2,7 @@
   "id": "valid-full-scaffold",
   "owner": "api",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python",
     "framework": "fastapi",
     "modules": [
@@ -19,14 +10,14 @@
       "uvicorn"
     ]
   },
-  "route_map": [
+  "interface_map": [
     {
-      "api_ref": "api-get-users",
+      "interface_ref": "api-get-users",
       "path": "/users",
       "method": "GET"
     },
     {
-      "api_ref": "api-create-user",
+      "interface_ref": "api-create-user",
       "path": "/users",
       "method": "POST"
     }
@@ -46,11 +37,5 @@
       "target": "https://example.com/docs"
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

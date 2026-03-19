@@ -2,151 +2,122 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/09_impl_plan.schema.json",
   "title": "09_impl_plan",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "tech_stack": {
-      "allOf": [
-        {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStack"
-        },
-        {
-          "required": [
-            "languages",
-            "frameworks",
-            "infrastructure",
-            "tools"
-          ]
-        }
-      ]
-    },
-    "tech_stack_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "milestones": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "milestone_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "target_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "in_progress",
-              "done",
-              "deferred"
-            ],
-            "default": "pending"
-          },
-          "risks": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "spikes": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "deliverables": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+    {
+      "type": "object",
+      "properties": {
+        "tech_stack": {
+          "description": "Technology stack for the implementation, including languages, frameworks, infrastructure, and tools.",
+          "allOf": [
+            {
+              "$ref": "https://specdev.local/schema/core/collections/1#techStack"
+            },
+            {
+              "required": [
+                "languages",
+                "frameworks",
+                "infrastructure",
+                "tools"
+              ]
             }
-          },
-          "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          ]
+        },
+        "tech_stack_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the technology stack entry in the registry."
+        },
+        "milestones": {
+          "type": "array",
+          "description": "Ordered list of implementation milestones with deliverables and status tracking.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "milestone_id": {
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "description": "Unique kebab-case identifier for this milestone."
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable name of the milestone."
+              },
+              "target_date": {
+                "type": "string",
+                "format": "date",
+                "description": "Planned completion date for this milestone (ISO 8601 date)."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "done",
+                  "deferred"
+                ],
+                "default": "pending",
+                "description": "Current progress status of the milestone."
+              },
+              "risks": {
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "description": "Known risks that could delay or block this milestone."
+              },
+              "spikes": {
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "description": "Technical spikes or investigations required before work can proceed."
+              },
+              "deliverables": {
+                "type": "array",
+                "description": "Trace references to artifacts this milestone will produce.",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                }
+              },
+              "status_ref": {
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "description": "Canonical reference for the status value in the registry."
+              }
+            },
+            "required": [
+              "milestone_id",
+              "name",
+              "deliverables",
+              "status"
+            ]
           }
         },
-        "required": [
-          "milestone_id",
-          "name",
-          "deliverables",
-          "status"
-        ]
-      }
-    },
-    "migration_plan": {
-      "type": "string"
-    },
-    "dependencies": {
-      "$ref": "https://specdev.local/schema/core/collections/1#dependencyList"
-    },
-    "dependency_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "environment_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        "migration_plan": {
+          "type": "string",
+          "description": "High-level strategy for migrating from existing systems or data to the new implementation."
+        },
+        "dependencies": {
+          "$ref": "https://specdev.local/schema/core/collections/1#dependencyList",
+          "description": "External or internal dependencies required by the implementation."
+        },
+        "dependency_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the dependency list in the registry."
+        },
+        "environment_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the target deployment environment."
+        },
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting this plan to upstream and downstream artifacts.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+          }
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "tech_stack",
+        "milestones",
+        "trace"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "tech_stack",
-    "milestones",
-    "trace",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

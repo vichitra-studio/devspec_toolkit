@@ -6,8 +6,10 @@
     "kebabIdArray": {
       "$anchor": "kebabIdArray",
       "type": "array",
+      "description": "Non-empty array of unique kebab-case identifiers, used for cross-referencing spec artifacts.",
       "items": {
-        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+        "description": "A kebab-case identifier."
       },
       "minItems": 1,
       "uniqueItems": true
@@ -15,6 +17,7 @@
     "stringArray": {
       "$anchor": "stringArray",
       "type": "array",
+      "description": "Generic array of strings used for lists of labels, paths, exclusions, or freeform text entries.",
       "items": {
         "type": "string"
       }
@@ -22,16 +25,20 @@
     "link": {
       "$anchor": "link",
       "type": "object",
+      "description": "Hyperlink object representing a relationship between artifacts, with an optional spec cross-reference.",
       "additionalProperties": false,
       "properties": {
         "rel": {
-          "type": "string"
+          "type": "string",
+          "description": "Relationship type describing how the linked resource relates to this artifact (e.g., 'source', 'documentation')."
         },
         "href": {
-          "type": "string"
+          "type": "string",
+          "description": "URL or relative path to the linked resource."
         },
         "spec_ref": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Optional kebab-case ID referencing another spec artifact related to this link."
         }
       },
       "required": [
@@ -41,6 +48,7 @@
     },
     "traceId": {
       "$anchor": "traceId",
+      "description": "Kebab-case identifier used as a traceability target, linking requirements to implementations.",
       "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
     },
     "traceRef": {
@@ -51,13 +59,15 @@
         "type": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Trace type \u2014 validated against canon/kinds/trace_type.json entries."
+          "description": "Trace type — validated against canon/kinds/trace_type.json entries."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Kebab-case ID of the target artifact being traced to."
         },
         "note": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional human-readable explanation of why this trace link exists."
         }
       },
       "required": [
@@ -83,7 +93,8 @@
             ]
           }
         }
-      ]
+      ],
+      "description": "Typed cross-reference linking one spec artifact to another for traceability. External traces require an owner and note."
     },
     "canonicalRef": {
       "$anchor": "canonicalRef",
@@ -92,36 +103,45 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
+          "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$",
+          "description": "Fully qualified canonical ID in the format cn:<namespace>:<kind>:<slug>."
         },
         "kind": {
           "type": "string",
-          "pattern": "^[a-z_][a-z0-9_]*$"
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Canonical kind category this reference belongs to (e.g., unit, stage, environment)."
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "description": "Semantic version of the canonical entry at the time of reference."
         },
         "label": {
-          "type": "string"
+          "type": "string",
+          "description": "Human-readable display label for this canonical reference."
         },
         "alias_used": {
-          "type": "string"
+          "type": "string",
+          "description": "If an alias was used in the source, records the original alias string before resolution."
         },
         "note": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional note explaining why this canonical term was chosen."
         }
       },
       "required": [
         "id",
         "kind"
-      ]
+      ],
+      "description": "Reference to a canonical registry entry, binding a spec field value to the shared vocabulary."
     },
     "canonicalRefArray": {
       "$anchor": "canonicalRefArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-      }
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+        "description": "A canonical registry reference."
+      },
+      "description": "Array of canonical registry references used within an artifact."
     },
     "canonicalProposal": {
       "$anchor": "canonicalProposal",
@@ -129,23 +149,29 @@
       "additionalProperties": false,
       "properties": {
         "temp_id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Temporary kebab-case ID assigned to this proposal until it is accepted into the registry."
         },
         "kind": {
-          "type": "string"
+          "type": "string",
+          "description": "Canonical kind category for the proposed term (e.g., unit, entity, role)."
         },
         "proposed_label": {
-          "type": "string"
+          "type": "string",
+          "description": "Human-readable label suggested for the new canonical entry."
         },
         "definition": {
-          "type": "string"
+          "type": "string",
+          "description": "Clear definition of what this proposed canonical term represents."
         },
         "source_field": {
-          "type": "string"
+          "type": "string",
+          "description": "JSON path or field name in the source artifact where this term was encountered."
         },
         "suggested_namespace": {
           "type": "string",
-          "pattern": "^[a-z0-9.]+$"
+          "pattern": "^[a-z0-9.]+$",
+          "description": "Dot-separated namespace suggestion for organizing this term in the canonical registry."
         }
       },
       "required": [
@@ -154,14 +180,17 @@
         "proposed_label",
         "definition",
         "source_field"
-      ]
+      ],
+      "description": "Proposal for a new canonical term discovered during AI generation that does not yet exist in the registry."
     },
     "canonicalProposalArray": {
       "$anchor": "canonicalProposalArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      }
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal",
+        "description": "A proposed canonical term."
+      },
+      "description": "Array of proposed canonical terms discovered during artifact generation."
     },
     "canonicalConflict": {
       "$anchor": "canonicalConflict",
@@ -169,16 +198,20 @@
       "additionalProperties": false,
       "properties": {
         "field_path": {
-          "type": "string"
+          "type": "string",
+          "description": "JSON path to the field in the artifact where the conflict was detected."
         },
         "input_value": {
-          "type": "string"
+          "type": "string",
+          "description": "The original input value that triggered the ambiguous match."
         },
         "candidate_ids": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "description": "List of canonical IDs that all matched the input value."
         },
         "reason": {
-          "type": "string"
+          "type": "string",
+          "description": "Explanation of why the conflict could not be auto-resolved."
         }
       },
       "required": [
@@ -186,14 +219,17 @@
         "input_value",
         "candidate_ids",
         "reason"
-      ]
+      ],
+      "description": "Record of an ambiguous canonical resolution where multiple registry entries matched an input value."
     },
     "canonicalConflictArray": {
       "$anchor": "canonicalConflictArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      }
+        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict",
+        "description": "A canonical resolution conflict."
+      },
+      "description": "Array of canonical resolution conflicts encountered during artifact generation."
     },
     "environmentName": {
       "$anchor": "environmentName",
@@ -203,7 +239,8 @@
         "ci",
         "staging",
         "prod"
-      ]
+      ],
+      "description": "Deployment environment name. One of dev, ci, staging, or prod."
     },
     "stageName": {
       "$anchor": "stageName",
@@ -213,7 +250,8 @@
         "ci",
         "staging",
         "prod"
-      ]
+      ],
+      "description": "Pipeline stage name indicating the deployment target. One of dev, ci, staging, or prod."
     },
     "environmentConfig": {
       "$anchor": "environmentConfig",
@@ -247,7 +285,8 @@
             }
           }
         ]
-      }
+      },
+      "description": "Key-value configuration map for a deployment environment, supporting string, number, boolean, string array, and string-map values."
     },
     "techStackItem": {
       "$anchor": "techStackItem",
@@ -255,32 +294,40 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "Name of the technology (e.g., Python, React, PostgreSQL)."
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "description": "Version string or constraint for this technology."
         },
         "notes": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional implementation notes about this technology choice."
         },
         "rationale": {
-          "type": "string"
+          "type": "string",
+          "description": "Justification for selecting this technology over alternatives."
         },
         "tech_stack_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Optional canonical reference linking this tech stack item to the canonical registry."
         }
       },
       "required": [
         "name",
         "version"
-      ]
+      ],
+      "description": "A single technology component in the project stack, with version and optional rationale."
     },
     "techStackList": {
       "$anchor": "techStackList",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#techStackItem"
-      }
+        "$ref": "https://specdev.local/schema/core/collections/1#techStackItem",
+        "description": "A technology stack item."
+      },
+      "description": "Array of technology stack items within a single category."
     },
     "techStack": {
       "$anchor": "techStack",
@@ -288,22 +335,27 @@
       "additionalProperties": false,
       "properties": {
         "languages": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "description": "Programming languages used in the project."
         },
         "frameworks": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "description": "Application frameworks and libraries used in the project."
         },
         "infrastructure": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "description": "Infrastructure and platform services (databases, cloud providers, CI/CD)."
         },
         "tools": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList"
+          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "description": "Development and operational tools (linters, bundlers, monitoring)."
         }
       },
       "required": [
         "languages",
         "frameworks"
-      ]
+      ],
+      "description": "Structured technology stack organized by category: languages, frameworks, infrastructure, and tools."
     },
     "dependencyItem": {
       "$anchor": "dependencyItem",
@@ -315,20 +367,25 @@
           "enum": [
             "milestone",
             "external"
-          ]
+          ],
+          "description": "Dependency type: milestone for internal project milestones, external for third-party or cross-team dependencies."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "description": "Kebab-case identifier for this dependency."
         },
         "owner": {
-          "type": "string"
+          "type": "string",
+          "description": "Team or individual responsible for resolving this dependency. Required for external dependencies."
         },
         "note": {
           "type": "string",
-          "pattern": "^\\S+\\s+\\S+.*$"
+          "pattern": "^\\S+\\s+\\S+.*$",
+          "description": "Description of the dependency with at least two words. Required for external dependencies."
         },
         "dependency_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Optional canonical reference linking this dependency to the canonical registry."
         }
       },
       "required": [
@@ -354,7 +411,8 @@
             ]
           }
         }
-      ]
+      ],
+      "description": "A milestone or external dependency that must be resolved before work can proceed."
     },
     "dependencyList": {
       "$anchor": "dependencyList",
@@ -365,131 +423,22 @@
             "type": "string"
           },
           {
-            "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
+            "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem",
+            "description": "A structured dependency item with type, ID, and optional owner."
           }
-        ]
-      }
+        ],
+        "description": "A dependency entry: either a simple string ID or a structured dependency item."
+      },
+      "description": "Array of dependencies, each either a simple string ID or a structured dependency item."
     },
     "dependencyObjectList": {
       "$anchor": "dependencyObjectList",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem"
-      }
-    },
-    "generationQuality": {
-      "$anchor": "generationQuality",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "assumptions"
-      ],
-      "properties": {
-        "assumptions": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-        }
-      }
-    },
-    "seedRef": {
-      "$anchor": "seedRef",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "seed_id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-        },
-        "path": {
-          "type": "string"
-        },
-        "section": {
-          "type": "string"
-        },
-        "note": {
-          "type": "string"
-        },
-        "hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$",
-          "description": "SHA-256 hash of the seed document at time of ingestion."
-        },
-        "version": {
-          "type": "string",
-          "description": "Version identifier of the seed document."
-        }
+        "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem",
+        "description": "A structured dependency item."
       },
-      "required": [
-        "seed_id"
-      ]
-    },
-    "seedRefArray": {
-      "$anchor": "seedRefArray",
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#seedRef"
-      },
-      "minItems": 0
-    },
-    "specRefIngested": {
-      "$anchor": "specRefIngested",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "step_id": {
-          "type": "string",
-          "pattern": "^\\d{2}[a-z]?$",
-          "description": "Pipeline step number of the ingested artifact."
-        },
-        "artifact_id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-        },
-        "hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$",
-          "description": "SHA-256 hash of the ingested artifact."
-        }
-      },
-      "required": [
-        "step_id",
-        "artifact_id"
-      ]
-    },
-    "specRefsIngestedArray": {
-      "$anchor": "specRefsIngestedArray",
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#specRefIngested"
-      }
-    },
-    "coverageGap": {
-      "$anchor": "coverageGap",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "upstream_item_id",
-        "source_step",
-        "reason"
-      ],
-      "properties": {
-        "upstream_item_id": {
-          "type": "string"
-        },
-        "source_step": {
-          "type": "string",
-          "pattern": "^[0-9]{2}[a-c]?$"
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 10
-        }
-      }
-    },
-    "coverageGapsArray": {
-      "$anchor": "coverageGapsArray",
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#coverageGap"
-      },
-      "minItems": 0
+      "description": "Array of structured dependency items (no simple string entries allowed)."
     },
     "anyJson": {
       "$anchor": "anyJson",
@@ -515,7 +464,8 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "description": "Accepts any valid JSON value (object, array, string, number, integer, boolean, or null)."
     }
   }
 }

@@ -67,7 +67,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Step 05 Troubleshooting
 - **Missing Parameters**: Validation fails if `parameters` are needed but not defined in the new array format.
-- **Invalid Schema Refs**: `request_schema_ref` and `response_schema_ref` should point to valid `file://`, `glossary:`, or be marked `-tbd`.
+- **Invalid Schema Refs**: `input_schema_ref` and `output_schema_ref` should point to valid `file://`, `glossary:`, or be marked `-tbd`.
 - **Protocol Mismatch**: Non-HTTP protocols like `grpc` must mapping their methods (e.g., to `POST`) as per proper guidance.
 - **Empty Errors**: Every API must define at least one error state or explicitly justify why it cannot fail.
 

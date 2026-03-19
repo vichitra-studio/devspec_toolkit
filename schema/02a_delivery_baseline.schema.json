@@ -2,109 +2,73 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/02a_delivery_baseline.schema.json",
   "title": "02a_delivery_baseline",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "environments": {
+    {
       "type": "object",
-      "propertyNames": {
-        "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
-      },
-      "additionalProperties": {
-        "$ref": "https://specdev.local/schema/core/collections/1#environmentConfig"
+      "properties": {
+        "trace": {
+          "description": "Traceability links back to upstream artifacts (charter, system sketch).",
+          "type": "array",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+          }
+        },
+        "environments": {
+          "description": "Map of deployment environments (dev, ci, staging, prod) with their configurations.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
+          },
+          "additionalProperties": {
+            "$ref": "https://specdev.local/schema/core/collections/1#environmentConfig"
+          },
+          "required": [
+            "dev",
+            "ci",
+            "staging",
+            "prod"
+          ],
+          "minProperties": 4
+        },
+        "ci_gates": {
+          "description": "List of CI gate names that must pass before deployment (e.g., 'lint', 'unit-tests').",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A CI gate identifier in kebab-case format.",
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          }
+        },
+        "secrets": {
+          "description": "List of secret names or keys required by the delivery pipeline.",
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "compliance": {
+          "description": "List of compliance standards or frameworks the delivery must satisfy (e.g., 'SOC2', 'GDPR').",
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        },
+        "environment_ref": {
+          "description": "Canonical reference to the environment definitions in the canonical registry.",
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        "command_ref": {
+          "description": "Canonical reference to the command definitions used in CI gates.",
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        },
+        "policy_ref": {
+          "description": "Canonical reference to the compliance policies governing this delivery baseline.",
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+        }
       },
       "required": [
-        "dev",
-        "ci",
-        "staging",
-        "prod"
-      ],
-      "minProperties": 4
-    },
-    "ci_gates": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "string",
-        "pattern": "^[a-z0-9-]+$"
-      }
-    },
-    "secrets": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "compliance": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "environment_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "command_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+        "environments",
+        "ci_gates"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "environments",
-    "ci_gates",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

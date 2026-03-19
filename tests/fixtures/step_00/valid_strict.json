@@ -3,15 +3,6 @@
   "title": "Project Alpha Charter",
   "owner": "product",
   "created_at": "2023-10-27T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "spec_refs_ingested": [],
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
   "in_scope": [
     "User Authentication",
@@ -78,16 +69,10 @@
       "measurement_method": "Monthly monitoring"
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
       "kind": "unit"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }

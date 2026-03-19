@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -62,7 +51,7 @@ You must populate the `review` JSON object according to these specific definitio
 
 ## 1. `review.fixture_status` (The Scoreboard)
 *   **The Final Gatekeeper**.
-*   `implemented_endpoints`: List only endpoints that are LIVE and passing.
+*   `implemented_interfaces`: List only endpoints that are LIVE and passing.
 *   `test_results`: List status for critical fixtures (`pass`, `fail`, `skip`).
 *   `ci_status`: Overall health (`green` or `red`).
 *   *Heuristic*: If `ci_status` is red, you CANNOT have a `verified` verdict.
@@ -288,7 +277,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Schema Reference
 - Schema URI: https://specdev.local/schema/16_impl_context.schema.json
@@ -310,10 +298,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -326,8 +313,6 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -394,9 +379,6 @@ This step's output artifact MUST include every field listed in the schema's `req
     "emergent_ambiguities": []
   },
   "review": {},
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
@@ -404,8 +386,7 @@ This step's output artifact MUST include every field listed in the schema's `req
     }
   ],
   "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_conflicts": []
 }
 ```
 
@@ -415,15 +396,19 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
       "functional_summary": "Implement core API login",
-      "scope_in": ["login"],
-      "scope_out": ["oauth"],
-      "target_file_patterns": ["src/auth/routes.py"]
+      "scope_in": [
+        "login"
+      ],
+      "scope_out": [
+        "oauth"
+      ],
+      "target_file_patterns": [
+        "src/auth/routes.py"
+      ]
     },
     "spec_alignment": {
       "checklist": [
@@ -437,7 +422,9 @@ This step's output artifact MUST include every field listed in the schema's `req
           },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
-          "nfr_refs": ["nfr-security-auth"],
+          "nfr_refs": [
+            "nfr-security-auth"
+          ],
           "fixture_ref": "fixture-login-jwt",
           "implementation": {
             "status": "verified",
@@ -457,16 +444,22 @@ This step's output artifact MUST include every field listed in the schema's `req
       ]
     },
     "review_requirements": {
-      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
+      "test_commands": [
+        "pytest tests/auth/test_login.py::test_jwt -q"
+      ]
     },
     "docs_impact": {
       "status": "required",
       "rationale": "Code changes require documentation updates for traceability.",
-      "docs_touched": ["README.md"]
+      "docs_touched": [
+        "README.md"
+      ]
     }
   },
   "execution": {
-    "files_touched": ["src/auth/routes.py"],
+    "files_touched": [
+      "src/auth/routes.py"
+    ],
     "execution_results": [
       {
         "status": "failed",
@@ -506,8 +499,12 @@ This step's output artifact MUST include every field listed in the schema's `req
         "remediation_task": {
           "task_id": "fix-auth-token-response",
           "summary": "Return JWT token in login response body.",
-          "checklist_ids": ["CHK_AUTH_01"],
-          "files_to_touch": ["src/auth/routes.py"]
+          "checklist_ids": [
+            "CHK_AUTH_01"
+          ],
+          "files_to_touch": [
+            "src/auth/routes.py"
+          ]
         },
         "metadata": {
           "source": "execution_results",
@@ -517,18 +514,12 @@ This step's output artifact MUST include every field listed in the schema's `req
     ],
     "next_actions": "Implement remediation task and rerun targeted auth tests."
   },
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
       "kind": "unit"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }
 ```
 

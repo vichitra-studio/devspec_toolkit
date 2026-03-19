@@ -3,12 +3,6 @@
   "id": "step-impl-semantic-review",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
-  "spec_refs_ingested": [],
   "plan": {
     "status": "active",
     "summary": {
@@ -146,7 +140,7 @@
   "review": {
     "verdict": "verified",
     "fixture_status": {
-      "implemented_endpoints": [
+      "implemented_interfaces": [
         "auth-login"
       ],
       "test_results": [
@@ -172,11 +166,5 @@
       "scope_delta": "No unplanned features detected. Implementation matches spec scope exactly."
     }
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  "canonical_refs_used": []
 }

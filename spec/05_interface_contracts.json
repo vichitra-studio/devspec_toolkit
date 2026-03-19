@@ -3,7 +3,6 @@
     "id": "interface-contracts",
     "owner": "api",
     "created_at": "2025-01-01T00:00:00Z",
-    "seed_refs": [],
     "apis": [
         {
             "api_id": "api-ask",
@@ -16,7 +15,7 @@
                 "version": "^1.0.0",
                 "label": "ask"
             },
-            "route": "/ask",
+            "path": "/ask",
             "method": "POST",
             "owner": "api"
         },
@@ -31,7 +30,7 @@
                 "version": "^1.0.0",
                 "label": "search"
             },
-            "route": "/search",
+            "path": "/search",
             "method": "GET",
             "owner": "api"
         },
@@ -46,14 +45,11 @@
                 "version": "^1.0.0",
                 "label": "trace retrieval"
             },
-            "route": "/trace",
+            "path": "/trace",
             "method": "GET",
             "owner": "api"
         }
     ],
-    "generation_quality": {
-        "assumptions": []
-    },
     "canonical_refs_used": [
         {
             "id": "cn:core:interface:ask",
@@ -75,7 +71,5 @@
         }
     ],
     "canonical_proposals": [],
-    "canonical_conflicts": [],
-    "spec_refs_ingested": [],
-    "coverage_gaps": []
+    "canonical_conflicts": []
 }

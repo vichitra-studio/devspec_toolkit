@@ -7,32 +7,10 @@
   "global_seed_order": [
     "seed-overview"
   ],
-  "nested_order": [
-    {
-      "level_id": "foundation",
-      "seed_ids": [
-        "seed-overview"
-      ]
-    }
-  ],
-  "seeds": [
-    {
-      "seed_id": "seed-overview",
-      "path": "docs/seed/seed_overview.md",
-      "description": "Project scope and personas.",
-      "required": true,
-      "source_type": "doc"
-    }
-  ],
   "step_requirements": {
     "00": [
       "seed-overview"
     ]
   },
-  "generation_quality": {
-    "assumptions": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }

@@ -2,138 +2,110 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/04_fr_list.schema.json",
   "title": "04_fr_list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "functional_requirements": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "fr_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "statement": {
-            "type": "string",
-            "minLength": 20
-          },
-          "rationale": {
-            "type": "string"
-          },
-          "preconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "postconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "acceptance_criteria": {
-            "type": "array",
-            "minItems": 2,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "criterion_id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "text": {
-                  "type": "string",
-                  "minLength": 15
-                },
-                "fixture_ref": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    {
+      "type": "object",
+      "properties": {
+        "functional_requirements": {
+          "description": "Array of functional requirements derived from capabilities, each with acceptance criteria and trace links.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single functional requirement with statement, acceptance criteria, and traceability.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fr_id": {
+                "description": "Unique kebab-case identifier for this functional requirement (e.g., 'fr-user-login').",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+              },
+              "statement": {
+                "description": "Clear statement of the functional requirement, minimum 20 characters.",
+                "type": "string",
+                "minLength": 20
+              },
+              "rationale": {
+                "description": "Explanation of why this requirement exists and what business need it addresses.",
+                "type": "string"
+              },
+              "preconditions": {
+                "description": "Conditions that must hold before this requirement can be exercised.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "postconditions": {
+                "description": "Conditions guaranteed after successful fulfillment of this requirement.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "acceptance_criteria": {
+                "description": "Testable criteria that define when this requirement is satisfied, at least 2 required.",
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "description": "A single acceptance criterion with an ID, descriptive text, and optional fixture reference.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "criterion_id": {
+                      "description": "Unique kebab-case identifier for this acceptance criterion.",
+                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    },
+                    "text": {
+                      "description": "Descriptive text of the acceptance criterion, minimum 15 characters.",
+                      "type": "string",
+                      "minLength": 15
+                    },
+                    "fixture_ref": {
+                      "description": "Optional reference to a test fixture that validates this criterion.",
+                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    }
+                  },
+                  "required": [
+                    "criterion_id",
+                    "text"
+                  ]
                 }
               },
-              "required": [
-                "criterion_id",
-                "text"
-              ]
-            }
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "capability_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "action_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              "trace": {
+                "description": "Traceability links back to upstream capabilities or charter items.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                }
+              },
+              "capability_ref": {
+                "description": "Canonical reference to the capability this requirement implements.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "action_ref": {
+                "description": "Canonical reference to the action verb used in this requirement.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the primary entity this requirement operates on.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "status_ref": {
+                "description": "Canonical reference to the status lifecycle this requirement affects.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              }
+            },
+            "required": [
+              "fr_id",
+              "statement",
+              "acceptance_criteria",
+              "trace",
+              "capability_ref"
+            ]
           }
-        },
-        "required": [
-          "fr_id",
-          "statement",
-          "acceptance_criteria",
-          "trace",
-          "capability_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "functional_requirements"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "functional_requirements",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

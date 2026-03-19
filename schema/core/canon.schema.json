@@ -7,24 +7,30 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "JSON Schema URI identifying the schema this canonical registry conforms to."
     },
     "registry_version": {
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the canonical registry format."
     },
     "entries": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/entry"
+        "$ref": "#/$defs/entry",
+        "description": "A canonical registry entry."
       },
-      "minItems": 1
+      "minItems": 1,
+      "description": "Array of canonical registry entries defining the shared vocabulary."
     },
     "aliases": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/alias"
-      }
+        "$ref": "#/$defs/alias",
+        "description": "A canonical alias mapping."
+      },
+      "description": "Array of alias mappings that resolve alternative names to canonical entry IDs."
     }
   },
   "required": [
@@ -36,17 +42,20 @@
     "canonicalId": {
       "$anchor": "canonicalId",
       "type": "string",
-      "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$"
+      "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$",
+      "description": "Fully qualified canonical identifier in the format cn:<namespace>:<kind>:<slug>."
     },
     "semver": {
       "$anchor": "semver",
       "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version string in MAJOR.MINOR.PATCH format."
     },
     "owner": {
       "$anchor": "owner",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*$"
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Lowercase identifier for a team or role responsible for a canonical entry."
     },
     "entryStatus": {
       "$anchor": "entryStatus",
@@ -56,7 +65,8 @@
         "deprecated",
         "sunset",
         "retired"
-      ]
+      ],
+      "description": "Lifecycle status of a canonical entry: active (in use), deprecated (discouraged), sunset (removal scheduled), or retired (removed)."
     },
     "lifecycle": {
       "$anchor": "lifecycle",
@@ -65,30 +75,37 @@
       "properties": {
         "introduced_at": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this canonical entry was first added to the registry."
         },
         "deprecated_since": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this entry was marked as deprecated."
         },
         "sunset_after": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "ISO 8601 timestamp after which this entry will be retired."
         },
         "retired_at": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this entry was fully retired and removed from active use."
         },
         "replaced_by": {
-          "$ref": "#/$defs/canonicalId"
+          "$ref": "#/$defs/canonicalId",
+          "description": "Canonical ID of the entry that supersedes this deprecated or retired entry."
         },
         "deprecation_note": {
-          "type": "string"
+          "type": "string",
+          "description": "Human-readable explanation of why this entry was deprecated and what to use instead."
         }
       },
       "required": [
         "introduced_at"
-      ]
+      ],
+      "description": "Lifecycle timestamps tracking the progression of a canonical entry through active, deprecated, sunset, and retired states."
     },
     "aliasLifecycle": {
       "$anchor": "aliasLifecycle",
@@ -97,19 +114,23 @@
       "properties": {
         "deprecated_since": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "ISO 8601 date when this alias was deprecated."
         },
         "sunset_date": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "ISO 8601 date after which this alias will no longer resolve."
         },
         "replaced_by": {
-          "$ref": "#/$defs/canonicalId"
+          "$ref": "#/$defs/canonicalId",
+          "description": "Canonical ID that this deprecated alias should be replaced with."
         }
       },
       "required": [
         "deprecated_since"
-      ]
+      ],
+      "description": "Lifecycle metadata for a deprecated alias, tracking deprecation and sunset dates."
     },
     "entry": {
       "$anchor": "entry",
@@ -117,65 +138,76 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/$defs/canonicalId"
+          "$ref": "#/$defs/canonicalId",
+          "description": "Fully qualified canonical ID for this entry (cn:<namespace>:<kind>:<slug>)."
         },
         "kind": {
           "type": "string",
-          "pattern": "^[a-z_][a-z0-9_]*$"
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Category of this canonical entry (e.g., unit, stage, environment, role)."
         },
         "preferred_label": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Human-readable display name for this canonical term."
         },
         "definition": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Clear definition of what this canonical term represents in the spec pipeline."
         },
         "version": {
-          "$ref": "#/$defs/semver"
+          "$ref": "#/$defs/semver",
+          "description": "Semantic version of this individual canonical entry."
         },
         "status": {
-          "$ref": "#/$defs/entryStatus"
+          "$ref": "#/$defs/entryStatus",
+          "description": "Current lifecycle status of this entry (active, deprecated, sunset, or retired)."
         },
         "owners": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/owner"
+            "$ref": "#/$defs/owner",
+            "description": "An owner identifier for this canonical entry."
           },
           "minItems": 1,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Array of team or role identifiers responsible for maintaining this canonical entry."
         },
         "constraints": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Optional array of constraint strings that limit how this canonical term may be used."
         },
         "examples": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Optional array of example usage strings demonstrating this canonical term in context."
         },
         "tags": {
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#tag"
+            "$ref": "https://specdev.local/schema/core/atoms/1#tag",
+            "description": "A classification tag for this canonical entry."
           },
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Optional array of classification tags for filtering and grouping canonical entries."
         },
         "aliases": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "uniqueItems": true
-        },
-        "source_refs": {
-          "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
+          "uniqueItems": true,
+          "description": "Optional array of alternative names that resolve to this canonical entry."
         },
         "lifecycle": {
-          "$ref": "#/$defs/lifecycle"
+          "$ref": "#/$defs/lifecycle",
+          "description": "Lifecycle timestamps for this entry, tracking introduction, deprecation, sunset, and retirement."
         }
       },
       "required": [
@@ -253,7 +285,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "A single canonical registry entry defining a shared vocabulary term with lifecycle management."
     },
     "aliasStatus": {
       "$anchor": "aliasStatus",
@@ -261,7 +294,8 @@
       "enum": [
         "active",
         "deprecated"
-      ]
+      ],
+      "description": "Status of a canonical alias: active (resolves normally) or deprecated (still resolves but discouraged)."
     },
     "alias": {
       "$anchor": "alias",
@@ -270,20 +304,25 @@
       "properties": {
         "kind": {
           "type": "string",
-          "pattern": "^[a-z_][a-z0-9_]*$"
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "description": "Canonical kind category this alias belongs to (must match the target entry kind)."
         },
         "normalized": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Normalized form of the alias string used for matching during resolution."
         },
         "target_id": {
-          "$ref": "#/$defs/canonicalId"
+          "$ref": "#/$defs/canonicalId",
+          "description": "Fully qualified canonical ID that this alias resolves to."
         },
         "status": {
-          "$ref": "#/$defs/aliasStatus"
+          "$ref": "#/$defs/aliasStatus",
+          "description": "Whether this alias is active or deprecated."
         },
         "lifecycle": {
-          "$ref": "#/$defs/aliasLifecycle"
+          "$ref": "#/$defs/aliasLifecycle",
+          "description": "Lifecycle metadata for deprecated aliases, including deprecation date and replacement."
         }
       },
       "required": [
@@ -310,7 +349,8 @@
             ]
           }
         }
-      ]
+      ],
+      "description": "An alias mapping that resolves an alternative name to a canonical entry ID."
     }
   }
 }

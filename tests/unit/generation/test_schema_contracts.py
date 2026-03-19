@@ -16,12 +16,31 @@ class SchemaContractsTests(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parents[3]
         self.schema_root = self.repo_root / "schema"
 
+    def _setup_step_base(self, root: Path, registry_map: dict) -> None:
+        """Add step_base schema to a temp registry for allOf composition support."""
+        registry_map["https://specdev.local/schema/core/step_base/1"] = "schema/step_base.schema.json"
+        (root / "schema" / "step_base.schema.json").write_text(
+            (self.schema_root / "core" / "step_base.schema.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
     def test_all_step_schemas_include_metadata_top_level_fields(self):
+        step_base_ref = "https://specdev.local/schema/core/step_base/1"
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
             with path.open("r", encoding="utf-8") as f:
                 schema = json.load(f)
-            props = schema.get("properties", {})
-            self.assertIn("generation_quality", props, msg=path.name)
+            props = _collect_all_properties(schema)
+            # canonical_refs_used, canonical_proposals, canonical_conflicts
+            # are now inherited from step_base via allOf composition
+            allof = schema.get("allOf", [])
+            has_step_base = any(
+                isinstance(e, dict) and e.get("$ref") == step_base_ref
+                for e in allof
+            )
+            if has_step_base:
+                # Fields come from step_base — no need to check inline
+                continue
+            # Legacy flat schemas (if any remain) must still have them inline
             self.assertIn("canonical_refs_used", props, msg=path.name)
             self.assertIn("canonical_proposals", props, msg=path.name)
             self.assertIn("canonical_conflicts", props, msg=path.name)
@@ -57,7 +76,7 @@ class SchemaContractsTests(unittest.TestCase):
             "13": {"tag", "policy", "id_pattern", "governance_label"},
             "13a": {"risk_category", "tag", "completeness_dimension"},
             "14": {"status", "environment", "metric", "tech_stack", "dependency"},
-            "15": {"interface", "command"},
+            "15": {"command"},
             "16": {"status", "command", "policy", "risk_category"},
         }
         for step, expected_kinds in expected_by_step.items():
@@ -97,7 +116,8 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_step_07_requires_metric_unit_and_environment_refs_per_nfr_item(self):
         schema = json.loads((self.schema_root / "07_nfrs.schema.json").read_text(encoding="utf-8"))
-        nfr_item = schema["properties"]["nfrs"]["items"]
+        props = _collect_all_properties(schema)
+        nfr_item = props["nfrs"]["items"]
         required = set(nfr_item.get("required", []))
         self.assertTrue({"metric_ref", "unit_ref", "environment_ref"}.issubset(required))
 
@@ -128,7 +148,6 @@ class SchemaContractsTests(unittest.TestCase):
             "id": "delivery-baseline",
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
-            "seed_refs": [{"seed_id": "seed-overview"}],
             "environments": {
                 "dev": {"nested": {"a": 1}},
                 "ci": {"runner": "gha"},
@@ -136,7 +155,6 @@ class SchemaContractsTests(unittest.TestCase):
                 "prod": {"url": "https://example.com"},
             },
             "ci_gates": ["validate-all"],
-            "generation_quality": {"assumptions": []},
             "canonical_refs_used": [],
             "canonical_proposals": [],
             "canonical_conflicts": [],
@@ -220,6 +238,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "01_capabilities.schema.json").write_text(
                 (self.schema_root / "01_capabilities.schema.json").read_text(encoding="utf-8"),
@@ -241,7 +260,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "caps",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "capabilities": [
                             {
                                 "capability_id": "cap-a",
@@ -256,10 +275,12 @@ class SchemaContractsTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_file(str(root), str(sample))
-            self.assertTrue(any("missing top-level 'generation_quality'" in e.render() for e in errs))
             self.assertTrue(any("missing top-level 'canonical_refs_used'" in e.render() for e in errs))
-            self.assertTrue(any("missing top-level 'canonical_proposals'" in e.render() for e in errs))
-            self.assertTrue(any("missing top-level 'canonical_conflicts'" in e.render() for e in errs))
+            # Removed fields should NOT trigger missing-field errors
+            self.assertFalse(any("missing top-level 'generation_quality'" in e.render() for e in errs))
+            self.assertFalse(any("missing top-level 'seed_refs'" in e.render() for e in errs))
+            self.assertFalse(any("missing top-level 'canonical_proposals'" in e.render() for e in errs))
+            self.assertFalse(any("missing top-level 'canonical_conflicts'" in e.render() for e in errs))
 
     def test_validate_file_enforces_metadata_even_with_nonstandard_filename(self):
         with tempfile.TemporaryDirectory() as td:
@@ -273,6 +294,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "01_capabilities.schema.json").write_text(
                 (self.schema_root / "01_capabilities.schema.json").read_text(encoding="utf-8"),
@@ -294,7 +316,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "caps",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "capabilities": [
                             {
                                 "capability_id": "cap-a",
@@ -309,8 +331,8 @@ class SchemaContractsTests(unittest.TestCase):
                 encoding="utf-8",
             )
             errs = validate_file(str(root), str(sample))
-            self.assertTrue(any("missing top-level 'generation_quality'" in e.render() for e in errs))
             self.assertTrue(any("missing top-level 'canonical_refs_used'" in e.render() for e in errs))
+            self.assertFalse(any("missing top-level 'generation_quality'" in e.render() for e in errs))
 
     def test_validate_file_enforces_canonical_refs_used_closure(self):
         with tempfile.TemporaryDirectory() as td:
@@ -326,6 +348,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
                 "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "07_nfrs.schema.json").write_text(
                 (self.schema_root / "07_nfrs.schema.json").read_text(encoding="utf-8"),
@@ -356,7 +379,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "nfrs-test",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "nfrs": [
                             {
                                 "nfr_id": "nfr-latency-p95",
@@ -370,7 +393,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "environment_ref": {"id": "cn:core:environment:prod", "kind": "environment"},
                             }
                         ],
-                        "generation_quality": {"assumptions": []},
+
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -404,7 +427,6 @@ class SchemaContractsTests(unittest.TestCase):
             "id": "step-api-core",
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
-            "seed_refs": [{"seed_id": "seed-overview"}],
             "plan": {
                 "summary": {
                     "functional_summary": "Implement auth core",
@@ -432,6 +454,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
                 "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "03_glossary.schema.json").write_text(
                 (self.schema_root / "03_glossary.schema.json").read_text(encoding="utf-8"),
@@ -462,7 +485,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "glossary-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "terms": [
                             {
                                 "term_id": "term-jwt",
@@ -471,7 +494,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "units": "ms",
                             }
                         ],
-                        "generation_quality": {"assumptions": []},
+
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -514,6 +537,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
                 "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "07_nfrs.schema.json").write_text(
                 (self.schema_root / "07_nfrs.schema.json").read_text(encoding="utf-8"),
@@ -544,7 +568,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "nfr-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "nfrs": [
                             {
                                 "nfr_id": "nfr-auth-latency",
@@ -555,7 +579,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "stage": "prod",
                             }
                         ],
-                        "generation_quality": {"assumptions": []},
+
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -603,6 +627,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
                 "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
             }
+            self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
             (root / "schema" / "11_redteam.schema.json").write_text(
                 (self.schema_root / "11_redteam.schema.json").read_text(encoding="utf-8"),
@@ -633,7 +658,7 @@ class SchemaContractsTests(unittest.TestCase):
                         "id": "redteam-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
+
                         "threats": [
                             {
                                 "threat_id": "threat-authz-bypass",
@@ -645,7 +670,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "severity": "high",
                             }
                         ],
-                        "generation_quality": {"assumptions": []},
+
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -820,6 +845,20 @@ class SchemaContractsTests(unittest.TestCase):
             any("replaced_by" in m for m in rendered_warns),
             f"Expected 'replaced_by' in WARN message, got: {rendered_warns}",
         )
+
+
+def _collect_all_properties(schema: dict) -> dict:
+    """Collect properties from a schema, merging allOf entries if present.
+
+    Handles both legacy flat schemas (properties at top level) and
+    allOf-composed schemas (properties split across allOf entries and
+    inherited from $ref targets like step_base).
+    """
+    props = dict(schema.get("properties", {}))
+    for entry in schema.get("allOf", []):
+        if isinstance(entry, dict) and "properties" in entry:
+            props.update(entry["properties"])
+    return props
 
 
 def _count_canonical_ref_slots(obj) -> int:

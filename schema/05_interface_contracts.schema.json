@@ -2,219 +2,203 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/05_interface_contracts.schema.json",
   "title": "05_interface_contracts",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "apis": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "api_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string",
-            "pattern": "^v\\d+(?:\\.\\d+)*$"
-          },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "http",
-              "grpc",
-              "ws",
-              "mqtt"
-            ]
-          },
-          "route": {
-            "type": "string"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "GET",
-              "POST",
-              "PUT",
-              "PATCH",
-              "DELETE"
-            ]
-          },
-          "request_schema_ref": {
-            "type": "string"
-          },
-          "response_schema_ref": {
-            "type": "string"
-          },
-          "errors": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/errors/1#errorState"
-            }
-          },
-          "parameters": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "in": {
-                  "type": "string",
-                  "enum": [
-                    "query",
-                    "path",
-                    "header"
-                  ]
-                },
-                "required": {
-                  "type": "boolean"
-                },
-                "schema": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                }
-              },
-              "required": [
-                "name",
-                "in",
-                "required"
-              ]
-            }
-          },
-          "example_refs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "security": {
-            "type": "string",
-            "enum": [
-              "none",
-              "api-key",
-              "oauth2",
-              "jwt",
-              "mTLS"
-            ]
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "interface_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "event_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "policy_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-          },
-          "enum_provenance": {
+    {
+      "type": "object",
+      "properties": {
+        "apis": {
+          "description": "Array of API interface contracts defining endpoints, protocols, and security requirements.",
+          "type": "array",
+          "items": {
+            "description": "A single API contract with path, method, parameters, security, and traceability.",
             "type": "object",
             "additionalProperties": false,
-            "description": "Provenance tracking for externally-sourced enums in this API.",
             "properties": {
-              "source_url": {
-                "type": "string",
-                "format": "uri"
+              "api_id": {
+                "description": "Unique kebab-case identifier for this API (e.g., 'api-session-create').",
+                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
               },
-              "source_date": {
-                "type": "string",
-                "format": "date"
-              },
-              "resolved_version": {
+              "name": {
+                "description": "Human-readable name of this API endpoint.",
                 "type": "string"
               },
-              "resolved_at": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-              },
-              "resolver": {
+              "version": {
+                "description": "API version string in vN or vN.N format (e.g., 'v1', 'v2.1').",
                 "type": "string",
-                "description": "Tool or person that resolved the enum values."
+                "pattern": "^v\\d+(?:\\.\\d+)*$"
+              },
+              "protocol": {
+                "description": "Communication protocol for this API: http, grpc, ws (WebSocket), or mqtt.",
+                "type": "string",
+                "enum": [
+                  "http",
+                  "grpc",
+                  "ws",
+                  "mqtt"
+                ]
+              },
+              "path": {
+                "description": "URL path for this API endpoint (e.g., '/api/v1/sessions').",
+                "type": "string"
+              },
+              "method": {
+                "description": "HTTP method for this endpoint: GET, POST, PUT, PATCH, or DELETE.",
+                "type": "string",
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ]
+              },
+              "input_schema_ref": {
+                "description": "Reference to the JSON Schema defining the request body structure.",
+                "type": "string"
+              },
+              "output_schema_ref": {
+                "description": "Reference to the JSON Schema defining the response body structure.",
+                "type": "string"
+              },
+              "errors": {
+                "description": "Array of error states that this API may return.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/errors/1#errorState"
+                }
+              },
+              "parameters": {
+                "description": "Array of parameters accepted by this API endpoint.",
+                "type": "array",
+                "items": {
+                  "description": "A single API parameter with its name, location, and whether it is required.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "description": "Name of the parameter as it appears in the request.",
+                      "type": "string"
+                    },
+                    "in": {
+                      "description": "Where the parameter is located: query string, URL path, or request header.",
+                      "type": "string",
+                      "enum": [
+                        "query",
+                        "path",
+                        "header"
+                      ]
+                    },
+                    "required": {
+                      "description": "Whether this parameter must be provided in the request.",
+                      "type": "boolean"
+                    },
+                    "schema": {
+                      "description": "Reference to the schema type for this parameter value.",
+                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "in",
+                    "required"
+                  ]
+                }
+              },
+              "example_refs": {
+                "description": "References to example request/response pairs for this API.",
+                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+              },
+              "security": {
+                "description": "Authentication/authorization mechanism for this API: none, api-key, oauth2, jwt, or mTLS.",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "api-key",
+                  "oauth2",
+                  "jwt",
+                  "mTLS"
+                ]
+              },
+              "owner": {
+                "description": "Team or domain responsible for this API.",
+                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+              },
+              "trace": {
+                "description": "Traceability links back to upstream functional requirements or capabilities.",
+                "type": "array",
+                "items": {
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                }
+              },
+              "interface_ref": {
+                "description": "Canonical reference linking this API to the canonical interface registry.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "event_ref": {
+                "description": "Canonical reference to events emitted or consumed by this API.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the primary entity this API operates on.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "policy_ref": {
+                "description": "Canonical reference to the access or governance policy for this API.",
+                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+              },
+              "enum_provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Provenance tracking for externally-sourced enums in this API.",
+                "properties": {
+                  "source_url": {
+                    "description": "URL of the external source where the enum values originate.",
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "source_date": {
+                    "description": "Date when the enum values were retrieved from the source.",
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "resolved_version": {
+                    "description": "Version of the external source used to resolve enum values.",
+                    "type": "string"
+                  },
+                  "resolved_at": {
+                    "description": "ISO 8601 timestamp when the enum values were resolved.",
+                    "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+                  },
+                  "resolver": {
+                    "type": "string",
+                    "description": "Tool or person that resolved the enum values."
+                  }
+                },
+                "required": [
+                  "source_url",
+                  "source_date",
+                  "resolved_at"
+                ]
               }
             },
             "required": [
-              "source_url",
-              "source_date",
-              "resolved_at"
+              "api_id",
+              "name",
+              "version",
+              "protocol",
+              "owner",
+              "interface_ref"
             ]
           }
-        },
-        "required": [
-          "api_id",
-          "name",
-          "version",
-          "protocol",
-          "owner",
-          "interface_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
+      "required": [
+        "apis"
+      ]
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "apis",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

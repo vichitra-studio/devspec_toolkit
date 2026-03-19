@@ -34,8 +34,6 @@ def _make_step_artifact(**extra) -> dict:
         "id": "fr-test",
         "owner": "system",
         "created_at": "2026-01-01T00:00:00Z",
-        "seed_refs": [],
-        "generation_quality": {"assumptions": []},
         "canonical_refs_used": [],
         "canonical_proposals": [],
         "canonical_conflicts": [],

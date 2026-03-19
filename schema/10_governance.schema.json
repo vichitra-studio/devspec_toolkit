@@ -2,177 +2,152 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specdev.local/schema/10_governance.schema.json",
   "title": "10_governance",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "https://specdev.local/schema/core/step_base/1"
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "spec_refs_ingested": {
-      "$ref": "https://specdev.local/schema/core/collections/1#specRefsIngestedArray"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "versioning": {
-      "type": "string"
-    },
-    "pr_rules": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "validate",
-          "validate-all",
-          "matrix",
-          "fixtures-lint",
-          "invariants-check",
-          "governance-check",
-          "seed-lint",
-          "docs-lint",
-          "test",
-          "build",
-          "lint",
-          "format",
-          "audit",
-          "security"
-        ]
-      },
-      "uniqueItems": true
-    },
-    "spec_first_policy": {
-      "type": "boolean"
-    },
-    "commit_message_rules": {
+    {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
-        "require_spec_ids": {
-          "type": "boolean"
-        },
-        "pattern": {
-          "type": "string"
-        },
-        "id_pattern_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-        },
-        "error_message": {
+        "versioning": {
           "type": "string",
-          "description": "Human readable guidance. MUST list allowed types/values if a specific set is required."
-        }
-      },
-      "required": [
-        "require_spec_ids"
-      ]
-    },
-    "review_policy": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "verdict_requirements": {
+          "description": "Versioning strategy for spec artifacts (e.g., semantic versioning, date-based)."
+        },
+        "pr_rules": {
           "type": "array",
-          "minItems": 1,
+          "description": "CI checks that must pass on every pull request before merge.",
           "items": {
-            "type": "string"
-          }
+            "type": "string",
+            "enum": [
+              "validate",
+              "validate-all",
+              "matrix",
+              "fixtures-lint",
+              "invariants-check",
+              "governance-check",
+              "seed-lint",
+              "docs-lint",
+              "test",
+              "build",
+              "lint",
+              "format",
+              "audit",
+              "security"
+            ],
+            "description": "A CI check command that runs as part of the PR pipeline."
+          },
+          "uniqueItems": true
         },
-        "required_metadata": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        "spec_first_policy": {
+          "type": "boolean",
+          "description": "Whether the spec-first policy is enforced, requiring spec changes before code changes."
         },
-        "evidence_source_by_phase": {
+        "commit_message_rules": {
           "type": "object",
+          "description": "Rules governing commit message format and content.",
           "additionalProperties": false,
           "properties": {
-            "dev": {
-              "type": "string"
+            "require_spec_ids": {
+              "type": "boolean",
+              "description": "Whether commit messages must include spec artifact IDs."
             },
-            "staging": {
-              "type": "string"
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern that commit messages must match."
             },
-            "prod": {
-              "type": "string"
+            "id_pattern_ref": {
+              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+              "description": "Canonical reference for the ID pattern used in commit messages."
+            },
+            "error_message": {
+              "type": "string",
+              "description": "Human readable guidance. MUST list allowed types/values if a specific set is required."
             }
           },
           "required": [
-            "dev",
-            "staging",
-            "prod"
+            "require_spec_ids"
           ]
+        },
+        "review_policy": {
+          "type": "object",
+          "description": "Policy governing code review requirements and evidence collection.",
+          "additionalProperties": false,
+          "properties": {
+            "verdict_requirements": {
+              "type": "array",
+              "description": "Conditions that must be met for a review verdict to be accepted.",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "required_metadata": {
+              "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+              "description": "Metadata fields required in every review submission."
+            },
+            "evidence_source_by_phase": {
+              "type": "object",
+              "description": "Mapping of deployment phases to their evidence sources.",
+              "additionalProperties": false,
+              "properties": {
+                "dev": {
+                  "type": "string",
+                  "description": "Evidence source for the development phase."
+                },
+                "staging": {
+                  "type": "string",
+                  "description": "Evidence source for the staging phase."
+                },
+                "prod": {
+                  "type": "string",
+                  "description": "Evidence source for the production phase."
+                }
+              },
+              "required": [
+                "dev",
+                "staging",
+                "prod"
+              ]
+            }
+          },
+          "required": [
+            "verdict_requirements",
+            "required_metadata",
+            "evidence_source_by_phase"
+          ]
+        },
+        "reviewers": {
+          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "description": "List of designated reviewers responsible for spec and code reviews."
+        },
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting this governance spec to related artifacts.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+          }
+        },
+        "links": {
+          "type": "array",
+          "description": "External links to related governance resources or documentation.",
+          "items": {
+            "$ref": "https://specdev.local/schema/core/collections/1#link"
+          }
+        },
+        "policy_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the governance policy in the registry."
+        },
+        "command_ref": {
+          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "description": "Canonical reference for the governance CLI command."
         }
       },
       "required": [
-        "verdict_requirements",
-        "required_metadata",
-        "evidence_source_by_phase"
+        "spec_first_policy",
+        "commit_message_rules"
       ]
-    },
-    "reviewers": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict"
-      },
-      "default": []
-    },
-    "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "command_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
-    },
-    "coverage_gaps": {
-      "$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"
-    },
-    "_migration_notes": {
-      "type": "string",
-      "description": "Optional migration notes added during schema version upgrades."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "spec_refs_ingested",
-    "spec_first_policy",
-    "commit_message_rules",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts",
-    "coverage_gaps"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

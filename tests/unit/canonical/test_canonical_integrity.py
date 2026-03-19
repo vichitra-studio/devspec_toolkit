@@ -299,7 +299,6 @@ class CanonicalIntegrityTests(unittest.TestCase):
                         "id": "glossary-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
-                        "seed_refs": [{"seed_id": "seed-overview"}],
                         "terms": [
                             {
                                 "term_id": "term-jwt",
@@ -307,7 +306,6 @@ class CanonicalIntegrityTests(unittest.TestCase):
                                 "definition": "JSON Web Token used to carry signed authentication claims.",
                             }
                         ],
-                        "generation_quality": {"assumptions": []},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],

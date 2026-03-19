@@ -9,17 +9,6 @@ field definitions, types, required vs optional markers, enum values, patterns, a
 MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
 all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
 
-## Coverage Gap Reporting
-
-Any output field whose value cannot be traced to a specific upstream artifact or seed document
-MUST be recorded in `coverage_gaps[]` with:
-- `upstream_item_id`: the ID of the upstream item that should have provided the data
-- `source_step`: the step number where the data was expected
-- `reason`: why the value could not be traced
-
-This is DISTINCT from the Clarify->Emit protocol: ambiguous requirements trigger clarification
-questions; untraceable content triggers `coverage_gaps[]` population.
-
 ## Path Variables
 | Variable | Description |
 |---|---|
@@ -77,12 +66,10 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
 ## Self-Audit Gate
-- Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
 - If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Each high-priority FR has ≥1 fixture; negative fixtures exist for key errors; contract mode covers each public API.
   - Inputs/expected align with schemas; targets list correct IDs; tags present for CI gating where needed.
-
 
 ### Coverage Closure
 Before emitting, verify:
@@ -95,7 +82,6 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `seed_refs` is `[]` (this step derives from upstream specs, not seeds)
 
 # Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
@@ -126,7 +112,7 @@ Before emitting, verify:
 - mode: `unit`, `contract`, `e2e`, or `redteam`.
   - **contract**: usage requires `expected` to have `status`, `body`, and optionally `headers`.
 - input: minimal JSON payload or setup state; MUST use explicit field names and values (not narrative descriptions).
-- expected: MUST contain the exact expected payload fields and values as defined by the `response_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
+- expected: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 - tags: optional labels for grouping and CI selection (e.g. `smoke`, `security`).
 
 ## Best Practices
@@ -173,10 +159,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
 ## Canonical Binding Rules
 1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Populate `generation_quality.assumptions` with specific, testable claims about decisions made during generation.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
+2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
+3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
+4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
 
 ## Metadata Contract
 
@@ -188,8 +173,6 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "fixtures-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [],
-  "spec_refs_ingested": [],
   "fixtures": [
     {
       "fixture_id": "fixture-auth-login-success",
@@ -213,17 +196,11 @@ This step's output artifact MUST include every field listed in the schema's `req
       }
     }
   ],
-  "generation_quality": {
-    "assumptions": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:tag:smoke",
       "kind": "tag"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": [],
-  "coverage_gaps": []
+  ]
 }
 ```

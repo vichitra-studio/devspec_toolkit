@@ -86,7 +86,7 @@ Before writing formal specs, you must define the "Seed" of your project using th
 
 0. **Seed Manifest** (`spec/common/seed_manifest.json`):
    - **Purpose**: defines the mandatory seed order and step-specific requirements.
-   - **Expectation**: treat it as the authoritative source for seed ingestion order and `seed_refs` population.
+   - **Expectation**: treat it as the authoritative source for seed ingestion order and per-step seed requirements.
 1. **Seed Overview** (`docs/seed/seed_overview.md`):
    - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
    - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
