@@ -57,7 +57,6 @@ devspec_toolkit/
 │   │   │   ├── validate.py          # Main validation orchestrator
 │   │   │   ├── validators/          # Per-step validators (step_00.py .. step_16c.py)
 │   │   │   ├── seed_lint.py         # Seed document linter
-│   │   │   ├── docs_lint.py         # Documentation linter
 │   │   │   ├── quality_lint.py      # Spec quality linter
 │   │   │   ├── hallucination_lint.py # Hallucination detection
 │   │   │   ├── traceability_closure.py # FR/API/NFR traceability

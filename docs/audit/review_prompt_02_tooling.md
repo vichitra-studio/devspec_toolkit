@@ -94,7 +94,6 @@ The following tooling gaps were identified during the System Audit (Phase 1) and
     *   `devspec_toolkit/tools/specdev_tools/__init__.py`
     *   `devspec_toolkit/tools/specdev_tools/changelog_parser.py`
     *   `devspec_toolkit/tools/specdev_tools/cli.py`
-    *   `devspec_toolkit/tools/specdev_tools/docs_lint.py`
     *   `devspec_toolkit/tools/specdev_tools/fixtures_lint.py`
     *   `devspec_toolkit/tools/specdev_tools/governance.py`
     *   `devspec_toolkit/tools/specdev_tools/invariants.py`
