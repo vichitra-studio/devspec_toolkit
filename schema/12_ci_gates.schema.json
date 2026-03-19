@@ -4,7 +4,8 @@
   "title": "12_ci_gates",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -13,7 +14,8 @@
           "type": "array",
           "description": "Traceability links connecting this CI gates spec to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for the CI gates spec."
           }
         },
         "jobs": {
@@ -63,7 +65,8 @@
                     "id",
                     "name",
                     "command"
-                  ]
+                  ],
+                  "description": "A single CI step with command and optional canonical reference."
                 }
               },
               "environment_ref": {
@@ -82,7 +85,8 @@
                   "runner_labels": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "A runner label for isolation (e.g., 'self-hosted', 'ubuntu-latest')."
                     },
                     "description": "Runner isolation labels (e.g. 'self-hosted', 'ubuntu-latest')."
                   },
@@ -94,7 +98,8 @@
                         "read",
                         "write",
                         "none"
-                      ]
+                      ],
+                      "description": "Permission level for this token scope: read, write, or none."
                     },
                     "description": "Token permission scopes (e.g. {'contents': 'read', 'packages': 'write'})."
                   },
@@ -123,7 +128,8 @@
               "name",
               "steps",
               "environment_ref"
-            ]
+            ],
+            "description": "A single CI job definition with steps, dependencies, and security configuration."
           }
         },
         "coverage_thresholds": {
@@ -148,7 +154,8 @@
       },
       "required": [
         "jobs"
-      ]
+      ],
+      "description": "Step-specific properties for 12_ci_gates."
     }
   ],
   "unevaluatedProperties": false

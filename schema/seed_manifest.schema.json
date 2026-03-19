@@ -176,5 +176,6 @@
     "global_seed_order",
     "seeds",
     "step_requirements"
-  ]
+  ],
+  "description": "Schema for the seed manifest defining seed documents, their ordering, step requirements, and documentation policy."
 }

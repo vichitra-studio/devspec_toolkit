@@ -4,7 +4,8 @@
   "title": "01_capabilities",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -64,14 +65,16 @@
                 "description": "Possible error conditions that may arise during capability execution.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/errors/1#errorState"
+                  "$ref": "https://specdev.local/schema/core/errors/1#errorState",
+                  "description": "An error state that may occur during capability execution."
                 }
               },
               "trace": {
                 "description": "Traceability links back to upstream artifacts (e.g., charter segments, stakeholders).",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this capability."
                 }
               },
               "capability_ref": {
@@ -103,7 +106,8 @@
       },
       "required": [
         "capabilities"
-      ]
+      ],
+      "description": "Step-specific properties for 01_capabilities."
     }
   ],
   "unevaluatedProperties": false

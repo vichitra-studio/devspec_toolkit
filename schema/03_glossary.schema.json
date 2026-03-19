@@ -4,7 +4,8 @@
   "title": "03_glossary",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -73,7 +74,8 @@
       },
       "required": [
         "terms"
-      ]
+      ],
+      "description": "Step-specific properties for 03_glossary."
     }
   ],
   "unevaluatedProperties": false

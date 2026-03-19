@@ -4,7 +4,8 @@
   "title": "02a_delivery_baseline",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -13,17 +14,20 @@
           "description": "Traceability links back to upstream artifacts (charter, system sketch).",
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for the delivery baseline."
           }
         },
         "environments": {
           "description": "Map of deployment environments (dev, ci, staging, prod) with their configurations.",
           "type": "object",
           "propertyNames": {
-            "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
+            "$ref": "https://specdev.local/schema/core/collections/1#environmentName",
+            "description": "Environment name constraint: must be a valid environment (dev, ci, staging, prod)."
           },
           "additionalProperties": {
-            "$ref": "https://specdev.local/schema/core/collections/1#environmentConfig"
+            "$ref": "https://specdev.local/schema/core/collections/1#environmentConfig",
+            "description": "Environment configuration values for a specific deployment environment."
           },
           "required": [
             "dev",
@@ -67,7 +71,8 @@
       "required": [
         "environments",
         "ci_gates"
-      ]
+      ],
+      "description": "Step-specific properties for 02a_delivery_baseline."
     }
   ],
   "unevaluatedProperties": false

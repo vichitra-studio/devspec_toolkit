@@ -4,7 +4,8 @@
   "title": "13a_completeness_assessment",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -54,7 +55,8 @@
                 "description": "Spec files where this element should have been defined.",
                 "items": {
                   "type": "string",
-                  "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$"
+                  "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$",
+                  "description": "A spec file name where this element should have been defined."
                 }
               },
               "risk_category_ref": {
@@ -77,7 +79,8 @@
               "priority",
               "impact_on_completeness",
               "specification_source"
-            ]
+            ],
+            "description": "A single missing element with category, priority, impact, and source specification."
           }
         },
         "completeness_rating": {
@@ -114,7 +117,8 @@
       "required": [
         "missing_elements",
         "completeness_rating"
-      ]
+      ],
+      "description": "Step-specific properties for 13a_completeness_assessment."
     }
   ],
   "unevaluatedProperties": false

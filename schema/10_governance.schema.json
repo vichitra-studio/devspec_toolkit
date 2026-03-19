@@ -4,7 +4,8 @@
   "title": "10_governance",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -78,7 +79,8 @@
               "description": "Conditions that must be met for a review verdict to be accepted.",
               "minItems": 1,
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A condition that must be met for a review verdict to be accepted."
               }
             },
             "required_metadata": {
@@ -124,14 +126,16 @@
           "type": "array",
           "description": "Traceability links connecting this governance spec to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for the governance spec."
           }
         },
         "links": {
           "type": "array",
           "description": "External links to related governance resources or documentation.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#link"
+            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "description": "A link to an external governance resource."
           }
         },
         "policy_ref": {
@@ -146,7 +150,8 @@
       "required": [
         "spec_first_policy",
         "commit_message_rules"
-      ]
+      ],
+      "description": "Step-specific properties for 10_governance."
     }
   ],
   "unevaluatedProperties": false

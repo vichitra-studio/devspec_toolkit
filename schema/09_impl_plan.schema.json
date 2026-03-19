@@ -4,7 +4,8 @@
   "title": "09_impl_plan",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -13,7 +14,8 @@
           "description": "Technology stack for the implementation, including languages, frameworks, infrastructure, and tools.",
           "allOf": [
             {
-              "$ref": "https://specdev.local/schema/core/collections/1#techStack"
+              "$ref": "https://specdev.local/schema/core/collections/1#techStack",
+              "description": "Inherits the structured technology stack definition from core collections."
             },
             {
               "required": [
@@ -72,7 +74,8 @@
                 "type": "array",
                 "description": "Trace references to artifacts this milestone will produce.",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A trace reference to an artifact this milestone will produce."
                 }
               },
               "status_ref": {
@@ -85,7 +88,8 @@
               "name",
               "deliverables",
               "status"
-            ]
+            ],
+            "description": "A single implementation milestone with deliverables, risks, and status tracking."
           }
         },
         "migration_plan": {
@@ -108,7 +112,8 @@
           "type": "array",
           "description": "Traceability links connecting this plan to upstream and downstream artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for the implementation plan."
           }
         }
       },
@@ -116,7 +121,8 @@
         "tech_stack",
         "milestones",
         "trace"
-      ]
+      ],
+      "description": "Step-specific properties for 09_impl_plan."
     }
   ],
   "unevaluatedProperties": false

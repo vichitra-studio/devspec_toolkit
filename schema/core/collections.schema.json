@@ -19,7 +19,8 @@
       "type": "array",
       "description": "Generic array of strings used for lists of labels, paths, exclusions, or freeform text entries.",
       "items": {
-        "type": "string"
+        "type": "string",
+        "description": "A string entry in the array."
       }
     },
     "link": {
@@ -59,7 +60,7 @@
         "type": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Trace type — validated against canon/kinds/trace_type.json entries."
+          "description": "Trace type \u2014 validated against canon/kinds/trace_type.json entries."
         },
         "id": {
           "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
@@ -259,32 +260,41 @@
       "minProperties": 1,
       "propertyNames": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9_-]*$"
+        "pattern": "^[a-z][a-z0-9_-]*$",
+        "description": "Property name constraint: must be lowercase alphanumeric with optional hyphens or underscores."
       },
       "additionalProperties": {
         "oneOf": [
           {
-            "type": "string"
+            "type": "string",
+            "description": "String configuration value."
           },
           {
-            "type": "number"
+            "type": "number",
+            "description": "Numeric configuration value."
           },
           {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Boolean configuration value."
           },
           {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "description": "A string entry in the configuration array."
+            },
+            "description": "Array of string configuration values."
           },
           {
             "type": "object",
             "additionalProperties": {
-              "type": "string"
-            }
+              "type": "string",
+              "description": "A string value in the configuration map."
+            },
+            "description": "Object map of string configuration values."
           }
-        ]
+        ],
+        "description": "Allowed value types for environment configuration entries."
       },
       "description": "Key-value configuration map for a deployment environment, supporting string, number, boolean, string array, and string-map values."
     },
@@ -420,7 +430,8 @@
       "items": {
         "oneOf": [
           {
-            "type": "string"
+            "type": "string",
+            "description": "A simple string dependency identifier."
           },
           {
             "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem",
@@ -444,25 +455,32 @@
       "$anchor": "anyJson",
       "oneOf": [
         {
-          "type": "object"
+          "type": "object",
+          "description": "JSON object value."
         },
         {
-          "type": "array"
+          "type": "array",
+          "description": "JSON array value."
         },
         {
-          "type": "string"
+          "type": "string",
+          "description": "JSON string value."
         },
         {
-          "type": "number"
+          "type": "number",
+          "description": "JSON number value."
         },
         {
-          "type": "integer"
+          "type": "integer",
+          "description": "JSON integer value."
         },
         {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "JSON boolean value."
         },
         {
-          "type": "null"
+          "type": "null",
+          "description": "JSON null value."
         }
       ],
       "description": "Accepts any valid JSON value (object, array, string, number, integer, boolean, or null)."

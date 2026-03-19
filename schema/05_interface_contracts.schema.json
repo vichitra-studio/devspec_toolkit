@@ -4,7 +4,8 @@
   "title": "05_interface_contracts",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -67,7 +68,8 @@
                 "description": "Array of error states that this API may return.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/errors/1#errorState"
+                  "$ref": "https://specdev.local/schema/core/errors/1#errorState",
+                  "description": "An error state that this API may return."
                 }
               },
               "parameters": {
@@ -130,7 +132,8 @@
                 "description": "Traceability links back to upstream functional requirements or capabilities.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this API contract."
                 }
               },
               "interface_ref": {
@@ -197,7 +200,8 @@
       },
       "required": [
         "apis"
-      ]
+      ],
+      "description": "Step-specific properties for 05_interface_contracts."
     }
   ],
   "unevaluatedProperties": false

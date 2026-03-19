@@ -4,7 +4,8 @@
   "title": "04_fr_list",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -72,7 +73,8 @@
                 "description": "Traceability links back to upstream capabilities or charter items.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this functional requirement."
                 }
               },
               "capability_ref": {
@@ -104,7 +106,8 @@
       },
       "required": [
         "functional_requirements"
-      ]
+      ],
+      "description": "Step-specific properties for 04_fr_list."
     }
   ],
   "unevaluatedProperties": false

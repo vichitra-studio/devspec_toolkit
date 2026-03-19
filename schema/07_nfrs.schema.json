@@ -4,7 +4,8 @@
   "title": "07_nfrs",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -48,11 +49,13 @@
                 "description": "Target value for this NFR metric, either numeric or a string containing a number.",
                 "oneOf": [
                   {
-                    "type": "number"
+                    "type": "number",
+                    "description": "Numeric target value."
                   },
                   {
                     "type": "string",
-                    "pattern": "^.*\\d+.*$"
+                    "pattern": "^.*\\d+.*$",
+                    "description": "String target value containing at least one digit (e.g., '<200ms', '>99.9%')."
                   }
                 ]
               },
@@ -76,7 +79,8 @@
                 "description": "Traceability links back to upstream requirements, components, or APIs.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A traceability reference for this non-functional requirement."
                 }
               },
               "metric_ref": {
@@ -115,7 +119,8 @@
       },
       "required": [
         "nfrs"
-      ]
+      ],
+      "description": "Step-specific properties for 07_nfrs."
     }
   ],
   "unevaluatedProperties": false

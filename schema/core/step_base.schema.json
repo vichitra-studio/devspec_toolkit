@@ -3,7 +3,7 @@
   "$id": "https://specdev.local/schema/core/step_base/1",
   "$anchor": "stepBase",
   "title": "Step Base",
-  "description": "Shared base properties for all pipeline step schemas. Does not set additionalProperties — intended as a composable fragment.",
+  "description": "Shared base properties for all pipeline step schemas. Does not set additionalProperties \u2014 intended as a composable fragment.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -38,7 +38,8 @@
     "_migration_notes": {
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "string",
+        "description": "A migration annotation string added by canonical-autofix or align tooling."
       },
       "description": "Optional migration annotations added by canonical-autofix or align tooling."
     }

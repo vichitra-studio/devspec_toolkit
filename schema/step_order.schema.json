@@ -4,7 +4,13 @@
   "title": "Step Order Configuration",
   "description": "Defines the strict waterfall dependency DAG, pipeline policies, and downstream consumer mappings for the spec-driven development workflow.",
   "type": "object",
-  "required": ["version", "policy", "steps", "downstream_consumers", "coverage_thresholds"],
+  "required": [
+    "version",
+    "policy",
+    "steps",
+    "downstream_consumers",
+    "coverage_thresholds"
+  ],
   "additionalProperties": false,
   "properties": {
     "version": {
@@ -16,13 +22,20 @@
       "type": "object",
       "description": "Human-readable documentation notes explaining design decisions. Not consumed by tooling.",
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "description": "A human-readable documentation note."
       }
     },
     "policy": {
       "type": "object",
       "description": "Pipeline execution policy governing dependency resolution and replay behavior.",
-      "required": ["mode", "allow_self_dependency", "allow_forward_dependency", "require_full_forward_replay_on_change", "status_write_exemptions"],
+      "required": [
+        "mode",
+        "allow_self_dependency",
+        "allow_forward_dependency",
+        "require_full_forward_replay_on_change",
+        "status_write_exemptions"
+      ],
       "additionalProperties": false,
       "properties": {
         "mode": {
@@ -47,8 +60,10 @@
           "additionalProperties": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "description": "A JSON path pattern exempt from replay (e.g., '$.milestones[*].status')."
+            },
+            "description": "Array of JSON path patterns exempt from triggering forward replay for this step."
           }
         }
       }
@@ -66,7 +81,10 @@
     "coverage_thresholds": {
       "type": "object",
       "description": "Thresholds governing traceability coverage requirements for the spec pipeline.",
-      "required": ["fr_coverage", "mode"],
+      "required": [
+        "fr_coverage",
+        "mode"
+      ],
       "additionalProperties": false,
       "properties": {
         "fr_coverage": {
@@ -77,7 +95,10 @@
         },
         "mode": {
           "type": "string",
-          "enum": ["warn", "error"],
+          "enum": [
+            "warn",
+            "error"
+          ],
           "description": "Whether coverage threshold violations produce warnings or hard errors."
         }
       }
@@ -89,8 +110,10 @@
         "type": "array",
         "items": {
           "type": "string",
-          "pattern": "^[0-9]{2}[a-c]?$"
-        }
+          "pattern": "^[0-9]{2}[a-c]?$",
+          "description": "A step ID (two-digit, optionally with letter suffix) that consumes this step's output."
+        },
+        "description": "Array of step IDs that consume output from this step."
       }
     }
   }

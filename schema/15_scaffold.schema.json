@@ -4,7 +4,8 @@
   "title": "15_scaffold",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -106,7 +107,8 @@
         "project_skeleton",
         "validators",
         "build_status"
-      ]
+      ],
+      "description": "Step-specific properties for 15_scaffold."
     },
     {
       "if": {

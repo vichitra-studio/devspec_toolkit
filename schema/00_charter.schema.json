@@ -4,7 +4,8 @@
   "title": "00_charter",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -124,10 +125,12 @@
                 "description": "Current baseline value before the project begins.",
                 "oneOf": [
                   {
-                    "type": "number"
+                    "type": "number",
+                    "description": "Numeric baseline value."
                   },
                   {
-                    "type": "string"
+                    "type": "string",
+                    "description": "String baseline value (e.g., 'unknown', 'N/A')."
                   }
                 ]
               },
@@ -135,10 +138,12 @@
                 "description": "Target value this metric should reach after project delivery.",
                 "oneOf": [
                   {
-                    "type": "number"
+                    "type": "number",
+                    "description": "Numeric target value."
                   },
                   {
-                    "type": "string"
+                    "type": "string",
+                    "description": "String target value (e.g., '<200ms', '>99.9%')."
                   }
                 ]
               },
@@ -169,7 +174,8 @@
           "description": "Array of external links relevant to the charter (e.g., design docs, research).",
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#link"
+            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "description": "A link to an external resource related to the charter."
           }
         }
       },
@@ -178,7 +184,8 @@
         "success_metrics",
         "stakeholders",
         "user_segments"
-      ]
+      ],
+      "description": "Step-specific properties for 00_charter."
     }
   ],
   "unevaluatedProperties": false

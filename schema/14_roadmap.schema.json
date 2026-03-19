@@ -4,7 +4,8 @@
   "title": "14_roadmap",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -13,7 +14,8 @@
           "description": "Technology stack for the roadmap, at minimum specifying languages and frameworks.",
           "allOf": [
             {
-              "$ref": "https://specdev.local/schema/core/collections/1#techStack"
+              "$ref": "https://specdev.local/schema/core/collections/1#techStack",
+              "description": "Inherits the structured technology stack definition from core collections."
             },
             {
               "required": [
@@ -81,7 +83,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^fr-[a-z0-9-]+$"
+                  "pattern": "^fr-[a-z0-9-]+$",
+                  "description": "An FR ID in the format 'fr-<slug>' referencing a functional requirement."
                 },
                 "description": "FR IDs from spec/04_fr_list.json that this milestone delivers."
               },
@@ -89,7 +92,8 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^cap-[a-z0-9-]+$"
+                  "pattern": "^cap-[a-z0-9-]+$",
+                  "description": "A capability ID in the format 'cap-<slug>' referencing a capability."
                 },
                 "description": "Capability IDs from spec/01_capabilities.json that this milestone implements."
               },
@@ -133,7 +137,8 @@
                         "required": [
                           "criterion_id",
                           "text"
-                        ]
+                        ],
+                        "description": "A single acceptance criterion with ID, text, and optional fixture reference."
                       }
                     },
                     "status": {
@@ -160,7 +165,8 @@
                     "depends_on": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "A task_id that this task depends on within the same milestone."
                       },
                       "description": "task_ids this task depends on (within same milestone). Must not create cycles."
                     },
@@ -168,7 +174,8 @@
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "minLength": 10
+                        "minLength": 10,
+                        "description": "An assumption that must hold for this task to succeed (minimum 10 characters)."
                       },
                       "description": "Assumptions that must hold for this task to succeed."
                     },
@@ -176,7 +183,8 @@
                       "type": "array",
                       "items": {
                         "type": "string",
-                        "minLength": 15
+                        "minLength": 15,
+                        "description": "A condition that definitively marks this task complete (minimum 15 characters)."
                       },
                       "description": "Conditions that definitively mark this task complete."
                     }
@@ -184,7 +192,8 @@
                   "required": [
                     "task_id",
                     "description"
-                  ]
+                  ],
+                  "description": "A single task within a milestone, with acceptance criteria and dependencies."
                 },
                 "description": "Atomic sub-tasks required to complete the user story."
               },
@@ -192,7 +201,8 @@
                 "type": "array",
                 "description": "Trace references to artifacts this milestone will produce.",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "description": "A trace reference to an artifact this milestone will produce."
                 }
               },
               "risks": {
@@ -218,7 +228,8 @@
               "deliverables",
               "fr_refs",
               "capability_refs"
-            ]
+            ],
+            "description": "A single roadmap milestone with user story, tasks, and deliverables."
           }
         },
         "migration_plan": {
@@ -238,14 +249,16 @@
           "type": "array",
           "description": "Traceability links connecting this roadmap to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "description": "A traceability reference for the roadmap."
           }
         }
       },
       "required": [
         "tech_stack",
         "milestones"
-      ]
+      ],
+      "description": "Step-specific properties for 14_roadmap."
     }
   ],
   "unevaluatedProperties": false

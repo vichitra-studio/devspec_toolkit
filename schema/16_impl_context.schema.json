@@ -113,7 +113,8 @@
   },
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -150,7 +151,8 @@
                   "type": "object",
                   "description": "Map of command names to override values for execution.",
                   "additionalProperties": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Override value for a specific command name."
                   }
                 }
               }
@@ -187,20 +189,23 @@
                   "type": "array",
                   "description": "Items explicitly included in the scope of this plan.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "An item explicitly included in the plan scope."
                   }
                 },
                 "scope_out": {
                   "type": "array",
                   "description": "Items explicitly excluded from the scope of this plan.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "An item explicitly excluded from the plan scope."
                   }
                 },
                 "target_file_patterns": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A file or directory path pattern to modify or create."
                   },
                   "description": "Explicit list of files/directories to modify or create."
                 }
@@ -234,7 +239,8 @@
                   "type": "array",
                   "description": "List of documentation files that need to be updated.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A documentation file path that needs updating."
                   }
                 },
                 "status_ref": {
@@ -416,7 +422,8 @@
                             "type": "array",
                             "description": "Files modified or created to implement this checklist item.",
                             "items": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "A file path modified or created for this checklist item."
                             }
                           },
                           "actions": {
@@ -502,7 +509,8 @@
                                         "minLength": 1
                                       },
                                       "command_ref": {
-                                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                                        "description": "Canonical reference for the run_command action's command."
                                       }
                                     }
                                   }
@@ -643,7 +651,8 @@
                     "type": "array",
                     "description": "List of areas or artifacts affected by this ambiguity.",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "An area or artifact affected by this ambiguity."
                     }
                   },
                   "proposed_assumption": {
@@ -673,10 +682,12 @@
                     "description": "Resolution indicator -- a string explanation or boolean flag.",
                     "oneOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "description": "String explanation of how the ambiguity was resolved."
                       },
                       {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Boolean flag indicating whether the ambiguity has been resolved."
                       }
                     ]
                   },
@@ -722,14 +733,16 @@
                   "type": "array",
                   "description": "Ordered list of concerns to address during implementation.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A concern to address during implementation, in priority order."
                   }
                 },
                 "risks": {
                   "type": "array",
                   "description": "Risks identified in the proposed solution.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A risk identified in the proposed solution."
                   }
                 }
               },
@@ -748,7 +761,8 @@
                   "items": {
                     "oneOf": [
                       {
-                        "type": "string"
+                        "type": "string",
+                        "description": "A free-text reference to a non-code or code structure."
                       },
                       {
                         "type": "object",
@@ -1305,14 +1319,16 @@
                   "type": "array",
                   "description": "Items confirmed as within scope during implementation.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "An item confirmed as within scope during implementation."
                   }
                 },
                 "out_of_scope": {
                   "type": "array",
                   "description": "Items confirmed as out of scope during implementation.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "An item confirmed as out of scope during implementation."
                   }
                 },
                 "acknowledged": {
@@ -1335,7 +1351,8 @@
                     ],
                     "properties": {
                       "acknowledged": {
-                        "const": true
+                        "const": true,
+                        "description": "Must be true when out_of_scope items exist, confirming scope boundaries were acknowledged."
                       }
                     }
                   }
@@ -1445,7 +1462,8 @@
               "type": "array",
               "description": "All files modified or created during execution.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A file path modified or created during execution."
               }
             },
             "execution_results": {
@@ -1551,7 +1569,7 @@
                       ],
                       "properties": {
                         "evidence": {
-                          "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
+                          "pattern": "(PASSED|passed|OK|SUCCESS|\u2713|0 (errors|failures?|failed)|\\d+ passed)"
                         }
                       }
                     }
@@ -1569,14 +1587,16 @@
                   "type": "array",
                   "description": "Checklist item IDs that have been satisfied with evidence.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A checklist item ID that has been satisfied with evidence."
                   }
                 },
                 "passed_test_commands": {
                   "type": "array",
                   "description": "Test commands that passed during execution.",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A test command that passed during execution."
                   }
                 }
               }
@@ -1627,7 +1647,8 @@
                     "type": "array",
                     "description": "Areas or artifacts affected by this ambiguity.",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "An area or artifact affected by this emergent ambiguity."
                     }
                   },
                   "status": {
@@ -1656,7 +1677,8 @@
                   "type": "array",
                   "description": "Summary of test results from execution.",
                   "items": {
-                    "type": "object"
+                    "type": "object",
+                    "description": "A test result summary object."
                   }
                 },
                 "ci_status": {
@@ -1722,7 +1744,8 @@
                     "type": "array",
                     "description": "Checklist item IDs related to this finding.",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "A checklist item ID related to this finding."
                     }
                   },
                   "remediation_task": {
@@ -1742,14 +1765,16 @@
                         "type": "array",
                         "description": "Files that need to be modified for remediation.",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "A file path that needs modification for remediation."
                         }
                       },
                       "checklist_ids": {
                         "type": "array",
                         "description": "Checklist item IDs that the remediation must satisfy.",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "A checklist item ID that the remediation must satisfy."
                         }
                       }
                     },
@@ -1955,14 +1980,16 @@
                         "description": "Target deployment environment.",
                         "allOf": [
                           {
-                            "$ref": "https://specdev.local/schema/core/collections/1#environmentName"
+                            "$ref": "https://specdev.local/schema/core/collections/1#environmentName",
+                            "description": "Inherits the environment name constraint from core collections."
                           },
                           {
                             "enum": [
                               "dev",
                               "staging",
                               "prod"
-                            ]
+                            ],
+                            "description": "Restricts deployment environments to dev, staging, or prod (excludes ci)."
                           }
                         ]
                       },
@@ -2074,7 +2101,8 @@
                   "fixture_status": {
                     "properties": {
                       "ci_status": {
-                        "const": "green"
+                        "const": "green",
+                        "description": "CI status must be green when verdict is verified."
                       }
                     },
                     "required": [
@@ -2114,7 +2142,8 @@
       },
       "required": [
         "plan"
-      ]
+      ],
+      "description": "Step-specific properties for 16_impl_context."
     }
   ],
   "unevaluatedProperties": false

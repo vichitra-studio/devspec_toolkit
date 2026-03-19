@@ -177,14 +177,16 @@
         "constraints": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "description": "A constraint string limiting how this canonical term may be used."
           },
           "description": "Optional array of constraint strings that limit how this canonical term may be used."
         },
         "examples": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "description": "An example usage string demonstrating this canonical term."
           },
           "description": "Optional array of example usage strings demonstrating this canonical term in context."
         },
@@ -200,7 +202,8 @@
         "aliases": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "description": "An alternative name that resolves to this canonical entry."
           },
           "uniqueItems": true,
           "description": "Optional array of alternative names that resolve to this canonical entry."
@@ -352,5 +355,6 @@
       ],
       "description": "An alias mapping that resolves an alternative name to a canonical entry ID."
     }
-  }
+  },
+  "description": "Schema for the canonical registry defining shared vocabulary terms with lifecycle management."
 }

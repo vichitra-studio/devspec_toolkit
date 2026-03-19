@@ -4,7 +4,8 @@
   "title": "13_extension_generator",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1"
+      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
       "type": "object",
@@ -42,7 +43,8 @@
                 "type": "array",
                 "description": "Schema sections that the extension must define.",
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "A schema section name that the extension must define."
                 }
               },
               "schema_design_guidelines": {
@@ -73,13 +75,15 @@
               "area_of_concern",
               "required_schema_sections",
               "governance_label_ref"
-            ]
+            ],
+            "description": "A single extension spec definition with ID, title, and schema requirements."
           }
         }
       },
       "required": [
         "extensions"
-      ]
+      ],
+      "description": "Step-specific properties for 13_extension_generator."
     }
   ],
   "unevaluatedProperties": false
