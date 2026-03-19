@@ -4,52 +4,33 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
-# Template for pre-commit-config.yaml
-def _build_pre_commit_template(rel_toolkit_root: str, is_submodule: bool) -> str:
-    """Build pre-commit config with correct --repo-root, --spec-root, --git-root flags.
-
-    When the toolkit is vendored as a submodule, hooks need --spec-root and --git-root
-    so that forward-replay and other git-dependent checks run from the correct directory.
-    """
-    repo_root_flag = f"--repo-root ./{rel_toolkit_root}" if rel_toolkit_root != "." else "--repo-root ."
-    # Build the flag suffix for submodule deployments
-    if is_submodule:
-        extra_flags = f" --spec-root ./spec --git-root ."
-    else:
-        extra_flags = ""
-    return f"""repos:
+def _build_pre_commit_config(rel_toolkit_root: str) -> str:
+    """Read the host pre-commit template and substitute the toolkit root path."""
+    template_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..", "templates", "pre-commit-config.host.yaml",
+    )
+    template_path = os.path.abspath(template_path)
+    if os.path.exists(template_path):
+        with open(template_path) as f:
+            content = f.read()
+        # Replace the default ./devspec_toolkit with the actual relative path
+        return content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
+    # Fallback: minimal config if template is missing
+    repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
+    return f"""# Pre-commit hooks — template not found, minimal config generated.
+repos:
   - repo: local
     hooks:
-      - id: devspec-validate
-        name: DevSpec Validate
-        entry: ./tools/run_specdev.sh validate-all spec {repo_root_flag}{extra_flags}
+      - id: validate-all
+        name: Validate all spec files
+        entry: python -m specdev_tools.cli validate-all spec {repo_root_flag}
         language: system
-        types: [json]
-        files: ^spec/
-        verbose: true
-        additional_dependencies: []
-
-      - id: devspec-fixtures
-        name: DevSpec Fixtures Lint
-        entry: ./tools/run_specdev.sh fixtures-lint spec {repo_root_flag}{extra_flags}
-        language: system
-        types: [json]
-        files: ^spec/
-        verbose: true
-        additional_dependencies: []
-
-#  - id: devspec-governance
-#    name: DevSpec Governance Check
-#    entry: ./tools/run_specdev.sh governance-check spec {repo_root_flag}{extra_flags} --message
-#    language: python
-#    stages: [commit-msg]
-#    # Note: commit-msg hooks require 'pre-commit install --hook-type commit-msg'
+        pass_filenames: false
+        files: spec/.*\\.json$
+        types: [file]
 """
-
-# Default template for backward compatibility
-PRE_COMMIT_TEMPLATE = _build_pre_commit_template("devspec_toolkit", is_submodule=True)
 
 CI_WORKFLOW_TEMPLATE = """name: SpecDev CI
 
@@ -287,7 +268,7 @@ def main():
     pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
     if not os.path.exists(pre_commit_file):
         print("Creating .pre-commit-config.yaml...")
-        config_content = _build_pre_commit_template(rel_toolkit_root, is_submodule)
+        config_content = _build_pre_commit_config(rel_toolkit_root)
         with open(pre_commit_file, "w") as f:
             f.write(config_content)
         print("Note: You need to install pre-commit (pip install pre-commit) and run 'pre-commit install'")
@@ -345,21 +326,23 @@ def main():
             print("Strict mode enabled: Installing commit-msg hook...")
             run_cmd([pre_commit_bin, "install", "--hook-type", "commit-msg"], cwd=target_dir)
             
-            # Uncomment governance check in config
+            # Append governance commit-msg hook if not already present
             config_path = os.path.join(target_dir, ".pre-commit-config.yaml")
             if os.path.exists(config_path):
                 with open(config_path, "r") as f:
                     config_content = f.read()
-                # Simple string replacement to uncomment the governance block
-                if "#  - id: devspec-governance" in config_content:
+                if "devspec-governance" not in config_content:
                     print("Enabling governance check in pre-commit config...")
-                    new_content = config_content.replace("#  - id: devspec-governance", "  - id: devspec-governance")
-                    new_content = new_content.replace("#    name: DevSpec Governance Check", "    name: DevSpec Governance Check")
-                    new_content = new_content.replace("#    entry: ./tools/run_specdev.sh", "    entry: ./tools/run_specdev.sh")
-                    new_content = new_content.replace("#    language: python", "    language: system") # Ensure system language here too
-                    new_content = new_content.replace("#    stages: [commit-msg]", "    stages: [commit-msg]")
-                    with open(config_path, "w") as f:
-                        f.write(new_content)
+                    repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
+                    governance_hook = f"""      - id: devspec-governance
+        name: DevSpec Governance Check
+        entry: python -m specdev_tools.cli governance-check spec {repo_root_flag} --message
+        language: system
+        pass_filenames: false
+        stages: [commit-msg]
+"""
+                    with open(config_path, "a") as f:
+                        f.write(governance_hook)
     else:
         print("Warning: pre-commit binary not found in dev_env. Skipping hook install.")
 

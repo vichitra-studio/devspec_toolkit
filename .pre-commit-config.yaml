@@ -1,6 +1,10 @@
-# Pre-commit hooks for the DevSpec Toolkit.
+# Pre-commit hooks for the DevSpec Toolkit (toolkit-internal).
 # Install: pip install pre-commit && pre-commit install
 # Run manually: pre-commit run --all-files
+#
+# Host repos that vendor the toolkit as a submodule should copy the
+# template at templates/pre-commit-config.host.yaml and adjust
+# --repo-root to ./devspec_toolkit (or wherever the submodule lives).
 repos:
   - repo: local
     hooks:
