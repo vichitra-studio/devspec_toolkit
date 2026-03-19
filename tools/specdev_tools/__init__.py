@@ -9,7 +9,7 @@ __all__: list[str] = []
 
 # Backward-compatibility lazy-import registry (AUDIT-061 design decision).
 #
-# The _MOVED dict maps 22 top-level attribute names (e.g.
+# The _MOVED dict maps 23 top-level attribute names (e.g.
 # ``specdev_tools.validate``) to their current fully-qualified module paths
 # inside the reorganised subpackages (``specdev_tools.validation.validate``).
 # ``__getattr__`` intercepts accesses to these names, emits a
@@ -28,7 +28,6 @@ _MOVED = {
     "hallucination_lint": "specdev_tools.validation.hallucination_lint",
     "fixtures_lint": "specdev_tools.validation.fixtures_lint",
     "seed_lint": "specdev_tools.validation.seed_lint",
-    "docs_lint": "specdev_tools.validation.docs_lint",
     "matrix": "specdev_tools.validation.matrix",
     "invariants": "specdev_tools.validation.invariants",
     "governance": "specdev_tools.validation.governance",

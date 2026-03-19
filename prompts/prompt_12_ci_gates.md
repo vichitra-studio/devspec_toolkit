@@ -103,7 +103,6 @@ Available CLI tools include:
 - `./tools/run_specdev.sh invariants-check --repo-root ./devspec_toolkit --sample ./path/to/sample.json` - Check spec invariants
 - `./tools/run_specdev.sh governance-check --repo-root ./devspec_toolkit` - Validate governance policies
 - `./tools/run_specdev.sh seed-lint --repo-root ./devspec_toolkit` - Validate seed requirements
-- `./tools/run_specdev.sh docs-lint --repo-root ./devspec_toolkit` - Enforce docs policy
 
 ## Output Rules
 1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).

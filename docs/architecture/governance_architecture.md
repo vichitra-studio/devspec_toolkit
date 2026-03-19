@@ -191,16 +191,15 @@ The required sequence after any spec edit:
 ```
 1. validate          -- JSON Schema validation of the changed artifact
 2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
-3. docs-lint         -- check README coverage per docs_policy
-4. matrix            -- regenerate trace_matrix.json (if traceability changed)
-5. fixtures-lint     -- verify fixture targets resolve (after matrix rebuild)
+3. matrix            -- regenerate trace_matrix.json (if traceability changed)
+4. fixtures-lint     -- verify fixture targets resolve (after matrix rebuild)
 ```
 
 **When to run each check:**
 
 | Trigger | Required checks |
 |---|---|
-| Any spec file edit | `validate`, `seed-lint`, `docs-lint` |
+| Any spec file edit | `validate`, `seed-lint` |
 | Trace field changed (`trace`, `targets`, `_ref`) | Add `matrix` + `fixtures-lint` |
 | New canon entry added | `canonical-lint`, `canonical-integrity` |
 | Commit | `governance-check` against commit message |

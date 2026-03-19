@@ -5,7 +5,6 @@ import unittest
 
 from specdev_tools.validation.validators.step_03 import validate_step_03
 from specdev_tools.validation.validators.step_04 import validate_step_04
-from specdev_tools.validation.validators.step_10 import validate_step_10
 
 
 def _render(errors):
@@ -14,18 +13,6 @@ def _render(errors):
 
 
 class Step0310Tests(unittest.TestCase):
-    def test_step_10_accepts_seed_docs_lint(self):
-        errs = validate_step_10(
-            {
-                "owner": "system",
-                "pr_rules": ["seed-lint", "docs-lint"],
-                "commit_message_rules": {"pattern": "^feat:.+"},
-                "trace": [{"type": "component", "id": "comp-a"}],
-            },
-            ".",
-        )
-        self.assertEqual([], errs)
-
     def test_step_03_optional_dataset_checks(self):
         errs = validate_step_03(
             {

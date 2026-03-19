@@ -27,7 +27,7 @@
               "invariants-check",
               "governance-check",
               "seed-lint",
-              "docs-lint",
+
               "test",
               "build",
               "lint",

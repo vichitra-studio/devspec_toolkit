@@ -160,11 +160,6 @@ def main():
     sl.add_argument("--repo-root", default=".")
     sl.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
-    dl = sub.add_parser("docs-lint")
-    dl.add_argument("spec_dir")
-    dl.add_argument("--repo-root", default=".")
-    dl.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
-
     ps = sub.add_parser("prompt-sync")
     ps.add_argument("spec_dir", nargs="?")
     ps.add_argument("--repo-root", default=".")
@@ -381,14 +376,6 @@ def main():
         errs = lint_seeds(repo_root, spec_dir)
         if getattr(args, "json_output", False):
             _json_exit(errs, "seed-lint")
-        else:
-            _print_and_exit_if_errors(errs)
-    elif args.cmd == "docs-lint":
-        from .validation.docs_lint import lint_docs
-        spec_dir = os.path.abspath(args.spec_dir)
-        errs = lint_docs(spec_dir)
-        if getattr(args, "json_output", False):
-            _json_exit(errs, "docs-lint")
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "prompt-sync":

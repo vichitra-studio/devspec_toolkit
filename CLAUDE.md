@@ -38,9 +38,8 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 
-# Seed and docs enforcement
+# Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh docs-lint spec --repo-root ./devspec_toolkit
 
 # Invariants & Governance
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
@@ -150,7 +149,7 @@ Artifacts live in `spec/NN_name.json`; human guides in `spec/NN_name.guide.md`. 
 - `canon/` — Canonical registry (`manifest.json`, `aliases.json`) for shared vocabulary: units, stages, environments, roles, NFR categories, trace types, owners, etc. Referenced by canonical-lint and canonical-integrity checks.
 - `tools/specdev_tools/` — Python CLI package; entry point at `cli.py`, organized into subpackages:
   - `core/` — errors, json_output, registry, trace_types, changelog_parser, config, constants, loaders
-  - `validation/` — validate, validators/, linters (fixtures, seed, docs, quality, hallucination, dependency, forward-replay, traceability, invariants, governance, matrix)
+  - `validation/` — validate, validators/, linters (fixtures, seed, quality, hallucination, dependency, forward-replay, traceability, invariants, governance, matrix)
   - `generation/` — prompt_generator, prompt_schema_sync, schema_differ
   - `canonical/` — autofix, integrity, lint, registry
   - `migration/` — planner, runner
@@ -180,9 +179,8 @@ Agent protocol metadata lives in `docs/agents/manifest.json`.
 
 1. `validate` the changed artifact
 2. `seed-lint` to verify seed refs are current
-3. `docs-lint` for README coverage
-4. If traceability changed: regenerate `matrix` and run `fixtures-lint`
-5. Governance-compliant commit message per `spec/10_governance.json`
+3. If traceability changed: regenerate `matrix` and run `fixtures-lint`
+4. Governance-compliant commit message per `spec/10_governance.json`
 
 ---
 

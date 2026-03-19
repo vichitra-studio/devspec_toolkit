@@ -81,9 +81,8 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 
-# Seed and docs enforcement
+# Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh docs-lint spec --repo-root ./devspec_toolkit
 
 # Invariants & Governance
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
@@ -209,9 +208,8 @@ Invoke commands from the root of your host repository so relative paths to `spec
 1. Edit the JSON artifact.
 2. Run `validate`.
 3. Run `seed-lint` to ensure required seed context is referenced and current.
-4. Run `docs-lint` to enforce README coverage and documentation policy.
-5. If any traceability changed, regenerate the matrix and lint fixtures.
-6. Update governance-compliant commit messages per `spec/10_governance.json`.
+4. If any traceability changed, regenerate the matrix and lint fixtures.
+5. Update governance-compliant commit messages per `spec/10_governance.json`.
 
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).

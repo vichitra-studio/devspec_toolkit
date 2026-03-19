@@ -41,7 +41,7 @@ def validate_step_10(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     if "pr_rules" in instance:
         allowed_rules = {
             "validate", "validate-all", "matrix", "fixtures-lint",
-            "invariants-check", "governance-check", "seed-lint", "docs-lint", "test", "build",
+            "invariants-check", "governance-check", "seed-lint", "test", "build",
             "lint", "format", "audit", "security"
         }
         for i, rule in enumerate(instance["pr_rules"]):

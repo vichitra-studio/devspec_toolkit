@@ -129,7 +129,7 @@ def _scan_node(
             if key == "pr_rules" and isinstance(value, list):
                 allowed_pr_rules = {
                     "validate", "validate-all", "matrix", "fixtures-lint", "invariants-check",
-                    "governance-check", "seed-lint", "docs-lint", "test", "build", "lint",
+                    "governance-check", "seed-lint", "test", "build", "lint",
                     "format", "audit", "security"
                 }
                 for idx, item in enumerate(value):

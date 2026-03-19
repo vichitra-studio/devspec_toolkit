@@ -132,11 +132,6 @@ Automation protocol and runner tips live in [../agents/manifest.json](../agents/
 ## 7. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
 
-## 7a. Documentation Policy
-Documentation coverage is controlled by `spec/common/seed_manifest.json`. Use `docs-lint` to validate coverage and keep docs updated when code changes occur. The planner decides when new directories require README coverage and records that in `docs_policy.readme_depth_by_scope`.
-
-
-
 ## 8. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).
 - Looking for troubleshooting tactics? Review [tooling/gap_hunter_checklist.md](tooling/gap_hunter_checklist.md) and [tooling/coverage_matrix.md](tooling/coverage_matrix.md).

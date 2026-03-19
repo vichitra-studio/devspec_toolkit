@@ -60,7 +60,7 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 
 ## CLI Overview
 
-The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `seed-lint`, `docs-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and `forward-replay-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
+The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `seed-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and `forward-replay-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
 
 From any location, run:
 ```bash
