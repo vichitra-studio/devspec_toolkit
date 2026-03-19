@@ -14,7 +14,7 @@ from ..core.errors import SpecError, make_error
 _ENUM_CANON_PAIRINGS = [
     ("core/collections.schema.json", ["$defs", "environmentName", "enum"], "environment"),
     ("core/collections.schema.json", ["$defs", "stageName", "enum"], "stage"),
-    ("07_nfrs.schema.json", ["properties", "nfrs", "items", "properties", "category", "enum"], "nfr_category"),
+    ("core/atoms.schema.json", ["$defs", "nfrCategory", "enum"], "nfr_category"),
 ]
 
 

@@ -25,17 +25,7 @@
               },
               "type": {
                 "description": "The architectural type of this component: service, db, queue, cache, job, ui, lib, or external.",
-                "type": "string",
-                "enum": [
-                  "service",
-                  "db",
-                  "queue",
-                  "cache",
-                  "job",
-                  "ui",
-                  "lib",
-                  "external"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#componentType"
               },
               "responsibilities": {
                 "description": "List of 3-6 responsibilities this component handles within the system.",
@@ -118,24 +108,11 @@
               },
               "protocol": {
                 "description": "Communication protocol used for this connection: http, grpc, event, rpc, db, or file.",
-                "type": "string",
-                "enum": [
-                  "http",
-                  "grpc",
-                  "event",
-                  "rpc",
-                  "db",
-                  "file"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#connectionProtocol"
               },
               "trust_boundary": {
                 "description": "Trust boundary classification: internal (same trust zone), partner (B2B), or public (internet-facing).",
-                "type": "string",
-                "enum": [
-                  "internal",
-                  "partner",
-                  "public"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#trustBoundary"
               },
               "schema_ref": {
                 "description": "Reference to the schema governing data exchanged over this connection.",
@@ -144,15 +121,7 @@
               },
               "auth": {
                 "description": "Authentication mechanism required for this connection: none, basic, oauth2, jwt, mTLS, or key.",
-                "type": "string",
-                "enum": [
-                  "none",
-                  "basic",
-                  "oauth2",
-                  "jwt",
-                  "mTLS",
-                  "key"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#connectionAuth"
               },
               "rate_limit": {
                 "description": "Rate limiting configuration for this connection, required for partner/public trust boundaries.",
@@ -195,12 +164,7 @@
               },
               "reliability": {
                 "description": "Message delivery guarantee for event-based connections: best-effort, at-least-once, or exactly-once.",
-                "type": "string",
-                "enum": [
-                  "best-effort",
-                  "at-least-once",
-                  "exactly-once"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#messageReliability"
               },
               "trace": {
                 "description": "Traceability links back to upstream artifacts for this connection.",

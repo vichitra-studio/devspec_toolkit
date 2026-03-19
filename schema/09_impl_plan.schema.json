@@ -52,14 +52,7 @@
                 "description": "Planned completion date for this milestone (ISO 8601 date)."
               },
               "status": {
-                "type": "string",
-                "enum": [
-                  "pending",
-                  "in_progress",
-                  "done",
-                  "deferred"
-                ],
-                "default": "pending",
+                "$ref": "https://specdev.local/schema/core/atoms/1#milestoneStatus",
                 "description": "Current progress status of the milestone."
               },
               "risks": {

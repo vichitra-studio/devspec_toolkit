@@ -38,13 +38,7 @@
               },
               "mode": {
                 "description": "Testing mode: unit (isolated), contract (API boundary), e2e (end-to-end flow), or redteam (adversarial).",
-                "type": "string",
-                "enum": [
-                  "unit",
-                  "contract",
-                  "e2e",
-                  "redteam"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#testingMode"
               },
               "input": {
                 "description": "Input data for this test fixture, can be any valid JSON value.",

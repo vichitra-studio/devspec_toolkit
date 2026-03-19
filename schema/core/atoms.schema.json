@@ -56,6 +56,91 @@
         "TASK_01_INIT",
         "FR_USER_LOGIN"
       ]
+    },
+    "milestoneStatus": {
+      "$anchor": "milestoneStatus",
+      "type": "string",
+      "enum": ["pending", "in_progress", "done", "deferred"],
+      "default": "pending",
+      "description": "Progress status for milestones: pending (not started), in_progress, done, or deferred."
+    },
+    "severityLevel": {
+      "$anchor": "severityLevel",
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Severity or risk level used across threat assessments, milestone risk ratings, and review findings."
+    },
+    "httpMethod": {
+      "$anchor": "httpMethod",
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "description": "Standard HTTP methods for REST API interface contracts."
+    },
+    "httpMethodFull": {
+      "$anchor": "httpMethodFull",
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+      "description": "Extended HTTP method set including OPTIONS and HEAD for scaffold interface mappings."
+    },
+    "componentType": {
+      "$anchor": "componentType",
+      "type": "string",
+      "enum": ["service", "db", "queue", "cache", "job", "ui", "lib", "external"],
+      "description": "Architectural component type classification in system sketches."
+    },
+    "connectionProtocol": {
+      "$anchor": "connectionProtocol",
+      "type": "string",
+      "enum": ["http", "grpc", "event", "rpc", "db", "file"],
+      "description": "Inter-component connection protocol in system sketches."
+    },
+    "apiProtocol": {
+      "$anchor": "apiProtocol",
+      "type": "string",
+      "enum": ["http", "grpc", "ws", "mqtt"],
+      "description": "API-level communication protocol for interface contracts."
+    },
+    "trustBoundary": {
+      "$anchor": "trustBoundary",
+      "type": "string",
+      "enum": ["internal", "partner", "public"],
+      "description": "Trust boundary classification for inter-component connections."
+    },
+    "connectionAuth": {
+      "$anchor": "connectionAuth",
+      "type": "string",
+      "enum": ["none", "basic", "oauth2", "jwt", "mTLS", "key"],
+      "description": "Authentication mechanism for inter-component connections in system sketches."
+    },
+    "apiSecurity": {
+      "$anchor": "apiSecurity",
+      "type": "string",
+      "enum": ["none", "api-key", "oauth2", "jwt", "mTLS"],
+      "description": "Security mechanism for API interface contracts."
+    },
+    "nfrCategory": {
+      "$anchor": "nfrCategory",
+      "type": "string",
+      "enum": ["latency", "throughput", "availability", "durability", "cost", "security", "privacy", "maintainability", "usability", "portability", "energy"],
+      "description": "Non-functional requirement category classification."
+    },
+    "testingMode": {
+      "$anchor": "testingMode",
+      "type": "string",
+      "enum": ["unit", "contract", "e2e", "redteam"],
+      "description": "Testing mode for fixture definitions."
+    },
+    "threatCategory": {
+      "$anchor": "threatCategory",
+      "type": "string",
+      "enum": ["authn", "authz", "business_logic", "transport", "data_privacy"],
+      "description": "Threat category classification for red team assessments."
+    },
+    "messageReliability": {
+      "$anchor": "messageReliability",
+      "type": "string",
+      "enum": ["best-effort", "at-least-once", "exactly-once"],
+      "description": "Message delivery guarantee level for event-driven connections."
     }
   }
 }

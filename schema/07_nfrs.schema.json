@@ -26,20 +26,7 @@
               },
               "category": {
                 "description": "Quality attribute category: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, or energy.",
-                "type": "string",
-                "enum": [
-                  "latency",
-                  "throughput",
-                  "availability",
-                  "durability",
-                  "cost",
-                  "security",
-                  "privacy",
-                  "maintainability",
-                  "usability",
-                  "portability",
-                  "energy"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#nfrCategory"
               },
               "metric": {
                 "description": "Name of the metric being measured (e.g., 'p99 response time', 'uptime percentage').",

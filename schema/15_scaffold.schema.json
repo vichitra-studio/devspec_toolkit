@@ -48,16 +48,7 @@
                 "description": "URL path for this interface (e.g., '/api/v1/users')."
               },
               "method": {
-                "type": "string",
-                "enum": [
-                  "GET",
-                  "POST",
-                  "PUT",
-                  "DELETE",
-                  "PATCH",
-                  "OPTIONS",
-                  "HEAD"
-                ],
+                "$ref": "https://specdev.local/schema/core/atoms/1#httpMethodFull",
                 "description": "HTTP method for this interface route."
               }
             },

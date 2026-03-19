@@ -1775,16 +1775,10 @@ class CliTests(unittest.TestCase):
                 }),
                 encoding="utf-8",
             )
-            (root / "schema" / "07_nfrs.schema.json").write_text(
+            (schema_core / "atoms.schema.json").write_text(
                 json.dumps({
-                    "properties": {
-                        "nfrs": {
-                            "items": {
-                                "properties": {
-                                    "category": {"enum": nfr_values},
-                                },
-                            },
-                        },
+                    "$defs": {
+                        "nfrCategory": {"enum": nfr_values},
                     },
                 }),
                 encoding="utf-8",

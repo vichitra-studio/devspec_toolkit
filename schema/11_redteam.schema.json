@@ -46,14 +46,7 @@
                 }
               },
               "category": {
-                "type": "string",
-                "enum": [
-                  "authn",
-                  "authz",
-                  "business_logic",
-                  "transport",
-                  "data_privacy"
-                ],
+                "$ref": "https://specdev.local/schema/core/atoms/1#threatCategory",
                 "description": "Security domain category: authentication, authorization, business logic, transport, or data privacy."
               },
               "mitigations": {
@@ -93,13 +86,7 @@
                 }
               },
               "severity": {
-                "type": "string",
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "critical"
-                ],
+                "$ref": "https://specdev.local/schema/core/atoms/1#severityLevel",
                 "description": "Severity rating of the threat from low to critical."
               },
               "risk_category_ref": {

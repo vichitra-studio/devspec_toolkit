@@ -52,14 +52,7 @@
       ]
     },
     "severityLevel": {
-      "type": "string",
-      "enum": [
-        "low",
-        "medium",
-        "high",
-        "critical"
-      ],
-      "description": "Severity classification from low to critical."
+      "$ref": "https://specdev.local/schema/core/atoms/1#severityLevel"
     },
     "executionStatus": {
       "type": "string",

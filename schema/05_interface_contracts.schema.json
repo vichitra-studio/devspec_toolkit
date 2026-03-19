@@ -33,13 +33,7 @@
               },
               "protocol": {
                 "description": "Communication protocol for this API: http, grpc, ws (WebSocket), or mqtt.",
-                "type": "string",
-                "enum": [
-                  "http",
-                  "grpc",
-                  "ws",
-                  "mqtt"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#apiProtocol"
               },
               "path": {
                 "description": "URL path for this API endpoint (e.g., '/api/v1/sessions').",
@@ -47,14 +41,7 @@
               },
               "method": {
                 "description": "HTTP method for this endpoint: GET, POST, PUT, PATCH, or DELETE.",
-                "type": "string",
-                "enum": [
-                  "GET",
-                  "POST",
-                  "PUT",
-                  "PATCH",
-                  "DELETE"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#httpMethod"
               },
               "input_schema_ref": {
                 "description": "Reference to the JSON Schema defining the request body structure.",
@@ -115,14 +102,7 @@
               },
               "security": {
                 "description": "Authentication/authorization mechanism for this API: none, api-key, oauth2, jwt, or mTLS.",
-                "type": "string",
-                "enum": [
-                  "none",
-                  "api-key",
-                  "oauth2",
-                  "jwt",
-                  "mTLS"
-                ]
+                "$ref": "https://specdev.local/schema/core/atoms/1#apiSecurity"
               },
               "owner": {
                 "description": "Team or domain responsible for this API.",
