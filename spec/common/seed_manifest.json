@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/seed_manifest.schema.json",
+  "$schema": "vc:seed-manifest",
   "seed_manifest_id": "seed-manifest-core",
   "version": "0.1.0",
   "created_at": "2026-02-07T00:00:00Z",

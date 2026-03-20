@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/13a_completeness_assessment.schema.json`
+`vc:13a-completeness-assessment`
 
 ## Required Changes
 

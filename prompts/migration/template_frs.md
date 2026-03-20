@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/04_fr_list.schema.json`
+`vc:04-fr-list`
 
 ## Required Changes
 

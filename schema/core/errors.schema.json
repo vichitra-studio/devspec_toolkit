@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/core/errors/1",
+  "$id": "vc:core:errors",
   "title": "Error Shapes",
   "$defs": {
     "errorState": {
@@ -9,7 +9,7 @@
       "additionalProperties": false,
       "properties": {
         "code": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Kebab-case error code identifying the specific validation failure (e.g., missing-field, invalid-ref)."
         },
         "message": {

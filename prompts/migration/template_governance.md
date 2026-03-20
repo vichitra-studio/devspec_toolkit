@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/10_governance.schema.json`
+`vc:10-governance`
 
 ## Required Changes
 

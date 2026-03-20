@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schema/00_charter.schema.json",
+  "$schema": "vc:00-charter",
   "id": "charter-minimal",
   "title": "Minimal Charter Test",
   "owner": "product",

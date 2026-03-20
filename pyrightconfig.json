@@ -1,0 +1,12 @@
+{
+  "venvPath": ".",
+  "venv": "devspec_env",
+  "extraPaths": [
+    "tools",
+    "scripts"
+  ],
+  "include": [
+    "tools/specdev_tools",
+    "tests"
+  ]
+}

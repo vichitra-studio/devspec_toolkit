@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/12_ci_gates.schema.json`
+`vc:12-ci-gates`
 
 ## Required Changes
 

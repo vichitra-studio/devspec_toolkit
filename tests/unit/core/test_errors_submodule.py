@@ -35,8 +35,8 @@ class TestSchemaRegistryError:
         assert isinstance(err, SpecdevError)
 
     def test_message_contains_uri(self):
-        err = SchemaRegistryError("https://specdev.local/schema/foo.json")
-        assert "https://specdev.local/schema/foo.json" in str(err)
+        err = SchemaRegistryError("vc:foo")
+        assert "vc:foo" in str(err)
         assert "schema_registry.json" in str(err)
 
     def test_uri_attribute(self):

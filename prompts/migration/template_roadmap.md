@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/14_roadmap.schema.json`
+`vc:14-roadmap`
 
 ## Required Changes
 

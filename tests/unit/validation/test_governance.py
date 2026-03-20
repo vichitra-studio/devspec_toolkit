@@ -124,7 +124,7 @@ class TestCheckCommitMessage:
             "require_spec_ids": True,
             "pattern": r"^(feat|fix)\(.+\):.*$",
         })
-        errors = check_commit_message(str(tmp_path), None)
+        errors = check_commit_message(str(tmp_path), None)  # type: ignore[arg-type]
         assert len(errors) == 1
 
     def test_default_error_message_mentions_regex(self, tmp_path):

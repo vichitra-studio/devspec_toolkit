@@ -106,7 +106,7 @@ Before emitting, verify:
 3. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/13_extension_generator.schema.json
+- Schema URI: vc:13-extension-generator
 - Schema File: schema/13_extension_generator.schema.json
 - Schema Registry: tools/schema_registry.json
 

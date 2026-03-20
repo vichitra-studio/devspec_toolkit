@@ -19,7 +19,7 @@ from specdev_tools.validation.invariants import _tiny_eval, run_invariants
 def _make_spec_file(tmp_path, rules, filename="06_invariants.json"):
     """Write a minimal step-06 invariant spec file into *tmp_path*."""
     spec = {
-        "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+        "$schema": "vc:06-invariants",
         "id": "invariants-test",
         "owner": "api",
         "created_at": "2025-01-01T00:00:00Z",

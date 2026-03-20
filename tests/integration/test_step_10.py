@@ -22,7 +22,7 @@ def validate_schema(fixture_path):
             print(f"❌ {fixture_path}: Missing $schema field")
             return False
             
-        if data["$schema"] != "https://specdev.local/schema/10_governance.schema.json":
+        if data["$schema"] != "vc:10-governance":
             pass
             return False
             

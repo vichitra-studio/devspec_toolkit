@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "$id": "vc:05-interface-contracts",
   "title": "05_interface_contracts",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -20,7 +20,7 @@
             "properties": {
               "api_id": {
                 "description": "Unique kebab-case identifier for this API (e.g., 'api-session-create').",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "name": {
                 "description": "Human-readable name of this API endpoint.",
@@ -33,7 +33,7 @@
               },
               "protocol": {
                 "description": "Communication protocol for this API: http, grpc, ws (WebSocket), or mqtt.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#apiProtocol"
+                "$ref": "vc:core:atoms#apiProtocol"
               },
               "path": {
                 "description": "URL path for this API endpoint (e.g., '/api/v1/sessions').",
@@ -41,7 +41,7 @@
               },
               "method": {
                 "description": "HTTP method for this endpoint: GET, POST, PUT, PATCH, or DELETE.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#httpMethod"
+                "$ref": "vc:core:atoms#httpMethod"
               },
               "input_schema_ref": {
                 "description": "Reference to the JSON Schema defining the request body structure.",
@@ -55,7 +55,7 @@
                 "description": "Array of error states that this API may return.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/errors/1#errorState",
+                  "$ref": "vc:core:errors#errorState",
                   "description": "An error state that this API may return."
                 }
               },
@@ -86,7 +86,7 @@
                     },
                     "schema": {
                       "description": "Reference to the schema type for this parameter value.",
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                      "$ref": "vc:core:atoms#kebabId"
                     }
                   },
                   "required": [
@@ -98,39 +98,39 @@
               },
               "example_refs": {
                 "description": "References to example request/response pairs for this API.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "security": {
                 "description": "Authentication/authorization mechanism for this API: none, api-key, oauth2, jwt, or mTLS.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#apiSecurity"
+                "$ref": "vc:core:atoms#apiSecurity"
               },
               "owner": {
                 "description": "Team or domain responsible for this API.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+                "$ref": "vc:core:atoms#owner"
               },
               "trace": {
                 "description": "Traceability links back to upstream functional requirements or capabilities.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A traceability reference for this API contract."
                 }
               },
               "interface_ref": {
                 "description": "Canonical reference linking this API to the canonical interface registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "event_ref": {
                 "description": "Canonical reference to events emitted or consumed by this API.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary entity this API operates on.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "policy_ref": {
                 "description": "Canonical reference to the access or governance policy for this API.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "enum_provenance": {
                 "type": "object",
@@ -153,7 +153,7 @@
                   },
                   "resolved_at": {
                     "description": "ISO 8601 timestamp when the enum values were resolved.",
-                    "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+                    "$ref": "vc:core:atoms#timestamp"
                   },
                   "resolver": {
                     "type": "string",

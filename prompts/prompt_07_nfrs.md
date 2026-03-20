@@ -135,7 +135,7 @@ Before emitting, verify:
 - Which FRs, APIs, or components does each NFR apply to? Any invariants required to enforce it?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/07_nfrs.schema.json
+- Schema URI: vc:07-nfrs
 - Schema File: schema/07_nfrs.schema.json
 - Schema Registry: tools/schema_registry.json
 

@@ -198,7 +198,7 @@ Before emitting, verify:
 The `$schema` field is required in the output and is stripped before validation during prompt-schema sync checks.
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/14_roadmap.schema.json
+- Schema URI: vc:14-roadmap
 - Schema File: schema/14_roadmap.schema.json
 - Schema Registry: tools/schema_registry.json
 
@@ -228,7 +228,7 @@ This step's output artifact MUST include every field listed in the schema's `req
 # Output Contract
 ```json
 {
-  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "$schema": "vc:14-roadmap",
   "id": "roadmap-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",

@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/15_scaffold.schema.json",
+  "$id": "vc:15-scaffold",
   "title": "15_scaffold",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -24,7 +24,7 @@
               "description": "Web framework (e.g., fastapi, nextjs, gin). Use lowercase/kebab-case."
             },
             "modules": {
-              "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+              "$ref": "vc:core:collections#stringArray",
               "description": "List of top-level modules or packages in the project skeleton."
             }
           },
@@ -40,7 +40,7 @@
             "additionalProperties": false,
             "properties": {
               "interface_ref": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Reference to the interface definition in the API contracts spec."
               },
               "path": {
@@ -48,7 +48,7 @@
                 "description": "URL path for this interface (e.g., '/api/v1/users')."
               },
               "method": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#httpMethodFull",
+                "$ref": "vc:core:atoms#httpMethodFull",
                 "description": "HTTP method for this interface route."
               }
             },
@@ -61,11 +61,11 @@
           }
         },
         "validators": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "description": "List of validation checks that have been run against the scaffold."
         },
         "command_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the scaffold CLI command."
         },
         "build_status": {
@@ -81,7 +81,7 @@
           "type": "array",
           "description": "Traceability links connecting this scaffold to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for this scaffold."
           }
         },
@@ -89,7 +89,7 @@
           "type": "array",
           "description": "External links to related scaffold resources or documentation.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "$ref": "vc:core:collections#link",
             "description": "An external link related to this scaffold."
           }
         }

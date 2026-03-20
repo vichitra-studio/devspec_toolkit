@@ -68,10 +68,10 @@ When running from the host repo, always pass `--repo-root ./devspec_toolkit` so 
 
 ### Schema Context
 
-Schema `$id` URIs use the `specdev.local` namespace and resolve via the schema registry:
+Schema `$id` URIs use the `vc:` namespace and resolve via the schema registry:
 
-- `https://specdev.local/schema/core/atoms/1` — resolves to `$SCHEMA_DIR/core/atoms.schema.json`
-- `https://specdev.local/schema/04_fr_list/1` — resolves to `$SCHEMA_DIR/04_fr_list.schema.json`
+- `vc:core:atoms` — resolves to `$SCHEMA_DIR/core/atoms.schema.json`
+- `vc:04-fr-list` — resolves to `$SCHEMA_DIR/04_fr_list.schema.json`
 
 The registry file at `$TOOLKIT_ROOT/tools/schema_registry.json` maps URIs to relative file paths.
 

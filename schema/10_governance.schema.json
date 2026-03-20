@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/10_governance.schema.json",
+  "$id": "vc:10-governance",
   "title": "10_governance",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -27,7 +27,6 @@
               "invariants-check",
               "governance-check",
               "seed-lint",
-
               "test",
               "build",
               "lint",
@@ -57,7 +56,7 @@
               "description": "Regex pattern that commit messages must match."
             },
             "id_pattern_ref": {
-              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+              "$ref": "vc:core:collections#canonicalRef",
               "description": "Canonical reference for the ID pattern used in commit messages."
             },
             "error_message": {
@@ -84,7 +83,7 @@
               }
             },
             "required_metadata": {
-              "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+              "$ref": "vc:core:collections#stringArray",
               "description": "Metadata fields required in every review submission."
             },
             "evidence_source_by_phase": {
@@ -119,14 +118,14 @@
           ]
         },
         "reviewers": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "description": "List of designated reviewers responsible for spec and code reviews."
         },
         "trace": {
           "type": "array",
           "description": "Traceability links connecting this governance spec to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the governance spec."
           }
         },
@@ -134,16 +133,16 @@
           "type": "array",
           "description": "External links to related governance resources or documentation.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "$ref": "vc:core:collections#link",
             "description": "A link to an external governance resource."
           }
         },
         "policy_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the governance policy in the registry."
         },
         "command_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the governance CLI command."
         }
       },

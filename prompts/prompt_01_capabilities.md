@@ -147,7 +147,7 @@ Before emitting, verify:
 - Which FRs or APIs (existing or anticipated) does each capability map to?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/01_capabilities.schema.json
+- Schema URI: vc:01-capabilities
 - Schema File: schema/01_capabilities.schema.json
 - Schema Registry: tools/schema_registry.json
 

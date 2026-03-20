@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/14_roadmap.schema.json",
+  "$id": "vc:14-roadmap",
   "title": "14_roadmap",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -14,7 +14,7 @@
           "description": "Technology stack for the roadmap, at minimum specifying languages and frameworks.",
           "allOf": [
             {
-              "$ref": "https://specdev.local/schema/core/collections/1#techStack",
+              "$ref": "vc:core:collections#techStack",
               "description": "Inherits the structured technology stack definition from core collections."
             },
             {
@@ -26,7 +26,7 @@
           ]
         },
         "tech_stack_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the technology stack in the registry."
         },
         "milestones": {
@@ -37,7 +37,7 @@
             "additionalProperties": false,
             "properties": {
               "milestone_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this milestone."
               },
               "name": {
@@ -50,11 +50,11 @@
                 "description": "Planned completion date for this milestone (ISO 8601 date)."
               },
               "status": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#milestoneStatus",
+                "$ref": "vc:core:atoms#milestoneStatus",
                 "description": "Current progress status of the milestone."
               },
               "risk_status": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#severityLevel",
+                "$ref": "vc:core:atoms#severityLevel",
                 "default": "low",
                 "description": "Risk level associated with this milestone."
               },
@@ -63,7 +63,7 @@
                 "description": "The specific user story this milestone addresses."
               },
               "source_milestones": {
-                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                "$ref": "vc:core:collections#kebabIdArray",
                 "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
               },
               "fr_refs": {
@@ -91,7 +91,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "task_id": {
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                      "$ref": "vc:core:atoms#kebabId",
                       "description": "Unique kebab-case identifier for this task."
                     },
                     "description": {
@@ -108,7 +108,7 @@
                         "additionalProperties": false,
                         "properties": {
                           "criterion_id": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "Unique kebab-case identifier for this acceptance criterion."
                           },
                           "text": {
@@ -117,7 +117,7 @@
                             "description": "Full text of the acceptance criterion (minimum 15 characters)."
                           },
                           "fixture_ref": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "Reference to a fixture that validates this criterion."
                           }
                         },
@@ -138,15 +138,15 @@
                       "description": "Current progress status of the task."
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the status value in the registry."
                     },
                     "environment_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the target environment of this task."
                     },
                     "metric_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the metric used to measure task completion."
                     },
                     "depends_on": {
@@ -188,20 +188,20 @@
                 "type": "array",
                 "description": "Trace references to artifacts this milestone will produce.",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A trace reference to an artifact this milestone will produce."
                 }
               },
               "risks": {
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "$ref": "vc:core:collections#stringArray",
                 "description": "Known risks that could delay or block this milestone."
               },
               "spikes": {
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "$ref": "vc:core:collections#stringArray",
                 "description": "Technical spikes or investigations required before work can proceed."
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the milestone status in the registry."
               }
             },
@@ -225,18 +225,18 @@
           "description": "High-level strategy for migrating from existing systems or data."
         },
         "dependencies": {
-          "$ref": "https://specdev.local/schema/core/collections/1#dependencyObjectList",
+          "$ref": "vc:core:collections#dependencyObjectList",
           "description": "External or internal dependencies required by the roadmap."
         },
         "dependency_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the dependency list in the registry."
         },
         "trace": {
           "type": "array",
           "description": "Traceability links connecting this roadmap to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the roadmap."
           }
         }

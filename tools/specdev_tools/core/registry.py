@@ -3,6 +3,8 @@ from __future__ import annotations
 import json, os
 from typing import Optional
 
+from referencing import Registry as _ReferencingRegistry, Resource as _Resource
+
 class SchemaRegistry:
     def __init__(self, repo_root: str):
         self.repo_root = os.path.abspath(repo_root)
@@ -56,6 +58,18 @@ class SchemaRegistry:
             if default is not None:
                 return default
             raise
+
+    def to_referencing_registry(self) -> _ReferencingRegistry:
+        """Build a ``referencing.Registry`` from the pre-loaded schema store.
+
+        This consolidates the pattern previously duplicated across validate,
+        canonical lint, canonical autofix, and prompt-schema sync modules.
+        """
+        store = {
+            uri: _Resource.from_contents(schema)
+            for uri, schema in self.store.items()
+        }
+        return _ReferencingRegistry().with_resources(store.items())
 
     def load(self, uri: str) -> dict:
         path = self.resolve(uri)

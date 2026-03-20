@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/09_impl_plan.schema.json",
+  "$id": "vc:09-impl-plan",
   "title": "09_impl_plan",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -14,7 +14,7 @@
           "description": "Technology stack for the implementation, including languages, frameworks, infrastructure, and tools.",
           "allOf": [
             {
-              "$ref": "https://specdev.local/schema/core/collections/1#techStack",
+              "$ref": "vc:core:collections#techStack",
               "description": "Inherits the structured technology stack definition from core collections."
             },
             {
@@ -28,7 +28,7 @@
           ]
         },
         "tech_stack_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the technology stack entry in the registry."
         },
         "milestones": {
@@ -39,7 +39,7 @@
             "additionalProperties": false,
             "properties": {
               "milestone_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this milestone."
               },
               "name": {
@@ -52,27 +52,27 @@
                 "description": "Planned completion date for this milestone (ISO 8601 date)."
               },
               "status": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#milestoneStatus",
+                "$ref": "vc:core:atoms#milestoneStatus",
                 "description": "Current progress status of the milestone."
               },
               "risks": {
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "$ref": "vc:core:collections#stringArray",
                 "description": "Known risks that could delay or block this milestone."
               },
               "spikes": {
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+                "$ref": "vc:core:collections#stringArray",
                 "description": "Technical spikes or investigations required before work can proceed."
               },
               "deliverables": {
                 "type": "array",
                 "description": "Trace references to artifacts this milestone will produce.",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A trace reference to an artifact this milestone will produce."
                 }
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the status value in the registry."
               }
             },
@@ -90,22 +90,22 @@
           "description": "High-level strategy for migrating from existing systems or data to the new implementation."
         },
         "dependencies": {
-          "$ref": "https://specdev.local/schema/core/collections/1#dependencyList",
+          "$ref": "vc:core:collections#dependencyList",
           "description": "External or internal dependencies required by the implementation."
         },
         "dependency_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the dependency list in the registry."
         },
         "environment_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the target deployment environment."
         },
         "trace": {
           "type": "array",
           "description": "Traceability links connecting this plan to upstream and downstream artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the implementation plan."
           }
         }

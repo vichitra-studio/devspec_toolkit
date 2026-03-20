@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "$schema": "vc:12-ci-gates",
   "id": "valid-ci-pipeline",
   "owner": "api",
   "created_at": "2026-01-01T00:00:00Z",

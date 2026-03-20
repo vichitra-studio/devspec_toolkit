@@ -395,7 +395,7 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Standard extraction intent entry without parenthetical matches."""
         line = "- **04_functional_requirements.json**: Extract all FR identifiers and acceptance criteria for traceability"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "04_functional_requirements.json")
         self.assertIn("Extract all FR identifiers", m.group(2))
 
@@ -403,7 +403,7 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Entry with (optional) annotation after the artifact name matches."""
         line = "- **03_glossary.json** (optional): Extract domain terms and definitions for consistency checking"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "03_glossary.json")
         self.assertIn("Extract domain terms", m.group(2))
 
@@ -411,7 +411,7 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Entry with (if present) annotation matches."""
         line = "- **02a_delivery_baseline.json** (if present): Extract delivery constraints and timeline boundaries for planning"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "02a_delivery_baseline.json")
         self.assertIn("Extract delivery constraints", m.group(2))
 
@@ -419,7 +419,7 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Entry with (when available) annotation matches."""
         line = "- **08_fixtures.json** (when available): Extract fixture definitions and their target mappings for validation"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "08_fixtures.json")
         self.assertIn("Extract fixture definitions", m.group(2))
 
@@ -427,21 +427,21 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Seed document reference with docs/seed/ prefix matches."""
         line = "- **docs/seed/seed_overview.md**: Extract high-level product vision and target audience for capability alignment"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "seed_overview.md")
 
     def test_seed_doc_without_prefix_matches(self):
         """Bare seed_*.md reference matches."""
         line = "- **seed_tech_stack.md**: Extract technology choices and platform constraints for architecture decisions"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "seed_tech_stack.md")
 
     def test_step_with_letter_suffix_matches(self):
         """Step numbers with letter suffixes like 02a, 13a, 16b match."""
         line = "- **13a_completeness_assessment.json**: Extract completeness scores and gap analysis for roadmap planning"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "13a_completeness_assessment.json")
 
     def test_non_intent_line_does_not_match(self):
@@ -454,7 +454,7 @@ class TestIntentEntryRegex(unittest.TestCase):
         """Entry with leading whitespace still matches."""
         line = "  - **00_charter.json**: Extract the project scope boundaries and constraints to inform decisions"
         m = _INTENT_ENTRY_RE.match(line)
-        self.assertIsNotNone(m)
+        assert m is not None
         self.assertEqual(m.group(1), "00_charter.json")
 
 

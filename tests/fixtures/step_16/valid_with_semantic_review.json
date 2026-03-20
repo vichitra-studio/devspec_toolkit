@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+  "$schema": "vc:16-impl-context",
   "id": "step-impl-semantic-review",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",

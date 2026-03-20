@@ -140,7 +140,7 @@ Before emitting, verify:
 - Which scenarios must run as smoke/contract in CI vs e2e? Any red-team cases to add now?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/08_fixtures.schema.json
+- Schema URI: vc:08-fixtures
 - Schema File: schema/08_fixtures.schema.json
 - Schema Registry: tools/schema_registry.json
 

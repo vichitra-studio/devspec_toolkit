@@ -80,7 +80,7 @@ After running `prompts/prompt_13a_completeness_assessment.md`, validate the resu
 
 ## Schema Resolution
 
-- Artifacts embed `$schema` URIs (for example `https://specdev.local/schema/04_fr_list.schema.json`).
+- Artifacts embed `$schema` URIs (for example `vc:04-fr-list`).
 - The CLI maps each URI using `tools/schema_registry.json` relative to the toolkit root.
 - After moving or versioning schema files, update the registry to keep validation deterministic.
 

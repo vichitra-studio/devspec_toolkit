@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/step_order.schema.json",
+  "$id": "vc:step-order",
   "title": "Step Order Configuration",
   "description": "Defines the strict waterfall dependency DAG, pipeline policies, and downstream consumer mappings for the spec-driven development workflow.",
   "type": "object",

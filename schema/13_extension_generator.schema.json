@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13_extension_generator.schema.json",
+  "$id": "vc:13-extension-generator",
   "title": "13_extension_generator",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -52,19 +52,19 @@
                 "description": "Guidelines for designing the extension's JSON schema."
               },
               "tag_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the tag associated with this extension."
               },
               "policy_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the governance policy governing this extension."
               },
               "id_pattern_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the ID pattern used in this extension."
               },
               "governance_label_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the governance label assigned to this extension."
               }
             },

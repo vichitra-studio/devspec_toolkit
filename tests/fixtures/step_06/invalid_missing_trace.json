@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+  "$schema": "vc:06-invariants",
   "id": "invariants-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",

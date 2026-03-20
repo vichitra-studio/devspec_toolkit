@@ -142,7 +142,7 @@ Before emitting, verify:
 - What is the current build status and criteria for moving to `green`?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/15_scaffold.schema.json
+- Schema URI: vc:15-scaffold
 - Schema File: schema/15_scaffold.schema.json
 - Schema Registry: tools/schema_registry.json
 

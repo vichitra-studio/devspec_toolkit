@@ -81,7 +81,7 @@ class SpecQualityLintTests(unittest.TestCase):
             (root / "spec" / "artifact.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+                        "$schema": "vc:01-capabilities",
                         "id": "capabilities-test",
                         "owner": "system",
                         "created_at": "2026-01-01T00:00:00Z",

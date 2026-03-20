@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/01_capabilities.schema.json`
+`vc:01-capabilities`
 
 ## Required Changes
 

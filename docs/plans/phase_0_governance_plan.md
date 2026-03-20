@@ -1388,7 +1388,7 @@ prompt: |
 
   Canon kind fixture format (minimal):
   {
-    "$schema": "https://specdev.local/schema/canon/kind/1",
+    "$schema": "vc:canon:kind",
     "registry_version": "1.0.0",
     "kind": "environment",
     "entries": [

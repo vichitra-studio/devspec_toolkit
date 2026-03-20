@@ -145,7 +145,7 @@ Before emitting, verify:
 - Who are the required reviewers by change type (spec vs code)? Any escalation paths?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/10_governance.schema.json
+- Schema URI: vc:10-governance
 - Schema File: schema/10_governance.schema.json
 - Schema Registry: tools/schema_registry.json
 

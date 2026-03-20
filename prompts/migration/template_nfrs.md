@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/07_nfrs.schema.json`
+`vc:07-nfrs`
 
 ## Required Changes
 

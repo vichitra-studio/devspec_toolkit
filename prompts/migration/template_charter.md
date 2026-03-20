@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/00_charter.schema.json`
+`vc:00-charter`
 
 ## Required Changes
 

@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/08_fixtures.schema.json`
+`vc:08-fixtures`
 
 ## Required Changes
 

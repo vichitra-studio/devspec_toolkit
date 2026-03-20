@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/05_interface_contracts.schema.json`
+`vc:05-interface-contracts`
 
 ## Required Changes
 

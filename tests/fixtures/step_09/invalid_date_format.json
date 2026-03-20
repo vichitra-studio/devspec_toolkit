@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/09_impl_plan.schema.json",
+  "$schema": "vc:09-impl-plan",
   "id": "impl-plan-invalid-date-format",
   "owner": "api",
   "created_at": "2025-10-22T00:00:00Z",

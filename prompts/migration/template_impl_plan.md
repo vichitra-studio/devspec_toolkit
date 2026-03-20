@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/09_impl_plan.schema.json`
+`vc:09-impl-plan`
 
 ## Required Changes
 

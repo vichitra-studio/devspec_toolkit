@@ -227,7 +227,7 @@ class HallucinationLintTests(unittest.TestCase):
                 repo_root=str(root),
                 require_manifest_schema_registration=False,
             )
-            self.assertFalse(any("schema_uri_not_registered" in e for e in relaxed))
+            self.assertFalse(any("schema_uri_not_registered" in e.render() for e in relaxed))
 
 
     def test_existing_structures_missing_path(self):

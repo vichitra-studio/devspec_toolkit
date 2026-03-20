@@ -18,8 +18,6 @@ from typing import Any, Callable
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
-from referencing import Registry, Resource
-
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
 from ..canonical.lint import lint_canon_dir
 from .dependency_order_lint import lint_dependency_order
@@ -60,10 +58,6 @@ from .validators import (
 STEP_FILE_RE = re.compile(r"^(\d{2}[a-z]?)_")
 STEP_DIR_RE = re.compile(r"^step_(\d{2}[a-z]?)$")
 IMPL_CONTEXT_DIR_RE = re.compile(r"^impl_context$")
-
-def _registry_for(registry: SchemaRegistry) -> Registry:
-    store = {uri: Resource.from_contents(schema) for uri, schema in registry.store.items()}
-    return Registry().with_resources(store.items())
 
 def _get_step_from_path(path: str) -> str:
     """Extract step number from file path.
@@ -144,7 +138,7 @@ def validate_file(
         data_for_validation.pop("$schema", None)
 
         # Build a resolver store
-        reg = _registry_for(registry)
+        reg = registry.to_referencing_registry()
         v = Draft202012Validator(
             schema,
             registry=reg,

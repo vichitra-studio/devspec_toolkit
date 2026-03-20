@@ -37,7 +37,7 @@ def _make_canon_kind(tmp: str, kind: str, labels: list[str]) -> None:
         )
 
     kind_doc = {
-        "$schema": "https://specdev.local/schema/canon/kind/1",
+        "$schema": "vc:canon:kind",
         "registry_version": "1.0.0",
         "kind": kind,
         "entries": entries,
@@ -214,7 +214,7 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
             with patch(f"{_MODULE}._ENUM_CANON_PAIRINGS", []):
                 errors = lint_canon_schema_alignment(tmp)
 
-            w552 = [e for e in errors if e.startswith("W552")]
+            w552 = [e for e in errors if isinstance(e, str) and e.startswith("W552")]
             self.assertEqual(w552, [])
 
 

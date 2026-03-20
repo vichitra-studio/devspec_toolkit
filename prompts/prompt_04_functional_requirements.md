@@ -149,7 +149,7 @@ Before emitting, verify:
 - Which capabilities, APIs, or NFRs does each FR map to? Any governance constraints to reflect?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/04_fr_list.schema.json
+- Schema URI: vc:04-fr-list
 - Schema File: schema/04_fr_list.schema.json
 - Schema Registry: tools/schema_registry.json
 

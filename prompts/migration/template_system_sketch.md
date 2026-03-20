@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/02_system_sketch.schema.json`
+`vc:02-system-sketch`
 
 ## Required Changes
 

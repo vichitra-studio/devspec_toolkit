@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/11_redteam.schema.json",
+  "$id": "vc:11-redteam",
   "title": "11_redteam",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -14,7 +14,7 @@
           "type": "array",
           "description": "Traceability links connecting this red-team analysis to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the red-team analysis."
           }
         },
@@ -26,7 +26,7 @@
             "additionalProperties": false,
             "properties": {
               "threat_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this threat."
               },
               "description": {
@@ -41,12 +41,12 @@
                 "type": "array",
                 "description": "IDs of the APIs or components targeted by this threat.",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A trace reference to an API or component targeted by this threat."
                 }
               },
               "category": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#threatCategory",
+                "$ref": "vc:core:atoms#threatCategory",
                 "description": "Security domain category: authentication, authorization, business logic, transport, or data privacy."
               },
               "mitigations": {
@@ -70,7 +70,7 @@
                       "description": "The artifact type that provides the mitigation."
                     },
                     "id": {
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                      "$ref": "vc:core:atoms#kebabId",
                       "description": "Kebab-case ID of the mitigating artifact."
                     },
                     "note": {
@@ -86,15 +86,15 @@
                 }
               },
               "severity": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#severityLevel",
+                "$ref": "vc:core:atoms#severityLevel",
                 "description": "Severity rating of the threat from low to critical."
               },
               "risk_category_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the risk category in the registry."
               },
               "policy_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the security policy governing this threat."
               }
             },
@@ -118,7 +118,7 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this edge case."
               },
               "description": {

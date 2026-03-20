@@ -14,7 +14,7 @@ class FixturesLintTests(unittest.TestCase):
             (root / "08_fixtures.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+                        "$schema": "vc:08-fixtures",
                         "fixtures": [
                             {
                                 "fixture_id": "fx-1",
@@ -31,7 +31,7 @@ class FixturesLintTests(unittest.TestCase):
             (root / "04_fr_list.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/04_fr_list.schema.json",
+                        "$schema": "vc:04-fr-list",
                         "functional_requirements": [{"fr_id": "fr-1"}],
                     }
                 ),
@@ -46,7 +46,7 @@ class FixturesLintTests(unittest.TestCase):
             (root / "08_fixtures.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+                        "$schema": "vc:08-fixtures",
                         "fixtures": [
                             {
                                 "fixture_id": "fx-1",
@@ -63,7 +63,7 @@ class FixturesLintTests(unittest.TestCase):
             (root / "06_invariants.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+                        "$schema": "vc:06-invariants",
                         "rules": [{"inv_id": "inv-1"}],
                     }
                 ),

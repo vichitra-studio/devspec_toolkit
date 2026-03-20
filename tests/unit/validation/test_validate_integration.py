@@ -67,7 +67,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             root = Path(td)
             missing_repo = root / "missing-repo-root"
             spec_file = root / "00_charter.json"
-            spec_file.write_text(json.dumps({"$schema": "https://specdev.local/schema/00_charter.schema.json"}), encoding="utf-8")
+            spec_file.write_text(json.dumps({"$schema": "vc:00-charter"}), encoding="utf-8")
             errs = validate_file(str(missing_repo), str(spec_file))
             self.assertTrue(errs)
             self.assertTrue(any(e.code == "E520" for e in errs))
@@ -119,7 +119,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text("[]", encoding="utf-8")
             spec_file = root / "spec" / "artifact.json"
             spec_file.write_text(
-                json.dumps({"$schema": "https://specdev.local/schema/00_charter.schema.json"}),
+                json.dumps({"$schema": "vc:00-charter"}),
                 encoding="utf-8",
             )
             errs = validate_file(str(root), str(spec_file))

@@ -150,7 +150,7 @@ Available CLI tools include:
 - Should scaffolding or codegen checks be included to prevent drift from specs?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/12_ci_gates.schema.json
+- Schema URI: vc:12-ci-gates
 - Schema File: schema/12_ci_gates.schema.json
 - Schema Registry: tools/schema_registry.json
 

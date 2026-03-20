@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/03_glossary.schema.json`
+`vc:03-glossary`
 
 ## Required Changes
 

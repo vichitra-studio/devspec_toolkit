@@ -144,7 +144,7 @@ Before emitting, verify:
 - What compliance or audit requirements apply to environments and pipelines?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/02a_delivery_baseline.schema.json
+- Schema URI: vc:02a-delivery-baseline
 - Schema File: schema/02a_delivery_baseline.schema.json
 - Schema Registry: tools/schema_registry.json
 

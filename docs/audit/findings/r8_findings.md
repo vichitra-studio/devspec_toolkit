@@ -142,12 +142,12 @@ Read the file first. Find the `$defs` section (NOT `definitions` — this codeba
 1. `coverageGap` — the individual gap entry object
 2. `coverageGapsArray` — array of coverageGap with minItems: 0
 
-The reference pattern for step schemas MUST be: `"$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"` — this uses the `$anchor`-based syntax consistent with all other cross-schema refs (`#canonicalRefArray`, `#seedRefArray`, etc.). A-R8-11 normalized all 189 cross-schema refs to this anchor pattern.
+The reference pattern for step schemas MUST be: `"$ref": "vc:core:collections#coverageGapsArray"` — this uses the `$anchor`-based syntax consistent with all other cross-schema refs (`#canonicalRefArray`, `#seedRefArray`, etc.). A-R8-11 normalized all 189 cross-schema refs to this anchor pattern.
 
 **T02-T19 (step schemas)**:
 For each step schema:
 1. Read the file
-2. Add `coverage_gaps` to `properties` using: `"$ref": "https://specdev.local/schema/core/collections/1#coverageGapsArray"`
+2. Add `coverage_gaps` to `properties` using: `"$ref": "vc:core:collections#coverageGapsArray"`
 3. Add `"coverage_gaps"` to the `required` array
 4. For T03 (Step 01): Also find the capability items `required` array and add `"trace"`
 5. For T10 (Step 07): Also find the NFR items `required` array and add `"trace"`

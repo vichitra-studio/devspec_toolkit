@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/16_impl_context.schema.json`
+`vc:16-impl-context`
 
 ## Required Changes
 

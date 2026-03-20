@@ -158,7 +158,7 @@ Before emitting, verify:
 - Who is the primary audience for this assessment?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/13a_completeness_assessment.schema.json
+- Schema URI: vc:13a-completeness-assessment
 - Schema File: schema/13a_completeness_assessment.schema.json
 - Schema Registry: tools/schema_registry.json
 

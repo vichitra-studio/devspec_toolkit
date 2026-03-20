@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/06_invariants.schema.json",
+  "$id": "vc:06-invariants",
   "title": "06_invariants",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -21,7 +21,7 @@
             "properties": {
               "inv_id": {
                 "description": "Unique kebab-case identifier for this invariant (e.g., 'inv-balance-non-negative').",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "description": {
                 "description": "Human-readable description of what this invariant enforces.",
@@ -47,11 +47,11 @@
                 "properties": {
                   "components": {
                     "description": "List of component IDs this invariant applies to.",
-                    "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                    "$ref": "vc:core:collections#kebabIdArray"
                   },
                   "apis": {
                     "description": "List of API IDs this invariant applies to.",
-                    "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                    "$ref": "vc:core:collections#kebabIdArray"
                   }
                 }
               },
@@ -67,21 +67,21 @@
                 "description": "Traceability links back to upstream requirements, APIs, or components.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A traceability reference for this invariant rule."
                 }
               },
               "policy_ref": {
                 "description": "Canonical reference to the governance policy this invariant enforces.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "risk_category_ref": {
                 "description": "Canonical reference to the risk category this invariant mitigates.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "status_ref": {
                 "description": "Canonical reference to the lifecycle status of this invariant.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [

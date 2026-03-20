@@ -88,21 +88,21 @@ def _derive_step_names(repo_root: str) -> dict[str, str]:
     """Derive step ID -> display name mapping from schema_registry.json.
 
     Falls back to a minimal mapping if the registry cannot be loaded.
-    The schema registry keys follow the pattern
-    ``https://specdev.local/schema/NN_name.schema.json``; this function
-    extracts the step number and converts the snake_case name to Title Case.
+    The schema registry keys follow the pattern ``vc:NN-name``; this function
+    extracts the step number and converts the kebab-case name to Title Case.
+    Keys like ``vc:core:...`` or ``vc:canon:...`` are intentionally skipped.
     """
     registry_path = os.path.join(repo_root, "tools", "schema_registry.json")
     names: dict[str, str] = {}
     try:
         with open(registry_path, "r", encoding="utf-8") as f:
             registry = json.load(f)
-        step_re = re.compile(r"/(\d{2}[a-z]?)_([^.]+)\.schema\.json$")
+        step_re = re.compile(r"^vc:(\d{2}[a-z]?)-(.+)$")
         for uri in registry:
             m = step_re.search(uri)
             if m:
                 step_id = m.group(1)
-                raw_name = m.group(2).replace("_", " ").title()
+                raw_name = m.group(2).replace("-", " ").title()
                 if step_id not in names:
                     names[step_id] = raw_name
     except (OSError, json.JSONDecodeError, ValueError, TypeError):

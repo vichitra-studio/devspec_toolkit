@@ -170,7 +170,7 @@ DO NOT:
 - Use `trust_boundary: internal` on connections that touch `type: external` components
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/02_system_sketch.schema.json
+- Schema URI: vc:02-system-sketch
 - Schema File: schema/02_system_sketch.schema.json
 - Schema Registry: tools/schema_registry.json
 

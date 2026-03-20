@@ -162,7 +162,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
             (root / "spec" / "11_redteam.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/does-not-exist/1",
+                        "$schema": "vc:does-not-exist",
                         "threats": [
                             {
                                 "threat_id": "t1",
@@ -201,8 +201,8 @@ class CanonicalIntegrityTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/test/1": "schema/test.schema.json",
-                        "https://specdev.local/schema/shared/1": "schema/shared.schema.json",
+                        "vc:test": "schema/test.schema.json",
+                        "vc:shared": "schema/shared.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -211,10 +211,10 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test/1",
+                        "$id": "vc:test",
                         "type": "object",
                         "properties": {
-                            "obj": {"$ref": "https://specdev.local/schema/shared/1#/$defs/object"},
+                            "obj": {"$ref": "vc:shared#/$defs/object"},
                             "canonical_refs_used": {"type": "array"},
                             "canonical_proposals": {"type": "array"},
                             "canonical_conflicts": {"type": "array"},
@@ -228,7 +228,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/shared/1",
+                        "$id": "vc:shared",
                         "$defs": {
                             "object": {
                                 "type": "object",
@@ -245,7 +245,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
             (root / "spec" / "sample.json").write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test/1",
+                        "$schema": "vc:test",
                         "obj": {"status": "active"},
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
@@ -269,9 +269,9 @@ class CanonicalIntegrityTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/03_glossary.schema.json": "schema/03_glossary.schema.json",
-                        "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                        "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                        "vc:03-glossary": "schema/03_glossary.schema.json",
+                        "vc:core:atoms": "schema/atoms.schema.json",
+                        "vc:core:collections": "schema/collections.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -295,7 +295,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+                        "$schema": "vc:03-glossary",
                         "id": "glossary-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",

@@ -279,7 +279,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/16_impl_context.schema.json
+- Schema URI: vc:16-impl-context
 - Schema File: schema/16_impl_context.schema.json
 - Schema Registry: tools/schema_registry.json
 

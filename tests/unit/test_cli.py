@@ -37,7 +37,7 @@ class CliTests(unittest.TestCase):
             json.dumps(
                 {
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
-                    "$id": "https://specdev.local/schema/core/canon/1",
+                    "$id": "vc:core:canon",
                     "type": "object",
                     "properties": {
                         "registry_version": {"type": "string"},
@@ -51,7 +51,7 @@ class CliTests(unittest.TestCase):
         )
 
         registry_map = {
-            "https://specdev.local/schema/core/canon/1": "schema/core/canon.schema.json",
+            "vc:core:canon": "schema/core/canon.schema.json",
         }
         if extra_map:
             registry_map.update(extra_map)
@@ -254,13 +254,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -459,7 +459,7 @@ class CliTests(unittest.TestCase):
             artifact.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "$schema": "vc:test",
                         "stage": "prod",
                         "status": "active",
                         "role": "reviewer",
@@ -576,13 +576,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -646,7 +646,7 @@ class CliTests(unittest.TestCase):
             artifact.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "$schema": "vc:test",
                         "terms": [
                             {"term": "JWT"},
                             {"term": "unknown-term"},
@@ -692,13 +692,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
@@ -752,7 +752,7 @@ class CliTests(unittest.TestCase):
             artifact.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "$schema": "vc:test",
                         "stage": "ci",
                         "environment": "prod",
                         "canonical_refs_used": [],
@@ -790,13 +790,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
@@ -832,7 +832,7 @@ class CliTests(unittest.TestCase):
             artifact.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "$schema": "vc:test",
                         "id": "artifact-id",
                         "canonical_refs_used": [],
                     }
@@ -862,13 +862,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -931,7 +931,7 @@ class CliTests(unittest.TestCase):
             artifact.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/test.schema.json",
+                        "$schema": "vc:test",
                         "terms": [{"acronym": "JWT"}, {"acronym": "XYZ"}],
                         "missing_elements": [
                             {"category": "traceability"},
@@ -998,13 +998,13 @@ class CliTests(unittest.TestCase):
             schema_dir.mkdir()
             self._write_schema_registry_with_canon(
                 repo_root,
-                {"https://specdev.local/schema/test.schema.json": "schema/test.schema.json"},
+                {"vc:test": "schema/test.schema.json"},
             )
             (schema_dir / "test.schema.json").write_text(
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -1040,7 +1040,7 @@ class CliTests(unittest.TestCase):
             bad_file.write_text("{bad", encoding="utf-8")
             good_file = spec_dir / "b_good.json"
             original_good = {
-                "$schema": "https://specdev.local/schema/test.schema.json",
+                "$schema": "vc:test",
                 "stage": "prod",
                 "canonical_refs_used": [],
             }
@@ -1070,7 +1070,7 @@ class CliTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (spec_dir / "artifact.json").write_text(
-                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "canonical_refs_used": []}),
+                json.dumps({"$schema": "vc:test", "canonical_refs_used": []}),
                 encoding="utf-8",
             )
 
@@ -1096,7 +1096,7 @@ class CliTests(unittest.TestCase):
             (tools_dir / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                        "vc:test": "schema/test.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -1105,7 +1105,7 @@ class CliTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -1120,7 +1120,7 @@ class CliTests(unittest.TestCase):
             # Malformed modular registry artifact should fail autofix preflight.
             (canon_dir / "aliases.json").write_text("{bad", encoding="utf-8")
             (spec_dir / "artifact.json").write_text(
-                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "term": "jwt", "canonical_refs_used": []}),
+                json.dumps({"$schema": "vc:test", "term": "jwt", "canonical_refs_used": []}),
                 encoding="utf-8",
             )
 
@@ -1146,7 +1146,7 @@ class CliTests(unittest.TestCase):
             (tools_dir / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                        "vc:test": "schema/test.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -1155,7 +1155,7 @@ class CliTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "additionalProperties": True,
                         "properties": {
@@ -1178,7 +1178,7 @@ class CliTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (spec_dir / "artifact.json").write_text(
-                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "term": "jwt", "canonical_refs_used": []}),
+                json.dumps({"$schema": "vc:test", "term": "jwt", "canonical_refs_used": []}),
                 encoding="utf-8",
             )
 
@@ -1726,7 +1726,7 @@ class CliTests(unittest.TestCase):
             kinds_dir.mkdir(parents=True)
             (root / "canon" / "manifest.json").write_text(
                 json.dumps({
-                    "$schema": "https://specdev.local/schema/canon/manifest/1",
+                    "$schema": "vc:core:canon",
                     "registry_version": "1.0.0",
                     "entries": [],
                 }),
@@ -1735,7 +1735,7 @@ class CliTests(unittest.TestCase):
 
             def _canon_kind(kind, values):
                 return json.dumps({
-                    "$schema": "https://specdev.local/schema/canon/kind/1",
+                    "$schema": "vc:canon:kind",
                     "registry_version": "1.0.0",
                     "kind": kind,
                     "entries": [

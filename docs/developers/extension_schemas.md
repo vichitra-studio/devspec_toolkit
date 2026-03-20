@@ -30,7 +30,7 @@ The manifest (`13_extension_manifest.json`) dictates which extensions exist. It 
 
 ```json
 {
-  "$schema": "https://specdev.local/schema/13_extension_generator.schema.json",
+  "$schema": "vc:13-extension-generator",
   "id": "13-extension-manifest",
   "extensions": [
     {
@@ -57,14 +57,14 @@ If you need to enforce strict structure for an extension (e.g. `ext_03_ml_models
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/ext_03_ml_models.schema.json",
+  "$id": "vc:ext-03-ml-models",
   "title": "ext_03_ml_models",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "id": { "$ref": "https://specdev.local/schema/core/atoms/1#kebabId" },
-    "owner": { "$ref": "https://specdev.local/schema/core/atoms/1#owner" },
-    "created_at": { "$ref": "https://specdev.local/schema/core/atoms/1#timestamp" },
+    "id": { "$ref": "vc:core:atoms#kebabId" },
+    "owner": { "$ref": "vc:core:atoms#owner" },
+    "created_at": { "$ref": "vc:core:atoms#timestamp" },
     "model_type": {
       "type": "string",
       "enum": ["regression", "classification", "llm"]

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "$schema": "vc:10-governance",
   "id": "governance-invalid-enum",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",

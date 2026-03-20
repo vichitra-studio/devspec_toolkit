@@ -241,7 +241,7 @@ class TestCheckCrossStepRefs:
 
     def test_valid_refs_no_errors(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": ({"fr-login", "fr-logout"}, "04_frs.json", "FR"),
         }
         check_cross_step_refs(["fr-login"], upstream, errors)
@@ -249,7 +249,7 @@ class TestCheckCrossStepRefs:
 
     def test_invalid_ref_appends_e590(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": ({"fr-login"}, "04_frs.json", "FR"),
         }
         check_cross_step_refs(["fr-nonexistent"], upstream, errors)
@@ -259,7 +259,7 @@ class TestCheckCrossStepRefs:
 
     def test_missing_upstream_appends_w590(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": (None, "04_frs.json", "FR"),
         }
         check_cross_step_refs(["fr-login"], upstream, errors)
@@ -268,7 +268,7 @@ class TestCheckCrossStepRefs:
 
     def test_code_prefix_included(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": ({"fr-login"}, "04_frs.json", "FR"),
         }
         check_cross_step_refs(["fr-missing"], upstream, errors, code_prefix="fixture 'fix-login' ")
@@ -276,7 +276,7 @@ class TestCheckCrossStepRefs:
 
     def test_empty_targets_no_errors(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": ({"fr-login"}, "04_frs.json", "FR"),
         }
         check_cross_step_refs([], upstream, errors)
@@ -284,7 +284,7 @@ class TestCheckCrossStepRefs:
 
     def test_empty_target_id_skipped(self):
         errors: list[str] = []
-        upstream = {
+        upstream: dict[str, tuple[set[str] | None, str, str]] = {
             "fr-": ({"fr-login"}, "04_frs.json", "FR"),
         }
         check_cross_step_refs(["", "fr-login"], upstream, errors)

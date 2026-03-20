@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/seed_manifest.schema.json",
+  "$id": "vc:seed-manifest",
   "title": "seed_manifest",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "seed_manifest_id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+      "$ref": "vc:core:atoms#kebabId",
       "description": "Unique kebab-case identifier for this seed manifest instance."
     },
     "version": {
@@ -15,15 +15,15 @@
       "description": "Semantic version of the seed manifest format."
     },
     "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp",
+      "$ref": "vc:core:atoms#timestamp",
       "description": "ISO 8601 timestamp when this seed manifest was initially created."
     },
     "last_updated": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp",
+      "$ref": "vc:core:atoms#timestamp",
       "description": "ISO 8601 timestamp when this seed manifest was last modified."
     },
     "global_seed_order": {
-      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+      "$ref": "vc:core:collections#kebabIdArray",
       "description": "Ordered array of seed IDs defining the default ingestion sequence across all pipeline steps."
     },
     "nested_order": {
@@ -34,7 +34,7 @@
         "additionalProperties": false,
         "properties": {
           "level_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "$ref": "vc:core:atoms#kebabId",
             "description": "Kebab-case identifier for this nesting level (e.g., foundation, domain, detail)."
           },
           "description": {
@@ -42,7 +42,7 @@
             "description": "Human-readable description of what seeds at this level provide."
           },
           "seed_ids": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+            "$ref": "vc:core:collections#kebabIdArray",
             "description": "Ordered array of seed IDs belonging to this nesting level."
           }
         },
@@ -62,7 +62,7 @@
         "additionalProperties": false,
         "properties": {
           "seed_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+            "$ref": "vc:core:atoms#kebabId",
             "description": "Unique kebab-case identifier for this seed document."
           },
           "path": {
@@ -106,7 +106,7 @@
       "patternProperties": {
         "^(\\d{2}[a-z]?)$": {
           "description": "Array of seed IDs required for this pipeline step.",
-          "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+          "$ref": "vc:core:collections#kebabIdArray"
         }
       },
       "additionalProperties": false,
@@ -142,16 +142,16 @@
           "description": "Per-scope overrides for README depth requirements, keyed by directory path suffix."
         },
         "scope": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 1,
           "description": "Array of directory paths that are in scope for documentation coverage checks."
         },
         "exclusions": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "description": "Array of directory paths or patterns excluded from documentation coverage checks."
         },
         "doc_paths": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 1,
           "description": "Array of paths where documentation files are expected to be found."
         }

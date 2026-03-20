@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/13a_completeness_assessment.schema.json",
+  "$id": "vc:13a-completeness-assessment",
   "title": "13a_completeness_assessment",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -18,7 +18,7 @@
             "additionalProperties": false,
             "properties": {
               "element_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this missing element."
               },
               "category": {
@@ -60,15 +60,15 @@
                 }
               },
               "risk_category_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the risk category of this gap."
               },
               "completeness_dimension_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the completeness dimension in the registry."
               },
               "tag_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the tag associated with this element."
               }
             },

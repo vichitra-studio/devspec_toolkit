@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/15_scaffold.schema.json`
+`vc:15-scaffold`
 
 ## Required Changes
 

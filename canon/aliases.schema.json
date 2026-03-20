@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/canon/aliases/1",
+  "$id": "vc:canon:aliases",
   "title": "Canonical Alias Registry",
   "type": "object",
   "additionalProperties": false,
@@ -11,13 +11,13 @@
       "description": "JSON Schema URI identifying the schema this aliases registry file conforms to."
     },
     "registry_version": {
-      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver",
+      "$ref": "vc:core:canon#/$defs/semver",
       "description": "Semantic version of the canonical registry format for the aliases file."
     },
     "aliases": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/canon/1#/$defs/alias"
+        "$ref": "vc:core:canon#/$defs/alias"
       },
       "description": "Array of alias mappings, each resolving an alternative name to a canonical entry ID."
     }

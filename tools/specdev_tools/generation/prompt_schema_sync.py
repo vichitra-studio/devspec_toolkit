@@ -6,11 +6,13 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
-from referencing import Registry, Resource
+
+if TYPE_CHECKING:
+    from referencing import Registry
 
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
@@ -450,8 +452,7 @@ def _schema_registry(repo_root: Path) -> tuple[Registry | None, str | None]:
         schema_registry = SchemaRegistry(str(repo_root))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return None, str(exc)
-    store = {uri: Resource.from_contents(schema) for uri, schema in schema_registry.store.items()}
-    return Registry().with_resources(store.items()), None
+    return schema_registry.to_referencing_registry(), None
 
 
 _DEAD_FIELD_DEFAULTS: dict[str, Any] = {

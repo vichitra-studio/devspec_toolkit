@@ -300,7 +300,7 @@ class TestStep16(unittest.TestCase):
         """Helper to create a step_16 fixture with roadmap for milestone_ref tests."""
         tmp_dir = Path(tmpdir)
         data = {
-            "$schema": "https://specdev.local/schema/16_impl_context.schema.json",
+            "$schema": "vc:16-impl-context",
             "id": "step-ms-ref-test",
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",

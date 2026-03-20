@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/03_glossary.schema.json",
+  "$id": "vc:03-glossary",
   "title": "03_glossary",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -21,7 +21,7 @@
             "properties": {
               "term_id": {
                 "description": "Unique kebab-case identifier for this glossary term (e.g., 'term-session-token').",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "term": {
                 "description": "The glossary term as it appears in natural language, minimum 2 characters.",
@@ -52,15 +52,15 @@
               },
               "term_ref": {
                 "description": "Canonical reference linking this term to the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "acronym_ref": {
                 "description": "Canonical reference for the acronym in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "unit_ref": {
                 "description": "Canonical reference for the unit of measurement in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [

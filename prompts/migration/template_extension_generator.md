@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/13_extension_generator.schema.json`
+`vc:13-extension-generator`
 
 ## Required Changes
 

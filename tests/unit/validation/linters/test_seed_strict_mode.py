@@ -41,7 +41,7 @@ class TestStrictMode:
             "step_requirements": {},
         }
         (common / "seed_manifest.json").write_text(json.dumps({
-            "$schema": "https://specdev.local/schema/seed_manifest.schema.json",
+            "$schema": "vc:seed-manifest",
             **manifest,
         }))
         return {"repo_root": str(repo_root), "spec_dir": str(spec_dir)}

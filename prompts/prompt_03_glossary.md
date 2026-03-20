@@ -137,7 +137,7 @@ Before emitting, verify:
 - Which acronyms must be expanded and standardized across docs and code?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/03_glossary.schema.json
+- Schema URI: vc:03-glossary
 - Schema File: schema/03_glossary.schema.json
 - Schema Registry: tools/schema_registry.json
 

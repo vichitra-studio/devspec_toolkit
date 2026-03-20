@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/02a_delivery_baseline.schema.json",
+  "$id": "vc:02a-delivery-baseline",
   "title": "02a_delivery_baseline",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -14,7 +14,7 @@
           "description": "Traceability links back to upstream artifacts (charter, system sketch).",
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the delivery baseline."
           }
         },
@@ -22,11 +22,11 @@
           "description": "Map of deployment environments (dev, ci, staging, prod) with their configurations.",
           "type": "object",
           "propertyNames": {
-            "$ref": "https://specdev.local/schema/core/collections/1#environmentName",
+            "$ref": "vc:core:collections#environmentName",
             "description": "Environment name constraint: must be a valid environment (dev, ci, staging, prod)."
           },
           "additionalProperties": {
-            "$ref": "https://specdev.local/schema/core/collections/1#environmentConfig",
+            "$ref": "vc:core:collections#environmentConfig",
             "description": "Environment configuration values for a specific deployment environment."
           },
           "required": [
@@ -49,23 +49,23 @@
         },
         "secrets": {
           "description": "List of secret names or keys required by the delivery pipeline.",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "$ref": "vc:core:collections#stringArray"
         },
         "compliance": {
           "description": "List of compliance standards or frameworks the delivery must satisfy (e.g., 'SOC2', 'GDPR').",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+          "$ref": "vc:core:collections#stringArray"
         },
         "environment_ref": {
           "description": "Canonical reference to the environment definitions in the canonical registry.",
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          "$ref": "vc:core:collections#canonicalRef"
         },
         "command_ref": {
           "description": "Canonical reference to the command definitions used in CI gates.",
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          "$ref": "vc:core:collections#canonicalRef"
         },
         "policy_ref": {
           "description": "Canonical reference to the compliance policies governing this delivery baseline.",
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+          "$ref": "vc:core:collections#canonicalRef"
         }
       },
       "required": [

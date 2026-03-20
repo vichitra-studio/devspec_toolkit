@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_impl_context.schema.json",
+  "$id": "vc:16-impl-context",
   "title": "16_impl_context",
   "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
   "$defs": {
@@ -23,7 +23,7 @@
           "description": "The artifact type being referenced: functional requirement, API, NFR, invariant, fixture, doc, or code."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Kebab-case identifier of the referenced artifact."
         },
         "note": {
@@ -52,7 +52,7 @@
       ]
     },
     "severityLevel": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#severityLevel"
+      "$ref": "vc:core:atoms#severityLevel"
     },
     "executionStatus": {
       "type": "string",
@@ -106,7 +106,7 @@
   },
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -237,7 +237,7 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                  "$ref": "vc:core:collections#canonicalRef",
                   "description": "Canonical reference for the docs impact status in the registry."
                 }
               },
@@ -253,7 +253,7 @@
                         "const": "required"
                       },
                       "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                        "$ref": "vc:core:collections#canonicalRef"
                       }
                     }
                   },
@@ -314,7 +314,7 @@
                     "additionalProperties": false,
                     "properties": {
                       "id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId",
+                        "$ref": "vc:core:atoms#screamingSnakeId",
                         "description": "Unique SCREAMING_SNAKE_CASE identifier for this checklist item."
                       },
                       "spec_ref": {
@@ -384,11 +384,11 @@
                         ]
                       },
                       "nfr_refs": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                        "$ref": "vc:core:collections#kebabIdArray",
                         "description": "NFR IDs that this checklist item satisfies."
                       },
                       "fixture_ref": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "$ref": "vc:core:atoms#kebabId",
                         "description": "Fixture ID that validates this checklist item."
                       },
                       "milestone_ref": {
@@ -454,7 +454,7 @@
                                   "description": "Evidence proving this action was completed successfully."
                                 },
                                 "command_ref": {
-                                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                                  "$ref": "vc:core:collections#canonicalRef",
                                   "description": "Canonical reference for the command in the registry."
                                 }
                               },
@@ -502,7 +502,7 @@
                                         "minLength": 1
                                       },
                                       "command_ref": {
-                                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                                        "$ref": "vc:core:collections#canonicalRef",
                                         "description": "Canonical reference for the run_command action's command."
                                       }
                                     }
@@ -513,7 +513,7 @@
                             }
                           },
                           "status_ref": {
-                            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                            "$ref": "vc:core:collections#canonicalRef",
                             "description": "Canonical reference for the implementation status in the registry."
                           }
                         },
@@ -529,7 +529,7 @@
                                   "const": "verified"
                                 },
                                 "status_ref": {
-                                  "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                                  "$ref": "vc:core:collections#canonicalRef"
                                 }
                               },
                               "required": [
@@ -614,7 +614,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "$ref": "vc:core:atoms#kebabId",
                     "description": "Unique kebab-case identifier for this ambiguity."
                   },
                   "description": {
@@ -685,7 +685,7 @@
                     ]
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "$ref": "vc:core:collections#canonicalRef",
                     "description": "Canonical reference for the ambiguity status in the registry."
                   }
                 },
@@ -859,7 +859,7 @@
                             "description": "Human-readable description of what this test command verifies."
                           },
                           "command_ref": {
-                            "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                            "$ref": "vc:core:collections#canonicalRef",
                             "description": "Canonical reference for the command in the registry."
                           }
                         },
@@ -895,7 +895,7 @@
                           "description": "Description of how this NFR is measured."
                         },
                         "command_ref": {
-                          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                          "$ref": "vc:core:collections#canonicalRef",
                           "description": "Canonical reference for the measurement command."
                         }
                       }
@@ -934,7 +934,7 @@
                       "description": "Reason why documentation updates are not applicable."
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the docs status."
                     }
                   },
@@ -976,7 +976,7 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the docs status."
                     }
                   },
@@ -1004,7 +1004,7 @@
                       "description": "Reason why security changes are not applicable."
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the security status."
                     }
                   },
@@ -1023,7 +1023,7 @@
                       "description": "Indicates security changes are planned."
                     },
                     "new_fixtures": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                      "$ref": "vc:core:collections#kebabIdArray",
                       "description": "IDs of new security fixtures to create."
                     },
                     "spec_mutations": {
@@ -1034,7 +1034,7 @@
                         "additionalProperties": false,
                         "properties": {
                           "ref": {
-                            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                            "$ref": "vc:core:collections#traceRef",
                             "description": "Trace reference to the spec artifact being mutated."
                           },
                           "change": {
@@ -1055,7 +1055,7 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the security status."
                     }
                   },
@@ -1082,7 +1082,7 @@
                       "description": "Reason why delivery observability is not applicable."
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the delivery status."
                     }
                   },
@@ -1108,11 +1108,11 @@
                         "additionalProperties": false,
                         "properties": {
                           "dashboard_id": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "Unique kebab-case identifier for this dashboard."
                           },
                           "nfr_refs": {
-                            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                            "$ref": "vc:core:collections#kebabIdArray",
                             "description": "NFR IDs this dashboard monitors."
                           },
                           "url": {
@@ -1134,11 +1134,11 @@
                         "additionalProperties": false,
                         "properties": {
                           "alert_id": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "Unique kebab-case identifier for this alert."
                           },
                           "nfr_ref": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "NFR ID this alert monitors."
                           },
                           "rule": {
@@ -1158,7 +1158,7 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the delivery status."
                     }
                   },
@@ -1185,7 +1185,7 @@
                       "description": "Reason why drift detection is not applicable."
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the drift status."
                     }
                   },
@@ -1211,7 +1211,7 @@
                         "additionalProperties": false,
                         "properties": {
                           "check_id": {
-                            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                            "$ref": "vc:core:atoms#kebabId",
                             "description": "Unique kebab-case identifier for this drift check."
                           },
                           "target": {
@@ -1259,7 +1259,7 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the drift status."
                     }
                   },
@@ -1353,7 +1353,7 @@
               ]
             },
             "status_ref": {
-              "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+              "$ref": "vc:core:collections#canonicalRef",
               "description": "Canonical reference for the plan status in the registry."
             }
           },
@@ -1371,7 +1371,7 @@
                     "const": "deferred"
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                    "$ref": "vc:core:collections#canonicalRef"
                   }
                 }
               },
@@ -1517,7 +1517,7 @@
                         "description": "The command that produced this evidence."
                       },
                       "command_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "$ref": "vc:core:collections#canonicalRef",
                         "description": "Canonical reference for the command in the registry."
                       }
                     },
@@ -1528,11 +1528,11 @@
                     ]
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "$ref": "vc:core:collections#canonicalRef",
                     "description": "Canonical reference for the execution status."
                   },
                   "command_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "$ref": "vc:core:collections#canonicalRef",
                     "description": "Canonical reference for the command in the registry."
                   }
                 },
@@ -1551,7 +1551,7 @@
                           "const": "passed"
                         },
                         "status_ref": {
-                          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                          "$ref": "vc:core:collections#canonicalRef"
                         }
                       }
                     },
@@ -1562,7 +1562,7 @@
                       ],
                       "properties": {
                         "evidence": {
-                          "pattern": "(PASSED|passed|OK|SUCCESS|\u2713|0 (errors|failures?|failed)|\\d+ passed)"
+                          "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
                         }
                       }
                     }
@@ -1625,7 +1625,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "$ref": "vc:core:atoms#kebabId",
                     "description": "Unique kebab-case identifier for this emergent ambiguity."
                   },
                   "description": {
@@ -1649,7 +1649,7 @@
                     "description": "Current resolution status of this emergent ambiguity."
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                    "$ref": "vc:core:collections#canonicalRef",
                     "description": "Canonical reference for the ambiguity status."
                   }
                 },
@@ -1699,7 +1699,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                    "$ref": "vc:core:atoms#kebabId",
                     "description": "Unique kebab-case identifier for this finding."
                   },
                   "type": {
@@ -1747,7 +1747,7 @@
                     "additionalProperties": false,
                     "properties": {
                       "task_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "$ref": "vc:core:atoms#kebabId",
                         "description": "Unique kebab-case identifier for the remediation task."
                       },
                       "summary": {
@@ -1894,7 +1894,7 @@
                   "type": "array",
                   "description": "Trace IDs of interfaces that have been implemented.",
                   "items": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#traceId",
+                    "$ref": "vc:core:collections#traceId",
                     "description": "Trace ID of an implemented interface."
                   }
                 },
@@ -1906,7 +1906,7 @@
                     "additionalProperties": false,
                     "properties": {
                       "fixture_ref": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "$ref": "vc:core:atoms#kebabId",
                         "description": "Fixture ID being tested."
                       },
                       "status": {
@@ -1923,7 +1923,7 @@
                         "description": "Additional notes about this test result."
                       },
                       "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "$ref": "vc:core:collections#canonicalRef",
                         "description": "Canonical reference for the test status."
                       }
                     },
@@ -1973,7 +1973,7 @@
                         "description": "Target deployment environment.",
                         "allOf": [
                           {
-                            "$ref": "https://specdev.local/schema/core/collections/1#environmentName",
+                            "$ref": "vc:core:collections#environmentName",
                             "description": "Inherits the environment name constraint from core collections."
                           },
                           {
@@ -1987,7 +1987,7 @@
                         ]
                       },
                       "build_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                        "$ref": "vc:core:atoms#kebabId",
                         "description": "Unique kebab-case identifier for this build/deployment."
                       },
                       "status": {
@@ -2000,7 +2000,7 @@
                         "description": "Deployment status: pending, success, or failed."
                       },
                       "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                        "$ref": "vc:core:collections#canonicalRef",
                         "description": "Canonical reference for the deployment status."
                       }
                     },
@@ -2038,7 +2038,7 @@
                         "description": "Summary of evidence showing how the FR was satisfied (minimum 20 characters)."
                       },
                       "checklist_ids": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                        "$ref": "vc:core:collections#kebabIdArray",
                         "description": "Checklist item IDs that provide evidence for this FR."
                       }
                     },
@@ -2125,11 +2125,11 @@
           ]
         },
         "policy_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the governance policy governing this implementation."
         },
         "risk_category_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Canonical reference for the risk category of this implementation."
         }
       },

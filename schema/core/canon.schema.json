@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/core/canon/1",
+  "$id": "vc:core:canon",
   "title": "Canonical Registry",
   "type": "object",
   "additionalProperties": false,
@@ -193,7 +193,7 @@
         "tags": {
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#tag",
+            "$ref": "vc:core:atoms#tag",
             "description": "A classification tag for this canonical entry."
           },
           "uniqueItems": true,

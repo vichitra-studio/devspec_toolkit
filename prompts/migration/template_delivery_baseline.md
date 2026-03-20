@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/02a_delivery_baseline.schema.json`
+`vc:02a-delivery-baseline`
 
 ## Required Changes
 

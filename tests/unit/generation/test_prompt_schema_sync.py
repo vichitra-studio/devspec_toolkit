@@ -63,7 +63,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                         "type": "object",
                         "properties": {
                             "dependencies": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyList"
+                                "$ref": "vc:core:collections#/$defs/dependencyList"
                             }
                         },
                         "required": [],
@@ -75,7 +75,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                 (
                     "## Embedded Schema\n"
                     "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"dependencies\":{\"$ref\":\"https://specdev.local/schema/core/collections/1#stringArray\"}},\"required\":[]}\n"
+                    "{\"type\":\"object\",\"properties\":{\"dependencies\":{\"$ref\":\"vc:core:collections#stringArray\"}},\"required\":[]}\n"
                     "```\n"
                 ),
                 encoding="utf-8",
@@ -94,7 +94,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                         "type": "object",
                         "properties": {
                             "dependencies": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/dependencyList"
+                                "$ref": "vc:core:collections#/$defs/dependencyList"
                             }
                         },
                         "required": [],
@@ -126,7 +126,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                         "properties": {
                             "trace": {
                                 "type": "array",
-                                "items": {"$ref": "https://specdev.local/schema/core/collections/1#traceRef"},
+                                "items": {"$ref": "vc:core:collections#traceRef"},
                             }
                         },
                         "required": [],
@@ -138,7 +138,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                 (
                     "## Embedded Schema\n"
                     "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"trace\":{\"$ref\":\"https://specdev.local/schema/core/collections/1#traceRef\"}},\"required\":[]}\n"
+                    "{\"type\":\"object\",\"properties\":{\"trace\":{\"$ref\":\"vc:core:collections#traceRef\"}},\"required\":[]}\n"
                     "```\n"
                 ),
                 encoding="utf-8",
@@ -157,7 +157,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                         "type": "object",
                         "properties": {
                             "canonical_refs_used": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+                                "$ref": "vc:core:collections#/$defs/canonicalRefArray"
                             }
                         },
                         "required": [],
@@ -193,10 +193,10 @@ class PromptSchemaSyncTests(unittest.TestCase):
                                     "type": "object",
                                     "properties": {
                                         "metric_ref": {
-                                            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                                            "$ref": "vc:core:collections#/$defs/canonicalRef"
                                         },
                                         "unit_ref": {
-                                            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                                            "$ref": "vc:core:collections#/$defs/canonicalRef"
                                         },
                                     },
                                     "required": ["metric_ref", "unit_ref"],
@@ -212,7 +212,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                 (
                     "## Embedded Schema\n"
                     "```json\n"
-                    "{\"type\":\"object\",\"properties\":{\"nfrs\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"metric_ref\":{\"$ref\":\"https://specdev.local/schema/core/collections/1#/$defs/canonicalRef\"},\"unit_ref\":{\"$ref\":\"https://specdev.local/schema/core/collections/1#/$defs/canonicalRef\"}},\"required\":[]}}},\"required\":[]}\n"
+                    "{\"type\":\"object\",\"properties\":{\"nfrs\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"metric_ref\":{\"$ref\":\"vc:core:collections#/$defs/canonicalRef\"},\"unit_ref\":{\"$ref\":\"vc:core:collections#/$defs/canonicalRef\"}},\"required\":[]}}},\"required\":[]}\n"
                     "```\n"
                 ),
                 encoding="utf-8",
@@ -231,7 +231,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                         "type": "object",
                         "properties": {
                             "canonical_refs_used": {
-                                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
+                                "$ref": "vc:core:collections#/$defs/canonicalRefArray"
                             }
                         },
                         "required": [],
@@ -293,7 +293,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "schema").mkdir()
             (root / "prompts").mkdir()
             (root / "tools").mkdir()
-            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            schema_uri = "vc:00-charter"
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps({schema_uri: "schema/00_charter.schema.json"}),
                 encoding="utf-8",
@@ -320,7 +320,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```\n\n"
                     "# Output Contract\n"
                     "```json\n"
-                    "{\"$schema\":\"https://specdev.local/schema/wrong.schema.json\",\"id\":\"charter\"}\n"
+                    "{\"$schema\":\"vc:wrong\",\"id\":\"charter\"}\n"
                     "```\n\n"
                     "## Metadata Contract\n"
                 ),
@@ -335,7 +335,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "schema").mkdir()
             (root / "prompts").mkdir()
             (root / "tools").mkdir()
-            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            schema_uri = "vc:00-charter"
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps({schema_uri: "schema/00_charter.schema.json"}),
                 encoding="utf-8",
@@ -362,10 +362,10 @@ class PromptSchemaSyncTests(unittest.TestCase):
                     "```\n\n"
                     "# Output Contract\n"
                     "```json\n"
-                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
+                    "{\"$schema\":\"vc:00-charter\",\"id\":\"charter\"}\n"
                     "```\n"
                     "```json\n"
-                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\n"
+                    "{\"$schema\":\"vc:00-charter\",\"id\":\n"
                     "```\n\n"
                     "## Metadata Contract\n"
                 ),
@@ -454,7 +454,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "schema").mkdir()
             (root / "prompts").mkdir()
-            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            schema_uri = "vc:00-charter"
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps({schema_uri: "schema/00_charter.schema.json"}),
                 encoding="utf-8",
@@ -474,12 +474,12 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "prompts" / "prompt_00_project_charter.md").write_text(
                 (
                     "# Schema Reference\n"
-                    "- Schema URI: https://specdev.local/schema/00_charter.schema.json\n"
+                    "- Schema URI: vc:00-charter\n"
                     "- Schema File: schema/00_charter.schema.json\n"
                     "- Schema Registry: tools/schema_registry.json\n\n"
                     "# Output Contract\n"
                     "```json\n"
-                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
+                    "{\"$schema\":\"vc:00-charter\",\"id\":\"charter\"}\n"
                     "```\n\n"
                     "## Metadata Contract\n"
                 ),
@@ -494,7 +494,7 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "schema").mkdir()
             (root / "prompts").mkdir()
-            schema_uri = "https://specdev.local/schema/00_charter.schema.json"
+            schema_uri = "vc:00-charter"
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps({schema_uri: "schema/00_charter.schema.json"}),
                 encoding="utf-8",
@@ -514,12 +514,12 @@ class PromptSchemaSyncTests(unittest.TestCase):
             (root / "prompts" / "prompt_00_project_charter.md").write_text(
                 (
                     "# Schema Reference\n"
-                    "- Schema URI: https://specdev.local/schema/wrong.schema.json\n"
+                    "- Schema URI: vc:wrong\n"
                     "- Schema File: schema/00_charter.schema.json\n"
                     "- Schema Registry: tools/schema_registry.json\n\n"
                     "# Output Contract\n"
                     "```json\n"
-                    "{\"$schema\":\"https://specdev.local/schema/00_charter.schema.json\",\"id\":\"charter\"}\n"
+                    "{\"$schema\":\"vc:00-charter\",\"id\":\"charter\"}\n"
                     "```\n\n"
                     "## Metadata Contract\n"
                 ),

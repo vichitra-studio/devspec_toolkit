@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/04_fr_list.schema.json",
+  "$id": "vc:04-fr-list",
   "title": "04_fr_list",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -21,7 +21,7 @@
             "properties": {
               "fr_id": {
                 "description": "Unique kebab-case identifier for this functional requirement (e.g., 'fr-user-login').",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "statement": {
                 "description": "Clear statement of the functional requirement, minimum 20 characters.",
@@ -34,11 +34,11 @@
               },
               "preconditions": {
                 "description": "Conditions that must hold before this requirement can be exercised.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "postconditions": {
                 "description": "Conditions guaranteed after successful fulfillment of this requirement.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "acceptance_criteria": {
                 "description": "Testable criteria that define when this requirement is satisfied, at least 2 required.",
@@ -51,7 +51,7 @@
                   "properties": {
                     "criterion_id": {
                       "description": "Unique kebab-case identifier for this acceptance criterion.",
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                      "$ref": "vc:core:atoms#kebabId"
                     },
                     "text": {
                       "description": "Descriptive text of the acceptance criterion, minimum 15 characters.",
@@ -60,7 +60,7 @@
                     },
                     "fixture_ref": {
                       "description": "Optional reference to a test fixture that validates this criterion.",
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                      "$ref": "vc:core:atoms#kebabId"
                     }
                   },
                   "required": [
@@ -73,25 +73,25 @@
                 "description": "Traceability links back to upstream capabilities or charter items.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A traceability reference for this functional requirement."
                 }
               },
               "capability_ref": {
                 "description": "Canonical reference to the capability this requirement implements.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "action_ref": {
                 "description": "Canonical reference to the action verb used in this requirement.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary entity this requirement operates on.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "status_ref": {
                 "description": "Canonical reference to the status lifecycle this requirement affects.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [

@@ -20,14 +20,12 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
-from referencing import Registry, Resource
-
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
 
-CANON_ALIASES_SCHEMA_URI = "https://specdev.local/schema/canon/aliases/1"
-CANON_KIND_SCHEMA_URI = "https://specdev.local/schema/canon/kind/1"
-CANON_MANIFEST_SCHEMA_URI = "https://specdev.local/schema/core/canon/1"
+CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
+CANON_KIND_SCHEMA_URI = "vc:canon:kind"
+CANON_MANIFEST_SCHEMA_URI = "vc:core:canon"
 
 
 def lint_canon_dir(
@@ -454,7 +452,7 @@ def _validate_doc_schema(
     except json.JSONDecodeError as exc:
         return [make_error("E520", f"UNRESOLVED_INPUT schema_json_decode_failed uri={schema_uri} detail={exc}")]
 
-    reg = _jsonschema_registry(schema_registry)
+    reg = schema_registry.to_referencing_registry()
     validator = Draft202012Validator(
         schema,
         registry=reg,
@@ -473,11 +471,6 @@ def _validate_doc_schema(
             make_error("E520", f"UNRESOLVED_INPUT schema_invalid {path} uri={schema_uri} path={error_path or '$'} detail={error.message}")
         )
     return errs
-
-
-def _jsonschema_registry(schema_registry: SchemaRegistry) -> Registry:
-    store = {uri: Resource.from_contents(schema) for uri, schema in schema_registry.store.items()}
-    return Registry().with_resources(store.items())
 
 
 def _schema_uri_registered(schema_registry: SchemaRegistry, schema_uri: str) -> bool:

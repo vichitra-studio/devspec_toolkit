@@ -40,7 +40,7 @@ class CanonicalLintTests(unittest.TestCase):
             self.assertTrue(any("invalid_manifest" in e.render() for e in errs))
 
     def test_manifest_root_must_be_object(self):
-        errs = lint_manifest([])
+        errs = lint_manifest([])  # type: ignore[arg-type]
         self.assertTrue(any("manifest root must be an object" in e.render() for e in errs))
 
     def test_lint_canon_dir_accepts_modular_registry_without_manifest(self):
@@ -203,8 +203,8 @@ class CanonicalLintTests(unittest.TestCase):
     def test_schema_registry_includes_canon_modular_schemas(self):
         repo_root = Path(__file__).resolve().parents[3]
         registry = SchemaRegistry(str(repo_root))
-        aliases_uri = "https://specdev.local/schema/canon/aliases/1"
-        kind_uri = "https://specdev.local/schema/canon/kind/1"
+        aliases_uri = "vc:canon:aliases"
+        kind_uri = "vc:canon:kind"
 
         self.assertEqual("canon/aliases.schema.json", registry.map.get(aliases_uri))
         self.assertEqual("canon/kind.schema.json", registry.map.get(kind_uri))
@@ -224,7 +224,7 @@ class CanonicalLintTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/core/canon/1",
+                        "$id": "vc:core:canon",
                         "$defs": {
                             "semver": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
                             "alias": {
@@ -270,9 +270,9 @@ class CanonicalLintTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/core/canon/1": "schema/core/canon.schema.json",
-                        "https://specdev.local/schema/canon/aliases/1": "canon/aliases.schema.json",
-                        "https://specdev.local/schema/canon/kind/1": "canon/kind.schema.json",
+                        "vc:core:canon": "schema/core/canon.schema.json",
+                        "vc:canon:aliases": "canon/aliases.schema.json",
+                        "vc:canon:kind": "canon/kind.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -338,7 +338,7 @@ class CanonicalLintTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/core/canon/1": "schema/core/canon.schema.json",
+                        "vc:core:canon": "schema/core/canon.schema.json",
                     }
                 ),
                 encoding="utf-8",
@@ -378,8 +378,8 @@ class CanonicalLintTests(unittest.TestCase):
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(
                     {
-                        "https://specdev.local/schema/canon/aliases/1": "canon/aliases.schema.json",
-                        "https://specdev.local/schema/canon/kind/1": "canon/kind.schema.json",
+                        "vc:canon:aliases": "canon/aliases.schema.json",
+                        "vc:canon:kind": "canon/kind.schema.json",
                     }
                 ),
                 encoding="utf-8",

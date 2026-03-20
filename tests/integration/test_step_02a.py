@@ -3,23 +3,21 @@ import jsonschema
 import sys
 import os
 
-try:
-    from referencing import Registry, Resource
-    from referencing.jsonschema import DRAFT202012
-    HAS_REFERENCING = True
-except ImportError:
-    HAS_REFERENCING = False
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
+
+HAS_REFERENCING = True
 
 # Define schema path relative to the repo root (assumed execution dir)
 SCHEMA_PATH = "schema/02a_delivery_baseline.schema.json"
 REPO_ROOT = os.getcwd()
 
-# Map specdev.local URIs to local file paths for offline resolution
+# Map vc: URIs to local file paths for offline resolution
 _URI_TO_PATH = {
-    "https://specdev.local/schema/core/atoms/1": "schema/core/atoms.schema.json",
-    "https://specdev.local/schema/core/collections/1": "schema/core/collections.schema.json",
-    "https://specdev.local/schema/core/step_base/1": "schema/core/step_base.schema.json",
-    "https://specdev.local/schema/core/errors/1": "schema/core/errors.schema.json",
+    "vc:core:atoms": "schema/core/atoms.schema.json",
+    "vc:core:collections": "schema/core/collections.schema.json",
+    "vc:core:step-base": "schema/core/step_base.schema.json",
+    "vc:core:errors": "schema/core/errors.schema.json",
 }
 
 def load_schema(schema_subpath):
@@ -54,7 +52,7 @@ def _build_registry(schema):
     return None
 
 def _build_resolver(schema):
-    """Build a legacy RefResolver with a store and an https handler that resolves specdev.local URIs locally."""
+    """Build a legacy RefResolver with a store and a handler that resolves vc: URIs locally."""
     store = {schema['$id']: schema}
     for uri, path in _URI_TO_PATH.items():
         core = load_schema_from_path(path)
@@ -79,7 +77,7 @@ def validate_artifact(json_path, schema):
 
         if HAS_REFERENCING:
             registry = _build_registry(schema)
-            validator_cls = jsonschema.validators.validator_for(schema)
+            validator_cls = jsonschema.validators.validator_for(schema)  # type: ignore[attr-defined]
             validator = validator_cls(schema, registry=registry)
             validator.validate(data)
         else:

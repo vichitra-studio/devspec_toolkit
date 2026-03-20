@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/06_invariants.schema.json`
+`vc:06-invariants`
 
 ## Required Changes
 

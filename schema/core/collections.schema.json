@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/core/collections/1",
+  "$id": "vc:core:collections",
   "title": "Core Collections",
   "$defs": {
     "kebabIdArray": {
@@ -8,7 +8,7 @@
       "type": "array",
       "description": "Non-empty array of unique kebab-case identifiers, used for cross-referencing spec artifacts.",
       "items": {
-        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+        "$ref": "vc:core:atoms#kebabId",
         "description": "A kebab-case identifier."
       },
       "minItems": 1,
@@ -38,7 +38,7 @@
           "description": "URL or relative path to the linked resource."
         },
         "spec_ref": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Optional kebab-case ID referencing another spec artifact related to this link."
         }
       },
@@ -50,7 +50,7 @@
     "traceId": {
       "$anchor": "traceId",
       "description": "Kebab-case identifier used as a traceability target, linking requirements to implementations.",
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+      "$ref": "vc:core:atoms#kebabId"
     },
     "traceRef": {
       "$anchor": "traceRef",
@@ -60,10 +60,10 @@
         "type": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Trace type \u2014 validated against canon/kinds/trace_type.json entries."
+          "description": "Trace type — validated against canon/kinds/trace_type.json entries."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Kebab-case ID of the target artifact being traced to."
         },
         "note": {
@@ -139,7 +139,7 @@
       "$anchor": "canonicalRefArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+        "$ref": "vc:core:collections#canonicalRef",
         "description": "A canonical registry reference."
       },
       "description": "Array of canonical registry references used within an artifact."
@@ -150,7 +150,7 @@
       "additionalProperties": false,
       "properties": {
         "temp_id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Temporary kebab-case ID assigned to this proposal until it is accepted into the registry."
         },
         "kind": {
@@ -188,7 +188,7 @@
       "$anchor": "canonicalProposalArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposal",
+        "$ref": "vc:core:collections#canonicalProposal",
         "description": "A proposed canonical term."
       },
       "description": "Array of proposed canonical terms discovered during artifact generation."
@@ -207,7 +207,7 @@
           "description": "The original input value that triggered the ambiguous match."
         },
         "candidate_ids": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "description": "List of canonical IDs that all matched the input value."
         },
         "reason": {
@@ -227,7 +227,7 @@
       "$anchor": "canonicalConflictArray",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflict",
+        "$ref": "vc:core:collections#canonicalConflict",
         "description": "A canonical resolution conflict."
       },
       "description": "Array of canonical resolution conflicts encountered during artifact generation."
@@ -320,7 +320,7 @@
           "description": "Justification for selecting this technology over alternatives."
         },
         "tech_stack_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Optional canonical reference linking this tech stack item to the canonical registry."
         }
       },
@@ -334,7 +334,7 @@
       "$anchor": "techStackList",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#techStackItem",
+        "$ref": "vc:core:collections#techStackItem",
         "description": "A technology stack item."
       },
       "description": "Array of technology stack items within a single category."
@@ -345,19 +345,19 @@
       "additionalProperties": false,
       "properties": {
         "languages": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "$ref": "vc:core:collections#techStackList",
           "description": "Programming languages used in the project."
         },
         "frameworks": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "$ref": "vc:core:collections#techStackList",
           "description": "Application frameworks and libraries used in the project."
         },
         "infrastructure": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "$ref": "vc:core:collections#techStackList",
           "description": "Infrastructure and platform services (databases, cloud providers, CI/CD)."
         },
         "tools": {
-          "$ref": "https://specdev.local/schema/core/collections/1#techStackList",
+          "$ref": "vc:core:collections#techStackList",
           "description": "Development and operational tools (linters, bundlers, monitoring)."
         }
       },
@@ -381,7 +381,7 @@
           "description": "Dependency type: milestone for internal project milestones, external for third-party or cross-team dependencies."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+          "$ref": "vc:core:atoms#kebabId",
           "description": "Kebab-case identifier for this dependency."
         },
         "owner": {
@@ -394,7 +394,7 @@
           "description": "Description of the dependency with at least two words. Required for external dependencies."
         },
         "dependency_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+          "$ref": "vc:core:collections#canonicalRef",
           "description": "Optional canonical reference linking this dependency to the canonical registry."
         }
       },
@@ -434,7 +434,7 @@
             "description": "A simple string dependency identifier."
           },
           {
-            "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem",
+            "$ref": "vc:core:collections#dependencyItem",
             "description": "A structured dependency item with type, ID, and optional owner."
           }
         ],
@@ -446,7 +446,7 @@
       "$anchor": "dependencyObjectList",
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#dependencyItem",
+        "$ref": "vc:core:collections#dependencyItem",
         "description": "A structured dependency item."
       },
       "description": "Array of structured dependency items (no simple string entries allowed)."

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/core/canon/1",
+  "$schema": "vc:core:canon",
   "registry_version": "1.0.0",
   "entries": [
     {

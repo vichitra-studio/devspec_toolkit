@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/canon/kind/1",
+  "$id": "vc:canon:kind",
   "title": "Canonical Kind Registry",
   "type": "object",
   "additionalProperties": false,
@@ -11,7 +11,7 @@
       "description": "JSON Schema URI identifying the schema this kind registry file conforms to."
     },
     "registry_version": {
-      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver",
+      "$ref": "vc:core:canon#/$defs/semver",
       "description": "Semantic version of the canonical registry format for this kind file."
     },
     "kind": {
@@ -22,7 +22,7 @@
     "entries": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/canon/1#/$defs/entry"
+        "$ref": "vc:core:canon#/$defs/entry"
       },
       "description": "Array of canonical entries belonging to this kind, each validated against the core canon entry schema."
     }

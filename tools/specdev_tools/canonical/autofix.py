@@ -9,8 +9,6 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator
-from referencing import Registry, Resource
-
 from .lint import lint_canon_dir
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
@@ -186,8 +184,7 @@ def _build_schema_validator(
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, f"schema_load_failed uri={schema_uri} detail={str(exc)}"
     try:
-        store = {uri: Resource.from_contents(contents) for uri, contents in schema_registry.store.items()}
-        reg = Registry().with_resources(store.items())
+        reg = schema_registry.to_referencing_registry()
         validator = Draft202012Validator(
             schema,
             registry=reg,

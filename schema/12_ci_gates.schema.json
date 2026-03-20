@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "$id": "vc:12-ci-gates",
   "title": "12_ci_gates",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -14,7 +14,7 @@
           "type": "array",
           "description": "Traceability links connecting this CI gates spec to related artifacts.",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+            "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the CI gates spec."
           }
         },
@@ -26,7 +26,7 @@
             "additionalProperties": false,
             "properties": {
               "job_id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                "$ref": "vc:core:atoms#kebabId",
                 "description": "Unique kebab-case identifier for this CI job."
               },
               "name": {
@@ -34,7 +34,7 @@
                 "description": "Human-readable name of the CI job."
               },
               "requires": {
-                "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray",
+                "$ref": "vc:core:collections#kebabIdArray",
                 "description": "Job IDs that must complete before this job runs."
               },
               "steps": {
@@ -45,7 +45,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "id": {
-                      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+                      "$ref": "vc:core:atoms#kebabId",
                       "description": "Unique kebab-case identifier for this step within the job."
                     },
                     "name": {
@@ -57,7 +57,7 @@
                       "description": "Shell command to execute for this step."
                     },
                     "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                      "$ref": "vc:core:collections#canonicalRef",
                       "description": "Canonical reference for the command in the registry."
                     }
                   },
@@ -70,11 +70,11 @@
                 }
               },
               "environment_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the execution environment."
               },
               "role_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef",
+                "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the role that owns this job."
               },
               "security": {

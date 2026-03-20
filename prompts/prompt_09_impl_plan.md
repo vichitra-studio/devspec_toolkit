@@ -140,7 +140,7 @@ Before emitting, verify:
 - What external dependencies (teams, vendors) could block delivery? How will we mitigate?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/09_impl_plan.schema.json
+- Schema URI: vc:09-impl-plan
 - Schema File: schema/09_impl_plan.schema.json
 - Schema Registry: tools/schema_registry.json
 

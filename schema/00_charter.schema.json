@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/00_charter.schema.json",
+  "$id": "vc:00-charter",
   "title": "00_charter",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -21,22 +21,22 @@
         },
         "in_scope": {
           "description": "Items explicitly within the boundaries of this project, at least 3 required.",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 3
         },
         "out_of_scope": {
           "description": "Items explicitly excluded from this project, at least 3 required.",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 3
         },
         "assumptions": {
           "description": "Assumptions made during project scoping that could affect delivery if invalidated.",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 1
         },
         "risks": {
           "description": "Known risks that could impact project success or timeline.",
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
+          "$ref": "vc:core:collections#stringArray",
           "minItems": 1
         },
         "stakeholders": {
@@ -53,11 +53,11 @@
               },
               "needs": {
                 "description": "List of needs or expectations this stakeholder has for the project.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "role_ref": {
                 "description": "Canonical reference to a role defined in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [
@@ -76,7 +76,7 @@
             "properties": {
               "segment_id": {
                 "description": "Unique kebab-case identifier for this user segment.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "description": {
                 "description": "Human-readable description of who this user segment represents.",
@@ -84,15 +84,15 @@
               },
               "jobs_to_be_done": {
                 "description": "List of jobs this user segment is trying to accomplish.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "pains": {
                 "description": "Pain points this user segment currently experiences.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "gains": {
                 "description": "Benefits this user segment expects to achieve from the project.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               }
             },
             "required": [
@@ -115,7 +115,7 @@
             "properties": {
               "metric_id": {
                 "description": "Unique kebab-case identifier for this success metric.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "name": {
                 "description": "Human-readable name of the metric (e.g., 'page-load-time').",
@@ -157,7 +157,7 @@
               },
               "unit_ref": {
                 "description": "Canonical reference to the unit defined in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [
@@ -174,7 +174,7 @@
           "description": "Array of external links relevant to the charter (e.g., design docs, research).",
           "type": "array",
           "items": {
-            "$ref": "https://specdev.local/schema/core/collections/1#link",
+            "$ref": "vc:core:collections#link",
             "description": "A link to an external resource related to the charter."
           }
         }

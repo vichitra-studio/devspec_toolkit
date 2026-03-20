@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/01_capabilities.schema.json",
+  "$id": "vc:01-capabilities",
   "title": "01_capabilities",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -21,7 +21,7 @@
             "properties": {
               "capability_id": {
                 "description": "Unique kebab-case identifier for this capability (e.g., 'cap-user-login').",
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId"
               },
               "verb": {
                 "description": "Action verb describing the capability (e.g., 'authenticate', 'create').",
@@ -43,29 +43,29 @@
               },
               "owner": {
                 "description": "Team or domain responsible for implementing this capability.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+                "$ref": "vc:core:atoms#owner"
               },
               "inputs": {
                 "description": "Data or signals required to exercise this capability.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "outputs": {
                 "description": "Data or effects produced when this capability executes successfully.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "preconditions": {
                 "description": "Conditions that must be true before this capability can execute.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "postconditions": {
                 "description": "Conditions guaranteed to be true after successful execution of this capability.",
-                "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+                "$ref": "vc:core:collections#stringArray"
               },
               "error_states": {
                 "description": "Possible error conditions that may arise during capability execution.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/errors/1#errorState",
+                  "$ref": "vc:core:errors#errorState",
                   "description": "An error state that may occur during capability execution."
                 }
               },
@@ -73,25 +73,25 @@
                 "description": "Traceability links back to upstream artifacts (e.g., charter segments, stakeholders).",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A traceability reference for this capability."
                 }
               },
               "capability_ref": {
                 "description": "Canonical reference linking this capability to the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "action_ref": {
                 "description": "Canonical reference to the action verb used in this capability.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary entity this capability operates on.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "role_ref": {
                 "description": "Canonical reference to the role that exercises this capability.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [

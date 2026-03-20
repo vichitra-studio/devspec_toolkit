@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/15_scaffold.schema.json",
+  "$schema": "vc:15-scaffold",
   "id": "scaffold-invalid-green",
   "owner": "api",
   "created_at": "2023-10-27T10:00:00Z",

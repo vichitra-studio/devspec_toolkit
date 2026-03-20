@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/07_nfrs.schema.json",
+  "$id": "vc:07-nfrs",
   "title": "07_nfrs",
   "allOf": [
     {
-      "$ref": "https://specdev.local/schema/core/step_base/1",
+      "$ref": "vc:core:step-base",
       "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
     {
@@ -26,7 +26,7 @@
               },
               "category": {
                 "description": "Quality attribute category: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, or energy.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#nfrCategory"
+                "$ref": "vc:core:atoms#nfrCategory"
               },
               "metric": {
                 "description": "Name of the metric being measured (e.g., 'p99 response time', 'uptime percentage').",
@@ -56,35 +56,35 @@
               },
               "stage": {
                 "description": "Delivery stage at which this NFR must be met (e.g., 'mvp', 'ga').",
-                "$ref": "https://specdev.local/schema/core/collections/1#stageName"
+                "$ref": "vc:core:collections#stageName"
               },
               "owner": {
                 "description": "Team or domain responsible for meeting this NFR.",
-                "$ref": "https://specdev.local/schema/core/atoms/1#owner"
+                "$ref": "vc:core:atoms#owner"
               },
               "trace": {
                 "description": "Traceability links back to upstream requirements, components, or APIs.",
                 "type": "array",
                 "items": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#traceRef",
+                  "$ref": "vc:core:collections#traceRef",
                   "description": "A traceability reference for this non-functional requirement."
                 }
               },
               "metric_ref": {
                 "description": "Canonical reference to the metric definition in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "unit_ref": {
                 "description": "Canonical reference to the unit of measurement in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "stage_ref": {
                 "description": "Canonical reference to the delivery stage in the canonical registry.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               },
               "environment_ref": {
                 "description": "Canonical reference to the environment where this NFR is measured.",
-                "$ref": "https://specdev.local/schema/core/collections/1#canonicalRef"
+                "$ref": "vc:core:collections#canonicalRef"
               }
             },
             "required": [

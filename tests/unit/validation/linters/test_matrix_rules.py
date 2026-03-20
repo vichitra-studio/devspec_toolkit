@@ -41,7 +41,7 @@ class TestLoadCoverageThresholds(unittest.TestCase):
                 json.dump(step_order, f)
 
             result = _load_coverage_thresholds(repo_root)
-            self.assertIsNotNone(result)
+            assert isinstance(result, dict)
             self.assertEqual(result["fr_coverage"], 80)
             self.assertEqual(result["mode"], "warn")
 

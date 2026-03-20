@@ -6,7 +6,6 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from specdev_tools.core.registry import SchemaRegistry
-from specdev_tools.validation.validate import _registry_for
 
 
 class PromptContractsTests(unittest.TestCase):
@@ -34,10 +33,10 @@ class PromptContractsTests(unittest.TestCase):
 
     def test_output_contract_examples_validate_against_step_schemas(self):
         registry = SchemaRegistry(str(self.repo_root))
-        jsonschema_registry = _registry_for(registry)
+        jsonschema_registry = registry.to_referencing_registry()
         step_to_schema: dict[str, str] = {}
         for uri in registry.store:
-            match = re.search(r"/schema/(\d{2}[a-z]?)_.*\.schema\.json$", uri)
+            match = re.match(r"^vc:(\d{2}[a-z]?)-", uri)
             if match:
                 step_to_schema[match.group(1)] = uri
 

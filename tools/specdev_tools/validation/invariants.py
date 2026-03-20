@@ -58,7 +58,8 @@ def run_invariants(spec_dir: str, sample: dict) -> list[dict]:
                         data = json.load(fh)
                 except (OSError, json.JSONDecodeError):
                     continue
-                if data.get("$schema","").endswith("/06_invariants.schema.json"):
+                schema_uri = data.get("$schema", "")
+                if schema_uri == "vc:06-invariants":
                     for rule in data.get("rules", []):
                         lang = rule.get("language", "jsonlogic")
                         expr = rule.get("expression")

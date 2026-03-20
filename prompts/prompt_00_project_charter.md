@@ -156,7 +156,7 @@ Before emitting, verify:
 - Which upstream systems, dependencies, or programs does this charter rely on, and what risks do they introduce?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/00_charter.schema.json
+- Schema URI: vc:00-charter
 - Schema File: schema/00_charter.schema.json
 - Schema Registry: tools/schema_registry.json
 

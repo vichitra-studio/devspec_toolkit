@@ -7,8 +7,9 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator
 
 from specdev_tools.canonical.autofix import _try_infer_ref, canonical_autofix
+from specdev_tools.core.errors import SpecError
 from specdev_tools.core.registry import SchemaRegistry
-from specdev_tools.validation.validate import _registry_for, validate_file
+from specdev_tools.validation.validate import validate_file
 
 
 class SchemaContractsTests(unittest.TestCase):
@@ -18,14 +19,14 @@ class SchemaContractsTests(unittest.TestCase):
 
     def _setup_step_base(self, root: Path, registry_map: dict) -> None:
         """Add step_base schema to a temp registry for allOf composition support."""
-        registry_map["https://specdev.local/schema/core/step_base/1"] = "schema/step_base.schema.json"
+        registry_map["vc:core:step-base"] = "schema/step_base.schema.json"
         (root / "schema" / "step_base.schema.json").write_text(
             (self.schema_root / "core" / "step_base.schema.json").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
 
     def test_all_step_schemas_include_metadata_top_level_fields(self):
-        step_base_ref = "https://specdev.local/schema/core/step_base/1"
+        step_base_ref = "vc:core:step-base"
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
             with path.open("r", encoding="utf-8") as f:
                 schema = json.load(f)
@@ -45,11 +46,29 @@ class SchemaContractsTests(unittest.TestCase):
             self.assertIn("canonical_proposals", props, msg=path.name)
             self.assertIn("canonical_conflicts", props, msg=path.name)
 
-    def test_step_schemas_do_not_use_unregistered_collections_schema_uri(self):
-        old_uri = "https://specdev.local/schema/core/collections.schema.json#/"
-        for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
-            text = path.read_text(encoding="utf-8")
-            self.assertNotIn(old_uri, text, msg=path.name)
+    def test_no_schema_file_references_specdev_local(self):
+        """Migration guard: the legacy specdev.local host must not appear in any schema.
+
+        Earlier schemas used URIs like https://specdev.local/... which are
+        unregistered and unresolvable.  All references should use the vc:
+        URI scheme instead.  This test iterates every schema and canon file
+        to catch any future regression.
+        """
+        globs = [
+            self.schema_root.glob("*.schema.json"),
+            (self.schema_root / "core").glob("*.schema.json"),
+            (self.repo_root / "canon").glob("*.schema.json"),
+        ]
+        checked = 0
+        violations: list[str] = []
+        for file_iter in globs:
+            for path in sorted(file_iter):
+                text = path.read_text(encoding="utf-8")
+                checked += 1
+                if "specdev.local" in text:
+                    violations.append(path.name)
+        self.assertGreater(checked, 0, "No schema files found — glob patterns may be wrong")
+        self.assertEqual([], violations, f"specdev.local found in: {violations}")
 
     def test_all_step_schemas_have_at_least_one_canonical_ref_slot(self):
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
@@ -134,16 +153,16 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_dependency_item_requires_owner_and_note_when_external(self):
         registry = SchemaRegistry(str(self.repo_root))
-        core = registry.load("https://specdev.local/schema/core/collections/1")
+        core = registry.load("vc:core:collections")
         dep_item = core["$defs"]["dependencyItem"]
-        validator = Draft202012Validator(dep_item, registry=_registry_for(registry))
+        validator = Draft202012Validator(dep_item, registry=registry.to_referencing_registry())
         errors = list(validator.iter_errors({"type": "external", "id": "dep-a"}))
         self.assertTrue(errors)
 
     def test_02a_environment_config_rejects_unbounded_nested_values(self):
         registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("https://specdev.local/schema/02a_delivery_baseline.schema.json")
-        validator = Draft202012Validator(schema, registry=_registry_for(registry))
+        schema = registry.load("vc:02a-delivery-baseline")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
         payload = {
             "id": "delivery-baseline",
             "owner": "api",
@@ -178,7 +197,7 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "spec").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/test.schema.json": "schema/test.schema.json",
+                "vc:test": "schema/test.schema.json",
             }
             (root / "tools" / "schema_registry.json").write_text(
                 json.dumps(registry_map),
@@ -188,10 +207,10 @@ class SchemaContractsTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "https://specdev.local/schema/test.schema.json",
+                        "$id": "vc:test",
                         "type": "object",
                         "properties": {
-                            "x": {"$ref": "https://specdev.local/schema/missing.schema.json#/$defs/value"}
+                            "x": {"$ref": "vc:missing#/$defs/value"}
                         },
                     }
                 ),
@@ -199,7 +218,7 @@ class SchemaContractsTests(unittest.TestCase):
             )
             sample = root / "spec" / "sample.json"
             sample.write_text(
-                json.dumps({"$schema": "https://specdev.local/schema/test.schema.json", "x": 1}),
+                json.dumps({"$schema": "vc:test", "x": 1}),
                 encoding="utf-8",
             )
             errs = validate_file(str(root), str(sample))
@@ -213,8 +232,8 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_step_14_rejects_string_dependencies(self):
         registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("https://specdev.local/schema/14_roadmap.schema.json")
-        validator = Draft202012Validator(schema, registry=_registry_for(registry))
+        schema = registry.load("vc:14-roadmap")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
 
         with (self.repo_root / "tests" / "fixtures" / "step_14" / "valid_roadmap.json").open(
             "r", encoding="utf-8"
@@ -234,9 +253,9 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "spec").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/01_capabilities.schema.json": "schema/01_capabilities.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "vc:01-capabilities": "schema/01_capabilities.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -256,7 +275,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+                        "$schema": "vc:01-capabilities",
                         "id": "caps",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -290,9 +309,9 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "spec").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/01_capabilities.schema.json": "schema/01_capabilities.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
+                "vc:01-capabilities": "schema/01_capabilities.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -312,7 +331,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+                        "$schema": "vc:01-capabilities",
                         "id": "caps",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -343,10 +362,10 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "canon").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/07_nfrs.schema.json": "schema/07_nfrs.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
-                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
+                "vc:07-nfrs": "schema/07_nfrs.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -375,7 +394,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/07_nfrs.schema.json",
+                        "$schema": "vc:07-nfrs",
                         "id": "nfrs-test",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -406,8 +425,8 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_step_09_allows_string_dependencies_without_oneof_overlap(self):
         registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("https://specdev.local/schema/09_impl_plan.schema.json")
-        validator = Draft202012Validator(schema, registry=_registry_for(registry))
+        schema = registry.load("vc:09-impl-plan")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
 
         with (self.repo_root / "tests" / "fixtures" / "step_09" / "valid_complete.json").open(
             "r", encoding="utf-8"
@@ -421,8 +440,8 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_step_16_plan_requires_explicit_status(self):
         registry = SchemaRegistry(str(self.repo_root))
-        schema = registry.load("https://specdev.local/schema/16_impl_context.schema.json")
-        validator = Draft202012Validator(schema, registry=_registry_for(registry))
+        schema = registry.load("vc:16-impl-context")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
         payload = {
             "id": "step-api-core",
             "owner": "api",
@@ -449,10 +468,10 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "canon").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/03_glossary.schema.json": "schema/03_glossary.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
-                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
+                "vc:03-glossary": "schema/03_glossary.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -481,7 +500,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+                        "$schema": "vc:03-glossary",
                         "id": "glossary-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -532,10 +551,10 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "canon").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/07_nfrs.schema.json": "schema/07_nfrs.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
-                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
+                "vc:07-nfrs": "schema/07_nfrs.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -564,7 +583,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/07_nfrs.schema.json",
+                        "$schema": "vc:07-nfrs",
                         "id": "nfr-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -622,10 +641,10 @@ class SchemaContractsTests(unittest.TestCase):
             (root / "canon").mkdir()
 
             registry_map = {
-                "https://specdev.local/schema/11_redteam.schema.json": "schema/11_redteam.schema.json",
-                "https://specdev.local/schema/core/atoms/1": "schema/atoms.schema.json",
-                "https://specdev.local/schema/core/collections/1": "schema/collections.schema.json",
-                "https://specdev.local/schema/core/canon/1": "schema/canon.schema.json",
+                "vc:11-redteam": "schema/11_redteam.schema.json",
+                "vc:core:atoms": "schema/atoms.schema.json",
+                "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:canon": "schema/canon.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -654,7 +673,7 @@ class SchemaContractsTests(unittest.TestCase):
             sample.write_text(
                 json.dumps(
                     {
-                        "$schema": "https://specdev.local/schema/11_redteam.schema.json",
+                        "$schema": "vc:11-redteam",
                         "id": "redteam-auth",
                         "owner": "api",
                         "created_at": "2026-01-01T00:00:00Z",
@@ -712,7 +731,7 @@ class SchemaContractsTests(unittest.TestCase):
 
             sample = root / "spec" / "artifact.json"
             initial_payload = {
-                "$schema": "https://specdev.local/schema/unknown.schema.json",
+                "$schema": "vc:unknown",
                 "stage": "prod",
                 "canonical_refs_used": [],
             }
@@ -720,7 +739,7 @@ class SchemaContractsTests(unittest.TestCase):
 
             changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
-            rendered = [e.render() if hasattr(e, "render") else str(e) for e in changes[str(sample)]]
+            rendered = [e.render() if isinstance(e, SpecError) else str(e) for e in changes[str(sample)]]
             self.assertTrue(any("E520 UNRESOLVED_INPUT" in entry for entry in rendered))
             self.assertTrue(any("schema_not_found" in entry for entry in rendered))
 
@@ -748,7 +767,7 @@ class SchemaContractsTests(unittest.TestCase):
 
             changes = canonical_autofix(str(root), str(root / "spec"), write=True, require_manifest_schema_registration=False)
             self.assertIn(str(sample), changes)
-            rendered = [e.render() if hasattr(e, "render") else str(e) for e in changes[str(sample)]]
+            rendered = [e.render() if isinstance(e, SpecError) else str(e) for e in changes[str(sample)]]
             self.assertTrue(any("E520 UNRESOLVED_INPUT" in entry for entry in rendered))
             self.assertTrue(any("missing_schema_uri" in entry for entry in rendered))
 
@@ -830,13 +849,12 @@ class SchemaContractsTests(unittest.TestCase):
         )
 
         # A WARN message must have been appended (now SpecError with W570 code).
-        from specdev_tools.core.errors import SpecError
         warn_messages = [m for m in file_changes if (isinstance(m, SpecError) and m.code.startswith("W")) or (isinstance(m, str) and m.startswith("WARN"))]
         self.assertTrue(
             warn_messages,
             f"Expected at least one WARN message, got file_changes={file_changes}",
         )
-        rendered_warns = [m.render() if hasattr(m, "render") else m for m in warn_messages]
+        rendered_warns = [m.render() if isinstance(m, SpecError) else m for m in warn_messages]
         self.assertTrue(
             any("deprecated" in m for m in rendered_warns),
             f"Expected 'deprecated' in WARN message, got: {rendered_warns}",

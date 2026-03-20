@@ -144,7 +144,7 @@ Before emitting, verify:
 - What is the versioning strategy and deprecation policy? Any breaking changes planned soon?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/05_interface_contracts.schema.json
+- Schema URI: vc:05-interface-contracts
 - Schema File: schema/05_interface_contracts.schema.json
 - Schema Registry: tools/schema_registry.json
 

@@ -171,7 +171,7 @@ Before emitting, verify:
 - What is the expected throughput (NFRs) to define "Resource Exhaustion" thresholds?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/11_redteam.schema.json
+- Schema URI: vc:11-redteam
 - Schema File: schema/11_redteam.schema.json
 - Schema Registry: tools/schema_registry.json
 

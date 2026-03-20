@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`https://specdev.local/schema/11_redteam.schema.json`
+`vc:11-redteam`
 
 ## Required Changes
 

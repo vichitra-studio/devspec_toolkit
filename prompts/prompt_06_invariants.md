@@ -139,7 +139,7 @@ Before emitting, verify:
 - Which FRs, NFRs, or governance policies motivate each invariant?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/06_invariants.schema.json
+- Schema URI: vc:06-invariants
 - Schema File: schema/06_invariants.schema.json
 - Schema Registry: tools/schema_registry.json
 

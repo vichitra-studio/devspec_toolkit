@@ -30,7 +30,7 @@ from specdev_tools.validation.spec_quality_lint import (
 def _make_step_artifact(**extra) -> dict:
     """Return a minimal valid step artifact with required top-level fields."""
     base = {
-        "$schema": "https://specdev.local/schema/04_functional_requirements.schema.json",
+        "$schema": "vc:04-fr-list",
         "id": "fr-test",
         "owner": "system",
         "created_at": "2026-01-01T00:00:00Z",

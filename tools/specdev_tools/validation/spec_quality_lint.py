@@ -27,7 +27,7 @@ _VAGUE_SCAN_FIELDS = {
 }
 # Metadata fields that should NOT be scanned
 _METADATA_FIELDS = {"$schema", "id", "owner", "created_at", "specdev_version"}
-STEP_SCHEMA_URI_RE = re.compile(r"^https://specdev\.local/schema/\d{2}[a-z]?_[a-z0-9_]+\.schema\.json$")
+STEP_SCHEMA_URI_RE = re.compile(r"^vc:\d{2}[a-z]?-[a-z0-9-]+$")
 CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfrs", "fixtures", "milestones", "jobs", "threats"}
 
 # Maximum number of assumptions before W572 fires.  Chosen empirically:

@@ -42,7 +42,7 @@ class SeedPathValidationTests(unittest.TestCase):
     def test_valid_seed_path_passes(self):
         """Seed with valid, existing path passes lint."""
         manifest = {
-            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "$schema": "vc:seed-manifest",
             "seeds": [
                 {"seed_id": "seed-overview", "path": "docs/seed/overview.md"}
             ],
@@ -58,7 +58,7 @@ class SeedPathValidationTests(unittest.TestCase):
     def test_missing_seed_path_fails(self):
         """Seed path that doesn't exist on disk produces an error."""
         manifest = {
-            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "$schema": "vc:seed-manifest",
             "seeds": [
                 {"seed_id": "seed-missing", "path": "docs/seed/nonexistent.md"}
             ],
@@ -74,7 +74,7 @@ class SeedPathValidationTests(unittest.TestCase):
     def test_missing_path_field_fails(self):
         """Seed entry without a 'path' field produces an error."""
         manifest = {
-            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "$schema": "vc:seed-manifest",
             "seeds": [
                 {"seed_id": "seed-no-path"}
             ],
@@ -90,7 +90,7 @@ class SeedPathValidationTests(unittest.TestCase):
     def test_undeclared_seed_on_disk_emits_warning(self):
         """On-disk .md file not declared in manifest triggers W551 UNDECLARED_SEED."""
         manifest = {
-            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "$schema": "vc:seed-manifest",
             "seeds": [
                 {"seed_id": "seed-overview", "path": "docs/seed/overview.md"}
             ],
@@ -114,7 +114,7 @@ class SeedPathValidationTests(unittest.TestCase):
     def test_path_escape_fails(self):
         """Seed path that escapes project root produces an error."""
         manifest = {
-            "$schema": "https://specdev.local/schema/seed_manifest/1",
+            "$schema": "vc:seed-manifest",
             "seeds": [
                 {"seed_id": "seed-escape", "path": "../../etc/passwd"}
             ],

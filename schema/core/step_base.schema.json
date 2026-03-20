@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/core/step_base/1",
+  "$id": "vc:core:step-base",
   "$anchor": "stepBase",
   "title": "Step Base",
-  "description": "Shared base properties for all pipeline step schemas. Does not set additionalProperties \u2014 intended as a composable fragment.",
+  "description": "Shared base properties for all pipeline step schemas. Does not set additionalProperties — intended as a composable fragment.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -12,27 +12,27 @@
       "description": "JSON Schema URI identifying the schema this artifact conforms to. Must match the schema registered for this pipeline step in schema_registry.json."
     },
     "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
+      "$ref": "vc:core:atoms#kebabId",
       "description": "Unique kebab-case identifier for this artifact instance (e.g., 'charter-v1', 'fr-list-v1')."
     },
     "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner",
+      "$ref": "vc:core:atoms#owner",
       "description": "Owner of this spec artifact. Must be a valid owner from the canonical registry (canon/kinds/owner.json)."
     },
     "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp",
+      "$ref": "vc:core:atoms#timestamp",
       "description": "ISO 8601 timestamp of when this artifact was generated or last regenerated."
     },
     "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalRefArray",
+      "$ref": "vc:core:collections#canonicalRefArray",
       "description": "Array of canonical registry references used in this artifact. Validated by canonical-integrity checks."
     },
     "canonical_proposals": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalProposalArray",
+      "$ref": "vc:core:collections#canonicalProposalArray",
       "description": "Array of proposed new canonical terms discovered during generation. Empty array if none proposed."
     },
     "canonical_conflicts": {
-      "$ref": "https://specdev.local/schema/core/collections/1#canonicalConflictArray",
+      "$ref": "vc:core:collections#canonicalConflictArray",
       "description": "Array of canonical resolution conflicts encountered during generation. Empty array if none."
     },
     "_migration_notes": {

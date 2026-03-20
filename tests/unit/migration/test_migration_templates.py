@@ -77,13 +77,14 @@ class TestTemplateContentValidation:
 
     @pytest.mark.parametrize("template_name", EXPECTED_TEMPLATES)
     def test_templates_reference_canonical_schema_uri(self, templates_dir, template_name):
-        """Each template mentions specdev.local/schema."""
+        """Each template mentions a canonical schema URI (vc: format)."""
         path = templates_dir / template_name
         if not path.exists():
             pytest.skip(f"{template_name} does not exist")
         content = path.read_text(encoding="utf-8")
-        assert "specdev.local/schema" in content, (
-            f"{template_name} does not reference canonical schema URI (specdev.local/schema)"
+        has_uri = "vc:" in content
+        assert has_uri, (
+            f"{template_name} does not reference canonical schema URI"
         )
 
     @pytest.mark.parametrize("template_name", EXPECTED_TEMPLATES)
