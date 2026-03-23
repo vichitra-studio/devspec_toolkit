@@ -24,14 +24,21 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
 
     # Verdict must be a valid enum
     verdict = review.get("verdict")
-    if verdict and verdict not in VALID_VERDICTS:
+    semantic_review = review.get("semantic_review")
+    if verdict is not None and verdict not in VALID_VERDICTS:
         errors.append(
             make_error("E520", f"Step 16c: invalid verdict '{verdict}'. "
             f"Must be one of: {', '.join(sorted(VALID_VERDICTS))}")
         )
 
+    # When verdict is "verified", semantic_review with fr_coverage is REQUIRED
+    if verdict == "verified":
+        if not isinstance(semantic_review, dict):
+            errors.append(make_error("E520", "Step 16c: verdict is 'verified' but 'review.semantic_review' is missing"))
+        elif not semantic_review.get("fr_coverage"):
+            errors.append(make_error("E520", "Step 16c: verdict is 'verified' but 'review.semantic_review.fr_coverage' is empty"))
+
     # Semantic review coverage check
-    semantic_review = review.get("semantic_review")
     if isinstance(semantic_review, dict):
         fr_coverage = semantic_review.get("fr_coverage", [])
         if isinstance(fr_coverage, list):

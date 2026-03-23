@@ -181,6 +181,10 @@
       },
       "required": [
         "problem_statement",
+        "in_scope",
+        "out_of_scope",
+        "assumptions",
+        "risks",
         "success_metrics",
         "stakeholders",
         "user_segments"

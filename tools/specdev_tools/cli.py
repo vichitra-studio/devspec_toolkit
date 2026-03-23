@@ -1036,7 +1036,7 @@ def main():
 
         normalized_step = args.step.zfill(2) if args.step.isdigit() else args.step
 
-        if normalized_step not in step_order.get("allowed_upstream_dependencies", {}):
+        if normalized_step not in step_order.get("steps", []):
             err_msg = f"E520 UNRESOLVED_INPUT unknown_step {args.step}"
             if getattr(args, "json_output", False):
                 _json_exit([err_msg], "prompt-context")

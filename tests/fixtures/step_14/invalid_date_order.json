@@ -64,6 +64,8 @@
           "id": "auth-endpoints"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [
         "Security vulnerabilities in token implementation"
       ],
@@ -99,6 +101,8 @@
           "id": "health-endpoint"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     }

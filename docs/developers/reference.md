@@ -127,15 +127,15 @@ Validates the completeness and consistency of the dependency DAG defined in `too
 
 **What it checks:**
 - Every non-terminal step has at least one `downstream_consumers` entry (E596 DAG_DEAD_END_PRODUCER). Step 16c is exempt as the terminal step.
-- Every `downstream_consumers` entry is consistent with `allowed_upstream_dependencies` (E599 DAG_CONSUMER_INCONSISTENCY). If step X lists Y as a consumer, Y must list X as an allowed upstream.
-- No circular dependencies in `allowed_upstream_dependencies` (E585 DAG_CIRCULAR_DEPENDENCY).
-- Prompt extraction intent entries reference only declared upstream dependencies (W596 UNDECLARED_UPSTREAM_REF).
+- Every `downstream_consumers` entry is consistent with the computed step ordering (E599 DAG_CONSUMER_INCONSISTENCY). If step X lists Y as a consumer, Y must appear after X in the `steps` list.
+- No circular dependencies in the computed upstream graph (E585 DAG_CIRCULAR_DEPENDENCY).
+- Prompt extraction intent entries reference only computed upstream steps (W596 UNDECLARED_UPSTREAM_REF).
 
 **When to run:** After modifying `tools/step_order.json` or any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
 
 #### `extraction-intent-check`
 
-Validates that each prompt's `### Extraction Intent` section is consistent with `allowed_upstream_dependencies` declared in `tools/step_order.json`.
+Validates that each prompt's `### Extraction Intent` section is consistent with the allowed upstream steps computed at runtime from `tools/step_order.json` (all steps preceding the current step in the `steps` list).
 
 **What it checks:**
 - Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).

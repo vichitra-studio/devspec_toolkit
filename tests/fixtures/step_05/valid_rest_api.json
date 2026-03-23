@@ -41,6 +41,16 @@
       ],
       "security": "none",
       "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
       "trace": [
         {
           "type": "fr",
@@ -55,7 +65,7 @@
       "protocol": "http",
       "path": "/users/{id}",
       "method": "GET",
-      "input_schema_ref": "-tbd",
+      "input_schema_ref": "schemas/payloads/user-profile-request.json",
       "output_schema_ref": "schemas/payloads/user-profile.json",
       "errors": [
         {
@@ -74,6 +84,16 @@
       ],
       "security": "jwt",
       "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
       "trace": [
         {
           "type": "fr",
@@ -82,5 +102,11 @@
       ]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:interface:http-json",
+      "kind": "interface",
+      "version": "1.0.0"
+    }
+  ]
 }

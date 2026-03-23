@@ -182,15 +182,15 @@
 
 ### W596 UNDECLARED_UPSTREAM_REF
 
-**Trigger**: A prompt's extraction intent references an artifact from a step that is not in the step's `allowed_upstream_dependencies`.
+**Trigger**: A prompt's extraction intent references an artifact from a step that is not in the computed allowed upstream steps (all steps preceding the current step in `tools/step_order.json`).
 
-**Resolution**: Either add the step to `allowed_upstream_dependencies` in step_order.json, or remove the reference from the prompt's extraction intent.
+**Resolution**: Either adjust the step ordering in `steps` so the referenced step precedes the current step, or remove the reference from the prompt's extraction intent.
 
 **Promotable**: No. W596 has different semantics from E596 (undeclared ref vs dead-end producer).
 
 ### E597 / W597 EXTRACTION_INTENT_UPSTREAM_GAP / EXTRACTION_INTENT_VAGUE
 
-**Trigger (E597)**: A step's `allowed_upstream_dependencies` lists an upstream step, but the prompt's extraction intent has no entry for that upstream artifact.
+**Trigger (E597)**: A step has an allowed upstream step (computed at runtime from the `steps` order in step_order.json), but the prompt's extraction intent has no entry for that upstream artifact.
 
 **Trigger (W597)**: An extraction intent entry has vague text (fewer than 10 words or contains "relevant", "as needed", "as appropriate", "various", "TBD", "TODO").
 
@@ -210,17 +210,17 @@
 
 ### E599 DAG_CONSUMER_INCONSISTENCY
 
-**Trigger**: A step is listed in another step's `downstream_consumers`, but its own `allowed_upstream_dependencies` does not include the producer step.
+**Trigger**: A step is listed in another step's `downstream_consumers`, but the consumer step does not appear after the producer in the `steps` ordering (i.e., the consumer precedes or equals the producer in the `steps` list).
 
-**Resolution**: Ensure bidirectional consistency between `downstream_consumers` and `allowed_upstream_dependencies` in step_order.json.
+**Resolution**: Ensure `downstream_consumers` entries are consistent with the positional ordering of steps in `tools/step_order.json`. Every declared consumer must appear after its producer in the `steps` list.
 
 **Promotable**: No (error only).
 
 ### E585 DAG_CIRCULAR_DEPENDENCY
 
-**Trigger**: The `allowed_upstream_dependencies` graph contains a cycle.
+**Trigger**: The computed upstream dependency graph (derived from `steps` positional order) contains a cycle.
 
-**Resolution**: Remove the circular dependency from `allowed_upstream_dependencies` in step_order.json.
+**Resolution**: Remove the circular dependency from the `steps` ordering in `tools/step_order.json`.
 
 **Promotable**: No (error only).
 

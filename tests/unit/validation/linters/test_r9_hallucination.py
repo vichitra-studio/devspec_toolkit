@@ -17,16 +17,15 @@ from specdev_tools.validation.hallucination_lint import (
 from specdev_tools.validation.linter_utils import tokenize_free_text
 
 
-def _write_step_order(root: Path, deps: dict[str, list[str]]) -> None:
-    """Write a minimal step_order.json with given allowed_upstream_dependencies."""
+def _write_step_order(root: Path, steps: list[str]) -> None:
+    """Write a minimal step_order.json for the given steps list."""
     tools = root / "tools"
     tools.mkdir(exist_ok=True)
     (tools / "step_order.json").write_text(
         json.dumps({
             "version": "1.0.0",
             "policy": {"mode": "strict_waterfall"},
-            "steps": sorted(deps.keys()),
-            "allowed_upstream_dependencies": deps,
+            "steps": steps,
         }),
         encoding="utf-8",
     )
@@ -164,10 +163,7 @@ class TestCheckContentDerivation(unittest.TestCase):
                 "description": shared_text + " plus extra capability details",
             })
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",
@@ -196,10 +192,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",
@@ -226,10 +219,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",
@@ -266,11 +256,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "02_sketch.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-                "02": ["00", "01"],
-            })
+            _write_step_order(root, ["00", "01", "02"])
 
             errs = _check_content_derivation(
                 "02_sketch.json",
@@ -304,10 +290,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             # threshold=3 -> exactly meets threshold -> no W594
             errs_pass = _check_content_derivation(
@@ -345,10 +328,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "00_charter.json", charter_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "00_charter.json",
@@ -386,7 +366,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             spec_dir = root / "spec"
             spec_dir.mkdir()
 
-            _write_step_order(root, {"00": [], "01": ["00"]})
+            _write_step_order(root, ["00", "01"])
             data = {"description": "random content without upstream derivation"}
 
             errs = _check_content_derivation(
@@ -412,10 +392,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             downstream_data = {"id": "cap-1", "version": "1.0.0"}
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",
@@ -438,11 +415,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "02_sketch.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-                "02": ["00", "01"],
-            })
+            _write_step_order(root, ["00", "01", "02"])
 
             errs = _check_content_derivation(
                 "02_sketch.json",
@@ -495,10 +468,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "02a_glossary.json", downstream_data)
 
-            _write_step_order(root, {
-                "02": [],
-                "02a": ["02"],
-            })
+            _write_step_order(root, ["02", "02a"])
 
             errs = _check_content_derivation(
                 "02a_glossary.json",
@@ -526,10 +496,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",
@@ -562,10 +529,7 @@ class TestCheckContentDerivation(unittest.TestCase):
             }
             _write_spec(spec_dir, "01_capabilities.json", downstream_data)
 
-            _write_step_order(root, {
-                "00": [],
-                "01": ["00"],
-            })
+            _write_step_order(root, ["00", "01"])
 
             errs = _check_content_derivation(
                 "01_capabilities.json",

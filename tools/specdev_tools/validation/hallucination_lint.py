@@ -8,6 +8,7 @@ from typing import Any
 from ..canonical.lint import lint_canon_dir
 from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
+from ..core.registry import derive_allowed_upstream
 from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
     collect_ids_and_refs,
@@ -321,7 +322,7 @@ def _check_content_derivation(
     except (OSError, json.JSONDecodeError):
         return errs
 
-    upstream_deps = order_data.get("allowed_upstream_dependencies", {}).get(step_id, [])
+    upstream_deps = derive_allowed_upstream(step_id, order_data.get("steps", []))
     if not upstream_deps:
         return errs
 

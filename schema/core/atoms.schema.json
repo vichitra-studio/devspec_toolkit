@@ -38,8 +38,8 @@
     "owner": {
       "$anchor": "owner",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_-]*$",
-      "description": "Artifact owner — validated against canon/kinds/owner.json entries."
+      "description": "Team or role responsible for this artifact. Must be one of the 8 canonical owner values.",
+      "enum": ["api", "ui", "system", "ops", "data", "product", "business", "engineering"]
     },
     "tag": {
       "$anchor": "tag",

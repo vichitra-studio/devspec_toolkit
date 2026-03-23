@@ -23,17 +23,12 @@ class TestDagLint(unittest.TestCase):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _make_repo(self, tmp, steps=None, deps=None, consumers=None):
+    def _make_repo(self, tmp, steps=None, consumers=None):
         """Build a minimal repo layout with tools/step_order.json."""
         tools_dir = os.path.join(tmp, "tools")
         os.makedirs(tools_dir, exist_ok=True)
         data = {
             "steps": steps or ["00", "01", "02"],
-            "allowed_upstream_dependencies": deps or {
-                "00": [],
-                "01": ["00"],
-                "02": ["00", "01"],
-            },
             "downstream_consumers": consumers or {
                 "00": ["01", "02"],
                 "01": ["02"],
@@ -77,7 +72,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "16c"],
-                deps={"00": [], "01": ["00"], "16c": ["00", "01"]},
                 consumers={"00": ["01", "16c"], "01": ["16c"], "16c": []},
             )
             errors = lint_dag(tmp)
@@ -89,7 +83,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": ["00", "01"]},
                 consumers={"00": ["01", "02"], "01": ["02"], "02": ["01"]},
             )
             errors = lint_dag(tmp)
@@ -106,7 +99,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": ["01"]},
                 consumers={"00": ["01"], "01": [], "02": []},
             )
             errors = lint_dag(tmp)
@@ -128,7 +120,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": ["01"]},
                 consumers={"00": ["01"], "01": ["02"], "02": []},
             )
             errors = lint_dag(tmp)
@@ -150,7 +141,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "16c"],
-                deps={"00": [], "01": ["00"], "16c": ["00", "01"]},
                 consumers={"00": ["01", "16c"], "01": ["16c"], "16c": []},
             )
             errors = lint_dag(tmp)
@@ -166,7 +156,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02", "16c"],
-                deps={"00": [], "01": ["00"], "02": ["00"], "16c": ["01"]},
                 consumers={"00": ["01", "02"], "01": ["16c"], "02": [], "16c": []},
             )
             errors = lint_dag(tmp)
@@ -183,21 +172,25 @@ class TestDagLint(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_consumer_inconsistency_emits_e599(self):
-        """Step X lists Y as consumer but Y does not list X as upstream dep -> E599."""
+        """Step X lists Y as consumer but Y appears BEFORE X in steps ordering -> E599.
+
+        Under derive_allowed_upstream (strict_waterfall), allowed upstreams are
+        derived from positional order. E599 fires when a declared consumer does
+        not come after its producer in the steps list.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": ["01"]},
-                # 00 claims 02 is a consumer, but 02's deps only include 01
-                consumers={"00": ["01", "02"], "01": ["02"], "02": []},
+                # 02 claims 01 is its consumer, but 01 appears BEFORE 02 -> E599
+                consumers={"00": ["01", "02"], "01": ["02"], "02": ["01"]},
             )
             errors = lint_dag(tmp)
             e599_errors = [e for e in render_errors(errors) if "E599" in e]
             self.assertTrue(len(e599_errors) >= 1)
-            # The error should mention step '00' listing '02' as consumer
+            # The error should mention step '02' listing '01' as consumer
             self.assertTrue(
-                any("'00'" in e and "'02'" in e for e in e599_errors)
+                any("'02'" in e and "'01'" in e for e in e599_errors)
             )
 
     def test_consumer_references_nonexistent_step_emits_e599(self):
@@ -206,7 +199,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"00": [], "01": ["00"]},
                 consumers={"00": ["01", "99"], "01": []},
             )
             errors = lint_dag(tmp)
@@ -220,7 +212,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "16c"],
-                deps={"00": [], "01": ["00"], "16c": ["00", "01"]},
                 consumers={"00": ["01", "16c"], "01": ["16c"], "16c": []},
             )
             errors = lint_dag(tmp)
@@ -232,18 +223,24 @@ class TestDagLint(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_circular_dependency_detected(self):
-        """A cycle in allowed_upstream_dependencies triggers E585 DAG_CIRCULAR_DEPENDENCY."""
+        """A consumer ordering violation (consumer before producer) triggers E599.
+
+        Under derive_allowed_upstream, allowed upstreams are strictly positional,
+        making true DAG cycles impossible. Consumer ordering violations — where a
+        declared consumer appears before its producer in the steps list — are
+        detected via E599 instead.
+        """
         with tempfile.TemporaryDirectory() as tmp:
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": ["02"], "01": ["00"], "02": ["01"]},
-                # Consumers irrelevant here; just make non-empty to avoid E596 dead-end noise
-                consumers={"00": ["01"], "01": ["02"], "02": ["00"]},
+                # 02 lists 00 as consumer, but 00 appears before 02 -> E599
+                consumers={"00": ["01", "02"], "01": ["02"], "02": ["00"]},
             )
             errors = lint_dag(tmp)
-            circular_errors = [e for e in render_errors(errors) if "DAG_CIRCULAR_DEPENDENCY" in e]
-            self.assertTrue(len(circular_errors) >= 1)
+            # Should detect the ordering violation as E599
+            ordering_errors = [e for e in render_errors(errors) if "E599" in e]
+            self.assertTrue(len(ordering_errors) >= 1)
 
     def test_no_circular_dependency_in_linear_chain(self):
         """A simple linear chain (00->01->02) has no cycles."""
@@ -251,7 +248,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "16c"],
-                deps={"00": [], "01": ["00"], "16c": ["01"]},
                 consumers={"00": ["01"], "01": ["16c"], "16c": []},
             )
             errors = lint_dag(tmp)
@@ -259,29 +255,33 @@ class TestDagLint(unittest.TestCase):
             self.assertEqual(circular_errors, [])
 
     # ------------------------------------------------------------------
-    # 6. W596: Prompt references artifact not in allowed_upstream_dependencies
+    # 6. W596: Prompt references artifact not in computed allowed upstream steps
     # ------------------------------------------------------------------
 
     def test_undeclared_upstream_ref_emits_w596(self):
-        """Extraction intent references a valid step that is NOT in the step's upstream deps -> W596."""
+        """Extraction intent references a FUTURE step (after current) -> W596.
+
+        Under derive_allowed_upstream, any prior step is a valid upstream.
+        W596 fires when a prompt references a step that comes AFTER the current
+        step in the pipeline (a forward reference, which is not a valid upstream).
+        """
         with tempfile.TemporaryDirectory() as tmp:
-            # Step 02 only depends on 01, but its prompt also references 00
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": ["01"]},
                 consumers={"00": ["01"], "01": ["02"], "02": []},
             )
-            self._make_prompt(tmp, "02", "system_sketch", (
-                "# Prompt for Step 02\n\n"
+            # Prompt for step 01 references step 02, which comes AFTER 01
+            self._make_prompt(tmp, "01", "capabilities", (
+                "# Prompt for Step 01\n\n"
                 "### Extraction Intent\n\n"
-                "- **00_charter.json**: Extract the project scope boundaries and constraints to inform architecture decisions\n"
-                "- **01_capabilities.json**: Extract all capability identifiers and their descriptions for cross-referencing\n"
+                "- **00_charter.json**: Extract the project scope and constraints to scope capability discovery\n"
+                "- **02_system_sketch.json**: Extract system architecture details to inform capability definitions\n"
             ))
             errors = lint_dag(tmp)
             w596_errors = [e for e in render_errors(errors) if "W596" in e]
             self.assertTrue(len(w596_errors) >= 1)
-            self.assertTrue(any("'00'" in e for e in w596_errors))
+            self.assertTrue(any("'02'" in e for e in w596_errors))
 
 
     # ------------------------------------------------------------------
@@ -318,7 +318,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "16c"],
-                deps={"00": [], "01": ["00"], "16c": ["00", "01"]},
                 consumers={"00": ["01", "16c"], "01": ["16c"], "16c": []},
             )
             # Explicitly ensure no prompts dir
@@ -341,15 +340,14 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"00": [], "01": ["00"], "02": []},
-                # 00 claims 02 is consumer (but 02 has no upstream deps) -> E599
+                # 02 claims 01 is consumer (but 01 appears before 02) -> E599
                 # 01 has no consumers -> E596
-                # 02 has no consumers -> E596
-                consumers={"00": ["01", "02"], "01": [], "02": []},
+                # 02 has no consumers -> E596 (but 02 lists 01 as consumer, which is invalid)
+                consumers={"00": ["01", "02"], "01": [], "02": ["01"]},
             )
             errors = lint_dag(tmp)
             codes = set(self._error_codes(errors))
-            # Should have dead-end (E596) and consumer inconsistency (E599)
+            # Should have dead-end (E596) and consumer ordering inconsistency (E599)
             self.assertIn("E596", codes)
             self.assertIn("E599", codes)
 
@@ -358,7 +356,7 @@ class TestDagLint(unittest.TestCase):
         """Allowed upstream deps NOT in provider's downstream_consumers should NOT emit E599.
 
         downstream_consumers is a curated provider-side subset — the inverse
-        of allowed_upstream_dependencies is intentionally NOT enforced.
+        the inverse of computed upstream deps is intentionally NOT enforced.
         """
         with tempfile.TemporaryDirectory() as tmp:
             # Step 02 lists both 00 and 01 as upstream deps, but 00 only
@@ -367,7 +365,6 @@ class TestDagLint(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02", "16c"],
-                deps={"00": [], "01": ["00"], "02": ["00", "01"], "16c": ["02"]},
                 consumers={
                     "00": ["01"],     # Intentionally omits "02"
                     "01": ["02"],

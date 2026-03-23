@@ -22,7 +22,7 @@ EXAMPLE_SPEC_RE = re.compile(
 def lint_dependency_order(repo_root: str) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     try:
-        order, allowed, policy = _load_order(root / "tools" / "step_order.json")
+        order, policy = _load_order(root / "tools" / "step_order.json")
     except (OSError, json.JSONDecodeError, ValueError, TypeError, KeyError) as exc:
         return [make_error("E520", f"UNRESOLVED_INPUT invalid_step_order {root / 'tools' / 'step_order.json'} {exc}")]
     index = {step: i for i, step in enumerate(order)}
@@ -49,15 +49,14 @@ def lint_dependency_order(repo_root: str) -> list[SpecError]:
                         _add_error(errors, seen_errors, str(prompt_path), line_no, step, ref, "self-edge")
                     elif target > current and not allow_forward:
                         _add_error(errors, seen_errors, str(prompt_path), line_no, step, ref, "forward-edge")
-                    elif target < current and ref not in allowed.get(step, []):
-                        _add_error(errors, seen_errors, str(prompt_path), line_no, step, ref, "disallowed-upstream")
     return errors
 
 
-def _load_order(path: Path) -> tuple[list[str], dict[str, list[str]], dict[str, object]]:
+def _load_order(path: Path) -> tuple[list[str], dict[str, object]]:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
-    return data["steps"], data.get("allowed_upstream_dependencies", {}), data.get("policy", {})
+    steps = data["steps"]
+    return steps, data.get("policy", {})
 
 
 def _extract_step_refs(line: str) -> list[str]:

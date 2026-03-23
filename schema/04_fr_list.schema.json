@@ -24,7 +24,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "statement": {
-                "description": "Clear statement of the functional requirement, minimum 20 characters.",
+                "description": "Clear, falsifiable statement of a single system behavior. Describe WHAT the system does, not HOW. Structure as subject + verb + object + measurable condition (e.g., 'The system shall return a 401 response within 200ms when an expired token is presented'). Minimum 20 characters.",
                 "type": "string",
                 "minLength": 20
               },
@@ -54,7 +54,7 @@
                       "$ref": "vc:core:atoms#kebabId"
                     },
                     "text": {
-                      "description": "Descriptive text of the acceptance criterion, minimum 15 characters.",
+                      "description": "Testable criterion text that can be objectively verified. Must be specific enough to write an automated test. Avoid subjective terms like 'fast', 'good', 'user-friendly'. Include concrete thresholds, expected behaviors, and boundary conditions. Minimum 15 characters.",
                       "type": "string",
                       "minLength": 15
                     },

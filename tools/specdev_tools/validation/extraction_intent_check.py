@@ -4,9 +4,9 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..core.registry import derive_allowed_upstream
 from ._extraction_intent_parser import parse_extraction_intent
 
 
@@ -28,7 +28,7 @@ def check_extraction_intent(
 
     For each prompt file that contains a ``### Extraction Intent`` section:
     1. Parse declared upstream artifact references from the section.
-    2. Cross-reference against ``allowed_upstream_dependencies`` from step_order.json.
+    2. Cross-reference against the derived allowed upstream steps (computed at runtime via derive_allowed_upstream).
     3. Report missing intent entries, invalid references, and vague descriptions.
 
     Error codes:
@@ -53,10 +53,11 @@ def check_extraction_intent(
     except (OSError, json.JSONDecodeError):
         return errors
 
-    allowed_deps: dict[str, list[str]] = step_order.get(
-        "allowed_upstream_dependencies", {}
-    )
-    valid_steps: set[str] = set(step_order.get("steps", []))
+    steps_list: list[str] = step_order.get("steps", [])
+    valid_steps: set[str] = set(steps_list)
+    allowed_deps: dict[str, list[str]] = {
+        s: derive_allowed_upstream(s, steps_list) for s in steps_list
+    }
 
     # Scan prompt files
     if not os.path.isdir(prompts_path):

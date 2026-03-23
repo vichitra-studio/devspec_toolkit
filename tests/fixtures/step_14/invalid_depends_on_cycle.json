@@ -54,7 +54,9 @@
           "type": "api",
           "id": "base-api"
         }
-      ]
+      ],
+      "fr_refs": [],
+      "capability_refs": []
     }
   ],
   "dependencies": [],

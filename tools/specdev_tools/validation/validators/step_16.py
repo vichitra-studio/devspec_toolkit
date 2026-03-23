@@ -177,10 +177,10 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-            doc_patterns = manifest.get("docs_policy", {}).get("doc_paths", []) or []
+            doc_patterns = manifest.get("doc_paths", []) or []
             doc_patterns_valid = isinstance(doc_patterns, list) and len(doc_patterns) > 0
             if not doc_patterns_valid:
-                errors.append(make_error("W570", "seed_manifest.json missing docs_policy.doc_paths; cannot validate docs_impact doc paths."))
+                errors.append(make_error("W570", "seed_manifest.json missing doc_paths; cannot validate docs_impact doc paths."))
         except Exception:
             errors.append(make_error("W570", "Failed to read seed_manifest.json; cannot validate docs_impact doc paths."))
     else:
@@ -310,12 +310,33 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         else:
             try:
                 roadmap_data = json.loads(roadmap_path.read_text())
-                roadmap_task_ids = {
-                    task["task_id"]
-                    for milestone in roadmap_data.get("milestones", [])
-                    for task in milestone.get("tasks", [])
-                    if isinstance(task, dict) and "task_id" in task
-                }
+                # Get milestone_ref from the artifact
+                milestone_ref = data.get("milestone_ref", "")
+                roadmap_task_ids = set()
+                milestone_found = False
+                for milestone in roadmap_data.get("milestones", []):
+                    mid = milestone.get("milestone_id", "")
+                    mstatus = milestone.get("status", "")
+                    if milestone_ref:
+                        # If milestone_ref is set, only include tasks from that milestone
+                        if mid != milestone_ref:
+                            continue
+                        milestone_found = True
+                    else:
+                        # If milestone_ref is absent (first Trinity cycle), include only
+                        # milestones that are not yet done (active/in-progress)
+                        if mstatus in ("done", "completed"):
+                            continue
+                    for task in milestone.get("tasks", []):
+                        tid = task.get("task_id")
+                        if tid:
+                            roadmap_task_ids.add(tid)
+                # E582 -- milestone_ref points to a non-existent roadmap milestone
+                roadmap_milestones = roadmap_data.get("milestones", [])
+                if milestone_ref and not milestone_found and len(roadmap_milestones) > 0:
+                    errors.append(
+                        make_error("E582", f"MILESTONE_REF_MISMATCH: milestone_ref '{milestone_ref}' not found in roadmap milestones")
+                    )
                 checklist_refs = {
                     item["spec_ref"]["id"]
                     for item in checklist

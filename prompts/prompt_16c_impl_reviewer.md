@@ -130,8 +130,9 @@ For each FR ID referenced in the checklist items:
 | Verdict | Condition | Rating |
 |---------|-----------|--------|
 | `verified` | All tests passed, all evidence bound, ci_status == green | 4-5 |
-| `deferred` | Minor issues, clear remediation path | 2-3 |
-| `rejected` | Critical bugs, missing evidence, hallucinated claims | 0-1 |
+| `needs_work` | Minor issues, clear remediation path | 2-3 |
+| `blocked` | External dependency missing, cannot proceed without unblocking action | 0-1 |
+| `deferred` | Intentionally postponed; scope moved out of current cycle | 0-3 |
 
 ### CRITICAL: Verdict Gates
 1. `verdict: verified` is **FORBIDDEN** if `fixture_status.ci_status == red`

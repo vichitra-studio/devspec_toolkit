@@ -20,13 +20,12 @@ from specdev_tools.core.errors import render_errors
 class TestExtractionIntentCheck(unittest.TestCase):
     """Unit tests for check_extraction_intent."""
 
-    def _make_repo(self, tmp, steps, deps, prompts):
+    def _make_repo(self, tmp, steps, prompts):
         """Create a minimal repo structure for testing.
 
         Args:
             tmp: path to the temporary directory root
             steps: list of step IDs (e.g. ["00", "01", "02"])
-            deps: dict mapping step ID -> list of upstream step IDs
             prompts: dict mapping filename -> content string
         Returns:
             tmp path (for use as repo_root)
@@ -34,7 +33,7 @@ class TestExtractionIntentCheck(unittest.TestCase):
         tools_dir = os.path.join(tmp, "tools")
         os.makedirs(tools_dir, exist_ok=True)
         with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
-            json.dump({"steps": steps, "allowed_upstream_dependencies": deps}, f)
+            json.dump({"steps": steps}, f)
 
         prompts_dir = os.path.join(tmp, "prompts")
         os.makedirs(prompts_dir, exist_ok=True)
@@ -53,7 +52,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"02": ["00", "01"]},
                 prompts={
                     "prompt_02_system_sketch.md": (
                         "# Step 02 System Sketch\n\n"
@@ -77,7 +75,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"02": ["00", "01"]},
                 prompts={
                     "prompt_02_system_sketch.md": (
                         "# Step 02 System Sketch\n\n"
@@ -100,7 +97,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02", "03"],
-                deps={"03": ["00", "01", "02"]},
                 prompts={
                     "prompt_03_glossary.md": (
                         "# Step 03 Glossary\n\n"
@@ -124,7 +120,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -144,7 +139,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -164,7 +158,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -187,7 +180,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -213,7 +205,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -233,7 +224,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -253,7 +243,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -274,7 +263,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -296,7 +284,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"00": [], "01": ["00"]},
                 prompts={
                     "prompt_00_charter.md": (
                         "# Step 00 Charter\n\n"
@@ -329,7 +316,7 @@ class TestExtractionIntentCheck(unittest.TestCase):
             tools_dir = os.path.join(tmp, "tools")
             os.makedirs(tools_dir, exist_ok=True)
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
-                json.dump({"steps": ["00"], "allowed_upstream_dependencies": {}}, f)
+                json.dump({"steps": ["00"]}, f)
             errors = check_extraction_intent(tmp)
             self.assertEqual(errors, [])
 
@@ -339,7 +326,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "README.md": "### Extraction Intent\n\nSome text.\n",
                     "notes_01_capabilities.md": "### Extraction Intent\n\nSome text.\n",
@@ -354,7 +340,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02", "02a", "03"],
-                deps={"03": ["00", "01", "02", "02a"]},
                 prompts={
                     "prompt_03_glossary.md": (
                         "# Step 03 Glossary\n\n"
@@ -379,7 +364,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01"],
-                deps={"01": ["00"]},
                 prompts={
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
@@ -409,7 +393,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
                 json.dump(
                     {
                         "steps": ["00", "01"],
-                        "allowed_upstream_dependencies": {"01": ["00"]},
                     },
                     f,
                 )
@@ -435,7 +418,6 @@ class TestExtractionIntentCheck(unittest.TestCase):
             self._make_repo(
                 tmp,
                 steps=["00", "01", "02"],
-                deps={"02": ["00", "01"]},
                 prompts={
                     "prompt_02_system_sketch.md": (
                         "# Step 02 System Sketch\n\n"

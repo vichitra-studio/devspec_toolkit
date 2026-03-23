@@ -27,9 +27,7 @@ def _make_project(tmpdir, spec_data=None, seed_text="", seed_id="seed-overview",
             {"seed_id": seed_id, "path": os.path.relpath(seed_path, tmpdir)}
         ],
         "global_seed_order": [seed_id],
-        "nested_order": [],
         "step_requirements": step_requirements or {},
-        "docs_policy": {"doc_paths": ["README.md"]},
     }
     with open(os.path.join(spec_dir, "common", "seed_manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f)

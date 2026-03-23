@@ -1,15 +1,10 @@
 {
   "$schema": "vc:00-charter",
-  "id": "project-alpha",
-  "title": "Project Alpha Charter",
+  "id": "project-missing-scope",
+  "title": "Project Missing Scope Charter",
   "owner": "product",
   "created_at": "2023-10-27T10:00:00Z",
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
-  "in_scope": [
-    "User Authentication",
-    "Dashboard Reporting",
-    "Data Export API"
-  ],
   "out_of_scope": [
     "Mobile App",
     "Legacy Data Migration",
@@ -73,10 +68,6 @@
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
-      "kind": "unit"
-    },
-    {
-      "id": "cn:core:unit:percent",
       "kind": "unit"
     }
   ]

@@ -103,19 +103,6 @@
         }
       }
     },
-    "allowed_upstream_dependencies": {
-      "type": "object",
-      "description": "Maps each step ID to the list of upstream steps it is allowed to depend on. Used by dag-lint, hallucination-lint, extraction-intent-check, and dependency-order-lint for DAG validation.",
-      "additionalProperties": {
-        "type": "array",
-        "items": {
-          "type": "string",
-          "pattern": "^[0-9]{2}[a-c]?$",
-          "description": "An upstream step ID that this step may depend on."
-        },
-        "description": "Array of upstream step IDs allowed as dependencies for this step."
-      }
-    },
     "downstream_consumers": {
       "type": "object",
       "description": "Maps each step ID to the list of steps that actively consume its output. Used by 'specdev prompt-context' to surface relevant upstream artifacts. NOT used by forward-replay checks.",

@@ -52,7 +52,6 @@ class ForwardReplayCheckIntegrationTests(unittest.TestCase):
             self._init_repo(root)
             step_order = {
                 "steps": ["09", "10"],
-                "allowed_upstream_dependencies": {"09": [], "10": ["09"]},
                 "policy": {
                     "status_write_exemptions": {
                         "09": ["milestones[].status"]
@@ -89,7 +88,7 @@ class ForwardReplayCheckIntegrationTests(unittest.TestCase):
 
     def _write_step_order(self, root: Path, steps: list[str]) -> None:
         (root / "tools" / "step_order.json").write_text(
-            json.dumps({"steps": steps, "allowed_upstream_dependencies": {s: steps[:i] for i, s in enumerate(steps)}}),
+            json.dumps({"steps": steps}),
             encoding="utf-8",
         )
 

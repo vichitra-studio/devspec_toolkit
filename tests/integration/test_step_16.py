@@ -71,7 +71,7 @@ class TestStep16(unittest.TestCase):
         path = os.path.join(self.fixtures_dir, "valid_minimal.json")
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid minimal fixture with new fields should pass. Errors: {errors}")
-    
+
     def test_valid_full_with_new_fields(self):
         # Test that valid_full fixture with new fields passes validation
         path = os.path.join(self.fixtures_dir, "valid_full.json")
@@ -159,7 +159,7 @@ class TestStep16(unittest.TestCase):
             common_dir = tmp_dir / "common"
             common_dir.mkdir()
             (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
                 encoding="utf-8"
             )
 
@@ -191,7 +191,7 @@ class TestStep16(unittest.TestCase):
             common_dir = tmp_dir / "common"
             common_dir.mkdir()
             (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
                 encoding="utf-8"
             )
 
@@ -217,11 +217,11 @@ class TestStep16(unittest.TestCase):
             common_dir = tmp_dir / "common"
             common_dir.mkdir()
             (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
                 encoding="utf-8"
             )
 
-            errors = validate_file(self.repo_root, str(fixture_path))
+            validate_file(self.repo_root, str(fixture_path))
 
         # With the bug fix, a malformed roadmap should either produce E304 errors
         # or at least not silently pass. The roadmap missing 'milestones' key
@@ -237,7 +237,7 @@ class TestStep16(unittest.TestCase):
             common_dir2 = tmp_dir2 / "common"
             common_dir2.mkdir()
             (common_dir2 / "seed_manifest.json").write_text(
-                json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
                 encoding="utf-8"
             )
 
@@ -285,7 +285,7 @@ class TestStep16(unittest.TestCase):
             common_dir = tmp_dir / "common"
             common_dir.mkdir()
             (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
                 encoding="utf-8"
             )
 
@@ -336,7 +336,7 @@ class TestStep16(unittest.TestCase):
         common_dir = tmp_dir / "common"
         common_dir.mkdir()
         (common_dir / "seed_manifest.json").write_text(
-            json.dumps({"docs_policy": {"doc_paths": ["README.md", "docs/**"]}}),
+            json.dumps({"doc_paths": ["README.md", "docs/**"]}),
             encoding="utf-8"
         )
         return str(fixture_path)
@@ -446,6 +446,212 @@ class TestStep16(unittest.TestCase):
             any(e.code == "E582" for e in errors),
             f"Expected E582 milestone_ref mismatch. Got: {errors}"
         )
+
+    def _make_e304_fixture(self, tmpdir, impl_context_data, roadmap_milestones):
+        """Helper to write a step_16 fixture + roadmap for E304 tests."""
+        tmp_dir = Path(tmpdir)
+        fixture_path = tmp_dir / "16_impl_context.json"
+        fixture_path.write_text(json.dumps(impl_context_data), encoding="utf-8")
+        roadmap = {"milestones": roadmap_milestones}
+        (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+        common_dir = tmp_dir / "common"
+        common_dir.mkdir()
+        (common_dir / "seed_manifest.json").write_text(
+            json.dumps({"doc_paths": []}),
+            encoding="utf-8"
+        )
+        return str(fixture_path)
+
+    def _minimal_impl_context(self, checklist_items, milestone_ref=None):
+        """Build a minimal impl_context dict for E304 tests."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-e304-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "E304 test case.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": checklist_items
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No code changes."}
+            },
+            "canonical_refs_used": [],
+            "canonical_proposals": [],
+            "canonical_conflicts": []
+        }
+        if milestone_ref is not None:
+            data["milestone_ref"] = milestone_ref
+        return data
+
+    def _make_checklist_item(self, item_id, task_id, milestone_ref=None):
+        """Build a minimal valid checklist item referencing a roadmap task_id."""
+        item = {
+            "id": item_id,
+            "spec_ref": {
+                "type": "fr",
+                "id": task_id,
+                "line_range": "L1-L10",
+                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+            },
+            "description": f"Implement {task_id}",
+            "type": "behavior",
+            "layer": "api",
+            "linked_test_expectation": f"pytest test_{task_id}",
+            "nfr_refs": ["nfr-availability-uptime"],
+            "fixture_ref": f"fixture-{task_id}",
+        }
+        if milestone_ref is not None:
+            item["milestone_ref"] = milestone_ref
+        return item
+
+    def test_e304_milestone_ref_scoping(self):
+        """E304 fires for uncovered tasks only within the scoped milestone (m1), not m2."""
+        # Checklist only covers t1; t2 is in m1 (uncovered); t3 is in m2 (out of scope)
+        checklist = [
+            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="m1"),
+            self._make_checklist_item("CHK_T1_V", "t1", milestone_ref="m1"),
+        ]
+        # Add validation pair for t1 so E307 doesn't fire
+        checklist[1]["type"] = "validation"
+        checklist[1]["layer"] = "tests"
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "m1",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}, {"task_id": "t2"}]
+            },
+            {
+                "milestone_id": "m2",
+                "status": "planned",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t3"}]
+            }
+        ]
+
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        e304_messages = [e.message for e in e304_errors]
+
+        # t2 is in m1 (the scoped milestone) and uncovered — must fire E304
+        self.assertTrue(
+            any("t2" in msg for msg in e304_messages),
+            f"Expected E304 for uncovered task 't2' in milestone m1. Got E304 errors: {e304_messages}"
+        )
+        # t3 is in m2 (out of scope) — must NOT fire E304
+        self.assertFalse(
+            any("t3" in msg for msg in e304_messages),
+            f"Did not expect E304 for task 't3' in out-of-scope milestone m2. Got E304 errors: {e304_messages}"
+        )
+
+    def test_e304_skips_done_milestones(self):
+        """E304 skips milestones with status 'done'; fires only for in_progress milestones."""
+        # Checklist is empty — no tasks covered
+        checklist = []
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "ms-done",
+                "status": "done",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}]
+            },
+            {
+                "milestone_id": "ms-active",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t2"}]
+            }
+        ]
+
+        # No milestone_ref set — should include non-done milestones only
+        impl_context = self._minimal_impl_context(checklist)
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        e304_messages = [e.message for e in e304_errors]
+
+        # t2 is in in_progress milestone — must fire E304
+        self.assertTrue(
+            any("t2" in msg for msg in e304_messages),
+            f"Expected E304 for uncovered task 't2' in in_progress milestone. Got E304 errors: {e304_messages}"
+        )
+        # t1 is in done milestone — must NOT fire E304
+        self.assertFalse(
+            any("t1" in msg for msg in e304_messages),
+            f"Did not expect E304 for task 't1' in done milestone. Got E304 errors: {e304_messages}"
+        )
+
+    def test_invalid_verified_no_semantic_review(self):
+        """E520: verified verdict without semantic_review triggers schema allOf violation."""
+        path = os.path.join(self.fixtures_dir, "invalid_verified_no_semantic_review.json")
+        errors = validate_file(self.repo_root, path)
+
+        self.assertTrue(len(errors) > 0, "Fixture with verified verdict but no semantic_review should fail validation")
+
+        e520_errors = [e for e in errors if e.code == "E520"]
+        self.assertTrue(
+            len(e520_errors) > 0,
+            f"Expected at least one E520 error. Got: {errors}"
+        )
+        self.assertTrue(
+            any("semantic_review" in e.message for e in e520_errors),
+            f"Expected an E520 error mentioning 'semantic_review'. Got E520 errors: {[e.message for e in e520_errors]}"
+        )
+
+    def test_e582_artifact_milestone_ref_not_in_roadmap(self):
+        """E582: top-level milestone_ref pointing to a non-existent roadmap milestone fires E582."""
+        # Roadmap has milestone 'ms-real'; artifact claims milestone_ref='ms-ghost' (does not exist)
+        checklist = [
+            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="ms-ghost"),
+            self._make_checklist_item("CHK_T1_V", "t1", milestone_ref="ms-ghost"),
+        ]
+        checklist[1]["type"] = "validation"
+        checklist[1]["layer"] = "tests"
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "ms-real",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}, {"task_id": "t2"}]
+            }
+        ]
+
+        # milestone_ref at artifact level points to a non-existent milestone
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="ms-ghost")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e582_errors = [e for e in errors if e.code == "E582"]
+        self.assertTrue(
+            len(e582_errors) > 0,
+            f"Expected E582 for artifact milestone_ref 'ms-ghost' not in roadmap. Got: {errors}"
+        )
+        self.assertTrue(
+            any("ms-ghost" in e.message for e in e582_errors),
+            f"Expected E582 message to contain 'ms-ghost'. Got E582 errors: {[e.message for e in e582_errors]}"
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

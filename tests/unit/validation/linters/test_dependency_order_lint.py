@@ -20,7 +20,7 @@ class DependencyOrderLintTests(unittest.TestCase):
                 / "prompt_01_with_forward_ref.md"
             )
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01", "02"], "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]}}),
+                json.dumps({"steps": ["00", "01", "02"]}),
                 encoding="utf-8"
             )
             (root / "prompts" / "prompt_01_test.md").write_text(
@@ -38,7 +38,7 @@ class DependencyOrderLintTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "prompts").mkdir()
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01", "02"], "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]}}),
+                json.dumps({"steps": ["00", "01", "02"]}),
                 encoding="utf-8"
             )
             (root / "prompts" / "prompt_01_abs.md").write_text(
@@ -54,7 +54,7 @@ class DependencyOrderLintTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "prompts").mkdir()
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01"], "allowed_upstream_dependencies": {"00": [], "01": ["00"]}}),
+                json.dumps({"steps": ["00", "01"]}),
                 encoding="utf-8",
             )
             (root / "prompts" / "prompt_01_text.md").write_text(
@@ -64,21 +64,27 @@ class DependencyOrderLintTests(unittest.TestCase):
             errs = lint_dependency_order(str(root))
             self.assertEqual([], errs)
 
-    def test_disallowed_upstream_enforced(self):
+    def test_forward_dependency_enforced(self):
+        """Forward references (to steps after the current step) are flagged as forward-edge violations.
+
+        Under derive_allowed_upstream, all prior steps are valid upstreams.
+        Only references to later steps (forward edges) are disallowed.
+        """
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "tools").mkdir()
             (root / "prompts").mkdir()
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01", "02"], "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["01"]}}),
+                json.dumps({"steps": ["00", "01", "02"]}),
                 encoding="utf-8",
             )
-            (root / "prompts" / "prompt_02_text.md").write_text(
-                "Use spec/00_project_charter.json and spec/01_capabilities.json",
+            # prompt_01 references spec/02_*.json which comes AFTER step 01 -> disallowed forward edge
+            (root / "prompts" / "prompt_01_text.md").write_text(
+                "Use spec/00_charter.json and spec/02_system_sketch.json",
                 encoding="utf-8",
             )
             errs = lint_dependency_order(str(root))
-            self.assertTrue(any("disallowed-upstream" in e for e in render_errors(errs)))
+            self.assertTrue(any("forward-edge" in e for e in render_errors(errs)))
 
     def test_ignores_example_spec_paths(self):
         with tempfile.TemporaryDirectory() as td:
@@ -86,7 +92,7 @@ class DependencyOrderLintTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "prompts").mkdir()
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01"], "allowed_upstream_dependencies": {"00": [], "01": ["00"]}}),
+                json.dumps({"steps": ["00", "01"]}),
                 encoding="utf-8",
             )
             (root / "prompts" / "prompt_00_test.md").write_text(
@@ -102,7 +108,7 @@ class DependencyOrderLintTests(unittest.TestCase):
             (root / "tools").mkdir()
             (root / "prompts").mkdir()
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00", "01", "02"], "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]}}),
+                json.dumps({"steps": ["00", "01", "02"]}),
                 encoding="utf-8",
             )
             (root / "prompts" / "prompt_01_text.md").write_text(
@@ -122,7 +128,6 @@ class DependencyOrderLintTests(unittest.TestCase):
                     {
                         "steps": ["00", "01", "02"],
                         "policy": {"allow_self_dependency": True, "allow_forward_dependency": True},
-                        "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]},
                     }
                 ),
                 encoding="utf-8",
@@ -152,7 +157,6 @@ class DependencyOrderLintTests(unittest.TestCase):
             (root / "tools" / "step_order.json").write_text(
                 json.dumps({
                     "steps": ["00", "01", "02"],
-                    "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]},
                     "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
                 }),
                 encoding="utf-8",

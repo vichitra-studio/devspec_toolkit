@@ -195,7 +195,6 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             os.makedirs(tools_dir)
             step_order = {
                 "steps": ["00", "01"],
-                "allowed_upstream_dependencies": {"00": [], "01": ["00"]},
                 "downstream_consumers": {"00": ["01"], "01": []},
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
@@ -207,7 +206,12 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             self.assertIn("'01'", err)
 
     def test_dag_lint_detects_circular_dependency(self):
-        """dag-lint reports E585 for circular dependencies."""
+        """dag-lint reports E599 when a consumer appears before its producer in steps ordering.
+
+        Under derive_allowed_upstream, cycles are structurally impossible.
+        Consumer ordering violations (consumer before producer in steps) are
+        detected as E599 DAG_CONSUMER_INCONSISTENCY.
+        """
         import json
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -215,22 +219,20 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             os.makedirs(tools_dir)
             step_order = {
                 "steps": ["00", "01", "02"],
-                "allowed_upstream_dependencies": {
-                    "00": ["02"], "01": ["00"], "02": ["01"],
-                },
                 "downstream_consumers": {
-                    "00": ["01"], "01": ["02"], "02": ["00"],
+                    # 02 claims 01 is its consumer, but 01 appears before 02 -> E599
+                    "00": ["01", "02"], "01": ["02"], "02": ["01"],
                 },
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
                 json.dump(step_order, f)
             code, out, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
             self.assertEqual(code, 1)
-            self.assertIn("E585", err)
-            self.assertIn("DAG_CIRCULAR_DEPENDENCY", err)
+            self.assertIn("E599", err)
+            self.assertIn("DAG_CONSUMER_INCONSISTENCY", err)
 
     def test_dag_lint_detects_consumer_inconsistency(self):
-        """dag-lint reports E599 when downstream_consumers is inconsistent."""
+        """dag-lint reports E599 when a declared consumer comes before the producer in steps."""
         import json
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -238,14 +240,11 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             os.makedirs(tools_dir)
             step_order = {
                 "steps": ["00", "01", "16c"],
-                "allowed_upstream_dependencies": {
-                    "00": [], "01": ["00"], "16c": ["01"],
-                },
                 "downstream_consumers": {
-                    # 00 claims 01 consumes it (correct) but also claims 16c consumes it
-                    # yet 16c's deps don't include 00 — inconsistency
+                    # 16c claims 00 is its consumer, but 00 appears before 16c -> E599
                     "00": ["01", "16c"],
                     "01": ["16c"],
+                    "16c": ["00"],
                 },
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:

@@ -92,3 +92,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import unittest
+from pathlib import Path
+
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
+
+
+class Step00IntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.repo_root = Path(__file__).resolve().parents[2]
+        self.fixtures_dir = self.repo_root / "tests" / "fixtures" / "step_00"
+
+    def test_invalid_missing_scope_fails_validation(self):
+        """invalid_missing_scope.json must fail because in_scope is required."""
+        errors = specdev_validate_file(
+            str(self.repo_root),
+            str(self.fixtures_dir / "invalid_missing_scope.json"),
+        )
+        self.assertTrue(errors, "Expected validation errors for missing in_scope")
+        rendered = [e.render() for e in errors]
+        self.assertTrue(
+            any("in_scope" in msg for msg in rendered),
+            f"Expected an error mentioning 'in_scope', got: {rendered}",
+        )

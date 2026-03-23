@@ -29,6 +29,7 @@
       "fr_refs": [
         "fr-does-not-exist"
       ],
+      "capability_refs": [],
       "tasks": [
         {
           "task_id": "init-project",

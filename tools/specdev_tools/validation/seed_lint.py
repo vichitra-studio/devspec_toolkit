@@ -258,11 +258,6 @@ def lint_seeds(
         if sid not in seed_id_set:
             errors.append(make_error("E520", f"global_seed_order references unknown seed_id: {sid}"))
 
-    for layer in manifest.get("nested_order", []):
-        for sid in layer.get("seed_ids", []):
-            if sid not in seed_id_set:
-                errors.append(make_error("E520", f"nested_order references unknown seed_id: {sid}"))
-
     for step_id, reqs in manifest.get("step_requirements", {}).items():
         for sid in reqs:
             if sid not in seed_id_set:

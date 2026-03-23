@@ -386,7 +386,7 @@
         },
         "owner": {
           "type": "string",
-          "description": "Team or individual responsible for resolving this dependency. Required for external dependencies."
+          "description": "Team or individual responsible for resolving this dependency. Required for external dependencies. Deliberately unconstrained (not the 8-value owner enum) because external dependency owners are free-form team names (e.g., 'platform-team', 'security-team') that may not map to canonical artifact-owner roles."
         },
         "note": {
           "type": "string",

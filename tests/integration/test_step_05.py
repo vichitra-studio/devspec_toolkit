@@ -95,3 +95,31 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import unittest
+
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
+
+
+class Step05IntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.repo_root = Path(__file__).resolve().parents[2]
+        self.fixtures_dir = self.repo_root / "tests" / "fixtures" / "step_05"
+
+    def test_invalid_missing_trace_fails_validation(self):
+        """invalid_missing_trace.json must fail because trace is required on API items."""
+        errors = specdev_validate_file(
+            str(self.repo_root),
+            str(self.fixtures_dir / "invalid_missing_trace.json"),
+        )
+        self.assertTrue(errors, "Expected validation errors for missing trace")
+        rendered = [e.render() for e in errors]
+        self.assertTrue(
+            any("trace" in msg for msg in rendered),
+            f"Expected an error mentioning 'trace', got: {rendered}",
+        )

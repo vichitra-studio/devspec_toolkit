@@ -5,6 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URI identifying the schema this seed manifest conforms to."
+    },
     "seed_manifest_id": {
       "$ref": "vc:core:atoms#kebabId",
       "description": "Unique kebab-case identifier for this seed manifest instance."
@@ -25,34 +29,6 @@
     "global_seed_order": {
       "$ref": "vc:core:collections#kebabIdArray",
       "description": "Ordered array of seed IDs defining the default ingestion sequence across all pipeline steps."
-    },
-    "nested_order": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "level_id": {
-            "$ref": "vc:core:atoms#kebabId",
-            "description": "Kebab-case identifier for this nesting level (e.g., foundation, domain, detail)."
-          },
-          "description": {
-            "type": "string",
-            "description": "Human-readable description of what seeds at this level provide."
-          },
-          "seed_ids": {
-            "$ref": "vc:core:collections#kebabIdArray",
-            "description": "Ordered array of seed IDs belonging to this nesting level."
-          }
-        },
-        "required": [
-          "level_id",
-          "seed_ids"
-        ],
-        "description": "A nesting level defining a group of seeds at a specific hierarchy tier."
-      },
-      "description": "Hierarchical ordering of seeds into named levels for multi-tier ingestion."
     },
     "seeds": {
       "type": "array",
@@ -112,60 +88,11 @@
       "additionalProperties": false,
       "description": "Map from pipeline step numbers to arrays of seed IDs required for that step."
     },
-    "docs_policy": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "readme_required": {
-          "type": "boolean",
-          "description": "Whether README files are required in scoped directories."
-        },
-        "root_readme_required": {
-          "type": "boolean",
-          "description": "Whether a root-level README file is required in the repository."
-        },
-        "readme_depth_default": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Default directory depth at which README requirements apply (0 = root only)."
-        },
-        "readme_depth_by_scope": {
-          "type": "object",
-          "patternProperties": {
-            "^.+/$": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "README depth override for this directory scope (0 = root only)."
-            }
-          },
-          "additionalProperties": false,
-          "description": "Per-scope overrides for README depth requirements, keyed by directory path suffix."
-        },
-        "scope": {
-          "$ref": "vc:core:collections#stringArray",
-          "minItems": 1,
-          "description": "Array of directory paths that are in scope for documentation coverage checks."
-        },
-        "exclusions": {
-          "$ref": "vc:core:collections#stringArray",
-          "description": "Array of directory paths or patterns excluded from documentation coverage checks."
-        },
-        "doc_paths": {
-          "$ref": "vc:core:collections#stringArray",
-          "minItems": 1,
-          "description": "Array of paths where documentation files are expected to be found."
-        }
-      },
-      "required": [
-        "readme_required",
-        "root_readme_required",
-        "readme_depth_default",
-        "readme_depth_by_scope",
-        "scope",
-        "exclusions",
-        "doc_paths"
-      ],
-      "description": "Policy configuration for documentation coverage enforcement (README requirements, scoping, exclusions)."
+    "doc_paths": {
+      "description": "Glob patterns identifying documentation files in the host repository. Used by step_16 validator to verify that docs_impact entries reference valid doc paths.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
     }
   },
   "required": [
@@ -177,5 +104,5 @@
     "seeds",
     "step_requirements"
   ],
-  "description": "Schema for the seed manifest defining seed documents, their ordering, step requirements, and documentation policy."
+  "description": "Schema for the seed manifest defining seed documents, their ordering, and step requirements."
 }

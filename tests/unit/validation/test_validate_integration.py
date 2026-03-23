@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 import os
 
-from specdev_tools.core.errors import SpecError
+
 from specdev_tools.validation.validate import (
     DEEP_VALIDATORS,
     _get_step_from_path,
@@ -32,7 +32,7 @@ class ValidateIntegrationTests(unittest.TestCase):
 
             (root / "spec" / "00_charter.json").write_text(json.dumps({"$schema": "x"}), encoding="utf-8")
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+                json.dumps({"steps": ["00"]}),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(
@@ -175,7 +175,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             (root / "schema").mkdir()
             (root / "spec" / "bad.json").write_text("{bad", encoding="utf-8")
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+                json.dumps({"steps": ["00"]}),
                 encoding="utf-8",
             )
             errs = validate_dir(str(root), str(root / "spec"))
@@ -199,7 +199,6 @@ class ValidateIntegrationTests(unittest.TestCase):
                     {
                         "steps": ["00"],
                         "policy": {"require_full_forward_replay_on_change": False},
-                        "allowed_upstream_dependencies": {"00": []},
                     }
                 ),
                 encoding="utf-8",
@@ -253,7 +252,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             (root / "canon").mkdir()
             (root / "spec" / "00_charter.json").write_text(json.dumps({"$schema": "x"}), encoding="utf-8")
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+                json.dumps({"steps": ["00"]}),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(
@@ -285,7 +284,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             (root / "canon").mkdir()
             (root / "spec" / "00_charter.json").write_text(json.dumps({"$schema": "x"}), encoding="utf-8")
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+                json.dumps({"steps": ["00"]}),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(
@@ -325,7 +324,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             (root / "canon").mkdir()
             (root / "spec" / "00_charter.json").write_text(json.dumps({"$schema": "x"}), encoding="utf-8")
             (root / "tools" / "step_order.json").write_text(
-                json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+                json.dumps({"steps": ["00"]}),
                 encoding="utf-8",
             )
             (root / "canon" / "manifest.json").write_text(

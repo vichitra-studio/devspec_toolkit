@@ -53,9 +53,7 @@ def _make_project(
             },
         ],
         "global_seed_order": global_seed_order or ["seed-overview", "seed-tech-stack"],
-        "nested_order": [],
         "step_requirements": step_requirements or {},
-        "docs_policy": {"doc_paths": ["README.md"]},
     }
     with open(
         os.path.join(spec_dir, "common", "seed_manifest.json"), "w", encoding="utf-8"

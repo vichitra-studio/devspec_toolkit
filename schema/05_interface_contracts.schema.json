@@ -173,7 +173,8 @@
               "version",
               "protocol",
               "owner",
-              "interface_ref"
+              "interface_ref",
+              "trace"
             ]
           }
         }

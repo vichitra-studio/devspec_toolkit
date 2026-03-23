@@ -14,7 +14,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Dict, List, Optional
+
 from unittest.mock import patch
 
 from specdev_tools.core.errors import PROMOTABLE_PAIRS, SpecError, make_error
@@ -29,7 +29,7 @@ def _make_minimal_repo(root: Path) -> Path:
         json.dumps({"$schema": "x"}), encoding="utf-8"
     )
     (root / "tools" / "step_order.json").write_text(
-        json.dumps({"steps": ["00"], "allowed_upstream_dependencies": {"00": []}}),
+        json.dumps({"steps": ["00"]}),
         encoding="utf-8",
     )
     (root / "canon" / "manifest.json").write_text(

@@ -101,7 +101,7 @@
       "name": "Implement Document Storage and CRUD Operations",
       "target_date": "2025-11-30",
       "status": "pending",
-      "depends_on": ["milestone-setup-core-infrastructure"],
+      "depends_on": ["INVALID_MILESTONE"],
       "risks": [
         "SQLite performance under concurrent writes may impact throughput targets"
       ],

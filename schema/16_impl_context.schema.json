@@ -124,7 +124,7 @@
               "properties": {
                 "outcome": {
                   "type": "string",
-                  "description": "The outcome of the review (e.g., approved, rejected, needs-revision)."
+                  "description": "The outcome of the review (e.g., verified, needs_work, blocked, deferred)."
                 },
                 "verified_by": {
                   "type": "string",
@@ -1876,10 +1876,11 @@
               "type": "string",
               "enum": [
                 "verified",
-                "deferred",
-                "rejected"
+                "needs_work",
+                "blocked",
+                "deferred"
               ],
-              "description": "Final review verdict: verified (approved), deferred, or rejected."
+              "description": "Final review verdict: verified (approved for merge), needs_work (revisions required), blocked (external blocker), or deferred (postponed)."
             },
             "next_actions": {
               "type": "string",

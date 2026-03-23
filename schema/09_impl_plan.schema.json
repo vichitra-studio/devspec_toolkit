@@ -71,6 +71,12 @@
                   "description": "A trace reference to an artifact this milestone will produce."
                 }
               },
+              "depends_on": {
+                "description": "IDs of milestones that must complete before this milestone can begin.",
+                "type": "array",
+                "items": { "$ref": "vc:core:atoms#kebabId" },
+                "uniqueItems": true
+              },
               "status_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
                 "description": "Canonical reference for the status value in the registry."

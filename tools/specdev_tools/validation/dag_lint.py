@@ -4,8 +4,8 @@ Checks that the step DAG is complete and consistent:
   E520 — step_order.json missing or malformed (unresolved input)
   E585 — circular dependency detected in the upstream dependency graph
   E596 — non-terminal step has zero downstream consumers (dead-end producer)
-  E599 — downstream_consumers entry inconsistent with allowed_upstream_dependencies
-  W596 — prompt references undeclared artifact not in allowed_upstream_dependencies
+  E599 — downstream_consumers entry inconsistent with computed upstream dependency order
+  W596 — prompt references undeclared artifact not in computed allowed upstream steps
 
 Terminal step 16c is explicitly exempted from E596.
 """
@@ -18,8 +18,9 @@ import re
 from pathlib import Path
 
 from ..core.errors import SpecError, make_error
+from ..core.registry import derive_allowed_upstream
 from ._extraction_intent_parser import parse_extraction_intent
-from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE
+from ._extraction_intent_parser import INTENT_ENTRY_RE as _INTENT_ENTRY_RE  # re-exported for tests
 
 
 # Matches prompt filenames like prompt_04_functional_requirements.md -> "04"
@@ -53,8 +54,9 @@ def lint_dag(repo_root: str) -> list[SpecError]:
 
     steps: list[str] = data.get("steps", [])
     downstream_consumers: dict[str, list[str]] = data.get("downstream_consumers", {})
-    allowed_deps: dict[str, list[str]] = data.get("allowed_upstream_dependencies", {})
+    allowed_deps: dict[str, list[str]] = {s: derive_allowed_upstream(s, steps) for s in steps}
     step_set = set(steps)
+    step_index: dict[str, int] = {s: i for i, s in enumerate(steps)}
 
     # ---------------------------------------------------------------
     # Check 1: Dead-end producers (E596)
@@ -73,8 +75,10 @@ def lint_dag(repo_root: str) -> list[SpecError]:
 
     # ---------------------------------------------------------------
     # Check 4: Consumer consistency (E599)
-    # If step X lists step Y as a downstream consumer, then Y's
-    # allowed_upstream_dependencies must include X.
+    # If step X lists step Y as a downstream consumer, then Y must
+    # appear after X in the ordered steps list (strict_waterfall).
+    # Under derive_allowed_upstream, any prior step is always an
+    # allowed upstream — so we check positional order directly.
     # ---------------------------------------------------------------
     for step, consumers in downstream_consumers.items():
         for consumer in consumers:
@@ -86,19 +90,21 @@ def lint_dag(repo_root: str) -> list[SpecError]:
                     f"recognized step",
                 ))
                 continue
-            consumer_deps = allowed_deps.get(consumer, [])
-            if step not in consumer_deps:
-                errors.append(make_error(
-                    "E599",
-                    f"DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
-                    f"'{consumer}' as consumer but '{consumer}' does not list "
-                    f"'{step}' as upstream dependency",
-                ))
+            # Consumer must come after the producer in the ordered steps list
+            if step in step_index and consumer in step_index:
+                if step_index[consumer] <= step_index[step]:
+                    errors.append(make_error(
+                        "E599",
+                        f"DAG_CONSUMER_INCONSISTENCY step '{step}' lists "
+                        f"'{consumer}' as consumer but '{consumer}' does not "
+                        f"appear after '{step}' in the steps ordering",
+                    ))
 
     # ---------------------------------------------------------------
     # Check 5: Circular dependencies
-    # Build a downstream adjacency graph from allowed_upstream_dependencies
-    # and detect cycles via DFS.
+    # Under strict_waterfall with derive_allowed_upstream, cycles are
+    # structurally impossible since allowed deps are always prior steps.
+    # This check is retained for robustness.
     # ---------------------------------------------------------------
     _check_circular_dependencies(steps, allowed_deps, errors)
 
@@ -168,7 +174,7 @@ def _check_extraction_intents(
 
     For each prompt file that has a ``### Extraction Intent`` section:
       - Parse intent entries to identify which upstream artifacts are declared
-      - Warn if a referenced artifact is not in allowed_upstream_dependencies
+      - Warn if a referenced artifact is not in the computed allowed upstream steps
 
     Note: E597, E598, and W597 checks are handled by extraction_intent_check.py.
     """
@@ -187,7 +193,7 @@ def _check_extraction_intents(
         if intent is not None:
             prompt_intents[step] = intent
 
-    # W596: Prompt references artifact not declared in allowed_upstream_dependencies
+    # W596: Prompt references artifact not in the runtime-computed allowed upstream steps
     for step, intent in prompt_intents.items():
         upstream_deps = set(allowed_deps.get(step, []))
         for ref_step in intent.referenced_steps:
@@ -196,6 +202,6 @@ def _check_extraction_intents(
                     "W596",
                     f"UNDECLARED_UPSTREAM_REF prompt for step '{step}' "
                     f"({intent.prompt_path.name}) references artifact for "
-                    f"step '{ref_step}' which is not in "
-                    f"allowed_upstream_dependencies",
+                    f"step '{ref_step}' which is not in the "
+                    f"computed allowed upstream steps",
                 ))

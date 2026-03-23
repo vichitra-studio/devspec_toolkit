@@ -70,18 +70,20 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^fr-[a-z0-9-]+$",
+                  "pattern": "^fr-[a-z0-9]+(?:-[a-z0-9]+)*$",
                   "description": "An FR ID in the format 'fr-<slug>' referencing a functional requirement."
                 },
-                "description": "FR IDs from spec/04_fr_list.json that this milestone delivers."
+                "uniqueItems": true,
+                "description": "Functional requirement IDs this milestone delivers. Each value must match a `fr_id` in the FR list (Step 04)."
               },
               "capability_refs": {
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^cap-[a-z0-9-]+$",
+                  "pattern": "^cap-[a-z0-9]+(?:-[a-z0-9]+)*$",
                   "description": "A capability ID in the format 'cap-<slug>' referencing a capability."
                 },
+                "uniqueItems": true,
                 "description": "Capability IDs from spec/01_capabilities.json that this milestone implements."
               },
               "tasks": {
@@ -174,6 +176,16 @@
                         "description": "A condition that definitively marks this task complete (minimum 15 characters)."
                       },
                       "description": "Conditions that definitively mark this task complete."
+                    },
+                    "fr_refs": {
+                      "description": "Functional requirement IDs this task addresses. Enables pairwise completeness checks.",
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^fr-[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "description": "An FR ID in the format 'fr-<slug>' referencing a functional requirement."
+                      },
+                      "uniqueItems": true
                     }
                   },
                   "required": [

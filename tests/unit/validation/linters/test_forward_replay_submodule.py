@@ -32,7 +32,6 @@ def submodule_layout(tmp_path):
         "version": "1.0.0",
         "policy": {"mode": "strict_waterfall"},
         "steps": ["00", "01", "02"],
-        "allowed_upstream_dependencies": {"00": [], "01": ["00"], "02": ["00", "01"]},
     }
     (tools / "step_order.json").write_text(json.dumps(step_order))
 

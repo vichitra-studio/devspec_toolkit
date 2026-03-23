@@ -83,6 +83,26 @@ class SchemaRegistry:
             return json.load(f)
 
 
+def derive_allowed_upstream(step_id: str, steps: list) -> list:
+    """Return all steps preceding step_id in the ordered steps list.
+
+    Under strict_waterfall, allowed upstream is simply all steps before
+    the given step in the ordered sequence.
+
+    Args:
+        step_id: The step to find allowed upstream steps for
+        steps: The ordered list of all step IDs
+
+    Returns:
+        List of step IDs that precede step_id, or empty list if not found
+    """
+    try:
+        idx = steps.index(step_id)
+        return steps[:idx]
+    except ValueError:
+        return []
+
+
 def _validate_registry_map(raw: object) -> dict[str, str]:
     if not isinstance(raw, dict):
         raise ValueError(

@@ -191,6 +191,22 @@ This step's output artifact MUST include every field listed in the schema's `req
   "created_at": "2025-01-01T00:00:00Z",
   "title": "Project Charter",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
+  "in_scope": [
+    "User authentication flows",
+    "Session lifecycle management",
+    "Token refresh and expiry handling"
+  ],
+  "out_of_scope": [
+    "OAuth third-party integrations",
+    "Legacy SSO migration",
+    "Mobile biometric authentication"
+  ],
+  "assumptions": [
+    "Existing user database schema remains unchanged"
+  ],
+  "risks": [
+    "Session storage capacity under peak load"
+  ],
   "stakeholders": [
     {
       "role": "Engineering Lead",

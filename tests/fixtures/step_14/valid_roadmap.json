@@ -63,6 +63,7 @@
         {
           "task_id": "init-fastapi-project",
           "description": "Initialize FastAPI project structure",
+          "fr_refs": ["fr-initial-setup", "fr-project-bootstrap"],
           "acceptance_criteria": [
             {
               "criterion_id": "project-structure-ready",
@@ -101,8 +102,8 @@
           "id": "project-structure"
         }
       ],
-      "fr_refs": [],
-      "capability_refs": [],
+      "fr_refs": ["fr-health-check", "fr-project-setup"],
+      "capability_refs": ["cap-core-infrastructure"],
       "risks": [],
       "spikes": []
     },
@@ -158,8 +159,8 @@
           "id": "auth-architecture"
         }
       ],
-      "fr_refs": [],
-      "capability_refs": [],
+      "fr_refs": ["fr-user-login", "fr-user-registration"],
+      "capability_refs": ["cap-auth", "cap-user-management"],
       "risks": [
         "Security vulnerabilities in token implementation"
       ],
