@@ -6,12 +6,16 @@
 
 ## Required Changes
 
+**Step-base fields (required in every artifact)**
+
+- `id`: Unique kebab-case identifier for this artifact instance (`$ref: vc:core:atoms#kebabId`).
+- `owner`: Owner of this spec artifact. Must be one of: `api | ui | system | ops | data | product | business | engineering`.
+- `created_at`: ISO 8601 timestamp of when this artifact was generated or last regenerated (`$ref: vc:core:atoms#timestamp`).
+- `canonical_refs_used`: array of canonical reference objects used in this artifact
+
 - `$schema`: Must reference the URI above for the target toolkit version.
-- `project_skeleton`: Object with at least `language` (lowercase/kebab-case string).
-- `interface_map`: Array of route objects; each needs `interface_ref`, `path`, and `method`.
-- `interface_map[].interface_ref`: Must be a kebab-case ID matching a defined API in Step 05; no duplicates.
-- `interface_map[].method`: Must be one of `GET | POST | PUT | DELETE | PATCH | OPTIONS | HEAD`.
-- `validators`: Array of validator strings; required to be non-empty when `build_status` is `green`.
+- `project_skeleton`: Object requiring `language` (lowercase string, no version suffix). Optional: `framework` (lowercase kebab-case), `modules` (array of directory path strings).
+- `validators`: Array of validator identifier strings — must be non-empty when `build_status` is `green`.
 - `build_status`: Must be one of `pending | green | red`.
 
 ## Output Contract
@@ -20,18 +24,14 @@ The migrated artifact MUST include:
 
 - `$schema`: Set to the canonical URI above.
 - `canonical_refs_used`: Array of canonical reference objects.
-- `canonical_proposals`: Array (OPTIONAL).
-- `canonical_conflicts`: Array (OPTIONAL).
 
 ## Optional Fields
 
-- `_migration_notes`: String describing what changed during migration.
-- `project_skeleton.framework`: String for the web framework (lowercase/kebab-case).
-- `project_skeleton.modules`: Array of module name strings.
-- `interface_map[].interface_ref`: Canonical reference to an interface protocol entry.
-- `command_ref`: Canonical reference to the scaffold build command.
-- `trace`: Array of trace refs for provenance.
-- `links`: Array of link objects pointing to generated code or docs.
+- `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
+- `interface_map`: Array of route objects; each requires `interface_ref` (kebab-case api_id from Step 05, no duplicates), `path` (relative forward-slash path), and `method` (one of `GET | POST | PUT | DELETE | PATCH | OPTIONS | HEAD`).
+- `command_ref`: Canonical reference (kind: `action`) to the scaffold build/generate command.
+- `trace`: Array of trace reference objects — use `type: implements` pointing to `fr-*` or `api-*` IDs.
+- `links`: Array of link objects pointing to generated code or documentation.
 
 ## Validation
 
@@ -52,3 +52,12 @@ validator must be listed; downgrade to `pending` during migration if validators
 have not yet been confirmed. The `project_skeleton.language` and `framework`
 values drive code generation in Step 16b, so ensure they accurately reflect the
 target tech stack from `seed_tech_stack.md`.
+
+
+## Full Generation Reference
+
+To generate this artifact from scratch (rather than migrate an existing one), use the canonical step prompt:
+
+- `prompts/prompt_15_scaffold.md`
+
+The generation prompt contains the complete Output Contract, Self-Audit Gate, and schema authority reference needed to produce a valid artifact.

@@ -12,7 +12,7 @@ import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import Optional
+
 from unittest.mock import patch
 
 from specdev_tools import cli
@@ -156,7 +156,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
 
     def test_dag_lint_registered_and_callable(self):
         """dag-lint runs without crashing on the real repo."""
-        code, out, err = self._run_cli(["dag-lint", "--repo-root", str(REPO_ROOT)])
+        code, _, err = self._run_cli(["dag-lint", "--repo-root", str(REPO_ROOT)])
         # It may exit 0 (OK) or 1 (errors found) — but it should not crash
         self.assertIn(code, (0, 1), f"Unexpected exit code {code}; stderr: {err}")
 
@@ -172,7 +172,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
     def test_dag_lint_respects_repo_root(self):
         """dag-lint uses --repo-root to locate step_order.json."""
         # Point at a nonexistent directory — should get E520 about missing step_order.json
-        code, out, err = self._run_cli(["dag-lint", "--repo-root", "/tmp/nonexistent_dag_test"])
+        code, _, err = self._run_cli(["dag-lint", "--repo-root", "/tmp/nonexistent_dag_test"])
         self.assertEqual(code, 1)
         self.assertIn("E520", err)
 
@@ -181,7 +181,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
             # Empty directory — no tools/step_order.json
-            code, out, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
+            code, _, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
             self.assertEqual(code, 1)
             self.assertIn("E520", err)
             self.assertIn("not found", err)
@@ -199,7 +199,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
                 json.dump(step_order, f)
-            code, out, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
+            code, _, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
             self.assertEqual(code, 1)
             self.assertIn("E596", err)
             self.assertIn("DAG_DEAD_END_PRODUCER", err)
@@ -226,7 +226,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
                 json.dump(step_order, f)
-            code, out, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
+            code, _, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
             self.assertEqual(code, 1)
             self.assertIn("E599", err)
             self.assertIn("DAG_CONSUMER_INCONSISTENCY", err)
@@ -249,7 +249,7 @@ class TestDagLint(_CliMixin, unittest.TestCase):
             }
             with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
                 json.dump(step_order, f)
-            code, out, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
+            code, _, err = self._run_cli(["dag-lint", "--repo-root", tmpdir])
             self.assertEqual(code, 1)
             self.assertIn("E599", err)
             self.assertIn("DAG_CONSUMER_INCONSISTENCY", err)
@@ -260,7 +260,7 @@ class TestExtractionIntentCheck(_CliMixin, unittest.TestCase):
 
     def test_extraction_intent_check_registered_and_callable(self):
         """extraction-intent-check runs without crashing on the real repo."""
-        code, out, err = self._run_cli(["extraction-intent-check", "--repo-root", str(REPO_ROOT)])
+        code, _, err = self._run_cli(["extraction-intent-check", "--repo-root", str(REPO_ROOT)])
         # It may exit 0 (OK) or 1 (errors found) — but it should not crash
         self.assertIn(code, (0, 1), f"Unexpected exit code {code}; stderr: {err}")
 
@@ -277,7 +277,7 @@ class TestExtractionIntentCheck(_CliMixin, unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
             # Empty directory — no step_order.json → should exit 0 (graceful skip)
-            code, out, err = self._run_cli(["extraction-intent-check", "--repo-root", tmpdir])
+            code, _, _ = self._run_cli(["extraction-intent-check", "--repo-root", tmpdir])
             self.assertEqual(code, 0)
 
 

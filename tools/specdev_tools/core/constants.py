@@ -32,4 +32,7 @@ STEP_TO_TEMPLATE: dict[str, str] = {
     "14": "template_roadmap.md",
     "15": "template_scaffold.md",
     "16": "template_impl_context.md",
+    "16a": "template_impl_planner.md",
+    "16b": "template_impl_coder.md",
+    "16c": "template_impl_reviewer.md",
 }

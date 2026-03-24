@@ -145,8 +145,8 @@ Before emitting, verify:
       "interface_ref": {"id": "cn:project:term:example-resource", "kind": "term"},
       "trace": [{"type": "implements", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
       "errors": [
-        {"code": 401, "name": "unauthenticated", "description": "No valid auth token provided"},
-        {"code": 404, "name": "resource-not-found", "description": "The requested resource does not exist"}
+        {"code": "unauthenticated", "message": "No valid auth token provided"},
+        {"code": "resource-not-found", "message": "The requested resource does not exist"}
       ]
     }
   ],

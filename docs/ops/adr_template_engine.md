@@ -6,13 +6,21 @@
 
 ## Context
 
-The DevSpec Toolkit migration system generates AI prompts from templates stored in `prompts/migration/`. These templates use variable interpolation to produce context-aware prompts for semantic migrations that cannot be handled automatically.
+The DevSpec Toolkit migration system generates AI prompts from templates stored in `prompts/migration/`. The design intent is for these templates to use variable interpolation to produce context-aware prompts for semantic migrations that cannot be handled automatically.
 
-The current implementation uses a Handlebars-style renderer that supports:
+The current implementation includes a Handlebars-style renderer (`render_template()` in `prompt_generator.py`) that supports:
 - Simple variable substitution: `{{VAR_NAME}}`
 - List iteration: `{{#each ITEMS}}...{{/each}}`
 
 The question was whether to replace this with a Python-native template engine (Jinja2, string.Template, f-strings) or keep the current approach.
+
+## Current Implementation Status (as of v0.5.0)
+
+**The renderer is implemented but templates are currently static.** The `render_template()` function fully supports `{{VAR}}` substitution and `{{#each}}` iteration, and the `PromptContext` dataclass populates variables such as `SOURCE_VERSION`, `TARGET_VERSION`, `STEP_ID`, `REQUIRED_FIELDS`, `CONTEXT_SOURCES`, and field-level variables (`FIELD_PATH`, `OLD_TYPE`, `NEW_TYPE`, etc.).
+
+However, the 22 templates in `prompts/migration/` do not currently contain any `{{VAR}}` placeholders — they are static Markdown documents authored for each pipeline step. The renderer runs on every template render call but performs no substitutions because no placeholders are present.
+
+**When interpolation would be used:** If a future template needs to embed context-specific content (e.g., the actual source file contents, a list of required fields extracted from the target schema, or the version numbers being migrated), authors can insert `{{SOURCE_CONTENT}}`, `{{#each REQUIRED_FIELDS}}...{{/each}}`, or any other supported placeholder directly in the template. The renderer will substitute them automatically without any code changes.
 
 ## Decision
 
@@ -28,14 +36,14 @@ The question was whether to replace this with a Python-native template engine (J
 
 4. **Predictable output.** Migration prompts must be deterministic and auditable. A minimal renderer with no implicit coercion or filter chains reduces the surface area for unexpected behavior.
 
-5. **Low maintenance burden.** The template set is small (14 templates) and changes infrequently. The cost of maintaining a custom renderer is negligible at this scale.
+5. **Low maintenance burden.** The template set is small (22 templates) and changes infrequently. The cost of maintaining a custom renderer is negligible at this scale.
 
 ## Alternatives Considered
 
 ### Jinja2
 - **Pros:** Full-featured, well-tested, supports conditionals/filters/inheritance
 - **Cons:** New dependency, more complex than needed, Python-specific syntax
-- **Verdict:** Over-engineered for 14 simple templates
+- **Verdict:** Over-engineered for 22 simple templates
 
 ### Python f-strings / str.format()
 - **Pros:** Zero dependency, native Python
@@ -47,12 +55,28 @@ The question was whether to replace this with a Python-native template engine (J
 - **Cons:** No iteration, limited syntax (`$var` only)
 - **Verdict:** Insufficient — same limitations as f-strings
 
+## Dual-Renderer Landscape
+
+Two renderers coexist in the toolkit — they serve different subsystems and are not interchangeable:
+
+### `render_template()` — Generation subsystem
+- **Location**: `specdev_tools/generation/prompt_generator.py`
+- **Role**: Produces AI prompts for the `specdev align prompts` pipeline.
+- **Mechanism**: Accepts a `PromptContext` dataclass and performs full `{{VAR}}` substitution and `{{#each LIST}}...{{/each}}` iteration against a loaded template string.
+- **Status**: Fully implemented; this ADR's decision applies to this renderer.
+
+### `_render_prompt()` — Migration subsystem
+- **Location**: `specdev_tools/migration/runner.py`
+- **Role**: Produces prompt files for `AI_ASSISTED` migration steps at plan-execution time (invoked by `execute_single_step()`).
+- **Mechanism**: Currently **static** — loads the template file raw, appends a `## Context` block containing the step's context JSON, and returns the concatenated string. No `{{VAR}}` interpolation is performed.
+- **Known Gap**: `_render_prompt()` does not yet implement `{{VAR}}` substitution. If migration templates need context-aware variable injection at execution time, this renderer will need to be updated to call `render_template()` (or an equivalent). This is a tracked future work item (AUDIT-049).
+
 ## Consequences
 
-- Templates continue to use `{{VAR}}` and `{{#each LIST}}...{{/each}}` syntax
+- Templates continue to use `{{VAR}}` and `{{#each LIST}}...{{/each}}` syntax (via `render_template()`)
 - If conditional logic is ever needed (e.g., `{{#if HAS_DEFAULT}}`), this decision should be revisited
-- The renderer remains in `prompt_generator.py` (now at `specdev_tools/generation/prompt_generator.py`)
-- New templates must be tested via `tests/test_migration_templates.py` to ensure all placeholders resolve
+- The generation-subsystem renderer remains in `specdev_tools/generation/prompt_generator.py`
+- New templates must be tested via `tests/unit/generation/test_prompt_generator.py` to ensure all placeholders resolve
 
 ## References
 

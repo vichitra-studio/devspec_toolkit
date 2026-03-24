@@ -1,7 +1,6 @@
 import io
 import json
 import os
-import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -1629,7 +1628,7 @@ class CliTests(unittest.TestCase):
             }
             (tools_dir / "step_order.json").write_text(json.dumps(step_order), encoding="utf-8")
 
-            code, out, err = self._run_cli(["prompt-context", "99", "--repo-root", str(repo_root)])
+            code, _, err = self._run_cli(["prompt-context", "99", "--repo-root", str(repo_root)])
             self.assertNotEqual(0, code)
             self.assertIn("Unknown step", err)
 
@@ -1739,7 +1738,7 @@ class CliTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            code, stdout, stderr = self._run_cli(
+            code, _, stderr = self._run_cli(
                 ["canon-schema-alignment", "--repo-root", str(root)]
             )
             # Should succeed (exit 0) — no E-level errors expected
@@ -1785,7 +1784,6 @@ class CliTests(unittest.TestCase):
             (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
             (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
 
-            env = {**_os.environ, "SPECDEV_WARNINGS_AS_ERRORS": "1"}
             with patch("specdev_tools.cli.check_venv", return_value=None), \
                  patch.object(sys, "argv", ["specdev-tools", "completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]):
                 from specdev_tools.core.config import reset_config

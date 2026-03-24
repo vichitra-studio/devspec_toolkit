@@ -147,9 +147,20 @@ Before emitting, verify:
     {
       "metric_id": "login-success-rate",
       "name": "Login Success Rate",
-      "target": "99.5%",
+      "target": ">= 99.5%",
       "unit": "percent",
-      "measurement_method": "Ratio of successful logins to total attempts",
+      "measurement_method": "Ratio of successful logins to total attempts via auth service metrics dashboard",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      }
+    },
+    {
+      "metric_id": "session-error-rate",
+      "name": "Session Error Rate",
+      "target": "< 0.1%",
+      "unit": "percent",
+      "measurement_method": "Ratio of session errors to total sessions from error tracking dashboard",
       "unit_ref": {
         "id": "cn:core:unit:percent",
         "kind": "unit"

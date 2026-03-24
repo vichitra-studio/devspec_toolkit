@@ -281,6 +281,8 @@ Before emitting, verify:
           "spec_ref": { "type": "api", "id": "api-auth-login", "line_range": "L12-L15", "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-auth-availability"],
+          "fixture_ref": "fix-auth-login-success",
           "implementation": { "status": "verified", "actions": [{ "type": "file_edit", "target": "src/auth/routes.py", "evidence": { "type": "snippet", "content": "def login(request): return issue_token(request.user)" } }] }
         }
       ]
@@ -291,7 +293,13 @@ Before emitting, verify:
   "execution": {
     "files_touched": ["src/auth/routes.py"],
     "execution_results": [
-      { "status": "failed", "command": "pytest tests/auth/test_login.py::test_jwt -q", "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing" }
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response missing token field — fix requires returning {'token': issue_token(user)} in routes.py.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
     ],
     "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []
@@ -310,11 +318,21 @@ Before emitting, verify:
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "plan": { "status": "active", "summary": { "functional_summary": "Implement core API login", "scope_in": ["login"], "scope_out": ["oauth"], "target_file_patterns": ["src/auth/routes.py"] } },
+  "plan": {
+    "status": "active",
+    "summary": { "functional_summary": "Implement core API login", "scope_in": ["login"], "scope_out": ["oauth"], "target_file_patterns": ["src/auth/routes.py"] },
+    "review_requirements": { "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"] }
+  },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
     "execution_results": [
-      { "status": "failed", "command": "pytest tests/auth/test_login.py::test_jwt -q", "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing" }
+      {
+        "status": "failed",
+        "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Login response missing token field — routes.py:L14 returns empty dict instead of {'token': issue_token(user)}.",
+        "command": "pytest tests/auth/test_login.py::test_jwt -q",
+        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
+      }
     ],
     "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []

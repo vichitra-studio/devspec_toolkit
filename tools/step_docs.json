@@ -1,0 +1,143 @@
+{
+  "step_docs": {
+    "00": [
+      "docs/developers/getting_started.md",
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "01": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "02": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "02a": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "03": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "04": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/workflows/workflow_bootstrap_legacy.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "05": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "06": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "07": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "08": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "09": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "10": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/architecture/governance_architecture.md",
+      "docs/ops/toolkit_update_checklist.md",
+      "docs/plans/phase_0_governance_plan.md"
+    ],
+    "11": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "12": [
+      "docs/developers/workflows/discovery.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/architecture/governance_architecture.md",
+      "docs/ops/toolkit_update_checklist.md"
+    ],
+    "13": [
+      "docs/developers/extension_schemas.md",
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "13a": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "14": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/developers/extension_schemas.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "15": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/workflows/workflow_feature_extension.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "16": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "16a": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/agents/agents.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "16b": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/agents/agents.md",
+      "docs/architecture/governance_architecture.md"
+    ],
+    "16c": [
+      "docs/developers/workflows/spec_to_impl.md",
+      "docs/developers/tooling/coverage_matrix.md",
+      "docs/developers/tooling/gap_hunter_checklist.md",
+      "docs/agents/agents.md",
+      "docs/architecture/governance_architecture.md"
+    ]
+  },
+  "description": "Maps step IDs to relevant documentation files. Used to surface context references for AI runners executing each step."
+}

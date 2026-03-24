@@ -213,7 +213,12 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:00:00Z",
   "plan": {
     "status": "active",
-    "summary": { "target_file_patterns": ["src/auth/routes.py"] },
+    "summary": {
+      "functional_summary": "Implement core API login endpoint with JWT issuance.",
+      "scope_in": ["POST /login handler", "JWT token issuance"],
+      "scope_out": ["OAuth login", "password reset"],
+      "target_file_patterns": ["src/auth/routes.py"]
+    },
     "spec_alignment": {
       "checklist": [
         {
@@ -242,12 +247,21 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:00:00Z",
   "plan": {
     "status": "active",
-    "summary": { "target_file_patterns": ["src/auth/routes.py"] },
+    "summary": { "functional_summary": "Implement core API login endpoint with JWT issuance.", "scope_in": ["POST /login handler", "JWT token issuance"], "scope_out": ["OAuth login", "password reset"], "target_file_patterns": ["src/auth/routes.py"] },
     "spec_alignment": {
       "checklist": [
         {
           "id": "CHK_AUTH_01",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-user-login",
+            "line_range": "L5-L8",
+            "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
+          },
+          "description": "POST /login validates credentials and returns a signed JWT.",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
+          "nfr_refs": ["nfr-auth-availability"],
+          "fixture_ref": "fix-auth-login-success",
           "implementation": {
             "status": "verified",
             "actions": [
@@ -270,6 +284,7 @@ Before emitting, verify:
       {
         "status": "failed",
         "outcome_description": "JWT assertion failed in targeted auth test.",
+        "reasoning": "Token field omitted from login response — fix requires returning {'token': issue_token(user)} in routes.py:L14.",
         "command": "pytest tests/auth/test_login.py::test_jwt -q",
         "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
       }

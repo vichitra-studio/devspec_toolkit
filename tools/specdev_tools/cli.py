@@ -12,7 +12,7 @@ migration) to improve readability and testability (see AUDIT-064).
    TODO: replace print() with logging in a future pass (AUDIT-065).
 """
 from __future__ import annotations
-import argparse, os, json, re, sys, traceback
+import argparse, os, json, re, sys
 from collections.abc import Sequence
 from pathlib import Path
 # Lazy imports handled inside main/command blocks to improve CLI responsiveness
@@ -226,6 +226,7 @@ def main():
 
     ai = sub.add_parser("ai-help")
     ai.add_argument("--step", help="Specific step to get help for")
+    ai.add_argument("--repo-root", default=".", help="Toolkit root directory")
     ai.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     # Changelog commands (Phase 2: Changelog Parser)
@@ -468,7 +469,7 @@ def main():
             # Flatten changes dict into a list of SpecError / str items
             all_items: list[str | SpecError] = []
             if changes:
-                for _fp, file_changes in sorted(changes.items()):
+                for _, file_changes in sorted(changes.items()):
                     for change in file_changes:
                         all_items.append(change)
             # Separate real errors from informational change descriptions
@@ -705,7 +706,7 @@ def main():
                 ("W567", "Milestone decomp completeness",  coverage["milestone_decomp_completeness"]),
                 ("W568", "Capability → FR coverage",       coverage["capability_fr_coverage"]),
             ]
-            for _code, label, dim in labels:
+            for _, label, dim in labels:
                 ratio = dim["ratio"]
                 uncovered = dim["uncovered_ids"]
                 pct = f"{ratio * 100:.1f}%"
@@ -757,6 +758,16 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "ai-help":
+        # Load step_docs.json for reference doc lookup
+        _ai_help_repo_root = os.path.abspath(getattr(args, "repo_root", "."))
+        _step_docs_path = os.path.join(_ai_help_repo_root, "tools", "step_docs.json")
+        _step_docs: dict = {}
+        try:
+            with open(_step_docs_path) as _f:
+                _step_docs = json.load(_f).get("step_docs", {})
+        except (OSError, KeyError, json.JSONDecodeError):
+            pass  # silently skip if file missing or malformed
+
         if getattr(args, "json_output", False):
             lines = []
             if args.step:
@@ -777,6 +788,11 @@ def main():
                     "5. Ensure all IDs use kebab-case format",
                     "6. No examples should be included in the AI output",
                 ]
+            if args.step and args.step in _step_docs:
+                lines.append("")
+                lines.append("Reference docs:")
+                for _doc in _step_docs[args.step]:
+                    lines.append(f"  - {_doc}")
             output = {
                 "status": "PASS",
                 "error_count": 0,
@@ -793,6 +809,11 @@ def main():
                 print(f"2. Copy the content into your AI assistant")
                 print(f"3. Write the AI-produced JSON directly to spec/{args.step}_*.json")
                 print(f"4. Validate: python -m specdev_tools.cli validate spec/{args.step}_*.json --repo-root <toolkit_dir>")
+                if args.step in _step_docs:
+                    print("")
+                    print("Reference docs:")
+                    for _doc in _step_docs[args.step]:
+                        print(f"  - {_doc}")
             else:
                 print("AI Interaction Guide:")
                 print("1. Locate the prompt file in prompts/prompt_XX_stepname.md")

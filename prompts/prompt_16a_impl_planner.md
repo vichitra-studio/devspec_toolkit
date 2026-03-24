@@ -305,6 +305,18 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
           "description": "POST /login validates credentials and returns a signed JWT.",
           "checklist_status": "active",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
+          "nfr_refs": ["nfr-auth-availability"],
+          "fixture_ref": "fix-auth-login-success",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "file_edit",
+                "description": "Implement POST /login handler with JWT issuance",
+                "target": "src/auth/routes.py"
+              }
+            ]
+          },
           "milestone_ref": "milestone-auth"
         }
       ]
