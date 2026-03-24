@@ -3,45 +3,9 @@
   "registry_version": "1.0.0",
   "aliases": [
     {
-      "kind": "acronym",
-      "normalized": "jwt",
-      "target_id": "cn:core:acronym:jwt",
-      "status": "active"
-    },
-    {
-      "kind": "action",
-      "normalized": "authn",
-      "target_id": "cn:core:action:authenticate",
-      "status": "active"
-    },
-    {
-      "kind": "capability",
-      "normalized": "auth",
-      "target_id": "cn:core:capability:authentication",
-      "status": "active"
-    },
-    {
-      "kind": "capability",
-      "normalized": "authn",
-      "target_id": "cn:core:capability:authentication",
-      "status": "active"
-    },
-    {
       "kind": "command",
       "normalized": "python test command",
       "target_id": "cn:core:command:pytest",
-      "status": "active"
-    },
-    {
-      "kind": "dependency",
-      "normalized": "auth service",
-      "target_id": "cn:core:dependency:auth-service",
-      "status": "active"
-    },
-    {
-      "kind": "entity",
-      "normalized": "account holder",
-      "target_id": "cn:core:entity:user",
       "status": "active"
     },
     {
@@ -75,12 +39,6 @@
       "status": "active"
     },
     {
-      "kind": "event",
-      "normalized": "auth success",
-      "target_id": "cn:core:event:login-succeeded",
-      "status": "active"
-    },
-    {
       "kind": "governance_label",
       "normalized": "sec",
       "target_id": "cn:core:governance_label:security",
@@ -108,24 +66,6 @@
       "kind": "policy",
       "normalized": "spec driven development",
       "target_id": "cn:core:policy:spec-first",
-      "status": "active"
-    },
-    {
-      "kind": "risk_category",
-      "normalized": "authentication",
-      "target_id": "cn:core:risk_category:authn",
-      "status": "active"
-    },
-    {
-      "kind": "risk_category",
-      "normalized": "authorization",
-      "target_id": "cn:core:risk_category:authz",
-      "status": "active"
-    },
-    {
-      "kind": "risk_category",
-      "normalized": "privacy",
-      "target_id": "cn:core:risk_category:data-privacy",
       "status": "active"
     },
     {
@@ -216,23 +156,6 @@
       "kind": "tech_stack",
       "normalized": "py",
       "target_id": "cn:core:tech_stack:python",
-      "status": "active"
-    },
-    {
-      "kind": "term",
-      "normalized": "java web token",
-      "target_id": "cn:core:term:jwt",
-      "status": "deprecated",
-      "lifecycle": {
-        "deprecated_since": "2026-01-15",
-        "sunset_date": "2026-06-01",
-        "replaced_by": "cn:core:term:jwt"
-      }
-    },
-    {
-      "kind": "term",
-      "normalized": "json web token",
-      "target_id": "cn:core:term:jwt",
       "status": "active"
     },
     {

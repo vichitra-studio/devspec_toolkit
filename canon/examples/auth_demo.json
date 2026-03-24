@@ -1,0 +1,248 @@
+{
+  "_description": "Auth-domain starter-kit entries. These use cn:core: namespace for backward compatibility. See canon/README.md for the planned cn:starter: namespace migration. For project-scoped terms, use cn:project: via specdev canon-accept.",
+  "$schema": "vc:core:canon",
+  "registry_version": "1.0.0",
+  "entries": [
+    {
+      "id": "cn:core:capability:authentication",
+      "kind": "capability",
+      "preferred_label": "authentication",
+      "definition": "Ability to verify identity and establish authenticated sessions.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "auth",
+        "authn"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:action:authenticate",
+      "kind": "action",
+      "preferred_label": "authenticate",
+      "definition": "Verify presented credentials and establish identity for subsequent operations.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "authn"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:entity:user",
+      "kind": "entity",
+      "preferred_label": "user",
+      "definition": "Primary actor record representing an authenticated or identifiable person.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "account-holder"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:event:login-succeeded",
+      "kind": "event",
+      "preferred_label": "login_succeeded",
+      "definition": "Event emitted when authentication succeeds and a session is issued.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "auth-success"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:dependency:auth-service",
+      "kind": "dependency",
+      "preferred_label": "auth-service",
+      "definition": "External authentication service dependency used by roadmap and implementation planning artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "auth-service"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:acronym:jwt",
+      "kind": "acronym",
+      "preferred_label": "JWT",
+      "definition": "Acronym for JSON Web Token.",
+      "version": "1.0.0",
+      "status": "deprecated",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "jwt"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z",
+        "deprecated_since": "2026-02-23T00:00:00Z",
+        "replaced_by": "cn:core:term:jwt"
+      }
+    },
+    {
+      "id": "cn:core:term:jwt",
+      "kind": "term",
+      "preferred_label": "JWT",
+      "definition": "JSON Web Token used to transport authenticated claims between parties.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "json-web-token"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:authn",
+      "kind": "risk_category",
+      "preferred_label": "authn",
+      "definition": "Risk related to user authentication mechanisms.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "authentication"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:authz",
+      "kind": "risk_category",
+      "preferred_label": "authz",
+      "definition": "Risk related to authorization and access control.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "authorization"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-privacy",
+      "kind": "risk_category",
+      "preferred_label": "data_privacy",
+      "definition": "Risk related to misuse or exposure of sensitive data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "privacy"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    }
+  ],
+  "aliases": [
+    {
+      "kind": "acronym",
+      "normalized": "jwt",
+      "target_id": "cn:core:acronym:jwt",
+      "status": "active"
+    },
+    {
+      "kind": "action",
+      "normalized": "authn",
+      "target_id": "cn:core:action:authenticate",
+      "status": "active"
+    },
+    {
+      "kind": "capability",
+      "normalized": "auth",
+      "target_id": "cn:core:capability:authentication",
+      "status": "active"
+    },
+    {
+      "kind": "capability",
+      "normalized": "authn",
+      "target_id": "cn:core:capability:authentication",
+      "status": "active"
+    },
+    {
+      "kind": "dependency",
+      "normalized": "auth service",
+      "target_id": "cn:core:dependency:auth-service",
+      "status": "active"
+    },
+    {
+      "kind": "entity",
+      "normalized": "account holder",
+      "target_id": "cn:core:entity:user",
+      "status": "active"
+    },
+    {
+      "kind": "event",
+      "normalized": "auth success",
+      "target_id": "cn:core:event:login-succeeded",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "authentication",
+      "target_id": "cn:core:risk_category:authn",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "authorization",
+      "target_id": "cn:core:risk_category:authz",
+      "status": "active"
+    },
+    {
+      "kind": "risk_category",
+      "normalized": "privacy",
+      "target_id": "cn:core:risk_category:data-privacy",
+      "status": "active"
+    },
+    {
+      "kind": "term",
+      "normalized": "json web token",
+      "target_id": "cn:core:term:jwt",
+      "status": "active"
+    }
+  ]
+}

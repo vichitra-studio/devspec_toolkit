@@ -616,6 +616,21 @@ class TestStep16(unittest.TestCase):
             f"Expected an E520 error mentioning 'semantic_review'. Got E520 errors: {[e.message for e in e520_errors]}"
         )
 
+    def test_valid_with_emergent_ambiguities(self):
+        """Valid fixture with emergent_ambiguities covering 'low' and 'high' severities should pass."""
+        path = os.path.join(self.fixtures_dir, "valid_with_emergent_ambiguities.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"Valid emergent_ambiguities fixture should pass. Errors: {errors}")
+
+    def test_invalid_emergent_ambiguity_severity(self):
+        """emergent_ambiguities entry with invalid severity value should fail schema validation."""
+        path = os.path.join(self.fixtures_dir, "invalid_emergent_ambiguity_severity.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(
+            len(errors) > 0,
+            "Invalid emergent_ambiguity severity fixture should fail validation"
+        )
+
     def test_e582_artifact_milestone_ref_not_in_roadmap(self):
         """E582: top-level milestone_ref pointing to a non-existent roadmap milestone fires E582."""
         # Roadmap has milestone 'ms-real'; artifact claims milestone_ref='ms-ghost' (does not exist)

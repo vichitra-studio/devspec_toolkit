@@ -2,23 +2,5 @@
   "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "action",
-  "entries": [
-    {
-      "id": "cn:core:action:authenticate",
-      "kind": "action",
-      "preferred_label": "authenticate",
-      "definition": "Verify presented credentials and establish identity for subsequent operations.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "authn"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    }
-  ]
+  "entries": []
 }

@@ -269,19 +269,25 @@ def main():
     eic.add_argument("--repo-root", default=".")
     eic.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    cca = sub.add_parser("canon-accept", help="Promote canonical_proposals from a spec file to canon/manifest.json")
+    cca.add_argument("--from", dest="spec_file", required=True, help="Path to spec file (e.g., spec/03_glossary.json)")
+    cca.add_argument("--namespace", default="cn:project:", help="Target namespace prefix (default: cn:project:)")
+    cca.add_argument("--repo-root", default=".")
+    cca.add_argument("--owner", default=None, help="Owner to assign to accepted entries (default: no owner)")
+    cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
+    cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
     args = p.parse_args()
 
     if getattr(args, "repo_root", None) == ".":
         # Auto-detect toolkit root by scanning immediate subdirectories
         current_dir = Path(".")
-        found = False
         for child in current_dir.iterdir():
             if child.is_dir():
-                 potential_marker = child / "tools" / "specdev_tools" / "__init__.py"
-                 if potential_marker.exists():
-                     args.repo_root = str(child)
-                     found = True
-                     break
+                potential_marker = child / "tools" / "specdev_tools" / "__init__.py"
+                if potential_marker.exists():
+                    args.repo_root = str(child)
+                    break
 
     if args.cmd == "validate":
         from .validation.validate import validate_file
@@ -1187,6 +1193,59 @@ def main():
             _json_exit(errs, "extraction-intent-check")
         else:
             _print_and_exit_if_errors(errs)
+
+    elif args.cmd == "canon-accept":
+        from .canonical.accept import run_canon_accept
+        repo_root = os.path.abspath(args.repo_root)
+        spec_file = os.path.abspath(args.spec_file)
+        result = run_canon_accept(
+            spec_file=spec_file,
+            namespace=args.namespace,
+            repo_root=repo_root,
+            dry_run=args.dry_run,
+            owner=getattr(args, "owner", None),
+        )
+        if getattr(args, "json_output", False):
+            error_str = result.get("error")
+            added = result.get("added", [])
+            skipped = result.get("skipped", [])
+            malformed = result.get("malformed", 0)
+            errs_list = [f"E521 CANON_ACCEPT_FAILED {error_str}"] if error_str else []
+            from .core.errors import ensure_spec_errors
+            from .core.json_output import format_errors_json
+            spec_errors = ensure_spec_errors(errs_list)
+            ctx: dict = {
+                "command": "canon-accept",
+                "added": added,
+                "skipped": skipped,
+                "malformed": malformed,
+                "dry_run": args.dry_run,
+            }
+            print(format_errors_json(spec_errors, context=ctx))
+            sys.exit(1 if error_str else 0)
+        else:
+            error_str = result.get("error")
+            if error_str:
+                print(f"E521 CANON_ACCEPT_FAILED {error_str}", file=sys.stderr)
+                sys.exit(1)
+            added = result.get("added", [])
+            skipped = result.get("skipped", [])
+            malformed = result.get("malformed", 0)
+            if added:
+                label = "would add" if args.dry_run else "added"
+                for cid in added:
+                    print(f"  + {label}: {cid}")
+            if skipped:
+                for cid in skipped:
+                    print(f"  ~ skipped (duplicate): {cid}")
+            if malformed:
+                print(f"  ! {malformed} malformed proposal(s) skipped (missing required fields)")
+            if not added and not skipped and not malformed:
+                print("OK (no proposals found)")
+            elif args.dry_run:
+                print(f"OK (dry-run: {len(added)} would be added, {len(skipped)} skipped, {malformed} malformed)")
+            else:
+                print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
 
     else:
         p.print_help()

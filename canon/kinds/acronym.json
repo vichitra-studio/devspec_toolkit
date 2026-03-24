@@ -2,25 +2,5 @@
   "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "acronym",
-  "entries": [
-    {
-      "id": "cn:core:acronym:jwt",
-      "kind": "acronym",
-      "preferred_label": "JWT",
-      "definition": "Acronym for JSON Web Token.",
-      "version": "1.0.0",
-      "status": "deprecated",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "jwt"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z",
-        "deprecated_since": "2026-02-23T00:00:00Z",
-        "replaced_by": "cn:core:term:jwt"
-      }
-    }
-  ]
+  "entries": []
 }

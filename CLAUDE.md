@@ -87,6 +87,11 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 # Changelog
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate 0.4.0 --repo-root ./devspec_toolkit
+
+# Canon management
+# Run after generating Step 03 glossary to promote project-specific terms to the canon registry.
+./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --namespace cn:project: --owner product
 ```
 
 > **JSON output**: All CLI commands accept `--json` for structured JSON output with `status`, `error_count`, `warning_count`, and `errors` array. Example: `./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit --json`

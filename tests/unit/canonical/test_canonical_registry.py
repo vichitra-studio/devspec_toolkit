@@ -356,5 +356,100 @@ class CanonicalRegistryTests(unittest.TestCase):
         self.assertFalse(any(e.code == "E125" for e in errs), f"Did not expect E125 in {errs}")
 
 
+    def test_registry_loader_includes_examples_directory(self):
+        """Regression guard: canon/examples/ entries MUST be loaded into the registry.
+
+        Auth entries (and other domain starter-kit entries) live in canon/examples/*.json.
+        The loader must scan that directory and merge all entries so that canonical-lint
+        and canonical-integrity can resolve IDs like cn:core:capability:authentication.
+        Manifest/kinds entries take precedence over examples entries when IDs collide.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            examples_dir = canon_root / "examples"
+            examples_dir.mkdir(parents=True)
+
+            example_ids = [
+                "cn:core:capability:authentication",
+                "cn:core:action:authenticate",
+                "cn:core:entity:user",
+            ]
+            example_doc = {
+                "registry_version": "1.0.0",
+                "entries": [
+                    {
+                        "id": eid,
+                        "kind": eid.split(":")[2],
+                        "preferred_label": eid.split(":")[-1],
+                        "version": "1.0.0",
+                        "status": "active",
+                        "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                    }
+                    for eid in example_ids
+                ],
+                "aliases": [],
+            }
+            (examples_dir / "auth_demo.json").write_text(
+                __import__("json").dumps(example_doc), encoding="utf-8"
+            )
+
+            reg = CanonicalRegistry.load(str(root))
+
+            for eid in example_ids:
+                self.assertIsNotNone(
+                    reg.get(eid),
+                    msg=f"Entry {eid!r} from canon/examples/ must be resolvable in the registry",
+                )
+
+    def test_registry_loader_manifest_takes_precedence_over_examples(self):
+        """Manifest entries override same-ID entries from canon/examples/."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon_root = root / "canon"
+            examples_dir = canon_root / "examples"
+            examples_dir.mkdir(parents=True)
+
+            # examples version = "9.9.9", manifest version = "1.0.0"
+            (examples_dir / "demo.json").write_text(
+                __import__("json").dumps({
+                    "registry_version": "1.0.0",
+                    "entries": [
+                        {
+                            "id": "cn:core:unit:percent",
+                            "kind": "unit",
+                            "preferred_label": "percent",
+                            "version": "9.9.9",
+                            "status": "active",
+                        }
+                    ],
+                    "aliases": [],
+                }),
+                encoding="utf-8",
+            )
+            (canon_root / "manifest.json").write_text(
+                __import__("json").dumps({
+                    "registry_version": "1.0.0",
+                    "entries": [
+                        {
+                            "id": "cn:core:unit:percent",
+                            "kind": "unit",
+                            "preferred_label": "percent",
+                            "version": "1.0.0",
+                            "status": "active",
+                        }
+                    ],
+                    "aliases": [],
+                }),
+                encoding="utf-8",
+            )
+
+            reg = CanonicalRegistry.load(str(root))
+            entry = reg.get("cn:core:unit:percent")
+            assert entry is not None, "cn:core:unit:percent must be resolvable"
+            self.assertEqual("1.0.0", entry.version,
+                             "Manifest entry (v1.0.0) must win over examples entry (v9.9.9)")
+
+
 if __name__ == "__main__":
     unittest.main()

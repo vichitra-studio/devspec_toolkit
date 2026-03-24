@@ -51,8 +51,6 @@ class CanonicalRegistry:
         alias_lifecycle: dict[tuple[str, str], dict] = {}
 
         def register_alias(kind: str, alias_value: str, target_id: str, status: str = "active") -> None:
-            if not isinstance(kind, str) or not isinstance(alias_value, str) or not isinstance(target_id, str):
-                return
             normalized = _norm(alias_value)
             if not normalized:
                 return
@@ -187,12 +185,56 @@ def _load_merged_manifest(root: Path, canon_dir: str) -> tuple[dict[str, Any] | 
     manifest = _read_json_file(manifest_path, load_errors, "invalid_manifest") if manifest_path.exists() else None
     modular = _load_modular_manifest(root / canon_dir, load_errors)
     if manifest is None and modular is None:
-        return None, load_errors
-    if manifest is None:
-        return modular, load_errors
-    if modular is None:
-        return manifest, load_errors
-    return _merge_manifest_data(manifest, modular), load_errors
+        combined = None
+    elif manifest is None:
+        combined = modular
+    elif modular is None:
+        combined = manifest
+    else:
+        combined = _merge_manifest_data(manifest, modular)
+
+    examples = _load_examples_manifests(root / canon_dir, load_errors)
+    if examples is None:
+        return combined, load_errors
+    if combined is None:
+        return examples, load_errors
+    # Manifest/modular entries take precedence over examples entries.
+    return _merge_manifest_data(examples, combined), load_errors
+
+
+def _load_examples_manifests(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:
+    examples_dir = canon_root / "examples"
+    if not examples_dir.exists() or not examples_dir.is_dir():
+        return None
+
+    all_entries: list[dict[str, Any]] = []
+    all_aliases: list[dict[str, Any]] = []
+    found_any = False
+
+    for example_file in sorted(examples_dir.glob("*.json")):
+        doc = _read_json_file(example_file, load_errors, "invalid_examples_file")
+        if not isinstance(doc, dict):
+            continue
+        raw_entries = doc.get("entries")
+        if isinstance(raw_entries, list):
+            for item in raw_entries:
+                if isinstance(item, dict):
+                    all_entries.append(item)
+            found_any = True
+        raw_aliases = doc.get("aliases")
+        if isinstance(raw_aliases, list):
+            for item in raw_aliases:
+                if isinstance(item, dict):
+                    all_aliases.append(item)
+
+    if not found_any:
+        return None
+
+    return {
+        "registry_version": "1.0.0",
+        "entries": all_entries,
+        "aliases": all_aliases,
+    }
 
 
 def _load_modular_manifest(canon_root: Path, load_errors: list[SpecError]) -> dict[str, Any] | None:

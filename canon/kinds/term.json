@@ -2,23 +2,5 @@
   "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "term",
-  "entries": [
-    {
-      "id": "cn:core:term:jwt",
-      "kind": "term",
-      "preferred_label": "JWT",
-      "definition": "JSON Web Token used to transport authenticated claims between parties.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "json-web-token"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    }
-  ]
+  "entries": []
 }
