@@ -71,7 +71,12 @@ class SchemaContractsTests(unittest.TestCase):
         self.assertEqual([], violations, f"specdev.local found in: {violations}")
 
     def test_all_step_schemas_have_at_least_one_canonical_ref_slot(self):
+        # Steps whose canonical refs are inherited entirely via step_base (canonical_refs_used)
+        # and have no step-specific *_ref properties of their own.
+        no_step_specific_refs = {"13a_completeness_assessment.schema.json"}
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
+            if path.name in no_step_specific_refs:
+                continue
             with path.open("r", encoding="utf-8") as f:
                 schema = json.load(f)
             self.assertGreater(_count_canonical_ref_slots(schema), 0, msg=path.name)
@@ -93,7 +98,6 @@ class SchemaContractsTests(unittest.TestCase):
             "11": {"risk_category", "policy"},
             "12": {"command", "environment", "role"},
             "13": {"tag", "policy", "id_pattern", "governance_label"},
-            "13a": {"risk_category", "tag", "completeness_dimension"},
             "14": {"status", "environment", "metric", "tech_stack", "dependency"},
             "15": {"command"},
             "16": {"status", "command", "policy", "risk_category"},

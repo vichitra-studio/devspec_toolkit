@@ -335,7 +335,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                 roadmap_milestones = roadmap_data.get("milestones", [])
                 if milestone_ref and not milestone_found and len(roadmap_milestones) > 0:
                     errors.append(
-                        make_error("E582", f"MILESTONE_REF_MISMATCH: milestone_ref '{milestone_ref}' not found in roadmap milestones")
+                        make_error("E582", f"UNCOVERED_FR_REVIEW_COVERAGE: milestone_ref '{milestone_ref}' not found in roadmap milestones")
                     )
                 checklist_refs = {
                     item["spec_ref"]["id"]
@@ -389,7 +389,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                         expected_ms = task_to_milestone[spec_ref_id]
                         if milestone_ref != expected_ms:
                             errors.append(
-                                make_error("E582", f"MILESTONE_REF_MISMATCH milestone_ref mismatch item={item_id} "
+                                make_error("E582", f"UNCOVERED_FR_REVIEW_COVERAGE milestone_ref mismatch item={item_id} "
                                 f"expected={expected_ms} got={milestone_ref}")
                             )
             except (OSError, json.JSONDecodeError, KeyError, TypeError):

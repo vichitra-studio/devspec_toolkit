@@ -5,6 +5,9 @@ verdict enums, and semantic coverage on top of the base step_16 checks.
 """
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
@@ -51,5 +54,69 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
                     if fr_id in seen_fr_ids:
                         errors.append(make_error("E520", f"Step 16c: duplicate fr_id '{fr_id}' in semantic_review.fr_coverage"))
                     seen_fr_ids.add(fr_id)
+
+    # W582 -- FR coverage completeness against the corresponding Step 14 milestone
+    # Only runs when verdict is "verified" and spec_path is available
+    if verdict == "verified" and spec_path:
+        spec_dir = os.path.dirname(spec_path)
+        roadmap_path = Path(spec_dir) / "14_roadmap.json"
+        if roadmap_path.exists():
+            try:
+                roadmap_data = json.loads(roadmap_path.read_text())
+                # milestone_ref is not a root field in the 16c schema — scan ALL
+                # checklist items to collect unique planning milestone references.
+                checklist = (
+                    data.get("plan", {})
+                    .get("spec_alignment", {})
+                    .get("checklist", [])
+                )
+                # Collect ALL unique milestone_ref values from ALL checklist items
+                milestone_refs: set[str] = set()
+                root_milestone_ref = data.get("milestone_ref", "")
+                if root_milestone_ref:
+                    milestone_refs.add(root_milestone_ref)
+                if isinstance(checklist, list):
+                    for item in checklist:
+                        if isinstance(item, dict):
+                            ref = item.get("milestone_ref", "")
+                            if ref:
+                                milestone_refs.add(ref)
+                # If milestone_refs is empty (checklist absent and no root milestone_ref),
+                # W582 runs against ALL milestones in the roadmap — a conservative "all coverage required"
+                # fallback. This is intentional: without a scoped milestone, we verify the full roadmap.
+                # The W582 message uses "(all)" as the milestone label in this case.
+                milestone_fr_refs: list[str] = []
+                for milestone in roadmap_data.get("milestones", []):
+                    if not isinstance(milestone, dict):
+                        continue
+                    mid = milestone.get("milestone_id", "")
+                    if milestone_refs:
+                        if mid not in milestone_refs:
+                            continue
+                    milestone_fr_refs.extend(
+                        fr for fr in milestone.get("fr_refs", []) if isinstance(fr, str)
+                    )
+
+                # Collect covered FR IDs from semantic_review.fr_coverage
+                covered_fr_ids: set[str] = set()
+                if isinstance(semantic_review, dict):
+                    for entry in semantic_review.get("fr_coverage", []):
+                        if isinstance(entry, dict):
+                            fr_id = entry.get("fr_id")
+                            if isinstance(fr_id, str):
+                                covered_fr_ids.add(fr_id)
+
+                # Fire W582 for each milestone FR not covered in fr_coverage
+                for fr_ref in milestone_fr_refs:
+                    if fr_ref not in covered_fr_ids:
+                        errors.append(
+                            make_error(
+                                "W582",
+                                f"Step 16c: FR '{fr_ref}' from milestone '{', '.join(sorted(milestone_refs)) or '(all)'}' "
+                                "in 14_roadmap.json is not covered in semantic_review.fr_coverage"
+                            )
+                        )
+            except (OSError, json.JSONDecodeError, KeyError, TypeError):
+                pass  # Roadmap parse errors handled by E304 in step_16 base validator
 
     return errors

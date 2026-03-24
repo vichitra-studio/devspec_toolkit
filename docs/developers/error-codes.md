@@ -36,6 +36,46 @@
 
 **Resolution**: Create a checklist item with `spec_ref.id` matching the roadmap `task_id`, or mark the task as deferred.
 
+### E564 / W564 UNCOVERED_FR_API
+
+**Trigger**: A functional requirement defined in step 04 has no API trace reference — no API in step 05 has a trace link with type "fr" pointing to this FR.
+
+**Resolution**: Add a trace link of type "fr" in the appropriate API contract in `05_api_contracts.json`, or document why the FR has no API surface.
+
+**Promotable**: W564 → E564.
+
+### E565 / W565 UNCOVERED_FR_FIXTURE
+
+**Trigger**: A functional requirement defined in step 04 has no fixture coverage — no fixture in step 08 has a target with type "fr" pointing to this FR.
+
+**Resolution**: Add a fixture in `08_fixtures.json` with a target referencing the FR, or document why the FR requires no fixture.
+
+**Promotable**: W565 → E565.
+
+### E566 / W566 UNCOVERED_FR_MILESTONE
+
+**Trigger**: A functional requirement defined in step 04 is not referenced in any step 14 milestone `fr_refs`.
+
+**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`, or document why the FR is intentionally unscheduled.
+
+**Promotable**: W566 → E566.
+
+### E567 / W567 INCOMPLETE_MILESTONE_DECOMPOSITION
+
+**Trigger**: A milestone in step 14 has no tasks, or the milestone's `fr_refs` are not covered by any task's `fr_refs`.
+
+**Resolution**: Add tasks to the milestone, or ensure task `fr_refs` collectively cover the milestone's `fr_refs`.
+
+**Promotable**: W567 → E567.
+
+### E568 / W568 UNCOVERED_CAPABILITY
+
+**Trigger**: A capability defined in step 01 has no functional requirement tracing to it. This replaces the former E560 `capability_without_fr` check.
+
+**Resolution**: Add an FR in `04_fr_list.json` that traces to the uncovered capability, or remove the capability if it is no longer relevant.
+
+**Promotable**: W568 → E568.
+
 ### E582 MILESTONE_REF_MISMATCH
 
 **Trigger**: A checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in step 14.

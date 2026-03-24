@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **AI Spec Driven Development Toolkit** is a schema-first, AI-assisted workflow that turns spec → implementation into a deterministic pipeline. It is typically vendored as a git submodule at `<product-repo>/devspec_toolkit/` beside the host repo's live `spec/` directory.
 
-Current version: **0.4.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
+Current version: **0.5.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
 
 ---
 
@@ -123,7 +123,7 @@ pytest tests/integration/ -v
 
 | Variable | Effect |
 |----------|--------|
-| `SPECDEV_WARNINGS_AS_ERRORS=1` | Promotes all 18 warning codes with E-code counterparts to errors |
+| `SPECDEV_WARNINGS_AS_ERRORS=1` | Promotes all 22 warning codes with E-code counterparts to errors |
 | `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion — only the listed W-codes are promoted to their E-code counterparts |
 | `SPECDEV_MATRIX_STRICT=1` | Makes matrix coverage errors fatal (exit non-zero) |
 | `SPECDEV_REPLAY_BASE_REF=<ref>` | Override the base ref for forward-replay diff detection |

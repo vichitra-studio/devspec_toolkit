@@ -1746,5 +1746,101 @@ class CliTests(unittest.TestCase):
             self.assertEqual(code, 0, f"stderr: {stderr}")
 
 
+    def test_completeness_check_runs_without_error_on_empty_spec_dir(self):
+        """completeness-check with an empty spec dir should exit 0 with no errors."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root)]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+
+    def test_completeness_check_json_output_has_coverage_key(self):
+        """completeness-check --json should include a 'coverage' key in output."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertIn("coverage", payload, f"Expected 'coverage' key in JSON output. Got: {payload}")
+
+    def test_completeness_check_exits_nonzero_on_wcodes_with_warnings_as_errors(self):
+        """With SPECDEV_WARNINGS_AS_ERRORS=1, W-codes from completeness-check cause non-zero exit."""
+        import os as _os
+        # Build a minimal spec dir that triggers W568 (capability with no FR tracing to it)
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+
+            # Write capabilities with cap-auth but no FRs tracing to it
+            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
+            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            env = {**_os.environ, "SPECDEV_WARNINGS_AS_ERRORS": "1"}
+            with patch("specdev_tools.cli.check_venv", return_value=None), \
+                 patch.object(sys, "argv", ["specdev-tools", "completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]):
+                from specdev_tools.core.config import reset_config
+                reset_config()
+                with patch.dict(_os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
+                    stdout = io.StringIO()
+                    stderr = io.StringIO()
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        try:
+                            from importlib import reload
+                            import specdev_tools.core.config as _cfg
+                            reload(_cfg)
+                            cli.main()
+                            code = 0
+                        except SystemExit as exc:
+                            code = int(exc.code) if isinstance(exc.code, int) else 1
+                        finally:
+                            reset_config()
+            self.assertEqual(1, code, msg=f"Expected exit 1 with SPECDEV_WARNINGS_AS_ERRORS=1. stdout: {stdout.getvalue()}")
+
+    def test_completeness_check_exits_nonzero_non_json_with_warnings_as_errors(self):
+        """Non-JSON path exits non-zero when W-codes are present with WARNINGS_AS_ERRORS."""
+        import os as _os
+        # Build a minimal spec dir that triggers W568 (capability with no FR tracing to it)
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+
+            # Write capabilities with cap-auth but no FRs tracing to it — W568 fires
+            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
+            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            with patch("specdev_tools.cli.check_venv", return_value=None), \
+                 patch.object(sys, "argv", ["specdev-tools", "completeness-check", str(spec_dir), "--repo-root", str(repo_root)]):
+                from specdev_tools.core.config import reset_config
+                reset_config()
+                with patch.dict(_os.environ, {"SPECDEV_WARNINGS_AS_ERRORS": "1"}):
+                    stdout = io.StringIO()
+                    stderr = io.StringIO()
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        try:
+                            from importlib import reload
+                            import specdev_tools.core.config as _cfg
+                            reload(_cfg)
+                            cli.main()
+                            code = 0
+                        except SystemExit as exc:
+                            code = int(exc.code) if isinstance(exc.code, int) else 1
+                        finally:
+                            reset_config()
+            self.assertEqual(1, code, msg=f"Expected exit 1 for non-JSON path with SPECDEV_WARNINGS_AS_ERRORS=1. stdout: {stdout.getvalue()}")
+
+
 if __name__ == "__main__":
     unittest.main()

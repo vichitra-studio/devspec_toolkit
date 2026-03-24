@@ -766,16 +766,49 @@ class TestStep13CrossStep(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Step 13a — FR + API refs in missing_elements spec_refs/related_ids
+# Step 13a — FR + API refs in dimensions.uncovered_ids
 # ---------------------------------------------------------------------------
 
+def _make_valid_13a_dimensions(fr_uncovered=None, api_uncovered=None):
+    """Helper: build a valid dimensions dict with optional uncovered IDs."""
+    return {
+        "fr_api_coverage": {
+            "covered_count": 1 if not fr_uncovered else 0,
+            "total_count": 1 + len(fr_uncovered or []),
+            "ratio": 1.0 if not fr_uncovered else 0.0,
+            "uncovered_ids": list(fr_uncovered or []),
+        },
+        "fr_fixture_coverage": {
+            "covered_count": 1,
+            "total_count": 1,
+            "ratio": 1.0,
+            "uncovered_ids": [],
+        },
+        "fr_milestone_coverage": {
+            "covered_count": 1,
+            "total_count": 1,
+            "ratio": 1.0,
+            "uncovered_ids": [],
+        },
+        "capability_fr_coverage": {
+            "covered_count": 1,
+            "total_count": 1,
+            "ratio": 1.0,
+            "uncovered_ids": [],
+        },
+    }
+
+
 class TestStep13aCrossStep(unittest.TestCase):
-    """Cross-step validation: step_13a checks FR/API refs in missing_elements."""
+    """Cross-step validation: step_13a checks FR/API refs in dimensions.uncovered_ids."""
 
     def test_valid_upstream_refs_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
             spec_dir = os.path.join(tmp, "spec")
             os.makedirs(spec_dir)
+            _write_json(spec_dir, "01_capabilities.json", {
+                "capabilities": [{"capability_id": "cap-auth"}]
+            })
             _write_json(spec_dir, "04_fr_list.json", {
                 "functional_requirements": [{"fr_id": "fr-login"}]
             })
@@ -783,15 +816,32 @@ class TestStep13aCrossStep(unittest.TestCase):
                 "apis": [{"api_id": "api-auth"}]
             })
             instance = {
-                "summary": {"completeness": 85},
-                "missing_elements": [
-                    {
-                        "element_id": "error-handling",
-                        "impact_score": 15,
-                        "spec_refs": ["fr-login"],
-                        "related_ids": ["api-auth"],
-                    }
-                ]
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_fixture_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_milestone_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "capability_fr_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                }
             }
             errors = validate_step_13a(instance, tmp)
             self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
@@ -801,17 +851,34 @@ class TestStep13aCrossStep(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             spec_dir = os.path.join(tmp, "spec")
             os.makedirs(spec_dir)
-            # No upstream files
+            # No upstream files — dimensions still has fr- refs in uncovered_ids
             instance = {
-                "summary": {"completeness": 85},
-                "missing_elements": [
-                    {
-                        "element_id": "error-handling",
-                        "impact_score": 15,
-                        "spec_refs": ["fr-login"],
-                        "related_ids": ["api-auth"],
-                    }
-                ]
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["fr-login"],
+                    },
+                    "fr_fixture_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_milestone_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "capability_fr_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                }
             }
             errors = validate_step_13a(instance, tmp)
             w = _w590(errors)
@@ -820,7 +887,7 @@ class TestStep13aCrossStep(unittest.TestCase):
             self.assertIn("04_fr_list.json", combined)
             self.assertIn("05_interface_contracts.json", combined)
 
-    def test_broken_ref_emits_e590(self):
+    def test_broken_ref_in_uncovered_ids_emits_e590(self):
         with tempfile.TemporaryDirectory() as tmp:
             spec_dir = os.path.join(tmp, "spec")
             os.makedirs(spec_dir)
@@ -830,26 +897,44 @@ class TestStep13aCrossStep(unittest.TestCase):
             _write_json(spec_dir, "05_interface_contracts.json", {
                 "apis": [{"api_id": "api-auth"}]
             })
+            # uncovered_ids reference IDs not in upstream specs
             instance = {
-                "summary": {"completeness": 85},
-                "missing_elements": [
-                    {
-                        "element_id": "error-handling",
-                        "impact_score": 15,
-                        "spec_refs": ["fr-nonexistent"],
-                        "related_ids": ["api-ghost"],
-                    }
-                ]
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["fr-nonexistent"],
+                    },
+                    "fr_fixture_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["fr-ghost"],
+                    },
+                    "fr_milestone_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "capability_fr_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                }
             }
             errors = validate_step_13a(instance, tmp)
             e = _e590(errors)
             self.assertGreaterEqual(len(e), 2, f"Expected E590 for broken refs: {e}")
             combined = " ".join(e)
             self.assertIn("fr-nonexistent", combined)
-            self.assertIn("api-ghost", combined)
+            self.assertIn("fr-ghost", combined)
 
-    def test_element_id_itself_checked_when_prefixed(self):
-        """An element_id starting with fr- or api- should be validated."""
+    def test_unknown_fr_in_uncovered_ids_emits_e590(self):
+        """An uncovered_id starting with fr- that does not exist in 04 should fire E590."""
         with tempfile.TemporaryDirectory() as tmp:
             spec_dir = os.path.join(tmp, "spec")
             os.makedirs(spec_dir)
@@ -860,20 +945,90 @@ class TestStep13aCrossStep(unittest.TestCase):
                 "apis": [{"api_id": "api-auth"}]
             })
             instance = {
-                "summary": {"completeness": 90},
-                "missing_elements": [
-                    {
-                        "element_id": "fr-phantom",
-                        "impact_score": 10,
-                    }
-                ]
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["fr-phantom"],
+                    },
+                    "fr_fixture_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_milestone_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "capability_fr_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                }
             }
             errors = validate_step_13a(instance, tmp)
             e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, f"Expected E590 for element_id 'fr-phantom': {e}")
+            self.assertGreaterEqual(len(e), 1, f"Expected E590 for unknown 'fr-phantom': {e}")
             self.assertTrue(
                 any("fr-phantom" in msg for msg in e),
                 f"E590 should mention fr-phantom: {e}"
+            )
+
+    def test_hallucinated_cap_id_in_capability_coverage_fires_e590(self):
+        """A capability-* ID in capability_fr_coverage.uncovered_ids that doesn't exist in 01_capabilities.json fires E590."""
+        with tempfile.TemporaryDirectory() as tmp:
+            spec_dir = os.path.join(tmp, "spec")
+            os.makedirs(spec_dir)
+            # 01_capabilities.json with only capability-auth (real prefix convention)
+            _write_json(spec_dir, "01_capabilities.json", {
+                "capabilities": [{"capability_id": "capability-auth"}]
+            })
+            _write_json(spec_dir, "04_fr_list.json", {
+                "functional_requirements": [{"fr_id": "fr-login"}]
+            })
+            _write_json(spec_dir, "05_interface_contracts.json", {
+                "apis": [{"api_id": "api-auth"}]
+            })
+            instance = {
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_fixture_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "fr_milestone_coverage": {
+                        "covered_count": 1,
+                        "total_count": 1,
+                        "ratio": 1.0,
+                        "uncovered_ids": [],
+                    },
+                    "capability_fr_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["capability-does-not-exist"],
+                    },
+                }
+            }
+            errors = validate_step_13a(instance, tmp)
+            e = _e590(errors)
+            self.assertGreaterEqual(len(e), 1, f"Expected E590 for hallucinated capability-* ID: {e}")
+            self.assertTrue(
+                any("capability-does-not-exist" in msg for msg in e),
+                f"E590 should mention capability-does-not-exist: {e}"
             )
 
 
@@ -1019,8 +1174,17 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
     def test_step_13a_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
             instance = {
-                "summary": {"completeness": 80},
-                "missing_elements": [{"element_id": "err", "impact_score": 20, "spec_refs": ["fr-x"]}],
+                "dimensions": {
+                    "fr_api_coverage": {
+                        "covered_count": 0,
+                        "total_count": 1,
+                        "ratio": 0.0,
+                        "uncovered_ids": ["fr-x"],
+                    },
+                    "fr_fixture_coverage": {"covered_count": 1, "total_count": 1, "ratio": 1.0, "uncovered_ids": []},
+                    "fr_milestone_coverage": {"covered_count": 1, "total_count": 1, "ratio": 1.0, "uncovered_ids": []},
+                    "capability_fr_coverage": {"covered_count": 1, "total_count": 1, "ratio": 1.0, "uncovered_ids": []},
+                }
             }
             errors = validate_step_13a(instance, tmp)
             self.assertGreaterEqual(len(_w590(errors)), 1)

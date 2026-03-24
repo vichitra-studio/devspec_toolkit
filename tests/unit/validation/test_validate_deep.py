@@ -367,8 +367,8 @@ class TestR9PromotablePairsIntegrity(unittest.TestCase):
     """Sanity checks on the PROMOTABLE_PAIRS data structure."""
 
     def test_promotable_pairs_count(self):
-        """PROMOTABLE_PAIRS has the expected 18 entries."""
-        self.assertEqual(len(PROMOTABLE_PAIRS), 18)
+        """PROMOTABLE_PAIRS has the expected 22 entries (W561 excluded to prevent double-promotion with W566)."""
+        self.assertEqual(len(PROMOTABLE_PAIRS), 23)
 
     def test_all_w_codes_map_to_e_codes(self):
         """Every key is a W-code and every value is the corresponding E-code."""

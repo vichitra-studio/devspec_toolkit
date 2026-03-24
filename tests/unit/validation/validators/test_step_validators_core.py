@@ -73,9 +73,9 @@ class StepValidatorsTests(unittest.TestCase):
         errs = step_13.validate_step_13({"extensions": [{"extension_id": "e1"}]}, ".")
         self.assertTrue(errs)
 
-    def test_step_13a_bad_score(self):
-        errs = step_13a.validate_step_13a({"missing_elements": [{"element_id": "x", "impact_score": 1000}]}, ".")
-        self.assertTrue(errs)
+    def test_step_13a_missing_dimensions(self):
+        errs = step_13a.validate_step_13a({}, ".")
+        self.assertTrue(any("MISSING_DIMENSIONS" in e for e in _render(errs)))
 
     def test_step_14_external_dependency_missing_owner(self):
         errs = step_14.validate_step_14({"milestones": [], "dependencies": [{"type": "external", "id": "auth-service"}]}, ".")
@@ -138,13 +138,27 @@ class StepValidatorsTests(unittest.TestCase):
         self.assertFalse(any("Circular" in e for e in _render(errs)))
 
     # T14a: step_13a tests
-    def test_step_13a_bad_element_id(self):
-        errs = step_13a.validate_step_13a({"missing_elements": [{"element_id": "BAD ID!", "impact_score": 50}]}, ".")
-        self.assertTrue(any("convention" in e for e in _render(errs)))
+    def test_step_13a_ratio_inconsistency(self):
+        errs = step_13a.validate_step_13a({
+            "dimensions": {
+                "fr_api_coverage": {"covered_count": 3, "total_count": 10, "ratio": 0.99, "uncovered_ids": ["fr-a", "fr-b", "fr-c", "fr-d", "fr-e", "fr-f", "fr-g"]},
+                "fr_fixture_coverage": {"covered_count": 10, "total_count": 10, "ratio": 1.0, "uncovered_ids": []},
+                "fr_milestone_coverage": {"covered_count": 10, "total_count": 10, "ratio": 1.0, "uncovered_ids": []},
+                "capability_fr_coverage": {"covered_count": 5, "total_count": 5, "ratio": 1.0, "uncovered_ids": []},
+            }
+        }, ".")
+        self.assertTrue(any("RATIO_INCONSISTENCY" in e for e in _render(errs)))
 
-    def test_step_13a_incomplete_but_no_missing(self):
-        errs = step_13a.validate_step_13a({"missing_elements": [], "summary": {"completeness": 50}}, ".")
-        self.assertTrue(any("missing_elements is empty" in e for e in _render(errs)))
+    def test_step_13a_below_threshold_fires_w592(self):
+        errs = step_13a.validate_step_13a({
+            "dimensions": {
+                "fr_api_coverage": {"covered_count": 0, "total_count": 10, "ratio": 0.0, "uncovered_ids": ["fr-a", "fr-b", "fr-c", "fr-d", "fr-e", "fr-f", "fr-g", "fr-h", "fr-i", "fr-j"]},
+                "fr_fixture_coverage": {"covered_count": 10, "total_count": 10, "ratio": 1.0, "uncovered_ids": []},
+                "fr_milestone_coverage": {"covered_count": 10, "total_count": 10, "ratio": 1.0, "uncovered_ids": []},
+                "capability_fr_coverage": {"covered_count": 5, "total_count": 5, "ratio": 1.0, "uncovered_ids": []},
+            }
+        }, ".")
+        self.assertTrue(any("W592" in e for e in _render(errs)))
 
 
 if __name__ == "__main__":

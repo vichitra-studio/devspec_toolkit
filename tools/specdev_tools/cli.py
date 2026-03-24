@@ -201,6 +201,11 @@ def main():
     tc.add_argument("--repo-root", default=".")
     tc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    cc = sub.add_parser("completeness-check", help="Run pairwise completeness checks (W564–W568) and report coverage ratios")
+    cc.add_argument("spec_dir")
+    cc.add_argument("--repo-root", default=".")
+    cc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
     dol.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
@@ -566,6 +571,151 @@ def main():
             _json_exit(errs, "traceability-check", {"spec_dir": spec_dir})
         else:
             _print_and_exit_if_errors(errs)
+    elif args.cmd == "completeness-check":
+        from .validation.traceability_closure import check_traceability_closure
+        spec_dir = os.path.abspath(args.spec_dir)
+        repo_root = os.path.abspath(args.repo_root)
+        all_errs = check_traceability_closure(spec_dir, repo_root)
+
+        # Filter for pairwise completeness codes W564–W568 (and E-code counterparts).
+        # W561 (UNCOVERED_FR legacy co-fire) is intentionally excluded — W566 covers the same FRs
+        # and is the promotable pairwise code for completeness reporting.
+        _completeness_codes = frozenset({
+            "W564", "W565", "W566", "W567", "W568",
+            "E564", "E565", "E566", "E567", "E568",
+        })
+        from .core.errors import SpecError
+        completeness_errs = [
+            e for e in all_errs
+            if (isinstance(e, SpecError) and e.code in _completeness_codes)
+            or (isinstance(e, str) and any(e.lstrip().startswith(c) for c in _completeness_codes))
+        ]
+
+        # Compute per-check coverage ratios by counting uncovered IDs.
+        # Each warning message has the form: "LABEL {id} [optional tail...]"
+        # For W564–W568 the uncovered ID is always the second token (parts[1]).
+        # Message forms:
+        #   W564: "UNCOVERED_FR_API {fr_id}"
+        #   W565: "UNCOVERED_FR_FIXTURE {fr_id}"
+        #   W566: "UNCOVERED_FR_MILESTONE {fr_id}"
+        #   W567: "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}" or
+        #          "INCOMPLETE_MILESTONE_DECOMPOSITION {ms_id}: fr_ref {fr_id} not covered ..."
+        #   W568: "UNCOVERED_CAPABILITY {cap_id}"
+        _PAIRWISE_CODES = frozenset({"W564", "W565", "W566", "W567", "W568",
+                                     "E564", "E565", "E566", "E567", "E568"})
+
+        def _extract_ids_for_code(code: str) -> list[str]:
+            result = []
+            # e_variant: the E-code counterpart of the W-code passed by callers (e.g. "W564" → "E564").
+            # Callers always pass W-codes (W564–W568); e_variant lets us match promoted E-code errors too.
+            e_variant = code.replace("W", "E", 1)
+            for e in completeness_errs:
+                msg = e.message if isinstance(e, SpecError) else e
+                # Match both W-code and promoted E-code
+                if isinstance(e, SpecError) and e.code in (code, e_variant):
+                    parts = msg.split()
+                    if len(parts) >= 2 and code in _PAIRWISE_CODES:
+                        # ID is always the second token for W564–W568.
+                        # Strip trailing colon: the fr_ref W567 variant emits
+                        # "INCOMPLETE_MILESTONE_DECOMPOSITION ms-id: fr_ref ..."
+                        # so parts[1] is "ms-id:" — normalise to "ms-id".
+                        result.append(parts[1].rstrip(':'))
+                    elif parts:
+                        result.append(parts[1] if len(parts) >= 2 else parts[-1])
+                # String format: legacy support; check_traceability_closure always returns SpecError objects
+                elif isinstance(e, str) and (e.lstrip().startswith(code) or e.lstrip().startswith(e_variant)):
+                    parts = e.split()
+                    if len(parts) >= 2:
+                        result.append(parts[1] if code in _PAIRWISE_CODES else parts[-1])
+            return list(dict.fromkeys(result))
+
+        # Gather totals by loading spec data inline (cheap re-read for ratio computation).
+        # We parse the raw spec files directly to avoid coupling with internal state.
+        def _load_spec_json(filename: str) -> dict:
+            import json as _json
+            path = os.path.join(spec_dir, filename)
+            if not os.path.isfile(path):
+                return {}
+            try:
+                with open(path, encoding="utf-8") as _f:
+                    return _json.load(_f)
+            except (OSError, ValueError):
+                return {}
+
+        frs_data = _load_spec_json("04_fr_list.json")
+        total_frs = len(frs_data.get("functional_requirements", [])) if frs_data else 0
+
+        caps_data = _load_spec_json("01_capabilities.json")
+        total_caps = len(caps_data.get("capabilities", [])) if caps_data else 0
+
+        roadmap_data = _load_spec_json("14_roadmap.json")
+        total_milestones = len(roadmap_data.get("milestones", [])) if roadmap_data else 0
+
+        def _ratio(total: int, uncovered_count: int) -> float:
+            if total == 0:
+                return 1.0
+            return round((total - uncovered_count) / total, 4)
+
+        uncovered_w564 = _extract_ids_for_code("W564")
+        uncovered_w565 = _extract_ids_for_code("W565")
+        uncovered_w566 = _extract_ids_for_code("W566")
+        uncovered_w567 = _extract_ids_for_code("W567")
+        uncovered_w568 = _extract_ids_for_code("W568")
+
+        def _dim(total: int, uncovered: list) -> dict:
+            covered = max(0, total - len(uncovered))
+            return {
+                "covered_count": covered,
+                "total_count": total,
+                "ratio": _ratio(total, len(uncovered)),
+                "uncovered_ids": uncovered,
+            }
+
+        coverage = {
+            "fr_api_coverage":               _dim(total_frs,        uncovered_w564),
+            "fr_fixture_coverage":           _dim(total_frs,        uncovered_w565),
+            "fr_milestone_coverage":         _dim(total_frs,        uncovered_w566),
+            "milestone_decomp_completeness": _dim(total_milestones, uncovered_w567),
+            "capability_fr_coverage":        _dim(total_caps,       uncovered_w568),
+        }
+
+        if getattr(args, "json_output", False):
+            from .core.errors import ensure_spec_errors
+            from .core.json_output import format_errors_json
+            spec_errors = ensure_spec_errors(completeness_errs)
+            ctx: dict = {
+                "command": "completeness-check",
+                "spec_dir": spec_dir,
+                "coverage": coverage,
+            }
+            print(format_errors_json(spec_errors, context=ctx))
+            has_ecodes = any(not e.code.startswith("W") for e in spec_errors)
+            if _warnings_as_errors() and spec_errors:
+                sys.exit(1)
+            if has_ecodes:
+                sys.exit(1)
+            sys.exit(0)
+        else:
+            print("=== Pairwise Completeness Check ===")
+            print()
+            labels = [
+                ("W564", "FR → API coverage",              coverage["fr_api_coverage"]),
+                ("W565", "FR → Fixture coverage",          coverage["fr_fixture_coverage"]),
+                ("W566", "FR → Milestone coverage",        coverage["fr_milestone_coverage"]),
+                ("W567", "Milestone decomp completeness",  coverage["milestone_decomp_completeness"]),
+                ("W568", "Capability → FR coverage",       coverage["capability_fr_coverage"]),
+            ]
+            for _code, label, dim in labels:
+                ratio = dim["ratio"]
+                uncovered = dim["uncovered_ids"]
+                pct = f"{ratio * 100:.1f}%"
+                status = "OK" if ratio == 1.0 else "WARN"
+                print(f"  [{status}] {label}: {pct}")
+                for uid in uncovered:
+                    print(f"        - uncovered: {uid}")
+            print()
+            if _has_error_messages(completeness_errs):
+                sys.exit(1)
     elif args.cmd == "dependency-order-lint":
         from .validation.dependency_order_lint import lint_dependency_order
         repo_root = os.path.abspath(args.repo_root)

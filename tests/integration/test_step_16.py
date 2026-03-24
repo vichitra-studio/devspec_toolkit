@@ -668,5 +668,290 @@ class TestStep16(unittest.TestCase):
         )
 
 
+    def test_step_16c_w582_fires_when_milestone_fr_not_in_fr_coverage(self):
+        """When verdict=='verified' and a milestone FR is not in semantic_review.fr_coverage, W582 fires."""
+        from specdev_tools.validation.validators.step_16c import validate_step_16c
+
+        # Build a valid 16c artifact with verdict=verified and fr_coverage only covering fr-login.
+        # The roadmap milestone ms-v1 has fr_refs: [fr-login, fr-logout].
+        # W582 should fire for fr-logout (present in milestone but absent from fr_coverage).
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w582-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "W582 test: milestone FR not covered.",
+                    "scope_in": ["auth-api"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
+                    "checklist": [
+                        {
+                            "id": "CHK_LOGIN_B",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
+                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Implement login",
+                            "type": "behavior",
+                            "layer": "api",
+                            "linked_test_expectation": "POST /login returns 200",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login",
+                            "milestone_ref": "ms-v1",
+                            "implementation": {
+                                "status": "verified",
+                                "files_touched": ["src/auth.py"],
+                                "actions": [
+                                    {
+                                        "type": "file_edit",
+                                        "target": "src/auth.py",
+                                        "description": "Add login handler",
+                                        "evidence": {"type": "snippet", "content": "def login(): pass"}
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "CHK_LOGIN_V",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
+                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Validate login",
+                            "type": "validation",
+                            "layer": "tests",
+                            "linked_test_expectation": "pytest test_login",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login",
+                            "milestone_ref": "ms-v1",
+                            "implementation": {
+                                "status": "verified",
+                                "files_touched": ["tests/test_auth.py"],
+                                "actions": [
+                                    {
+                                        "type": "manual_verification",
+                                        "description": "Verify test passes",
+                                        "evidence": {"type": "log", "content": "PASSED test_login"}
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]}
+            },
+            "execution": {
+                "execution_results": [
+                    {
+                        "command": "pytest tests/",
+                        "status": "passed",
+                        "outcome_description": "All tests passed.",
+                        "reasoning": "Tests cover login.",
+                        "evidence": "1 passed",
+                        "evidence_ref": "ci-001",
+                        "evidence_binding": {
+                            "timestamp": "2024-01-01T00:00:00Z",
+                            "sha256": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+                            "exit_code": 0,
+                            "command": "pytest tests/"
+                        }
+                    }
+                ],
+                "final_status": {"ci_status": "green"},
+                "critical_evidence": {
+                    "passed_test_commands": ["pytest tests/"],
+                    "satisfied_checklist_ids": ["CHK_LOGIN_B", "CHK_LOGIN_V"]
+                }
+            },
+            "review": {
+                "verdict": "verified",
+                "fixture_status": {
+                    "implemented_interfaces": ["auth-login"],
+                    "test_results": [{"fixture_ref": "fixture-login", "status": "pass"}],
+                    "ci_status": "green"
+                },
+                "semantic_review": {
+                    "fr_coverage": [
+                        {
+                            "fr_id": "fr-login",
+                            "satisfied": True,
+                            "evidence_summary": "Login endpoint implemented and verified.",
+                            "checklist_ids": ["CHK_LOGIN_B"]
+                        }
+                    ],
+                    "hallucinated_features": [],
+                    "scope_delta": "None."
+                }
+            },
+            "canonical_refs_used": []
+        }
+
+        # Roadmap has fr_refs: [fr-login, fr-logout] for ms-v1
+        roadmap = {
+            "milestones": [
+                {
+                    "milestone_id": "ms-v1",
+                    "fr_refs": ["fr-login", "fr-logout"],
+                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}]
+                }
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": []}), encoding="utf-8"
+            )
+
+            errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
+
+        w582_errors = [e for e in errors if e.code == "W582"]
+
+        # W582 should fire for fr-logout (in milestone but not in fr_coverage)
+        self.assertTrue(
+            any("fr-logout" in e.message for e in w582_errors),
+            f"Expected W582 for 'fr-logout'. Got W582 errors: {[e.message for e in w582_errors]}"
+        )
+
+        # W582 should NOT fire for fr-login (covered in fr_coverage)
+        self.assertFalse(
+            any("fr-login" in e.message for e in w582_errors),
+            f"Did not expect W582 for 'fr-login'. Got W582 errors: {[e.message for e in w582_errors]}"
+        )
+
+    def test_step_16c_w582_does_not_fire_when_verdict_is_not_verified(self):
+        """W582 must NOT fire when verdict is needs_work, blocked, or deferred."""
+        from specdev_tools.validation.validators.step_16c import validate_step_16c
+
+        # Roadmap has fr_refs for ms-v1 but fr_coverage is empty/absent.
+        # W582 must stay silent for all non-verified verdicts.
+        roadmap = {
+            "milestones": [
+                {
+                    "milestone_id": "ms-v1",
+                    "fr_refs": ["fr-login", "fr-logout"],
+                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}]
+                }
+            ]
+        }
+
+        base_data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w582-negative-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "W582 negative test.",
+                    "scope_in": ["auth-api"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
+                    "checklist": [
+                        {
+                            "id": "CHK_LOGIN_B",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
+                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Implement login",
+                            "type": "behavior",
+                            "layer": "api",
+                            "linked_test_expectation": "POST /login returns 200",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login",
+                            "milestone_ref": "ms-v1",
+                            "implementation": {
+                                "status": "verified",
+                                "files_touched": ["src/auth.py"],
+                                "actions": [
+                                    {
+                                        "type": "file_edit",
+                                        "target": "src/auth.py",
+                                        "description": "Add login handler",
+                                        "evidence": {"type": "snippet", "content": "def login(): pass"}
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]}
+            },
+            "execution": {
+                "execution_results": [
+                    {
+                        "command": "pytest tests/",
+                        "status": "passed",
+                        "outcome_description": "All tests passed.",
+                        "reasoning": "Tests cover login.",
+                        "evidence": "1 passed",
+                        "evidence_ref": "ci-001",
+                        "evidence_binding": {
+                            "timestamp": "2024-01-01T00:00:00Z",
+                            "sha256": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+                            "exit_code": 0,
+                            "command": "pytest tests/"
+                        }
+                    }
+                ],
+                "final_status": {"ci_status": "green"},
+                "critical_evidence": {
+                    "passed_test_commands": ["pytest tests/"],
+                    "satisfied_checklist_ids": ["CHK_LOGIN_B"]
+                }
+            },
+            "canonical_refs_used": []
+        }
+
+        for non_verified_verdict in ("needs_work", "blocked", "deferred"):
+            data = dict(base_data)
+            data["review"] = {
+                "verdict": non_verified_verdict,
+                "fixture_status": {
+                    "implemented_interfaces": [],
+                    "test_results": [],
+                    "ci_status": "green"
+                },
+                # fr_coverage is empty — W582 must still NOT fire
+                "semantic_review": {
+                    "fr_coverage": [],
+                    "hallucinated_features": [],
+                    "scope_delta": "None."
+                }
+            }
+
+            with tempfile.TemporaryDirectory() as td:
+                tmp_dir = Path(td)
+                fixture_path = tmp_dir / "16_impl_context.json"
+                fixture_path.write_text(json.dumps(data), encoding="utf-8")
+                (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+                common_dir = tmp_dir / "common"
+                common_dir.mkdir()
+                (common_dir / "seed_manifest.json").write_text(
+                    json.dumps({"doc_paths": []}), encoding="utf-8"
+                )
+
+                errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
+
+            w582_errors = [e for e in errors if e.code == "W582"]
+            self.assertEqual(
+                [],
+                w582_errors,
+                f"W582 must NOT fire when verdict='{non_verified_verdict}'. "
+                f"Got: {[e.message for e in w582_errors]}"
+            )
+
+
 if __name__ == '__main__':
     unittest.main()
