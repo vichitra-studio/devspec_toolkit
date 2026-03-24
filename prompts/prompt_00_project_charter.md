@@ -29,16 +29,19 @@ For each upstream artifact ingested, extract the following:
 - Auto-link seeds: add `links` to downstream FRs (`fr-*` once known) and NFR categories derived from `success_metrics` units (read `canon/manifest.json` for valid NFR category values).
 - Ambiguity scrub: MUST replace any instance of “improve”, “optimize”, “user-friendly”, or “fast” with a quantifiable target (numeric value + unit + timeframe) derived from `docs/seed/seed_overview.md` success criteria or `docs/seed/seed_tech_stack.md` constraints.
 
-## Self-Audit Gate (do not output)
-- Gating items to check before emitting:
-  - Problem statement names users, pain, measurable business impact, and hard constraints.
-  - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
-  - Stakeholders include at least product/eng/ops/security roles with distinct needs.
-  - User segments include JTBD/pains/gains for primary personas.
-  - Success metrics include unit+target+measurement_method (baseline where available) for ≥2 metrics.
-  - Owner reflects accountability for charter maintenance.
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `docs/seed/seed_overview.md` is present and non-empty.
+- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- `spec/common/seed_manifest.json` is present.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** use vague "business speak" (e.g. "optimize", "improve") without measurable metrics.
+- **DO NOT** omit the `owner` field; accountability is required.
+- **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
+- **DO NOT** list stakeholders without defining their specific `needs`.
+
+## Coverage Closure
 Before emitting, verify:
 - Every requirement stated in `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` is reflected in `goals`, `constraints`, `success_metrics`, or `user_segments`, OR explicitly listed in `out_of_scope` with rationale.
 - No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
@@ -61,12 +64,6 @@ Before emitting, verify:
 - Success metrics: each metric MUST include metric_id, name, unit, target, measurement_method, and — when `docs/seed/seed_overview.md` or product briefs contain historical values — baseline sourced from that data.
 - Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
 - Owner is set based on who will maintain the charter and is not just a default.
-
-## Negative Constraints
-- **DO NOT** use vague "business speak" (e.g. "optimize", "improve") without measurable metrics.
-- **DO NOT** omit the `owner` field; accountability is required.
-- **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
-- **DO NOT** list stakeholders without defining their specific `needs`.
 
 ## Best Practices
 - **Problem Statement**: Write a statement of 1-3 sentences that names the affected users, their pain, the measurable business impact, and hard constraints — sourced from `docs/seed/seed_overview.md`. Avoid solutioneering.

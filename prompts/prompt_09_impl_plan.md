@@ -42,13 +42,20 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: milestones should map to delivered FRs/APIs and passing CI gates.
 
 ## Self-Audit Gate
-- Gating items:
-  - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
-  - `tech_stack` aligns with `01_capabilities.json`.
-  - Dependencies listed for external teams/systems; plan aligns with governance/CI expectations.
-  - If milestone dates are not stated in `spec/00_charter.json` constraints, delivery sequencing is ambiguous, or resource constraints are not specified in any upstream artifact, ask Gap Questions — do not invent timeline commitments.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/07_nfrs.json` is present and contains at least one nfr entry.
+- `docs/seed/seed_tech_stack.md` is present and non-empty.
 
-### Coverage Closure
+## Negative Constraints
+- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/01_capabilities.json` without a clear "Spike" justification.
+- **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
+- **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
+- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It MUST be an object with `languages`, `frameworks`, `infrastructure`, and `tools` arrays.
+- **NO Missing Rationale**: Do not omit `rationale` for `tech_stack` items. Explain WHY a technology was chosen.
+
+## Coverage Closure
 Before emitting, verify:
 - Every `capability_id` from `spec/01_capabilities.json` appears in ≥1 milestone's scope or deliverables, OR explicitly listed in `out_of_scope` with rationale.
 - All `component_id` values from `spec/02_system_sketch.json` are reflected in the `tech_stack` or architecture decisions.
@@ -63,13 +70,6 @@ Before emitting, verify:
 - [ ] No circular milestone dependencies exist
 - [ ] Every milestone has at least one acceptance signal (named deliverable, demo, or test gate) that can be used to verify completion
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
-
-## Negative Constraints
-- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/01_capabilities.json` without a clear "Spike" justification.
-- **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
-- **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
-- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It MUST be an object with `languages`, `frameworks`, `infrastructure`, and `tools` arrays.
-- **NO Missing Rationale**: Do not omit `rationale` for `tech_stack` items. Explain WHY a technology was chosen.
 
 ## Step-Specific Completeness Checklist
 - `tech_stack` declares languages, frameworks, data stores, and major infra choices with rationale where contentious.

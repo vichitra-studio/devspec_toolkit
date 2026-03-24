@@ -41,13 +41,23 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: MUST NOT use generic phrases like “owns data” or “manages resources”; MUST specify the data domain (read from `spec/01_capabilities.json` inputs/outputs) and quantitative SLAs (read from `docs/seed/seed_tech_stack.md` constraints).
 
 ## Self-Audit Gate
-- Gating items:
-  - Each in-scope capability maps to at least one component.
-  - Every Step 01 capability appears in at least one component `trace` entry.
-  - All cross-component integrations appear as connections with protocol/auth; event connections include reliability.
-  - External systems are identified with clear boundaries and owners.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/00_charter.json` is present and contains at least one in_scope entry.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `docs/seed/seed_tech_stack.md` is present and non-empty.
 
-### Coverage Closure
+## Negative Constraints
+DO NOT:
+- Include out-of-scope capabilities in components or responsibilities
+- Use non-enum protocols (must be one of: http, grpc, event, rpc, db, file)
+- Use generic responsibilities (must be specific and measurable)
+- Reuse component IDs from other steps or artifacts
+- Create dangling connections (from/to must reference existing components)
+- Omit auth or rate_limit requirements for partner or public trust boundaries
+- Mark `type: external` without the `external-dependency` tag
+- Use `trust_boundary: internal` on connections that touch `type: external` components
+
+## Coverage Closure
 Before emitting, verify:
 - Every `capability_id` from `spec/01_capabilities.json` is reflected in ≥1 component's `trace` or `links`, OR explicitly listed in `out_of_scope` with rationale.
 - No capability is left without an architectural home — every capability must be owned by a `component_id`.
@@ -97,17 +107,6 @@ Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`,
 - For each connection, what protocol, auth method, and reliability semantics are required?
 - What data schemas or message contracts exist for each integration? Where are they tracked?
 - What rate limits and backpressure expectations apply? Any multi-region or data-residency constraints?
-
-## Negative Constraints
-DO NOT:
-- Include out-of-scope capabilities in components or responsibilities
-- Use non-enum protocols (must be one of: http, grpc, event, rpc, db, file)
-- Use generic responsibilities (must be specific and measurable)
-- Reuse component IDs from other steps or artifacts
-- Create dangling connections (from/to must reference existing components)
-- Omit auth or rate_limit requirements for partner or public trust boundaries
-- Mark `type: external` without the `external-dependency` tag
-- Use `trust_boundary: internal` on connections that touch `type: external` components
 
 # Schema Reference
 - Schema URI: vc:02-system-sketch

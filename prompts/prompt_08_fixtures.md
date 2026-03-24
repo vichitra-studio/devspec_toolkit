@@ -51,11 +51,18 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
 ## Self-Audit Gate
-- Gating items:
-  - Each high-priority FR has ≥1 fixture; negative fixtures exist for key errors; contract mode covers each public API.
-  - Inputs/expected align with schemas; targets list correct IDs; tags present for CI gating where needed.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/06_invariants.json` is present and contains at least one invariant entry.
 
-### Coverage Closure
+## Negative Constraints
+- **NEVER** invent new IDs. Every trace ID must exist in the upstream specs.
+- **NEVER** use generic placeholder IDs (e.g., `api-login`) unless they match the actual spec.
+- **NEVER** include markdown commentary or key-value pairs outside the JSON block.
+- **NEVER** generate a fixture without at least one target (orphan fixtures are invalid).
+
+## Coverage Closure
 Before emitting, verify:
 - Every FR acceptance criterion in `spec/04_functional_requirements.json` has ≥1 fixture with a matching `targets` entry referencing that `fr_id`.
 - Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
@@ -78,12 +85,6 @@ Before emitting, verify:
 - Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
 - `targets` link fixtures to FRs/APIs/NFRs/invariants to enable coverage reporting.
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
-
-## Negative Constraints
-- **NEVER** invent new IDs. Every trace ID must exist in the upstream specs.
-- **NEVER** use generic placeholder IDs (e.g., `api-login`) unless they match the actual spec.
-- **NEVER** include markdown commentary or key-value pairs outside the JSON block.
-- **NEVER** generate a fixture without at least one target (orphan fixtures are invalid).
 
 ## Cross-Step Synthesis Notes
 - **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`.

@@ -42,12 +42,19 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: make each rule testable (yes/no), not advisory.
 
 ## Self-Audit Gate
-- Gating items:
-  - Versioning strategy present; spec_first_policy explicit; commit message requirements clear and actionable.
-  - PR rules list core validations; reviewers cover necessary disciplines.
-  - If versioning strategy, review process, or release cadence are not derivable from upstream specs, ask Gap Questions for organizational preferences.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/00_charter.json` is present and contains at least one stakeholders entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
 
-### Coverage Closure
+## Negative Constraints
+- Do not output text-only logic where regex patterns could be used (e.g., "must include spec IDs" instead of "require spec IDs").
+- Do not omit spec IDs in commit message patterns when `require_spec_ids` is true.
+- Do not set `spec_first_policy: false` unless `spec/00_charter.json` explicitly states a non-spec-first workflow; if set to `false`, MUST include a rationale.
+- Do not create invalid regex patterns in `commit_message_rules.pattern`.
+- Do not omit required fields that are present in the schema.
+
+## Coverage Closure
 Before emitting, verify:
 - Every organizational constraint in `spec/00_charter.json` (`constraints`, `compliance`) is encoded as a governance rule, PR policy, or commit convention.
 - All `pr_rules` commands reference valid `specdev` CLI subcommands (validate, validate-all, matrix, fixtures-lint, etc.).
@@ -63,13 +70,6 @@ Before emitting, verify:
 - [ ] Every commit pattern rule corresponds to a specific artifact type or spec step
 - [ ] All PR rules use valid enum values from the schema
 - [ ] Quality gates cover all mandatory spec steps (not just a subset)
-
-## Negative Constraints
-- Do not output text-only logic where regex patterns could be used (e.g., "must include spec IDs" instead of "require spec IDs").
-- Do not omit spec IDs in commit message patterns when `require_spec_ids` is true.
-- Do not set `spec_first_policy: false` unless `spec/00_charter.json` explicitly states a non-spec-first workflow; if set to `false`, MUST include a rationale.
-- Do not create invalid regex patterns in `commit_message_rules.pattern`.
-- Do not omit required fields that are present in the schema.
 
 ## Step-Specific Completeness Checklist
 - Governance defines a clear versioning strategy for spec and artifacts.

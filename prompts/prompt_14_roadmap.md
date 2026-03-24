@@ -52,10 +52,25 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - **Ordering**: Core dependencies (e.g., Auth, Base API) must precede dependent Extensions.
 
 ## Self-Audit Gate
-- Confirm that existing specs cover enough scope to justify a roadmap.
-- Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/13a_completeness_assessment.json` is present.
 
-### Coverage Closure
+## Negative Constraints
+- **NO Hallucinations**: Do not list technologies not in Step 09/13.
+- **NO String Tech Stack**: `tech_stack` entries must be objects with `name` and `version` (optional `rationale`).
+- **NO String Deliverables**: `deliverables` items must be traceRef objects with `type` and `id` (optional `note`).
+- **NO Vague Tasks**: Tasks must be atomic and specific.
+- **NO Orphan Milestones**: Every milestone must map to a user story.
+- **NO Missing Source Milestones**: Every milestone must include `source_milestones` that map to Step 09 IDs.
+- **NO Backward Planning**: Dates must proceed logically from earliest to latest.
+- **NEVER create a `depends_on` cycle**: Task A depending on B which depends on A is forbidden and will fail validation.
+- **NEVER use a `fr_refs` ID not present in `spec/04_fr_list.json`**: All FR references must be grounded in Step 04.
+- **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
+
+## Coverage Closure
 Before emitting, verify:
 - Every upstream requirement from ingested context is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
 - No upstream capability, FR, or milestone ID is silently dropped.
@@ -85,18 +100,6 @@ Before emitting, verify:
 - **Ignoring Extensions**: Failing to schedule the work defined in `ext_01_database.json` or `ext_02_security.json`.
 - **Redoing Step 09**: Spending time debating "Python vs Go" (which was settled in Step 09) instead of planning "Sprint 1 vs Sprint 2".
 - **Skipping Completeness**: Creating a roadmap for a spec full of holes; the Roadmap step is the final quality gate before coding.
-
-## Negative Constraints
-- **NO Hallucinations**: Do not list technologies not in Step 09/13.
-- **NO String Tech Stack**: `tech_stack` entries must be objects with `name` and `version` (optional `rationale`).
-- **NO String Deliverables**: `deliverables` items must be traceRef objects with `type` and `id` (optional `note`).
-- **NO Vague Tasks**: Tasks must be atomic and specific.
-- **NO Orphan Milestones**: Every milestone must map to a user story.
-- **NO Missing Source Milestones**: Every milestone must include `source_milestones` that map to Step 09 IDs.
-- **NO Backward Planning**: Dates must proceed logically from earliest to latest.
-- **NEVER create a `depends_on` cycle**: Task A depending on B which depends on A is forbidden and will fail validation.
-- **NEVER use a `fr_refs` ID not present in `spec/04_fr_list.json`**: All FR references must be grounded in Step 04.
-- **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
 
 ## Cross-Step Synthesis Notes
 

@@ -58,12 +58,17 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 - Ambiguity scrub: translate narrative policies into boolean/evaluable forms.
 
 ## Self-Audit Gate
-- Gating items:
-  - Each critical FR/NFR has at least one corresponding invariant or rationale for omission.
-  - Expressions are syntactically valid and reference existing fields; scope defined for each rule; severity set.
-  - MUST verify: if `spec/04_fr_list.json` defines entities with state transitions in preconditions/postconditions, state transition invariants MUST exist for each such entity or Gap Questions MUST be raised.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
 
-### Coverage Closure
+## Negative Constraints
+- ❌ DO NOT use `text` language unless absolutely necessary.
+- ❌ DO NOT invent component IDs; use only those from Step 2.
+- ❌ DO NOT skip tracing; every rule must have a reason (trace).
+
+## Coverage Closure
 Before emitting, verify:
 - Every constraint in `spec/04_functional_requirements.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR explicitly listed in `out_of_scope` with rationale.
 - Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
@@ -94,11 +99,6 @@ Before emitting, verify:
 - **Trace**: Link invariants to FRs, NFRs, or governance rules using `trace` so auditors know why the rule exists.
 
 **Semantic Drift Prevention**: When tracing an invariant to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Enforces: 'The system shall authenticate a registered user and return a signed session token.'"`. This prevents trace drift when FR text is revised.
-
-## Negative Constraints
-- ❌ DO NOT use `text` language unless absolutely necessary.
-- ❌ DO NOT invent component IDs; use only those from Step 2.
-- ❌ DO NOT skip tracing; every rule must have a reason (trace).
 
 ## Common Pitfalls
 - **Empty Logic**: Leaving the `expression` empty or non-executable, which prevents automation in CI and runtime.

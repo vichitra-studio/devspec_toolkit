@@ -66,14 +66,22 @@ For each upstream artifact ingested, extract the following:
 - **Linkage**: If you list a mitigation "Enforce Role Check", link it to the actual invariant `inv-authz-admin-only`.
 
 ## Self-Audit Gate
-- [ ] Does every threat in `threats` have a non-empty `target_ids` array?
-- [ ] Are all `target_ids` valid IDs from Step 05 (APIs) or Step 02 (Components)?
-- [ ] Are `mitigations` structured objects with types, not just strings?
-- [ ] Are `edge_cases` structured with IDs?
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
+- `spec/06_invariants.json` is present and contains at least one invariant entry.
+
+## Clarification Questions
 - If the system operates in a regulated, high-risk, or domain-specific context not evident from upstream specs, ask about domain-specific threat categories before finalizing.
 - If the access control model is not fully specified in upstream interface contracts, ask Gap Questions rather than assuming a threat surface.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** list generic threats (e.g., "OWASP Top 10") without specific application context.
+- **DO NOT** omit `target_ids` for any threat; every threat must map to an API or component.
+- **DO NOT** use vague mitigations (e.g., "Fix it"); link to specific Invariants or NFRs.
+- **DO NOT** ignore edge cases; operational failure modes are just as critical as security threats.
+
+## Coverage Closure
 Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`, OR is explicitly listed in `out_of_scope` with rationale (low-risk internal-only endpoints).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
@@ -89,18 +97,14 @@ Before emitting, verify:
 - [ ] Every high-priority FR has at least one threat scenario modeled
 - [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch
+- [ ] All `mitigations` are structured objects with `type` and `control` fields, not plain strings
+- [ ] All `edge_cases` entries have a structured `id` field
 
 ## Step-Specific Output Constraints
 1.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
 2.  `target_ids`: MUST be populated for every threat.
 3.  `mitigations`: MUST use `traceRef` structure (type + id).
 4.  `category`: MUST be one of the allowed enum values.
-
-## Negative Constraints
-- **DO NOT** list generic threats (e.g., "OWASP Top 10") without specific application context.
-- **DO NOT** omit `target_ids` for any threat; every threat must map to an API or component.
-- **DO NOT** use vague mitigations (e.g., "Fix it"); link to specific Invariants or NFRs.
-- **DO NOT** ignore edge cases; operational failure modes are just as critical as security threats.
 
 ## Step-Specific Completeness Checklist
 - [ ] **Surface Coverage**: Every `public` API and critical component has at least one mapped threat.

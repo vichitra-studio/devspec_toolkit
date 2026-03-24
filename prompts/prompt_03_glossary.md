@@ -32,12 +32,17 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: MUST NOT use circular definitions (a definition MUST NOT reference the term being defined); MUST NOT use marketing language; every definition MUST state what the term includes and excludes.
 
 ## Self-Audit Gate
-- Gating items:
-  - All key nouns in upstream artifacts are present with clear definitions.
-  - All upstream metric names exist here with explicit units.
-  - No duplicates/synonyms remain unresolved.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/00_charter.json` is present and contains at least one user_segments entry.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
 
-### Coverage Closure
+## Negative Constraints
+- Do not emit empty terms arrays.
+- Do not write circular definitions.
+- Do not use empty optional fields (domain, units).
+
+## Coverage Closure
 Before emitting, verify:
 - Every domain noun used in `spec/00_charter.json` (`goals`, `success_metrics`, `user_segments`) and in `spec/01_capabilities.json` capability names is defined as a `term_id`.
 - No charter or capability concept is left undefined — vocabulary must be grounded before downstream specs use it.
@@ -61,11 +66,6 @@ Before emitting, verify:
 - Include `domain` and `units` where relevant (especially for quantities used in NFRs/monitoring).
 - Require `units` for metric-like terms referenced by NFRs or monitoring.
 - Avoid synonyms and duplicates; prefer one canonical term with aliases captured in the definition text.
-
-## Negative Constraints
-- Do not emit empty terms arrays.
-- Do not write circular definitions.
-- Do not use empty optional fields (domain, units).
 
 ## Cross-Step Synthesis Notes
 - terms[*].term_ref *(required)*: Canonical registry reference for this term. Construct as `{"id": "cn:<namespace>:<kind>:<temp_id>", "kind": "<kind>", "label": "<term>"}`. For new project terms, use the anticipated canon ID matching the `canonical_proposals` entry. For terms already in the registry, use the existing `canon/manifest.json` ID. See Canonical Binding Rules below.

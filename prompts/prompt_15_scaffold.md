@@ -49,13 +49,24 @@ After generating the JSON artifact, implement the scaffold manually or using you
 - Ambiguity scrub: minimal module set, clear names; avoid framework‑specific jargon where not needed.
 
 ## Self-Audit Gate
-- If the route map does not strictly match Step 05 APIs, ask.
-- Gating items:
-  - Route map includes all public APIs; paths/methods consistent with contracts.
-  - Service skeleton sufficient to run a minimal service; validators listed.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
 
-### Coverage Closure
+## Clarification Questions
+- If the route map does not strictly match Step 05 APIs, ask.
+
+## Negative Constraints
+- **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
+- **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
+- **DO NOT** mark build status as `green` if validators have not been executed.
+- **DO NOT** include logic or implementation code; this is a scaffold only.
+
+## Coverage Closure
 Before emitting, verify:
+- Route map includes all public APIs; paths/methods consistent with contracts.
+- Service skeleton sufficient to run a minimal service; validators listed.
 - Every `api_id` in `spec/05_interface_contracts.json` has a corresponding entry in `interface_map` with a matching `method` and `path`.
 - Every service `component_id` in `spec/02_system_sketch.json` has a scaffold module or directory represented in `project_skeleton`.
 - Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
@@ -68,12 +79,6 @@ Before emitting, verify:
 - [ ] Directory structure matches the component hierarchy and trust boundaries from Step 02
 - [ ] Every scaffold stub has at least one corresponding test file placeholder
 - [ ] Every `interface_map` route has a corresponding stub handler in the `project_skeleton` directory structure (not just a directory entry)
-
-## Negative Constraints
-- **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
-- **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
-- **DO NOT** mark build status as `green` if validators have not been executed.
-- **DO NOT** include logic or implementation code; this is a scaffold only.
 
 ## Step-Specific Completeness Checklist
 - `project_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.

@@ -48,11 +48,17 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
 ## Self-Audit Gate
-- Gating items:
-  - Every NFR includes metric, target, unit, and measurement_method; prod-stage NFRs also have owner.
-  - Names/units align with glossary; traces connect to relevant FRs/APIs/components.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/00_charter.json` is present and contains at least one success_metrics entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `docs/seed/seed_tech_stack.md` is present and non-empty.
 
-### Coverage Closure
+## Negative Constraints
+- NEVER invent new owner categories.
+- NEVER emit qualitative targets without metrics.
+- NEVER skip `trace` for critical NFRs.
+
+## Coverage Closure
 Before emitting, verify:
 - Every quantitative metric in `spec/00_charter.json` `success_metrics` is encoded as ≥1 `nfr_id` with a numeric `target` and canonical `unit`.
 - Every performance-critical FR in `spec/04_functional_requirements.json` (latency, throughput, availability requirements) has a corresponding `nfr_id`.
@@ -93,11 +99,6 @@ Before emitting, verify:
 - **Prod-Only**: Using prod-only targets without staging or dev expectations, making regressions invisible until go-live.
 - **Orphans**: Every NFR MUST have an `owner` assigned and at least one `trace` entry; NFRs without both are invalid and cause untracked regressions.
 - **Duplicates**: Duplicating NFR IDs across categories, which breaks coverage tooling.
-
-## Negative Constraints
-- NEVER invent new owner categories.
-- NEVER emit qualitative targets without metrics.
-- NEVER skip `trace` for critical NFRs.
 
 # Clarification Questions
 - Which performance, reliability, cost, security/privacy, and energy targets are non-negotiable? Which are stretch?

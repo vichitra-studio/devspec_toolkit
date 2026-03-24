@@ -50,13 +50,19 @@ For each upstream artifact ingested, extract the following:
 - **Justification**: Explaining *why* an extension is needed helps the Roadmap (Step 14) prioritize it correctly.
 
 ## Self-Audit Gate
-- **Naming Check**: Do all proposed files start with `ext_` and a number (e.g., `ext_01`, `ext_02`)?
-- **Overlap Check**: Are any extensions redefining standard API routes already in `05_interface_contracts.json`? If so, remove them.
-- **Library Bloat**: Are you creating extensions for items already expressible in existing step schemas? Logging belongs in `spec/07_nfrs.json`, not in an extension. Only create an extension when the domain requires >=3 dedicated schema sections.
-- **Redefinition**: Creating `ext_02_api.json` that conflicts with `05_interface_contracts.json`.
-- **Ignoring Flow**: Extensions are for domain-specific verticals that require dedicated data models (AI/ML pipelines, complex data schemas, compliance frameworks), not horizontal layers (Frontend, Backend) already covered by core specs.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/07_nfrs.json` is present and contains at least one NFR entry.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
+- `spec/03_glossary.json` is present with at least one term entry.
 
-### Coverage Closure
+## Negative Constraints
+- If no complex domains are found, return empty array. Do NOT invent trivial extensions.
+- **DO NOT** create extensions for items expressible via standard Steps 04–10 (library bloat).
+- **DO NOT** redefine standard API routes or create extensions that overlap existing pipeline steps.
+- **DO NOT** ignore the forward-only flow: extensions are for domain-specific verticals only.
+- **DO NOT** propose extensions without verifying the referenced schemas exist.
+
+## Coverage Closure
 Before emitting, verify:
 - Every complex domain identified in `spec/02_system_sketch.json` components (event sourcing, CQRS, multi-tenancy, etc.) has been evaluated for whether an extension spec is needed.
 - Every compliance/security constraint in `spec/07_nfrs.json` with `category: security` or `category: compliance` has been evaluated for extension need.
@@ -70,14 +76,13 @@ Before emitting, verify:
 - [ ] Every domain evaluated for extension necessity has an explicit accept/reject decision with rationale (no silent omissions)
 - [ ] No extension duplicates coverage already expressible in core step schemas (05, 06, 07)
 - [ ] Generated extension IDs follow the same kebab-case naming convention as existing IDs
+- [ ] All proposed extension file names follow kebab-case naming convention with `ext_` prefix
+- [ ] No extension redefines an entity or relationship already expressible by existing Step 04–10 artifacts
 - [ ] No extension introduces fields not present in the target step's schema
 - [ ] All extension points reference valid schema-defined extension mechanisms
 - [ ] Generated prompt follows the same phase structure as toolkit prompts (Operating Flow with named phases)
 - [ ] Extension includes validation command and test gate specification
 - [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps
-
-## Negative Constraints
-- If no complex domains are found, return empty array. Do NOT invent trivial extensions.
 
 ## Cross-Step Synthesis Notes
 - extensions[*].justification: MUST reference a specific `component_id` from `spec/02_system_sketch.json` or `nfr_id` from `spec/07_nfrs.json` that necessitates the extension.

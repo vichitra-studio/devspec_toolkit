@@ -147,7 +147,28 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 *   **Blind Copying**: Pasting config without validating against schema. *Fix*: Use `traceRef` or validate structure locally.
 *   **Mind Reading**: Guessing implementation details (names, logic) that are not in the plan. *Fix*: Treat as **Ambiguity** and REJECT.
 
-## FORBIDDEN ACTIONS (Immediate Rejection)
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- The Step 16a plan artifact (`spec/impl_context/{step_id}.json`) is present.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/08_fixtures.json` is present and contains at least one fixture entry.
+- `spec/15_scaffold.json` is present and contains at least one file entry.
+
+## Coverage Closure
+Before emitting, verify:
+- Every `checklist` item in `spec/impl_context/{step_id}.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
+- All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
+- Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
+- No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
+- If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
+- All checklist items with `status: active` have a non-empty `linked_test_expectation` pointing to a specific test identifier.
+- [ ] All code references include file paths and function signatures (no ambiguous references)
+- [ ] Error handling covers all failure modes identified in FR acceptance criteria
+- [ ] Implementation contracts match the interfaces defined in Step 05 API spec
+- [ ] Every implementation action in execution_results has evidence linking to a specific file path or commit (no action recorded without evidence)
+- [ ] Every implementation action stays within the target_file_patterns scope defined in the Step 16 anchor — no out-of-scope file modifications recorded in execution_results
+
+## Negative Constraints
 
 ### Code Generation
 1. **NEVER** touch files outside `target_file_patterns` — raise `emergent_ambiguity`
@@ -176,21 +197,6 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
 3.  Do NOT modify `plan` outside `checklist[].implementation` evidence/status updates. Update `review` only when a checklist action explicitly targets review fields.
-
-## Self-Audit Gate
-
-### Coverage Closure
-Before emitting, verify:
-- Every `checklist` item in `spec/impl_context/{step_id}.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
-- All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
-- Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
-- No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
-- If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
-- [ ] All code references include file paths and function signatures (no ambiguous references)
-- [ ] Error handling covers all failure modes identified in FR acceptance criteria
-- [ ] Implementation contracts match the interfaces defined in Step 05 API spec
-- [ ] Every implementation action in execution_results has evidence linking to a specific file path or commit (no action recorded without evidence)
-- [ ] Every implementation action stays within the target_file_patterns scope defined in the Step 16 anchor — no out-of-scope file modifications recorded in execution_results
 
 # Schema Reference
 - Schema URI: vc:16-impl-context

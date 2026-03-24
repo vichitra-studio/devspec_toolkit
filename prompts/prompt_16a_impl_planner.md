@@ -59,7 +59,32 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 ### Roadmap-to-Checklist Coverage
 Every `tasks[].task_id` from `14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
 
-## FORBIDDEN ACTIONS (Immediate Rejection)
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/16_impl_context.json` is present and non-empty.
+- `spec/14_roadmap.json` is present and contains at least one milestone entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+
+## Coverage Closure
+Before emitting, verify:
+- Every upstream requirement from ingested context is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
+- No upstream capability, FR, or milestone ID is silently dropped.
+- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
+- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every planned implementation task references a specific FR or Step 16 implementation context item
+- [ ] Task sequence is topologically sorted by dependencies (no task depends on a later task)
+- [ ] All implementation steps have clear, verifiable acceptance criteria
+- [ ] The plan covers all `fr_refs` listed on the active Step 14 milestone — no FR is left without an implementation task
+- [ ] The generated plan does not contradict or expand scope beyond what is defined in the Step 16 anchor (spec/16_impl_context.json)
+- [ ] Every roadmap task_id from the active milestone maps to ≥1 checklist item in the plan (no roadmap task left without implementation steps)
+- [ ] Every roadmap `task_id` in the active milestone maps to at least one checklist item in this plan.
+- [ ] All `spec_ref.commit_hash` values are valid 40-char SHAs (not zeros or placeholders).
+
+**Extraction Mandate**:
+- Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
+
+## Negative Constraints
 
 ### Structural Violations
 1. **NEVER** create `plan.tasks` — this field no longer exists
@@ -246,24 +271,6 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
 - Which spec version covers this step?
 - Are there any ambiguous requirements that need resolution before coding?
 - Do we have existing tests we can extend, or must we create new ones?
-
-## Self-Audit Gate
-
-### Coverage Closure
-Before emitting, verify:
-- Every upstream requirement from ingested context is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
-- No upstream capability, FR, or milestone ID is silently dropped.
-- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
-- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
-- [ ] Every planned implementation task references a specific FR or Step 16 implementation context item
-- [ ] Task sequence is topologically sorted by dependencies (no task depends on a later task)
-- [ ] All implementation steps have clear, verifiable acceptance criteria
-- [ ] The plan covers all `fr_refs` listed on the active Step 14 milestone — no FR is left without an implementation task
-- [ ] The generated plan does not contradict or expand scope beyond what is defined in the Step 16 anchor (spec/16_impl_context.json)
-- [ ] Every roadmap task_id from the active milestone maps to ≥1 checklist item in the plan (no roadmap task left without implementation steps)
-
-**Extraction Mandate**:
-- Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
 
 # Schema Reference
 - Schema URI: vc:16-impl-context

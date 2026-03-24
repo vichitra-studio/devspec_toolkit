@@ -31,19 +31,25 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: MUST map every `ci_gates` entry to one of the known gate commands: `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`. Do NOT invent gate names not in this list.
 
 ## Self-Audit Gate
-- Gating items:
-  - All four environments listed; each has enough detail to differentiate.
-  - CI gates include core validations; governance and coverage accounted for where relevant.
-  - Secrets are names only; no values.
-  - Compliance labels reflect real obligations (or explicitly none).
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
+- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- `spec/00_charter.json` is present and contains at least one in_scope entry.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** include actual secret values (use names only); specific values belong in secure stores.
+- **DO NOT** leave environments empty; every environment must have minimal configuration defined.
+- **DO NOT** invent compliance standards that are not relevant to the organizational context.
+- **DO NOT** include manual review steps in `ci_gates` (these belong in governance).
+
+## Coverage Closure
 Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
 - All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
 - No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
 - All environment names (`dev`, `ci`, `staging`, `prod`) align with canonical stage values.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
+- Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
@@ -56,12 +62,6 @@ Before emitting, verify:
 - `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
 - `secrets` includes names of required secrets; values are not embedded.
 - `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI) if relevant.
-
-## Negative Constraints
-- **DO NOT** include actual secret values (use names only); specific values belong in secure stores.
-- **DO NOT** leave environments empty; every environment must have minimal configuration defined.
-- **DO NOT** invent compliance standards that are not relevant to the organizational context.
-- **DO NOT** include manual review steps in `ci_gates` (these belong in governance).
 
 ## Best Practices
 - **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.

@@ -49,12 +49,6 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 
 **Granularity test**: If you cannot write a single failing test that specifically disproves this FR (and only this FR), it is too coarse.
 
-### Forbidden Actions
-- DO NOT combine multiple behaviors into one FR
-- DO NOT use subjective language ("fast", "secure", "user-friendly")
-- DO NOT reference implementation details (function names, DB tables, internal methods)
-- DO NOT write FRs that are implementation steps rather than observable behaviors
-
 ## Heuristics For Completeness
 - MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope); MUST include `fixture_ref` for every FR with `priority: high` in the capabilities.
 - Auto-trace: link FRs to capability and any API that delivers the behavior; include NFR trace where performance is key.
@@ -71,13 +65,21 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 | The system should support pagination. | The system shall return paginated results for all list endpoints, with a default page size of 20 and a maximum of 100. |
 
 ## Self-Audit Gate
-- Gating items:
-  - Every in-scope capability maps to ≥1 FR; each FR covers one behavior.
-  - Each FR has ≥2 acceptance criteria with measurable outcomes.
-  - Preconditions/postconditions present where boundaries exist.
-  - Traces to capability and (if known) API/NFR; IDs are kebab-case and stable.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/03_glossary.json` is present and contains at least one term entry.
+- `docs/seed/seed_overview.md` is present and non-empty.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** use implementation details (function names, DB tables) in statements.
+- **DO NOT** bundle multiple behaviors into one FR.
+- **DO NOT** leave acceptance criteria vague ('it works').
+- **DO NOT** trace to non-existent IDs.
+- **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
+- **DO NOT** use subjective language ("fast", "secure", "user-friendly").
+- **DO NOT** write FRs that are implementation steps rather than observable behaviors.
+
+## Coverage Closure
 Before emitting, verify:
 - Every upstream requirement referenced in "Extraction Intent" is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
 - No upstream capability, FR, or milestone ID is silently dropped.
@@ -115,13 +117,6 @@ Before emitting, verify:
 - **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
 - **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
 - **Implementation**: Embedding implementation details (function names, DB tables, internal method signatures) instead of outcomes, limiting design options.
-
-## Negative Constraints
-- **DO NOT** use implementation details (function names, DB tables) in statements.
-- **DO NOT** bundle multiple behaviors into one FR.
-- **DO NOT** leave acceptance criteria vague ('it works').
-- **DO NOT** trace to non-existent IDs.
-- **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
 
 # Clarification Questions
 - Which specific user or system behaviors must we guarantee in this phase? What is explicitly excluded?

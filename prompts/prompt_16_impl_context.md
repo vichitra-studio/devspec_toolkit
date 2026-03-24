@@ -57,7 +57,28 @@ implementation checklist, and review expectations for the *current* execution cy
     - `spec/09_impl_plan.json`: Statuses to `done`.
 8. **Emit**: Write the Step 16 anchor artifact in the `spec` root.
 
-# FORBIDDEN ACTIONS (Immediate Rejection)
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/14_roadmap.json` is present and contains at least one milestone entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/15_scaffold.json` is present and contains at least one file entry.
+
+## Coverage Closure
+Before emitting, verify:
+- Every `milestone_id` from `spec/14_roadmap.json` that is in scope for this session has ≥1 `checklist` item in `plan.spec_alignment.checklist`.
+- All `spec_ref.id` values in the checklist resolve to IDs present in their referenced upstream spec files (`fr_id`, `api_id`, `inv_id`, `nfr_id`, `fixture_id`).
+- Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
+- No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
+- If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
+- [ ] All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`
+- [ ] Every implementation context links to the active Step 14 milestone
+- [ ] All cross-references resolve to valid IDs in the referenced spec files
+- [ ] The `semantic_review` section covers all major implementation concerns (naming, structure, coverage) — not just surface-level checks
+- [ ] Every `plan.spec_alignment.checklist` item has a corresponding `execution.execution_results` entry (no planned item left without an execution record)
+- [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor — all checklist IDs and scope_in/scope_out values are consistent with spec/impl_context/*.json
+
+## Negative Constraints
 1. **NEVER** hallucinate `step_id` or use loose references.
 2. **NEVER** omit `commit_hash` in `spec_ref`.
 3. **NEVER** emit incomplete JSON or use placeholder values.
@@ -158,29 +179,6 @@ implementation checklist, and review expectations for the *current* execution cy
 3. **`target_file_patterns` use explicit globs** (avoid `**/*` or empty arrays unless deferred).
 4. **`docs_impact.status` is `required` if any non-doc file is in `target_file_patterns`**.
 5. **Anchor (Step 16) MUST NOT contradict any `checklist[].id`, `scope_in`, or `scope_out` value in active Milestone contexts (16a/b/c)** — run drift comparison against each `spec/impl_context/*.json`.
-
-# Self-Audit Gate
-Before emitting the Step 16 anchor artifact, verify:
-- [ ] All `spec_ref.commit_hash` values are valid 40-char SHAs (not `0000...`).
-- [ ] Every checklist item with `checklist_status: active` has an `implementation` block.
-- [ ] `target_file_patterns` are explicit (no `**/*` unless deferred).
-- [ ] If `docs_impact.status` is `required`, `docs_touched` has at least one entry.
-- [ ] If `plan.status` is `deferred`, `deferred_reason` is provided.
-- [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor.
-
-### Coverage Closure
-Before emitting, verify:
-- Every `milestone_id` from `spec/14_roadmap.json` that is in scope for this session has ≥1 `checklist` item in `plan.spec_alignment.checklist`.
-- All `spec_ref.id` values in the checklist resolve to IDs present in their referenced upstream spec files (`fr_id`, `api_id`, `inv_id`, `nfr_id`, `fixture_id`).
-- Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
-- No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
-- If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
-- [ ] All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`
-- [ ] Every implementation context links to the active Step 14 milestone
-- [ ] All cross-references resolve to valid IDs in the referenced spec files
-- [ ] The `semantic_review` section covers all major implementation concerns (naming, structure, coverage) — not just surface-level checks
-- [ ] Every `plan.spec_alignment.checklist` item has a corresponding `execution.execution_results` entry (no planned item left without an execution record)
-- [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor — all checklist IDs and scope_in/scope_out values are consistent with spec/impl_context/*.json
 
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.

@@ -58,14 +58,23 @@ Before finalizing, ensure these are addressed:
 - Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_functional_requirements.json` preconditions; MUST align with NFRs and governance.
 
 ## Self-Audit Gate
-- Gating items:
-  - For HTTP: route and method set; for gRPC: service/method identified.
-  - Request/response schemas known or marked `-tbd` with plan; errors enumerated.
-  - Security explicitly chosen and justified; owner set; traces to FRs/capabilities present.
-  - Access control for each interface is defined, or explicitly marked as open/public with rationale.
-  - If access control rules, permission boundaries, or identity model are not defined in `spec/04_functional_requirements.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/03_glossary.json` is present and contains at least one term entry.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** use generic error names like 'Error'—be specific (e.g., 'user-not-found').
+- **DO NOT** use `TBD` without a plan.
+- **DO NOT** skip security for non-public APIs.
+- **DO NOT** mix HTTP verbs in a single API entry (one entry per method).
+- **DO NOT** mix error types in a single API entry (separate distinct behaviors).
+- **DO NOT** use vague or non-specific error codes.
+
+## Clarification Questions
+- If access control rules, permission boundaries, or identity model are not defined in `spec/04_functional_requirements.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
+
+## Coverage Closure
 Before emitting, verify:
 - Every FR in `spec/04_functional_requirements.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
 - All `trace` entries on APIs reference valid `fr_id` values from `spec/04_functional_requirements.json`.
@@ -106,13 +115,6 @@ Before emitting, verify:
 - **Mixed Concerns**: Mixing multiple behaviors into a single API entry, hiding error handling and version strategy.
 - **Empty Errors**: Leaving `errors` empty, which prevents negative fixture coverage and red-team planning.
 - **Bad Versioning**: Using free-form version strings that violate the schema pattern and confuse change management.
-## Negative Constraints
-- **DO NOT** use generic error names like 'Error'—be specific (e.g., 'user-not-found').
-- **DO NOT** use `TBD` without a plan.
-- **DO NOT** skip security for non-public APIs.
-- **DO NOT** mix HTTP verbs in a single API entry (one entry per method).
-- **DO NOT** mix error types in a single API entry (separate distinct behaviors).
-- **DO NOT** use vague or non-specific error codes.
 
 # Clarification Questions
 - For each API, what is the exact behavior and which FR(s) does it satisfy?

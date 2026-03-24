@@ -39,13 +39,18 @@ Before finalizing, verify these system-level capabilities are considered:
 - Naming: MUST use `capability-<verb>-<noun>` format when a matching term exists in `spec/00_charter.json` goals or `docs/seed/seed_overview.md`; MUST NOT use UI-screen or database-table names as capability identifiers.
 
 ## Self-Audit Gate
-- Gating items:
-  - All in-scope charter goals map to at least one capability.
-  - Each capability contains a clear verb, scope, owner (if not external), and minimal inputs/outputs.
-  - Non-trivial capabilities include either pre/postconditions or error_states.
-  - No duplicate or overlapping capabilities (glossary-normalized).
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/00_charter.json` is present and contains at least one goals entry.
+- `spec/00_charter.json` is present and contains at least one user_segments entry.
+- `docs/seed/seed_overview.md` is present and non-empty.
 
-### Coverage Closure
+## Negative Constraints
+- **DO NOT** overlap capability scopes; each capability must have a clear boundary.
+- **DO NOT** use generic verbs ("manage", "handle"); MUST use specific action verbs derived from `spec/00_charter.json` goals and `docs/seed/seed_overview.md` user jobs.
+- **DO NOT** leave `trace` fields empty; use `*-tbd` if specific links are not yet known.
+- **DO NOT** invent capabilities that are not supported by the Charter goals.
+
+## Coverage Closure
 Before emitting, verify:
 - Every goal and success metric in `spec/00_charter.json` is addressed by ≥1 `capability_id`, OR explicitly listed in `out_of_scope` with rationale.
 - No charter goal is silently dropped — each must map to at least one named capability.
@@ -66,12 +71,6 @@ Before emitting, verify:
 - Preconditions, postconditions, and error_states are set for non-trivial capabilities.
 - Inputs/outputs are concrete (e.g., IDs, payload shapes, key fields), not hand-wavy.
 - Trace includes at least one reference to FRs or known interfaces once available; use `*-tbd` if not yet defined.
-
-## Negative Constraints
-- **DO NOT** overlap capability scopes; each capability must have a clear boundary.
-- **DO NOT** use generic verbs ("manage", "handle"); MUST use specific action verbs derived from `spec/00_charter.json` goals and `docs/seed/seed_overview.md` user jobs.
-- **DO NOT** leave `trace` fields empty; use `*-tbd` if specific links are not yet known.
-- **DO NOT** invent capabilities that are not supported by the Charter goals.
 
 ## Best Practices
 - **Verbs**: Phrase each `verb` as an observable action (e.g., "issue invoice"), avoiding generic "manage" or "handle".

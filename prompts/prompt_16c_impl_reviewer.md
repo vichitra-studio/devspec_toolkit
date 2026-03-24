@@ -201,7 +201,28 @@ For each `checklist[]` item:
 *   **Infinite Loop**: Failing to spawn recursive `remediation_tasks` for findings. *Fix*: Every finding must have a `task` unless it's a "won't fix".
 *   **Security Bypass**: Verifying while `security_status` is RED. *Fix*: Check Step 11/17 gates explicitly.
 
-## FORBIDDEN ACTIONS (Immediate Rejection)
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- The Step 16b execution artifact (`spec/impl_context/{step_id}.json`) is present.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/14_roadmap.json` is present and contains at least one milestone entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+
+## Coverage Closure
+Before emitting, verify:
+- Every `checklist` item in `spec/impl_context/{step_id}.json` has a corresponding entry in `review.findings` with a verdict.
+- All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
+- Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
+- No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
+- If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
+- Every FR referenced in the active milestone's `fr_refs` has a corresponding entry in `semantic_review.fr_coverage`.
+- [ ] Review covers all FRs listed in the active milestone's `fr_refs`
+- [ ] Every finding includes a specific file:line reference (no vague "the code has issues")
+- [ ] Verdict is based on measurable criteria from FR acceptance criteria — not subjective quality judgment
+- [ ] Every high-severity finding has a remediation_task with a specific, actionable fix description (not "fix the issue")
+- [ ] `semantic_review.fr_coverage` is populated for every FR listed in the active milestone's `fr_refs` (no FR left without a coverage verdict)
+
+## Negative Constraints
 
 ### Verification
 1. **NEVER** accept `verified` without inspecting actual `evidence` content
@@ -231,21 +252,6 @@ For each `checklist[]` item:
 # Output Rule
 1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
 2.  The JSON must validate against `schema/16_impl_context.schema.json`.
-
-## Self-Audit Gate
-
-### Coverage Closure
-Before emitting, verify:
-- Every `checklist` item in `spec/impl_context/{step_id}.json` has a corresponding entry in `review.findings` with a verdict.
-- All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
-- Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
-- No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
-- If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
-- [ ] Review covers all FRs listed in the active milestone's `fr_refs`
-- [ ] Every finding includes a specific file:line reference (no vague "the code has issues")
-- [ ] Verdict is based on measurable criteria from FR acceptance criteria — not subjective quality judgment
-- [ ] Every high-severity finding has a remediation_task with a specific, actionable fix description (not "fix the issue")
-- [ ] `semantic_review.fr_coverage` is populated for every FR listed in the active milestone's `fr_refs` (no FR left without a coverage verdict)
 
 # Schema Reference
 - Schema URI: vc:16-impl-context

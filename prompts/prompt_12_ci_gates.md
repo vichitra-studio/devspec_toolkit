@@ -34,12 +34,18 @@ Translate governance rules and fixture expectations into enforceable CI automati
 - Ambiguity scrub: make pipeline DAG explicit; avoid implicit sequencing.
 
 ## Self-Audit Gate
-- Gating items:
-  - All core validations (`validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`) present as job steps; all inter-job dependencies declared in `requires`; every step has a non-empty `command` field.
-  - Coverage thresholds stated or explicitly deferred with rationale.
-- If coverage thresholds or CI runner infrastructure preferences are not derivable from upstream specs, ask Gap Questions — do not assume default thresholds.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/10_governance.json` is present and contains at least one pr_rules entry.
+- `spec/07_nfrs.json` is present and contains at least one nfr entry.
+- `spec/08_fixtures.json` is present and contains at least one fixture entry.
 
-### Coverage Closure
+## Negative Constraints
+- Do not output YAML, Markdown prose, or any text outside the JSON schema.
+- Do not use placeholders like TBD or TODO.
+- Do not invent CI steps that do not map to actual tools in `specdev_tools` or standard shell commands.
+- Do not output unstructured strings for steps; use structured objects with `id`, `name`, and `command`.
+
+## Coverage Closure
 Before emitting, verify:
 - Every `ci_gate` defined in `spec/02a_delivery_baseline.json` is implemented as a `job_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
 - All `pr_rules` commands from `spec/10_governance.json` have corresponding CI job steps.
@@ -55,12 +61,6 @@ Before emitting, verify:
 - [ ] Every mandatory spec step has a corresponding CI validation command
 - [ ] All referenced validation commands exist in the toolkit CLI (verify against CLAUDE.md CLI reference)
 - [ ] Gate thresholds are numeric and measurable — no subjective pass criteria
-
-## Negative Constraints
-- Do not output YAML, Markdown prose, or any text outside the JSON schema.
-- Do not use placeholders like TBD or TODO.
-- Do not invent CI steps that do not map to actual tools in `specdev_tools` or standard shell commands.
-- Do not output unstructured strings for steps; use structured objects with `id`, `name`, and `command`.
 
 ## Hallucination Vectors
 - Do not invent new tools or commands that do not exist in the repository.
