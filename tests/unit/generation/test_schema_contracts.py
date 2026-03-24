@@ -141,8 +141,20 @@ class SchemaContractsTests(unittest.TestCase):
         self.assertTrue({"metric_ref", "unit_ref", "environment_ref"}.issubset(required))
 
     def test_canonical_manifest_covers_all_schema_ref_kinds(self):
+        # Collect kinds from manifest.json AND from canon/examples/ starter files (auth-domain
+        # entries were moved to canon/examples/ to keep cn:core: toolkit-mechanical only).
         manifest = json.loads((self.repo_root / "canon" / "manifest.json").read_text(encoding="utf-8"))
         manifest_kinds = {entry.get("kind") for entry in manifest.get("entries", []) if isinstance(entry, dict)}
+        examples_dir = self.repo_root / "canon" / "examples"
+        if examples_dir.is_dir():
+            for ex_path in sorted(examples_dir.glob("*.json")):
+                try:
+                    ex_doc = json.loads(ex_path.read_text(encoding="utf-8"))
+                    for entry in ex_doc.get("entries", []):
+                        if isinstance(entry, dict) and entry.get("kind"):
+                            manifest_kinds.add(entry["kind"])
+                except (json.JSONDecodeError, KeyError):
+                    pass
         ref_kinds: set[str] = set()
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
             with path.open("r", encoding="utf-8") as f:
@@ -491,8 +503,37 @@ class SchemaContractsTests(unittest.TestCase):
                 (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
+            # Provide an inline manifest with cn:core:term:jwt so autofix can resolve the term ref.
+            # (auth-domain entries were moved to canon/examples/ in the live repo.)
             (root / "canon" / "manifest.json").write_text(
-                (self.repo_root / "canon" / "manifest.json").read_text(encoding="utf-8"),
+                json.dumps({
+                    "registry_version": "1.0.0",
+                    "entries": [
+                        {
+                            "id": "cn:core:term:jwt",
+                            "kind": "term",
+                            "preferred_label": "JWT",
+                            "definition": "JSON Web Token used to transport authenticated claims between parties.",
+                            "version": "1.0.0",
+                            "status": "active",
+                            "owners": ["spec-platform"],
+                            "aliases": ["json-web-token"],
+                            "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                        },
+                        {
+                            "id": "cn:core:unit:ms",
+                            "kind": "unit",
+                            "preferred_label": "milliseconds",
+                            "definition": "Duration measured in milliseconds.",
+                            "version": "1.0.0",
+                            "status": "active",
+                            "owners": ["spec-platform"],
+                            "aliases": ["ms"],
+                            "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                        },
+                    ],
+                    "aliases": [],
+                }),
                 encoding="utf-8",
             )
 
@@ -664,8 +705,26 @@ class SchemaContractsTests(unittest.TestCase):
                 (self.schema_root / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
+            # Provide an inline manifest with cn:core:risk_category:authz so autofix can resolve it.
+            # (auth-domain entries were moved to canon/examples/ in the live repo.)
             (root / "canon" / "manifest.json").write_text(
-                (self.repo_root / "canon" / "manifest.json").read_text(encoding="utf-8"),
+                json.dumps({
+                    "registry_version": "1.0.0",
+                    "entries": [
+                        {
+                            "id": "cn:core:risk_category:authz",
+                            "kind": "risk_category",
+                            "preferred_label": "authz",
+                            "definition": "Risk related to authorization and access control.",
+                            "version": "1.0.0",
+                            "status": "active",
+                            "owners": ["spec-platform"],
+                            "aliases": ["authorization"],
+                            "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                        }
+                    ],
+                    "aliases": [],
+                }),
                 encoding="utf-8",
             )
 
@@ -877,6 +936,67 @@ def _collect_all_properties(schema: dict) -> dict:
         if isinstance(entry, dict) and "properties" in entry:
             props.update(entry["properties"])
     return props
+
+
+    # ------------------------------------------------------------------
+    # M10 — minItems contract tests for Step 11 and Step 12
+    # ------------------------------------------------------------------
+
+    def test_step_11_rejects_empty_threats_array(self):
+        """Step 11 schema requires minItems: 1 on threats — empty array must fail."""
+        registry = SchemaRegistry(str(self.repo_root))
+        schema = registry.load("vc:11-redteam")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
+
+        with (self.repo_root / "tests" / "fixtures" / "step_11" / "valid_full.json").open(
+            "r", encoding="utf-8"
+        ) as f:
+            payload = json.load(f)
+        payload.pop("$schema", None)
+        payload["threats"] = []
+
+        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+        threats_errors = [e for e in errors if list(e.path) == ["threats"]]
+        self.assertTrue(threats_errors, msg="Empty threats[] must be rejected by minItems constraint")
+
+    def test_step_11_rejects_empty_target_ids_on_threat(self):
+        """Step 11 schema requires minItems: 1 on target_ids within a threat — empty array must fail."""
+        registry = SchemaRegistry(str(self.repo_root))
+        schema = registry.load("vc:11-redteam")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
+
+        with (self.repo_root / "tests" / "fixtures" / "step_11" / "valid_full.json").open(
+            "r", encoding="utf-8"
+        ) as f:
+            payload = json.load(f)
+        payload.pop("$schema", None)
+        # Set target_ids to empty on the first threat
+        payload["threats"][0]["target_ids"] = []
+
+        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+        target_errors = [
+            e for e in errors
+            if len(e.path) >= 3 and list(e.path)[:2] == ["threats", 0]
+            and "target_ids" in str(list(e.path))
+        ]
+        self.assertTrue(target_errors, msg="Empty target_ids[] on a threat must be rejected by minItems constraint")
+
+    def test_step_12_rejects_empty_jobs_array(self):
+        """Step 12 schema requires minItems: 1 on jobs — empty array must fail."""
+        registry = SchemaRegistry(str(self.repo_root))
+        schema = registry.load("vc:12-ci-gates")
+        validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
+
+        with (self.repo_root / "tests" / "fixtures" / "step_12" / "valid_dag.json").open(
+            "r", encoding="utf-8"
+        ) as f:
+            payload = json.load(f)
+        payload.pop("$schema", None)
+        payload["jobs"] = []
+
+        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+        jobs_errors = [e for e in errors if list(e.path) == ["jobs"]]
+        self.assertTrue(jobs_errors, msg="Empty jobs[] must be rejected by minItems constraint")
 
 
 def _count_canonical_ref_slots(obj) -> int:

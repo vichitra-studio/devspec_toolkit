@@ -40,7 +40,10 @@
           "note": "Authentication API endpoint"
         }
       ],
-      "capability_ref": "cap-user-authentication"
+      "capability_ref": {
+        "id": "cn:project:capability:cap-user-authentication",
+        "kind": "capability"
+      }
     },
     {
       "fr_id": "fr-user-logout",
@@ -71,7 +74,10 @@
           "note": "Manages user session lifecycle"
         }
       ],
-      "capability_ref": "cap-user-session-management"
+      "capability_ref": {
+        "id": "cn:project:capability:cap-user-session-management",
+        "kind": "capability"
+      }
     }
   ],
   "canonical_refs_used": []

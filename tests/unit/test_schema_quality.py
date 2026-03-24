@@ -1,8 +1,8 @@
 """Schema quality CI lints — regression guards for structural hygiene.
 
 FIX-056: additionalProperties / unevaluatedProperties on every object node
-FIX-057: nesting depth ceiling (threshold = 19)
-FIX-058: description coverage floor (threshold = 5%)
+FIX-057: nesting depth ceiling (threshold = 21)
+FIX-058: description coverage floor (aggregate >= 80%, per-file >= 70%)
 """
 from __future__ import annotations
 
@@ -242,7 +242,7 @@ def test_all_objects_are_closed(schema_path: Path) -> None:
 
 
 # ===========================================================================
-# FIX-057 — nesting depth regression guard (threshold = 19)
+# FIX-057 — nesting depth regression guard (threshold = 21)
 # ===========================================================================
 
 _NESTING_THRESHOLD = 21  # observed max in Step 16 (16_impl_context) — increased by 2 after allOf composition with step_base
@@ -250,8 +250,8 @@ _NESTING_THRESHOLD = 21  # observed max in Step 16 (16_impl_context) — increas
 
 @pytest.mark.parametrize("schema_path", _SCHEMA_FILES, ids=_SCHEMA_IDS)
 def test_nesting_depth_within_threshold(schema_path: Path) -> None:
-    """Schema nesting depth must not exceed the threshold (currently 19,
-    the observed maximum in Step 16)."""
+    """Schema nesting depth must not exceed the threshold (currently 21,
+    increased for allOf composition with step_base)."""
     schema = _load_json(schema_path)
     depth = _measure_nesting_depth(schema)
     assert depth <= _NESTING_THRESHOLD, (
@@ -264,10 +264,11 @@ def test_nesting_depth_within_threshold(schema_path: Path) -> None:
 # FIX-058 — description coverage regression guard (aggregate floor)
 # ===========================================================================
 
-# Current aggregate coverage is ~8%.  The floor is set to catch regressions
-# (i.e. bulk removal of existing descriptions).  Raise the floor as coverage
-# improves via future audit batches.
-_DESCRIPTION_COVERAGE_FLOOR = 0.05  # 5% — below current 8% to avoid flapping
+# Aggregate coverage after Batch 0b enrichment is ~94.7%.  The floor is set
+# to 80% — well below current state — so any significant bulk removal of
+# descriptions is caught while leaving room for minor schema refactors.
+# Raise the floor if aggregate coverage climbs further and stabilises.
+_DESCRIPTION_COVERAGE_FLOOR = 0.80  # 80% — safe buffer below current 94.7%
 
 
 def test_aggregate_description_coverage() -> None:
@@ -295,16 +296,26 @@ def test_aggregate_description_coverage() -> None:
 
 @pytest.mark.parametrize("schema_path", _SCHEMA_FILES, ids=_SCHEMA_IDS)
 def test_description_coverage_no_regression(schema_path: Path) -> None:
-    """Per-schema guard: warn if a schema has zero description coverage
-    despite having properties (informational — does not fail)."""
+    """Per-schema description coverage must not fall below the per-file floor.
+
+    After Batch 0b enrichment the lowest-coverage schema sits at ~75%
+    (02_system_sketch.schema.json).  The floor is set to 70% — 5 percentage
+    points below that minimum — so any significant regression on an individual
+    schema is caught without failing on minor fluctuations from small refactors.
+    """
+    # Per-file floor: 70% — set 5pp below the current minimum of ~75%
+    # (02_system_sketch.schema.json: 3/4 = 75.0%).
+    # Raise this value as the lowest-coverage schemas are improved.
+    _PER_FILE_FLOOR = 0.70
+
     schema = _load_json(schema_path)
     with_desc, total = _count_description_coverage(schema)
 
     if total == 0:
         pytest.skip(f"{schema_path.name} has no properties to check")
 
-    # This is a soft check — it just ensures existing descriptions aren't
-    # removed.  It does NOT require adding new descriptions.
-    # We only fail if a schema that previously had descriptions loses ALL.
-    # For now, we track but don't enforce per-file.
-    pass  # tracking-only — aggregate test above enforces the floor
+    coverage_fraction = with_desc / total
+    assert coverage_fraction >= _PER_FILE_FLOOR, (
+        f"{schema_path.name}: description coverage {coverage_fraction:.1%} "
+        f"({with_desc}/{total}) is below per-file floor {_PER_FILE_FLOOR:.0%}"
+    )

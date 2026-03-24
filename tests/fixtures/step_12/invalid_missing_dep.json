@@ -12,6 +12,7 @@
     {
       "job_id": "job-a",
       "name": "Job A",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "non-existent-job"
       ],

@@ -17,7 +17,11 @@
       "input": {
         "data": "test input"
       },
-      "expected": "processed result"
+      "expected": "processed result",
+      "tag_ref": {
+        "id": "cn:core:term:data-processing",
+        "kind": "term"
+      }
     }
   ],
   "canonical_refs_used": []

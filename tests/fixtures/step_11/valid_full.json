@@ -3,10 +3,12 @@
   "id": "redteam-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "trace": {
-    "type": "doc",
-    "id": "spec-11-redteam"
-  },
+  "trace": [
+    {
+      "type": "doc",
+      "id": "spec-11-redteam"
+    }
+  ],
   "threats": [
     {
       "threat_id": "threat-input-injection",
@@ -33,7 +35,11 @@
           "id": "nfr-availability-api"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "risk_category_ref": {
+        "id": "cn:core:risk_category:business-logic",
+        "kind": "risk_category"
+      }
     },
     {
       "threat_id": "threat-authz-bypass",
@@ -52,7 +58,11 @@
           "id": "fr-read-document"
         }
       ],
-      "severity": "critical"
+      "severity": "critical",
+      "risk_category_ref": {
+        "id": "cn:core:risk_category:auth",
+        "kind": "risk_category"
+      }
     }
   ],
   "edge_cases": [

@@ -29,12 +29,14 @@
   "build_status": "green",
   "trace": [
     {
-      "target": "req-001"
+      "type": "implements",
+      "id": "req-001"
     }
   ],
   "links": [
     {
-      "target": "https://example.com/docs"
+      "rel": "documentation",
+      "href": "https://example.com/docs"
     }
   ],
   "canonical_refs_used": []

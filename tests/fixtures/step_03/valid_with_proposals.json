@@ -1,0 +1,48 @@
+{
+  "$schema": "vc:03-glossary",
+  "id": "glossary-with-proposals",
+  "owner": "system",
+  "created_at": "2025-01-15T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-auth-jwt",
+      "term": "JWT",
+      "definition": "JSON Web Token used to transport authenticated claims between parties.",
+      "domain": "auth",
+      "term_ref": {
+        "id": "cn:core:term:jwt",
+        "kind": "term",
+        "label": "JWT"
+      }
+    },
+    {
+      "term_id": "term-billing-invoice",
+      "term": "invoice",
+      "definition": "A formal document issued to a customer that itemises charges, quantities, and payment terms for goods or services rendered.",
+      "domain": "billing",
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-invoice",
+        "kind": "term",
+        "label": "invoice"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:term:jwt",
+      "kind": "term",
+      "label": "JWT"
+    }
+  ],
+  "canonical_proposals": [
+    {
+      "temp_id": "billing-invoice",
+      "kind": "term",
+      "proposed_label": "invoice",
+      "definition": "A formal document issued to a customer that itemises charges, quantities, and payment terms for goods or services rendered.",
+      "source_field": "terms[1].term",
+      "suggested_namespace": "project"
+    }
+  ]
+}

@@ -26,6 +26,10 @@
         "headers": {
           "content-type": "application/json"
         }
+      },
+      "tag_ref": {
+        "id": "cn:core:term:http-request",
+        "kind": "term"
       }
     }
   ],

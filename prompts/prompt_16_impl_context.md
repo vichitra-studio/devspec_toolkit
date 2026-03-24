@@ -471,7 +471,7 @@ This step's output artifact MUST include every field listed in the schema's `req
           "satisfied": true,
           "evidence_summary": "Login handler implemented with JWT token generation and validation, confirmed by passing pytest tests/auth/test_login.py::test_login_success",
           "checklist_ids": [
-            "chk-auth-01"
+            "CHK_AUTH_01"
           ]
         }
       ],

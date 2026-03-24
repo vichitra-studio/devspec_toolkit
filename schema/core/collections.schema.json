@@ -20,7 +20,7 @@
       "description": "Generic array of strings used for lists of labels, paths, exclusions, or freeform text entries.",
       "items": {
         "type": "string",
-        "description": "A string entry in the array."
+        "description": "A string entry in the array. Each string should be specific, bounded, and self-contained — the meaning must be clear without reading the surrounding context. Minimum 10 characters is recommended; single words are almost always too vague to be actionable. Examples of good entries: 'user authentication via OAuth2' (capability label), 'must complete within 200ms at p99' (NFR constraint), 'rejected when cart is empty' (exclusion rule). Examples of poor entries: 'auth' (ambiguous — which auth?), 'TODO' (placeholder that adds no information), '' (empty string carries no meaning). Anti-patterns: empty strings, single-word entries like 'payments' or 'login', filler text like 'N/A' or 'TBD' when the actual value is known."
       }
     },
     "link": {
@@ -31,11 +31,11 @@
       "properties": {
         "rel": {
           "type": "string",
-          "description": "Relationship type describing how the linked resource relates to this artifact (e.g., 'source', 'documentation')."
+          "description": "Relationship type describing how the linked resource relates to this artifact. Decision rule: 'source' = the original requirements document, product brief, or stakeholder request that motivated this artifact (e.g., a Notion brief, a customer ticket, a Jira epic); 'design' = a visual or structural design artifact such as a Figma wireframe, Miro board, or architecture diagram; 'research' = user research, usability study, or market analysis report that informed a decision; 'documentation' = existing API reference, product docs, or runbook that describes an interface this artifact depends on. Examples: {\"rel\": \"source\", \"href\": \"https://linear.app/team/issue/ENG-412\"} (requirement ticket), {\"rel\": \"design\", \"href\": \"https://www.figma.com/file/abc123/checkout-wireframes\"} (Figma file), {\"rel\": \"documentation\", \"href\": \"https://stripe.com/docs/api/payment_intents\"} (upstream API docs). Anti-pattern: generic values like 'related', 'linked', or 'reference' — these carry no semantic meaning and are rejected by hallucination-lint."
         },
         "href": {
           "type": "string",
-          "description": "URL or relative path to the linked resource."
+          "description": "URL or path to the linked resource. Decision rule: use absolute HTTPS URLs for all external resources; use forward-slash relative paths (no leading ./) for in-repo files. Examples: 'https://www.figma.com/file/abc123/checkout-wireframes' (external design link), 'https://stripe.com/docs/api/payment_intents' (external API docs), 'spec/seed_overview.md' (in-repo seed document), 'docs/architecture/auth-flow.png' (in-repo diagram). Anti-patterns: file:// URLs (not portable across machines), Windows backslash paths like 'docs\\auth\\flow.png' (breaks on non-Windows), localhost URLs like 'http://localhost:3000/api' (not resolvable outside the author's machine), paths starting with ./ (use 'spec/foo.md' not './spec/foo.md')."
         },
         "spec_ref": {
           "$ref": "vc:core:atoms#kebabId",
@@ -60,15 +60,21 @@
         "type": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Trace type — validated against canon/kinds/trace_type.json entries."
+          "description": "The relationship type from source artifact to target artifact. Common values: 'derives_from' (this artifact is derived from the target), 'implements' (this implements a requirement or design), 'tests' (this artifact tests the target), 'validates' (this validates the target), 'depends_on' (this depends on the target), 'refines' (this refines or elaborates the target), 'external' (triggers additional required fields: owner, note). Use consistent vocabulary across the spec.",
+          "examples": ["derives_from", "implements", "tests", "validates", "depends_on", "refines", "external"]
         },
         "id": {
           "$ref": "vc:core:atoms#kebabId",
-          "description": "Kebab-case ID of the target artifact being traced to."
+          "description": "Kebab-case ID of the target artifact this trace link points to. The prefix determines the upstream step: 'cap-*' = Step 01 capabilities, 'fr-*' = Step 04 functional requirements, 'api-*' = Step 05 interface contracts, 'inv-*' = Step 06 invariants, 'nfr-*' = Step 07 NFRs, 'ms-*' = Step 09 milestones, 'gate-*' = Step 12 CI gates, 'threat-*' = Step 11 threats. Must match the ID exactly as it appears in the upstream spec file — a typo here causes traceability-check failures silently. Anti-pattern: inventing an ID that doesn't exist in the referenced step file."
         },
         "note": {
           "type": "string",
-          "description": "Optional human-readable explanation of why this trace link exists."
+          "description": "Optional free-text annotation explaining why this trace link exists and what aspect of the upstream artifact is being referenced. Required when the link is non-obvious (e.g., a capability that is only partially fulfilled, or a constraint that applies only under specific conditions). Example: 'Only the authentication sub-path of this capability is implemented here — token refresh is in a separate FR'. Anti-pattern: leaving note empty on a 'derives_from' link where the derivation rationale is not obvious from the IDs alone."
+        },
+        "owner": {
+          "description": "Responsible party for this trace reference. Deliberately unconstrained (not the 8-value owner enum) because external dependency owners may be arbitrary team or organization names.",
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -104,21 +110,21 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^cn:[a-z0-9.]+:[a-z_]+:[a-z0-9-]+$",
-          "description": "Fully qualified canonical ID in the format cn:<namespace>:<kind>:<slug>."
+          "pattern": "^cn:[a-z0-9.]+:[a-z_][a-z0-9_]*:[a-z0-9-]+$",
+          "description": "Fully qualified canonical ID in the format cn:<namespace>:<kind>:<slug>. Example: 'cn:project:term:billing-amount'. The namespace is typically 'project' for project-specific entries; 'core' for shared primitives. The kind uses underscores not hyphens (e.g., 'risk_category' not 'risk-category'). The slug is kebab-case. Validated by canonical-lint at build time."
         },
         "kind": {
           "type": "string",
           "pattern": "^[a-z_][a-z0-9_]*$",
-          "description": "Canonical kind category this reference belongs to (e.g., unit, stage, environment)."
+          "description": "Canonical kind category, matching the kind field of the targeted canon entry. Common values: 'term' (vocabulary definitions), 'entity' (domain objects: User, Order, Session), 'action' (verbs: authenticate, submit, approve), 'event' (system events: login-succeeded, order-placed), 'acronym' (JWT, API, SLA), 'unit' (ms, req/s, MB), 'stage' (pipeline stages), 'environment' (dev, prod), 'capability', 'dependency', 'risk_category'."
         },
         "version": {
           "type": "string",
-          "description": "Semantic version of the canonical entry at the time of reference."
+          "description": "Semantic version constraint pinning this reference to a specific canon entry version. Omit in most cases — version pinning is only needed when a spec must not pick up newer canon entry versions automatically. When provided, use semver constraint syntax: '1.0.0' (exact) or '^1' (major-compatible). Example: \"^1\"."
         },
         "label": {
           "type": "string",
-          "description": "Human-readable display label for this canonical reference."
+          "description": "Human-readable display label for the referenced canon entry. Copy the preferred_label from the canon entry verbatim — do not rephrase or abbreviate. Example: if the entry's preferred_label is 'Billing Amount', set label to 'Billing Amount'. Used by tooling to display the reference without a registry lookup."
         },
         "alias_used": {
           "type": "string",
@@ -126,21 +132,21 @@
         },
         "note": {
           "type": "string",
-          "description": "Optional note explaining why this canonical term was chosen."
+          "description": "Optional note explaining why this canonical entry was chosen, or clarifying the alias_used resolution. Recommended when alias_used is set (explain what the alias resolved to) or when the reference is non-obvious. Example: 'Using the billing-amount entry because the FR uses the term amount in the billing domain context'."
         }
       },
       "required": [
         "id",
         "kind"
       ],
-      "description": "Reference to a canonical registry entry, binding a spec field value to the shared vocabulary."
+      "description": "Reference to a canonical registry entry, binding a spec field value to the shared vocabulary. Complete worked example: {\"id\": \"cn:project:term:billing-amount\", \"kind\": \"term\", \"label\": \"amount\"}. Required fields: `id` and `kind`. Populate `label` by copying the preferred_label from the canon entry verbatim. Populate `version` only when pinning a specific version constraint (e.g., \"^1\"). Populate `note` when using `alias_used` or when the reference is non-obvious. Omit unused optional fields rather than setting them to empty strings."
     },
     "canonicalRefArray": {
       "$anchor": "canonicalRefArray",
       "type": "array",
       "items": {
         "$ref": "vc:core:collections#canonicalRef",
-        "description": "A canonical registry reference."
+        "description": "A canonical reference. Each item requires `id` (cn:<namespace>:<kind>:<slug>) and `kind`. Example: {\"id\": \"cn:project:unit:milliseconds\", \"kind\": \"unit\", \"label\": \"ms\"}."
       },
       "description": "Array of canonical registry references used within an artifact."
     },
@@ -151,28 +157,28 @@
       "properties": {
         "temp_id": {
           "$ref": "vc:core:atoms#kebabId",
-          "description": "Temporary kebab-case ID assigned to this proposal until it is accepted into the registry."
+          "description": "Temporary kebab-case slug for this proposal, assigned until accepted into the registry. Must match ^[a-z0-9][a-z0-9-]*$ (enforced by canon-accept at acceptance time). Derivation rule for glossary proposals: strip the step-prefix from the term_id. Examples: term_id 'term-jwt' → temp_id 'jwt'; term_id 'term-user-session' → temp_id 'user-session'; term_id 'term-billing-amount' → temp_id 'billing-amount'. For non-glossary proposals, use the natural kebab-case slug of the concept. Do not include kind or namespace in the temp_id — those are added automatically by canon-accept."
         },
         "kind": {
           "type": "string",
-          "description": "Canonical kind category for the proposed term (e.g., unit, entity, role)."
+          "description": "Canonical kind category for the proposed entry. Must use underscores not hyphens — 'risk_category' not 'risk-category' (hyphenated kinds are rejected by canon-accept). Decision rule for glossary proposals: 'term' for vocabulary definitions; 'entity' for domain objects (User, Order, Session, Token); 'action' for operations or verbs (authenticate, submit, approve); 'event' for system events (login-succeeded, order-placed); 'acronym' for abbreviations in active use (JWT, API, SLA); 'unit' for measurement units (ms, req/s, MB); 'role' for personas or access roles (admin, end-user); 'risk_category' for threat or risk classifications; 'capability' for system capabilities; 'dependency' for external services or libraries. When in doubt between 'term' and 'entity': use 'entity' if the concept has lifecycle state or identity; use 'term' if it is purely vocabulary."
         },
         "proposed_label": {
           "type": "string",
-          "description": "Human-readable label suggested for the new canonical entry."
+          "description": "Human-readable display label for the canonical entry. For glossary proposals: copy exactly from the corresponding terms[*].term value — do not rephrase or abbreviate. Format follows the term's conventions: capitalize proper nouns and acronyms (JWT, REST API), lowercase common technical terms (endpoint, payload). Must be a noun or noun phrase — avoid verbs, adjectives, or full sentences. Examples: 'JWT Token', 'Billing Amount', 'end-user', 'checkout-flow'. The label must be stable once accepted — downstream dashboards, lint tools, and reports display it directly."
         },
         "definition": {
           "type": "string",
-          "description": "Clear definition of what this proposed canonical term represents."
+          "description": "Clear definition of this proposed canonical entry. For glossary proposals: copy exactly from the corresponding terms[*].definition value — definitions must be identical to preserve consistency between the glossary spec and the canonical registry. Must be at least 20 characters (same constraint as glossary term definitions). Quality criteria: (1) define the concept without using the label itself, (2) be specific to the project context rather than a generic dictionary definition, (3) distinguish this concept from similar ones in the domain. Example: 'A short-lived cryptographic credential issued by the authentication service upon successful login, valid for 15 minutes.' Do not paraphrase or shorten the glossary definition."
         },
         "source_field": {
           "type": "string",
-          "description": "JSON path or field name in the source artifact where this term was encountered."
+          "description": "JSON path pointing to the field in the source spec artifact where this concept was encountered. Use array wildcard notation for items. For glossary proposals (Step 03): always 'terms[*].term' — this is the standard value for all glossary-sourced proposals. For other step sources, use the pattern 'arrayName[*].fieldName'. For Step 03 (glossary): 'terms[*].term'. For Step 04 (FR list): 'functional_requirements[*].action_ref'. For Step 01 (capabilities): 'capabilities[*].capability_ref'. Format: arrayName[*].fieldName using dot-notation with wildcard index. Do not use zero-indexed paths like 'terms[0].term' — use the wildcard form 'terms[*].term' to indicate the concept may appear in any item. Anti-pattern: 'capability_ref' (missing the parent array and wildcard index)."
         },
         "suggested_namespace": {
           "type": "string",
           "pattern": "^[a-z0-9.]+$",
-          "description": "Dot-separated namespace suggestion for organizing this term in the canonical registry."
+          "description": "Namespace segment for the proposed canon entry ID. Decision rules: use 'project' for all project-specific terms, entities, events, capabilities, and roles (the most common choice); use 'domain' for concepts that apply across multiple projects in the same business domain (e.g., 'billing', 'auth') and should be shared; use 'core' ONLY for primitives defined by the toolkit itself (units, environments, stages, standard actions) — do not use 'core' for project content. Default to 'project' when in doubt. 'project' — for domain concepts specific to this repo (e.g., a custom business entity unique to this product: cn:project:entity:merchant-account). 'domain' — for concepts shared across multiple repos in the same domain (e.g., a shared payment term used by billing and checkout repos: cn:domain:term:settlement-period). 'core' — reserved for toolkit-managed entries only, never set manually. Anti-pattern: always using 'project' even for concepts that will be referenced across multiple repos in the same platform."
         }
       },
       "required": [
@@ -200,19 +206,19 @@
       "properties": {
         "field_path": {
           "type": "string",
-          "description": "JSON path to the field in the artifact where the conflict was detected."
+          "description": "JSON path to the field in the source document where the conflicting input value appeared. Uses dot-notation for objects and bracket-notation for arrays. Dot-notation for named properties: 'capabilities[0].capability_ref.id'. Bracket-notation for pattern properties or dynamic keys: 'environments[\"production\"].database_url'. Full example showing both: 'functional_requirements[2].trace[0].id'. Anti-pattern: using bracket-notation for simple named properties — prefer dot-notation (use 'terms[2].term_ref.id' not 'terms[2][\"term_ref\"][\"id\"]'). Populated by canonical-autofix tooling — do not author manually."
         },
         "input_value": {
           "type": "string",
-          "description": "The original input value that triggered the ambiguous match."
+          "description": "The original input value from the source document that matched multiple canon entries and could not be auto-resolved. Example: 'payment' (matched both cn:project:entity:payment and cn:project:term:payment-method). Populated by canonical-autofix tooling — do not author manually."
         },
         "candidate_ids": {
           "$ref": "vc:core:collections#stringArray",
-          "description": "List of canonical IDs that all matched the input value."
+          "description": "List of canonical IDs that all matched the input value, preventing automatic resolution. Each ID follows the cn:<namespace>:<kind>:<slug> format. Example: ['cn:project:entity:payment', 'cn:project:term:payment-method']. To resolve: inspect the canon manifest for each candidate and pick the one that matches the semantic intent of the source field. Then add the correct ID to the source field and remove the conflict entry."
         },
         "reason": {
           "type": "string",
-          "description": "Explanation of why the conflict could not be auto-resolved."
+          "description": "Explanation of why the conflict could not be auto-resolved. Common patterns: 'Multiple entries share the same preferred_label' — disambiguate by checking the kind or definition; 'Input matched an alias of multiple entries' — resolve by checking which entry the alias was intended for. Populated by canonical-autofix tooling — do not author manually."
         }
       },
       "required": [
@@ -241,7 +247,8 @@
         "staging",
         "prod"
       ],
-      "description": "Deployment environment name. One of dev, ci, staging, or prod."
+      "$comment": "Authoritative values maintained in canon/kinds/environment.json",
+      "description": "A runtime environment name. Represents WHERE the system runs (a target deployment environment). Examples: 'dev', 'ci', 'staging', 'prod'. DISTINCT from stageName: an environment is a runtime target, a stage is a pipeline phase."
     },
     "stageName": {
       "$anchor": "stageName",
@@ -252,7 +259,8 @@
         "staging",
         "prod"
       ],
-      "description": "Pipeline stage name indicating the deployment target. One of dev, ci, staging, or prod."
+      "$comment": "Authoritative values maintained in canon/kinds/stage.json",
+      "description": "A deployment pipeline stage name. Represents a phase in the CI/CD pipeline: where code goes THROUGH (build → test → deploy). Examples: 'dev', 'ci', 'staging', 'prod'. DISTINCT from environmentName: a stage is a pipeline phase, an environment is a runtime target."
     },
     "environmentConfig": {
       "$anchor": "environmentConfig",
@@ -296,7 +304,7 @@
         ],
         "description": "Allowed value types for environment configuration entries."
       },
-      "description": "Key-value configuration map for a deployment environment, supporting string, number, boolean, string array, and string-map values."
+      "description": "Key-value configuration map for a deployment environment, supporting string, number, boolean, string array, and string-map values. Conventional keys: 'replica_count', 'log_level', 'db_pool_size', 'feature_flags', 'cdn_enabled'. Include only keys that differ between environments. Example: database_url differs (dev=localhost, prod=rds.amazonaws.com) — include it. Log level differs (dev=DEBUG, prod=WARN) — include it. JWT algorithm is the same across all environments (always RS256) — omit it. Anti-pattern: copying the full config for each environment when most keys are identical."
     },
     "techStackItem": {
       "$anchor": "techStackItem",
@@ -309,15 +317,15 @@
         },
         "version": {
           "type": "string",
-          "description": "Version string or constraint for this technology."
+          "description": "Version string or constraint for this technology. Use semver or the ecosystem's standard format. Examples: '3.12' (Python exact minor), '^18.0' (Node.js semver range), '3.12.x' (patch-flexible), 'latest' (only acceptable for dev tools, never for production runtimes). Anti-pattern: omitting the version for production runtimes — unversioned entries cause reproducibility failures."
         },
         "notes": {
           "type": "string",
-          "description": "Optional implementation notes about this technology choice."
+          "description": "Optional free-text implementation notes specific to how this technology is used in this project. Use for gotchas, non-obvious configuration, or usage constraints. Example: 'Pinned to 3.12 due to upstream ML library incompatibility with 3.13'. Distinct from rationale: notes describe HOW it is used, rationale describes WHY it was chosen."
         },
         "rationale": {
           "type": "string",
-          "description": "Justification for selecting this technology over alternatives."
+          "description": "Optional justification for choosing this technology over alternatives. Explain the decision criteria, not just the outcome. Example: 'Chose FastAPI over Flask for built-in OpenAPI generation and async support required by the real-time notification feature'. Distinct from notes: rationale describes WHY it was chosen, notes describe HOW it is used."
         },
         "tech_stack_ref": {
           "$ref": "vc:core:collections#canonicalRef",
@@ -346,19 +354,19 @@
       "properties": {
         "languages": {
           "$ref": "vc:core:collections#techStackList",
-          "description": "Programming languages used in the project."
+          "description": "Programming languages used in the project. Include every language that appears in production source code. Examples: Python 3.12, TypeScript 5.x, Go 1.22, Rust 1.78, SQL (for stored procedures). Anti-patterns: listing runtimes (Node.js belongs in infrastructure), listing markup/config formats (HTML, YAML, JSON are not languages in this context), omitting a language used in ≥10% of the codebase."
         },
         "frameworks": {
           "$ref": "vc:core:collections#techStackList",
-          "description": "Application frameworks and libraries used in the project."
+          "description": "Application frameworks and major libraries that define the project's structure or runtime behavior. Include web frameworks, ORM/data-access layers, testing frameworks, and UI component libraries. Examples: FastAPI 0.111, React 18, Django 5.0, SQLAlchemy 2.0, pytest 8.x, Next.js 14. Anti-patterns: listing small utility libraries (lodash, requests) that are dependencies, not architectural choices; listing languages here instead of under languages."
         },
         "infrastructure": {
           "$ref": "vc:core:collections#techStackList",
-          "description": "Infrastructure and platform services (databases, cloud providers, CI/CD)."
+          "description": "Infrastructure services, cloud providers, databases, message brokers, and CI/CD platforms that the application depends on at runtime or deploy time. Examples: PostgreSQL 16, Redis 7, AWS ECS, Kafka 3.7, GitHub Actions, Terraform 1.8, Kubernetes 1.30, S3. Anti-patterns: listing application frameworks here, listing local developer tools (Docker Desktop is a tool, not infrastructure), omitting the primary database."
         },
         "tools": {
           "$ref": "vc:core:collections#techStackList",
-          "description": "Development and operational tools (linters, bundlers, monitoring)."
+          "description": "Developer and operational tooling used during build, test, lint, packaging, or observability — not present in production runtime artifacts. Examples: Ruff 0.4, ESLint 9, Webpack 5, Datadog Agent, Sentry SDK, pnpm 9, mypy 1.10, Playwright 1.44. Anti-patterns: listing production runtime frameworks or databases here, listing every transitive dependency instead of only first-party or architectural tool choices."
         }
       },
       "required": [
@@ -382,7 +390,7 @@
         },
         "id": {
           "$ref": "vc:core:atoms#kebabId",
-          "description": "Kebab-case identifier for this dependency."
+          "description": "Kebab-case identifier for this dependency. Use the team or service name as the slug. Examples: 'auth-service', 'payments-team', 'data-platform', 'mobile-client'. For external dependencies, use the vendor/package name: 'stripe-api', 'sendgrid'. This ID is referenced in milestone depends_on and trace fields."
         },
         "owner": {
           "type": "string",
@@ -391,7 +399,7 @@
         "note": {
           "type": "string",
           "pattern": "^\\S+\\s+\\S+.*$",
-          "description": "Description of the dependency with at least two words. Required for external dependencies."
+          "description": "Free-text description of the dependency relationship — what is needed and when. Minimum two words (enforced). Example: 'Auth service must expose the /token/validate endpoint before Sprint 3 starts. Blocked on mobile team finalising the token schema'. Include: what is needed, which milestone it blocks, and the blocking team contact if known."
         },
         "dependency_ref": {
           "$ref": "vc:core:collections#canonicalRef",

@@ -19,7 +19,11 @@
           "name": "Install Dependencies",
           "command": "npm install"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "lint",
@@ -33,7 +37,11 @@
           "name": "Run Linter",
           "command": "npm run lint"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "test",
@@ -47,7 +55,11 @@
           "name": "Execute Test Suite",
           "command": "npm test"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "deploy",
@@ -62,7 +74,11 @@
           "name": "Deploy",
           "command": "bash ./scripts/deploy.sh"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:staging",
+        "kind": "environment"
+      }
     }
   ],
   "coverage_thresholds": {

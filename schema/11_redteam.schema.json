@@ -12,46 +12,49 @@
       "properties": {
         "trace": {
           "type": "array",
-          "description": "Traceability links connecting this red-team analysis to related artifacts.",
+          "description": "Traceability links connecting this red team assessment to the capabilities and APIs it covers. Every threat must trace to at least one upstream capability or API it targets, using type='derives_from'. Example: [{\"type\": \"derives_from\", \"id\": \"cap-user-authentication\", \"note\": \"Threat targets the credential validation flow\"}]. Threats without trace links cannot be validated against the attack surface defined in Steps 01–05. Multiple traces allowed when a threat crosses capability boundaries.",
           "items": {
             "$ref": "vc:core:collections#traceRef",
-            "description": "A traceability reference for the red-team analysis."
+            "description": "A single traceability reference. At step 11, use type 'derives_from' pointing to cap-* or api-* IDs that define the attack surface this assessment covers. Example: {\"type\": \"derives_from\", \"id\": \"api-session-create\", \"note\": \"Token forgery and session fixation threats target this endpoint\"}. Anti-pattern: type 'implements' — a red team assessment derives from the system design, it does not implement anything."
           }
         },
         "threats": {
           "type": "array",
-          "description": "Identified security threats with severity, mitigations, and traceability.",
+          "minItems": 1,
+          "description": "Identified security threats with severity, mitigations, and traceability. Must contain at least one threat (enforced by minItems).",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "threat_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this threat."
+                "description": "Unique kebab-case identifier for this threat. Recommended format: threat-{category}-{description}. Example: 'threat-auth-token-forgery', 'threat-data-sql-injection', 'threat-dos-api-flooding'. Should be stable across spec versions."
               },
               "description": {
                 "type": "string",
-                "description": "Detailed description of the threat scenario."
+                "description": "Human-readable threat name and scenario summary. A threat description is specific enough when it names: (1) the attacker's entry point (which API, field, or component), (2) the attack technique, and (3) what the attacker gains if successful. Examples: 'JWT Token Forgery via Algorithm Confusion — attacker crafts a token with alg:none to bypass signature validation on the /api/session endpoint, gaining unauthenticated access as any user', 'SQL Injection via Unparameterized Search Query — attacker injects UNION SELECT into the q parameter of GET /api/search to exfiltrate the users table'. Anti-pattern: 'System might be vulnerable to injection attacks' (too vague — does not name the entry point, technique, or impact)."
               },
               "vector": {
                 "type": "string",
-                "description": "Attack vector or method by which the threat could be exploited."
+                "description": "Attack vector or method by which the threat could be exploited. Describe the attacker's entry point, technique, and preconditions. Example: 'Attacker crafts a JWT with alg=none header bypassing signature verification on the token validation middleware'. The vector should be specific enough that a penetration tester could begin probing immediately. Anti-pattern: 'via the API' (too generic — name the specific endpoint, field, or header); 'through user input' (does not specify which input or which manipulation)."
               },
               "target_ids": {
                 "type": "array",
-                "description": "IDs of the APIs or components targeted by this threat.",
+                "minItems": 1,
+                "description": "Trace references to spec artifacts this threat targets. Should typically reference IDs from other spec files, e.g. api_id (from Step 05), component_id (from Step 02), or inv_id (from Step 06). Each threat must target at least one concrete artifact (enforced by minItems) — generic 'the whole system' threats are not actionable. Targeting specific artifacts enables cross-referencing with Step 06 invariants and Step 05 APIs.",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A trace reference to an API or component targeted by this threat."
+                  "description": "A trace reference to a specific spec artifact (API, component, or invariant) targeted by this threat."
                 }
               },
               "category": {
                 "$ref": "vc:core:atoms#threatCategory",
-                "description": "Security domain category: authentication, authorization, business logic, transport, or data privacy."
+                "description": "Security domain category with one concrete example per value: 'authn' — JWT algorithm confusion attack where an attacker signs a token with 'alg: none'; 'authz' — IDOR via direct object reference where a user accesses another user's order by incrementing the ID; 'business_logic' — double-charge in a payment flow triggered by rapid duplicate POST requests; 'transport' — MITM attack stripping HTTPS to HTTP at a misconfigured proxy; 'data_privacy' — PII exposure in verbose error messages that include email addresses and stack traces. When a threat spans categories, assign the category of the primary attack surface. Anti-pattern: using 'transport' for network-level data leakage (that is 'data_privacy' if the data is the target, 'transport' only if the attack is the network path itself). Do NOT use expanded or alternate forms — they will fail enum validation."
               },
               "mitigations": {
                 "type": "array",
-                "description": "List of mitigations that address this threat.",
+                "minItems": 1,
+                "description": "Structured mitigations for this threat. Each mitigation should be a concrete action, not a vague aspiration. Include: (1) a specific technical or process control, (2) where it is applied (component, layer, or process), (3) how effectiveness is measured. Example: 'Apply HMAC-SHA256 signature verification on all incoming webhooks at the API gateway layer. Verified by integration test fix-05-webhook-tampered'. Mitigations must be structured objects — not plain strings. Valid mitigation target types: inv-* (invariant from Step 06 — adds an invariant to prevent the threat), nfr-* (NFR from Step 07 — adds a performance/security requirement), fr-* (FR from Step 04 — adds a functional requirement to address the threat), doc (documentation change in Step 10 governance). Each mitigation must reference an existing artifact ID. Anti-pattern: listing a mitigation without a target ID ('add input validation' with no fr-* or inv-* reference — not traceable to a spec change).",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -67,35 +70,35 @@
                         "doc",
                         "capability"
                       ],
-                      "description": "The artifact type that provides the mitigation."
+                      "description": "The artifact type that provides the mitigation (e.g., 'fr' for a functional requirement, 'inv' for an invariant, 'fixture' for a test fixture). For type 'capability', the id should reference a cap-* ID from Step 01 capabilities. Note: 'component' is not a separate mitigation type — component-level mitigations should be expressed as 'capability' type (the capability hosted by that component) or 'doc' type (architectural documentation)."
                     },
                     "id": {
                       "$ref": "vc:core:atoms#kebabId",
-                      "description": "Kebab-case ID of the mitigating artifact."
+                      "description": "Kebab-case ID of the mitigating artifact. Should match a valid ID in the referenced artifact type's spec file (validated by linters)."
                     },
                     "note": {
                       "type": "string",
-                      "description": "Additional context about how this mitigation addresses the threat."
+                      "description": "Specific explanation of how this artifact mitigates the threat — include the control mechanism, layer of application, and how effectiveness is verified."
                     }
                   },
                   "required": [
                     "type",
                     "id"
                   ],
-                  "description": "A mitigation linking a spec artifact to this threat."
+                  "description": "A structured mitigation linking a concrete spec artifact to this threat. Must specify artifact type, artifact ID, and optionally a note explaining the control."
                 }
               },
               "severity": {
                 "$ref": "vc:core:atoms#severityLevel",
-                "description": "Severity rating of the threat from low to critical."
+                "description": "Risk level for this threat. Calibrate using these concrete scenario anchors: 'critical' — auth bypass allows unauthenticated access to all user data or system compromise (e.g., admin takeover); 'high' — authenticated attacker can exfiltrate a significant data set or escalate privileges without additional prerequisites; 'medium' — authenticated attacker can exploit a vulnerability with 2+ additional steps required (requires specific account permissions or unusual timing); 'low' — verbose error messages expose internal paths or versions, exploitable only with significant reconnaissance. Anti-pattern: assigning 'critical' to all threats (use the scenarios above to calibrate — most threats are 'high' or 'medium')."
               },
               "risk_category_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the risk category in the registry."
+                "description": "Canonical reference to the risk category in the canonical registry. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Common IDs: 'cn:core:risk_category:security', 'cn:core:risk_category:data_privacy', 'cn:core:risk_category:business_logic'. Must exist in canon/manifest.json before authoring — validated by canonical-integrity lint."
               },
               "policy_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the security policy governing this threat."
+                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'risk_category'. policy_ref points to the security policy that mandates this threat be assessed. Example: for a JWT attack threat → {\"id\": \"cn:core:risk_category:authn\", \"kind\": \"risk_category\", \"label\": \"authn\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref."
               }
             },
             "required": [
@@ -112,22 +115,22 @@
         },
         "edge_cases": {
           "type": "array",
-          "description": "Edge cases identified during red-team analysis that may expose vulnerabilities.",
+          "description": "Anomalous inputs or boundary conditions that are not severe enough to be a named threat but could expose unexpected system behaviour under adversarial conditions. Decision rule: document edge cases when: (a) the input is valid by schema but semantically unexpected (empty password, 0-quantity cart), (b) boundary values produce different code paths (exactly at a rate limit, exactly at a max file size), or (c) state sequences are unusual but reachable (accessing a soft-deleted resource, double-submitting a form). Do not duplicate named threat scenarios here.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this edge case."
+                "description": "Unique kebab-case identifier for this edge case. Convention: ec-{related-threat-id-or-topic}-{n}. Examples: 'ec-session-create-empty-password', 'ec-payment-zero-amount', 'ec-auth-double-submit-1'. If the edge case is related to a named threat, reference the threat ID in the prefix. Anti-pattern: 'ec-1', 'ec-edge-case-3' — sequential labels that cannot be traced to meaning."
               },
               "description": {
                 "type": "string",
-                "description": "Description of the edge case scenario."
+                "description": "Human-readable description of the anomalous condition and its consequence. Format: '{anomalous input or state} → {expected behaviour} vs {actual/risky behaviour}'. Examples: 'Search query with 10,000-character input bypasses length validation and triggers a 500 error instead of a 400 validation failure', 'Session token presented 1ms after expiry is accepted due to clock skew tolerance exceeding security threshold', 'Cart quantity set to -1 passes schema validation and creates a negative-amount charge'. Anti-pattern: 'Edge case for login' — name the specific anomaly and its consequence."
               },
               "trigger": {
                 "type": "string",
-                "description": "Condition or action that triggers this edge case."
+                "description": "Description of how to reproduce this edge case — the trigger must be reproducible step-by-step without domain knowledge. Include: (1) exact input format or API call, (2) system state preconditions, (3) sequence of actions. Minimum specificity rule: the trigger must be reproducible — someone reading it must be able to reproduce the edge case without additional context. Good: 'Set JWT alg header to none and remove the signature — send as: eyJ...' (includes exact method). Examples: 'Submit POST /api/search with q parameter set to a 10,001-character string', 'Send authenticated request with token that expires exactly 1 second before the request reaches the validator', 'POST /api/auth/login with Authorization header containing a JWT signed with alg:none — e.g., curl -X POST /api/auth/login -H \\'Authorization: Bearer eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjoxfQ.\\''. Reference the related threat_id if this edge case is a boundary condition of a named threat. Anti-pattern: 'Malformed JWT' (too vague — specify what malformation and how to reproduce it); 'Send unusual request to the API' (not reproducible); omitting the expected vs. actual outcome contrast."
               }
             },
             "required": [

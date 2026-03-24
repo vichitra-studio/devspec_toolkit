@@ -158,7 +158,7 @@
           "satisfied": true,
           "evidence_summary": "Login endpoint returns signed JWT with correct claims as verified by test_auth_login_returns_jwt passing in CI.",
           "checklist_ids": [
-            "req-auth-login"
+            "REQ_AUTH_LOGIN"
           ]
         }
       ],

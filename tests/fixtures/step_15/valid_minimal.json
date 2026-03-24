@@ -12,7 +12,8 @@
   "build_status": "pending",
   "trace": [
     {
-      "target": "trace-target-id"
+      "type": "implements",
+      "id": "trace-target-id"
     }
   ],
   "canonical_refs_used": []

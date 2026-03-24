@@ -28,7 +28,11 @@
           "type": "nfr",
           "id": "nfr-security-1"
         }
-      ]
+      ],
+      "policy_ref": {
+        "id": "cn:project:term:authentication-policy",
+        "kind": "term"
+      }
     },
     {
       "inv_id": "invariant-data-consistency",
@@ -50,7 +54,11 @@
           "type": "fr",
           "id": "fr-financial-data"
         }
-      ]
+      ],
+      "policy_ref": {
+        "id": "cn:project:term:data-consistency-policy",
+        "kind": "term"
+      }
     }
   ],
   "canonical_refs_used": []

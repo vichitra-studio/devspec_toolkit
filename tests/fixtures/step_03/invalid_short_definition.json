@@ -8,8 +8,14 @@
       "term": "amount",
       "definition": "The value of a transaction.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount",
+        "kind": "term",
+        "label": "amount"
+      }
     }
   ],
+  "canonical_proposals": [],
   "canonical_refs_used": []
 }

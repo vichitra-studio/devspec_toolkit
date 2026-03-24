@@ -177,7 +177,17 @@ This step's output artifact MUST include every field listed in the schema's `req
   "id": "interface-contracts-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "apis": [],
+  "apis": [
+    {
+      "api_id": "api-example-resource",
+      "name": "Example Resource API",
+      "version": "v1",
+      "protocol": "http",
+      "owner": "api",
+      "interface_ref": {"id": "cn:project:term:example-resource", "kind": "term"},
+      "trace": [{"type": "implements", "id": "fr-example"}]
+    }
+  ],
   "canonical_refs_used": []
 }
 ```

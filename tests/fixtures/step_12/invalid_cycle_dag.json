@@ -12,6 +12,7 @@
     {
       "job_id": "job-a",
       "name": "Job A",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-b"
       ],
@@ -26,6 +27,7 @@
     {
       "job_id": "job-b",
       "name": "Job B",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-c"
       ],
@@ -40,6 +42,7 @@
     {
       "job_id": "job-c",
       "name": "Job C",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-a"
       ],

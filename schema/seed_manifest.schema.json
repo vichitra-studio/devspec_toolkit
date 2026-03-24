@@ -11,24 +11,24 @@
     },
     "seed_manifest_id": {
       "$ref": "vc:core:atoms#kebabId",
-      "description": "Unique kebab-case identifier for this seed manifest instance."
+      "description": "Unique kebab-case identifier for this seed manifest instance. Convention: {product-or-repo-slug}-seed-manifest. Examples: 'billing-api-seed-manifest', 'customer-portal-seed-manifest', 'devspec-toolkit-seed-manifest'. Should match the host repository name. Anti-pattern: 'seed-manifest-v1' (too generic) or using a version suffix here — version the manifest via the 'version' field."
     },
     "version": {
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "Semantic version of the seed manifest format."
+      "description": "SemVer string (MAJOR.MINOR.PATCH) for the seed manifest format. Increment MINOR when adding new seeds; increment MAJOR for breaking structural changes."
     },
     "created_at": {
       "$ref": "vc:core:atoms#timestamp",
-      "description": "ISO 8601 timestamp when this seed manifest was initially created."
+      "description": "ISO 8601 datetime when this seed manifest was initially created. Format: YYYY-MM-DDTHH:MM:SSZ."
     },
     "last_updated": {
       "$ref": "vc:core:atoms#timestamp",
-      "description": "ISO 8601 timestamp when this seed manifest was last modified."
+      "description": "ISO 8601 datetime of the most recent modification to this manifest. Format: YYYY-MM-DDTHH:MM:SSZ. Update whenever seeds or step_requirements change."
     },
     "global_seed_order": {
       "$ref": "vc:core:collections#kebabIdArray",
-      "description": "Ordered array of seed IDs defining the default ingestion sequence across all pipeline steps."
+      "description": "Ordered list of seed IDs that AI prompts should read before generating any spec artifact. The order determines the precedence of context: earlier seeds provide foundational context, later seeds provide specifics. All prompts read seeds in this order via the 'Seed Order & Mandatory Sources' section. Should include at minimum the IDs for seed_overview.md and seed_tech_stack.md."
     },
     "seeds": {
       "type": "array",
@@ -39,21 +39,21 @@
         "properties": {
           "seed_id": {
             "$ref": "vc:core:atoms#kebabId",
-            "description": "Unique kebab-case identifier for this seed document."
+            "description": "Unique kebab-case identifier for this seed document. Should match a corresponding entry in global_seed_order and/or step_requirements (validated by seed-lint). Example: 'seed-overview', 'seed-tech-stack'. Convention: use the filename stem in kebab-case."
           },
           "path": {
             "type": "string",
             "minLength": 1,
-            "description": "File path to the seed document relative to the repository root."
+            "description": "File path to the seed document relative to the repository root. Example: 'seed/seed_overview.md'."
           },
           "description": {
             "type": "string",
             "minLength": 1,
-            "description": "Human-readable summary of what this seed document contains."
+            "description": "What this seed file contains. Helps prompts understand whether to prioritize this seed for their step. Write from the prompt's perspective: what will it learn from this seed? Example: 'High-level product overview, goals, and user personas. Read first for all steps.' Avoid vague summaries like 'overview doc'."
           },
           "required": {
             "type": "boolean",
-            "description": "Whether this seed document must be present for pipeline execution."
+            "description": "Whether this seed document must be present for pipeline execution. true: pipeline will error if this file is missing. false: seed is optional and prompts may skip it when absent."
           },
           "source_type": {
             "type": "string",
@@ -63,7 +63,7 @@
               "config",
               "other"
             ],
-            "description": "Category of the seed source: doc (documentation), spec (specification), config (configuration), or other."
+            "description": "Category of the seed source. 'doc': narrative documentation (PRDs, meeting notes, design docs) — prose documents that are human-readable only. 'spec': formal specification or schema — JSON, YAML, or CSV files that can be parsed programmatically. 'config': project configuration or environment settings. 'other': any source not fitting the above categories. Values: 'narrative' describes prose documents like design briefs, user research reports, or meeting notes (human-readable only); 'structured' describes JSON, YAML, or CSV files that can be parsed programmatically; 'both' describes a Markdown document with embedded YAML front matter or structured tables (e.g., a spec guide with a machine-parseable requirements table). When a document is both narrative and machine-parseable, prefer 'spec' if it has a defined schema, or 'doc' if it is primarily human-authored prose. Anti-pattern: classifying a plaintext changelog as 'spec' or 'structured' — it must have a parseable format (JSON/YAML/CSV) to qualify."
           }
         },
         "required": [
@@ -73,23 +73,23 @@
           "required",
           "source_type"
         ],
-        "description": "A seed document definition with path, source type, and required flag."
+        "description": "Definition of a single seed document: its location, type, and role in the pipeline."
       },
-      "description": "Array of seed document definitions, each describing a source document available for ingestion."
+      "description": "Registry of all seed files available for this project. Each entry describes a seed file's purpose and scope. Seeds are source-of-truth documents (PRDs, technical specs, meeting notes) that ground AI outputs in project reality. Must contain at least one entry; seed_ids here should align with global_seed_order and step_requirements values (validated by seed-lint)."
     },
     "step_requirements": {
       "type": "object",
       "patternProperties": {
         "^(\\d{2}[a-z]?)$": {
-          "description": "Array of seed IDs required for this pipeline step.",
+          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '04': ['seed-overview', 'seed-tech-stack'] (FR list step requires both seeds). For multi-part steps use the full step key: '16a': ['seed-overview', 'seed-tech-stack', 'seed-domain-model']. Anti-pattern: key format '4' instead of '04' — step keys must be zero-padded two-digit strings, or the full step identifier for multi-part steps (e.g., '16a', '16b').",
           "$ref": "vc:core:collections#kebabIdArray"
         }
       },
       "additionalProperties": false,
-      "description": "Map from pipeline step numbers to arrays of seed IDs required for that step."
+      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to prioritize reading. Key: step ID matching the pattern NN or NNx (e.g., '04', '05', '16a'). Value: array of seed IDs from the seeds registry. Ensures each step gets the most relevant context without requiring all seeds. Steps not listed here fall back to reading global_seed_order."
     },
     "doc_paths": {
-      "description": "Glob patterns identifying documentation files in the host repository. Used by step_16 validator to verify that docs_impact entries reference valid doc paths.",
+      "description": "Array of glob patterns identifying documentation files in the repository that the step_16 docs_impact validator monitors. Use forward-slash glob syntax relative to the repository root. Examples: ['docs/**/*.md', 'README.md', 'api-reference/**/*.yaml', 'guides/*.md']. Anti-pattern: absolute paths or OS-specific separators ('docs\\*.md') — use forward-slash glob syntax only. Anti-pattern: listing individual files when a glob covers them ('README.md', 'SETUP.md' → use '*.md' at the root level instead).",
       "type": "array",
       "items": { "type": "string" },
       "uniqueItems": true

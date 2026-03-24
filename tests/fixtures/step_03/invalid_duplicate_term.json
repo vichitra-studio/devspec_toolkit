@@ -8,15 +8,26 @@
       "term": "amount",
       "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount1",
+        "kind": "term",
+        "label": "amount"
+      }
     },
     {
       "term_id": "term-billing-amount2",
       "term": "amount",
-      "definition": "Another monetary value definition with same term.",
+      "definition": "Another monetary value definition with same term name used for duplicate testing.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount2",
+        "kind": "term",
+        "label": "amount"
+      }
     }
   ],
+  "canonical_proposals": [],
   "canonical_refs_used": []
 }

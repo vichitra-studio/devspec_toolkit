@@ -23,6 +23,7 @@
           "fixture_ref": "fixture-user-login-success"
         }
       ],
+      "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},
       "trace": [
         {
           "type": "random",
@@ -49,6 +50,7 @@
           "fixture_ref": "fixture-user-logout-success"
         }
       ],
+      "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},
       "trace": [
         {
           "type": "fr",

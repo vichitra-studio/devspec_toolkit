@@ -20,20 +20,21 @@
             "additionalProperties": false,
             "properties": {
               "capability_id": {
-                "description": "Unique kebab-case identifier for this capability (e.g., 'cap-user-login').",
+                "description": "Unique kebab-case identifier for this capability. Should be stable across spec versions — never rename once downstream steps reference it. Recommended format: cap-{noun}-{verb-or-noun}. Example: 'cap-user-authentication', 'cap-payment-processing'. Avoid generic names like 'cap-feature-1'.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "verb": {
-                "description": "Action verb describing the capability (e.g., 'authenticate', 'create').",
+                "description": "Action verb expressing what the system does in this capability. Must be at least 2 characters (enforced by minLength). Decision rule: the verb must be a specific, domain-relevant imperative that uniquely identifies the action — it drives the action_ref canonical link, so duplicate or ambiguous verbs produce collisions in the canon. When multiple verbs could apply, choose the one that best names the primary state mutation: prefer create/delete over update, and update over read. Examples: 'authenticate' (not 'login' or 'verify'), 'provision' (not 'setup' or 'create'), 'reconcile', 'export', 'ingest'. Anti-pattern: 'manage' (ambiguous — does it mean create, update, or delete?), 'handle', 'do', 'process' — these are too vague to produce a meaningful action_ref and would result in duplicate verb entries in the canon.",
                 "type": "string",
                 "minLength": 2
               },
               "description": {
-                "description": "Human-readable explanation of what this capability does.",
-                "type": "string"
+                "description": "What this capability enables, written as: '[Beneficiary] can [outcome] by [mechanism].' Example: 'Merchants can reconcile daily revenue by downloading settlement reports in CSV format.' If provided, must be at least 20 characters (enforced by minLength). Should give a concrete, testable summary of what this capability enables.",
+                "type": "string",
+                "minLength": 20
               },
               "scope": {
-                "description": "Whether this capability is in-scope, out-of-scope, or planned for future delivery.",
+                "description": "Delivery scope for this capability. Use 'in' for capabilities committed for the current release, 'out' for explicitly excluded capabilities (document why to prevent scope creep), and 'future' for capabilities acknowledged but deferred to a later release. Out-of-scope capabilities should still be listed so downstream steps can reference them as exclusions.",
                 "type": "string",
                 "enum": [
                   "in",
@@ -42,31 +43,55 @@
                 ]
               },
               "owner": {
-                "description": "Team or domain responsible for implementing this capability.",
+                "description": "Team or domain responsible for implementing this capability. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product' (product management), 'business' (business stakeholders), 'engineering' (general engineering). Choose the team that will build and maintain this capability.",
                 "$ref": "vc:core:atoms#owner"
               },
               "inputs": {
-                "description": "Data or signals required to exercise this capability.",
+                "description": "Data or signals required to exercise this capability. At least one recommended for in-scope capabilities. Name each input and its type or source. Examples: 'user credentials (email + password)', 'OAuth token from identity provider', 'cart ID and selected payment method ID'. Anti-patterns: 'user data' (too vague — specify which data), 'request' (too generic — name the payload fields that matter). At least one input required for any capability that accepts external data.",
                 "$ref": "vc:core:collections#stringArray"
               },
               "outputs": {
-                "description": "Data or effects produced when this capability executes successfully.",
+                "description": "Data or effects produced when this capability executes successfully. At least one recommended for in-scope capabilities. Describe the observable result. Examples: 'session token returned to client with 24-hour TTL', 'audit log entry created with timestamp and actor ID', 'confirmation email enqueued for delivery within 60s'. Anti-patterns: 'result' (too vague), 'response' (doesn't describe what changes). Each output should be verifiable independently.",
                 "$ref": "vc:core:collections#stringArray"
               },
               "preconditions": {
-                "description": "Conditions that must be true before this capability can execute.",
-                "$ref": "vc:core:collections#stringArray"
+                "description": "Conditions that must be true before this capability can execute. Use declarative present-tense statements. These feed into Step 07 invariants and become invariant candidates.",
+                "$ref": "vc:core:collections#stringArray",
+                "items": {
+                  "type": "string",
+                  "description": "A specific, falsifiable condition that must hold before this capability can execute. State the exact system state, not a general category. Examples: 'User account exists and email_verified is true', 'Rate limit counter for this IP is below the configured threshold', 'Cart contains at least one item with available inventory'. Avoid: 'User is logged in' (too vague — specify what authenticated means), 'System is available' (this is always assumed)."
+                }
               },
               "postconditions": {
-                "description": "Conditions guaranteed to be true after successful execution of this capability.",
-                "$ref": "vc:core:collections#stringArray"
+                "description": "Conditions guaranteed to hold after successful execution of this capability. These become invariant candidates in Step 07. Use declarative present-tense statements describing verifiable state changes.",
+                "$ref": "vc:core:collections#stringArray",
+                "items": {
+                  "type": "string",
+                  "description": "A specific, verifiable state that holds after this capability completes successfully. Name the exact system state, including any persistence or timing guarantees. Examples: 'Session token is persisted to session store with 24-hour TTL', 'Account balance is updated atomically in a single database transaction with an audit log entry', 'Order status transitions from PENDING to CONFIRMED and confirmation email is enqueued'. Avoid: 'Data is saved' (too vague), 'User is logged in' (already a precondition — postconditions describe what changed)."
+                }
+              },
+              "name": {
+                "description": "Human-readable display label for this capability, suitable for UI renderers and reports. Use Title Case, 2–4 words. Examples: 'User Authentication', 'Payment Processing', 'Report Export', 'Session Management'. Should be a noun phrase (the outcome), not a verb phrase. Omit when the verb and description already provide sufficient human-readable context — this field adds value only when the capability is rendered in a list or table without its full description.",
+                "type": "string",
+                "minLength": 2
+              },
+              "goal_id": {
+                "description": "Kebab-case ID of a named charter goal this capability directly serves. Note: the default Step 00 charter schema does not include a goals array — this field is used by host repos that extend the charter with project-level goals alongside or instead of success_metrics. If no goals array exists in the charter, omit this field entirely rather than fabricating a goal ID. Decision rule: when a capability contributes to multiple goals, choose the *primary* goal that most directly motivated including this capability in scope — the one whose removal would cause this capability to be descoped. When the fit to any goal is loose, omit this field entirely rather than forcing a mapping; a missing goal_id is preferable to a misleading one. Correct: capability 'cap-user-authentication' → goal_id='goal-reduce-churn' when authentication improvements directly reduce churn (removing the goal would descope this capability). Wrong: mapping 'cap-audit-logging' to 'goal-increase-revenue' because logs help debugging which might eventually affect revenue — this is incidental, not causal. Anti-pattern: forcing a goal_id when the capability is a technical enabler (security, compliance, infrastructure) with no direct charter goal — omit rather than fabricate. Validated by linter cross-reference at build time.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "success_metric_refs": {
+                "description": "Charter success metric IDs this capability contributes to, referencing success_metrics[*].metric_id from spec/00_charter.json. Include a metric_id when this capability is responsible for moving that metric, even partially. Example: 'cap-checkout-performance' fully drives 'metric-checkout-page-load-time' and partially drives 'metric-checkout-conversion' (faster pages increase conversion) — list both. Omit a metric when the capability's removal would not measurably affect that metric. Omit the array entirely when the capability does not map to any quantifiable charter success metric. Anti-pattern: listing every charter metric for every capability — only list metrics the capability directly influences. Validated by linter cross-reference.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                }
               },
               "error_states": {
-                "description": "Possible error conditions that may arise during capability execution.",
+                "description": "Named error conditions that may arise during capability execution. Include error_states for all in-scope capabilities that can fail with a named error. Omit only for capabilities that have no defined error contract (e.g., 'cap-system-health-check' that returns a boolean). Each in-scope capability that interacts with external data, users, or services should have at least one named error state. Anti-pattern: omitting error_states because 'errors are handled in the FR' — capabilities define the error vocabulary; FRs reference it.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:errors#errorState",
-                  "description": "An error state that may occur during capability execution."
+                  "description": "A specific error condition that may arise during this capability's execution. Provide a named error code (SCREAMING_SNAKE_CASE) and a brief description of what triggered it and what the caller should do. Examples: INSUFFICIENT_PERMISSIONS (caller does not have the required role for this operation), RATE_LIMIT_EXCEEDED (too many requests from this IP in the configured window — retry after 60s), RESOURCE_NOT_FOUND (the targeted entity does not exist or is soft-deleted), UPSTREAM_SERVICE_UNAVAILABLE (dependent external service is unreachable — circuit breaker open). Avoid generic codes like ERROR or FAILURE — each error state should be specific enough to handle distinctly."
                 }
               },
               "trace": {
@@ -74,23 +99,23 @@
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference for this capability."
+                  "description": "A traceability reference linking this capability to an upstream charter artifact. At step 01 (capabilities), use type 'derives_from' pointing to the charter artifact ID. Example: {\"type\": \"derives_from\", \"id\": \"charter-v1\", \"note\": \"Capability directly addresses the checkout flow in-scope item\"}. At minimum, include one trace per capability — capabilities without trace links are architectural drift that cannot be validated against charter scope."
                 }
               },
               "capability_ref": {
-                "description": "Canonical reference linking this capability to the canonical registry.",
+                "description": "Canonical registry entry for this capability's concept. Ensures the capability name is drawn from shared vocabulary rather than invented ad-hoc. Kind must be 'capability'. Example: {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}. The id must exist in canon/manifest.json before the spec is written, or a corresponding entry must be added to canonical_proposals. Validated by canonical-integrity lint at build time.",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "action_ref": {
-                "description": "Canonical reference to the action verb used in this capability.",
+                "description": "Canonical registry entry for the action verb of this capability. Should align with the value in the 'verb' field. Kind must be 'action'. Example: {\"id\": \"cn:project:action:authenticate\", \"kind\": \"action\", \"label\": \"authenticate\"}. Ensures consistent verb vocabulary across all capabilities and downstream steps. Validated by canonical-integrity lint.",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "entity_ref": {
-                "description": "Canonical reference to the primary entity this capability operates on.",
+                "description": "Canonical registry entry for the primary domain entity this capability operates on. Kind must be 'entity'. Examples: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"user\"} for user management capabilities; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"order\"} for order processing capabilities. Drives consistent naming in FRs, APIs, and data models downstream. Validated by canonical-integrity lint.",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "role_ref": {
-                "description": "Canonical reference to the role that exercises this capability.",
+                "description": "Canonical registry entry for the actor or role that exercises this capability. Kind must be 'entity' (roles are modelled as entities in the canon). Examples: {\"id\": \"cn:project:entity:end-user\", \"kind\": \"entity\", \"label\": \"end-user\"} for customer-facing capabilities; {\"id\": \"cn:project:entity:admin\", \"kind\": \"entity\", \"label\": \"admin\"} for admin-only capabilities. Should match a role defined in the canon manifest. Validated by canonical-integrity lint.",
                 "$ref": "vc:core:collections#canonicalRef"
               }
             },

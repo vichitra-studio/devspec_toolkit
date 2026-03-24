@@ -15,6 +15,7 @@
         }
       ],
       "category": "invalid-category",
+      "risk_category_ref": {"id": "cn:core:risk_category:auth", "kind": "risk_category"},
       "mitigations": [
         {
           "type": "inv",

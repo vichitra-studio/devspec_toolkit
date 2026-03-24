@@ -11,6 +11,7 @@
         "fr-user-login",
         "api-auth"
       ],
+      "tag_ref": {"id": "cn:core:term:data-processing", "kind": "term"},
       "mode": "contract",
       "input": {
         "username": "testuser"

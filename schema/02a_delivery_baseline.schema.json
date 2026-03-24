@@ -11,15 +11,15 @@
       "type": "object",
       "properties": {
         "trace": {
-          "description": "Traceability links back to upstream artifacts (charter, system sketch).",
+          "description": "Traceability links connecting this delivery baseline to upstream spec artifacts. Use 'implements' to reference capabilities (cap-*) or charter scope items this baseline realises. Use 'derives_from' to reference charter decisions or risk assessments that constrain this environment configuration. Example: [{type: 'implements', id: 'cap-continuous-deployment', note: 'This baseline defines the CI/CD pipeline for this capability'}, {type: 'derives_from', id: 'charter-v1', note: 'Environment structure follows the charter deployment scope'}]. At least one trace entry per baseline. Anti-pattern: omitting trace entirely — baselines without trace links cannot be validated against charter scope.",
           "type": "array",
           "items": {
             "$ref": "vc:core:collections#traceRef",
-            "description": "A traceability reference for the delivery baseline."
+            "description": "A traceability reference linking this delivery baseline to the upstream spec artifacts it formalises. At step 02a, use 'implements' for artifacts this baseline directly operationalises (e.g., the system sketch or capability list) and 'derives_from' for charter constraints it encodes (e.g., compliance requirements driving environment topology). Example: {\"type\": \"implements\", \"id\": \"system-sketch-v1\", \"note\": \"Delivery baseline formalises the component topology defined in the system sketch\"}."
           }
         },
         "environments": {
-          "description": "Map of deployment environments (dev, ci, staging, prod) with their configurations.",
+          "description": "Map of environment names to their configuration objects. Each key must be one of the canonical environment names (dev, ci, staging, prod). The value is a key-value config map capturing environment-specific overrides for infrastructure, scaling, and feature flags. Decision rule: include only keys whose value differs across at least two environments — if a key has the same value in every environment, omit it; shared defaults belong in application configuration, not here. Worked example: if 'api_url' is 'https://api.staging.example.com' in staging and 'https://api.example.com' in prod, include it; if 'log_level' is always 'info' in every environment, omit it entirely. Correct: {\"dev\": {\"replica_count\": 1, \"log_level\": \"debug\", \"api_url\": \"https://api.dev.example.com\"}, \"prod\": {\"replica_count\": 3, \"log_level\": \"warn\", \"api_url\": \"https://api.example.com\"}}. Anti-pattern: duplicating keys with identical values across all environments (e.g., {\"dev\": {\"timeout\": 30}, \"staging\": {\"timeout\": 30}, \"prod\": {\"timeout\": 30}}) — this creates a false impression that values vary and pollutes the diff when values do change; also avoid listing every possible config key regardless of whether it actually varies between environments.",
           "type": "object",
           "propertyNames": {
             "$ref": "vc:core:collections#environmentName",
@@ -27,7 +27,7 @@
           },
           "additionalProperties": {
             "$ref": "vc:core:collections#environmentConfig",
-            "description": "Environment configuration values for a specific deployment environment."
+            "description": "Configuration block for one deployment environment. Must capture the settings that differ between tiers — e.g., replica count, database URL pattern, feature flags, resource limits. Values should reflect actual delivery targets, not placeholder strings."
           },
           "required": [
             "dev",
@@ -38,33 +38,33 @@
           "minProperties": 4
         },
         "ci_gates": {
-          "description": "List of CI gate names that must pass before deployment (e.g., 'lint', 'unit-tests').",
+          "description": "Ordered list of CI gate identifiers that must all pass before a deployment is considered promotable. At least one gate must be provided (enforced by minItems). Decision rule: the name must be recognizable to a developer reading the CI log — use kebab-case that matches what the gate actually validates. Standard names: 'unit-tests', 'lint', 'type-check', 'security-scan', 'integration-tests', 'e2e-smoke', 'coverage-check'. Worked examples: ['unit-tests', 'lint', 'type-check', 'security-scan'] for a typical backend service; ['unit-tests', 'integration-tests', 'e2e-smoke', 'coverage-check'] for a full-stack app. Anti-pattern: 'tests' (ambiguous — unit, integration, or e2e?), 'CI' (too generic to be actionable), 'checks' (not machine-identifiable); also avoid capital letters and spaces as they break pipeline job name matching.",
           "type": "array",
           "minItems": 1,
           "items": {
-            "description": "A CI gate identifier in kebab-case format.",
+            "description": "CI gate identifier in kebab-case (e.g., 'unit-tests', 'lint', 'security-scan'). Should match a pipeline job name in the host repo's CI configuration.",
             "type": "string",
             "pattern": "^[a-z0-9-]+$"
           }
         },
         "secrets": {
-          "description": "List of secret names or keys required by the delivery pipeline.",
+          "description": "List of secret names (environment variable keys) that the delivery pipeline requires at runtime. Each entry should be the exact env-var name injected by the secrets manager — e.g., 'DATABASE_URL', 'API_KEY_STRIPE', 'JWT_SECRET'. Do not include values or partial keys. This list drives audit trails and helps reviewers confirm all secrets are provisioned before deployment. Omit internal framework secrets that are auto-injected by the platform.",
           "$ref": "vc:core:collections#stringArray"
         },
         "compliance": {
-          "description": "List of compliance standards or frameworks the delivery must satisfy (e.g., 'SOC2', 'GDPR').",
+          "description": "List of compliance standards or regulatory frameworks this delivery baseline must satisfy. Use canonical short names: 'SOC2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO27001'. Each entry should reflect an actual external or internal obligation — not aspirational standards. If no formal compliance applies, use an empty array rather than inventing entries. This list is consumed by the governance check (step 10) to verify that compliance-gating CI gates are present.",
           "$ref": "vc:core:collections#stringArray"
         },
         "environment_ref": {
-          "description": "Canonical reference to the environment definitions in the canonical registry.",
+          "description": "Canonical reference to the environment definitions in the canonical registry. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:prod\", \"kind\": \"environment\", \"label\": \"prod\"}. Common IDs: 'cn:core:environment:prod', 'cn:core:environment:staging', 'cn:core:environment:dev'. Should match one of the keys in the 'environments' object of this artifact. Validated by canonical-integrity lint.",
           "$ref": "vc:core:collections#canonicalRef"
         },
         "command_ref": {
-          "description": "Canonical reference to the command definitions used in CI gates.",
+          "description": "Canonical reference to the CLI command this CI gate invokes. Kind must be 'capability'. Reference the specdev or CI command registered in the canon. Examples: {\"id\": \"cn:core:capability:validate-all\", \"kind\": \"capability\", \"label\": \"validate-all\"} for the specdev validate-all command; {\"id\": \"cn:core:capability:pytest\", \"kind\": \"capability\", \"label\": \"pytest\"} for pytest. Only reference commands that are registered in the canon — do not fabricate IDs. Omit when the CI gate name already implies the command (e.g., ci_gate 'lint' implicitly runs the project lint command). If the command is project-specific, define it in project canon first.",
           "$ref": "vc:core:collections#canonicalRef"
         },
         "policy_ref": {
-          "description": "Canonical reference to the compliance policies governing this delivery baseline.",
+          "description": "Canonical reference to the compliance framework or risk category this baseline configuration enforces. Kind must be 'risk_category' (not 'compliance-framework'). Examples: {\"id\": \"cn:core:risk_category:data_privacy\", \"kind\": \"risk_category\", \"label\": \"data_privacy\"} for GDPR-driven environment configuration; {\"id\": \"cn:core:risk_category:transport\", \"kind\": \"risk_category\", \"label\": \"transport\"} for TLS configuration requirements. Anti-pattern: using kind='capability' — policy references must use kind='risk_category'. Validated by canonical-integrity lint.",
           "$ref": "vc:core:collections#canonicalRef"
         }
       },

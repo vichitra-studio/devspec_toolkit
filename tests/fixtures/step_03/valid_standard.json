@@ -9,21 +9,62 @@
       "term": "login",
       "definition": "The process of authenticating a user by verifying their credentials against stored identifiers and access permissions within the authentication system.",
       "domain": "auth",
-      "units": "req/s"
+      "units": "req/s",
+      "term_ref": {
+        "id": "cn:project:term:auth-login",
+        "kind": "term",
+        "label": "login"
+      }
     },
     {
       "term_id": "term-billing-amount",
       "term": "amount",
       "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount",
+        "kind": "term",
+        "label": "amount"
+      }
     },
     {
       "term_id": "term-analytics-session",
       "term": "session",
       "definition": "A period of user activity within an application, tracked from initial interaction until the user stops interacting or times out.",
-      "domain": "analytics"
+      "domain": "analytics",
+      "term_ref": {
+        "id": "cn:project:term:analytics-session",
+        "kind": "term",
+        "label": "session"
+      }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [],
+  "canonical_proposals": [
+    {
+      "temp_id": "auth-login",
+      "kind": "term",
+      "proposed_label": "login",
+      "definition": "The process of authenticating a user by verifying their credentials against stored identifiers and access permissions within the authentication system.",
+      "source_field": "terms[0].term",
+      "suggested_namespace": "project"
+    },
+    {
+      "temp_id": "billing-amount",
+      "kind": "term",
+      "proposed_label": "amount",
+      "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
+      "source_field": "terms[1].term",
+      "suggested_namespace": "project"
+    },
+    {
+      "temp_id": "analytics-session",
+      "kind": "term",
+      "proposed_label": "session",
+      "definition": "A period of user activity within an application, tracked from initial interaction until the user stops interacting or times out.",
+      "source_field": "terms[2].term",
+      "suggested_namespace": "project"
+    }
+  ]
 }

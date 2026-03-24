@@ -11,79 +11,97 @@
       "type": "object",
       "properties": {
         "nfrs": {
-          "description": "Array of non-functional requirements specifying measurable quality attributes for the system.",
+          "description": "Array of non-functional requirements specifying measurable quality attributes for the system. Coverage rule: include at least one NFR for each quality dimension that is explicitly committed to in the charter success_metrics or stakeholder needs. Priority coverage: latency (for any user-facing API), availability (for any service with an SLA), security (for any auth path or PII handling), and durability (for any persistent data). Complete worked example of a single well-formed NFR entry: {\"nfr_id\": \"nfr-auth-p95-latency\", \"name\": \"Auth API P95 Latency\", \"category\": \"latency\", \"metric\": \"P95 response time for POST /auth/login\", \"target\": \"< 200ms\", \"unit\": \"ms\", \"measurement_method\": \"P95 latency from DataDog APM — auth.request.duration metric, averaged over 5-minute windows\", \"stage\": \"production\", \"owner\": \"api\", \"trace\": [{\"type\": \"derives_from\", \"id\": \"metric-auth-p95-latency\", \"note\": \"Charter success metric directly motivating this NFR\"}]}. Further examples: a checkout API with a latency success metric needs an nfr-latency-checkout-p95 entry; a 24/7 SaaS service needs an nfr-availability-api-uptime entry; a system handling user credentials needs an nfr-security-auth-encryption entry. Anti-patterns: copying NFRs verbatim from a template without grounding them in charter goals (produces unverifiable entries); omitting availability NFRs for a system whose charter commits to 24/7 uptime (breaks traceability-check).",
           "type": "array",
           "minItems": 1,
           "items": {
-            "description": "A single non-functional requirement with category, metric target, measurement method, and traceability.",
+            "description": "A single non-functional requirement covering exactly one measurable quality attribute for one component or service. Worked example — a complete entry: {\"nfr_id\": \"nfr-api-auth-p95-latency\", \"category\": \"latency\", \"metric\": \"P95 response time\", \"target\": \"< 200ms\", \"unit\": \"ms\", \"stage\": \"prod\", \"owner\": \"api\", \"trace\": [{\"type\": \"derives_from\", \"id\": \"metric-checkout-latency\", \"note\": \"NFR enforces the latency target from this success metric\"}]}. Create one NFR per quality dimension per component — a single service may have separate NFRs for latency, availability, and throughput because each has a different target, measurement method, and owner. Example: the authentication service warrants nfr-auth-p95-latency (owner: api, metric: P95 response time), nfr-auth-availability (owner: ops, metric: uptime percentage), and nfr-auth-throughput (owner: api, metric: requests per second) as three distinct entries. Each NFR must have a distinct nfr_id; do not bundle multiple quality attributes (e.g., latency + availability) into a single entry — create separate NFR entries so each can be traced, measured, and owned independently.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "nfr_id": {
-                "description": "Unique identifier for this NFR in the format 'nfr-<category>-<name>' (e.g., 'nfr-latency-api-response').",
+                "description": "Unique kebab-case identifier for this NFR. Required format (enforced by pattern): nfr-{category}-{condition}. Examples: 'nfr-perf-api-latency', 'nfr-sec-data-encryption', 'nfr-latency-api-response'. Should be stable across spec versions — do not rename after downstream steps reference this ID.",
                 "type": "string",
                 "pattern": "^nfr-[a-z0-9]+-[a-z0-9-]+$"
               },
+              "name": {
+                "description": "Human-readable label for this NFR, suitable for dashboards and reports. Example: 'Login API latency', 'Checkout throughput', 'Auth service availability'. Distinct from metric (which names the measured dimension) — name identifies the NFR entry for humans. Optional.",
+                "type": "string",
+                "minLength": 2
+              },
               "category": {
-                "description": "Quality attribute category: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, or energy.",
+                "description": "Quality attribute category for this NFR. Must be one of the 11 canonical values (enforced by enum): latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy. Choose the most specific category that matches the requirement. Common mismatches: 'performance' -> use 'latency' or 'throughput'; 'reliability' -> use 'availability' or 'durability'; 'scalability' -> use 'throughput'; 'compliance' -> use 'privacy' or 'security'. Ambiguity decision rule: if a requirement could fit 'security' or 'privacy', use 'security' when the primary concern is access control or encryption, and 'privacy' when the primary concern is PII data handling. Worked examples: 'JWT token must use RS256 signing' -> 'security' (access-control mechanism); 'User email must not appear in application logs' -> 'privacy' (PII data handling). Anti-pattern: using 'security' as a catch-all for all non-functional requirements — requirements about data retention, PII exposure, or consent belong under 'privacy'.",
                 "$ref": "vc:core:atoms#nfrCategory"
               },
               "metric": {
-                "description": "Name of the metric being measured (e.g., 'p99 response time', 'uptime percentage').",
+                "description": "Name of the specific measurable dimension this NFR constrains. Must be precise enough to be graphed or queried in a monitoring tool. Format rule: use a noun phrase identifying the signal, not the goal. Vague-to-precise progression examples: 'response time' -> 'P95 HTTP response time for POST /api/orders measured at the load balancer'; 'error rate' -> 'HTTP 5xx error rate as a percentage of total requests per 5-minute window, excluding health checks'; 'memory usage' -> 'peak RSS memory of the auth-service pod under 1000 concurrent sessions'. Further examples: 'uptime percentage', 'mean time to recovery', 'concurrent session count'. Anti-patterns: 'performance' (too vague — which metric?), 'fast response' (adjective, not a metric name), 'SLA' (outcome, not a dimension). Pair with 'unit' so the full measurement is unambiguous: metric='P95 response time' + unit='ms'.",
                 "type": "string"
               },
               "target": {
-                "description": "Target value for this NFR metric, either numeric or a string containing a number.",
+                "description": "The measurable threshold this NFR must meet. When using a numeric target, pair with the 'unit' field for context. When using a string target, embed the unit and condition in the string. Examples: 'P95 latency < 200ms under 1000 concurrent users', '99.9% uptime measured monthly', 'AES-256 encryption for all PII fields'. Avoid vague targets like 'fast' or 'secure' — every target should be falsifiable.",
                 "oneOf": [
                   {
                     "type": "number",
-                    "description": "Numeric target value."
+                    "description": "Numeric target value. Use this form only when the target is a raw count or exact value where direction is self-evident from the metric name. Worked examples where numeric form is unambiguous: 99.9 for 'API Uptime Percentage' (higher is better, universally understood), 5 (max retry count — lower is better and obvious from 'max'), 3 (max DB connections per request). If there is any ambiguity about direction, threshold, or operator, use the string form instead. Use string form '< 200ms' not 200 for latency — the operator must be explicit. Anti-pattern: setting target to 200 when you mean 'under 200ms' — without the operator the direction is ambiguous and tooling cannot evaluate compliance."
                   },
                   {
                     "type": "string",
                     "pattern": "^.*\\d+.*$",
-                    "description": "String target value containing at least one digit (e.g., '<200ms', '>99.9%')."
+                    "description": "String target value containing at least one digit. Preferred for expressive thresholds (e.g., '<200ms', '>99.9%', 'P95 < 500ms under 500 VUs')."
                   }
                 ]
               },
+              "baseline": {
+                "description": "Current measured value before the optimization target is applied. Provides the pre-improvement reference point, enabling progress tracking. Use a string for measured values with context, or a number for simple numeric baselines. Omit if not yet measured.",
+                "oneOf": [
+                  {"type": "number", "description": "Numeric baseline value before this project begins, in the same units as the target. Use when the baseline is a clean number. Worked example: 450 (current measured P95 latency in ms before optimization — unit is 'ms' so 450 means 450ms). When baseline is unknown, omit the entire baseline field rather than guessing. Never set to 0 unless 0 is the true measured baseline."},
+                  {"type": "string", "minLength": 1, "description": "Descriptive baseline value when the numeric form is insufficient. Worked examples: '4-6 hours per billing cycle' (current manual reconciliation time before automation); 'unknown' (new system with no prior measurement — do not use 0, which implies a measured value of zero); 'N/A' (new capability with no prior state to measure from — distinct from 'unknown' which implies measurement is possible but not yet done). Include units in the string for ranges: 'P95: 450ms under 500 concurrent users', '< 5% monthly error rate'. Anti-pattern: '0' as a string — use the numeric branch for actual zero measurements; anti-pattern: omitting baseline entirely when current performance is known, as this removes the improvement reference point."}
+                ]
+              },
               "unit": {
-                "description": "Unit of measurement for the metric (e.g., 'ms', 'percent', 'req/s').",
+                "description": "Unit of measurement for the metric. Required for numeric targets; include context for string targets when the unit is not embedded. Selection rule: match the unit to your metric and target. If target is '< 200ms', unit is 'ms'. If target is '>= 99.9%', unit is 'percent'. If target is '< 50' (raw count), unit is 'count'. Decision rule: always use the abbreviated canonical form — never the expanded form. Approved abbreviations: 'ms' (milliseconds), 'percent' (percentage points), 'req/s' (requests per second), 'count' (raw integer count), 'MB' (megabytes), 'GB' (gigabytes), 'USD' (currency). Further examples: unit='ms' for a latency NFR, unit='percent' for an availability NFR, unit='req/s' for a throughput NFR, unit='count' for a retry-limit NFR. For custom units not on this list, follow the same abbreviation convention and register the unit in canon/kinds/term.json before use. Anti-patterns: 'milliseconds' (use 'ms'), 'pct' (non-standard abbreviation — use 'percent'), 'percentage' (use 'percent'), 'requests-per-second' (use 'req/s'), leaving unit empty when the target is a numeric value (makes the target dimensionless and unverifiable).",
                 "type": "string"
               },
               "measurement_method": {
-                "description": "How this NFR will be measured or verified (e.g., 'synthetic monitoring', 'load test').",
+                "description": "How compliance with this NFR is measured. Should specify: the tool or mechanism, the metric collected, and the test conditions. Complete worked examples: 'P95 latency from DataDog APM dashboard — apm.request.duration metric, 5-minute window, production environment only' or 'Weekly reconciliation job exit code from CloudWatch log group /app/reconciliation, filter: EXIT_CODE != 0' or 'Load test with k6: 1000 VUs over 5 minutes, measuring P95 response time at /api/checkout, run in staging before each release'. Should be reproducible by an engineer who hasn't seen this spec. Anti-pattern: 'Measured by monitoring' — does not specify the dashboard, metric name, query, or conditions, making compliance unverifiable.",
                 "type": "string"
               },
+              "measurement_frequency": {
+                "description": "How often this metric is measured and evaluated against its target. Decision rules by requirement type: 'real-time' — for latency and availability metrics that must trigger immediate alerts (e.g., P95 API latency, service uptime); 'per-release' — for code quality metrics evaluated at deployment time (e.g., test coverage percentage, lint score); 'monthly' — for cost and business metrics reviewed in billing cycles (e.g., infrastructure spend, monthly active users); 'weekly' — for error rates that need regular review but not real-time alerting (e.g., weekly 5xx error trend). Full enum: 'real-time' (continuous), 'hourly' (aggregated each hour), 'daily' (daily report or alert), 'weekly' (weekly review), 'monthly' (monthly SLA review), 'per-release' (at each deployment), 'on-demand' (manually triggered). Anti-pattern: using 'real-time' for all metrics regardless of cost or actionability — continuous monitoring of low-priority or slowly-changing metrics wastes observability budget and creates alert fatigue. Optional — omit when frequency is determined by the monitoring toolchain.",
+                "type": "string",
+                "enum": ["real-time", "hourly", "daily", "weekly", "monthly", "per-release", "on-demand"]
+              },
               "stage": {
-                "description": "Delivery stage at which this NFR must be met (e.g., 'mvp', 'ga').",
+                "description": "CI/CD pipeline phase through which this NFR is validated. Must be one of: dev, ci, staging, prod (enforced by enum). DISTINCT from environment (where the system runs); stage refers to a CI/CD pipeline phase (where code goes THROUGH). Common mismatches: 'mvp' -> use 'dev'; 'ga' -> use 'prod'.",
                 "$ref": "vc:core:collections#stageName"
               },
               "owner": {
-                "description": "Team or domain responsible for meeting this NFR.",
+                "description": "Team or role accountable for meeting and monitoring this NFR. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product', 'business', 'engineering'. Decision rule: choose the team that controls the code path most responsible for this NFR. For latency NFRs on API endpoints: 'api'. For availability/uptime NFRs: 'ops'. For data retention NFRs: 'data'.",
                 "$ref": "vc:core:atoms#owner"
               },
               "trace": {
-                "description": "Traceability links back to upstream requirements, components, or APIs.",
+                "description": "Traceability links connecting this NFR to the upstream charter success metrics or capabilities it quantifies. Every NFR must trace to at least one upstream success metric or capability using type='derives_from'. Complete worked example for an auth latency NFR: [{\"type\": \"derives_from\", \"id\": \"metric-auth-p95-latency\", \"note\": \"Charter success metric directly motivating this NFR\"}, {\"type\": \"constrains\", \"id\": \"cap-user-authentication\", \"note\": \"This latency budget applies to the authentication capability\"}]. The derives_from entry is required; the constrains entry is optional but recommended when the NFR applies to a specific capability. Secondary traces using type='constrains' are allowed for capabilities that must operate within this NFR's limits (e.g., a cap-* ID from spec/01_capabilities.json), but they do not substitute for a derives_from link to a metric-* or cap-* charter source. Minimum: one trace per NFR. NFRs without at least one derives_from trace link cannot be validated against charter commitments and will fail canonical-integrity and traceability-check.",
                 "type": "array",
+                "minItems": 1,
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference for this non-functional requirement."
+                  "description": "A traceability reference linking this NFR to the upstream charter success metric or capability it quantifies. At step 07, use type 'derives_from' pointing to a metric-* ID from spec/00_charter.json success_metrics or a cap-* ID from spec/01_capabilities.json. Example: {\"type\": \"derives_from\", \"id\": \"metric-checkout-latency\", \"note\": \"NFR quantifies the checkout page load time success metric\"}. Secondary traces to FR or API IDs (type 'constrains') are allowed but do not substitute for a charter or capability link. NFRs without a derives_from trace to metric-* or cap-* cannot be validated against charter success criteria and will fail canonical-integrity checks."
                 }
               },
               "metric_ref": {
-                "description": "Canonical reference to the metric definition in the canonical registry.",
+                "description": "Canonical reference binding the 'metric' string to a shared vocabulary entry in the canonical registry. Format rule: use a canonicalRef object with id, kind, and optional label. The id must use the cn: URN scheme. Example: {\"id\": \"cn:core:metric:p95-response-time\", \"kind\": \"metric\", \"label\": \"P95 Response Time\"}. Decision guidance: look up available metric IDs with 'specdev canonical-lint canon --repo-root ./devspec_toolkit' before authoring. Anti-patterns: omitting metric_ref and relying on a free-form metric string (breaks canonical-integrity checks); using a bare string instead of a canonicalRef object; inventing new metric IDs without adding them to the canon registry first.",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "unit_ref": {
-                "description": "Canonical reference to the unit of measurement in the canonical registry.",
+                "description": "Canonical reference binding the 'unit' string to a normalised unit entry in the canonical registry. Format rule: use a canonicalRef object; the id must use the cn: URN scheme. Always pair with the 'unit' field. Worked examples: if unit is 'ms', use {\"id\": \"cn:core:term:ms\", \"kind\": \"term\", \"label\": \"ms\"}; if unit is 'percent', use {\"id\": \"cn:core:term:percent\", \"kind\": \"term\", \"label\": \"percent\"}; if unit is 'req/s', use {\"id\": \"cn:core:term:req-per-s\", \"kind\": \"term\", \"label\": \"req/s\"}. Decision guidance: always use the canonical abbreviated form (ms, percent, req/s, MB) as the id suffix — not the expanded form — so NFRs across the spec share identical unit references. Anti-patterns: using {\"kind\": \"unit\"} — units are modelled as 'term' not 'unit' in the canon; 'milliseconds' instead of 'ms' as the id suffix; omitting unit_ref when unit is present (breaks canonical-integrity checks).",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "stage_ref": {
-                "description": "Canonical reference to the delivery stage in the canonical registry.",
+                "description": "Canonical reference binding the 'stage' enum value to its entry in the canonical stage registry. Format rule: use a canonicalRef object with kind 'stage' and a cn: URN id matching the stage value. Worked example: if stage is 'production', use {\"id\": \"cn:core:stage:production\", \"kind\": \"stage\", \"label\": \"production\"}; if stage is 'ci', use {\"id\": \"cn:core:stage:ci\", \"kind\": \"stage\", \"label\": \"CI\"}. Decision guidance: stage_ref must agree with the 'stage' string — mismatches are flagged by canonical-lint. Anti-patterns: using a stage_ref id that differs from the 'stage' field value (e.g., stage='production' but stage_ref id='cn:core:stage:staging' — causes canonical-integrity lint failure); omitting stage_ref while providing stage (partial canonical coverage leaves the entry unverifiable).",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "environment_ref": {
-                "description": "Canonical reference to the environment where this NFR is measured.",
+                "description": "Canonical reference to the environment where this NFR is measured. Decision rule: include environment_ref only when the NFR target differs by environment. Worked example: a latency target of 200ms in production but 500ms in staging requires two separate NFR entries — one with environment_ref {\"id\": \"cn:core:environment:production\", \"kind\": \"environment\", \"label\": \"production\"} and target '< 200ms', and another with environment_ref {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"} and target '< 500ms'. Counter-example: a code coverage requirement of >= 80% applies identically in all environments — omit environment_ref entirely. Do NOT use bare environment names — this field requires a full canonicalRef object with id and kind (label recommended). Anti-pattern: including environment_ref set to a value meaning 'all environments' — if the target is the same everywhere, omit the field entirely.",
                 "$ref": "vc:core:collections#canonicalRef"
               }
             },

@@ -18,7 +18,8 @@
           "api-secure-endpoint"
         ]
       },
-      "severity": "error"
+      "severity": "error",
+      "policy_ref": {"id": "cn:project:term:data-policy", "kind": "term"}
     }
   ],
   "canonical_refs_used": []

@@ -13,14 +13,17 @@
         }
       },
       "additionalProperties": false,
-      "description": "Generic key-value store for extra context (e.g., source, impact, legacy output)."
+      "description": "Generic key-value store for extra context attached to a spec entry. Keys must match ^[a-zA-Z0-9_]+$ (alphanumeric and underscore only). Examples: {\"source\": \"design-doc-v3\", \"impact\": \"high\", \"legacy_output\": \"billing-report-v2\"}. Use for traceability annotations that don't fit a typed field. Anti-pattern: nesting objects as values — all values must be strings."
     },
     "kebabId": {
       "$anchor": "kebabId",
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-      "description": "Lowercase kebab-case identifier used as the universal ID format across all spec artifacts (e.g., 'fr-user-login', 'api-session-create').",
+      "description": "A kebab-case identifier string. Format: lowercase letters, digits, and hyphens only. No underscores, spaces, or uppercase. Examples: 'user-login', 'api-order-create', 'fr-checkout-flow'. Used for all spec artifact IDs to ensure URL-safe, stable references.",
       "examples": [
+        "user-login",
+        "api-order-create",
+        "fr-checkout-flow",
         "fr-user-login",
         "api-login",
         "cap-export-reports"
@@ -30,7 +33,7 @@
       "$anchor": "timestamp",
       "type": "string",
       "format": "date-time",
-      "description": "ISO 8601 date-time string used for artifact creation and modification timestamps.",
+      "description": "A date-time string in ISO 8601 format. Example: '2025-10-16T22:06:04.202593Z'. Used for artifact creation and modification timestamps (created_at, updated_at fields).",
       "examples": [
         "2025-10-16T22:06:04.202593Z"
       ]
@@ -38,14 +41,15 @@
     "owner": {
       "$anchor": "owner",
       "type": "string",
-      "description": "Team or role responsible for this artifact. Must be one of the 8 canonical owner values.",
-      "enum": ["api", "ui", "system", "ops", "data", "product", "business", "engineering"]
+      "description": "Team or role responsible for this artifact. Must be one of the 8 canonical owner values. Choose based on who creates, maintains, and is accountable for this artifact: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product' (product management), 'business' (business stakeholders), 'engineering' (general engineering).",
+      "enum": ["api", "ui", "system", "ops", "data", "product", "business", "engineering"],
+      "examples": ["api", "ui", "system", "ops", "data", "product", "business", "engineering"]
     },
     "tag": {
       "$anchor": "tag",
       "type": "string",
       "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
-      "description": "Short alphanumeric label used for categorization and filtering of canonical entries (max 64 chars)."
+      "description": "Short alphanumeric label for categorisation and filtering of canonical entries (max 64 chars). Pattern: ^[A-Za-z0-9_.:-]{1,64}$. Examples: 'critical', 'pii', 'stateful', 'auth:jwt', 'env:prod'. Use 1–3 tags per entry — more than 3 signals unclear scope. Anti-pattern: spaces or hyphens (use dots or colons as separators instead)."
     },
     "screamingSnakeId": {
       "$anchor": "screamingSnakeId",
@@ -67,7 +71,7 @@
         "deferred"
       ],
       "default": "pending",
-      "description": "Progress status for milestones: pending (not started), in_progress, done, or deferred."
+      "description": "Progress status for milestones and tasks. Decision rules: 'pending' — not yet started (default); 'in_progress' — actively being worked, assigned developer exists; 'done' — all deliverables completed and verified against acceptance criteria; 'deferred' — explicitly postponed to a future milestone. Anti-pattern: using 'deferred' as a synonym for 'not yet started' — only defer items that were previously planned and consciously deprioritised."
     },
     "severityLevel": {
       "$anchor": "severityLevel",
@@ -78,7 +82,7 @@
         "high",
         "critical"
       ],
-      "description": "Severity or risk level used across threat assessments, milestone risk ratings, and review findings."
+      "description": "Severity or risk level across threat assessments, milestone risk ratings, and review findings. Decision rules: 'critical' — system cannot operate or data is permanently corrupted (e.g., auth bypass, data loss); 'high' — significant customer-visible impact or security vulnerability exploitable without authentication; 'medium' — degraded functionality with a workaround available, or authenticated exploit only; 'low' — cosmetic or UX issues, or theoretical attack paths with significant attacker prerequisites."
     },
     "httpMethod": {
       "$anchor": "httpMethod",
@@ -90,7 +94,7 @@
         "PATCH",
         "DELETE"
       ],
-      "description": "Standard HTTP methods for REST API interface contracts."
+      "description": "Standard HTTP methods for REST API interface contracts. Decision rules: GET — read without side effects, safe and idempotent; POST — create a new resource or trigger a non-idempotent action; PUT — full replacement of an existing resource, idempotent; PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource. Anti-pattern: using POST for idempotent updates (use PUT/PATCH) or using GET for actions with side effects."
     },
     "httpMethodFull": {
       "$anchor": "httpMethodFull",
@@ -104,7 +108,7 @@
         "OPTIONS",
         "HEAD"
       ],
-      "description": "Extended HTTP method set including OPTIONS and HEAD for scaffold interface mappings."
+      "description": "Extended HTTP method set including OPTIONS and HEAD, used for scaffold interface mappings. Includes all five standard REST methods plus: OPTIONS — returns allowed methods for a resource (used in CORS preflight); HEAD — returns headers only, no response body (used for existence checks). Use OPTIONS and HEAD only when the scaffold explicitly maps them to a route handler."
     },
     "componentType": {
       "$anchor": "componentType",
@@ -119,7 +123,7 @@
         "lib",
         "external"
       ],
-      "description": "Architectural component type classification in system sketches."
+      "description": "Architectural component type classification in system sketches. Decision rules: 'service' — stateless business logic process (REST API, gRPC service); 'db' — persistent store with durable writes (PostgreSQL, DynamoDB, MongoDB); 'queue' — async message broker with a channel/topic model (Kafka, SQS, RabbitMQ); 'cache' — ephemeral in-memory store (Redis, Memcached); 'job' — triggered or scheduled batch process (cron job, AWS Lambda); 'ui' — browser or mobile frontend application; 'lib' — importable library with no own runtime or deployment; 'external' — third-party service outside the project boundary (Stripe, Auth0, Twilio). Anti-pattern: calling a message broker a 'db' — use 'queue' for any async publish/subscribe component."
     },
     "connectionProtocol": {
       "$anchor": "connectionProtocol",
@@ -132,7 +136,7 @@
         "db",
         "file"
       ],
-      "description": "Inter-component connection protocol in system sketches."
+      "description": "Inter-component connection protocol in system sketches. Decision rules: 'http' — synchronous REST or HTTP call between services; 'grpc' — gRPC binary protocol over HTTP/2; 'event' — asynchronous message via a queue or event bus (pair with a 'queue' component as the target); 'rpc' — generic remote procedure call not covered by gRPC; 'db' — direct database wire protocol (e.g., PostgreSQL psql protocol, MongoDB wire protocol); 'file' — file-based data exchange via shared volume, S3, or SFTP. Anti-pattern: using 'http' for async fire-and-forget — use 'event' instead."
     },
     "apiProtocol": {
       "$anchor": "apiProtocol",
@@ -143,7 +147,7 @@
         "ws",
         "mqtt"
       ],
-      "description": "API-level communication protocol for interface contracts."
+      "description": "API-level communication protocol for interface contracts. Decision rules: 'http' — REST over HTTP/1.1 or HTTP/2 (most common for public APIs); 'grpc' — Protocol Buffers over HTTP/2 (use for internal high-throughput service-to-service); 'ws' — WebSocket for bidirectional streaming (chat, live dashboards, real-time notifications); 'mqtt' — lightweight pub-sub designed for IoT or constrained mobile clients. Anti-pattern: using 'grpc' for public-facing APIs without a transcoding proxy."
     },
     "trustBoundary": {
       "$anchor": "trustBoundary",
@@ -153,7 +157,7 @@
         "partner",
         "public"
       ],
-      "description": "Trust boundary classification for inter-component connections."
+      "description": "Trust boundary classification for inter-component connections. Decision rules: 'internal' — both ends within the same deployment boundary (same VPC, same cluster, service mesh) — no rate limiting required; 'partner' — trusted external systems (B2B integrations, partner APIs) — auth required, rate limiting recommended; 'public' — internet-facing, untrusted callers — auth required, rate limiting mandatory, input validation enforced. Connections crossing from 'internal' to 'partner' or 'public' are the primary threat surface."
     },
     "connectionAuth": {
       "$anchor": "connectionAuth",
@@ -166,7 +170,7 @@
         "mTLS",
         "key"
       ],
-      "description": "Authentication mechanism for inter-component connections in system sketches."
+      "description": "Authentication mechanism for inter-component connections in system sketches. Decision rules: 'none' — only for internal connections within the same trust zone (same pod/process); 'basic' — HTTP Basic auth, avoid in production (credentials in base64); 'oauth2' — delegated authorization with scopes (use for partner/user-delegated access); 'jwt' — stateless bearer token (use for internal service-to-service when token is short-lived); 'mTLS' — mutual TLS certificate exchange (use in service mesh for zero-trust internal); 'key' — API key in header or query string (use for non-HTTP connections; for HTTP APIs use 'api-key' in apiSecurity instead)."
     },
     "apiSecurity": {
       "$anchor": "apiSecurity",
@@ -178,7 +182,7 @@
         "jwt",
         "mTLS"
       ],
-      "description": "Security mechanism for API interface contracts."
+      "description": "Security mechanism for API interface contracts. Decision rules: 'none' — only for internal-only endpoints behind a firewall with no public exposure; 'api-key' — API key in Authorization or X-API-Key header (use for server-to-server integrations); 'oauth2' — OAuth 2.0 bearer token with scopes (use for user-delegated access); 'jwt' — JSON Web Token, stateless (use for internal service auth or short-lived sessions); 'mTLS' — mutual TLS certificate authentication (use for high-trust service mesh). Anti-pattern: using 'none' for any partner or public trust_boundary connection."
     },
     "nfrCategory": {
       "$anchor": "nfrCategory",
@@ -196,7 +200,7 @@
         "portability",
         "energy"
       ],
-      "description": "Non-functional requirement category classification."
+      "description": "Non-functional requirement category classification. Definitions: 'latency' — response time (p95, p99 metrics); 'throughput' — requests-per-second, transactions-per-hour; 'availability' — uptime percentage, error budget; 'durability' — data retention guarantees, backup/recovery; 'cost' — operational expense targets; 'security' — auth, encryption, vulnerability coverage; 'privacy' — PII handling, GDPR/CCPA compliance; 'maintainability' — code quality, test coverage, DORA metrics; 'usability' — task completion rate, error rate for user flows; 'portability' — deployment target flexibility (cloud, on-prem); 'energy' — power consumption (relevant for edge/IoT)."
     },
     "testingMode": {
       "$anchor": "testingMode",
@@ -207,7 +211,7 @@
         "e2e",
         "redteam"
       ],
-      "description": "Testing mode for fixture definitions."
+      "description": "Testing mode for fixture definitions. Decision rules: 'unit' — test a single function or rule in isolation, no network calls, all dependencies mocked; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but HTTP layer is live; 'e2e' — test a full user journey across integrated components (database, queue, external calls may be stubbed but service layer is real); 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. Anti-pattern: using 'unit' for tests that make real HTTP calls — those are 'contract' or 'e2e'."
     },
     "threatCategory": {
       "$anchor": "threatCategory",
@@ -219,7 +223,7 @@
         "transport",
         "data_privacy"
       ],
-      "description": "Threat category classification for red team assessments."
+      "description": "Threat category classification for red team assessments. Definitions: 'authn' — authentication bypass, credential theft, session fixation; 'authz' — authorization escalation, permission bypass, IDOR; 'business_logic' — abuse of valid functionality (race conditions, replay attacks, price manipulation); 'transport' — network-level attacks (MITM, TLS stripping, DNS hijacking); 'data_privacy' — PII exposure, data leakage, or retention policy violations. When a threat spans multiple categories, assign the category that describes the *primary attack surface*. Example: 'JWT alg:none attack' spans authn (bypass) and transport (header manipulation) — assign 'authn' because the primary goal is authentication bypass. Example: 'IDOR on order IDs' spans authz (missing check) and business_logic (accessing wrong data) — assign 'authz' because the root cause is a missing authorization check. Anti-pattern: listing multiple categories — each threat entry must have exactly one category."
     },
     "messageReliability": {
       "$anchor": "messageReliability",
@@ -229,7 +233,7 @@
         "at-least-once",
         "exactly-once"
       ],
-      "description": "Message delivery guarantee level for event-driven connections."
+      "description": "Message delivery guarantee level for event-driven connections. Decision rules: 'best-effort' — fire-and-forget, no delivery guarantee; acceptable for analytics events, notifications where loss is tolerable; 'at-least-once' — delivery guaranteed, duplicates possible — callers must be idempotent; the default for most async use cases (order events, webhooks); 'exactly-once' — no loss, no duplication — requires infrastructure support (Kafka exactly-once semantics, transactional outbox pattern) and has significant complexity and cost overhead; use only when duplicate processing causes irreversible harm (financial transactions). Anti-pattern: using 'exactly-once' by default without verifying infrastructure support."
     }
   }
 }

@@ -16,6 +16,7 @@
       "errors": [],
       "security": "none",
       "owner": "api",
+      "interface_ref": {"id": "cn:core:interface:http-json", "kind": "interface"},
       "trace": [
         {
           "type": "fr",

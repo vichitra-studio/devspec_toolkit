@@ -20,28 +20,28 @@
             "additionalProperties": false,
             "properties": {
               "component_id": {
-                "description": "Unique kebab-case identifier for this component (e.g., 'comp-auth-service').",
+                "description": "Unique kebab-case identifier for this system component. Format: descriptive kebab-case identifier. Examples: 'api-gateway', 'user-service', 'postgres-db', 'auth-service'. Should be stable across spec versions — downstream connections, trace links, and interface refs all reference this ID.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "type": {
-                "description": "The architectural type of this component: service, db, queue, cache, job, ui, lib, or external.",
+                "description": "Architectural classification of this component. Must be one of: 'service' (business logic), 'db' (persistent storage), 'queue' (async messaging), 'cache' (ephemeral storage), 'job' (scheduled/batch processing), 'ui' (user-facing frontend), 'lib' (shared library/SDK), 'external' (third-party dependency). When type is 'external': this component represents a third-party service outside the project boundary (e.g., Stripe, Auth0, SendGrid, Twilio). External components MUST include the tag 'external-dependency'. They should have a source_url pointing to the vendor's API docs. Do NOT model internal microservices as 'external' — use 'service' for internal services you own. Anti-pattern: using 'external' for an internal service that happens to be in a different repo.",
                 "$ref": "vc:core:atoms#componentType"
               },
               "responsibilities": {
-                "description": "List of 3-6 responsibilities this component handles within the system.",
+                "description": "3–6 statements describing what this component does — its bounded context. Each statement should be a present-tense action phrase naming a specific responsibility. Examples: 'Validates user credentials against the identity store', 'Issues short-lived JWT tokens with configurable TTL', 'Publishes authentication events to the session topic'. Anti-pattern: 'Handles authentication' (too vague) or listing infrastructure concerns like 'Runs on Kubernetes' (that belongs in 02a delivery baseline).",
                 "$ref": "vc:core:collections#stringArray",
                 "minItems": 3,
                 "maxItems": 6
               },
               "owner": {
-                "description": "Team or domain responsible for this component.",
+                "description": "Team or domain accountable for developing, deploying, and on-call support of this component. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product', 'business', 'engineering'. Examples: 'api' for a REST microservice; 'ops' for a managed Kubernetes cluster; 'data' for a pipeline job.",
                 "$ref": "vc:core:atoms#owner"
               },
               "tags": {
                 "description": "Classification tags for this component (e.g., critical-path, stateful, pii).",
                 "type": "array",
                 "items": {
-                  "description": "A tag classifying the component by criticality, data sensitivity, tenancy, or lifecycle stage.",
+                  "description": "Standard tag vocabulary for components — use 1–3 tags per component from this list: 'stateful' (maintains durable state), 'stateless' (no persistent state), 'external-dependency' (required for all type='external' components), 'pii-store' (stores personally identifiable information), 'auth-boundary' (performs authentication or authorization), 'async' (communicates via events/queues), 'sync' (communicates via request/response), 'critical-path' (failure causes system-wide outage), 'read-heavy' (primarily serves read traffic), 'write-heavy' (primarily serves write traffic), 'cache' (stores ephemeral data), 'batch' (processes data in scheduled jobs). Anti-pattern: inventing tags not in this vocabulary — use the canonical list for consistent linting.",
                   "type": "string",
                   "enum": [
                     "critical-path",
@@ -68,16 +68,16 @@
                 }
               },
               "trace": {
-                "description": "Traceability links back to upstream capabilities or charter items.",
+                "description": "Traceability links back to upstream capabilities (Step 01) or charter goals (Step 00). Every component must justify its existence through at least one upstream trace. Use the target artifact's actual ID (e.g., a capability_id from Step 01).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference for this component."
+                  "description": "A traceability reference linking this component to the upstream capability that drives its inclusion. At step 02 (system sketch), use type 'implements' pointing to a cap-* ID from spec/01_capabilities.json. Example: {\"type\": \"implements\", \"id\": \"cap-user-authentication\"}. Components without trace links are architectural drift — every component must trace to at least one capability that justified its design."
                 },
                 "minItems": 1
               },
               "entity_ref": {
-                "description": "Canonical reference to the entity this component represents in the canonical registry.",
+                "description": "Canonical reference to the primary domain entity this component owns or manages. Kind must be 'entity'. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"user\"} for a user service; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"order\"} for an order management service. Drives consistent naming in downstream FRs, APIs, and data models. Omit for infrastructure components (db, cache, queue) that don't own a specific domain entity.",
                 "$ref": "vc:core:collections#canonicalRef"
               }
             },
@@ -99,55 +99,55 @@
             "additionalProperties": false,
             "properties": {
               "from": {
-                "description": "Component ID of the connection source.",
+                "description": "Component ID of the connection source. Must match a component_id defined in components[*].component_id in this same document. The linter validates this cross-reference at build time — JSON Schema alone cannot enforce it. Examples: 'api-gateway' (the ingress service), 'auth-service' (the authentication microservice), 'web-ui' (the frontend component). Anti-pattern: using a display name ('API Gateway'), a non-existent component ID, or the component's name field instead of its component_id.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "to": {
-                "description": "Component ID of the connection destination.",
+                "description": "Component ID of the connection destination. Must match a component_id defined in components[*].component_id in this same document. The linter validates this cross-reference at build time — JSON Schema alone cannot enforce it. Examples: 'postgres-db' (the database component receiving a query), 'notification-service' (the service receiving an outbound call), 'event-bus' (the queue component receiving a published message). Anti-pattern: using a display name ('Postgres Database'), a non-existent component ID, or the component's name field instead of its component_id.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "protocol": {
-                "description": "Communication protocol used for this connection: http, grpc, event, rpc, db, or file.",
+                "description": "Transport abstraction for this connection — never the implementation technology. Decision rules: 'http' — synchronous REST or HTTP call between services; 'grpc' — binary Protocol Buffers over HTTP/2; 'event' — any asynchronous message broker (Kafka, SQS, RabbitMQ); pair with a 'queue' component as the target; 'db' — database wire protocol (PostgreSQL wire, MongoDB wire); 'file' — file-based exchange via S3, SFTP, or shared volume. Examples: api-gateway → auth-service uses 'http'; order-service → order-events-queue uses 'event'; user-service → postgres-db uses 'db'. Anti-pattern: using 'kafka' or 'rabbitmq' as the protocol value — those are implementation details, not transport protocols; use 'event' instead.",
                 "$ref": "vc:core:atoms#connectionProtocol"
               },
               "trust_boundary": {
-                "description": "Trust boundary classification: internal (same trust zone), partner (B2B), or public (internet-facing).",
+                "description": "Security trust boundary classification: 'internal' (same trust zone, no external exposure), 'partner' (B2B or machine-to-machine with a known external party), or 'public' (internet-facing, untrusted callers). Partner and public trust boundaries require auth and rate_limit.",
                 "$ref": "vc:core:atoms#trustBoundary"
               },
               "schema_ref": {
-                "description": "Reference to the schema governing data exchanged over this connection.",
+                "description": "Reference to the schema describing this connection's data contract. Format: relative path from repo root to the spec file, optionally with a JSON Pointer fragment. Must start with 'file://', 'https://', 'glossary:', 'api:', or be exactly '-tbd'. Worked examples: 'file://spec/05_interface_contracts.json#/apis/0' for a specific API object within the contracts file; 'file://spec/05_interface_contracts.json' for the full contracts file; 'api:user-auth' when referencing by logical name; '-tbd' as a placeholder when the interface schema does not yet exist (signals that Step 05 needs to define this contract). Anti-pattern: absolute paths ('/Users/dev/project/spec/...') that break in CI and other environments; HTTP URLs pointing to external registries; JSON Schema $id URNs (those are schema identifiers, not spec references).",
                 "type": "string",
                 "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
               },
               "auth": {
-                "description": "Authentication mechanism required for this connection: none, basic, oauth2, jwt, mTLS, or key.",
+                "description": "Authentication mechanism required for this connection. Must be provided when trust_boundary is 'partner' or 'public' (enforced by if/then). Options: 'none' (internal connections only), 'basic' (HTTP basic auth), 'oauth2' (delegated authorization), 'jwt' (signed token), 'mTLS' (mutual TLS certificate), 'key' (API key or shared secret). Note: connectionAuth uses 'key' for static shared secrets; the separate apiSecurity atom uses 'api-key' for the same concept — do not confuse them.",
                 "$ref": "vc:core:atoms#connectionAuth"
               },
               "rate_limit": {
-                "description": "Rate limiting configuration for this connection, required for partner/public trust boundaries.",
+                "description": "Rate limiting configuration for this connection. Required when trust_boundary is 'partner' or 'public' (enforced by schema conditional). For 'internal' trust boundaries, omit unless the connection is a hot path requiring back-pressure. Populate all three sub-fields (rps, burst, window_s) as a consistent set.",
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "rps": {
-                    "description": "Maximum requests per second allowed through this connection.",
+                    "description": "Maximum requests per second allowed per scope unit. Valid range: 1–100,000. Typical ranges by trust boundary: public read endpoints 100–1,000 req/s; public write endpoints 10–100 req/s; partner endpoints 50–500 req/s; internal endpoints 1,000–10,000 req/s. Derivation: start from expected peak load and add 20–50% headroom. Worked examples: if peak analytics traffic is 40 req/s, set rps to 50–60; if checkout page load is 200 req/s peak, set rps to 250–300. Anti-pattern: setting rps to the current average load without headroom — a sudden 2× traffic spike will cause 429 errors for legitimate users. Example: if average load is 50 req/s, set rps to at least 75 (50 × 1.5 for stable traffic) or 100–150 for spiky traffic. Setting rps=10 for a public read endpoint when average load is 50 req/s will cause constant rate limiting in production. Anti-pattern: rps=1 for a production API (too restrictive) or rps=1,000,000 (exceeds what most infrastructure can sustain).",
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 100000
                   },
                   "burst": {
-                    "description": "Maximum burst size allowed above the steady-state rate.",
+                    "description": "Maximum burst size — the number of requests allowed above rps for short spikes. Valid range: 1–200,000. Set to 1.5× rps for stable traffic patterns; 2–3× rps for spiky traffic (batch jobs, marketing campaigns). Must be ≥ rps. Decision rule: use 1.5× for stable, predictable traffic (background jobs, scheduled imports); use 2–3× for user-facing APIs subject to spikes (flash sales, marketing email campaigns, viral content). Examples: rps=100, burst=150 for a scheduled reporting API; rps=50, burst=150 for a checkout API during a flash sale. Anti-pattern: burst equal to rps (provides no spike headroom) or burst=0 (invalid — burst must be ≥ 1); setting burst to 10× rps (would allow the connection to overwhelm downstream services before throttling engages).",
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 200000
                   },
                   "window_s": {
-                    "description": "Time window in seconds over which the rate limit is measured.",
+                    "description": "Time window in seconds over which the rate limit is enforced. Valid range: 1–3,600 seconds. Common values: 1 (per-second rate limit; per-second sliding window — lowest latency for throttle detection), 60 (per-minute — smoother for human-initiated traffic), 3600 (per-hour — for quota-based partner contracts). Example: 1 (enforce rps limit on a 1-second sliding window). Coordinate with burst — a window_s of 1 with burst of 100 allows 100 requests in any 1-second window. Anti-pattern: window_s=0 or omitting window_s when rps is set (defaults to 1 second if omitted).",
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 3600
                   },
                   "scope": {
-                    "description": "Scope at which the rate limit is applied: per-ip, per-client, per-token, or globally.",
+                    "description": "Scope at which the rate limit is applied: 'ip' (per IP address), 'client' (per client identity), 'token' (per auth token), or 'global' (system-wide). Do NOT use 'per-ip', 'per-client', 'per-token', or 'globally'.",
                     "type": "string",
                     "enum": [
                       "ip",
@@ -163,24 +163,24 @@
                 ]
               },
               "reliability": {
-                "description": "Message delivery guarantee for event-based connections: best-effort, at-least-once, or exactly-once.",
+                "description": "Message delivery guarantee for event-based connections. Decision rule: 'best-effort' when message loss is acceptable and ordering is not required (e.g., analytics events, non-critical notifications); 'at-least-once' when every message must be processed but idempotent consumers can handle duplicates (default for most async operations); 'exactly-once' only when both loss and duplication are unacceptable AND the infrastructure supports it (higher cost and complexity — use sparingly). Wrong choice: exactly-once for a notification email sender — email delivery infrastructure rarely guarantees exactly-once, and duplicate emails are less harmful than complex transaction overhead. Correct choice: at-least-once for order events (duplicates are handled by idempotent consumers). Anti-pattern: using exactly-once by default without verifying infrastructure support — Kafka exactly-once semantics require specific producer/consumer configuration and add significant latency overhead. Only applicable to event/queue connections; omit for synchronous http or grpc connections.",
                 "$ref": "vc:core:atoms#messageReliability"
               },
               "trace": {
-                "description": "Traceability links back to upstream artifacts for this connection.",
+                "description": "Traceability links back to upstream capabilities or charter items that justify this connection. Every connection must be traceable to an upstream requirement — connections without a trace are architectural drift.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference for this connection."
+                  "description": "A traceability reference linking this connection to the capability that requires it. At step 02, use type 'implements' pointing to a cap-* ID from spec/01_capabilities.json. Example: {\"type\": \"implements\", \"id\": \"cap-payment-processing\", \"note\": \"Payment service calls auth service to validate session before processing charge\"}. Connections that cannot be traced to a capability may indicate architectural over-design."
                 },
                 "minItems": 1
               },
               "interface_ref": {
-                "description": "Canonical reference to the interface this connection implements.",
+                "description": "Canonical reference to the named interface in the canonical registry for this connection's API contract. Kind must be 'entity'. Example: {\"id\": \"cn:project:entity:user-auth-api\", \"kind\": \"entity\", \"label\": \"User Auth API\"}. Use when this connection crosses a defined API boundary that will be formally specified in Step 05. If the interface is not yet named in canon, add a canonical_proposals entry. Distinct from schema_ref: interface_ref points to the contract owner; schema_ref points to the payload schema.",
                 "$ref": "vc:core:collections#canonicalRef"
               },
               "event_ref": {
-                "description": "Canonical reference to the event type carried by this connection.",
+                "description": "Canonical reference to the event type flowing through this connection. Required when protocol is 'event'. Kind must be 'event'. Example: {\"id\": \"cn:project:event:order-placed\", \"kind\": \"event\", \"label\": \"order-placed\"}. The event ID should match the topic or event type name in your message broker. Anti-pattern: using event_ref for REST endpoint connections — event_ref is only for async message-passing.",
                 "$ref": "vc:core:collections#canonicalRef"
               }
             },

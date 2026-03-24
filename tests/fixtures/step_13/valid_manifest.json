@@ -13,7 +13,8 @@
         "tables",
         "relationships",
         "database_config"
-      ]
+      ],
+      "governance_label_ref": {"id": "cn:core:term:spec-extension", "kind": "term"}
     },
     {
       "extension_id": "ext-02-session-management",
@@ -26,7 +27,8 @@
         "session_operations",
         "session_validation",
         "session_security"
-      ]
+      ],
+      "governance_label_ref": {"id": "cn:core:term:spec-extension", "kind": "term"}
     }
   ],
   "canonical_refs_used": []

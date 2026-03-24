@@ -11,7 +11,7 @@
       "type": "object",
       "properties": {
         "tech_stack": {
-          "description": "Technology stack for the roadmap, at minimum specifying languages and frameworks.",
+          "description": "Technology stack for the roadmap. Decision rule: include at minimum `languages` and `frameworks`; add `databases`, `queues`, `caches`, `infra`, and `tools` as needed. Example 1 (Python backend): {\"languages\": [\"python\"], \"frameworks\": [\"fastapi\"], \"databases\": [\"postgresql\"], \"caches\": [\"redis\"], \"infra\": [\"docker\", \"github-actions\"]}. Example 2 (TypeScript fullstack): {\"languages\": [\"typescript\"], \"frameworks\": [\"nextjs\", \"express\"], \"databases\": [\"postgresql\"], \"infra\": [\"vercel\", \"github-actions\"]}. Anti-pattern: leaving `tech_stack` empty or omitting `languages` and `frameworks` — these are always required because they define the primary development environment.",
           "allOf": [
             {
               "$ref": "vc:core:collections#techStack",
@@ -27,7 +27,7 @@
         },
         "tech_stack_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the technology stack in the registry."
+          "description": "Canonical reference to the project's technology stack in the canonical registry. Kind must be 'capability'. Example: {\"id\": \"cn:project:capability:tech-stack-web\", \"kind\": \"capability\", \"label\": \"web tech stack\"}. Define this entry in project canon (canon/manifest.json) before referencing it here. Anti-pattern: inventing a cn: ID without a corresponding canon entry — canonical-lint will fail if the ID is not registered."
         },
         "milestones": {
           "type": "array",
@@ -38,33 +38,33 @@
             "properties": {
               "milestone_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this milestone."
+                "description": "Unique kebab-case identifier for this milestone. Convention: ms-{phase-or-domain}-{noun}. Decision rule: choose a name that reflects the delivered capability, not a sequential position — IDs must remain stable once tasks reference them, so renaming breaks dependency tracking. Examples: 'ms-auth-mvp' (auth domain, first release), 'ms-payment-integration' (payment domain), 'ms-reporting-phase1' (phased delivery with explicit phase suffix). Anti-pattern: 'ms-1' or 'ms-milestone-a' (sequential labels with no traceable meaning); 'ms-all-features' (too broad to manage — split into domain-scoped milestones)."
               },
               "name": {
                 "type": "string",
-                "description": "Human-readable name of the milestone."
+                "description": "Human-readable name of the milestone, distinguishable from all other milestones in this roadmap. Use Title Case, 3–6 words describing the major deliverable theme. Examples: 'Core Authentication API', 'Payment Integration MVP', 'User Profile Management', 'Performance Hardening Sprint', 'Data Migration Phase 1'. Avoid sequential labels ('Milestone 1', 'Phase A') — they carry no semantic meaning. Avoid verb phrases ('Implement Auth') — use noun phrases describing the delivered capability."
               },
               "target_date": {
                 "type": "string",
                 "format": "date",
-                "description": "Planned completion date for this milestone (ISO 8601 date)."
+                "description": "Target completion date in ISO 8601 format (YYYY-MM-DD). Decision rule: set target_date to the sprint end date when the milestone aligns to a sprint; use the agreed delivery date from the project plan otherwise. Examples: '2025-03-31' (end of Q1 sprint), '2025-06-15' (negotiated delivery date for a partner integration). Each milestone should have a distinct date that reflects its actual planned completion. Anti-pattern: setting all milestones to the same date — identical dates signal copy-paste from a template rather than a real plan, and make it impossible to sequence or track progress."
               },
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
-                "description": "Current progress status of the milestone."
+                "description": "Current progress status of the milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release. Use 'pending' for newly created milestones."
               },
               "risk_status": {
                 "$ref": "vc:core:atoms#severityLevel",
                 "default": "low",
-                "description": "Risk level associated with this milestone."
+                "description": "Risk level for this milestone's delivery confidence. Decision rule — 'low': on track, no known blockers; 'medium': risk identified, mitigation in progress, delivery still achievable; 'high': blocker present, delivery at risk without active intervention; 'critical': milestone at risk of failure, escalate to stakeholders immediately. Escalation examples: use 'medium' when a key dependency has slipped by 1 week and a workaround is in progress; use 'high' when a dependency has slipped by 2+ weeks with no confirmed mitigation; use 'critical' when the milestone cannot be delivered in scope without a timeline change decision. Anti-pattern: defaulting to 'low' to avoid escalation — 'medium' and 'high' trigger the review process that surfaces and resolves blockers before they become critical."
               },
               "user_story": {
                 "type": "string",
-                "description": "The specific user story this milestone addresses."
+                "description": "User story this milestone addresses. Should follow 'As a <role>, I want <goal>, so that <benefit>' format to tie the milestone to a user-facing outcome."
               },
               "source_milestones": {
                 "$ref": "vc:core:collections#kebabIdArray",
-                "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to."
+                "description": "Upstream Step 09 milestone IDs this roadmap milestone maps to. Look up valid IDs in spec/09_impl_plan.json under milestones[*].milestone_id. Examples: ['ms-auth-backend', 'ms-user-profile'] (if this roadmap milestone corresponds to both of those impl plan milestones). Decision rule: include all Step 09 milestones whose deliverables contribute to this roadmap milestone's user story. Omit if the roadmap milestone has no direct Step 09 counterpart (e.g., a discovery milestone with no impl plan deliverables). Anti-pattern: inventing milestone IDs — only reference IDs that exist in spec/09_impl_plan.json."
               },
               "fr_refs": {
                 "type": "array",
@@ -74,7 +74,7 @@
                   "description": "An FR ID in the format 'fr-<slug>' referencing a functional requirement."
                 },
                 "uniqueItems": true,
-                "description": "Functional requirement IDs this milestone delivers. Each value must match a `fr_id` in the FR list (Step 04)."
+                "description": "Functional requirement IDs this milestone delivers. Each should match an fr_id in spec/04_fr_list.json (validated by traceability checks). Should contain at least one entry; list all FRs substantially addressed by the milestone's tasks."
               },
               "capability_refs": {
                 "type": "array",
@@ -88,22 +88,23 @@
               },
               "tasks": {
                 "type": "array",
+                "minItems": 1,
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
                     "task_id": {
                       "$ref": "vc:core:atoms#kebabId",
-                      "description": "Unique kebab-case identifier for this task."
+                      "description": "Unique kebab-case identifier for this task within the parent milestone. Use the pattern 'task-{verb}-{noun}' to make the ID self-describing. Examples: 'task-implement-auth-endpoint', 'task-add-session-schema', 'task-write-login-unit-tests', 'task-deploy-auth-service', 'task-configure-rate-limiting'. The verb names the work type (implement, add, write, migrate, configure, deploy, integrate). Avoid sequential IDs like 'task-1' or 'task-a' — they convey no meaning and break traceability when tasks are reordered."
                     },
                     "description": {
                       "type": "string",
                       "pattern": "^\\S+\\s+\\S+.*$",
-                      "description": "Description of the task (must contain at least two words)."
+                      "description": "What this task accomplishes, at the granularity of a developer story. Describe the user-facing or system-observable outcome, not implementation steps. Scope: one coherent piece of work completable in 1–3 days. Examples: 'Implement POST /auth/login endpoint with JWT issuance and rate limiting', 'Add users table migration with bcrypt password column and soft-delete support', 'Write unit tests for token refresh logic covering expiry and invalid-signature boundary conditions', 'Configure Stripe webhook handler to transition order status on payment confirmation'. Avoid: single-word descriptions ('Implement'), pure technical micro-steps ('Add index'), or commit-message-level details."
                     },
                     "acceptance_criteria": {
                       "type": "array",
-                      "description": "Criteria that must be met for this task to be considered complete.",
+                      "description": "Conditions that must be met for this task to be considered complete. Each criterion should be objectively verifiable — write them so a reviewer who wasn't present can confirm completion. Examples: 'All unit tests pass with >80% coverage', 'API endpoint responds within 200ms under load test'. Avoid: 'code reviewed', 'looks good', 'done'.",
                       "minItems": 1,
                       "items": {
                         "type": "object",
@@ -111,23 +112,23 @@
                         "properties": {
                           "criterion_id": {
                             "$ref": "vc:core:atoms#kebabId",
-                            "description": "Unique kebab-case identifier for this acceptance criterion."
+                            "description": "Unique kebab-case identifier for this acceptance criterion within the task. Convention: ac-{task_id_slug}-{n} where task_id_slug is the parent task ID without the 'task-' prefix. Examples: 'ac-implement-jwt-auth-1', 'ac-implement-jwt-auth-2'. Anti-pattern: 'ac-1', 'ac-criterion-a' — sequential labels that cannot be traced to the parent task."
                           },
                           "text": {
                             "type": "string",
                             "minLength": 15,
-                            "description": "Full text of the acceptance criterion (minimum 15 characters)."
+                            "description": "Full text of the acceptance criterion (minimum 15 characters). Decision rule: each criterion should cover a distinct scenario type — happy path, error case, or boundary condition — so that together they provide full coverage of the task's behavior. Happy path example: 'All unit tests pass and line coverage is >= 80%.' Error case example: 'POST /checkout with an expired payment token returns HTTP 402 with error code PAYMENT_EXPIRED.' Boundary condition example: 'A cart with exactly 100 items processes without timeout under nominal load.' Anti-pattern: criteria that only describe happy paths — error cases and boundary conditions must also be specified to prevent regressions."
                           },
                           "fixture_ref": {
                             "$ref": "vc:core:atoms#kebabId",
-                            "description": "Reference to a fixture that validates this criterion."
+                            "description": "Kebab-case ID of the fixture from spec/08_fixtures.json that validates this acceptance criterion. Use the fixture's own fixture_id value. Example: 'fix-checkout-payment-expired' (validates the 402 error case for expired payment tokens), 'fix-cart-boundary-100-items' (validates the 100-item boundary condition). Omit this field if no fixture has been defined for this criterion yet — do not fabricate a fixture ID, as canonical-integrity lint will fail if the referenced fixture does not exist."
                           }
                         },
                         "required": [
                           "criterion_id",
                           "text"
                         ],
-                        "description": "A single acceptance criterion with ID, text, and optional fixture reference."
+                        "description": "A single acceptance criterion covering one scenario type (happy path, error case, or boundary condition), with an optional fixture reference for automated validation."
                       }
                     },
                     "status": {
@@ -137,19 +138,19 @@
                         "in_progress",
                         "done"
                       ],
-                      "description": "Current progress status of the task."
+                      "description": "Task-level status: 'pending' (not started), 'in_progress' (actively being worked), 'done' (completed and verified). Note: tasks cannot be 'deferred' — only milestones support deferral. If a task's parent milestone is deferred, the task remains 'pending'."
                     },
                     "status_ref": {
                       "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the status value in the registry."
+                      "description": "Canonical reference to the task status in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"}. Must be consistent with the task's 'status' field value."
                     },
                     "environment_ref": {
                       "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the target environment of this task."
+                      "description": "Canonical reference to the target environment for this task. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Use to indicate which environment this task targets for deployment or testing. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'."
                     },
                     "metric_ref": {
                       "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the metric used to measure task completion."
+                      "description": "Canonical reference to the metric used to measure task completion. Kind must be 'term'. Example: {\"id\": \"cn:project:term:api-response-time\", \"kind\": \"term\", \"label\": \"API Response Time\"}. Use when task completion is gated on a measurable metric (e.g., performance benchmark, coverage threshold). Omit for tasks with qualitative acceptance criteria only."
                     },
                     "depends_on": {
                       "type": "array",
@@ -157,7 +158,7 @@
                         "type": "string",
                         "description": "A task_id that this task depends on within the same milestone."
                       },
-                      "description": "task_ids this task depends on (within same milestone). Must not create cycles."
+                      "description": "task_ids this task depends on (within same milestone). Should not create cycles (validated by tooling)."
                     },
                     "assumptions": {
                       "type": "array",
@@ -178,7 +179,7 @@
                       "description": "Conditions that definitively mark this task complete."
                     },
                     "fr_refs": {
-                      "description": "Functional requirement IDs this task addresses. Enables pairwise completeness checks.",
+                      "description": "Functional requirement IDs this task addresses. Each should match an fr_id in spec/04_fr_list.json (validated by traceability checks). Enables pairwise completeness checks: verifies every FR has at least one roadmap task. Add all FRs this task contributes to, even partially. Example: ['fr-user-login', 'fr-session-refresh'].",
                       "type": "array",
                       "items": {
                         "type": "string",
@@ -198,7 +199,8 @@
               },
               "deliverables": {
                 "type": "array",
-                "description": "Trace references to artifacts this milestone will produce.",
+                "minItems": 1,
+                "description": "Trace references to spec artifacts this milestone will produce or modify as deliverables. Use type 'produces' for new artifacts and type 'modifies' for updated artifacts. Example: [{\"type\": \"produces\", \"id\": \"fr-user-login\", \"note\": \"New FR created in this milestone\"}, {\"type\": \"modifies\", \"id\": \"cap-user-authentication\", \"note\": \"Capability updated to reflect auth scope changes\"}]. Anti-pattern: bare strings — deliverables must be typed traceRef objects.",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
                   "description": "A trace reference to an artifact this milestone will produce."
@@ -206,15 +208,15 @@
               },
               "risks": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Known risks that could delay or block this milestone."
+                "description": "Known risks that could delay or block this milestone. Each entry should name the specific threat, its probability, and the planned mitigation. Decision rule: write one entry per distinct risk, not one entry per category. Examples: 'Third-party payment API instability — high probability during peak load; mitigate with circuit breaker and fallback to manual processing order queue.' 'Legal review for PII data policy may miss Sprint 3 deadline — medium probability; mitigate by requesting review in Sprint 2 with a two-week buffer.' Anti-pattern: 'Technical risks' or 'Integration risks' (category labels, not named risks — a reviewer cannot act on a category)."
               },
               "spikes": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Technical spikes or investigations required before work can proceed."
+                "description": "Time-boxed technical investigations required to resolve specific uncertainties before work can proceed. Decision rule: each spike entry must name (1) the question being answered, (2) the time budget, and (3) the expected output. Examples: 'Evaluate Redis Cluster vs Elasticache for session store — 2-day spike, output: architectural decision record with latency benchmarks.' 'Prototype JWT rotation with zero-downtime rollover — 1-day spike, output: working proof of concept committed to feature branch.' Anti-pattern: 'Investigate performance' or 'Research options' (open-ended spikes with no time box or defined output cannot be completed or reviewed)."
               },
               "status_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the milestone status in the registry."
+                "description": "Canonical reference to the milestone status in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"}. Must be consistent with the 'status' field value. Common IDs: 'cn:core:stage:pending', 'cn:core:stage:in-progress', 'cn:core:stage:done', 'cn:core:stage:deferred'."
               }
             },
             "required": [
@@ -234,19 +236,19 @@
         "migration_plan": {
           "type": "string",
           "minLength": 1,
-          "description": "High-level strategy for migrating from existing systems or data."
+          "description": "High-level strategy for migrating from existing systems or data. A good migration plan addresses four areas: (1) what is being replaced (legacy system, schema version, or API contract); (2) migration sequence (strangler fig pattern vs. big-bang replacement); (3) rollback plan (how to revert if migration fails); (4) acceptance test for successful migration (how to confirm the migration is complete). Example: 'Migrate auth from session cookies to JWT tokens using strangler fig pattern across 3 milestones — existing session auth remains active until milestone 3; rollback: re-enable session middleware; acceptance: all auth endpoints accept JWT tokens and all legacy session tests pass.' Anti-pattern: 'We will migrate the data' (does not describe sequence, rollback, or acceptance criteria)."
         },
         "dependencies": {
           "$ref": "vc:core:collections#dependencyObjectList",
-          "description": "External or internal dependencies required by the roadmap."
+          "description": "External or internal dependencies required by the roadmap. Uses structured dependency objects (each with type, id, and optional owner/note fields) — not simple string IDs. Contrast with Step 09 impl_plan which uses dependencyList (mixed string/object). Every entry here must be a full object."
         },
         "dependency_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the dependency list in the registry."
+          "description": "Canonical reference to the primary external or cross-team dependency this roadmap depends on. Kind must be 'dependency'. Decision rule: use this field to reference a single canonical dependency entry that gates the entire roadmap; use the milestone-level `risks` and `deliverables` fields for per-milestone dependency notes. Cross-team example: {\"id\": \"cn:project:dependency:auth-service-api-contract\", \"kind\": \"dependency\", \"label\": \"auth-service-api-contract\"} (a dependency on another team's API contract). External vendor example: {\"id\": \"cn:project:dependency:stripe-api\", \"kind\": \"dependency\", \"label\": \"stripe-api\"} (a third-party payment provider). Omit when the dependency is an internal milestone referenced via a milestone's depends_on field — those are tracked within the roadmap itself, not in the canonical registry."
         },
         "trace": {
           "type": "array",
-          "description": "Traceability links connecting this roadmap to related artifacts.",
+          "description": "Traceability links connecting this roadmap to upstream FRs and capabilities it implements or was shaped by. Every roadmap milestone must trace to at least one upstream FR or capability it implements. Use type='implements' for FRs/capabilities being delivered, type='derives_from' for constraints or NFRs that shaped the milestone scope. Example: [{\"type\": \"implements\", \"id\": \"fr-user-login\", \"note\": \"Milestone delivers the authentication endpoint for this FR\"}]. Milestones without trace links are floating delivery units that cannot be validated against the spec. Consult the items description for approved types and ID formats.",
           "items": {
             "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the roadmap."

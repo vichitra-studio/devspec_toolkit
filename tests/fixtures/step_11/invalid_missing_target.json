@@ -9,6 +9,7 @@
       "description": "Malicious input in queries or document content can lead to injection attacks that bypass validation and potentially affect system behavior",
       "vector": "input-injection",
       "category": "business_logic",
+      "risk_category_ref": {"id": "cn:core:risk_category:business-logic", "kind": "risk_category"},
       "mitigations": [
         {
           "type": "inv",

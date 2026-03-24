@@ -11,7 +11,7 @@
       "type": "object",
       "properties": {
         "tech_stack": {
-          "description": "Technology stack for the implementation, including languages, frameworks, infrastructure, and tools.",
+          "description": "Technology choices for this project. Each entry should specify the technology and its role. Must include languages, frameworks, infrastructure, and tools sections (all four are required by schema). Choices here constrain all downstream implementation steps.",
           "allOf": [
             {
               "$ref": "vc:core:collections#techStack",
@@ -29,57 +29,59 @@
         },
         "tech_stack_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the technology stack entry in the registry."
+          "description": "Canonical reference for the technology stack entry in the canon registry. Kind must be 'capability' — tech stacks are modelled as capabilities in the canon. Concrete example: {\"id\": \"cn:project:capability:tech-stack-web\", \"kind\": \"capability\", \"label\": \"Web Tech Stack\"}. Decision rule: include this field when the milestone introduces or modifies a technology commitment that is registered in canon/manifest.json; omit when no canon entry exists and the tech stack is purely inherited from the project baseline."
         },
         "milestones": {
           "type": "array",
-          "description": "Ordered list of implementation milestones with deliverables and status tracking.",
+          "minItems": 1,
+          "description": "List of implementation milestones in recommended execution order (ordering is convention, not schema-enforced).",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "milestone_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this milestone."
+                "description": "Unique kebab-case identifier. Recommended format: milestone-{phase}-{description}. Example: 'milestone-phase1-user-auth'. Should be stable — changing breaks depends_on references and traceability."
               },
               "name": {
                 "type": "string",
-                "description": "Human-readable name of the milestone."
+                "description": "Human-readable name of the milestone, distinguishable from all other milestones in this plan. Use Title Case, 3–6 words describing the major deliverable or theme. Examples: 'Core Authentication API', 'Payment Integration', 'User Profile Management', 'Performance Hardening', 'Data Migration Phase 1'. Avoid sequential labels ('Milestone 1', 'Phase A') — they carry no semantic meaning and make roadmap reports unreadable. Avoid implementation verbs ('Implement Auth', 'Build Payment') — use noun phrases describing the delivered capability."
               },
               "target_date": {
                 "type": "string",
                 "format": "date",
-                "description": "Planned completion date for this milestone (ISO 8601 date)."
+                "description": "Target completion date for this milestone in ISO 8601 format (YYYY-MM-DD). Example: '2025-03-31'. Should align with team sprint boundaries or external deadlines where applicable. Anti-pattern: relative dates ('end of Q1', 'in 6 weeks') — always convert to absolute YYYY-MM-DD dates for deterministic tooling."
               },
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
-                "description": "Current progress status of the milestone."
+                "description": "Current status of this milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release."
               },
               "risks": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Known risks that could delay or block this milestone."
+                "description": "Known risks that could delay or block this milestone from completing on time. Each risk should identify the source, potential impact, and affected deliverable. Example: 'Third-party OAuth provider SLA instability may delay auth milestone by 2 weeks — monitor weekly, escalate if 2 consecutive missed SLAs'. Format: '{risk source} may {impact} — {mitigation/monitoring action}'. Anti-pattern: 'External dependencies' (too vague) or listing a risk without a mitigation or monitoring action."
               },
               "spikes": {
                 "$ref": "vc:core:collections#stringArray",
-                "description": "Technical spikes or investigations required before work can proceed."
+                "description": "Technical spikes or investigations required before implementation work can proceed. List each spike as a time-boxed question to be answered. Examples: 'Can PostgreSQL handle 10k concurrent connections with our current schema? (2-day spike before ms-core-infra)', 'Does the third-party API rate limit apply per IP or per account? (1-day spike before ms-integration)'. Format: '{question to answer} ({time-box} before {milestone-id})'. Anti-pattern: listing implementation tasks as spikes — spikes are for unknown unknowns only."
               },
               "deliverables": {
                 "type": "array",
-                "description": "Trace references to artifacts this milestone will produce.",
+                "minItems": 1,
+                "description": "Trace references to artifacts this milestone will produce. Must be present (required by schema). Each item is a traceRef object with type, id, and optional note — not a free-text string. Example: {type: 'implements', id: 'fr-user-login', note: 'Working login endpoint with JWT tokens'}. Should contain at least one deliverable per milestone.",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A trace reference to an artifact this milestone will produce."
+                  "description": "A trace reference to an artifact this milestone will produce. Each item must be an object with 'type' and 'id' fields (not a free-text string). 'type' must be a valid trace type (e.g., 'implements', 'validates', 'depends_on'). 'id' must match a real artifact ID from another spec step (fr-*, api-*, nfr-*, inv-*). The optional 'note' field should describe what specifically is delivered. Examples: {type: 'implements', id: 'fr-user-login', note: 'Working login endpoint with JWT tokens and refresh flow'}, {type: 'validates', id: 'nfr-response-time', note: 'Load test suite confirming p99 < 200ms'}. Anti-pattern: free-text strings like 'Build login page' — these break traceability and cannot be linted."
                 }
               },
               "depends_on": {
-                "description": "IDs of milestones that must complete before this milestone can begin.",
+                "description": "IDs of milestones that must complete before this milestone can begin. Creates an explicit dependency DAG. Each entry should match a milestone_id in this spec (validated by linters, not the schema). Use to model sequential phases and prevent parallel execution of dependent work. Example: ['milestone-database-setup', 'milestone-auth-service']. Leave empty or omit for milestones with no predecessors.",
                 "type": "array",
                 "items": { "$ref": "vc:core:atoms#kebabId" },
                 "uniqueItems": true
               },
               "status_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the status value in the registry."
+                "description": "Canonical reference to the status value in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"} or {\"id\": \"cn:core:stage:in-progress\", \"kind\": \"stage\", \"label\": \"in-progress\"}. Should be consistent with the 'status' field value."
               }
             },
             "required": [
@@ -93,26 +95,27 @@
         },
         "migration_plan": {
           "type": "string",
-          "description": "High-level strategy for migrating from existing systems or data to the new implementation."
+          "description": "High-level strategy for migrating from existing systems. Required only when this implementation plan replaces existing data schemas, replaces a running system, or changes a public API contract in a breaking way. Describe in 2–4 sentences covering: (1) what is being replaced or changed, (2) the migration sequence (dual-write, cutover, rollback), (3) the rollback mechanism, and (4) the acceptance test that confirms migration success. Example: 'Existing user records will be migrated from PostgreSQL 12 to 15 using pg_upgrade. Zero-downtime via dual-write period with 48-hour overlap. Rollback by restoring pre-migration snapshot within 4 hours. Verified by row-count and checksum reconciliation job post-cutover.' Omit if no migration is required."
         },
         "dependencies": {
           "$ref": "vc:core:collections#dependencyList",
-          "description": "External or internal dependencies required by the implementation."
+          "description": "External team or system dependencies that must deliver before this milestone can complete. Each entry should name what is needed, from which team, and by which milestone it is required. Cross-team dependency example: 'Auth service must publish OpenAPI spec before Sprint 3 — blocks ms-checkout-integration milestone'. External dependency: 'Stripe SDK v4 must be stable before payment milestone — currently in beta'. Impact: each dependency should state what milestone it blocks. Examples: ['Auth team must expose /token/validate endpoint before ms-auth-backend', 'Mobile team must finalise token schema before ms-integration']. Distinct from Step 09's depends_on (internal milestone ordering) — this field tracks cross-team external dependencies. Anti-pattern: listing 'internal team alignment' as a dependency (too vague — name the specific artifact or decision needed)."
         },
         "dependency_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the dependency list in the registry."
+          "description": "Canonical reference for the dependency when it maps to a registered canon entry (a known external service or cross-team contract). Include when the dependency maps to a registered canon entry. Example: {\"id\": \"cn:project:dependency:auth-service-openapi\", \"kind\": \"dependency\", \"label\": \"auth-service-openapi\"}. Omit for informal dependencies or internal task ordering (use `depends_on` instead). Anti-pattern: using dependency_ref for a milestone in the same impl plan — use `depends_on` with the milestone_id instead."
         },
         "environment_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the target deployment environment."
+          "description": "Canonical reference to the deployment environment required for this milestone. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'. Use to indicate which environment this milestone targets for delivery or testing."
         },
         "trace": {
           "type": "array",
-          "description": "Traceability links connecting this plan to upstream and downstream artifacts.",
+          "minItems": 1,
+          "description": "Traceability links connecting this implementation plan to upstream spec artifacts. Every milestone must trace to at least one upstream NFR, invariant, or capability that it implements or satisfies. Use type='derives_from' pointing to nfr-*, inv-*, or cap-* IDs. Example: [{\"type\": \"derives_from\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"Milestone delivers the auth service meeting this latency target\"}]. Multiple trace links are allowed when a milestone spans several NFRs. Consult the items description for approved types and ID formats. Anti-pattern: type 'implements' — this plan derives from requirements, it does not implement them directly.",
           "items": {
             "$ref": "vc:core:collections#traceRef",
-            "description": "A traceability reference for the implementation plan."
+            "description": "A single traceability reference. At step 09, use type 'derives_from' pointing to nfr-* or inv-* IDs that constrain the implementation plan. Example: {\"type\": \"derives_from\", \"id\": \"inv-data-isolation\", \"note\": \"Multi-tenant isolation invariant constrains the database schema design in milestone ms-core-infra\"}. Anti-pattern: linking to cap-* IDs here — capability traceability belongs in Step 01, not Step 09."
           }
         }
       },

@@ -12,14 +12,14 @@
       "properties": {
         "missing_elements": {
           "type": "array",
-          "description": "Elements missing from the spec suite that affect completeness.",
+          "description": "Gaps and missing coverage items identified across the spec suite. Each entry represents one discrete gap. Include at least one entry for any assessment where completeness_rating.current < completeness_rating.target. An empty array is only valid when current equals target (perfect completeness). Decision rule: if confidence_level < 0.9, there should be at least one missing_elements entry explaining the gap. Should contain at least one entry for any non-perfect assessment. Items should be ordered by priority (high first) to guide the remediation sequence. Anti-pattern: empty missing_elements when current=0.7 (the gap exists but isn't documented — this blocks downstream steps that depend on knowing what's missing).",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "element_id": {
                 "$ref": "vc:core:atoms#kebabId",
-                "description": "Unique kebab-case identifier for this missing element."
+                "description": "Unique kebab-case identifier for this missing element. Recommended format: gap-{category}-{short-label}. Example: 'gap-traceability-fr-login-postconditions'. Should be unique across all entries in this assessment."
               },
               "category": {
                 "type": "string",
@@ -29,11 +29,11 @@
                   "quality",
                   "ambiguity"
                 ],
-                "description": "The dimension of completeness affected: traceability, completeness, quality, or ambiguity."
+                "description": "The completeness dimension this gap affects. Use 'traceability' for missing cross-artifact links (e.g., FR not referenced by any fixture), 'completeness' for outright missing content (e.g., no postconditions defined), 'quality' for weak or unverifiable content (e.g., vague acceptance criteria), and 'ambiguity' for contradictory or unclear definitions that block downstream steps. Worked examples for the two most confusable pairs — (1) 'quality' vs 'ambiguity': 'quality' example: \"FR-04 acceptance criteria are present but untestable: 'system responds quickly' has no measurable threshold\"; 'ambiguity' example: \"FR-12 states 'within 2 seconds' but nfr-api-auth-p95-latency sets a 5-second target — these two statements directly contradict each other.\" (2) 'traceability' vs 'completeness': 'traceability' example: \"cap-payment-processing has no FR implementing it — the capability is declared but no requirement defines its behaviour\"; 'completeness' example: \"The FRs describe login and logout but no session refresh FR exists — the lifecycle is incomplete.\" Anti-pattern: using 'quality' for any finding that is vague — reserve 'quality' for untestable criteria specifically, not general vagueness."
               },
               "description": {
                 "type": "string",
-                "description": "Description of what is missing and why it matters."
+                "description": "Precise description of what is missing or incomplete and why it matters. Each entry must identify: (1) which spec file or artifact is incomplete — use the filename, e.g. 'spec/04_fr_list.json'; (2) what specifically is missing or wrong — be concrete, not general; (3) the recommended resolution — what should be added or changed to close the gap. Example: 'spec/04_fr_list.json: fr-user-login missing postconditions — add at least 2 verifiable postconditions describing the session state after successful login'. Avoid vague language like 'needs improvement'; state the exact deficit."
               },
               "priority": {
                 "type": "string",
@@ -42,34 +42,35 @@
                   "medium",
                   "low"
                 ],
-                "description": "Priority level for addressing this gap."
+                "description": "Remediation priority. Use 'high' for gaps that block downstream steps (Steps 14–16c) or invalidate existing traceability links. Use 'medium' for gaps that degrade quality but don't block pipeline execution. Use 'low' for improvements that are desirable but non-blocking."
               },
               "impact_on_completeness": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1,
-                "description": "Fractional impact on overall completeness score (0 = none, 1 = maximum)."
+                "description": "Fractional impact this gap has on the overall completeness score (0.0–1.0). All impact_on_completeness values across all missing_elements must sum to ≤ 1.0. Calibration guide: a gap that orphans 3+ FRs or invalidates a milestone → 0.15–0.25; a missing required field in one FR or API → 0.05–0.10; a vague definition that can be clarified without re-work → 0.01–0.03. Assign higher weight to 'high' priority gaps than 'medium' or 'low' gaps of equivalent scope. Example: 4 gaps of similar severity → approximately 0.20 each. Anti-pattern: assigning 0.5 to all gaps — weights must reflect relative severity."
               },
               "specification_source": {
                 "type": "array",
-                "description": "Spec files where this element should have been defined.",
+                "minItems": 1,
+                "description": "One or more spec filenames where this gap should be resolved. List all affected files when the gap spans multiple artifacts (e.g., both FR list and fixture file). Should contain at least one entry.",
                 "items": {
                   "type": "string",
                   "pattern": "^[0-9]{2}[a-z]?_.*\\.json$|^(ext_[0-9]{2}_[a-z0-9_]+\\.json)$",
-                  "description": "A spec file name where this element should have been defined."
+                  "description": "Exact spec filename where this missing element should have been defined. Pattern: NN_name.json or ext_{NN}_{topic}.json (filename only, no directory path). Examples: '04_fr_list.json', '05_interface_contracts.json', 'ext_17_payments.json'. Must match the regex pattern enforced by the schema. Anti-pattern: 'spec/04_fr_list.json' (directory-qualified path — the pattern requires filename only, no slash separator)."
                 }
               },
               "risk_category_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the risk category of this gap."
+                "description": "Canonical reference to the risk category this completeness gap belongs to. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:completeness\", \"kind\": \"risk_category\", \"label\": \"completeness\"}. Links the gap to the canonical risk classification used in red team and governance assessments. Validated by canonical-integrity lint."
               },
               "completeness_dimension_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the completeness dimension in the registry."
+                "description": "Canonical reference to the completeness dimension this gap affects. Kind must be 'term'. Example: {\"id\": \"cn:core:term:traceability-completeness\", \"kind\": \"term\", \"label\": \"traceability completeness\"}. Common dimension IDs: 'cn:core:term:traceability-completeness' (missing trace links), 'cn:core:term:coverage-completeness' (uncovered requirements), 'cn:core:term:definition-completeness' (under-specified fields). Validated by canonical-integrity lint."
               },
               "tag_ref": {
                 "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference for the tag associated with this element."
+                "description": "Canonical reference linking this gap to a tag kind entry in the canonical registry. Kind must be 'term'. Reference the canonical tag for this gap's classification. Examples: {\"id\": \"cn:core:term:completeness\", \"kind\": \"term\", \"label\": \"completeness\"} for coverage gaps; {\"id\": \"cn:core:term:traceability\", \"kind\": \"term\", \"label\": \"traceability\"} for missing trace links; {\"id\": \"cn:core:term:quality\", \"kind\": \"term\", \"label\": \"quality\"} for quality gaps. Should resolve to a valid canon entry (validated by canonical-integrity lint, not by JSON Schema). Anti-pattern: using kind='tag' — tags are modelled as 'term' in the canon."
               }
             },
             "required": [
@@ -85,26 +86,26 @@
         },
         "completeness_rating": {
           "type": "object",
-          "description": "Overall completeness rating of the spec suite.",
+          "description": "Summary scores for the current assessment. Scores will be redesigned in a future batch; keep values consistent with the identified missing_elements. A 'current' score of 10 with non-empty missing_elements is a contradiction.",
           "additionalProperties": false,
           "properties": {
             "current": {
               "type": "number",
               "minimum": 0,
               "maximum": 10,
-              "description": "Current completeness score on a 0-10 scale."
+              "description": "Current completeness score for this specification, on a scale of 0–10. current = 10 minus the total impact deducted by all gaps found in this assessment. Each gap's impact_on_completeness (0.0–1.0) is converted to a 0–10 scale by multiplying by 10, then subtracted from 10. Derivation: start from 10.0 and subtract the sum of all impact_on_completeness values from missing_elements (each element's weight × 10 gives the point deduction). Example: 3 gaps with impact weights 0.10, 0.15, and 0.20 → total impact = 0.45 × 10 = 4.5 → current = 10 - 4.5 = 5.5. Anti-pattern: round numbers like 7.0 or 8.0 with no arithmetic trace — the value should be derivable from the listed gaps."
             },
             "target": {
               "type": "number",
               "minimum": 0,
               "maximum": 10,
-              "description": "Target completeness score to achieve."
+              "description": "Target completeness score after all identified gaps are closed, on a scale of 0–10. target = 10 minus the total impact of gaps you expect to defer (i.e., gaps that are known but intentionally not addressed in this cycle). Derivation: 10 minus the sum of impact_on_completeness for any gaps you expect to leave open (e.g., deferred 'low' priority items). Example: if 2 gaps with impact 0.05 and 0.10 are deferred to a future milestone, target = 10 - (0.05 + 0.10) × 10 = 8.5. If all gaps are expected to be resolved, target = 10.0. Anti-pattern: always writing target=10 when the spec knowingly has deferred gaps — target should reflect achievable completeness given the planned scope."
             },
             "confidence_level": {
               "type": "number",
               "minimum": 0,
               "maximum": 1,
-              "description": "Confidence in the accuracy of the current rating (0 = no confidence, 1 = certain)."
+              "description": "Assessor confidence in the current rating accuracy, 0.0–1.0. Calibrated thresholds: ≥0.9 — all spec files for this assessment are present and fully reviewed, seed docs are complete; 0.7–0.8 — some spec files are missing (e.g., Step 08 fixtures not yet written) or seed docs are incomplete/outdated; 0.5–0.6 — fundamental requirements are undefined (missing charter or capabilities) and the assessment is speculative; <0.5 — reserved for partial-spec assessments where fewer than half the pipeline steps are available. Examples: all steps 00–12 present with good coverage → 0.95; steps 00–08 present but 09–12 missing → 0.75; only steps 00–03 present → 0.55. Anti-pattern: always writing 1.0 or 0.9 regardless of missing spec files — confidence_level is a data quality signal, not a confidence score about the product."
             }
           },
           "required": [
