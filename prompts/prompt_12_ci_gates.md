@@ -139,10 +139,6 @@ Available CLI tools include:
 - **Perma-Red**: Setting aspirational coverage numbers with no plan to meet them, leading to perma-red pipelines.
 - **Drift**: Duplicating job IDs or renaming them without updating CI scripts and governance docs.
 
-## Quick Reference
-- Jobs: `job_id`, `name`, `requires`, `steps`.
-- Coverage: `lines`, `branches` between 0 and 100.
-
 # Clarification Questions
 - Which validation steps must be enforced in CI to block merges? Any coverage targets?
 - How should jobs depend on one another (DAG)? Which can run in parallel?

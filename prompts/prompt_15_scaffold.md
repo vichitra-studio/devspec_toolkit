@@ -131,10 +131,6 @@ Before emitting, verify:
 - **False Green**: Marking build status green without running validators, giving a false sense of readiness.
 - **Route Drift**: Creating route paths that differ from Step 05 definitions, breaking client compatibility.
 
-## Quick Reference
-- Service Skeleton: `language` (required), optional `framework` and `modules`.
-- Route Map: `interface_ref`, `path`, `method` for each route.
-
 # Clarification Questions
 - What language/framework should the scaffold target? Any org standards or templates to reuse?
 - Which APIs from Step 5 must be present in the initial route map?

@@ -132,12 +132,6 @@ Before emitting, verify:
 - **Silos**: Forgetting to identify reviewers across disciplines, resulting in siloed approvals.
 - **Breaking Automation**: Treating versioning as incidental, which breaks automation in CI and drift audits.
 
-## Quick Reference
-- ID Format: `governance-<descriptor>`; owner commonly `ops` or `system`.
-- Required Fields: must declare `spec_first_policy`; other sections should be filled for practical governance.
-- Commit Rules: `require_spec_ids` MUST align with ID formats like `fr-*`, `api-*`, `fixture-*`.
-- Reviewer List: maintain stable names or roles; update when ownership shifts.
-
 # Clarification Questions
 - What versioning scheme should we follow for specs and APIs? Who owns version bumps?
 - Which CI validations must be mandatory before merge? Any coverage thresholds?

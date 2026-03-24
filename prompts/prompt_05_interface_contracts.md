@@ -129,13 +129,6 @@ Before emitting, verify:
 - **DO NOT** mix error types in a single API entry (separate distinct behaviors).
 - **DO NOT** use vague or non-specific error codes.
 
-## Quick Reference
-- ID Format: `interface_contracts-<descriptor>`; APIs use `api-<resource>-<action>`.
-- Required Fields: each API needs `api_id`, `name`, `version`, `protocol`, and `owner`.
-- Allowed Protocols: `http`, `grpc`, `ws`, `mqtt`.
-- Security Flag: choose from `none`, `api-key`, `oauth2`, `jwt`, `mTLS`.
-- Trace: use `trace` to reference FRs (`fr-*`) or Capabilities (`capability-*`).
-
 # Clarification Questions
 - For each API, what is the exact behavior and which FR(s) does it satisfy?
 - What are the request/response schemas and example payloads? Where are schemas versioned?

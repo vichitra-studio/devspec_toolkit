@@ -135,12 +135,6 @@ Before emitting, verify:
 - **DO NOT** trace to non-existent IDs.
 - **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
 
-## Quick Reference
-- ID Format: `fr-<descriptor>` with stable suffixes for traceability.
-- Required Fields: every FR needs `statement`, `acceptance_criteria`, and `fr_id`.
-- Criteria Structure: each criterion requires `criterion_id` and `text`; add `fixture_ref` when automation exists.
-- Trace Hooks: expect coverage from `trace` to Capabilities (`capability-*`), APIs (`api-*`), or NFRs.
-
 # Clarification Questions
 - Which specific user or system behaviors must we guarantee in this phase? What is explicitly excluded?
 - For each FR, what are the minimal inputs and exact expected outputs or state changes?

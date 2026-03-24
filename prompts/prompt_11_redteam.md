@@ -158,12 +158,6 @@ Before emitting, verify:
 - **Vague Mitigations**: "Implement security" (Bad) vs "Enforce `inv-authz-admin` validation" (Good).
 - **Ignoring Edge Cases**: Only focusing on malicious hackers and forgetting about timeouts, retries, and concurrency limits.
 
-## Quick Reference
-- **ID Format**: `redteam-catalog` (file), `threat-<cat>-<slug>`, `ec-<slug>`.
-- **Categories**: `authn`, `authz`, `business_logic`, `transport`, `data_privacy`.
-- **Targets**: Link to `api-*` (Step 05) or `component-*` (Step 02).
-- **Mitigation Types**: `inv` (Step 06), `nfr` (Step 07), `fr` (Step 04), `doc` (Step 10).
-
 # Clarification Questions
 - Are there any specific compliance requirements (GDPR, HIPAA) that dictate data privacy threats?
 - Which third-party integrations (from System Sketch) are considered untrusted trust boundaries?

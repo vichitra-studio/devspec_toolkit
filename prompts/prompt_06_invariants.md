@@ -125,12 +125,6 @@ Before emitting, verify:
 - **False Positives**: Forgetting to scope the invariant, causing checks to fail on unrelated components.
 - **Bad IDs**: Failing to version or reuse `inv_id`, leading to duplicate or orphaned invariants.
 
-## Quick Reference
-- ID Format: `invariant-<descriptor>`; keep stable for cross-step traceability.
-- Required Fields: every rule needs `inv_id`, `description`, `language`, and `expression`.
-- Scope Usage: populate `components` or `apis` arrays to target enforcement precisely.
-- Trace Hooks: reference FR (`fr-*`), API (`api-*`), or governance policy IDs to show motivation.
-
 # Clarification Questions
 - Which truths must always hold regardless of implementation (data relationships, auth requirements, idempotency)?
 - Where can we encode these as executable rules (jsonlogic or CEL)? Provide expressions or field-level specs.

@@ -132,11 +132,6 @@ Before emitting, verify:
 - **Staging Drift**: Missing staging environment parity causing late-stage surprises.
 - **Optional Compliance**: Treating compliance requirements as optional notes instead of binding constraints.
 
-## Quick Reference
-- Environments: objects for `dev`, `ci`, `staging`, `prod`.
-- CI Gates: strings naming the checks to run.
-- Trace: upstream/downstream connections.
-
 # Clarification Questions
 - What deployment environments are required now and in the near term? Any differences in config or data sources?
 - Which CI gates must block merges? Any minimum coverage thresholds or invariants that must run?

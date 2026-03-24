@@ -132,11 +132,6 @@ Before emitting, verify:
 - **Duplicate IDs**: Duplicating capabilities with different IDs, breaking traceability.
 - **Undefined I/O**: Leaving inputs/outputs undefined makes API generation impossible.
 
-## Quick Reference
-- ID Format: `capability-<verb>-<object>`.
-- Scope: `in`, `out`, or `future`.
-- Owner: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, or `engineering`.
-
 # Clarification Questions
 - Which core user jobs require first-class capabilities now vs later? What must not be built?
 - For each capability, what are the minimal inputs/outputs needed to prove it works end-to-end?

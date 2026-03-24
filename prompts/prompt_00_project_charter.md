@@ -138,14 +138,6 @@ Before emitting, verify:
 - **Missing Stakeholders**: Forgetting key segments or stakeholders (breaks downstream traceability).
 - **Scope Creep**: Missing an "out-of-scope" list, leading to ambiguity.
 
-## Quick Reference
-- Required: `id`, `owner`, `created_at`, `problem_statement`, `success_metrics`.
-- **Validation Gates**: 
-  - `stakeholders` MUST have `needs`.
-  - `success_metrics` MUST have `measurement_method`.
-  - `in_scope` MUST have at least 3 items.
-- Stakeholders: list roles and needs; must inform later FRs and NFRs.
-
 # Clarification Questions
 - What are the top 3 measurable business outcomes (with units and targets) and by when?
 - Which user segments are in primary focus, and what critical JTBD do they have today that we must address?

@@ -127,12 +127,6 @@ Before emitting, verify:
 - **Complexity**: Overloading fixtures with multiple expectations, making failures hard to diagnose.
 - **Drift**: Forgetting to update fixtures when interface contracts version, causing format mismatches.
 
-## Quick Reference
-- ID Format: `fixture-<scenario>`; MUST NOT be renamed once referenced by downstream steps.
-- Required Fields: `fixture_id`, `mode`, `input`, `expected`, and `targets`.
-- Mode Choices: `unit`, `contract`, `e2e`, `redteam`; use multiple to cover layers.
-- Trace Hooks: populate `targets` with IDs like `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.
-
 # Clarification Questions
 - Which acceptance criteria lack fixtures today? Prioritize those first.
 - What are the top negative/error scenarios (auth, validation, conflicts, rate limits) that must be encoded?

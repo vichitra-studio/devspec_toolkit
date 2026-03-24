@@ -131,10 +131,6 @@ Before emitting, verify:
 - **Drift**: Every domain noun introduced in steps 04-16c MUST have a corresponding `term_id` in this glossary; downstream steps MUST NOT introduce terms not defined here.
 - **Broadness**: Definitions that are too broad or business-jargon-heavy to guide engineers.
 
-## Quick Reference
-- Required: `term_id`, `term`, `definition`, `term_ref`.
-- Optional but recommended: `domain`, `units`.
-
 # Clarification Questions
 - Which terms cause confusion today between engineering, product, and ops? Define these first.
 - What metrics appear in success metrics and NFRs? What are their precise units and definitions?

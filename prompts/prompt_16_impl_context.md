@@ -204,24 +204,6 @@ Before emitting, verify:
 4. **Prefer atomic checklist items** (one testable behavior per item, not compound requirements).
 5. **Link evidence explicitly** when marking items as `verified` (use `evidence_ref` field).
 
-# Quick Reference
-
-| Field | Type | Required | Purpose |
-|-------|------|----------|----------|
-| `plan.summary` | object | yes | Scope definition (functional_summary, scope_in/out, target_file_patterns) |
-| `plan.spec_alignment.checklist` | array | yes | Atomic requirements with spec_ref, linked_test_expectation, implementation |
-| `plan.ambiguities` | array | no | Risk management (blocking/non_blocking issues) |
-| `plan.solution` | object | no | Architecture sketch and sequence of concerns |
-| `plan.context` | object | no | Existing codebase structures and coding examples |
-| `plan.review_requirements` | object | no | Verification plan (test_commands, guidelines) |
-| `plan.docs_impact` | object | yes | Documentation impact assessment |
-| `plan.security` | object | no | Security fixtures and spec mutations |
-| `plan.delivery` | object | no | Observability (dashboards, alerts) |
-| `plan.drift` | object | no | Sustainment (periodic drift checks) |
-| `plan.docs` | object | no | Documentation plan |
-| `plan.coverage_status` | object | no | Metrics (total, verified, deferred, pending) |
-| `plan.scope_validation` | object | no | Scope acknowledgment |
-
 # Failure Modes (Pitfalls)
 *   **Anchor Drift**: Producing a Step 16 context that conflicts with the specific Milestone contexts (16a/b/c). *Fix*: Anchor must be the union/root, not a distinct implementation plan.
 *   **Lazy Scope**: Leaving `target_file_patterns` empty or using broad `**/*` patterns. *Fix*: Must be explicit glob patterns based on `spec/impl_context/*.json`.

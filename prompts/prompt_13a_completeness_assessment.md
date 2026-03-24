@@ -149,9 +149,6 @@ Before emitting, verify:
 - **Inflation**: Rating 10/10 while TBDs exist.
 - **Isolation**: Ignoring missing references/links between steps.
 
-## Quick Reference
-- Required: `id`, `owner`, `created_at`, `missing_elements`, `completeness_rating`.
-
 # Clarification Questions
 - Are there specific files excluded from this review?
 - Is there a known reason for missing headers/sections (e.g. omitted by design)?

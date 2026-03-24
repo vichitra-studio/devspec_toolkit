@@ -137,14 +137,6 @@ Before emitting, verify:
 - **ID Reuse**: Reusing IDs from other steps, which confuses schema validation and traceability tooling.
 - **Hidden Constraints**: Missing auth/reliability on connections.
 
-## Quick Reference
-- Component Types: `service`, `db`, `queue`, `cache`, `job`, `ui`, `lib`, `external`.
-- Connection Protocols: `http`, `grpc`, `event`, `rpc`, `db`, `file`.
-- Auth Methods: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, `key`.
-- Trust Boundaries: `internal`, `partner`, `public`.
-- Rate Limit Shape: `{ rps, burst?, window_s?, scope }`.
-- Tag Vocabulary: `critical-path`, `supporting`, `external-dependency`, `shared-platform`, `stateful`, `stateless`, `realtime`, `batch`, `latency-sensitive`, `throughput-sensitive`, `pii`, `phi`, `pci`, `confidential`, `public-data`, `multi-tenant`, `single-tenant`, `experimental`, `legacy`, `deprecated`.
-
 ## External Definition
 Define `type: external` as a component that represents third-party services or systems that are not owned or controlled by the organization. Examples include cloud APIs (AWS, GCP), payment processors (Stripe), identity providers (Auth0), or analytics services (Google Analytics). Internal partner services should be marked as `type: service` with appropriate `trust_boundary` and authentication. External components must include the `external-dependency` tag.
 

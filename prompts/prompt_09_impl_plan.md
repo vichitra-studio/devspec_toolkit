@@ -129,10 +129,6 @@ Before emitting, verify:
 - **Surprise**: Ignoring migration steps, which causes surprise downtime or data loss later.
 - **Blockers**: Omitting external dependencies until late, creating critical path delays.
 
-## Quick Reference
-- Required: `tech_stack`.
-- Milestones: `milestone_id`, `name`, optional `target_date`, `risks`, `spikes`.
-
 # Clarification Questions
 - What tech choices are locked vs flexible? Any org standards to follow?
 - What are the major deliverable milestones with dates? What risks or spikes accompany each?

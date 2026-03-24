@@ -124,10 +124,6 @@ Before emitting, verify:
 - NEVER emit qualitative targets without metrics.
 - NEVER skip `trace` for critical NFRs.
 
-## Quick Reference
-- Categories: latency, throughput, availability, durability, cost, security, privacy, maintainability, usability, portability, energy.
-- Stage: `dev`, `ci`, `staging`, `prod`.
-
 # Clarification Questions
 - Which performance, reliability, cost, security/privacy, and energy targets are non-negotiable? Which are stretch?
 - What are the exact units and where will each metric be measured (tool/query/url)?
