@@ -99,6 +99,9 @@ def check_forward_replay(
         elif err["type"] == "regression":
             dropped_str = ",".join(err["dropped_ids"])
             errors.append(make_error("E555", f"SEMANTIC_COVERAGE_REGRESSION path={err['path']} dropped_ids={dropped_str}"))
+            # W598: warn individually for each removed ID to surface renames early
+            for removed_id in err["dropped_ids"]:
+                errors.append(make_error("W598", f"ID_STABILITY_REMOVAL path={err['path']} removed_id={removed_id}"))
         elif err["type"] == "staleness":
             errors.append(make_error(
                 "W595",

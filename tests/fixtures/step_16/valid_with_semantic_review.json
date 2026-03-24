@@ -52,8 +52,8 @@
                 "target": "src/api/auth.py",
                 "description": "Add login route handler with JWT generation",
                 "evidence": {
-                  "type": "snippet",
-                  "content": "@app.post('/auth/login') def login(): return {'token': generate_jwt()}"
+                  "type": "log",
+                  "content": "PASSED tests/test_auth.py::test_login_route_handler_returns_jwt (0.08s)"
                 }
               }
             ]
@@ -86,7 +86,7 @@
                 "description": "Verify JWT token structure in test output",
                 "evidence": {
                   "type": "log",
-                  "content": "PASSED tests/test_auth.py::test_login_returns_jwt"
+                  "content": "PASSED tests/test_auth.py::test_login_returns_jwt (0.05s) - 1 passed in 0.45s"
                 }
               }
             ]

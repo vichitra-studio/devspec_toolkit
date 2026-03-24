@@ -1,6 +1,7 @@
 {
   "venvPath": ".",
   "venv": "devspec_env",
+  "pythonVersion": "3.9",
   "extraPaths": [
     "tools",
     "scripts"

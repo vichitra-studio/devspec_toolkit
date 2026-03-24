@@ -17,6 +17,9 @@ VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "meta
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
 
+# Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
+_SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
+
 # Cache for step_16 validation results by content hash.  When step_16a, 16b,
 # and 16c each call validate_step_16(), the first call computes the result and
 # subsequent calls for the same artifact return cached results.  This prevents
@@ -137,24 +140,51 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                  errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but has no actions."))
 
             # Logic Check: Verified items must have evidence for at least one action if actions exist
+            # Task 7-03 (AUDIT-070) + Task 7-04 (AUDIT-032): evidence content quality + binding
             if status == "verified" and actions:
                 has_evidence = False
                 for action in actions:
-                    if "evidence" in action:
-                        has_evidence = True
-                        break
+                    evidence = action.get("evidence")
+                    if evidence is None:
+                        # W600: each individual verified action should have evidence
+                        errors.append(make_error("W600", f"VERIFIED_ACTION_NO_EVIDENCE: verified action '{action.get('type', 'unknown')}' in checklist item '{item_id}' has no evidence field"))
+                        continue
+                    # evidence is present — mark presence and validate quality
+                    has_evidence = True
+                    if not isinstance(evidence, dict):
+                        # Non-dict evidence (e.g., plain string) satisfies presence check but
+                        # cannot be quality-validated — skip content/structure checks
+                        continue
+                    content = evidence.get("content")
+                    has_structured = "stdout" in evidence or "stderr" in evidence
+                    if isinstance(content, str):
+                        if len(content) < 50:
+                            errors.append(make_error("W599", f"EVIDENCE_TOO_SHORT: action evidence in checklist item '{item_id}' has content shorter than 50 characters ({len(content)} chars)"))
+                        has_success_marker = any(marker in content for marker in _SUCCESS_MARKERS)
+                        if not has_success_marker and not has_structured:
+                            errors.append(make_error("E301", f"EVIDENCE_CONTENT_INVALID: action evidence in checklist item '{item_id}' lacks a success marker keyword (e.g. PASS, OK, passed, success, '0 failures') and has no stdout/stderr fields"))
+                    elif not has_structured:
+                        # Evidence dict present but missing both content and stdout/stderr
+                        errors.append(make_error("W600", f"EVIDENCE_NO_CONTENT: verified action in checklist item '{item_id}' has evidence dict but no 'content', 'stdout', or 'stderr' field"))
                 if not has_evidence:
                     errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
 
     # Logic Check: Ensure target_file_patterns cover touched files
     summary_patterns = set(plan.get("summary", {}).get("target_file_patterns", []))
 
-    # Collect all files touched in actions
+    # Collect all files touched in actions (implementation.files_touched per checklist item)
     actually_touched = set()
     for item in checklist:
         impl = item.get("implementation", {})
         if impl.get("status") in ["in_progress", "verified"]:
             for f in impl.get("files_touched", []):
+                actually_touched.add(f)
+
+    # Task 7-09 (AUDIT-087): also collect files from execution.files_touched
+    execution_block = data.get("execution", {})
+    if isinstance(execution_block, dict):
+        for f in execution_block.get("files_touched", []):
+            if isinstance(f, str):
                 actually_touched.add(f)
 
     # Logic: Warn if files are touched but not in target_file_patterns
@@ -286,10 +316,10 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                         f"not listed in critical_evidence.passed_test_commands")
                     )
 
-    # E303 -- ci_status gate
+    # E303 -- ci_status gate (Task 7-04 AUDIT-032: strengthened to reject anything not explicitly 'green')
     fixture_status = review.get("fixture_status") if isinstance(review, dict) else None
     ci_status_val = fixture_status.get("ci_status") if isinstance(fixture_status, dict) else None
-    if verdict == "verified" and (ci_status_val is None or ci_status_val == "red"):
+    if verdict == "verified" and ci_status_val != "green":
         if ci_status_val is None:
             errors.append(
                 make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status is absent or "
@@ -297,7 +327,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             )
         else:
             errors.append(
-                make_error("E303", "CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is 'red' -- "
+                make_error("E303", f"CI_GATE_VIOLATION: verdict is 'verified' but review.fixture_status.ci_status is '{ci_status_val}' -- "
                 "set fixture_status.ci_status to 'green' or change verdict")
             )
 

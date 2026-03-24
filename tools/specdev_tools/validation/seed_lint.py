@@ -58,9 +58,11 @@ def _collect_required_seeds(manifest: Dict, step_id: str) -> Set[str]:
         if step_id not in step_requirements:
             return set()
         required = set(step_requirements.get(step_id, []))
-    global_required = set(manifest.get("global_seed_order", []))
-    required.update(global_required)
-    return required
+    # Use global_seed_order for ordering only, not membership expansion.
+    global_order = manifest.get("global_seed_order", [])
+    ordered = [s for s in global_order if s in required]
+    remaining = [s for s in required if s not in set(global_order)]
+    return set(ordered + remaining)
 
 
 def _extract_step_from_prompt_filename(filename: str) -> str:

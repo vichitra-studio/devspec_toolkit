@@ -116,6 +116,61 @@ class SpecQualityLintTests(unittest.TestCase):
         errs = _check_assumptions("test.json", {"assumptions": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]}, set())
         self.assertTrue(any("W572 ASSUMPTION_COUNT_HIGH" in e for e in render_errors(errs)))
 
+    def test_tech_stack_coherence_mismatch_warns(self):
+        """W574 fires when Steps 09 and 14 both have tech_stack but they differ."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            base_meta = {
+                "id": "step-x",
+                "owner": "engineering",
+                "created_at": "2026-01-01T00:00:00Z",
+                "canonical_refs_used": [],
+            }
+            step09 = {**base_meta, "id": "impl-plan", "tech_stack": {"language": "Python", "framework": "FastAPI"}}
+            step14 = {**base_meta, "id": "roadmap", "tech_stack": {"language": "Python", "framework": "Django"}}
+            (spec / "09_impl_plan.json").write_text(json.dumps(step09), encoding="utf-8")
+            (spec / "14_roadmap.json").write_text(json.dumps(step14), encoding="utf-8")
+            errs = lint_spec_quality(str(spec))
+            self.assertTrue(any("W574 TECH_STACK_COHERENCE_MISMATCH" in e for e in render_errors(errs)))
+
+    def test_tech_stack_coherence_matching_no_warn(self):
+        """W574 does not fire when both Steps 09 and 14 have identical tech_stack."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            base_meta = {
+                "id": "step-x",
+                "owner": "engineering",
+                "created_at": "2026-01-01T00:00:00Z",
+                "canonical_refs_used": [],
+            }
+            ts = {"language": "Python", "framework": "FastAPI"}
+            step09 = {**base_meta, "id": "impl-plan", "tech_stack": ts}
+            step14 = {**base_meta, "id": "roadmap", "tech_stack": ts}
+            (spec / "09_impl_plan.json").write_text(json.dumps(step09), encoding="utf-8")
+            (spec / "14_roadmap.json").write_text(json.dumps(step14), encoding="utf-8")
+            errs = lint_spec_quality(str(spec))
+            self.assertFalse(any("W574 TECH_STACK_COHERENCE_MISMATCH" in e for e in render_errors(errs)))
+
+    def test_tech_stack_coherence_only_one_step_present_no_warn(self):
+        """W574 does not fire when only one of the two spec files exists."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            step09 = {
+                "id": "impl-plan",
+                "owner": "engineering",
+                "created_at": "2026-01-01T00:00:00Z",
+                "canonical_refs_used": [],
+                "tech_stack": {"language": "Python"},
+            }
+            (spec / "09_impl_plan.json").write_text(json.dumps(step09), encoding="utf-8")
+            errs = lint_spec_quality(str(spec))
+            self.assertFalse(any("W574" in e for e in render_errors(errs)))
 
 
 if __name__ == "__main__":

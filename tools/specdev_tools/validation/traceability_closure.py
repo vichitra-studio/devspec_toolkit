@@ -48,6 +48,8 @@ SPEC_FILES = {
     "frs": "04_fr_list.json",
     "apis": "05_interface_contracts.json",
     "fixtures": "08_fixtures.json",
+    "governance": "10_governance.json",
+    "ci_gates": "12_ci_gates.json",
     "roadmap": "14_roadmap.json",
     "impl_planner": "16a_impl_planner.json",
 }
@@ -61,7 +63,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     data: dict[str, Any] = {}
     # Keys that are silently optional — coverage checks fire only when present.
-    _optional_keys = {"charter", "apis", "fixtures"}
+    _optional_keys = {"charter", "apis", "fixtures", "governance", "ci_gates"}
     for key, filename in SPEC_FILES.items():
         # I5: fallback for impl_planner: try 16a first, then 16_impl_context.json
         if key == "impl_planner":
@@ -105,6 +107,22 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
             for goal_id in sorted(goal_ids - cap_traced_goals):
                 errors.append(make_error("E560", f"TRACEABILITY_GAP charter_goal_without_capability {goal_id}"))
+
+        # Task 7-01 (AUDIT-022): success_metrics traceability
+        # Each charter success_metric must be referenced by at least one capability's success_metric_refs
+        metric_ids: set[str] = set()
+        for metric in charter_goals.get("success_metrics", []):
+            if isinstance(metric, dict) and metric.get("metric_id"):
+                metric_ids.add(metric["metric_id"])
+
+        if metric_ids:
+            cap_traced_metrics: set[str] = set()
+            for cap in data["capabilities"].get("capabilities", []):
+                for metric_ref in cap.get("success_metric_refs", []):
+                    if isinstance(metric_ref, str) and metric_ref:
+                        cap_traced_metrics.add(metric_ref)
+            for metric_id in sorted(metric_ids - cap_traced_metrics):
+                errors.append(make_error("E560", f"TRACEABILITY_GAP charter_success_metric_without_capability {metric_id}"))
 
     fr_traced_caps: set[str] = set()
     fr_ids: set[str] = set()
@@ -234,5 +252,27 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     if "capabilities" in data and "frs" in data:
         for cap_id in sorted(capability_ids - fr_traced_caps):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
+
+    # Task 7-07 (AUDIT-077): governance-to-CI cross-validation
+    # For each pr_rule in Step 10, verify a corresponding CI job step command references it.
+    if "governance" in data and "ci_gates" in data:
+        pr_rules = data["governance"].get("pr_rules", [])
+        ci_jobs = data["ci_gates"].get("jobs", [])
+        # Collect all step commands from all CI jobs
+        ci_commands: list[str] = []
+        for job in ci_jobs:
+            if not isinstance(job, dict):
+                continue
+            for step in job.get("steps", []):
+                if not isinstance(step, dict):
+                    continue
+                cmd = step.get("command", "")
+                if isinstance(cmd, str) and cmd:
+                    ci_commands.append(cmd)
+        for rule in pr_rules:
+            if not isinstance(rule, str):
+                continue
+            if not any(rule in cmd for cmd in ci_commands):
+                errors.append(make_error("W569", f"GOVERNANCE_PR_RULE_UNCOVERED {rule} has no corresponding CI job step enforcing it"))
 
     return errors

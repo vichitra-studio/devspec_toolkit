@@ -953,5 +953,350 @@ class TestStep16(unittest.TestCase):
             )
 
 
+    # --- Evidence validation tests (Bug fixes: W599, W600, E301) ---
+
+    def _make_evidence_test_data(self, item_id, actions):
+        """Build a minimal impl_context dict with a single verified checklist item for evidence tests."""
+        return {
+            "$schema": "vc:16-impl-context",
+            "id": f"step-evidence-test-{item_id}",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "Evidence validation test case.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": [
+                        {
+                            "id": item_id,
+                            "spec_ref": {
+                                "type": "fr",
+                                "id": f"task-{item_id}",
+                                "line_range": "L1-L10",
+                                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                            },
+                            "description": f"Evidence test item {item_id}",
+                            "type": "behavior",
+                            "layer": "api",
+                            "linked_test_expectation": f"pytest test_{item_id}",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": f"fixture-{item_id}",
+                            "implementation": {
+                                "status": "verified",
+                                "files_touched": [],
+                                "actions": actions
+                            }
+                        },
+                        {
+                            "id": f"{item_id}-VAL",
+                            "spec_ref": {
+                                "type": "fr",
+                                "id": f"task-{item_id}",
+                                "line_range": "L1-L10",
+                                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+                            },
+                            "description": f"Validation item for {item_id}",
+                            "type": "validation",
+                            "layer": "tests",
+                            "linked_test_expectation": f"pytest test_{item_id}_val",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": f"fixture-{item_id}"
+                        }
+                    ]
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No code changes."}
+            },
+            "canonical_refs_used": []
+        }
+
+    def test_w599_fires_for_short_evidence(self):
+        """W599 fires when verified action evidence content is shorter than 50 characters."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Check output",
+                "evidence": {"type": "log", "content": "PASS short"}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W599_SHORT", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w599_errors = [e for e in errors if e.code == "W599"]
+        self.assertTrue(
+            len(w599_errors) > 0,
+            f"Expected W599 for short evidence content. Got: {errors}"
+        )
+        self.assertTrue(
+            any("CHK_W599_SHORT" in e.message for e in w599_errors),
+            f"Expected W599 message to reference item id. Got: {[e.message for e in w599_errors]}"
+        )
+
+    def test_e301_fires_no_success_marker(self):
+        """E301 EVIDENCE_CONTENT_INVALID fires when evidence content has no success marker keyword."""
+        long_content = (
+            "This is a detailed description of what was done during the implementation "
+            "phase with no markers indicating test outcome at all."
+        )
+        self.assertGreaterEqual(len(long_content), 50, "Test content must be >= 50 chars")
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Detailed check",
+                "evidence": {"type": "log", "content": long_content}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_E301_NO_MARKER", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e301_content_errors = [
+            e for e in errors if e.code == "E301" and "EVIDENCE_CONTENT_INVALID" in e.message
+        ]
+        self.assertTrue(
+            len(e301_content_errors) > 0,
+            f"Expected E301 EVIDENCE_CONTENT_INVALID for missing success marker. Got: {errors}"
+        )
+
+    def test_structured_evidence_bypasses_success_marker_check(self):
+        """Structured evidence (stdout/stderr present) does not require a success marker keyword."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Run build",
+                "evidence": {"type": "log", "stdout": "build output here..."}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_STRUCTURED_EVIDENCE", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e301_content_errors = [
+            e for e in errors if e.code == "E301" and "EVIDENCE_CONTENT_INVALID" in e.message
+        ]
+        self.assertEqual(
+            e301_content_errors, [],
+            f"Structured evidence (stdout present) must not fire E301 EVIDENCE_CONTENT_INVALID. "
+            f"Got: {e301_content_errors}"
+        )
+
+    def test_w600_fires_per_action_not_all_or_nothing(self):
+        """W600 fires for each individual verified action missing evidence, even if other actions have evidence."""
+        long_ok_content = "Tests passed: 12/12. All assertions OK. PASS - 0 failures detected in suite."
+        actions = [
+            {
+                "type": "file_edit",
+                "target": "src/main.py",
+                "description": "Action with valid evidence",
+                "evidence": {"type": "log", "content": long_ok_content}
+            },
+            {
+                "type": "manual_verification",
+                "description": "Action without evidence — should trigger W600"
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W600_PER_ACTION", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w600_errors = [e for e in errors if e.code == "W600"]
+        self.assertTrue(
+            len(w600_errors) > 0,
+            f"Expected W600 for the second action which has no evidence. Got: {errors}"
+        )
+        self.assertTrue(
+            any("CHK_W600_PER_ACTION" in e.message for e in w600_errors),
+            f"Expected W600 message to reference checklist item id. Got: {[e.message for e in w600_errors]}"
+        )
+        # The overall item has_evidence = True (first action has evidence),
+        # so E301 'no evidence in any action' must NOT fire
+        e301_no_evidence = [
+            e for e in errors if e.code == "E301" and "contains no evidence in any action" in e.message
+        ]
+        self.assertEqual(
+            e301_no_evidence, [],
+            f"E301 'no evidence' must not fire when at least one action has evidence. "
+            f"Got: {e301_no_evidence}"
+        )
+
+    def test_non_dict_evidence_bypasses_quality_check(self):
+        """Non-dict evidence (e.g., plain string) satisfies presence check without triggering W599 or W600."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Action with plain-string evidence",
+                "evidence": "plain string evidence value"
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_NON_DICT_EVIDENCE", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w599_errors = [e for e in errors if e.code == "W599"]
+        w600_errors = [e for e in errors if e.code == "W600"]
+        self.assertEqual(
+            w599_errors, [],
+            f"Non-dict evidence must not trigger W599. Got: {w599_errors}"
+        )
+        self.assertEqual(
+            w600_errors, [],
+            f"Non-dict evidence must not trigger W600. Got: {w600_errors}"
+        )
+
+    def test_w600_empty_dict_evidence_fires_evidence_no_content(self):
+        """W600 with EVIDENCE_NO_CONTENT fires when evidence is {} (empty dict).
+        E301 'no evidence in any action' must NOT fire because the evidence key IS present.
+        """
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Action with empty dict evidence",
+                "evidence": {}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W600_EMPTY_DICT", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        # W600 must fire with EVIDENCE_NO_CONTENT label (empty dict — evidence present but no fields)
+        w600_errors = [e for e in errors if e.code == "W600"]
+        self.assertTrue(
+            len(w600_errors) > 0,
+            f"Expected W600 for empty dict evidence. Got: {errors}"
+        )
+        self.assertTrue(
+            any("EVIDENCE_NO_CONTENT" in e.message for e in w600_errors),
+            f"Expected W600 message label EVIDENCE_NO_CONTENT for empty dict. "
+            f"Got W600 messages: {[e.message for e in w600_errors]}"
+        )
+        # E301 'contains no evidence in any action' must NOT fire — evidence key IS present
+        e301_no_evidence = [
+            e for e in errors if e.code == "E301" and "contains no evidence in any action" in e.message
+        ]
+        self.assertEqual(
+            e301_no_evidence, [],
+            f"E301 'no evidence in any action' must not fire when evidence key is present (even if empty). "
+            f"Got: {e301_no_evidence}"
+        )
+
+    def test_execution_files_touched_outside_patterns_fires_e520(self):
+        """E520 fires when execution.files_touched contains a file not covered by target_file_patterns."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-exec-files-touched-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "Execution files_touched scope test.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/*.py"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": []
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No code changes."}
+            },
+            "execution": {
+                "files_touched": ["src/main.py", "infra/deploy.sh"]
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e520_errors = [e for e in errors if e.code == "E520"]
+        self.assertTrue(
+            any("infra/deploy.sh" in e.message for e in e520_errors),
+            f"Expected E520 for 'infra/deploy.sh' outside target_file_patterns. "
+            f"Got E520 errors: {[e.message for e in e520_errors]}"
+        )
+        # src/main.py matches src/*.py — must NOT fire E520
+        self.assertFalse(
+            any("src/main.py" in e.message for e in e520_errors),
+            f"Did not expect E520 for 'src/main.py' which matches pattern 'src/*.py'. "
+            f"Got E520 errors: {[e.message for e in e520_errors]}"
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -76,6 +76,8 @@ def lint_spec_quality(spec_dir: str) -> list[SpecError]:
         if ref_id not in known_ids:
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel}:{p} ref={ref_id}"))
 
+    errors.extend(_check_tech_stack_coherence(spec_dir))
+
     return errors
 
 
@@ -214,6 +216,48 @@ def _check_critical_arrays(rel: str, data: dict[str, Any]) -> list[SpecError]:
     return errs
 
 
+
+
+def _check_tech_stack_coherence(spec_dir: str) -> list[SpecError]:
+    """W574: Warn if Steps 09 and 14 both define tech_stack with differing entries."""
+    errs: list[SpecError] = []
+    step09_path = os.path.join(spec_dir, "09_impl_plan.json")
+    step14_path = os.path.join(spec_dir, "14_roadmap.json")
+
+    step09_data: dict[str, Any] | None = None
+    step14_data: dict[str, Any] | None = None
+
+    for path, name in [(step09_path, "09_impl_plan.json"), (step14_path, "14_roadmap.json")]:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                parsed = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if name == "09_impl_plan.json":
+            step09_data = parsed
+        else:
+            step14_data = parsed
+
+    if step09_data is None or step14_data is None:
+        return errs
+
+    ts09 = step09_data.get("tech_stack")
+    ts14 = step14_data.get("tech_stack")
+
+    if ts09 is None or ts14 is None:
+        return errs
+
+    if ts09 != ts14:
+        errs.append(
+            make_error(
+                "W574",
+                "TECH_STACK_COHERENCE_MISMATCH 09_impl_plan.json vs 14_roadmap.json tech_stack entries differ",
+            )
+        )
+
+    return errs
 
 
 def _is_step_artifact(path: str, data: dict[str, Any] | None = None) -> bool:

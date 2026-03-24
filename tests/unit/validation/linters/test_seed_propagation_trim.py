@@ -134,15 +134,16 @@ class TestSeedPropagationTrim(unittest.TestCase):
         result = _collect_required_seeds(manifest, "07")
         self.assertEqual(result, set(), f"Step 07 should have no required seeds. Got: {result}")
 
-    def test_collect_required_seeds_includes_global_for_listed_step(self):
-        """_collect_required_seeds includes global_seed_order for steps in step_requirements."""
+    def test_collect_required_seeds_returns_only_declared_seeds(self):
+        """_collect_required_seeds returns only seeds declared in step_requirements, not all global seeds."""
         manifest = {
             "global_seed_order": ["seed-overview", "seed-tech-stack"],
             "step_requirements": {"00": ["seed-overview"]},
         }
         result = _collect_required_seeds(manifest, "00")
         self.assertIn("seed-overview", result)
-        self.assertIn("seed-tech-stack", result)
+        # seed-tech-stack is in global_seed_order but NOT in step_requirements["00"] — must be excluded
+        self.assertNotIn("seed-tech-stack", result)
 
     def test_step_16_no_sub_steps_in_requirements(self):
         """Step 16 with no 16a/16b/16c in step_requirements should require no seeds."""

@@ -73,6 +73,42 @@ class StepValidatorsTests(unittest.TestCase):
         errs = step_13.validate_step_13({"extensions": [{"extension_id": "e1"}]}, ".")
         self.assertTrue(errs)
 
+    def test_step_13_domain_section_names_accepted(self):
+        """Domain-style section names like 'tables', 'indexes' must not fire E320."""
+        ext = {
+            "extension_id": "ext-01-db",
+            "required_schema_sections": ["tables", "indexes", "my-section", "step_13"],
+            "justification": "Extends schema with domain-specific sections.",
+            "verification_rules": ["all tables have a primary key"],
+        }
+        errs = step_13.validate_step_13({"extensions": [ext]}, ".")
+        section_errs = [e for e in _render(errs) if "not a valid identifier" in e]
+        self.assertFalse(section_errs, f"Unexpected section pattern errors: {section_errs}")
+
+    def test_step_13_numeric_prefixed_section_names_accepted(self):
+        """Numeric-prefixed section names like '13_extensions' must still be accepted."""
+        ext = {
+            "extension_id": "ext-02-step",
+            "required_schema_sections": ["13_extensions", "04_functional_requirements"],
+            "justification": "Extends step-numbered schema sections.",
+            "verification_rules": ["section exists in schema registry"],
+        }
+        errs = step_13.validate_step_13({"extensions": [ext]}, ".")
+        section_errs = [e for e in _render(errs) if "not a valid identifier" in e]
+        self.assertFalse(section_errs, f"Unexpected section pattern errors: {section_errs}")
+
+    def test_step_13_empty_string_section_rejected(self):
+        """An empty string section name must still be caught (fails the identifier pattern)."""
+        ext = {
+            "extension_id": "ext-03-bad",
+            "required_schema_sections": [""],
+            "justification": "Testing empty section name.",
+            "verification_rules": ["check"],
+        }
+        errs = step_13.validate_step_13({"extensions": [ext]}, ".")
+        section_errs = [e for e in _render(errs) if "not a valid identifier" in e]
+        self.assertTrue(section_errs, "Expected an error for empty section name string")
+
     def test_step_13a_missing_dimensions(self):
         errs = step_13a.validate_step_13a({}, ".")
         self.assertTrue(any("MISSING_DIMENSIONS" in e for e in _render(errs)))

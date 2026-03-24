@@ -9,8 +9,11 @@ from ...core.errors import make_error, SpecError
 from ...validation.linter_utils import check_no_duplicates
 
 
-# Valid step schema patterns: 00-16 + optional letter suffix
-_STEP_PATTERN = re.compile(r"^[0-9]{2}[a-z]?_")
+# Valid section name patterns: numeric step prefix (00_*, 13a_*) OR any
+# domain-style identifier (tables, indexes, my-section, etc.).  The original
+# strict pattern r"^[0-9]{2}[a-z]?_" incorrectly rejected non-numeric section
+# names used by domain-specific schemas.
+_STEP_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
 def validate_step_13(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
@@ -28,7 +31,7 @@ def validate_step_13(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
                 if isinstance(section, str) and not _STEP_PATTERN.match(section):
                     errors.append(
                         make_error("E320", f"Extension '{ext_id}' required_schema_sections[{j}] "
-                        f"'{section}' does not match a valid step schema pattern (NN_*)")
+                        f"'{section}' is not a valid identifier (must start with alphanumeric, only alphanumeric/underscore/hyphen allowed)")
                     )
 
         # Justification must be non-empty

@@ -19,6 +19,7 @@ from specdev_tools.validation.matrix import (
     _DEFAULT_COVERAGE_THRESHOLDS,
     _load_coverage_thresholds,
     _MISSING_FILE,
+    build_trace_matrix,
 )
 
 
@@ -257,6 +258,121 @@ class TestSentinelsAndDefaults(unittest.TestCase):
             _DEFAULT_COVERAGE_THRESHOLDS,
             {"fr_coverage": 80, "mode": "warn"},
         )
+
+
+class TestMilestoneCoverageInMatrixOutput(unittest.TestCase):
+    """Tests that build_trace_matrix returns milestone_coverage when Step 14 data is present."""
+
+    def _write_spec_file(self, spec_dir, filename, data):
+        path = os.path.join(spec_dir, filename)
+        with open(path, "w") as f:
+            json.dump(data, f)
+        return path
+
+    def test_milestone_coverage_key_present_when_step14_has_fr_refs(self):
+        """milestone_coverage key exists in result when Step 14 artifact with fr_refs is present."""
+        with tempfile.TemporaryDirectory() as repo_root:
+            spec_dir = os.path.join(repo_root, "spec")
+            os.makedirs(spec_dir)
+
+            # Minimal Step 14 artifact with milestone-level fr_refs
+            roadmap = {
+                "$schema": "https://example.com/schema/14-roadmap.json",
+                "milestones": [
+                    {
+                        "milestone_id": "ms-v1",
+                        "fr_refs": ["fr-login", "fr-auth"],
+                        "tasks": [],
+                    }
+                ],
+            }
+            self._write_spec_file(spec_dir, "14_roadmap.json", roadmap)
+
+            result = build_trace_matrix(repo_root, spec_dir)
+            self.assertIn("milestone_coverage", result)
+
+    def test_milestone_coverage_maps_frs_to_milestone_ids(self):
+        """FR IDs map to the correct milestone IDs in milestone_coverage."""
+        with tempfile.TemporaryDirectory() as repo_root:
+            spec_dir = os.path.join(repo_root, "spec")
+            os.makedirs(spec_dir)
+
+            roadmap = {
+                "$schema": "https://example.com/schema/14-roadmap.json",
+                "milestones": [
+                    {
+                        "milestone_id": "ms-v1",
+                        "fr_refs": ["fr-login", "fr-auth"],
+                        "tasks": [],
+                    },
+                    {
+                        "milestone_id": "ms-v2",
+                        "fr_refs": ["fr-auth"],
+                        "tasks": [],
+                    },
+                ],
+            }
+            self._write_spec_file(spec_dir, "14_roadmap.json", roadmap)
+
+            result = build_trace_matrix(repo_root, spec_dir)
+            mc = result.get("milestone_coverage", {})
+            self.assertEqual(mc.get("fr-login"), ["ms-v1"])
+            self.assertEqual(sorted(mc.get("fr-auth", [])), ["ms-v1", "ms-v2"])
+
+    def test_milestone_coverage_includes_task_level_fr_refs(self):
+        """FR refs at task level within milestones are also included in milestone_coverage."""
+        with tempfile.TemporaryDirectory() as repo_root:
+            spec_dir = os.path.join(repo_root, "spec")
+            os.makedirs(spec_dir)
+
+            roadmap = {
+                "$schema": "https://example.com/schema/14_roadmap.json",
+                "milestones": [
+                    {
+                        "milestone_id": "ms-v1",
+                        "fr_refs": [],
+                        "tasks": [
+                            {"task_id": "t-1", "fr_refs": ["fr-login"]},
+                            {"task_id": "t-2", "fr_refs": ["fr-signup"]},
+                        ],
+                    }
+                ],
+            }
+            self._write_spec_file(spec_dir, "14_roadmap.json", roadmap)
+
+            result = build_trace_matrix(repo_root, spec_dir)
+            mc = result.get("milestone_coverage", {})
+            self.assertEqual(mc.get("fr-login"), ["ms-v1"])
+            self.assertEqual(mc.get("fr-signup"), ["ms-v1"])
+
+    def test_milestone_coverage_absent_when_no_step14(self):
+        """milestone_coverage key is absent when no Step 14 artifact is present."""
+        with tempfile.TemporaryDirectory() as repo_root:
+            spec_dir = os.path.join(repo_root, "spec")
+            os.makedirs(spec_dir)
+
+            result = build_trace_matrix(repo_root, spec_dir)
+            self.assertNotIn("milestone_coverage", result)
+
+    def test_milestone_coverage_sorted_milestone_ids(self):
+        """Milestone IDs in milestone_coverage values are sorted."""
+        with tempfile.TemporaryDirectory() as repo_root:
+            spec_dir = os.path.join(repo_root, "spec")
+            os.makedirs(spec_dir)
+
+            roadmap = {
+                "$schema": "https://example.com/schema/14-roadmap.json",
+                "milestones": [
+                    {"milestone_id": "ms-z", "fr_refs": ["fr-x"], "tasks": []},
+                    {"milestone_id": "ms-a", "fr_refs": ["fr-x"], "tasks": []},
+                    {"milestone_id": "ms-m", "fr_refs": ["fr-x"], "tasks": []},
+                ],
+            }
+            self._write_spec_file(spec_dir, "14_roadmap.json", roadmap)
+
+            result = build_trace_matrix(repo_root, spec_dir)
+            mc = result.get("milestone_coverage", {})
+            self.assertEqual(mc.get("fr-x"), ["ms-a", "ms-m", "ms-z"])
 
 
 if __name__ == "__main__":

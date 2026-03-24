@@ -403,5 +403,156 @@ class TestTraceabilityClosure(unittest.TestCase):
             )
 
 
+class TestSuccessMetricsTraceability(unittest.TestCase):
+
+    def test_success_metric_traced_by_capability_no_error(self):
+        charter = {"success_metrics": [{"metric_id": "metric-auth", "description": "Auth rate"}]}
+        caps = {"capabilities": [{"capability_id": "cap-auth", "success_metric_refs": ["metric-auth"]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "00_charter.json", charter)
+            _write(d, "01_capabilities.json", caps)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("E560" in e and "charter_success_metric_without_capability" in e for e in rendered),
+                f"Did not expect E560 for success_metric. Got: {rendered}"
+            )
+
+    def test_success_metric_not_traced_fires_e560(self):
+        charter = {"success_metrics": [{"metric_id": "metric-auth"}, {"metric_id": "metric-perf"}]}
+        caps = {"capabilities": [{"capability_id": "cap-auth", "success_metric_refs": ["metric-auth"]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "00_charter.json", charter)
+            _write(d, "01_capabilities.json", caps)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            matching = [e for e in rendered if "E560" in e and "charter_success_metric_without_capability" in e and "metric-perf" in e]
+            self.assertEqual(len(matching), 1, f"Expected exactly one E560 for metric-perf. Got: {rendered}")
+            self.assertFalse(
+                any("E560" in e and "charter_success_metric_without_capability" in e and "metric-auth" in e for e in rendered),
+                f"Did not expect E560 for metric-auth. Got: {rendered}"
+            )
+
+    def test_no_success_metrics_no_error(self):
+        charter = {"success_metrics": []}
+        caps = {"capabilities": [{"capability_id": "cap-auth"}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "00_charter.json", charter)
+            _write(d, "01_capabilities.json", caps)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("charter_success_metric_without_capability" in e for e in rendered),
+                f"Did not expect any success_metric errors. Got: {rendered}"
+            )
+
+    def test_success_metrics_no_capabilities_file_skips(self):
+        charter = {"success_metrics": [{"metric_id": "metric-auth"}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "00_charter.json", charter)
+            # No 01_capabilities.json written — charter+capabilities guard not met
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("charter_success_metric_without_capability" in e for e in rendered),
+                f"Did not expect E560 for success_metric when capabilities missing. Got: {rendered}"
+            )
+
+
+class TestGovernanceCICrossValidation(unittest.TestCase):
+
+    def test_pr_rule_covered_by_ci_command_no_warning(self):
+        governance = {"pr_rules": ["validate-all"]}
+        ci_gates = {"jobs": [{"job_id": "job-1", "steps": [{"id": "s1", "name": "Validate", "command": "specdev validate-all spec"}]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "10_governance.json", governance)
+            _write(d, "12_ci_gates.json", ci_gates)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W569" in e for e in rendered),
+                f"Did not expect W569. Got: {rendered}"
+            )
+
+    def test_pr_rule_not_in_any_ci_command_fires_w569(self):
+        governance = {"pr_rules": ["validate-all", "matrix"]}
+        ci_gates = {"jobs": [{"job_id": "job-1", "steps": [{"id": "s1", "name": "Validate", "command": "specdev validate-all spec"}]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "10_governance.json", governance)
+            _write(d, "12_ci_gates.json", ci_gates)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            matching = [e for e in rendered if "W569" in e and "matrix" in e]
+            self.assertEqual(len(matching), 1, f"Expected exactly one W569 for matrix. Got: {rendered}")
+
+    def test_no_governance_file_skips_check(self):
+        ci_gates = {"jobs": [{"job_id": "job-1", "steps": [{"id": "s1", "command": "specdev validate-all spec"}]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "12_ci_gates.json", ci_gates)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W569" in e for e in rendered),
+                f"Did not expect W569 without governance file. Got: {rendered}"
+            )
+
+    def test_empty_pr_rules_no_warning(self):
+        governance = {"pr_rules": []}
+        ci_gates = {"jobs": [{"job_id": "job-1", "steps": [{"id": "s1", "command": "specdev validate-all spec"}]}]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "10_governance.json", governance)
+            _write(d, "12_ci_gates.json", ci_gates)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W569" in e for e in rendered),
+                f"Did not expect W569 for empty pr_rules. Got: {rendered}"
+            )
+
+    def test_no_ci_gates_file_skips_check(self):
+        governance = {"pr_rules": ["validate-all"]}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "10_governance.json", governance)
+            # 12_ci_gates.json intentionally absent
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W569" in e for e in rendered),
+                f"Did not expect W569 without ci_gates file. Got: {rendered}"
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

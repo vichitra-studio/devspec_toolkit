@@ -286,9 +286,34 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
         "scaffolds_found": len([a for a in artifacts.values() if "15_scaffold" in a.get("$schema", "")]),
     }
     
+    # Build milestone_coverage: map FR IDs -> sorted list of milestone IDs that reference them
+    # Load from any Step 14 roadmap artifact found in the spec directory.
+    milestone_coverage: dict[str, list[str]] = {}
+    fr_to_milestones: dict[str, set[str]] = collections.defaultdict(set)
+    for data in artifacts.values():
+        schema = data.get("$schema", "")
+        if "14-roadmap" in schema or "14_roadmap" in schema:
+            for milestone in data.get("milestones", []):
+                ms_id = milestone.get("milestone_id")
+                if not ms_id:
+                    continue
+                # Collect fr_refs at milestone level
+                for fr_ref in milestone.get("fr_refs", []):
+                    fr_to_milestones[fr_ref].add(ms_id)
+                # Collect fr_refs at task level
+                for task in milestone.get("tasks", []):
+                    for fr_ref in task.get("fr_refs", []):
+                        fr_to_milestones[fr_ref].add(ms_id)
+    if fr_to_milestones:
+        milestone_coverage = {fr: sorted(ms_ids) for fr, ms_ids in sorted(fr_to_milestones.items())}
+
     # Add extensions to the result for traceability
     result = {"matrix": matrix, "coverage": coverage}
-    
+
+    # Add milestone_coverage if Step 14 data was found
+    if milestone_coverage:
+        result["milestone_coverage"] = milestone_coverage
+
     # Add extension information if available
     if extensions:
         result["extensions"] = extensions

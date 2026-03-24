@@ -169,3 +169,78 @@ class TestNonObjectMitigation:
         errors = validate_step_11(instance, toolkit_root)
         rendered = _render(errors)
         assert any("non-object mitigation" in e for e in rendered)
+
+
+class TestApiCoverageCheck:
+    """W583: every public API in Step 05 should be targeted by at least one threat."""
+
+    def _write_step05(self, toolkit_root, apis):
+        spec_dir = os.path.join(toolkit_root, "spec")
+        data = {"apis": apis}
+        with open(os.path.join(spec_dir, "05_interface_contracts.json"), "w") as f:
+            json.dump(data, f)
+
+    def test_no_step05_no_warning(self, toolkit_root):
+        """When step 05 is absent, no W583 warnings should fire."""
+        instance = {"threats": []}
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert not any("W583" in e for e in rendered)
+
+    def test_uncovered_api_emits_w583(self, toolkit_root):
+        """When step 05 exists and an API has no threat, W583 should fire."""
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}, {"api_id": "api-logout"}])
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-login"}],
+                "mitigations": [{"type": "fr", "description": "Rate limiting"}],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("W583" in e and "api-logout" in e for e in rendered)
+        assert not any("W583" in e and "api-login" in e for e in rendered)
+
+    def test_all_apis_covered_no_w583(self, toolkit_root):
+        """When all APIs have at least one threat, no W583 should fire."""
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-login"}],
+                "mitigations": [{"type": "fr", "description": "Rate limiting"}],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert not any("W583" in e for e in rendered)
+
+    def test_empty_apis_list_no_w583(self, toolkit_root):
+        """When step 05 exists but has no APIs, no W583 should fire."""
+        self._write_step05(toolkit_root, [])
+        instance = {"threats": []}
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert not any("W583" in e for e in rendered)
+
+    def test_multiple_threats_cover_same_api(self, toolkit_root):
+        """Multiple threats targeting the same API should not cause W583."""
+        self._write_step05(toolkit_root, [{"api_id": "api-login"}])
+        instance = {
+            "threats": [
+                {
+                    "threat_id": "threat-01",
+                    "target_ids": [{"type": "api", "id": "api-login"}],
+                    "mitigations": [{"type": "fr", "description": "Rate limiting"}],
+                },
+                {
+                    "threat_id": "threat-02",
+                    "target_ids": [{"type": "api", "id": "api-login"}],
+                    "mitigations": [{"type": "fr", "description": "Auth check"}],
+                },
+            ]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert not any("W583" in e for e in rendered)

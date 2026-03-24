@@ -301,6 +301,71 @@ class ForwardReplayCheckTests(unittest.TestCase):
                     errs = check_forward_replay(str(root), base_ref="origin/main")
             self.assertTrue(any("E550" in e for e in render_errors(errs)))
 
+    def test_id_stability_removal_warning_on_dropped_id(self):
+        """W598 ID_STABILITY_REMOVAL fires for each ID removed between base and current."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "step_order.json").write_text(
+                json.dumps({"steps": ["04"]}), encoding="utf-8"
+            )
+            # Current version of 04 is missing fr-removed that was in the base
+            (root / "spec" / "04_frs.json").write_text(
+                '{"id": "fr-kept"}', encoding="utf-8"
+            )
+
+            with patch(
+                "specdev_tools.validation.forward_replay_check._changed_files",
+                return_value=(["spec/04_frs.json"], None),
+            ):
+                with patch("subprocess.run") as mock_run:
+                    mock_run.return_value.returncode = 0
+                    mock_run.return_value.stdout = '{"id": "fr-kept", "extra_ref": "fr-removed"}'
+                    mock_run.return_value.stderr = ""
+                    errs = check_forward_replay(str(root), base_ref="origin/main")
+
+            rendered = render_errors(errs)
+            stability_warnings = [e for e in rendered if "W598" in e and "ID_STABILITY_REMOVAL" in e]
+            self.assertTrue(
+                len(stability_warnings) > 0,
+                f"Expected W598 ID_STABILITY_REMOVAL warning, got: {rendered}",
+            )
+            self.assertTrue(
+                any("fr-removed" in e for e in stability_warnings),
+                f"W598 should name the removed ID, got: {stability_warnings}",
+            )
+
+    def test_id_stability_no_warning_when_ids_preserved(self):
+        """W598 does not fire when no IDs are removed between base and current."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tools").mkdir()
+            (root / "spec").mkdir()
+            (root / "tools" / "step_order.json").write_text(
+                json.dumps({"steps": ["04"]}), encoding="utf-8"
+            )
+            (root / "spec" / "04_frs.json").write_text(
+                '{"id": "fr-kept", "extra_ref": "fr-new"}', encoding="utf-8"
+            )
+
+            with patch(
+                "specdev_tools.validation.forward_replay_check._changed_files",
+                return_value=(["spec/04_frs.json"], None),
+            ):
+                with patch("subprocess.run") as mock_run:
+                    mock_run.return_value.returncode = 0
+                    mock_run.return_value.stdout = '{"id": "fr-kept"}'
+                    mock_run.return_value.stderr = ""
+                    errs = check_forward_replay(str(root), base_ref="origin/main")
+
+            rendered = render_errors(errs)
+            stability_warnings = [e for e in rendered if "W598" in e]
+            self.assertEqual(
+                stability_warnings, [],
+                f"Expected no W598 when no IDs removed, got: {stability_warnings}",
+            )
+
     def test_traceability_gaps_surfaced_as_warnings(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

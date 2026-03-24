@@ -62,7 +62,7 @@ def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     """Validate Step 11 (Red Team / Threat Modeling) logic.
 
     Checks threat_id uniqueness, target ID cross-references against steps 02/05,
-    and mitigation constraints.
+    mitigation constraints, and API-to-threat coverage (W583).
     """
     _validate_trace_types_once()
     errors: list[SpecError] = []
@@ -117,6 +117,23 @@ def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
             if not mitigation.get("description") and not mitigation.get("ref"):
                 errors.append(
                     make_error("E520", f"Threat '{threat_id}' has mitigation without description or ref")
+                )
+
+    # W583: API-to-threat coverage — each public API should be targeted by at
+    # least one threat.  Only fires when step 05 is present (api_ids is not None).
+    if api_ids is not None:
+        threatened_api_ids: set[str] = set()
+        for threat in instance.get("threats", []):
+            for target in threat.get("target_ids", []):
+                t = normalize_trace_type(target.get("type", ""))
+                if t == "api":
+                    tid = target.get("id", "")
+                    if tid:
+                        threatened_api_ids.add(tid)
+        for api_id in sorted(api_ids):
+            if api_id not in threatened_api_ids:
+                errors.append(
+                    make_error("W583", f"API_UNCOVERED_BY_THREAT {api_id} has no corresponding threat in Step 11")
                 )
 
     return errors
