@@ -1,3 +1,4 @@
+<!-- Migration template for {{project_name}} — specdev v{{spec_version}} — step {{step_id}} -->
 # Migration: Capabilities (Step 01)
 
 ## Schema URI

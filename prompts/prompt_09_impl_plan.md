@@ -23,12 +23,17 @@ For each upstream artifact ingested, extract the following:
 - **07_nfrs.json**: Non-functional requirement IDs, performance targets, and quality thresholds that constrain tech stack selection and define spike success criteria for unknowns
 - **08_fixtures.json**: Test fixture definitions and target coverage expectations that validate milestone acceptance signals and inform spike scoping for test infrastructure
 
-## Operating Flow: Scope → Sequence → Resource → Trace → Emit
+## Operating Flow: Scope → Sequence → Resource → Trace → Reconcile → Emit
 - **Scope**: Derive the set of deliverables from in-scope capabilities and FRs. Every in-scope capability must appear in ≥1 deliverable.
 - **Sequence**: Order milestones using `depends_on` references. Identify the critical path. A later milestone cannot depend on a future milestone (no cycles).
 - **Resource**: Assign effort estimates, owners, and tech stack components per milestone. Validate feasibility against charter constraints.
 - **Trace**: Link each milestone to the capability(ies) it delivers. Reference FR IDs where applicable.
-- **Emit**: Write the artifact only when all milestones are sequenced without cycles and all in-scope capabilities are covered.
+- **Reconcile**: Verify cross-step consistency before emitting:
+  - Verify `tech_stack` entries are consistent with `spec/02_system_sketch.json` component IDs and technology choices — no tech stack item should contradict the system sketch architecture.
+  - Verify milestones collectively cover all in-scope FRs from `spec/04_fr_list.json` — any uncovered FR must appear in `out_of_scope` with rationale.
+  - Verify milestone delivery order does not contradict enforcement conditions in `spec/06_invariants.json` — a milestone must not ship a behavior before the invariant that governs it is in place.
+  - If any inconsistency is found, add it as a gap question (enter Clarify mode) — do not silently resolve or defer.
+- **Emit**: Write the artifact only when all milestones are sequenced without cycles, all in-scope capabilities are covered, and Reconcile found no unresolved inconsistencies.
 
 **Milestone Ordering with `depends_on`**: Use the `depends_on` field on each milestone to declare prerequisite milestone IDs. This enables dependency-order validation via `specdev dependency-order-lint`. Rules:
 - A milestone with no prerequisites has an empty or absent `depends_on`.

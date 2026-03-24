@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 from ...core.errors import make_error, SpecError
@@ -19,6 +20,9 @@ TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf
 
 # Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
 _SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
+
+# Spec artifact ID pattern for evidence binding validation (AUDIT-032)
+_ARTIFACT_ID_RE = re.compile(r'\b(?:fr|api|nfr|inv)-[a-z0-9-]+\b')
 
 # Cache for step_16 validation results by content hash.  When step_16a, 16b,
 # and 16c each call validate_step_16(), the first call computes the result and
@@ -166,6 +170,15 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                     elif not has_structured:
                         # Evidence dict present but missing both content and stdout/stderr
                         errors.append(make_error("W600", f"EVIDENCE_NO_CONTENT: verified action in checklist item '{item_id}' has evidence dict but no 'content', 'stdout', or 'stderr' field"))
+                    # AUDIT-032: check that evidence content references at least one spec artifact ID
+                    if isinstance(evidence, dict):
+                        combined = " ".join(filter(None, [
+                            evidence.get("content") if isinstance(evidence.get("content"), str) else "",
+                            evidence.get("stdout") if isinstance(evidence.get("stdout"), str) else "",
+                            evidence.get("stderr") if isinstance(evidence.get("stderr"), str) else "",
+                        ]))
+                        if combined and not _ARTIFACT_ID_RE.search(combined):
+                            errors.append(make_error("W601", f"EVIDENCE_NO_ARTIFACT_REF: evidence in checklist item '{item_id}' action '{action.get('type', 'unknown')}' does not reference any spec artifact ID (fr-*, api-*, nfr-*, inv-*)"))
                 if not has_evidence:
                     errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
 
@@ -182,10 +195,25 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
 
     # Task 7-09 (AUDIT-087): also collect files from execution.files_touched
     execution_block = data.get("execution", {})
+    execution_files: set[str] = set()
     if isinstance(execution_block, dict):
         for f in execution_block.get("files_touched", []):
             if isinstance(f, str):
                 actually_touched.add(f)
+                execution_files.add(f)
+
+    # AUDIT-087: Scope-binding check — warn if execution.files_touched contains files
+    # not declared in any checklist item's implementation.files_touched.
+    # Such files are outside any specific task's tracked scope.
+    checklist_declared_files: set[str] = set()
+    for item in checklist:
+        impl = item.get("implementation", {})
+        for f in impl.get("files_touched", []):
+            if isinstance(f, str):
+                checklist_declared_files.add(f)
+    for f in execution_files:
+        if f not in checklist_declared_files:
+            errors.append(make_error("W603", f"FILES_OUTSIDE_TASK_SCOPE: execution file '{f}' is not declared in any checklist item's files_touched — may be outside task scope"))
 
     # Logic: Warn if files are touched but not in target_file_patterns
     import fnmatch

@@ -48,10 +48,12 @@ SPEC_FILES = {
     "frs": "04_fr_list.json",
     "apis": "05_interface_contracts.json",
     "fixtures": "08_fixtures.json",
+    "impl_plan": "09_impl_plan.json",
     "governance": "10_governance.json",
     "ci_gates": "12_ci_gates.json",
     "roadmap": "14_roadmap.json",
     "impl_planner": "16a_impl_planner.json",
+    "code_execution": "16b_code.json",
 }
 
 def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
@@ -63,7 +65,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     data: dict[str, Any] = {}
     # Keys that are silently optional — coverage checks fire only when present.
-    _optional_keys = {"charter", "apis", "fixtures", "governance", "ci_gates"}
+    _optional_keys = {"charter", "apis", "fixtures", "impl_plan", "governance", "ci_gates", "code_execution"}
     for key, filename in SPEC_FILES.items():
         # I5: fallback for impl_planner: try 16a first, then 16_impl_context.json
         if key == "impl_planner":
@@ -226,10 +228,6 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             errors.append(make_error("W566", f"UNCOVERED_FR_MILESTONE {fr_id}"))
 
     # W567: Milestone decomposition completeness — milestones without any tasks.
-    # TODO(batch-7): Also cross-check milestone.fr_refs against Step 09 deliverable IDs.
-    # Per task 5-04 fix plan: load source_milestones from 09_impl_plan.json, collect
-    # deliverable IDs, verify each appears in Step 14 tasks. Deferred: requires adding
-    # "impl_plan" to SPEC_FILES and a new W-code for the Step 09 deliverable coverage gap.
     if "roadmap" in data:
         for ms_id, tasks in sorted(milestone_task_ids.items()):
             if not tasks:
@@ -252,6 +250,69 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     if "capabilities" in data and "frs" in data:
         for cap_id in sorted(capability_ids - fr_traced_caps):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
+
+    # W575: Step 09 deliverable → Step 14 task pairwise completeness.
+    # For each Step 09 milestone deliverable (traceRef with an 'id' field), verify that the
+    # deliverable ID is referenced by at least one Step 14 task via the task's fr_refs, or
+    # is referenced in any Step 14 milestone's deliverables list.
+    # Guard: only fires when both impl_plan and roadmap are present.
+    if "impl_plan" in data and "roadmap" in data:
+        # Collect all artifact IDs referenced in Step 14 tasks (fr_refs) and deliverables
+        step14_task_fr_ids: set[str] = set()
+        step14_deliverable_ids: set[str] = set()
+        for ms in data["roadmap"].get("milestones", []):
+            for task in ms.get("tasks", []):
+                for fr_id in task.get("fr_refs", []):
+                    if isinstance(fr_id, str):
+                        step14_task_fr_ids.add(fr_id)
+            for deliverable in ms.get("deliverables", []):
+                if isinstance(deliverable, dict) and "id" in deliverable:
+                    step14_deliverable_ids.add(deliverable["id"])
+        step14_covered_ids = step14_task_fr_ids | step14_deliverable_ids
+        for ms09 in data["impl_plan"].get("milestones", []):
+            ms09_id = ms09.get("milestone_id") or ms09.get("id", "<unknown>")
+            for deliverable in ms09.get("deliverables", []):
+                if not isinstance(deliverable, dict):
+                    continue
+                deliverable_id = deliverable.get("id")
+                if not isinstance(deliverable_id, str) or not deliverable_id:
+                    continue
+                if deliverable_id not in step14_covered_ids:
+                    errors.append(make_error(
+                        "W575",
+                        f"IMPL_PLAN_DELIVERABLE_UNCOVERED {deliverable_id} "
+                        f"(Step 09 milestone: {ms09_id}) not referenced in any Step 14 task fr_refs or deliverables"
+                    ))
+
+    # W576: Step 14 task → Step 16b execution pairwise completeness.
+    # For each Step 14 task with status != "done", verify that at least one Step 16b
+    # execution entry references that task_id.
+    # Guard: only fires when code_execution (16b_code.json) is present — skip entirely otherwise.
+    if "code_execution" in data and "roadmap" in data:
+        code_exec_data = data["code_execution"]
+        # Collect all task_ids referenced in 16b execution entries
+        executed_task_ids: set[str] = set()
+        for exec_entry in code_exec_data.get("execution", {}).get("execution_results", []):
+            if isinstance(exec_entry, dict):
+                task_ref = exec_entry.get("task_id")
+                if isinstance(task_ref, str) and task_ref:
+                    executed_task_ids.add(task_ref)
+        # Check each non-done task
+        for ms in data["roadmap"].get("milestones", []):
+            for task in ms.get("tasks", []):
+                if not isinstance(task, dict):
+                    continue
+                task_id = task.get("task_id")
+                task_status = task.get("status", "pending")
+                if not isinstance(task_id, str) or not task_id:
+                    continue
+                if task_status == "done":
+                    continue
+                if task_id not in executed_task_ids:
+                    errors.append(make_error(
+                        "W576",
+                        f"TASK_EXECUTION_MISSING {task_id} has no corresponding Step 16b execution entry"
+                    ))
 
     # Task 7-07 (AUDIT-077): governance-to-CI cross-validation
     # For each pr_rule in Step 10, verify a corresponding CI job step command references it.

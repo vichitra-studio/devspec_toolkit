@@ -7,6 +7,17 @@ The DevSpec Toolkit evolves rapidly. When you update the toolkit submodule (e.g.
 
 This guide explains how to use the automated alignment system. For the legacy manual approach, see [Manual Fallback](#manual-fallback-legacy).
 
+## Prerequisites
+
+Activate the virtual environment before running any `specdev` commands:
+
+```bash
+source devspec_env/bin/activate
+```
+
+> [!NOTE]
+> The environment name is `devspec_env`. If you are running via `./tools/run_specdev.sh` the wrapper handles venv activation automatically.
+
 ## The Alignment Workflow (Recommended)
 
 The **Alignment System** is the standard way to upgrade. It calculates the difference between your current specs and the new toolkit version, then helps you close the gap.

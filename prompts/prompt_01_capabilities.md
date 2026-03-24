@@ -118,9 +118,9 @@ Before emitting, verify:
       },
       "trace": [
         {
-          "type": "goal",
+          "type": "derives_from",
           "id": "goal-secure-access",
-          "note": "Implements core authentication requirement from charter"
+          "note": "Capability derives from charter goal for secure access"
         }
       ]
     }

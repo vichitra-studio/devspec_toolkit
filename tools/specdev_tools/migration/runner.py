@@ -195,11 +195,95 @@ def execute_single_step(
         return (False, message)
 
 
+def _load_render_context(step: MigrationStep, toolkit_root: Path) -> Dict[str, str]:
+    """Build the interpolation context dict for a migration prompt.
+
+    Collects ``project_name`` from ``spec/00_charter.json`` (if present),
+    ``spec_version`` from the ``spec/specdev_version`` file (if present),
+    and ``step_id`` from the step itself.  Unknown variables are replaced
+    with empty strings rather than raising an error.
+
+    Args:
+        step: The migration step being rendered.
+        toolkit_root: Path to the devspec_toolkit root.
+
+    Returns:
+        Dict mapping variable names to string values.
+    """
+    ctx: Dict[str, str] = {
+        "project_name": "",
+        "spec_version": "",
+        "step_id": step.step_id or "",
+    }
+
+    # Attempt to read project_name from spec/00_charter.json
+    charter_path = toolkit_root / "spec" / "00_charter.json"
+    if not charter_path.exists():
+        # Support submodule deployments where spec lives beside toolkit_root
+        charter_path = toolkit_root.parent / "spec" / "00_charter.json"
+    if charter_path.exists():
+        try:
+            charter_data = json.loads(charter_path.read_text(encoding="utf-8"))
+            ctx["project_name"] = charter_data.get("title", "") or ""
+        except Exception:
+            pass
+
+    # Attempt to read spec_version from spec/specdev_version
+    version_path = toolkit_root / "spec" / "specdev_version"
+    if not version_path.exists():
+        version_path = toolkit_root.parent / "spec" / "specdev_version"
+    if version_path.exists():
+        try:
+            ctx["spec_version"] = version_path.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+
+    return ctx
+
+
+def _interpolate_template(template: str, ctx: Dict[str, str]) -> str:
+    """Replace ``{{VAR_NAME}}`` placeholders in *template* using *ctx*.
+
+    Only simple ``{{IDENTIFIER}}`` patterns are substituted; ``{{#each}}``
+    blocks and other Handlebars-style constructs are left unchanged so that
+    the generation-subsystem renderer (``render_template()`` in
+    ``prompt_generator.py``) can handle them if needed.
+
+    If a placeholder refers to a key that is not in *ctx*, the placeholder
+    is left as-is (backward-compatible: static templates are unaffected).
+
+    Args:
+        template: Raw template string, possibly containing ``{{VAR}}`` tokens.
+        ctx: Mapping from variable names to their string values.
+
+    Returns:
+        Template string with known placeholders substituted.
+    """
+    import re
+
+    def _replace(match: "re.Match[str]") -> str:
+        var_name = match.group(1)
+        if var_name in ctx:
+            return ctx[var_name]
+        # Unknown variable — leave placeholder intact (backward-compatible)
+        return match.group(0)
+
+    return re.sub(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}", _replace, template)
+
+
 def _render_prompt(step: MigrationStep, toolkit_root: Path) -> str:
     """Render a migration prompt file for an AI-assisted step.
 
     If a template file exists at ``toolkit_root/prompts/migration/<template>``,
-    its contents are used as the base.  Otherwise a minimal prompt is
+    its contents are used as the base with ``{{VAR}}`` interpolation applied.
+    The interpolation context contains at minimum:
+
+    - ``project_name`` — from ``spec/00_charter.json`` ``title`` field
+    - ``spec_version`` — from ``spec/specdev_version``
+    - ``step_id`` — the step being migrated
+
+    Unknown placeholders are left as-is (backward-compatible with static
+    templates).  If no template file is found, a minimal prompt is
     generated from the step context.
 
     Args:
@@ -216,13 +300,18 @@ def _render_prompt(step: MigrationStep, toolkit_root: Path) -> str:
         "",
     ]
 
+    # Build interpolation context
+    ctx = _load_render_context(step, toolkit_root)
+
     # Try to load template
     if step.template:
         template_path = toolkit_root / "prompts" / "migration" / step.template
         if template_path.exists():
+            raw_template = template_path.read_text(encoding="utf-8")
+            rendered_template = _interpolate_template(raw_template, ctx)
             lines.append("## Template")
             lines.append("")
-            lines.append(template_path.read_text(encoding="utf-8"))
+            lines.append(rendered_template)
             lines.append("")
 
     # Include context

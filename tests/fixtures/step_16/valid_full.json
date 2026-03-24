@@ -89,7 +89,7 @@
                 "description": "Add route handler",
                 "evidence": {
                   "type": "log",
-                  "content": "PASSED tests/test_profile.py::test_get_profile_returns_200 (0.12s)"
+                  "content": "PASSED tests/test_profile.py::test_get_profile_returns_200 (0.12s) [fr-get-user-profile]"
                 }
               },
               {
@@ -97,7 +97,7 @@
                 "description": "Curl the endpoint",
                 "evidence": {
                   "type": "log",
-                  "content": "HTTP/1.1 200 OK\nContent-Type: application/json\nAll checks passed successfully."
+                  "content": "HTTP/1.1 200 OK\nContent-Type: application/json\nAll checks passed successfully. Satisfies api-get-profile endpoint."
                 }
               }
             ]

@@ -13,9 +13,19 @@ Turn capabilities into falsifiable statements of system behavior with clear entr
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Project scope boundaries, success criteria, and constraints for grounding FR rationale and priority decisions
+
+### Must-Extract (required for valid output)
+Items without which this step cannot emit a valid artifact:
 - **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs; use as primary source of behaviors alongside charter goals/constraints
+- **00_charter.json**: `problem_statement` and project scope boundaries for grounding FR rationale and priority decisions; in-scope items drive FR coverage
+
+### Should-Extract (strongly recommended)
+Items that substantially improve FR quality:
+- **00_charter.json**: `user_segments` jobs-to-be-done (JTBDs) and `success_metrics` to validate that FRs address real user needs and measurable outcomes
 - **02_system_sketch.json**: Component IDs and trust boundaries for mapping FRs to responsible system components and integration points
+
+### May-Extract (if present, enriches output)
+Optional signals that improve specificity when available:
 - **02a_delivery_baseline.json**: Environment definitions and deployment stages for determining FR acceptance criteria feasibility constraints
 - **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria; do not depend on downstream interface/NFR artifacts in this step
 
@@ -41,6 +51,9 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 
 ### Granularity Heuristics
 **Rule**: One FR = one behavior = one subject + one verb + one measurable outcome.
+
+> **Forward contract note**: Acceptance criteria written here become the contract that Step 14 task decomposition must satisfy — write them as falsifiable conditions, not implementation steps.
+
 **Split when**:
 - The statement has multiple subjects (“users and admins shall…”)
 - The statement has multiple conditions joined by “and”
@@ -91,6 +104,8 @@ Before emitting, verify:
 - [ ] Every FR statement is falsifiable — there exists a test that could prove it wrong
 - [ ] No two FRs describe overlapping behaviors (each FR has a unique behavior boundary)
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
+- [ ] Each FR's `acceptance_criteria` is written at the behavioral level — concrete enough that Step 14 tasks can derive execution-level criteria without contradiction
+- [ ] At least 2 functional requirements are present (schema minimum)
 
 **Extraction Mandate**:
 - Every capability ID from `01_capabilities.json` must map to ≥1 FR. List any capability left without an FR and explain why.
@@ -155,10 +170,30 @@ Before emitting, verify:
         {
           "type": "capability",
           "id": "cap-user-auth"
+        }
+      ],
+      "capability_ref": {
+        "id": "cn:core:capability:example",
+        "kind": "capability"
+      }
+    },
+    {
+      "fr_id": "fr-auth-logout",
+      "statement": "The system shall invalidate the session token and end the user session on logout.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-auth-logout-success",
+          "text": "A valid session token is invalidated and subsequent requests with it return 401."
         },
         {
-          "type": "api",
-          "id": "api-session-create"
+          "criterion_id": "ac-auth-logout-idempotent",
+          "text": "Repeated logout requests with the same token return 401 without error."
+        }
+      ],
+      "trace": [
+        {
+          "type": "capability",
+          "id": "cap-user-auth"
         }
       ],
       "capability_ref": {

@@ -69,9 +69,11 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ## 8. Self-Audit Gate Protocol
 
-### 8.1 Threshold
+### 8.1 Self-Audit Gate (input sufficiency)
 
-If score < 0.9, output clarifying questions only — do not emit JSON. Group questions by field/topic. Stop and wait for answers before proceeding.
+Each gate item is a pass/fail check on whether upstream inputs are sufficient to proceed. If ALL items pass → enter Emit mode. If ANY item cannot be satisfied → enter Clarify mode: output only short bulleted gap questions, no JSON, no code fences. Stop and wait for user input.
+
+Output quality verification is in the Coverage Closure section — run Coverage Closure AFTER emitting the artifact.
 
 ### 8.2 Universal Coverage Closure Checklist
 
@@ -110,3 +112,12 @@ Before emitting output, build a private synthesis ledger (Context Ledger) contai
 ## 13. Cross-Step Relationships
 
 Cross-step relationships (dependencies, downstream consumers) are derivable from `step_order.json` DAG. Do not restate them in prompts. Use `specdev prompt-context NN` to inspect them at runtime.
+
+## 14. Documentation Resources
+
+Use these resources to orient yourself within the toolkit before emitting output:
+
+- **`docs/README.md`** — index of all documentation; start here to find the right guide.
+- **`docs/`** — organized into subdirectories: `workflows/` (how-to guides), `reference/` (CLI and schema reference), `ops/` (operational runbooks), `plans/` (roadmaps and design records), `agents/` (agent manifests and protocols).
+- **`tools/step_docs.json`** — machine-readable mapping from step name to its documentation files; use this to locate step-specific guides programmatically.
+- **Step guides** — human-readable guidance for each step lives at `docs/spec/NN_name.guide.md` (if present) or inline in the step's prompt file. Check step_docs.json for the authoritative list.
