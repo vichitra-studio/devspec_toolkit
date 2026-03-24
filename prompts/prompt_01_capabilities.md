@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 01` to see downstream consumers. This prompt's output feeds 7 downstream steps.
 
+## Role
+You are a **senior capability architect and systems analyst**. Your job is to decompose product intent into a complete, non-overlapping set of system capabilities that fully covers stakeholder JTBD and cross-cutting concerns.
+
 ## Purpose
 Translate the charter into a catalog of system capabilities with explicit verbs, scope boundaries, and operating conditions. This step defines what value the system must deliver, when it is intentionally deferred, and how each capability traces back to stakeholders and success metrics.
 
@@ -13,11 +16,22 @@ For each upstream artifact ingested, extract the following:
 - **docs/seed/seed_overview.md** (required): Scope boundaries, user persona definitions, high-level feature expectations, and product vision for capability derivation
 - **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries; use canonical nouns/verbs from charter language; do not depend on downstream glossary/FR artifacts
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
-- **Cross-Check**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in `docs/seed/seed_overview.md`. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question.
-- Rewrite to single, testable behaviors with explicit boundaries and error states; propose `trace` hooks to FRs (if any exist) or leave `*-tbd` anchors.
-- Emit JSON after alignment.
+## Operating Flow: Discover → Cross-Cut → Trace → Emit
+- **Discover**: Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
+- **Cross-Cut**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in `docs/seed/seed_overview.md`. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question. Apply the Cross-Cutting Capability Checklist below.
+- **Trace**: Rewrite to single, testable behaviors with explicit boundaries and error states; propose `trace` hooks to FRs (if any exist) or leave `*-tbd` anchors. For each in-scope user segment's `jobs_to_be_done` from `00_charter.json`, verify at least one capability traces to that job. Any uncovered JTBD must either generate a new capability or be explicitly listed as out-of-scope.
+- **Emit**: Emit JSON after alignment.
+
+### Cross-Cutting Capability Checklist (AUDIT-081)
+Before finalizing, verify these system-level capabilities are considered:
+- Authentication and authorization management
+- Audit logging and observability
+- Error handling and graceful degradation
+- Configuration and feature-flag management
+- Data lifecycle (retention, archival, deletion)
+- Rate limiting and backpressure
+- Notifications and event emission
+- Multi-tenancy or environment isolation (if applicable)
 
 ## Heuristics For Completeness
 - MUST include pre/postconditions for capabilities when `spec/00_charter.json` constraints or `docs/seed/seed_overview.md` define prerequisites or side effects; MUST include owner for any capability that spans multiple components as identified in upstream artifacts.
@@ -40,6 +54,10 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every JTBD from charter's `user_segments` is served by at least one in-scope capability
+- [ ] All cross-cutting concerns (auth, observability, error handling, rate limiting, audit) have dedicated capabilities
+- [ ] No two capabilities describe overlapping behaviors (check for duplication)
+- [ ] Every capability has a clearly defined `scope` value (in/out/future)
 
 ## Step-Specific Completeness Checklist
 - Capabilities cover the full scope of the charter/user segments; each is a single verb-driven behavior (e.g., "search products", "issue refund").
@@ -86,6 +104,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:01-capabilities",
   "id": "capabilities-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
@@ -100,18 +119,14 @@ Before emitting, verify:
       },
       "trace": [
         {
-          "type": "capability",
-          "id": "capability-authentication"
+          "type": "goal",
+          "id": "goal-secure-access",
+          "note": "Implements core authentication requirement from charter"
         }
       ]
     }
   ],
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:capability:example",
-      "kind": "capability"
-    }
-  ]
+  "canonical_refs_used": []
 }
 ```
 

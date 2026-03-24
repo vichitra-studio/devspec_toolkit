@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 10` to see downstream consumers.
 
+## Role
+You are a **senior engineering manager and governance architect**. Your job is to emit a single JSON artifact for **Step 10 · Governance** that encodes commit conventions, PR rules, and branch policies as machine-enforceable constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Set the policies that keep the spec authoritative by covering change control, versioning, reviewer expectations, and how code changes reference spec artifacts. Strong governance ensures every update flows through spec-first workflows and remains auditable.
 
@@ -28,12 +31,11 @@ For each upstream artifact ingested, extract the following:
 - **08_fixtures.json**: Fixture target definitions and coverage expectations that mandate fixtures-lint as a required PR rule for spec-first enforcement
 - **09_impl_plan.json**: Milestone schedule, delivery cadence, and team dependencies to align review cadence, branching strategy, and release governance with the delivery timeline
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Governance Ledger: versioning strategy, PR rules (required validations), spec_first_policy, commit message pattern, reviewers/roles. Do not output it.
-- Validate PR rules cover core spec validations; ensure commit pattern supports traceability.
-- Self-audit; if policies are ambiguous or unenforceable, ask Gap Questions.
-- Rewrite into concise, enforceable statements and patterns; finalize reviewers.
-- Emit JSON when enforceable.
+## Operating Flow: Audit → Formalize → Validate → Emit
+- **Audit**: Examine existing governance practices and stakeholder constraints from the charter; identify all change-control mandates, compliance requirements, and organizational policies that must be encoded.
+- **Formalize**: Translate audited constraints into commit message patterns and PR rules; assign each control to the governance schema fields and verify allowed enum values from schema.
+- **Validate**: Check that all mandatory spec steps are gated; ensure commit patterns are valid regex; PR rules reference valid roles from the canon; branch rules reference real branch naming patterns.
+- **Emit**: Write the artifact only when all rules are machine-checkable.
 
 ## Heuristics For Completeness
 - MUST populate `commit_message_rules.pattern` with a valid regex when `require_spec_ids=true`. SHOULD populate `pr_rules` with at least `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check` when `spec_first_policy=true`.
@@ -55,6 +57,12 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] All commit message patterns are valid regex and tested against example commit messages
+- [ ] All PR approval roles reference valid owner/role values from the canon registry
+- [ ] Every CI gate references a command or check that actually exists in the repo
+- [ ] Every commit pattern rule corresponds to a specific artifact type or spec step
+- [ ] All PR rules use valid enum values from the schema
+- [ ] Quality gates cover all mandatory spec steps (not just a subset)
 
 ## Negative Constraints
 - Do not output text-only logic where regex patterns could be used (e.g., "must include spec IDs" instead of "require spec IDs").
@@ -102,6 +110,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:10-governance",
   "id": "governance-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",

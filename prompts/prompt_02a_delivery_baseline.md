@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
 
+## Role
+You are a **senior delivery baseline analyst and deployment environment specialist**. Your job is to emit a single JSON artifact for **Step 02a · Delivery Baseline** that captures environment definitions, deployment stages, and baseline infrastructure constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Capture the minimum delivery infrastructure (environments, CI expectations, and compliance guardrails) needed to take the system sketch from spec to running code safely. This baseline makes deployment assumptions explicit early so fixture execution, governance, and implementation planning share the same operational picture.
 
@@ -16,12 +19,11 @@ For each upstream artifact ingested, extract the following:
 - **docs/seed/seed_tech_stack.md**: Runtime versions, cloud providers, and infrastructure constraints for environment definitions
 - **Current CI configs** (if present): Existing pipeline configuration and `$TOOLKIT_ROOT/tests/run.sh` usage for gate alignment
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
-- Cross-check gates against required command list and seed constraints; add missing core checks.
-- Self-audit; if any environment or critical gate is unclear, ask Gap Questions.
-- Rewrite gate names to match CLI commands; ensure secrets are names only and compliance labels reflect actual obligations.
-- Emit JSON once consistent.
+## Operating Flow: Enumerate → Baseline → Validate → Emit
+- **Enumerate**: List all deployment stages and environments from seed_tech_stack.md.
+- **Baseline**: Capture infrastructure constraints, SLA targets, and deployment dependencies per environment.
+- **Validate**: Verify every stage has a complete definition; no environment name is undefined.
+- **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
 - MUST include secrets (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external`; MUST include compliance labels when `spec/00_charter.json` constraints or `docs/seed/seed_tech_stack.md` reference regulatory frameworks.
@@ -45,6 +47,9 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every deployment stage from seed_tech_stack.md is represented
+- [ ] All environment-specific constraints and SLA targets are explicitly defined
+- [ ] No environment name referenced in other spec files is missing from this baseline
 
 ## Step-Specific Completeness Checklist
 - All environments (`dev`, `ci`, `staging`, `prod`) present with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
@@ -86,26 +91,43 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:02a-delivery-baseline",
   "id": "delivery-baseline-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:01:00Z",
   "environments": {
     "dev": {
-      "runtime": "python3.11"
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 1,
+      "log_level": "debug"
     },
     "ci": {
-      "runner": "ubuntu-latest"
+      "runner": "ubuntu-latest",
+      "region": "us-east-1",
+      "replica_count": 1
     },
     "staging": {
-      "region": "us-east-1"
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 2,
+      "log_level": "warn"
     },
     "prod": {
-      "region": "us-east-1"
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 3,
+      "log_level": "warn"
     }
   },
   "ci_gates": [
-    "schema-validate"
+    "schema-validate",
+    "fixtures-lint",
+    "invariants-check",
+    "governance-check"
   ],
+  "secrets": ["DATABASE_URL", "JWT_SECRET"],
+  "compliance": ["SOC2"],
   "canonical_refs_used": []
 }
 ```

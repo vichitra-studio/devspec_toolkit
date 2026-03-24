@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 03` to see downstream consumers. This prompt's output feeds 3 downstream steps.
 
+## Role
+You are a **senior domain modeler and terminology specialist**. Your job is to emit a single JSON artifact for **Step 03 · Glossary** that establishes a canonical, conflict-free domain vocabulary traceable to the project charter. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Create a single vocabulary that removes ambiguity across product, engineering, and governance stakeholders. The glossary keeps later artifacts crisp by codifying domain terms, measurement units, and context that might otherwise drift between documents.
 
@@ -15,12 +18,12 @@ For each upstream artifact ingested, extract the following:
 - **02_system_sketch.json**: Component names, protocol terms, and architectural patterns for technical vocabulary alignment
 - **02a_delivery_baseline.json**: Environment names, CI pipeline terminology, and infrastructure concepts for deployment domain terms
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of candidate terms grouped by domain (billing, auth, analytics, operations), including aliases and units for metrics. Do not output it.
-- MUST normalize to one canonical `term_id` per concept (check `canon/manifest.json` for existing canonical entries); MUST track aliases in the `definition` text field.
-- Self-audit; if any term driving upstream artifacts is ambiguous, ask Gap Questions.
-- Rewrite definitions to include boundaries and units where applicable; ensure terms match upstream artifact usage.
-- Emit JSON once reconciled.
+## Operating Flow: Collect → Define → Canonicalize → Emit
+
+- **Collect**: Build a private Context Ledger of candidate terms grouped by domain (billing, auth, analytics, operations), including aliases and units for metrics. Do not output it.
+- **Define**: Rewrite definitions to include boundaries and units where applicable; ensure terms match upstream artifact usage.
+- **Canonicalize**: MUST normalize to one canonical `term_id` per concept (check `canon/manifest.json` for existing canonical entries); MUST track aliases in the `definition` text field. Self-audit; if any term driving upstream artifacts is ambiguous, ask Gap Questions.
+- **Emit**: Write artifact JSON once all terms are reconciled and canonical proposals are prepared.
 
 ## Heuristics For Completeness
 - MUST include `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics`; MUST include `domain` for every term to enable downstream grouping.
@@ -45,6 +48,12 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every term in `terms` that does not already have a matching entry in `canon/manifest.json` has a corresponding entry in `canonical_proposals`
+- [ ] Every domain entity referenced in the project charter has a glossary entry
+- [ ] No two terms have overlapping or conflicting definitions
+- [ ] Every term with a lifecycle has its valid stages explicitly enumerated
+- [ ] Every domain term used in charter, capabilities, and system sketch is defined here
+- [ ] No circular definitions (A defined using B, B defined using A without resolution)
+- [ ] Every term with a matching canonical entry has `canonical_ref` populated
 
 ## Step-Specific Completeness Checklist
 - Terms include all domain objects, key metrics, roles, and acronyms used across specs.
@@ -132,41 +141,22 @@ Field guidance:
       "term_id": "term-api-endpoint",
       "term": "API Endpoint",
       "definition": "A specific URL path exposed by the service that accepts HTTP requests and returns structured JSON responses.",
+      "domain": "api",
       "term_ref": {
         "id": "cn:core:term:api-endpoint",
         "kind": "term"
       }
     },
     {
-      "term_id": "term-jwt",
-      "term": "JWT",
-      "definition": "Signed token used to represent authenticated user claims in API sessions.",
-      "term_ref": {
-        "id": "cn:project:term:jwt",
-        "kind": "term",
-        "label": "JWT"
-      },
-      "acronym": "JWT",
-      "acronym_ref": {
-        "id": "cn:core:acronym:jwt",
-        "kind": "acronym",
-        "label": "JWT"
-      }
-    },
-    {
       "term_id": "term-response-time",
       "term": "Response Time",
       "definition": "Elapsed wall-clock duration from the moment a client sends an HTTP request to the moment the complete response is received, measured at the edge.",
+      "domain": "api",
+      "units": "ms",
       "term_ref": {
         "id": "cn:project:term:response-time",
         "kind": "term",
         "label": "Response Time"
-      },
-      "units": "ms",
-      "unit_ref": {
-        "id": "cn:core:unit:ms",
-        "kind": "unit",
-        "label": "ms"
       }
     }
   ],
@@ -178,10 +168,10 @@ Field guidance:
   ],
   "canonical_proposals": [
     {
-      "temp_id": "jwt",
+      "temp_id": "response-time",
       "kind": "term",
-      "proposed_label": "JWT",
-      "definition": "Signed token used to represent authenticated user claims in API sessions.",
+      "proposed_label": "Response Time",
+      "definition": "Elapsed wall-clock duration from the moment a client sends an HTTP request to the moment the complete response is received, measured at the edge.",
       "source_field": "terms[*].term",
       "suggested_namespace": "project"
     }

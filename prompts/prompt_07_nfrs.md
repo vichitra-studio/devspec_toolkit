@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 07` to see downstream consumers. This prompt's output feeds 5 downstream steps.
 
+## Role
+You are a **performance engineer and SLA analyst**. Your job is to emit a single JSON artifact for **Step 07 · Non-Functional Requirements** that translates quality constraints into quantifiable, monitorable targets. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Define the measurable performance, reliability, security, and operational targets that keep the product trustworthy once it ships. These benchmarks inform design trade-offs, fixtures, monitoring, and delivery plans so non-functional needs stay visible.
 
@@ -18,13 +21,26 @@ For each upstream artifact ingested, extract the following:
 - **05_interface_contracts.json**: API IDs, protocol types, and endpoint definitions to connect latency and throughput NFRs to specific public-facing APIs and to ensure every performance-critical endpoint has a measurable target
 - **06_invariants.json**: Invariant IDs and severity levels to cross-reference enforcement rules with NFR thresholds and to ensure invariants with severity error have corresponding measurable NFR targets for monitoring
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of NFRs by category (latency/throughput/availability/etc.), with metric→target→unit→measurement_method, stage, owner, and traces to FRs/APIs/components. Do not output it.
-- Align names/units with `spec/03_glossary.json`; MUST ensure measurement_method references a specific tool, query, or dashboard endpoint (not generic phrases like "automated monitoring").
-- Self-audit; if units/methods/owners or stage are missing, ask Gap Questions.
-- If measurement_method cannot be implemented with the system's infrastructure as defined in `spec/02_system_sketch.json` components and `spec/02a_delivery_baseline.json` environments, MUST ask Gap Questions for the intended measurement approach rather than inventing one.
-- Rewrite targets to numeric/operational formats; finalize traces.
-- Emit JSON when measurable.
+## Operating Flow: Categorize → Quantify → Baseline → Trace → Emit
+- **Categorize**: Group NFR candidates by category (performance, availability, security, scalability, etc.). Use the canonical NFR categories from `canon/manifest.json`.
+- **Quantify**: For each NFR, define a numeric target with explicit unit and measurement method. Replace all subjective language.
+- **Baseline**: Where seed documents or charter provide historical data or existing SLOs, record them as baselines. A target without a baseline is valid but weaker.
+- **Trace**: Link each NFR to the FR(s), API(s), or charter success_metrics it supports.
+- **Emit**: Write the artifact only when every NFR has a numeric target, unit, and measurement_method.
+
+### NFR Granularity Heuristics
+**Rule**: One NFR = one measurable property + one target + one measurement method. Split if: multiple measurement dimensions, different ownership domains, or "and" joins distinct performance concerns.
+
+
+### Weak-vs-Strong NFR Examples
+
+| Weak | Strong |
+|------|--------|
+| The system should be fast | API p95 latency ≤ 200ms measured via Prometheus histogram over rolling 5-min window |
+| High availability required | System uptime ≥ 99.9% per calendar month; measured via synthetic health-check probe |
+| Secure data storage | All PII fields encrypted at rest using AES-256; verified via quarterly key audit |
+| Good throughput | System handles ≥ 1000 concurrent users with no degradation in p99 latency beyond 2× baseline |
+| Automated monitoring | Alert fires within 60s when error rate exceeds 1% over 5-min window; measured in Datadog |
 
 ## Heuristics For Completeness
 - MUST include `stage` and `owner` for every NFR where `stage` is `prod` or `staging`; MUST include `measurement_method` that specifies a concrete query, tool, or dashboard URL.
@@ -46,6 +62,13 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every NFR target has a numeric value with explicit unit (no subjective language)
+- [ ] Every NFR has a `measurement_method` that is operationally achievable
+- [ ] Every NFR target has a corresponding baseline (no target without a starting measurement)
+- [ ] Every NFR target has a measurement_method specifying how and where the metric is captured
+- [ ] No NFR uses subjective language ("fast", "reliable", "secure") without a numeric target
+- [ ] Every performance-critical FR has a corresponding NFR covering its latency, throughput, or error budget
+- [ ] No ID referenced by this step (fr_id, api_id) conflicts with the same ID in a sibling step
 
 ## Step-Specific Completeness Checklist
 - NFRs cover latency, throughput, availability, durability, cost, security/privacy, maintainability, usability, portability, and energy as applicable.
@@ -60,6 +83,9 @@ Before emitting, verify:
 - **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, ci, staging, prod) to guide rollout plans.
 - **Trace**: Use `trace` to connect NFRs to FRs, invariants, or delivery tasks that uphold the requirement. For component-level NFRs, trace to relevant API, doc, or capability references.
 - **Measurement Verification**: Ensure `measurement_method` is a verifiable query or URL (e.g., "PromQL: ...", "Grafana dashboard: ...").
+
+**Semantic Drift Prevention**: When tracing an NFR to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Supports SLA for: 'The system shall return paginated results for all list endpoints within 200ms.'"`.
+
 
 ## Common Pitfalls
 - **Qualitative**: Writing qualitative statements ("fast", "secure", "reliable") instead of measurable targets with numeric values and units.
@@ -87,6 +113,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:07-nfrs",
   "id": "nfrs-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
@@ -97,42 +124,15 @@ Before emitting, verify:
       "metric": "p95 login latency",
       "target": 200,
       "unit": "ms",
-      "metric_ref": {
-        "id": "cn:core:metric:error-rate",
-        "kind": "metric"
-      },
-      "unit_ref": {
-        "id": "cn:core:unit:ms",
-        "kind": "unit"
-      },
-      "environment_ref": {
-        "id": "cn:core:environment:prod",
-        "kind": "environment"
-      },
-      "measurement_method": "automated monitoring",
+      "metric_ref": { "id": "cn:core:metric:p95-response-time", "kind": "metric" },
+      "unit_ref": { "id": "cn:core:term:ms", "kind": "term" },
+      "environment_ref": { "id": "cn:core:environment:prod", "kind": "environment" },
+      "measurement_method": "P95 latency via APM dashboard, 5-min rolling window",
       "stage": "prod",
       "owner": "api",
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-auth-login"
-        }
-      ]
+      "trace": [{ "type": "derives_from", "id": "fr-auth-login" }]
     }
   ],
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:metric:error-rate",
-      "kind": "metric"
-    },
-    {
-      "id": "cn:core:unit:ms",
-      "kind": "unit"
-    },
-    {
-      "id": "cn:core:environment:prod",
-      "kind": "environment"
-    }
-  ]
+  "canonical_refs_used": []
 }
 ```

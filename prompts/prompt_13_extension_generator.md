@@ -66,6 +66,15 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every extension request is traceable to a specific upstream spec artifact
+- [ ] Every domain evaluated for extension necessity has an explicit accept/reject decision with rationale (no silent omissions)
+- [ ] No extension duplicates coverage already expressible in core step schemas (05, 06, 07)
+- [ ] Generated extension IDs follow the same kebab-case naming convention as existing IDs
+- [ ] No extension introduces fields not present in the target step's schema
+- [ ] All extension points reference valid schema-defined extension mechanisms
+- [ ] Generated prompt follows the same phase structure as toolkit prompts (Operating Flow with named phases)
+- [ ] Extension includes validation command and test gate specification
+- [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps
 
 ## Negative Constraints
 - If no complex domains are found, return empty array. Do NOT invent trivial extensions.
@@ -85,6 +94,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:13-extension-generator",
   "id": "13-extension-manifest",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
@@ -93,26 +103,14 @@ Before emitting, verify:
       "extension_id": "ext-01-database",
       "title": "Database Schema Specification",
       "file_name": "ext_01_database_schema.json",
-      "area_of_concern": "Data Persistence",
-      "justification": "System Sketch defines complex relational + vector data needs.",
-      "required_schema_sections": [
-        "tables",
-        "indexes",
-        "relationships",
-        "vector_config"
-      ],
-      "schema_design_guidelines": "Must implement SQL schema for users/docs and Vector schema for embeddings.",
+      "area_of_concern": "Data",
+      "required_schema_sections": ["entities", "schemas", "migrations"],
       "governance_label_ref": {
         "id": "cn:core:governance_label:mandatory",
         "kind": "governance_label"
       }
     }
   ],
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:governance_label:mandatory",
-      "kind": "governance_label"
-    }
-  ]
+  "canonical_refs_used": []
 }
 ```

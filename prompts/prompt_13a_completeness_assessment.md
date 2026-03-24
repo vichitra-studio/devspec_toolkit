@@ -79,6 +79,13 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every `uncovered_ids` entry references a real ID from the referenced upstream spec
+- [ ] All coverage dimensions (FR→API, FR→fixture, capability→FR) have been assessed
+- [ ] Coverage ratios are derived from actual spec content counts — not estimated or guessed
+- [ ] All `uncovered_ids` reference valid IDs from their respective upstream spec files
+- [ ] All four pairwise transitions (capability→FR, FR→API, FR→fixture, FR→milestone) are assessed — no transition silently skipped
+- [ ] The completeness_rating reflects accumulated numeric deductions from the scoring rubric — not a subjective estimate
+- [ ] Every uncovered_id identified in pairwise checks appears in at least one gap or finding in this assessment
 
 ## Negative Constraints
 - **DO NOT** rate completeness as 10/10 if any "TBD" values exist.
@@ -128,6 +135,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:13a-completeness-assessment",
   "id": "assessment-20250101",
   "owner": "system",
   "created_at": "2025-01-01T12:00:00Z",

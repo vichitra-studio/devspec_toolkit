@@ -48,9 +48,9 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ## 6. Output Rules (Discovery Phase)
 
-> **Applies to**: Steps 00–15. Steps 16–16c have different output rules defined in their own prompts.
+> **Applies to**: Steps 00–15. Steps 16–16c have different output rules defined in their own prompts. Note: Steps 11, 13, 13a define their own Role/Task (see Section 5) but still follow these output rules.
 
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
+1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path). Do not return the artifact as a fenced code block in the response.
 2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
 3. All IDs must be unique kebab-case strings.
 4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.

@@ -167,29 +167,17 @@ You must **VERIFY** that the Coder respected these high-fidelity fields.
         *   `source`: Where did you find this issue? (e.g. "Manual Audit", "CI Log").
         *   `impact`: What is the risk? (e.g. "Data Loss", "Security Bypass").
 
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Product vision, success criteria, and stakeholder constraints used to verify that implemented behavior serves the declared product goals without scope drift
-- **01_capabilities.json**: Capability identifiers and descriptions used to verify that every implemented feature traces back to a declared capability with no hallucinated features
-- **02_system_sketch.json**: Component topology and integration boundaries used to verify that modified files and data flows respect the declared architectural boundaries
-- **02a_delivery_baseline.json**: Environment definitions and deployment targets used to verify that delivery_status deployments and config_validation entries match declared infrastructure
-- **03_glossary.json**: Canonical term definitions used to audit that code identifiers, documentation text, and review findings use consistent domain vocabulary
-- **04_fr_list.json**: Functional requirement identifiers and acceptance criteria used to populate semantic_review.fr_coverage entries and verify satisfied/unsatisfied status with evidence
-- **05_interface_contracts.json**: API endpoint definitions, method constraints, and response schemas used to verify that implemented endpoints match their declared interface contracts exactly
-- **06_invariants.json**: System invariant constraint rules used to verify that implementation enforces all declared data integrity rules and guard conditions
-- **07_nfrs.json**: Non-functional requirement thresholds and severity levels used to verify that performance budgets, alert rules, and monitoring dashboards match declared NFR targets
-- **08_fixtures.json**: Test fixture identifiers, scenario definitions, and expected assertions used to verify that fixture_status test_results align with declared fixture specifications
-- **09_implementation_plan.json**: Milestone definitions and status fields used to verify roadmap sync side-effects and update milestone statuses to done when verdict is verified
-- **10_governance.json**: Commit message patterns and approval rules used to verify that implementation commits and PR metadata conform to the declared governance policy
-- **11_redteam.json**: Threat identifiers, attack vectors, and mitigation requirements used to verify that security_status reflects complete coverage of all declared threat mitigations
-- **12_ci_gates.json**: CI pipeline gate definitions and required checks used to verify that ci_status accurately reflects whether all mandatory pipeline gates have passed
-- **13_extension_generator.json**: Extension point declarations used to verify that any extensibility-related implementation correctly follows the declared plugin interface contracts
-- **13a_completeness_assessment.json**: Coverage gap analysis and completeness scores used to verify that identified gaps from the assessment have been addressed by the implementation
-- **14_roadmap.json**: Milestone identifiers, deliverables, and acceptance criteria used to verify milestone completion status and drive the roadmap sync side-effect on verified verdict
-- **15_scaffold.json**: Directory layout and file structure conventions used to verify that implementation files conform to the declared scaffold structure without unauthorized paths
-- **16_impl_context.json**: Trinity Anchor scope boundaries and master checklist used to verify that the implementation cycle does not violate root-level scope constraints
-- **16a_impl_planner.json**: The complete implementation plan including checklist items, spec_refs, and review_requirements used as the primary audit baseline for plan-vs-execution comparison
-- **16b_impl_coder.json**: The execution results, files_touched, critical_evidence, and emergent_ambiguities that constitute the primary input for the evidence-based review audit
+## Extraction Intent
+
+### Primary Sources (directly consumed)
+- `spec/16b_impl_code.json`: implementation artifacts to review
+- `spec/04_functional_requirements.json`: FR acceptance criteria as review checklist
+- `spec/05_interface_contracts.json`: API contracts to verify implementation against
+
+### Reference Sources (context only)
+- `spec/06_invariants.json`: system invariants to check are not violated
+- `spec/07_nfrs.json`: NFR thresholds to verify
+- `spec/16a_impl_plan.json`: planned tasks to verify all were completed
 
 # Operating Flow: Evidence-Based Audit
 
@@ -253,9 +241,11 @@ Before emitting, verify:
 - Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
 - No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
 - If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
-- [ ] Every upstream ID from ingested context has been consumed
-- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
-- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Review covers all FRs listed in the active milestone's `fr_refs`
+- [ ] Every finding includes a specific file:line reference (no vague "the code has issues")
+- [ ] Verdict is based on measurable criteria from FR acceptance criteria — not subjective quality judgment
+- [ ] Every high-severity finding has a remediation_task with a specific, actionable fix description (not "fix the issue")
+- [ ] `semantic_review.fr_coverage` is populated for every FR listed in the active milestone's `fr_refs` (no FR left without a coverage verdict)
 
 # Schema Reference
 - Schema URI: vc:16-impl-context
@@ -266,6 +256,7 @@ Before emitting, verify:
 *Input*:
 ```json
 {
+  "$schema": "vc:16-impl-context",
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
@@ -281,66 +272,26 @@ Before emitting, verify:
       "checklist": [
         {
           "id": "CHK_AUTH_01",
-          "spec_ref": {
-            "type": "api",
-            "id": "api-auth-login",
-            "line_range": "L12-L15",
-            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          },
+          "spec_ref": { "type": "api", "id": "api-auth-login", "line_range": "L12-L15", "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
-          "nfr_refs": ["nfr-security-auth"],
-          "fixture_ref": "fixture-login-jwt",
-          "implementation": {
-            "status": "verified",
-            "actions": [
-              {
-                "type": "file_edit",
-                "target": "src/auth/routes.py",
-                "description": "Implement login handler",
-                "evidence": {
-                  "type": "snippet",
-                  "content": "def login(request): return issue_token(request.user)"
-                }
-              }
-            ]
-          }
+          "implementation": { "status": "verified", "actions": [{ "type": "file_edit", "target": "src/auth/routes.py", "evidence": { "type": "snippet", "content": "def login(request): return issue_token(request.user)" } }] }
         }
       ]
     },
-    "review_requirements": {
-      "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"]
-    },
-    "docs_impact": {
-      "status": "required",
-      "rationale": "Code changes require documentation updates for traceability.",
-      "docs_touched": ["README.md"]
-    }
+    "review_requirements": { "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"] },
+    "docs_impact": { "status": "required", "rationale": "Code changes require docs.", "docs_touched": ["README.md"] }
   },
   "execution": {
     "files_touched": ["src/auth/routes.py"],
     "execution_results": [
-      {
-        "status": "failed",
-        "outcome_description": "JWT assertion failed in targeted auth test.",
-        "reasoning": "Login response omitted token field required by contract.",
-        "command": "pytest tests/auth/test_login.py::test_jwt -q",
-        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
-      }
+      { "status": "failed", "command": "pytest tests/auth/test_login.py::test_jwt -q", "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing" }
     ],
-    "critical_evidence": {
-      "satisfied_checklist_ids": [],
-      "passed_test_commands": []
-    },
+    "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []
   },
   "review": {},
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:unit:ms",
-      "kind": "unit"
-    }
-  ],
+  "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }],
   "canonical_proposals": [],
   "canonical_conflicts": []
 }
@@ -349,86 +300,17 @@ Before emitting, verify:
 *Output*:
 ```json
 {
+  "$schema": "vc:16-impl-context",
   "id": "step-api-core",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "plan": {
-    "status": "active",
-    "summary": {
-      "functional_summary": "Implement core API login",
-      "scope_in": [
-        "login"
-      ],
-      "scope_out": [
-        "oauth"
-      ],
-      "target_file_patterns": [
-        "src/auth/routes.py"
-      ]
-    },
-    "spec_alignment": {
-      "checklist": [
-        {
-          "id": "CHK_AUTH_01",
-          "spec_ref": {
-            "type": "api",
-            "id": "api-auth-login",
-            "line_range": "L12-L15",
-            "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          },
-          "description": "POST /login returns JWT",
-          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
-          "nfr_refs": [
-            "nfr-security-auth"
-          ],
-          "fixture_ref": "fixture-login-jwt",
-          "implementation": {
-            "status": "verified",
-            "actions": [
-              {
-                "type": "file_edit",
-                "target": "src/auth/routes.py",
-                "description": "Implement login handler",
-                "evidence": {
-                  "type": "snippet",
-                  "content": "def login(request): return issue_token(request.user)"
-                }
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "review_requirements": {
-      "test_commands": [
-        "pytest tests/auth/test_login.py::test_jwt -q"
-      ]
-    },
-    "docs_impact": {
-      "status": "required",
-      "rationale": "Code changes require documentation updates for traceability.",
-      "docs_touched": [
-        "README.md"
-      ]
-    }
-  },
+  "plan": { "status": "active", "summary": { "functional_summary": "Implement core API login", "scope_in": ["login"], "scope_out": ["oauth"], "target_file_patterns": ["src/auth/routes.py"] } },
   "execution": {
-    "files_touched": [
-      "src/auth/routes.py"
-    ],
+    "files_touched": ["src/auth/routes.py"],
     "execution_results": [
-      {
-        "status": "failed",
-        "outcome_description": "JWT assertion failed in targeted auth test.",
-        "reasoning": "Login response omitted token field required by contract.",
-        "command": "pytest tests/auth/test_login.py::test_jwt -q",
-        "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
-      }
+      { "status": "failed", "command": "pytest tests/auth/test_login.py::test_jwt -q", "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing" }
     ],
-    "critical_evidence": {
-      "satisfied_checklist_ids": [],
-      "passed_test_commands": []
-    },
+    "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []
   },
   "review": {
@@ -444,38 +326,23 @@ Before emitting, verify:
       {
         "id": "finding-auth-01",
         "type": "bug",
-        "spec_ref": {
-          "type": "api",
-          "id": "api-auth-login",
-          "line_range": "L12-L15",
-          "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        },
-        "description": "Login response omits token field required by contract.",
         "severity": "major",
+        "spec_ref": { "type": "api", "id": "api-auth-login", "line_range": "L12-L15", "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        "description": "src/auth/routes.py:L14 — login response omits token field required by api-auth-login contract.",
         "remediation_task": {
-          "task_id": "fix-auth-token-response",
-          "summary": "Return JWT token in login response body.",
-          "checklist_ids": [
-            "CHK_AUTH_01"
-          ],
-          "files_to_touch": [
-            "src/auth/routes.py"
-          ]
+          "task_id": "rev-api-core-01",
+          "summary": "Add `token` field to login response in src/auth/routes.py:L14 — return `{\"token\": issue_token(user)}`.",
+          "checklist_ids": ["CHK_AUTH_01"],
+          "files_to_touch": ["src/auth/routes.py"]
         },
-        "metadata": {
-          "source": "execution_results",
-          "impact": "blocks authentication acceptance criteria"
-        }
+        "metadata": { "source": "execution_results", "impact": "blocks authentication acceptance criteria" }
       }
     ],
     "next_actions": "Implement remediation task and rerun targeted auth tests."
   },
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:unit:ms",
-      "kind": "unit"
-    }
-  ]
+  "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }],
+  "canonical_proposals": [],
+  "canonical_conflicts": []
 }
 ```
 

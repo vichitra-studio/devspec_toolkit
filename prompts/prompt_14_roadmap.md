@@ -4,27 +4,33 @@
 
 Run `specdev prompt-context 14` to see downstream consumers.
 
+## Role
+You are a **senior technical program manager and roadmap strategist**. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that translates the implementation plan into an execution-ready milestone sequence with FR-level task decomposition. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the scope down into sequential, verifiable milestones, where **Each Milestone** corresponds to exactly **One User Story** decomposed into atomic sub-tasks.
 
-### Extraction Intent
-For each upstream artifact ingested, extract the following:
+## Extraction Intent
+
+### Primary Sources (directly consumed)
+- **09_impl_plan.json**: Design-level milestones as the starting structure; derive execution milestones from these; copy `tech_stack` into the roadmap tech_stack and use Step 09 milestone IDs in `source_milestones`
+- **04_fr_list.json**: FR IDs and acceptance criteria for milestone `fr_refs` and task-level acceptance criteria — every FR ID must appear in ≥1 milestone's `fr_refs`
+- **01_capabilities.json**: Capability IDs for milestone-level `capability_refs` ensuring every capability is scheduled for delivery in at least one milestone
+
+### Reference Sources (context only)
 - **00_charter.json**: Project scope, timeline constraints, and success criteria used to bound roadmap milestones and validate that no out-of-scope work is scheduled
-- **01_capabilities.json**: Capability IDs used to populate milestone-level capability_refs ensuring every capability is scheduled for delivery in at least one milestone
 - **02_system_sketch.json**: Component architecture and subsystem dependencies used to determine milestone sequencing so infrastructure precedes dependent application layers
 - **02a_delivery_baseline.json**: Deployment environment specifications and release cadence constraints incorporated into milestone target dates and infrastructure task planning
 - **03_glossary.json**: Canonical domain terminology used to ensure consistent naming of milestones, tasks, and deliverables across the roadmap artifact
-- **04_fr_list.json**: All functional requirement IDs extracted and distributed across milestones via fr_refs to guarantee complete FR coverage with no orphaned requirements
 - **05_interface_contracts.json**: API endpoint definitions and dependencies used to sequence API implementation tasks and verify deliverable traceability to specific contract IDs
 - **06_invariants.json**: System invariant rules incorporated as task constraints and acceptance criteria to ensure milestone completion preserves data integrity guarantees
 - **07_nfrs.json**: Performance thresholds, security requirements, and compliance constraints incorporated as milestone risks and acceptance criteria for non-functional validation
 - **08_fixtures.json**: Test fixture definitions used to bind milestone acceptance criteria to concrete fixture references ensuring each deliverable has verifiable test coverage
-- **09_implementation_plan.json**: Technology stack (languages, frameworks, infrastructure, tools) copied into the roadmap tech_stack; milestones decomposed from Step 09 milestone IDs via source_milestones
-- **10_governance.json**: Commit conventions and PR rules used to ensure roadmap tasks align with governance-compliant delivery workflows and labeling requirements
+- **10_governance.json**: PR/commit rules that tasks must satisfy; used to ensure roadmap tasks align with governance-compliant delivery workflows and labeling requirements
 - **11_redteam.json**: Identified threats and mitigations used to populate milestone risks and inform task prioritization for security-critical implementation sequences
 - **12_ci_gates.json**: CI pipeline gate definitions used to ensure roadmap milestones include validation tasks that satisfy all required continuous integration quality checks
 - **13_extension_generator.json**: Extension manifest entries used to schedule extension implementation work as dedicated milestones with proper dependency ordering after core infrastructure
-- **13a_completeness_assessment.json**: High-priority missing elements and gap findings used to schedule remediation tasks and validate that all critical gaps are addressed before implementation begins
+- **13a_completeness_assessment.json** (if present): Coverage gaps to address in milestone decomposition; high-priority missing elements used to schedule remediation tasks before implementation begins
 
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
 - **Ingest**: Scan all `spec/` artifacts (Steps 00-13) to understand the complete scope.
@@ -32,6 +38,14 @@ For each upstream artifact ingested, extract the following:
 - **Sequence**: Arrange milestones in logical order based on dependencies and critical path.
 - **Decompose**: Break down Step 09 technical milestones into atomic user stories for Step 14.
 - **Emit**: Generate a roadmap that groups these items into logical milestones using the JIT (Just-In-Time) philosophy—plan details iteratively while still providing required fields.
+
+### Task vs FR Acceptance Criteria Relationship
+Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from Step 04 — they break high-level behavioral criteria into implementation-verifiable checks. Rules:
+- Task acceptance criteria MUST NOT contradict FR acceptance criteria.
+- Task acceptance criteria SHOULD be more specific and implementation-testable (e.g., "unit test passes for UserService.deactivate()" refines "user account is deactivated and sessions invalidated").
+- Every task criterion should be verifiable by a specific CI check, unit test, or manual procedure.
+
+**Step Authority**: Step 14 is the authoritative source for execution-level `migration_plan` entries and task-level `dependencies`. Step 09 provides the design-level implementation plan. When Step 09 and Step 14 disagree on sequencing or scope, Step 14 takes precedence for execution decisions.
 
 ## Heuristics For Completeness
 - **Unified View**: The roadmap must include items from BOTH the Core specs and any found Extensions.
@@ -50,6 +64,11 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every Step 09 milestone deliverable is addressed by ≥1 Step 14 task
+- [ ] Every FR referenced in milestone `fr_refs` is covered by ≥1 task's `fr_refs`
+- [ ] Task acceptance criteria refine (not contradict) the originating FR acceptance criteria
+- [ ] Every FR from Step 04 appears in at least one task's `fr_refs`
+- [ ] Every milestone's `source_milestones` references valid `milestone_id` values from Step 09
 
 **Extraction Mandate**:
 - Every FR ID from `04_functional_requirements.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
@@ -80,6 +99,7 @@ Before emitting, verify:
 - **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
 
 ## Cross-Step Synthesis Notes
+
 ### tech_stack.languages / tech_stack.frameworks / tech_stack.infrastructure / tech_stack.tools
 - Use arrays of objects with `name` and `version` (optional `rationale`).
 - Prefer copying from `spec/09_impl_plan.json`; only add entries if Step 13 extensions require them.
@@ -172,28 +192,10 @@ The `$schema` field is required in the output and is stripped before validation 
   "migration_plan": "none",
   "tech_stack": {
     "languages": [
-      {
-        "name": "python",
-        "version": "3.11"
-      }
+      { "name": "python", "version": "3.11" }
     ],
     "frameworks": [
-      {
-        "name": "fastapi",
-        "version": "0.110.0"
-      }
-    ],
-    "infrastructure": [
-      {
-        "name": "docker",
-        "version": "24.0"
-      }
-    ],
-    "tools": [
-      {
-        "name": "poetry",
-        "version": "1.7.0"
-      }
+      { "name": "fastapi", "version": "0.110.0" }
     ]
   },
   "milestones": [
@@ -201,9 +203,7 @@ The `$schema` field is required in the output and is stripped before validation 
       "milestone_id": "m1-core-foundation",
       "name": "Core Foundation",
       "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
-      "source_milestones": [
-        "m1-core-foundation"
-      ],
+      "source_milestones": ["m1-core-foundation"],
       "tasks": [
         {
           "task_id": "init-fastapi-project",
@@ -214,43 +214,14 @@ The `$schema` field is required in the output and is stripped before validation 
               "text": "Project boots with FastAPI app and expected folder layout."
             }
           ]
-        },
-        {
-          "task_id": "configure-docker-compose",
-          "description": "Configure Docker compose for DB and App",
-          "acceptance_criteria": [
-            {
-              "criterion_id": "docker-ready",
-              "text": "docker-compose up starts DB and App containers."
-            }
-          ]
-        },
-        {
-          "task_id": "implement-health-check",
-          "description": "Implement health check endpoint",
-          "acceptance_criteria": [
-            {
-              "criterion_id": "health-ok",
-              "text": "GET /health returns 200 with status ok."
-            }
-          ]
         }
       ],
       "deliverables": [
-        {
-          "type": "doc",
-          "id": "charter"
-        },
-        {
-          "type": "nfr",
-          "id": "ci-gates"
-        }
+        { "type": "doc", "id": "charter" }
       ],
       "target_date": "2025-02-01",
       "fr_refs": [],
-      "capability_refs": [],
-      "risks": [],
-      "spikes": []
+      "capability_refs": []
     }
   ],
   "canonical_refs_used": []

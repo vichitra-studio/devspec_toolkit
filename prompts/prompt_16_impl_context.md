@@ -23,25 +23,27 @@ Generate a **machine‑checkable JSON artifact** that captures the plan,
 implementation checklist, and review expectations for the *current* execution cycle.
 
 ### Extraction Intent
-For each upstream artifact ingested, extract the following:
-- **00_charter.json**: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
-- **01_capabilities.json**: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
-- **02_system_sketch.json**: Component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
-- **02a_delivery_baseline.json**: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
-- **03_glossary.json**: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
-- **04_fr_list.json**: Functional requirement identifiers, acceptance criteria, and priority levels that directly populate checklist spec_ref entries and linked_test_expectations
-- **05_interface_contracts.json**: API endpoint definitions, request/response schemas, and method constraints used to bind checklist items to concrete interface contracts
-- **06_invariants.json**: System invariant rules and constraint definitions that inform checklist validation items and drift check targets
-- **07_nfrs.json**: Non-functional requirement identifiers, thresholds, and measurement units that populate nfr_refs in checklist items and drive delivery alert rules
-- **08_fixtures.json**: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
-- **09_implementation_plan.json**: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
-- **10_governance.json**: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
-- **11_redteam.json**: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
-- **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
-- **13_extension_generator.json**: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
-- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
-- **14_roadmap.json**: Milestone identifiers, deliverables, scheduling, and status fields used to drive checklist coverage mapping and roadmap sync updates
-- **15_scaffold.json**: Generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
+
+#### Primary Sources (directly consumed)
+- `spec/14_roadmap.json`: active milestone, tasks, and fr_refs — primary source for implementation context; milestone identifiers, deliverables, scheduling, and status fields drive checklist coverage mapping and roadmap sync updates
+- `spec/04_functional_requirements.json`: FR statements and acceptance criteria for the active milestone; functional requirement identifiers, acceptance criteria, and priority levels directly populate checklist spec_ref entries and linked_test_expectations
+- `spec/05_interface_contracts.json`: API contracts to implement; endpoint definitions, request/response schemas, and method constraints bind checklist items to concrete interface contracts
+
+#### Reference Sources (context only)
+- `spec/00_charter.json`: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
+- `spec/01_capabilities.json`: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
+- `spec/02_system_sketch.json`: component boundaries and trust zones; component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
+- `spec/02a_delivery_baseline.json`: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
+- `spec/03_glossary.json`: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
+- `spec/06_invariants.json`, `spec/07_nfrs.json`: constraints to respect during implementation; invariant rules and NFR thresholds inform checklist validation items, nfr_refs, and delivery alert rules
+- `spec/08_fixtures.json`: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
+- `spec/09_implementation_plan.json`: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
+- `spec/10_governance.json`: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
+- `spec/11_redteam.json`: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
+- `spec/12_ci_gates.json`: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
+- `spec/13_extension_generator.json`: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
+- `spec/13a_completeness_assessment.json`: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
+- `spec/15_scaffold.json`: existing scaffold structure; generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
 
 # Operating Flow (MANDATORY)
 1. **Context Review**: Ingest required upstream spec artifacts.
@@ -173,9 +175,12 @@ Before emitting, verify:
 - Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
 - No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
 - If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
-- [ ] Every upstream ID from ingested context has been consumed
-- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
-- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`
+- [ ] Every implementation context links to the active Step 14 milestone
+- [ ] All cross-references resolve to valid IDs in the referenced spec files
+- [ ] The `semantic_review` section covers all major implementation concerns (naming, structure, coverage) — not just surface-level checks
+- [ ] Every `plan.spec_alignment.checklist` item has a corresponding `execution.execution_results` entry (no planned item left without an execution record)
+- [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor — all checklist IDs and scope_in/scope_out values are consistent with spec/impl_context/*.json
 
 # Best Practices
 1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
@@ -204,6 +209,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:16-impl-context",
   "id": "step-16-example",
   "owner": "system",
   "created_at": "2026-02-08T00:00:00Z",
@@ -211,34 +217,17 @@ Before emitting, verify:
     "status": "active",
     "summary": {
       "functional_summary": "Implement Core Authentication flow.",
-      "scope_in": [
-        "Login",
-        "Logout",
-        "Session Management"
-      ],
-      "scope_out": [
-        "OAuth",
-        "MFA"
-      ],
-      "target_file_patterns": [
-        "src/auth/*.py",
-        "tests/auth/*.py"
-      ]
+      "scope_in": ["Login", "Logout", "Session Management"],
+      "scope_out": ["OAuth", "MFA"],
+      "target_file_patterns": ["src/auth/*.py", "tests/auth/*.py"]
     },
     "docs_impact": {
       "status": "required",
       "rationale": "New auth module requires API documentation updates.",
-      "docs_touched": [
-        "docs/api/auth.md"
-      ]
+      "docs_touched": ["docs/api/auth.md"]
     },
     "spec_alignment": {
-      "requirements_summary": [
-        {
-          "theme": "Security",
-          "summary": "Implement JWT handling"
-        }
-      ],
+      "requirements_summary": [{ "theme": "Security", "summary": "Implement JWT handling" }],
       "checklist": [
         {
           "id": "CHK_AUTH_01",
@@ -250,22 +239,14 @@ Before emitting, verify:
           },
           "description": "User can login with valid credentials.",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_login_success",
-          "nfr_refs": [
-            "nfr-availability-uptime"
-          ],
+          "nfr_refs": ["nfr-availability-uptime"],
           "fixture_ref": "fixture-auth-login",
           "checklist_status": "active",
           "implementation": {
             "status": "pending",
-            "files_touched": [
-              "src/auth/login.py"
-            ],
+            "files_touched": ["src/auth/login.py"],
             "actions": [
-              {
-                "type": "file_create",
-                "description": "Create login handler",
-                "target": "src/auth/login.py"
-              }
+              { "type": "file_create", "description": "Create login handler", "target": "src/auth/login.py" }
             ]
           }
         }
@@ -278,75 +259,38 @@ Before emitting, verify:
         "source": "spec",
         "severity": "non_blocking",
         "mitigation": "Default to in-memory for MVP, Redis for production",
-        "impact": [
-          "session-management"
-        ],
+        "impact": ["session-management"],
         "status": "resolved"
       }
     ],
     "solution": {
       "architecture_sketch": "Flask Blueprint with JWT extended.",
-      "sequence_of_concerns": [
-        "Models",
-        "Views",
-        "Tests"
-      ],
-      "risks": [
-        "Token leakage in logs"
-      ]
+      "sequence_of_concerns": ["Models", "Views", "Tests"],
+      "risks": ["Token leakage in logs"]
     },
     "context": {
       "existing_structures": [
-        {
-          "signature": "class User(db.Model)",
-          "source_file": "src/models.py",
-          "line_range": "L1-L50"
-        }
+        { "signature": "class User(db.Model)", "source_file": "src/models.py", "line_range": "L1-L50" }
       ]
     },
-    "review_requirements": {
-      "test_commands": [
-        "pytest tests/auth"
-      ]
-    },
+    "review_requirements": { "test_commands": ["pytest tests/auth"] },
     "security": {
       "status": "planned",
-      "new_fixtures": [
-        "fix-auth-token-leak"
-      ],
+      "new_fixtures": ["fix-auth-token-leak"],
       "spec_mutations": [
-        {
-          "ref": {
-            "type": "nfr",
-            "id": "nfr-sec-01"
-          },
-          "change": "Add token rotation requirement",
-          "reason": "Mitigate token replay attacks"
-        }
+        { "ref": { "type": "nfr", "id": "nfr-sec-01" }, "change": "Add token rotation requirement", "reason": "Mitigate token replay attacks" }
       ]
     },
-    "delivery": {
-      "status": "not_applicable",
-      "reason": "No observability changes required for initial implementation"
-    },
+    "delivery": { "status": "not_applicable", "reason": "No observability changes required for initial implementation" },
     "drift": {
       "status": "planned",
       "checks": [
-        {
-          "check_id": "drift-auth-api",
-          "target": "api",
-          "method": "runtime-sample",
-          "schedule": "daily",
-          "remediation_policy": "Regenerate API fixtures from live endpoints"
-        }
+        { "check_id": "drift-auth-api", "target": "api", "method": "runtime-sample", "schedule": "daily", "remediation_policy": "Regenerate API fixtures from live endpoints" }
       ]
     }
   },
   "execution": {
-    "files_touched": [
-      "src/auth/login.py",
-      "tests/auth/test_login.py"
-    ],
+    "files_touched": ["src/auth/login.py", "tests/auth/test_login.py"],
     "execution_results": [
       {
         "status": "passed",
@@ -364,12 +308,8 @@ Before emitting, verify:
       }
     ],
     "critical_evidence": {
-      "satisfied_checklist_ids": [
-        "CHK_AUTH_01"
-      ],
-      "passed_test_commands": [
-        "pytest tests/auth"
-      ]
+      "satisfied_checklist_ids": ["CHK_AUTH_01"],
+      "passed_test_commands": ["pytest tests/auth"]
     }
   },
   "review": {
@@ -385,22 +325,11 @@ Before emitting, verify:
           "commit_hash": "b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4"
         },
         "description": "API documentation missing error response codes",
-        "related_checklist_ids": [
-          "CHK_AUTH_01"
-        ],
-        "metadata": {
-          "source": "reviewer",
-          "impact": "Documentation completeness"
-        }
+        "related_checklist_ids": ["CHK_AUTH_01"],
+        "metadata": { "source": "reviewer", "impact": "Documentation completeness" }
       }
     ],
-    "ratings": {
-      "spec_completeness": 5,
-      "code_quality": 5,
-      "tests_completeness": 5,
-      "docs_completeness": 4,
-      "metadata_usage": 5
-    },
+    "ratings": { "spec_completeness": 5, "code_quality": 5, "tests_completeness": 5, "docs_completeness": 4, "metadata_usage": 5 },
     "verdict": "verified",
     "next_actions": "Update API documentation with error codes",
     "semantic_review": {
@@ -409,25 +338,15 @@ Before emitting, verify:
           "fr_id": "fr-auth-login",
           "satisfied": true,
           "evidence_summary": "Login handler implemented with JWT token generation and validation, confirmed by passing pytest tests/auth/test_login.py::test_login_success",
-          "checklist_ids": [
-            "CHK_AUTH_01"
-          ]
+          "checklist_ids": ["CHK_AUTH_01"]
         }
       ],
       "hallucinated_features": [],
       "scope_delta": "No scope creep detected; implementation matches plan exactly."
     },
     "fixture_status": {
-      "implemented_interfaces": [
-        "api-auth-login"
-      ],
-      "test_results": [
-        {
-          "fixture_ref": "fix-auth-login-success",
-          "status": "pass",
-          "notes": "All assertions passed"
-        }
-      ],
+      "implemented_interfaces": ["api-auth-login"],
+      "test_results": [{ "fixture_ref": "fix-auth-login-success", "status": "pass", "notes": "All assertions passed" }],
       "ci_status": "green"
     }
   },

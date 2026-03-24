@@ -46,12 +46,11 @@ For each upstream artifact ingested, extract the following:
 - **09_impl_plan.json**: Technology stack selections, framework versions, and infrastructure choices to identify technology-specific vulnerability classes and attack vectors unique to the chosen stack
 - **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
 
-## Operating Flow: Attack → Trace → Mitigate
-1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
-2.  **Categorize**: Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.
-3.  **Trace**: Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY.
-4.  **Mitigate**: Define mitigations. MUST link to existing `inv-*` or `nfr-*` IDs from `spec/06_invariants.json` or `spec/07_nfrs.json` using the `traceRef` structure when a matching control exists. If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
-5.  **Edge Cases**: Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
+## Operating Flow: Threat Model → Exploit → Mitigate → Emit
+1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. Use threat categories: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation of Privilege). For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.
+2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
+3.  **Mitigate**: Propose mitigations as structured objects (`{ "control": "...", "type": "preventive|detective|corrective" }`). Not plain strings. MUST link to existing `inv-*` or `nfr-*` IDs from `spec/06_invariants.json` or `spec/07_nfrs.json` using the `traceRef` structure when a matching control exists. If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
+4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
 
 ## Examples: Weak vs. Strong
 | Quality | Threat Description | Vector | Linking |
@@ -84,6 +83,12 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
+- [ ] All mitigations are structured objects (not plain strings)
+- [ ] High-severity threats have ≥1 mitigation each
+- [ ] Every high-priority FR has at least one threat scenario modeled
+- [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
+- [ ] Attack surfaces align with trust zone boundaries from the system sketch
 
 ## Step-Specific Output Constraints
 1.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
@@ -149,6 +154,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:11-redteam",
   "id": "redteam-catalog",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",

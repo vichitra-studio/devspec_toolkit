@@ -4,6 +4,9 @@
 
 Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds 2 downstream steps.
 
+## Role
+You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data covering every high-priority FR acceptance criterion. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Supply deterministic inputs and expected outputs that exercise functional and non-functional behaviors across the spec. These fixtures form the backbone of automated validation, red-team loops, and regression detection.
 
@@ -25,12 +28,22 @@ For each upstream artifact ingested, extract the following:
 - **06_invariants.json**: Invariant IDs with severity error and their executable expressions to create negative-case fixtures that verify each critical invariant is enforced and that violations produce the expected rejection behavior
 - **07_nfrs.json**: NFR IDs with category latency or throughput, their numeric targets, and units to generate benchmark and load-test fixtures tagged appropriately for performance validation in CI pipelines
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Coverage Ledger mapping FR acceptance criteria to fixtures: happy-path, edge, and failure, plus contract/e2e/redteam modes. Do not output it.
-- Align inputs/expected with interface schemas; include negative cases for each enumerated error.
-- **Self-Correction**: Verify that every `target` ID actually exists in the provided context (Steps 4, 5, 7, 06). If an ID is missing, ask a clarification question instead of hallucinating it.
-- Rewrite expected outcomes precisely (no narratives); add targets and tags; finalise modes.
-- Emit JSON when coverage is representative.
+## Operating Flow: Map → Generate → Validate → Emit
+- **Map**: For each high-priority FR and its acceptance criteria, identify the fixture(s) needed. Track coverage in a private Context Ledger.
+- **Generate**: Create fixture data that is concrete, realistic, and deterministic. Each fixture should represent a specific scenario (happy path, boundary case, error case).
+- **Validate**: Verify every high-priority FR has ≥1 fixture; every acceptance criterion that is automatable has a `fixture_ref`; no fixture is missing a `target` ID.
+- **Emit**: Write the artifact only when coverage is complete.
+
+**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture. Every automatable acceptance criterion must have a `fixture_ref` pointing to a fixture ID. List any high-priority FR without a fixture and explain why.
+
+### Weak-vs-Strong Fixture Examples
+
+| Weak | Strong |
+|------|--------|
+| Test login | `fixture-auth-login-success`: POST /auth/sessions with valid credentials → 200 + signed token |
+| Error case | `fixture-auth-login-bad-password`: POST /auth/sessions with wrong password → 401 `INVALID_CREDENTIALS` |
+| Data test | `fixture-user-profile-update-valid`: PUT /users/{id} with valid fields → 200 + updated profile |
+| Edge case | `fixture-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
 - MUST add `targets` referencing every `fr_id`, `api_id`, `inv_id`, or `nfr_id` that the fixture exercises (as identified in `spec/04_functional_requirements.json`, `spec/05_interface_contracts.json`, `spec/06_invariants.json`, `spec/07_nfrs.json`); MUST add `smoke` tag for fixtures covering FRs listed as high-priority in capabilities; MUST add `load` tag for fixtures covering NFRs with `category: latency` or `category: throughput`.
@@ -53,6 +66,11 @@ Before emitting, verify:
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
+- [ ] Every FR with error conditions has at least one fixture covering the failure path
+- [ ] Fixture IDs in this step match the `fixture_ref` values used in Step 04 FR acceptance criteria
+- [ ] Every fixture has a valid `target` ID referencing an existing FR or acceptance criterion
+- [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist
 - Fixtures cover happy-path, edge, and failure scenarios for high-priority FRs and APIs.
@@ -97,6 +115,7 @@ Before emitting, verify:
 # Output Contract
 ```json
 {
+  "$schema": "vc:08-fixtures",
   "id": "fixtures-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
@@ -111,23 +130,10 @@ Before emitting, verify:
       "expected": {
         "status": 200
       },
-      "targets": [
-        {
-          "type": "api",
-          "id": "api-auth-login"
-        }
-      ],
-      "tag_ref": {
-        "id": "cn:core:tag:smoke",
-        "kind": "tag"
-      }
+      "targets": [{ "type": "validates", "id": "api-auth-login" }],
+      "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag" }
     }
   ],
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:tag:smoke",
-      "kind": "tag"
-    }
-  ]
+  "canonical_refs_used": []
 }
 ```
