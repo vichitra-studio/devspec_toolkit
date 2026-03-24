@@ -1,30 +1,11 @@
 # Step 16c · Implementation Reviewer
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 16c` to see downstream consumers.
-
-## Schema Authority
-
-The schema at `schema/16_impl_context.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Audit the implementation for completeness, quality, and rigorous adherence to the spec. This step acts as the "Gatekeeper" holding the "Definition of Done" for Code, Security, and Delivery before the cycle closes.
-
-## Tool Execution
-After updating the JSON artifact, validate it:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
 
 # Role
 You are a senior technical reviewer. Your job is to **Audit** the implementation of a Step by comparing the `plan` and `execution` in the `spec/impl_context/{step_id}.json` artifact against the actual code.
@@ -232,9 +213,6 @@ For each `checklist[]` item:
 *   **Infinite Loop**: Failing to spawn recursive `remediation_tasks` for findings. *Fix*: Every finding must have a `task` unless it's a "won't fix".
 *   **Security Bypass**: Verifying while `security_status` is RED. *Fix*: Check Step 11/17 gates explicitly.
 
-## Self-Audit Gate (Score Threshold)
-If score < 0.9, output clarifying questions only — do not emit JSON.
-
 ## FORBIDDEN ACTIONS (Immediate Rejection)
 
 ### Verification
@@ -283,29 +261,6 @@ Before emitting, verify:
 - Schema URI: vc:16-impl-context
 - Schema File: schema/16_impl_context.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract (Update Logic)
 *Input*:

@@ -1,44 +1,11 @@
 # Step 14 · Roadmap
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 14` to see downstream consumers.
-
-## Schema Authority
-
-The schema at `schema/14_roadmap.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Synthesize the foundational strategy (Step 09: Implementation Plan), the detailed core specifications (Steps 00–12), and any discovered domain extensions (Step 13) into a cohesive **Execution Roadmap**. This artifact drives the "Just-In-Time" implementation loop by breaking the scope down into sequential, verifiable milestones, where **Each Milestone** corresponds to exactly **One User Story** decomposed into atomic sub-tasks.
-
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
-Verify that the entire spec suite is consistent before finalizing the roadmap:
-```bash
-./tools/run_specdev.sh validate-all <spec_dir> --repo-root ./devspec_toolkit
-```
-
-# Role
-You are a senior program manager and architect. Your job is to emit a single JSON artifact for **Step 14 · Roadmap** that aggregates all discovery specs (Core 00-12 and Extensions) into a cohesive implementation plan.
-
-# Task
-- **Input context:** Completed Phase 1 specs (`00_charter.json` through `12_ci_gates.json`) AND any Phase 2 Custom Extensions.
-- **Objective:** Produce a high-level roadmap that sequences the work defined in both phases.
-- **Output type:** One JSON document conforming to the referenced step schema.
-- **Timing:** This step is executed AFTER all specifications are defined but BEFORE the detailed JIT Implementation Loop begins.
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
@@ -73,7 +40,6 @@ For each upstream artifact ingested, extract the following:
 ## Self-Audit Gate
 - Confirm that existing specs cover enough scope to justify a roadmap.
 - Confirm all "High" priority items from `13a_completeness_assessment` are accounted for (either fixed or scheduled).
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ### Coverage Closure
 Before emitting, verify:
@@ -113,7 +79,7 @@ Before emitting, verify:
 - **NEVER use a `fr_refs` ID not present in `spec/04_fr_list.json`**: All FR references must be grounded in Step 04.
 - **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
 
-## Field-by-Field Guidance
+## Cross-Step Synthesis Notes
 ### tech_stack.languages / tech_stack.frameworks / tech_stack.infrastructure / tech_stack.tools
 - Use arrays of objects with `name` and `version` (optional `rationale`).
 - Prefer copying from `spec/09_impl_plan.json`; only add entries if Step 13 extensions require them.
@@ -188,12 +154,6 @@ Before emitting, verify:
 ### trace
 - Use traceRef objects to cite upstream specs that shape the roadmap.
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON (excluding `$schema`) must validate against the referenced step schema listed in `Schema Reference`.
-3. Include a top-level `$schema` field that matches the schema URI.
-4. All milestones must have `target_date`, `deliverables`, and `source_milestones`.
-
 # Note on `$schema`
 The `$schema` field is required in the output and is stripped before validation during prompt-schema sync checks.
 
@@ -201,29 +161,6 @@ The `$schema` field is required in the output and is stripped before validation 
 - Schema URI: vc:14-roadmap
 - Schema File: schema/14_roadmap.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json

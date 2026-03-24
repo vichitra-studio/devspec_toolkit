@@ -1,57 +1,18 @@
 # Step 02 · System Sketch
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 02` to see downstream consumers. This prompt's output feeds 6 downstream steps.
-
-## Schema Authority
-
-The schema at `schema/02_system_sketch.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Build a lightweight architecture map that shows the components required to deliver the approved capabilities and how data flows between them. The system sketch communicates ownership, technology choices, and integration contracts early so interface design and delivery planning stay coherent.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 2 · System Sketch** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
-
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 2 · System Sketch**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** include `trace` that connect components and connections to upstream or downstream artifacts.
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["02"]`.
-- Ingest required seeds in order before any other context.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- **Primary Source:** `docs/seed/seed_tech_stack.md` (required) for architecture decisions, patterns, and constraints.
-- Capabilities and owners from `spec/01_capabilities.json` to inform components.
-- Use only upstream artifacts; do not ingest downstream interface, glossary, or NFR specs in this step.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, developer reference.
-
-### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_tech_stack.md**: Architecture patterns, technology constraints, infrastructure decisions, and deployment topology for component design
+- **docs/seed/seed_tech_stack.md** (required): Architecture patterns, technology constraints, infrastructure decisions, and deployment topology for component design
 - **00_charter.json**: Scope boundaries, system context, integration points, and deployment constraints for component identification
-- **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set
+- **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set; use only upstream artifacts — do not ingest downstream interface, glossary, or NFR specs in this step
 
 ## Operating Flow: Synthesize → Clarify → Emit
 
@@ -72,7 +33,6 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: MUST NOT use generic phrases like “owns data” or “manages resources”; MUST specify the data domain (read from `spec/01_capabilities.json` inputs/outputs) and quantitative SLAs (read from `docs/seed/seed_tech_stack.md` constraints).
 
 ## Self-Audit Gate
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Each in-scope capability maps to at least one component.
   - Every Step 01 capability appears in at least one component `trace` entry.
@@ -90,16 +50,6 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states only if the schema defines them (Step 02 does not).
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. Include `trace` as required by the schema (Step 02 requires them on components and connections).
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
 ## Step-Specific Completeness Checklist
 - Components enumerate services, data stores, queues, jobs, caches, UIs, libs, and external systems; each has a type and clear responsibilities.
 - Connections cover all cross-component interactions; ensure `from` and `to` component IDs exist and `trust_boundary` is set.
@@ -107,21 +57,6 @@ Before emitting, verify:
 - Protocols/auth match real integration constraints (e.g., gRPC with mTLS, events with exactly-once semantics where needed).
 - Include reliability semantics on event/async paths; specify rate limits where known.
 - Tag external dependencies and their owners; `type: external` must include the `external-dependency` tag.
-
-## Field-by-Field Guidance
-- components[*].component_id: kebab-case; map to ownership later in scaffolding.
-- components[*].type: one of service, db, queue, cache, job, ui, lib, external.
-- components[*].responsibilities: top 3–6 duties with clear boundaries; avoid overlap across components.
-- components[*].tags: allowed values only: `critical-path`, `supporting`, `external-dependency`, `shared-platform`, `stateful`, `stateless`, `realtime`, `batch`, `latency-sensitive`, `throughput-sensitive`, `pii`, `phi`, `pci`, `confidential`, `public-data`, `multi-tenant`, `single-tenant`, `experimental`, `legacy`, `deprecated`. Include `external-dependency` when `type: external`.
-- components[*].trace: required; include capability references that this component fulfills (use `type: doc` for capability IDs).
-- connections[*].from/to: existing component IDs.
-- connections[*].protocol: `http`, `grpc`, `event`, `rpc`, `db`, or `file` matching the interface.
-- connections[*].trust_boundary: `internal`, `partner`, or `public` (required).
-- connections[*].schema_ref: pointer to schema used on the wire (if known) or `-tbd`.
-- connections[*].auth: `none`, `basic`, `oauth2`, `jwt`, `mTLS`, or `key` (required for `partner`/`public`).
-- connections[*].rate_limit: required for `partner`/`public` trust boundaries; object `{ "rps": int, "burst": int, "window_s": int, "scope": "ip"|"client"|"token"|"global" }`; bounds: `rps` 1..100000, `burst` 1..200000 and >= `rps` when present, `window_s` 1..3600, `scope` required.
-- connections[*].reliability: `best-effort`, `at-least-once`, `exactly-once` aligned with business risk.
-- connections[*].trace: required; link each integration to the capabilities it supports (use `type: doc` for capability IDs, `nfr` for NFRs).
 
 ## Best Practices
 - **Components**: Assign deterministic `component_id` values and tag each component with the correct `type` and owning team.
@@ -165,29 +100,6 @@ DO NOT:
 - Schema URI: vc:02-system-sketch
 - Schema File: schema/02_system_sketch.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json

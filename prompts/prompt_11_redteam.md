@@ -1,30 +1,11 @@
 # Step 11 · Red‑Team / Failure Modes
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 11` to see downstream consumers.
-
-## Schema Authority
-
-The schema at `schema/11_redteam.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Proactively identify security threats, failure modes, and edge cases. Ensure every threat is directly **traceable** to a specific public API or system component, and define actionable **mitigations** linked to requirements or invariants.
-
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
 
 # Role
 You are a senior security architect and "Red Team" specialist. Your job is to emit a single JSON artifact for **Step 11 · Red‑Team / Failure Modes** that is machine-checkable. You must identify specific threats against the defined interfaces and system sketch, not generic security platitudes. You must think like an attacker who knows the system internals.
@@ -92,7 +73,6 @@ For each upstream artifact ingested, extract the following:
 - [ ] Are `edge_cases` structured with IDs?
 - If the system operates in a regulated, high-risk, or domain-specific context not evident from upstream specs, ask about domain-specific threat categories before finalizing.
 - If the access control model is not fully specified in upstream interface contracts, ask Gap Questions rather than assuming a threat surface.
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ### Coverage Closure
 Before emitting, verify:
@@ -105,14 +85,11 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
-# Output Rules
-1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2.  Do not dump JSON in the chat thread; respond with a short confirmation that the artifact path was written and validation status.
-3.  Follow the referenced step schema exactly.
-4.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
-5.  `target_ids`: MUST be populated for every threat.
-6.  `mitigations`: MUST use `traceRef` structure (type + id).
-7.  `category`: MUST be one of the allowed enum values.
+## Step-Specific Output Constraints
+1.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
+2.  `target_ids`: MUST be populated for every threat.
+3.  `mitigations`: MUST use `traceRef` structure (type + id).
+4.  `category`: MUST be one of the allowed enum values.
 
 ## Negative Constraints
 - **DO NOT** list generic threats (e.g., "OWASP Top 10") without specific application context.
@@ -127,7 +104,7 @@ Before emitting, verify:
 - [ ] **Traceability Integrity**: Every threat has a valid `target_id` pointing to an existing Step 05 or Step 02 ID.
 - [ ] **Mitigation Actionability**: Mitigations link to specific Invariants/NFRs or define concrete new capabilities (no vague "Fix it" notes).
 
-## Field-by-Field Guidance
+## Cross-Step Synthesis Notes
 - **id**: `redteam-catalog` (Fixed).
 - **threats**:
     - `threat_id`: `threat-<category>-<slug>` (e.g., `threat-authz-elevation`).
@@ -168,29 +145,6 @@ Before emitting, verify:
 - Schema URI: vc:11-redteam
 - Schema File: schema/11_redteam.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json

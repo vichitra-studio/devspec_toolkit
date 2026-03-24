@@ -1,42 +1,13 @@
 # Step 15 · Scaffold Generation
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 15` to see downstream consumers.
-
-## Schema Authority
-
-The schema at `schema/15_scaffold.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
 After generating the JSON artifact, implement the scaffold manually or using your preferred generator/framework CLI. Ensure the generated routes match `05_interface_contracts.json`.
-
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 15 · Scaffold Generation** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
-
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 15 · Scaffold Generation**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
@@ -74,7 +45,6 @@ For each upstream artifact ingested, extract the following:
 - Gating items:
   - Route map includes all public APIs; paths/methods consistent with contracts.
   - Service skeleton sufficient to run a minimal service; validators listed.
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ### Coverage Closure
 Before emitting, verify:
@@ -87,18 +57,6 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. DO NOT invent preconditions, postconditions, or error states as they are not supported by the schema.
-6. Set owner to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. Populate `trace` and `links` to connect to Step 05 or other artifacts if applicable.
-8. DO NOT guess `build_status`; default to `pending` if not known.
-9. DO NOT duplicate `interface_ref` values in the route map.
-10. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
 ## Negative Constraints
 - **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
 - **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
@@ -110,14 +68,6 @@ Before emitting, verify:
 - `interface_map` covers all in-scope APIs (Step 5) with path/method and `interface_ref` links.
 - `validators` MUST include at least one schema validation command (e.g., `specdev-tools validate-all spec --repo-root .`) and one type-check or lint command per language in `project_skeleton.language`.
 - `build_status` reflects build health; default to `pending` until CI succeeds.
-
-## Field-by-Field Guidance
-- project_skeleton.language/framework: e.g., `python` + `fastapi`, `node` + `express`.
-- project_skeleton.modules: high-level modules or packages to generate.
-- interface_map[*].interface_ref: `api-*` from interface contracts.
-- interface_map[*].path/method: concrete routing info for the chosen framework.
-- validators: names of validators or scripts to run (e.g., `spec-validate`, `openapi-sync`).
-- build_status: `pending`, `green`, or `red`.
 
 ## Best Practices
 - **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.
@@ -142,29 +92,6 @@ Before emitting, verify:
 - Schema File: schema/15_scaffold.schema.json
 - Schema Registry: tools/schema_registry.json
 
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
-
 # Output Contract
 ```json
 {
@@ -182,4 +109,3 @@ This step's output artifact MUST include every field listed in the schema's `req
   "canonical_refs_used": []
 }
 ```
-

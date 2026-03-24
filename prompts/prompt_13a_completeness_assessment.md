@@ -1,31 +1,13 @@
 # Step 13a · Completeness Assessment
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 13a` to see downstream consumers.
-
-## Schema Authority
-
-The schema at `schema/13a_completeness_assessment.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Assess the completeness of Phase 1 specifications and identify gaps that prevent achieving perfect system implementation readiness. This step evaluates the current specification state against ideal completeness criteria and generates actionable recommendations for improvement.
 
 ## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
 To ensure full suite consistency and generate a traceability matrix for analysis:
 ```bash
 ./tools/run_specdev.sh validate-all <spec_dir> --repo-root ./devspec_toolkit
@@ -86,7 +68,6 @@ For each upstream artifact ingested, extract the following:
   - Identification of at least one missing element OR confirmation of 100% completeness.
   - Ratings provided for current implementation state.
 - **Extension Check**: Ensure all extensions in manifest are present.
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 
 ### Coverage Closure
 Before emitting, verify:
@@ -105,29 +86,14 @@ Before emitting, verify:
 - **DO NOT** ignore missing extensions; if they are in the manifest, they must be on disk.
 - **DO NOT** evaluate files that are not part of the standard set (00-15 + extensions).
 
-## Field-by-Field Guidance
-- id: `assessment-YYYYMMDD`.
-- owner: typically `api` or `system`.
-- missing_elements:
-  - element_id: the ID of the missing or incomplete item (or a new ID if describing a gap).
-  - category: `traceability`, `completeness`, `quality`, `ambiguity`.
-  - priority: `high` (blocks implementation), `medium` (risk), `low` (debt).
-  - impact_on_completeness: 0.1 to 1.0 deduction.
-  - description: specific explanation of what is missing.
-  - specification_source: array of filenames (e.g. `04_fr_list.json`, `13_extension_manifest.json`).
-- completeness_rating:
-  - current: 0-10 score.
-  - target: 10.
-  - confidence_level: 0.0-1.0 (confidence in this assessment).
+## Cross-Step Synthesis Notes
+- missing_elements.priority: `high` = blocks implementation, `medium` = risk, `low` = debt.
+- missing_elements.impact_on_completeness: numeric deduction from 0.1 to 1.0 per missing element (e.g., Missing API=-1.0, Missing NFR=-0.5).
+- missing_elements.specification_source: array of filenames tracing the gap back to its origin (e.g. `04_fr_list.json`, `13_extension_manifest.json`).
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. `completeness_rating.target` MUST be 10.
-5. `missing_elements` must list specific gaps, not general complaints.
-6. Set `owner` to the group responsible for the spec set (usually same as Step 00).
-7. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+## Step-Specific Output Constraints
+1. `completeness_rating.target` MUST be 10.
+2. `missing_elements` must list specific gaps, not general complaints.
 
 ## Step-Specific Completeness Checklist
 - ID format follows `assessment-<date>`.
@@ -159,29 +125,6 @@ Before emitting, verify:
 - Schema File: schema/13a_completeness_assessment.schema.json
 - Schema Registry: tools/schema_registry.json
 
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
-
 # Output Contract
 ```json
 {
@@ -197,4 +140,3 @@ This step's output artifact MUST include every field listed in the schema's `req
   "canonical_refs_used": []
 }
 ```
-

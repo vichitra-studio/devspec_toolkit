@@ -140,16 +140,28 @@ class PromptContractsTests(unittest.TestCase):
 
     def test_all_prompts_include_hardening_protocol_block(self):
         required_lines = (
-            "## Hardening Protocol",
+            "Hardening Protocol",
             "- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.",
             "- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.",
             "- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.",
             "- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.",
         )
+        shared_expectations_path = self.repo_root / "docs" / "prompts" / "shared_expectations.md"
+        shared_text = shared_expectations_path.read_text(encoding="utf-8") if shared_expectations_path.exists() else ""
+        inherits_marker = "docs/prompts/shared_expectations.md"
         for path in sorted(self.prompt_dir.glob("prompt_*.md")):
             text = path.read_text(encoding="utf-8")
-            for line in required_lines:
-                self.assertIn(line, text, msg=f"{path.name} missing hardening line: {line}")
+            # Prompts that declare shared_expectations inheritance satisfy the Hardening Protocol
+            # requirement via centralized shared_expectations.md — verify the shared doc has the lines.
+            if inherits_marker in text:
+                for line in required_lines:
+                    self.assertIn(
+                        line, shared_text,
+                        msg=f"shared_expectations.md missing hardening line: {line}",
+                    )
+            else:
+                for line in required_lines:
+                    self.assertIn(line, text, msg=f"{path.name} missing hardening line: {line}")
 
     def test_trinity_output_examples_include_non_empty_canonical_refs(self):
         for file_name in (

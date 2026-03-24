@@ -1,40 +1,11 @@
 # Step 09 · Implementation Plan
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 09` to see downstream consumers. This prompt's output feeds 3 downstream steps.
-
-## Schema Authority
-
-The schema at `schema/09_impl_plan.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Translate the validated spec into an executable delivery roadmap that covers technology choices, sequencing, risks, and migration strategy. The implementation plan aligns teams on what will ship when, how dependencies are managed, and which experiments or spikes de-risk the path.
-
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 9 · Implementation Plan** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
-
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 9 · Implementation Plan**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
@@ -62,7 +33,6 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: milestones should map to delivered FRs/APIs and passing CI gates.
 
 ## Self-Audit Gate
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items:
   - Tech choices include versions and rationale; milestones have names and acceptance signals; known risks/spikes captured.
   - `tech_stack` aligns with `01_capabilities.json`.
@@ -80,16 +50,6 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. **Traceability**: You MUST include a top-level `trace` array linking to the Charter (`00_charter.json`) or System Sketch (`02_system_sketch.json`).
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
 ## Negative Constraints
 - **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/01_capabilities.json` without a clear "Spike" justification.
 - **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
@@ -102,19 +62,6 @@ Before emitting, verify:
 - Milestones include clear names, target dates, risks, and spikes for unknowns.
 - `migration_plan` describes data or API migration if replacing existing systems.
 - `dependencies` enumerate external systems, teams, or contracts that impact delivery.
-
-## Field-by-Field Guidance
-- tech_stack: structured object with arrays for `languages`, `frameworks`, `infrastructure`, `tools`. Each item must have `name`, `version`, and `rationale`.
-    - `name`: exact library/tool name (e.g., "pydantic", "postgresql").
-    - `version`: semantic version constraint (e.g., "^2.0.0").
-    - `rationale`: brief reason for selection (e.g., "Standard backend language per capabilities").
-- milestones[*].milestone_id/name: kebab-case ID and descriptive name.
-- milestones[*].target_date: ISO date for planning; can be tentative.
-- milestones[*].status: `pending`, `in_progress`, `done`, `deferred`.
-- milestones[*].risks/spikes: concrete bullets (e.g., perf unknowns, vendor limits, schema evolution).
-- milestones[*].deliverables: array of trace references linking to FRs/APIs.
-- migration_plan: narrative plan for cutover/backfill/rollback.
-- dependencies: list of external dependencies and agreements.
 
 ## Best Practices
 - **Stack**: Capture `tech_stack` decisions with rationale, version constraints, and ownership so scaffold generation is predictable.
@@ -139,29 +86,6 @@ Before emitting, verify:
 - Schema URI: vc:09-impl-plan
 - Schema File: schema/09_impl_plan.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json

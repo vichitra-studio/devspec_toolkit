@@ -1,58 +1,19 @@
 # Step 00 · Project Charter
 
+> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+
 Run `specdev prompt-context 00` to see downstream consumers. This prompt's output feeds 8 downstream steps.
-
-## Schema Authority
-
-The schema at `schema/00_charter.schema.json` is the authoritative source for all
-field definitions, types, required vs optional markers, enum values, patterns, and minItems rules.
-MUST read the schema before generating output. Do NOT guess field names, types, or valid values —
-all structural constraints are defined in the schema. Do NOT output fields not defined in the schema.
-
-## Path Variables
-| Variable | Description |
-|---|---|
-| `$PRODUCT_ROOT` | Root of the consumer/product repository |
-| `$TOOLKIT_ROOT` | Root of the devspec_toolkit directory |
-| `$SPEC_DIR` | `$PRODUCT_ROOT/spec` — where spec artifacts live |
-| `$SCHEMA_DIR` | `$TOOLKIT_ROOT/schema` — where JSON Schemas live |
 
 ## Purpose
 Establish the authoritative charter that captures the business problem, intended users, constraints, and measurable success criteria in falsifiable language. This artifact anchors downstream decisions by making scope boundaries, stakeholder needs, and success metrics explicit enough to trace through every later step.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 0 · Project Charter** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
-
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 0 · Project Charter**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["00"]`.
-- Ingest required seeds in order before any other context.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- **Primary Source:** `docs/seed/seed_overview.md` (required) for project scope boundaries, business objectives, target users, and success criteria.
-- **Constraints Source:** `docs/seed/seed_tech_stack.md` (required) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
-- Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
-- Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
-- Guides: Shared expectations `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`, reference `$TOOLKIT_ROOT/docs/developers/reference.md`.
-- Schema: `$SCHEMA_DIR/00_charter.schema.json` for Output Contract shape and required fields.
-
-### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_overview.md**: Project scope boundaries, business objectives, target users, and high-level success criteria
-- **docs/seed/seed_tech_stack.md**: Hardware/legacy constraints for `out_of_scope` or `assumptions`; technology constraints informing `risks`
+- **docs/seed/seed_overview.md** (required): Project scope boundaries, business objectives, target users, and high-level success criteria
+- **docs/seed/seed_tech_stack.md** (required): Hardware/legacy constraints for `out_of_scope` or `assumptions`; technology constraints informing `risks`
+- **Existing org context** (if present): Business objectives, compliance posture, target users/markets from any product briefs in repo
+- **spec/03_glossary.json, spec/07_nfrs.json** (if present): Align metrics/units and terminology with early drafts
 
 ## Operating Flow: Synthesize → Clarify → Emit
 - Build a private Context Ledger containing: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics (metric→unit→target→method). Do not output it.
@@ -67,7 +28,6 @@ For each upstream artifact ingested, extract the following:
 - Ambiguity scrub: MUST replace any instance of “improve”, “optimize”, “user-friendly”, or “fast” with a quantifiable target (numeric value + unit + timeframe) derived from `docs/seed/seed_overview.md` success criteria or `docs/seed/seed_tech_stack.md` constraints.
 
 ## Self-Audit Gate (do not output)
-- If score < 0.9, output clarifying questions only — do not emit JSON.
 - Gating items to check before emitting:
   - Problem statement names users, pain, measurable business impact, and hard constraints.
   - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
@@ -86,16 +46,6 @@ Before emitting, verify:
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
 ## Step-Specific Completeness Checklist
 - Problem statement specifies the primary pain, affected users, measurable business impact, and hard constraints (time, budget, compliance).
 - Scope is explicit: at least 3–5 in-scope items and 3–5 out-of-scope items; avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
@@ -110,18 +60,6 @@ Before emitting, verify:
 - **DO NOT** omit the `owner` field; accountability is required.
 - **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
 - **DO NOT** list stakeholders without defining their specific `needs`.
-
-## Field-by-Field Guidance
-- id: stable kebab-case; prefer `project_charter-<initiative>`.
-- owner: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, or `engineering`; pick the accountable group for charter updates.
-- problem_statement: 1–3 sentences, explicit on users, pain, outcome, and constraints.
-- in_scope/out_of_scope: concrete bullets; include integrations, data domains, and delivery boundaries.
-- assumptions: facts taken for granted (e.g., existing identity provider, data retention rules).
-- risks: delivery and operational risks with concise phrasing (e.g., dependency readiness, legal review timelines).
-- stakeholders: roles (e.g., Security Lead, Support Manager) with clear needs (e.g., audit logs retained 1 year).
-- user_segments: include description and JTBD; pains and gains should be testable or observable later.
-- success_metrics: target must be measurable in units; measurement_method states how/where it will be captured (e.g., analytics event, dashboard query).
-- links: trace to FRs/NFRs/governance ids when known; use temporary `*-tbd` anchors if not yet defined.
 
 ## Best Practices
 - **Problem Statement**: Write a statement of 1-3 sentences that names the affected users, their pain, the measurable business impact, and hard constraints — sourced from `docs/seed/seed_overview.md`. Avoid solutioneering.
@@ -151,29 +89,6 @@ Before emitting, verify:
 - Schema URI: vc:00-charter
 - Schema File: schema/00_charter.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is OPTIONAL. Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is OPTIONAL. Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.
-
-## Metadata Contract
-
-This step's output artifact MUST include every field listed in the schema's `required[]` array (see Schema Authority). Do NOT add fields not defined in the schema. Refer to the schema for the complete list of required fields, types, and structural constraints — do NOT restate them here.
 
 # Output Contract
 ```json
