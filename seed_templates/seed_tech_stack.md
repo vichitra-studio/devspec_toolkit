@@ -1,88 +1,93 @@
-<!--
-# AI AGENT INSTRUCTION (META-PROMPT)
-# Role: System Architect
-# Goal: Interview the user to populate the "Tech Stack" structure below.
-# Protocol:
-# 1. BE SPECIFIC. No generic "Python". We need "Python 3.12, chosen for asyncio maturity."
-# 2. ASK WHY. Challenge every technology choice — what alternative was considered?
-# 3. VERIFY COMPATIBILITY across all listed components.
-# 4. USE THE 'EXPECTATION' HINTS to judge completeness.
-# 5. USE [UNKNOWN: reason] for anything the user cannot yet answer. Never guess.
+# System Design: [Project Name]
 
-# EXAMPLES (Gold Standard vs Bad):
-
-# --- Web App Examples ---
-# BAD: "Database: Postgres"
-# GOOD: "Database: PostgreSQL 16 (AWS RDS), chosen for JSONB support and existing team expertise."
-# BAD: "Auth: Uses tokens."
-# GOOD: "Auth: JWT (RS256) issued by Auth0, validated via API gateway middleware."
-
-# --- Library / CLI Examples ---
-# BAD: "Language: Rust"
-# GOOD: "Language: Rust 1.75 (stable), chosen for zero-cost abstractions and no runtime dependency."
-# BAD: "Distribution: Published somewhere."
-# GOOD: "Distribution: Published to crates.io via GitHub Actions on tag push. MSRV policy: current stable minus 2."
-
-# SELF-CORRECTION CHECKLIST (Do not stop until specific):
-# - [ ] Did I identify the system type (web app, library, CLI, mobile, etc.)?
-# - [ ] Did I pin versions for all core technologies?
-# - [ ] Did I explain the *why* behind each major technology choice?
-# - [ ] Did I describe how the system reaches its users (deployment, publishing, distribution)?
-# - [ ] Did I mark unknowns with [UNKNOWN: reason] instead of guessing?
-# - [ ] Did I complete the Metadata section?
-# - [ ] Is every component's role and connections described?
--->
-
-# Tech Stack: [Project Name]
+> **AI Coach Instructions**
+> You are a **System Architect Coach**. Your goal is to help the user define the system design for the product described in `seed_overview.md`. Adapt your coaching depth based on the user's technical proficiency (§0 Metadata).
+>
+> **Protocol by Proficiency:**
+> - **Non-technical**: Ask about constraints and preferences in plain language. Recommend specific technologies based on requirements, explaining your reasoning. Mark recommendations as `[RECOMMENDED: reason]` so the user can accept or override. If a section depends on earlier answers the user couldn't provide, proactively suggest `[AUTO-DERIVE]`.
+> - **Some technical experience**: Ask clarifying questions before recommending. Present 2-3 options with trade-offs instead of a single recommendation. Use `[RECOMMENDED: reason]` for areas outside their expertise.
+> - **Software engineer / Architect**: Demand specificity. Challenge every technology choice — what alternative was considered? Verify compatibility across all listed components. For SWE users, also surface API design and interface style questions (REST vs gRPC vs GraphQL, versioning strategy).
+>
+> **For all proficiency levels:**
+> 1. FILL EVERY SECTION with real content, `[UNKNOWN: reason]`, or `[AUTO-DERIVE: based on requirements]`.
+> 2. DO NOT GUESS. An honest unknown is better than a wrong guess.
+> 3. VERIFY that choices here are consistent with constraints in `seed_overview.md`.
+>
+> **Quality Calibration (Gold Standard vs Bad):**
+> - BAD: "Database: Postgres"
+> - GOOD: "Database: PostgreSQL 16, chosen for JSONB support and existing team expertise."
+> - BAD (for non-technical user): Leaving blank because they don't know.
+> - GOOD (for non-technical user): "[AUTO-DERIVE: We need to store user data and orders. Team has no database preference.]"
+>
+> **Self-Correction Checklist:**
+> - [ ] Did I identify the system type and deployment model?
+> - [ ] Are technology choices specific (or marked for auto-derivation)?
+> - [ ] Did I describe how the major parts of the system connect?
+> - [ ] Did I capture hard constraints that limit what is possible?
+> - [ ] Did I capture scale expectations?
+> - [ ] Did I mark unknowns with `[UNKNOWN: reason]` instead of guessing?
 
 ## 0. Metadata
 | Key | Value |
 | :--- | :--- |
 | **Project Name** | [Name] |
-| **Version** | 0.1 (Draft) |
-| **Status** | [Draft/Review/Approved] |
+| **Version** | 0.3 (Draft) |
+| **Status** | [Draft / Review / Approved] |
 | **Date** | [YYYY-MM-DD] |
+| **Technical Proficiency** | [Non-technical / Some technical experience / Software engineer or architect] |
 
 ## 1. About This Document
-**Purpose**: This document serves as the **System Architecture Specification**. It maps the product requirements (defined in `seed_overview.md`) into concrete engineering decisions: what technologies are used, how the system is structured, and how it is delivered to users.
+**Purpose**: This document captures the **system design** for the product defined in `seed_overview.md`. It maps product requirements into engineering decisions: what kind of system this is, how it is structured, what technologies are used, and what constraints bound the design.
+
+**How to fill this out**: If you are non-technical, focus on what you know — your team's skills, your existing tools, your constraints. Mark anything you're unsure about as `[AUTO-DERIVE: brief context]` and the pipeline will resolve it based on your requirements. If you are technical, be as specific as possible — pinned versions with rationale reduce downstream decision fatigue.
+
+**How AUTO-DERIVE works**: When you mark a decision as `[AUTO-DERIVE: context]`, the pipeline's architecture step (Step 02) will resolve it by matching your constraints (team expertise, scale, budget, system type) to appropriate technologies. Include as much context as you can — `[AUTO-DERIVE: need fast reads, team knows SQL]` is much better than `[AUTO-DERIVE]` alone.
+
+**Important**: If you mark most of this document as `[AUTO-DERIVE]`, the pipeline will make technology decisions on your behalf. You will review these decisions at the architecture step (Step 02) — pay close attention during that review, and consult a technical advisor if available.
 
 **Expectations**:
-1.  **System Completeness**: Define every component required to build, run, and deliver the system. Nothing "magically" happens — if it is needed, it must be listed.
-2.  **Pinned Authority**: Technology choices must be explicit. No "We might use Rust". Instead: "Rust 1.75 (stable), chosen for memory safety without GC." This reduces downstream decision fatigue.
-3.  **Integration Logic**: Explicitly define the "glue". How does A talk to B? What protocol? What format?
-4.  **Honesty Over Completeness**: Use `[UNKNOWN: reason]` for decisions not yet made. An honest unknown is better than a wrong guess.
+1. **System Completeness**: Define every major part required to build and run the system.
+2. **Honesty Over Completeness**: Use `[UNKNOWN: reason]` for decisions not yet made, `[AUTO-DERIVE: context]` for decisions you want the pipeline to resolve.
+3. **Consistency**: Choices here must not contradict constraints in `seed_overview.md`.
+
+---
 
 ## 2. System Type & Core Technology
 
 ### 2.1 System Type
-- **Expectation**: What kind of software is this? Be specific about the category and its implications.
 <!--
 DEEP DIVE QUESTIONS:
 - "Is this a web application, library, CLI tool, mobile app, desktop app, framework, embedded system, API service, or something else?"
 - "Is it a standalone system or a component consumed by other systems?"
 - "Does it have a user interface, or is it purely programmatic?"
 -->
+- **Expectation**: What kind of software is this? Be specific about the category and its implications.
 - **System Type**: [e.g. "Web application", "Python library", "CLI tool", "iOS app", "REST API service", "Embedded firmware"]
 - **Deployment Model**: [e.g. "Long-running server", "Invoked on demand", "Imported as dependency", "Installed on device"]
 
 ### 2.2 Core Technology Decisions
-- **Expectation**: Specific versions for every core technology. Must include rationale. **NO "LATEST" TAGS.** Use `[UNKNOWN: reason]` for undecided choices.
 <!--
-DEEP DIVE QUESTIONS:
+FOR TECHNICAL USERS:
 - "What exact version? (e.g. Node 20.10.0, Rust 1.75, Swift 5.9)"
 - "Why that version? (LTS policy? Required feature? Team expertise?)"
 - "What alternatives were considered and rejected?"
+
+FOR NON-TECHNICAL USERS:
+- "Do you or your team have experience with any programming languages or tools?"
+- "Do you have any strong preferences? (e.g., 'I want it built in Python' or 'I have no preference')"
+- "If you don't have preferences, write [AUTO-DERIVE: brief context] and we'll recommend based on your requirements."
 -->
-| Technology | Version | Rationale |
+- **Expectation**: Technology choices with rationale. Non-technical users: state preferences or mark `[AUTO-DERIVE]` with context.
+
+| Technology | Decision | Rationale |
 | :--- | :--- | :--- |
-| **Language** | [e.g. Python 3.12] | [Why this language and version?] |
-| **Runtime / Platform** | [e.g. CPython, Node, JVM 21, .NET 8, bare metal] | [Why?] |
-| **Build System** | [e.g. Cargo, pip + setuptools, Gradle, CMake] | [Why?] |
-| **Primary Framework** | [e.g. FastAPI, React 18, SwiftUI, none] | [Why? Or "N/A" if not applicable] |
-| [Add rows as needed] | | |
+| **Language** | [e.g. "Python 3.12" or "[AUTO-DERIVE: team knows Python basics]"] | [Why, or context for auto-derivation] |
+| **Primary Framework** | [e.g. "FastAPI" or "[AUTO-DERIVE: need a web API]"] | [Why, or "N/A" if not applicable] |
+| **Data Storage** | [e.g. "PostgreSQL 16" or "[AUTO-DERIVE: need to store user accounts and orders]"] | [Why?] |
+| **Interface Style** (SWE users) | [e.g. "REST with JSON", "gRPC", "GraphQL", "CLI flags + stdout" or "N/A"] | [Why? Or skip if non-technical] |
+| [Add rows as needed — consider: cache, message broker, search, CDN if applicable] | | |
 
 ### 2.3 Architecture Overview
-- **Expectation**: Describe the major parts of the system and how they relate. The structure depends on the system type — there is no fixed set of layers. Identify what matters for *your* system.
 <!--
 DEEP DIVE QUESTIONS:
 - "What are the 2-5 major parts of this system?"
@@ -96,20 +101,21 @@ EXAMPLES BY SYSTEM TYPE:
 - Mobile app: "UI layer | Local storage | API client | Push notification handler"
 - Embedded: "Hardware abstraction | Sensor drivers | Communication protocol | OTA updater"
 -->
-| Part | Technologies | Role & Constraints |
+- **Expectation**: Describe the major parts of the system and how they relate.
+
+| Part | Technology | Role & Constraints |
 | :--- | :--- | :--- |
-| [Part 1] | [Tech] | [What it does and why it is structured this way] |
-| [Part 2] | [Tech] | [What it does and why] |
+| [Part 1] | [Tech or AUTO-DERIVE] | [What it does and why it is structured this way] |
+| [Part 2] | [Tech or AUTO-DERIVE] | [What it does and why] |
 | [Add rows as needed] | | |
 
 ---
 
-## 3. Components
+## 3. Components & External Systems
 
-- **Expectation**: Deep detail on each major part identified in 2.3. For each component, describe its role, what it connects to, and how it is configured. The number and nature of components depends on your system type.
 <!--
 GUIDANCE BY SYSTEM TYPE:
-- Web app: services, databases, queues, caches
+- Web app: services, databases, queues, caches, external APIs
 - Library: public modules, internal modules, extension points
 - CLI tool: subcommands, input parsers, output handlers
 - Mobile app: screens, services, data stores, platform integrations
@@ -117,115 +123,108 @@ GUIDANCE BY SYSTEM TYPE:
 
 DEEP DIVE QUESTIONS:
 - "What is its specific role?"
-- "How does it connect to other components?"
-- "Where is the configuration stored?"
+- "How does it connect to other components? (HTTP, database wire protocol, message queue, function call)"
+- "Are there any external systems this must talk to? (Payment processors, identity providers, analytics, email services?)"
 -->
+- **Expectation**: Detail on each major part from §2.3. Focus on role and connections. Include any third-party services the system depends on.
+- **If you marked §2.3 as AUTO-DERIVE**: Mark this section as `[AUTO-DERIVE: see §2.3]` and skip to §3.3 (External Systems). The pipeline will derive components from your requirements and constraints.
 
 ### 3.1 [Component Name]
-- **Technologies**: [Tech list with versions]
 - **Role**: [What it does]
 - **Connections**: [What it talks to and how — protocol, format, auth]
-- **Configuration**: [Key config patterns, environment variables, config files]
 
 ### 3.2 [Component Name]
-- **Technologies**: [Tech list with versions]
 - **Role**: [What it does]
 - **Connections**: [What it talks to and how]
-- **Configuration**: [Key config patterns]
 
-<!-- Add more components as needed. Every part from §2.3 should have a component entry. -->
+### 3.3 External Systems & Integrations
+- **Expectation**: Third-party services the system depends on (payment processors, identity providers, email services, analytics, cloud APIs, etc.).
+- **Content**:
+  - [External system 1]: [What it provides, how it connects]
+  - [External system 2]: [What it provides, how it connects]
+
+<!-- Add more components as needed. Every part from §2.3 should have an entry. -->
 
 ---
 
 ## 4. Constraints & Boundaries
 
-### 4.1 Security Boundary
-- **Expectation**: What needs protecting and from what? The answer depends on the system type. Be specific about the threat model that matters for *your* system.
+### 4.1 Security & Access
 <!--
 DEEP DIVE QUESTIONS:
-- "What is the most sensitive thing in the system? (User data? API keys? Privileged operations?)"
-- "Who or what could misuse it? (Untrusted users? Malicious input? Supply chain?)"
-- "What is the trust boundary? (Network perimeter? Process sandbox? Package signature?)"
+- "What is the most sensitive thing in the system? (User data? API keys? Privileged operations? Nothing?)"
+- "Who are the different types of users? (Admin, regular user, guest, API consumer?)"
+- "Where does trusted meet untrusted? (Public internet? Partner API? Internal only?)"
 
 EXAMPLES BY SYSTEM TYPE:
-- Web app: "Authentication via OAuth2, API rate limiting, secrets in Vault, WAF at edge."
-- Library: "Input validation on all public functions, no network calls, no filesystem writes outside specified paths."
-- CLI tool: "Runs with user-level permissions, no elevated privileges required, credentials stored in OS keychain."
-- Mobile app: "Biometric auth, certificate pinning, encrypted local storage, no PII in logs."
+- Web app: "Authentication via OAuth2, admin and regular user roles, secrets in Vault."
+- Library: "Input validation on all public functions, no network calls."
+- CLI tool: "Runs with user-level permissions, credentials stored in OS keychain."
+- Mobile app: "Biometric auth, certificate pinning, encrypted local storage."
 -->
-- **Threat Model**: [What needs protecting and from what]
-- **Trust Boundary**: [Where trusted meets untrusted]
-- **Access Control**: [Authentication/authorization approach, or "N/A" for a library with no auth concept]
-- **Secrets Management**: [How secrets are stored and accessed, or "N/A"]
+- **User Roles**: [e.g. "Admin (full access), Regular User (own data only), Guest (read-only)" or "Single-user CLI" or "Library consumers (trusted callers)" or "N/A"]
+- **Sensitive Data**: [What needs protecting — e.g. "User PII, payment info" or "API keys in config" or "Sensor calibration data" or "None"]
+- **Trust Boundary**: [Where trusted meets untrusted — e.g. "Public internet to API" or "Untrusted file input to parser" or "Bluetooth peripheral to firmware" or "N/A — trusted environment only"]
+- **Auth Approach** (state the approach, not specific vendors unless you have a preference): [e.g. "JWT tokens", "OAuth2 (provider TBD)", "API key", "OS-level file permissions", "Package signing" or "[AUTO-DERIVE: need user login]" or "N/A"]
 
-### 4.2 Distribution & Delivery
-- **Expectation**: How does this system reach its users? Be specific about the mechanism, not just the destination.
+### 4.2 Distribution & Target Environments
 <!--
 DEEP DIVE QUESTIONS:
-- "How do users get it? (Visit a URL? pip install? Download an installer? App store? Pre-installed on hardware?)"
-- "What environments does it target? (Dev/Staging/Prod? Or: Linux/macOS/Windows?)"
-- "What triggers a release? (Git tag? Manual approval? Continuous deployment?)"
-
-EXAMPLES BY SYSTEM TYPE:
-- Web app: "Deployed to AWS ECS via GitHub Actions on merge to main. Staging auto-deploys, prod requires manual approval."
-- Library: "Published to PyPI via GitHub Actions on tag push. Supports Python 3.10+."
-- CLI tool: "Distributed as a single binary via GitHub Releases. Homebrew tap for macOS. Scoop for Windows."
-- Mobile app: "Submitted to App Store Connect via Fastlane. TestFlight for beta. 2-week review cycle."
-- Embedded: "Firmware flashed at factory. OTA updates via MQTT channel."
+- "How do users get it? (Visit a URL? pip install? App store? Download an installer?)"
+- "What environments does it target? (Linux/macOS/Windows? Dev/Staging/Prod? Specific devices?)"
 -->
-- **Distribution Channel**: [How it reaches users]
-- **Target Environments**: [Where it must run]
-- **Release Mechanism**: [What triggers a release and how it flows]
+- **Distribution Channel**: [e.g. "Web URL", "PyPI", "npm", "crates.io", "App Store", "GitHub Releases", "Docker Hub", "OTA firmware update", "Pre-installed on device"]
+- **Target Environments**: [e.g. "AWS us-east-1, dev/staging/prod" or "macOS and Linux" or "iOS 15+" or "ARM Cortex-M4" or "Any platform with Python 3.10+"]
 
-### 4.3 Resilience
-- **Expectation**: What happens when things fail? The answer varies dramatically by system type. Some systems need disaster recovery plans; others just need graceful error messages. State what applies.
+### 4.3 Resilience & Data Sensitivity
 <!--
 DEEP DIVE QUESTIONS:
 - "What is the worst thing that can happen? (Data loss? Downtime? Corrupted output? Crash?)"
-- "How does the system recover? (Auto-restart? Retry? Manual intervention? User re-runs?)"
-- "Is there data that must survive failures? (Database backups? Local state? Nothing?)"
-
-EXAMPLES BY SYSTEM TYPE:
-- Web app: "Database: daily automated backups to S3, 15-min RPO. App: auto-restart via container orchestrator. RTO: 30 minutes."
-- Library: "No persistent state. Errors surfaced as typed exceptions with actionable messages. No silent failures."
-- CLI tool: "Interrupted operations leave no partial output. Atomic file writes. Exit codes follow POSIX conventions."
-- Mobile app: "Offline queue syncs on reconnect. Local SQLite survives app restart. Crash reports via Sentry."
+- "Is data loss acceptable? (Ephemeral data vs critical records)"
+- "How important is uptime? (24/7 critical vs best-effort vs runs-when-invoked)"
 -->
-- **Failure Mode**: [What can go wrong and how severe is it]
-- **Recovery Strategy**: [How the system recovers, or "N/A — stateless, user re-runs"]
-- **Data Durability**: [Backup strategy, or "No persistent state"]
+- **Expectation**: What matters for YOUR system — not every system needs a disaster recovery plan.
+- **Data Loss Tolerance**: [e.g. "Data loss is unacceptable — user financial records" or "Ephemeral — can be regenerated" or "Output is deterministic — re-run to recover" or "N/A — stateless tool"]
+- **Availability Expectation**: [e.g. "24/7, <1hr downtime/month" or "Best effort, occasional downtime OK" or "Runs on demand — no uptime concept" or "Must respond within hardware interrupt deadline"]
 
----
-
-## 5. Dependencies
-
-- **Expectation**: Complete list of external dependencies required to build and run the system from scratch.
+### 4.4 Build, Test & Deploy
 <!--
 DEEP DIVE QUESTIONS:
-- "System-level dependencies? (ffmpeg? libc? CUDA? Xcode?)"
-- "Build tools? (gcc? make? protoc?)"
-- "Runtime dependencies? (requirements.txt? package.json? Cargo.toml?)"
-- "Are there version constraints or known incompatibilities?"
+- "How do you build and test today? (CI service? Manual? Nothing yet?)"
+- "What quality checks should block a release? (Tests pass? Linting? Security scan?)"
+- "What secrets or credentials does the system need to run? (Database passwords? API keys? Signing certificates?)"
+- "Are there compliance standards the infrastructure must meet? (SOC2, GDPR, HIPAA, PCI-DSS?)"
 -->
-
-### 5.1 System Requirements (OS / Platform Level)
-*   **[Dependency]**: [Version constraint and purpose]
-
-### 5.2 Application Requirements (Runtime Level)
-*   **[Dependency]**: [Version constraint and purpose]
+- **Expectation**: How the system is built, tested, and released. Non-technical users: describe what you know or mark `[AUTO-DERIVE]`.
+- **CI/CD**: [e.g. "GitHub Actions", "Jenkins", "None yet — greenfield" or "[AUTO-DERIVE]"]
+- **Quality Gates**: [e.g. "Tests must pass, linting required" or "[AUTO-DERIVE: standard quality checks]"]
+- **Secrets / Credentials**: [e.g. "DATABASE_URL, STRIPE_API_KEY, JWT_SECRET" or "None" or "[UNKNOWN]"]
+- **Compliance Standards**: [e.g. "SOC2, GDPR" or "None" or "Same as overview §3.3"]
 
 ---
 
-## 6. Stack Summary
+## 5. Scale & Team Context
 
-- **Expectation**: A concise summary of the full technology stack. This is the "at a glance" reference for anyone joining the project.
+### 5.1 Scale Expectations
+<!--
+DEEP DIVE QUESTIONS:
+- "How many users do you expect? (10? 1,000? 1,000,000?)"
+- "How much data? (Megabytes? Gigabytes? Terabytes?)"
+- "What does growth look like? (Steady? Spiky? Seasonal?)"
+- "What is the expected request volume? (10 req/s? 1,000 req/s? Bursty?)"
+-->
+- **Expected Users / Consumers**: [e.g. "~100 internal users" or "10,000 app users, growing 20%/month" or "~500 library installs/week" or "1 device per deployment" or "[UNKNOWN: new market]"]
+- **Expected Data Volume**: [e.g. "~10GB database" or "Terabytes of sensor data/day" or "Small config files only" or "[UNKNOWN]"]
+- **Usage Pattern**: [e.g. "Steady low traffic" or "Bursty — spikes during business hours" or "Batch — runs nightly" or "Continuous sensor stream" or "On-demand CLI invocation"]
 
-| Aspect | Decision |
-| :--- | :--- |
-| **System Type** | [e.g. Web application, Python library, CLI tool] |
-| **Language** | [e.g. Python 3.12] |
-| **Runtime** | [e.g. CPython on Linux, Node 20 LTS] |
-| **Framework** | [e.g. FastAPI, none] |
-| **Data Storage** | [e.g. PostgreSQL 16, SQLite, none] |
-| **Distribution** | [e.g. PyPI, Docker Hub, GitHub Releases, App Store] |
-| **Key Constraints** | [e.g. Must run on Raspberry Pi, must work offline, single binary] |
+### 5.2 Team & Existing Infrastructure
+<!--
+DEEP DIVE QUESTIONS:
+- "What languages/tools does your team know well?"
+- "What cloud provider or hosting do you already use?"
+- "Are there existing systems, databases, or services this must integrate with?"
+- "What CI/CD or deployment tools do you already have?"
+-->
+- **Team Expertise**: [e.g. "Team knows Python and JavaScript well, some Go experience" or "Non-technical founder, will hire" or "[UNKNOWN]"]
+- **Existing Infrastructure**: [e.g. "AWS account with RDS and ECS", "Heroku", "Nothing — greenfield" or "[UNKNOWN]"]
+- **Existing Systems to Integrate**: [e.g. "Must connect to existing Salesforce and Stripe accounts" or "None"]

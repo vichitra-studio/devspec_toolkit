@@ -36,7 +36,7 @@ For each dimension, populate from the command output:
 | `capability_fr_coverage` | Capability has ≥1 FR implementing it | `capability-*` IDs with no FR | Yes |
 | `milestone_decomp_completeness` | Milestone's fr_refs all have task entries | milestone IDs with incomplete task decomposition | No (optional) |
 
-The optional `milestone_decomp_completeness` dimension captures W567 INCOMPLETE_MILESTONE_DECOMPOSITION signals: milestones in Step 14 whose `fr_refs` list is not fully decomposed into task entries. Populate this dimension only when the `completeness-check --json` output includes decomposition data; omit it if unavailable.
+The optional `milestone_decomp_completeness` dimension captures W567 INCOMPLETE_MILESTONE_DECOMPOSITION signals: milestones in Step 09 whose `fr_refs` list is not fully decomposed into task entries. Populate this dimension only when the `completeness-check --json` output includes decomposition data; omit it if unavailable.
 
 **Ratio rule**: `ratio = covered_count / total_count` when `total_count > 0`; `ratio = 1.0` when `total_count = 0` (vacuous coverage). A ratio below 0.8 triggers a W592 warning during validation.
 
@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 - **01_capabilities.json**: Capability IDs — the `capability_id` values form the universe for `capability_fr_coverage`
 - **05_interface_contracts.json**: API IDs — used to determine which FRs have an API binding
 - **08_fixtures.json**: Fixture target IDs — used to determine which FRs have fixture coverage
-- **14_roadmap.json**: Milestone IDs and fr_refs for fr_milestone_coverage universe
+- **09_impl_plan.json**: Milestone IDs and fr_refs for fr_milestone_coverage universe
 - **13_extension_manifest.json**: Extension entries — verify all extensions are implemented on disk
 
 # Operating Flow: Synthesize → Clarify → Emit
@@ -60,7 +60,7 @@ For each upstream artifact ingested, extract the following:
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
-- `spec/14_roadmap.json` is present and contains at least one milestone entry.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
 - `spec/05_interface_contracts.json` is present and contains at least one api entry.
 - `spec/08_fixtures.json` is present and contains at least one fixture entry.
 
