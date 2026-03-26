@@ -14,7 +14,7 @@ Document the external facing contracts (routes, schemas, security, and versionin
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries, success metrics, and high-level constraints that determine which interfaces are in-scope and what security or compliance postures apply to each API
 - **01_capabilities.json**: Capability IDs and their priority rankings to ensure every high-priority capability surfaces at least one corresponding API contract entry
-- **02_system_sketch.json**: Component IDs, trust boundaries, and inter-component communication paths to assign each API to an owning component and enforce correct security at boundary crossings
+- **02_system_sketch.json**: Component IDs, trust boundaries, inter-component communication paths, and **tech_stack** (framework and language choices that inform API style — e.g., REST with FastAPI, GraphQL with Apollo, gRPC with protobuf) to assign each API to an owning component and enforce correct security at boundary crossings
 - **02a_delivery_baseline.json**: Deployment environments and infrastructure constraints that influence protocol choices, versioning strategies, and transport-level security requirements for each API
 - **03_glossary.json**: Term IDs, canonical resource names, and action vocabulary to align all route paths, request/response field names, and error names with the shared domain language
 - **04_fr_list.json**: Functional requirement IDs, acceptance criteria, preconditions, postconditions, and input/output payload descriptions to derive one or more API contracts per externally observable FR behavior

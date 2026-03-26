@@ -15,7 +15,7 @@ Create a single vocabulary that removes ambiguity across product, engineering, a
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Business terms from `goals`, metric names and units from `success_metrics`, persona names from `user_segments`; derive metric names/units from charter and seed sources — do not depend on downstream NFR/monitoring artifacts
 - **01_capabilities.json**: Recurring nouns and action verbs from capability names and descriptions for domain vocabulary
-- **02_system_sketch.json**: Component names, protocol terms, and architectural patterns for technical vocabulary alignment
+- **02_system_sketch.json**: Component names, protocol terms, architectural patterns, and technology names from `tech_stack` (languages, frameworks, infrastructure, tools) for technical vocabulary alignment; technology names are domain terms that downstream specs will reference
 - **02a_delivery_baseline.json**: Environment names, CI pipeline terminology, and infrastructure concepts for deployment domain terms
 
 ## Operating Flow: Collect → Define → Canonicalize → Emit

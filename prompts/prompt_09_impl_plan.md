@@ -14,7 +14,7 @@ Translate the validated spec into an executable delivery roadmap that covers tec
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Project constraints, stated risks, timeline boundaries, and success metrics that bound milestone sequencing, target dates, and risk mitigation planning
 - **01_capabilities.json**: Capability IDs and priority rankings to ensure every capability is covered by at least one milestone deliverable or explicitly scoped out with rationale
-- **02_system_sketch.json**: Component IDs, component status (active vs deprecated), and inter-component data flows to inform architecture decisions and trigger migration plan requirements
+- **02_system_sketch.json**: Component IDs, component status (active vs deprecated), inter-component data flows, and **tech_stack** decisions (languages, frameworks, infrastructure, tools) as the baseline technology stack to inherit and optionally refine
 - **02a_delivery_baseline.json**: Deployment environment definitions, infrastructure constraints, and CI gate expectations that shape infrastructure tech stack selections and milestone phasing
 - **03_glossary.json**: Domain term definitions and canonical vocabulary to ensure milestone names, deliverable descriptions, and tech stack rationale use consistent domain language
 - **04_fr_list.json**: Functional requirement IDs and acceptance criteria to populate milestone deliverables arrays with traceable FR references ensuring full coverage
@@ -26,10 +26,10 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Scope → Sequence → Resource → Trace → Reconcile → Emit
 - **Scope**: Derive the set of deliverables from in-scope capabilities and FRs. Every in-scope capability must appear in ≥1 deliverable.
 - **Sequence**: Order milestones using `depends_on` references. Identify the critical path. A later milestone cannot depend on a future milestone (no cycles).
-- **Resource**: Assign effort estimates, owners, and tech stack components per milestone. Validate feasibility against charter constraints.
+- **Resource**: Inherit `tech_stack` from `spec/02_system_sketch.json` as the baseline. Refine only when implementation planning reveals needs not covered at architecture time (e.g., a testing tool discovered during spike scoping, a version pin change based on compatibility testing). Assign effort estimates and owners per milestone. Validate feasibility against charter constraints.
 - **Trace**: Link each milestone to the capability(ies) it delivers. Reference FR IDs where applicable.
 - **Reconcile**: Verify cross-step consistency before emitting:
-  - Verify `tech_stack` entries are consistent with `spec/02_system_sketch.json` component IDs and technology choices — no tech stack item should contradict the system sketch architecture.
+  - Verify `tech_stack` entries are a superset of `spec/02_system_sketch.json` `tech_stack` — Step 09 may ADD refinements (version pins, spike-discovered tools) but MUST NOT REMOVE or contradict entries from Step 02. Any tech stack item in Step 02 that is absent from Step 09 is a gap requiring explicit justification.
   - Verify milestones collectively cover all in-scope FRs from `spec/04_fr_list.json` — any uncovered FR must appear in `out_of_scope` with rationale.
   - Verify milestone delivery order does not contradict enforcement conditions in `spec/06_invariants.json` — a milestone must not ship a behavior before the invariant that governs it is in place.
   - If any inconsistency is found, add it as a gap question (enter Clarify mode) — do not silently resolve or defer.
@@ -54,7 +54,7 @@ For each upstream artifact ingested, extract the following:
 - `docs/seed/seed_tech_stack.md` is present and non-empty.
 
 ## Negative Constraints
-- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/01_capabilities.json` without a clear "Spike" justification.
+- **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/02_system_sketch.json` `tech_stack` or `spec/01_capabilities.json` without a clear "Spike" justification.
 - **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
 - **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
 - **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It MUST be an object with `languages`, `frameworks`, `infrastructure`, and `tools` arrays.
@@ -77,7 +77,7 @@ Before emitting, verify:
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
 
 ## Step-Specific Completeness Checklist
-- `tech_stack` declares languages, frameworks, data stores, and major infra choices with rationale where contentious.
+- `tech_stack` inherits from `spec/02_system_sketch.json` `tech_stack` and may add implementation-time refinements. All Step 02 `tech_stack` entries must be present (superset rule). New entries require rationale.
 - Milestones include clear names, target dates, risks, and spikes for unknowns.
 - `migration_plan` describes data or API migration if replacing existing systems.
 - `dependencies` enumerate external systems, teams, or contracts that impact delivery.

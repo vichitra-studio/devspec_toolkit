@@ -21,7 +21,7 @@ Failures here MUST block the merge.
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Organizational constraints, compliance requirements, and change-control mandates that must be encoded as enforceable governance rules and PR policies
 - **01_capabilities.json**: Capability IDs and ownership assignments to determine which disciplines require reviewer representation and which spec ID prefixes appear in commit patterns
-- **02_system_sketch.json**: Component boundaries and ownership domains to map reviewer coverage across system areas and ensure governance rules span all architectural layers
+- **02_system_sketch.json**: Component boundaries, ownership domains, and `tech_stack` technology decisions to map reviewer coverage across system areas, ensure governance rules span all architectural layers, and encode technology-specific change-control policies (e.g., database migration gates, framework upgrade procedures)
 - **02a_delivery_baseline.json**: Deployment environments, release cadence expectations, and infrastructure constraints that inform the versioning strategy and branching model
 - **03_glossary.json**: Canonical domain terms and naming conventions to ensure governance policy language, commit message patterns, and PR rule descriptions use consistent vocabulary
 - **04_fr_list.json**: Functional requirement IDs and their format patterns to configure commit message regex patterns that enforce FR traceability in code changes

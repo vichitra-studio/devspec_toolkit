@@ -108,6 +108,24 @@ def check_capability_coverage(components: list[dict], capability_ids: set[str]) 
         errors.append(make_error("E590", f"Missing capability coverage: {', '.join(missing)}"))
     return errors
 
+def check_tech_stack_present(instance: dict) -> list[SpecError]:
+    """Check that tech_stack is present (mirrors schema required constraint for standalone test runs)."""
+    if "tech_stack" not in instance:
+        return [make_error("E520", "Missing required field: tech_stack")]
+    return []
+
+
+def check_partner_public_rate_limit(connections: list[dict]) -> list[SpecError]:
+    """Check that partner/public trust boundary connections have a rate_limit defined."""
+    errors: list[SpecError] = []
+    for idx, conn in enumerate(connections):
+        if conn.get("trust_boundary") in ("partner", "public") and "rate_limit" not in conn:
+            errors.append(
+                make_error("E520", f"Connection[{idx}] trust_boundary is '{conn['trust_boundary']}' but rate_limit is missing")
+            )
+    return errors
+
+
 def validate_step_02(
     instance: dict,
     repo_root: str,
@@ -125,9 +143,11 @@ def validate_step_02(
     connections = instance.get("connections", [])
     comp_ids = {comp.get("component_id") for comp in components if comp.get("component_id")}
 
+    errors.extend(check_tech_stack_present(instance))
     errors.extend(check_component_ids(components))
     errors.extend(check_connection_integrity(connections, comp_ids))
     errors.extend(check_rate_limits(connections))
+    errors.extend(check_partner_public_rate_limit(connections))
     errors.extend(check_external_trust_boundaries(components, connections))
 
     if capability_ids:

@@ -1,0 +1,13 @@
+changes:
+  - type: add_field
+    path: "02_system_sketch.tech_stack"
+    description: "tech_stack field added to Step 02 system sketch as the authoritative source for technology decisions"
+    migration:
+      action: ai_assisted
+      note: "Use template_infer_missing.md prompt to populate tech_stack from seed_tech_stack.md"
+  - type: add_constraint
+    path: "02_system_sketch.tech_stack"
+    description: "tech_stack promoted to required — all 4 categories (languages, frameworks, infrastructure, tools) required"
+    migration:
+      action: ai_assisted
+      note: "Use template_infer_missing.md prompt to populate all 4 required tech_stack categories"

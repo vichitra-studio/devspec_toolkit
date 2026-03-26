@@ -1,5 +1,5 @@
 {
-  "id": "system-sketch-minimal",
+  "id": "system-sketch-invalid-missing-tech-stack",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
   "components": [
@@ -29,11 +29,5 @@
     }
   ],
   "connections": [],
-  "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [{ "name": "SQLite", "version": "3" }],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
-  },
   "canonical_refs_used": []
 }

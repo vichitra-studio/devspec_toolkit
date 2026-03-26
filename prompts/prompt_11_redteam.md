@@ -35,7 +35,7 @@ Use the `category` field to classify threats precisely:
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries, compliance posture, and regulatory constraints that define which threat categories are mandatory and which data sensitivity levels apply
 - **01_capabilities.json**: Capability IDs, priority rankings, and scope definitions to assess which capabilities carry the highest business impact if compromised or degraded
-- **02_system_sketch.json**: Component IDs, trust boundary crossings, inter-component communication paths, and external integration points to map every threat to a concrete target_ids entry
+- **02_system_sketch.json**: Component IDs, trust boundary crossings, inter-component communication paths, external integration points, and **tech_stack** (specific framework/runtime versions that have known CVE surfaces or security-relevant configuration defaults — e.g., Django CSRF middleware vs manual CSRF in Express) to map every threat to a concrete target_ids entry
 - **02a_delivery_baseline.json**: Deployment environment definitions and infrastructure topology to identify environment-specific attack surfaces and operational failure modes per stage
 - **03_glossary.json**: Domain term definitions and entity relationships to write threat descriptions and vectors using precise, unambiguous domain language rather than generic security jargon
 - **04_fr_list.json**: Functional requirement IDs, business logic workflows, preconditions, and postconditions to identify business logic abuse scenarios and link mitigations via traceRef

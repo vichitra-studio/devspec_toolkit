@@ -135,6 +135,7 @@ ERROR_CODES = {
     "W603": "FILES_OUTSIDE_TASK_SCOPE",
     "E604": "TRACE_MATRIX_STALE",
     "W604": "TRACE_MATRIX_STALE",
+    "W605": "TECH_STACK_02_MISSING",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

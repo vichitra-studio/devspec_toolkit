@@ -21,9 +21,7 @@ class StepScriptBridgeTests(unittest.TestCase):
         cases = [
             ("test_step_00.py", [], repo_root, {0}),
             ("test_step_01.py", [], repo_root, {0}),
-            # TODO(TEST-004): step_02 reports "FAIL (Unexpected Pass)" for one valid fixture;
-            # tighten to {0} once that fixture expectation is corrected.
-            ("test_step_02.py", [], repo_root, {0, 1}),
+            ("test_step_02.py", [], repo_root, {0}),
             ("test_step_02a.py", ["--self-test"], toolkit_root, {0}),
             # TODO(TEST-004): step_03 script-style runner uses schema validation via CLI;
             # currently fails because valid_minimal.json triggers a schema error. Fix the

@@ -16,10 +16,10 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 ### Primary Sources (directly consumed)
 - `spec/15_scaffold.json` (if updating): current scaffold state for incremental generation
-- **02_system_sketch.json**: Component IDs and service boundaries used to derive the project_skeleton module structure ensuring each architectural component has a scaffold directory
+- **02_system_sketch.json**: Component IDs, service boundaries, and **tech_stack** (`tech_stack.languages`, `tech_stack.frameworks`, `tech_stack.infrastructure`, `tech_stack.tools` — primary source of technology decisions) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
 - **02a_delivery_baseline.json**: Deployment environment and infrastructure constraints used to select appropriate framework configurations and container orchestration templates for the scaffold
 - **05_interface_contracts.json**: All API endpoint definitions (api_id, path, method) used to generate the interface_map with one-to-one binding between each contract and its scaffold route entry
-- **09_implementation_plan.json**: Technology stack decisions (language, framework, tools) directly consumed to set project_skeleton.language and project_skeleton.framework fields and module conventions
+- **09_implementation_plan.json**: Refined technology stack (version pins, spike-discovered tools) and milestone sequencing consumed to supplement Step 02 tech_stack with implementation-time additions
 - **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
 ### Reference Sources (context only)

@@ -93,6 +93,15 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
                 errors.append(
                     make_error("W602", f"TECH_STACK_02_MISMATCH: roadmap uses tech '{name}' not found in Step 02 system_sketch components")
                 )
+    # Step 02 tech_stack inheritance check (W605)
+    step02_tech_names = _load_step02_tech_stack_names(toolkit_root, artifact_path)
+    if step02_tech_names:
+        roadmap_tech_names = _collect_tech_names(instance.get("tech_stack", {}))
+        for name in step02_tech_names:
+            if name not in roadmap_tech_names:
+                errors.append(
+                    make_error("W605", f"TECH_STACK_02_MISSING: Step 02 declares tech '{name}' but it is absent from roadmap tech_stack")
+                )
     for dep in instance.get("dependencies", []):
         if not isinstance(dep, dict):
             errors.append(make_error("E520", f"Dependency entry must be an object: {dep!r}"))
@@ -304,4 +313,27 @@ def _load_step02_component_names(toolkit_root: str, artifact_path: str | None) -
             if isinstance(component_id, str) and component_id:
                 names.add(component_id)
         return names
+    return set()
+
+
+def _load_step02_tech_stack_names(toolkit_root: str, artifact_path: str | None) -> set[str]:
+    """Load tech_stack names from Step 02 system sketch for cross-ref validation.
+
+    Distinct from _load_step02_component_names() which loads component_id values.
+    This function loads technology names from Step 02's tech_stack categories.
+    """
+    candidates: list[Path] = []
+    if artifact_path:
+        artifact_dir = Path(artifact_path).resolve().parent
+        candidates.append(artifact_dir / "02_system_sketch.json")
+    candidates.append(Path(toolkit_root).resolve() / "spec" / "02_system_sketch.json")
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            continue
+        return _collect_tech_names(data.get("tech_stack", {}))
     return set()

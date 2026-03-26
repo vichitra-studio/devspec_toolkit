@@ -5,21 +5,22 @@
 ## Role
 You are a **senior solutions architect and system designer**. Your job is to emit a single JSON artifact for **Step 02 · System Sketch** that maps architectural components, trust boundaries, and data flows with enough fidelity to anchor downstream interface contracts and invariants. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
 
-Run `specdev prompt-context 02` to see downstream consumers. This prompt's output feeds 6 downstream steps.
+Run `specdev prompt-context 02` to see downstream consumers. This prompt's output feeds 12 downstream steps.
 
 ## Purpose
-Build a lightweight architecture map that shows the components required to deliver the approved capabilities and how data flows between them. The system sketch communicates ownership, technology choices, and integration contracts early so interface design and delivery planning stay coherent.
+Build a lightweight architecture map that shows the components required to deliver the approved capabilities, the technology stack that implements them, and how data flows between them. The system sketch communicates ownership, technology choices, and integration contracts early so downstream steps (interface contracts, NFRs, fixtures, scaffold) can make technology-aware decisions.
 
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_tech_stack.md** (required): Architecture patterns, technology constraints, infrastructure decisions, and deployment topology for component design
+- **docs/seed/seed_tech_stack.md** (required): Technology decisions (languages, frameworks, infrastructure, tools), architecture patterns, deployment topology, and technology constraints for both component design and tech_stack population
 - **00_charter.json**: Scope boundaries, system context, integration points, and deployment constraints for component identification
 - **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set; use only upstream artifacts — do not ingest downstream interface, glossary, or NFR specs in this step
 
-## Operating Flow: Decompose → Connect → Verify → Emit
+## Operating Flow: Decompose → Resolve Tech → Connect → Verify → Emit
 
 - **Decompose**: Break down the system into components (services, stores, clients, gateways) from charter scope and capabilities.
+- **Resolve Tech**: Extract technology decisions from `docs/seed/seed_tech_stack.md` into the `tech_stack` field. For each category (languages, frameworks, infrastructure, tools): resolve `[AUTO-DERIVE]` markers using system type, component types, and charter constraints. Validate consistency — a component of `type: db` should have a matching entry in `tech_stack.infrastructure`. Challenge version specificity: "Python 3" should become "Python 3.12" with rationale.
 - **Connect**: Map data flows, integration points, and trust boundaries between components.
 - **Verify**: Check that every in-scope capability maps to ≥1 component; no capability is architecturally orphaned.
 - **Emit**: Write artifact when all components are connected and trust boundaries are explicit.
@@ -39,6 +40,7 @@ For each upstream artifact ingested, extract the following:
 - External integrations: connections touching `type: external` components MUST use `trust_boundary` of `partner` or `public`; MUST populate `auth` with a value from the schema enum.
 - Implicit mapping: responsibilities MUST cover all in-scope capabilities from `spec/01_capabilities.json`; if a capability has no responsible component, MUST propose a new component to own it.
 - Ambiguity scrub: MUST NOT use generic phrases like “owns data” or “manages resources”; MUST specify the data domain (read from `spec/01_capabilities.json` inputs/outputs) and quantitative SLAs (read from `docs/seed/seed_tech_stack.md` constraints).
+- MUST populate `tech_stack` with at least one entry in each of `languages`, `frameworks`, `infrastructure`, and `tools`. MUST resolve any `[AUTO-DERIVE]` markers from `docs/seed/seed_tech_stack.md` into concrete technology choices with version and rationale. MUST cross-check that `type: db` components have corresponding `tech_stack.infrastructure` entries.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -72,6 +74,9 @@ Before emitting, verify:
 - [ ] No component appears in a data flow without being defined in the components list
 - [ ] All trust zone boundaries are explicit — no component straddles multiple trust zones silently
 - [ ] Every external system dependency is represented as a distinct component with interface type defined
+- [ ] `tech_stack` has at least one entry per category (languages, frameworks, infrastructure, tools)
+- [ ] Every `[AUTO-DERIVE]` marker from seed_tech_stack.md has been resolved to a concrete choice
+- [ ] Database/cache/queue component types have matching infrastructure entries in tech_stack
 
 ## Step-Specific Completeness Checklist
 - Components enumerate services, data stores, queues, jobs, caches, UIs, libs, and external systems; each has a type and clear responsibilities.
@@ -80,6 +85,8 @@ Before emitting, verify:
 - Protocols/auth match real integration constraints (e.g., gRPC with mTLS, events with exactly-once semantics where needed).
 - Include reliability semantics on event/async paths; specify rate limits where known.
 - Tag external dependencies and their owners; `type: external` must include the `external-dependency` tag.
+- `tech_stack` covers all technology decisions from `docs/seed/seed_tech_stack.md`; each entry has `name`, `version`, and `rationale` (rationale required for all non-obvious choices).
+- Infrastructure entries in `tech_stack` are consistent with component types (db, cache, queue) declared in `components`.
 
 ## Best Practices
 - **Components**: Assign deterministic `component_id` values and tag each component with the correct `type` and owning team.
@@ -139,6 +146,36 @@ Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`,
     }
   ],
   "connections": [],
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "TypeScript",
+        "version": "5.4",
+        "rationale": "Team expertise and type safety for API development"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "Express",
+        "version": "^4.19",
+        "rationale": "Lightweight HTTP framework matching team experience"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "PostgreSQL",
+        "version": "16",
+        "rationale": "JSONB support for flexible schema evolution"
+      }
+    ],
+    "tools": [
+      {
+        "name": "ESLint",
+        "version": "^9.0",
+        "rationale": "Standard linting for TypeScript projects"
+      }
+    ]
+  },
   "canonical_refs_used": []
 }
 ```

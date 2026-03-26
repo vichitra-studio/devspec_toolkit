@@ -20,7 +20,7 @@ Lint the fixtures for completeness:
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries and success metrics to determine which behaviors are in-scope for fixture coverage and to tag smoke fixtures for critical business flows
 - **01_capabilities.json**: Capability IDs and priority rankings to identify high-priority capabilities whose FRs require mandatory smoke-tagged fixtures and to prioritize fixture creation order
-- **02_system_sketch.json**: Component IDs and inter-component data flow paths to determine which components need contract-mode fixtures and to structure end-to-end fixture chains across service boundaries
+- **02_system_sketch.json**: Component IDs, inter-component data flow paths, and **tech_stack** (framework choices that determine test runner, fixture format, and setup/teardown patterns — e.g., pytest fixtures for Python, Jest for TypeScript, testcontainers for integration tests) to determine which components need contract-mode fixtures and to structure end-to-end fixture chains across service boundaries
 - **02a_delivery_baseline.json**: Environment definitions and CI pipeline configuration to determine which fixture tags map to which pipeline stages and to validate that fixture execution is feasible in each environment
 - **03_glossary.json**: Canonical term IDs, entity field names, and domain vocabulary to ensure all fixture input payloads and expected output fields use exact glossary terms rather than invented or inconsistent field names
 - **04_fr_list.json**: Functional requirement IDs, acceptance criteria including happy-path and negative cases, preconditions, and postconditions to generate at least one fixture per acceptance criterion with matching target references

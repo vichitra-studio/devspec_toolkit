@@ -20,7 +20,7 @@ To verify your invariants logic, verify against a sample data file:
 For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Product scope boundaries and organizational constraints that establish which business truths are non-negotiable and which compliance or regulatory rules must be encoded as hard invariants
 - **01_capabilities.json**: Capability IDs and priority levels to ensure every critical capability has at least one enforceable invariant guarding its core guarantees
-- **02_system_sketch.json**: Component IDs, trust boundaries, and data flow paths to scope each invariant to specific components or APIs and derive access boundary rules from architectural separation
+- **02_system_sketch.json**: Component IDs, trust boundaries, data flow paths, and `tech_stack` technology decisions to scope each invariant to specific components or APIs, derive access boundary rules from architectural separation, and encode technology-specific constraints (e.g., database transaction guarantees, framework security requirements)
 - **02a_delivery_baseline.json**: Environment definitions and deployment topology to determine which invariants apply at which deployment stage and to validate that enforcement mechanisms are feasible within the infrastructure
 - **03_glossary.json**: Entity definitions and domain term IDs to ensure invariant descriptions use canonical terminology
 - **04_fr_list.json**: Acceptance criteria with negative cases, error conditions, preconditions, and postconditions to encode each falsifiable constraint as a machine-checkable rule with correct severity

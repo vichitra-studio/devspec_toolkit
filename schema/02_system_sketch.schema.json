@@ -228,10 +228,23 @@
               "trace"
             ]
           }
+        },
+        "tech_stack": {
+          "description": "Technology decisions for the system, extracted from seed_tech_stack.md. Declares the languages, frameworks, infrastructure, and tools that downstream steps (05 Interface Contracts, 07 NFRs, 08 Fixtures, 15 Scaffold) should use when making technology-dependent decisions. Step 09 (Implementation Plan) inherits and may refine these choices.",
+          "allOf": [
+            {
+              "$ref": "vc:core:collections#techStack",
+              "description": "Inherits the structured technology stack definition from core collections."
+            },
+            {
+              "required": ["languages", "frameworks", "infrastructure", "tools"]
+            }
+          ]
         }
       },
       "required": [
-        "components"
+        "components",
+        "tech_stack"
       ],
       "description": "Step-specific properties for 02_system_sketch."
     },

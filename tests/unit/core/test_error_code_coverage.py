@@ -38,6 +38,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W596", "W597", "W598", "W599", "W600",
             "W601", "W602", "W603",
             "E604", "W604",
+            "W605",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

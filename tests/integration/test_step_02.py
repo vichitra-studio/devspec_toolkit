@@ -85,6 +85,7 @@ def main() -> None:
     invalid_fixtures = [
         "invalid_empty_components.json",
         "invalid_missing_required.json",
+        "invalid_missing_tech_stack.json",
         "invalid_no_responsibilities.json",
         "invalid_not_enough_responsibilities.json",
         "invalid_too_many_responsibilities.json",

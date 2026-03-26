@@ -19,7 +19,7 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 
 ### Reference Sources (context only)
 - **00_charter.json**: Project scope, timeline constraints, and success criteria used to bound roadmap milestones and validate that no out-of-scope work is scheduled
-- **02_system_sketch.json**: Component architecture and subsystem dependencies used to determine milestone sequencing so infrastructure precedes dependent application layers
+- **02_system_sketch.json**: Component architecture, subsystem dependencies, and `tech_stack` decisions (Step 02 is the authoritative source for technology choices) used to determine milestone sequencing so infrastructure precedes dependent application layers; the roadmap `tech_stack` must be grounded in Step 02's declarations
 - **02a_delivery_baseline.json**: Deployment environment specifications and release cadence constraints incorporated into milestone target dates and infrastructure task planning
 - **03_glossary.json**: Canonical domain terminology used to ensure consistent naming of milestones, tasks, and deliverables across the roadmap artifact
 - **05_interface_contracts.json**: API endpoint definitions and dependencies used to sequence API implementation tasks and verify deliverable traceability to specific contract IDs
@@ -59,7 +59,7 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - `spec/13a_completeness_assessment.json` is present.
 
 ## Negative Constraints
-- **NO Hallucinations**: Do not list technologies not in Step 09/13.
+- **NO Hallucinations**: Do not list technologies not in Step 02, Step 09, or Step 13.
 - **NO String Tech Stack**: `tech_stack` entries must be objects with `name` and `version` (optional `rationale`).
 - **NO String Deliverables**: `deliverables` items must be traceRef objects with `type` and `id` (optional `note`).
 - **NO Vague Tasks**: Tasks must be atomic and specific.
@@ -91,7 +91,7 @@ Before emitting, verify:
 ## Best Practices
 - **One Milestone = One User Story**: Every milestone must map individually to a specific user story. Do not bundle multiple stories into one vague milestone.
 - **Atomic Decomposition**: Each User Story must be broken down into specific, unambiguous, atomic sub-tasks.
-- **Reuse Tech Stack**: In most cases, copy the `tech_stack` from `spec/09_impl_plan.json`. Only update it if Step 13 Extensions introduced new mandated tools.
+- **Reuse Tech Stack**: Copy the `tech_stack` from `spec/09_impl_plan.json` (Step 09 is a required superset of Step 02's `tech_stack`). Only add entries if Step 13 Extensions introduced new mandated tools. Note: `spec/02_system_sketch.json` is the *origin* of tech stack decisions — Step 09 inherits and may refine them, but MUST NOT remove any Step 02 entries.
 - **Sequence Dependencies**: Ensure "Infrastructure" or "Base API" milestones precede "UI" or "Complex Logic" milestones.
 - **JIT Granularity**: Plan the immediate next 1-2 milestones in high detail (dates, deliverables). Later milestones MUST use tentative target dates and MUST include at minimum a `task_id`, `description` (>=2 words, imperative verb), and `status` for each task, but MAY omit `acceptance_criteria` and `depends_on`.
 - **Audit Trace**: Use the `milestones[].risks` field to note *why* a complex extension was deferred or split.
