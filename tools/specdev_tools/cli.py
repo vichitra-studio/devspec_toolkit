@@ -319,6 +319,10 @@ def main():
     ctx_review.add_argument("--spec-dir", default=None)
     ctx_review.add_argument("--repo-root", default=".")
 
+    # --- json subcommand group ---
+    json_p = sub.add_parser("json", help="Targeted JSON read/write operations (read, patch, insert, delete)")
+    json_p.add_argument("args", nargs=argparse.REMAINDER, help="json subcommand and arguments")
+
     args = p.parse_args()
 
     if getattr(args, "repo_root", None) == ".":
@@ -1516,6 +1520,11 @@ def main():
             print(json.dumps(dataclasses.asdict(result), indent=2))
         else:
             ctx_p.print_help()
+
+    elif args.cmd == "json":
+        from .core.json_utils import main as json_main
+        sys.argv = [sys.argv[0]] + args.args
+        json_main()
 
     else:
         p.print_help()

@@ -201,7 +201,7 @@ def _find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
         candidates.append(os.path.join(repo_root, 'schema'))
 
     this_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates.append(os.path.normpath(os.path.join(this_dir, '..', '..', 'schema')))
+    candidates.append(os.path.normpath(os.path.join(this_dir, '..', '..', '..', 'schema')))
 
     cwd = os.getcwd()
     candidates.append(os.path.join(cwd, 'schema'))
