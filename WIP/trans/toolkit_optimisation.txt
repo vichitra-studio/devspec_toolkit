@@ -3,7 +3,7 @@ Toolkit Optimization Plan — Token-Efficient Spec Authoring
 ═══════════════════════════════════════════════════════════════════════════
 
 Version: 2.0 (cleaned 2026-03-27, from 4052-line accumulated document)
-Status: Phase 0 COMPLETE, Phase A NEXT, Phases B/C PLANNED
+Status: Phase 0 COMPLETE, Phase A COMPLETE, Phase B MVP SHIPPED, Phase B Full / Phase C PLANNED
 
 ═══════════════════════════════════════════════════════════════════════════
 1. OVERVIEW
@@ -1131,6 +1131,77 @@ Deferred items:
     not a Phase A deliverable).
   - Structure recursion depth guard (max_depth=4 on _print_structure).
     Minor — 3-line change, can be added alongside any other work.
+
+
+═══════════════════════════════════════════════════════════════════════════
+11b. PHASE B MVP PIVOT — /specdev-context (2026-03-27)
+═══════════════════════════════════════════════════════════════════════════
+
+DECISION: Ship a minimal Phase B before building the full B1-B5 skill suite.
+
+The original Phase B plan (§8) defines five deliverables: B1 (/specdev-step,
+full 10-step loop), B2 (/specdev-validate), B3 (/specdev-review), B4 (hooks),
+B5 (/specdev-pipeline). The full suite provides automated retry loops and
+post-edit hooks, but adds significant complexity and reduces human oversight
+of the authoring loop.
+
+After Phase A shipped, the complexity/value tradeoff was re-evaluated:
+
+  RATIONALE FOR PIVOT:
+
+  1. Token reduction (the primary goal) is 100% realised by Phase A alone.
+     The context CLI commands already reduce per-step token load from ~25k to
+     ~4.5k. The skills layer is purely a delivery mechanism — it doesn't add
+     token efficiency, it just makes the context easier to invoke.
+
+  2. The B1 retry loop (review FAIL → fix → re-review, max 2x; validate FAIL
+     → fix → re-validate, max 3x) reduces human visibility into what Claude
+     is doing. The authoring loop benefits from human judgment at each pass,
+     especially for semantic review pairs (Pass 2 of reviewer.py). The loop
+     can be run manually with /specdev-review at negligible cost.
+
+  3. B5 (/specdev-pipeline) is a for-loop over B1. It adds no new capability
+     and can be deferred indefinitely — pipeline runs are rare and easy to
+     script manually.
+
+  4. B4 (post-edit hooks) depends on the Claude Code hook API format being
+     stable. The spec already notes "verify against Claude Code documentation
+     before implementing." Defer until the hook API is validated in practice.
+
+  5. B2 (/specdev-validate) and B3 (/specdev-review) are thin wrappers around
+     existing CLI commands. They can be added incrementally without planning.
+
+  MVP DELIVERED:
+
+  /specdev-context <NN> [--scope <entry-id>] [--full]
+  File: skills/specdev-context/SKILL.md (in the toolkit, not yet installed)
+
+  What it does (5 steps):
+    1. context structure --step NN      → orientation (what the step needs)
+    2. context scope --entry <id>       → trace-resolved ID set (if --scope)
+    3. context extract --step NN        → scoped spec content (main payload)
+    4. context canon --step NN          → canonical vocabulary
+    5. read seeds + prompt contract     → inline
+
+  What it does NOT do (intentional omissions vs B1):
+    - No artifact emit loop (Claude emits manually after reading context)
+    - No review retry loop (use /specdev-review separately if needed)
+    - No validation retry loop (run validate manually if needed)
+    - No pipeline orchestration (B5 deferred)
+    - No post-edit hooks (B4 deferred)
+
+  VERIFICATION:
+    The skill is verifiable by token count: before = full spec read (~25k),
+    after = context package output (~4.5k). Structural verification:
+    `context review` exit code is deterministic (PASS/FAIL/NEEDS_SEMANTIC).
+
+  REMAINING PHASE B ITEMS (deferred, original plan preserved in §8):
+    B1 (/specdev-step) — full orchestration loop. Build if the manual loop
+      proves too friction-heavy in practice.
+    B2 (/specdev-validate) — trivial; add when needed.
+    B3 (/specdev-review) — thin wrapper; add when needed.
+    B4 (hooks) — deferred until hook API is validated.
+    B5 (/specdev-pipeline) — deferred indefinitely.
 
 
 ═══════════════════════════════════════════════════════════════════════════

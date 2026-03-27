@@ -180,13 +180,6 @@ Prompts support **Clarify → Emit**:
 
 Agent protocol metadata lives in `docs/agents/manifest.json`.
 
-### Validation Ritual (after any spec edit)
-
-1. `validate` the changed artifact
-2. `seed-lint` to verify seed refs are current
-3. If traceability changed: regenerate `matrix` and run `fixtures-lint`
-4. Governance-compliant commit message per `spec/10_governance.json`
-
 ---
 
 ## Troubleshooting
