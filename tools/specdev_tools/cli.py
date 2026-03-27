@@ -283,6 +283,42 @@ def main():
     cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
     cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    # --- context subcommand group ---
+    ctx_p = sub.add_parser("context", help="Context preparation commands")
+    ctx_sub = ctx_p.add_subparsers(dest="context_cmd", help="Context subcommand")
+
+    ctx_struct = ctx_sub.add_parser("structure")
+    ctx_struct.add_argument("spec_dir")
+    ctx_struct.add_argument("--step", required=True)
+    ctx_struct.add_argument("--repo-root", default=".")
+
+    ctx_scope = ctx_sub.add_parser("scope")
+    ctx_scope.add_argument("spec_dir")
+    ctx_scope.add_argument("--entry", required=True)
+    ctx_scope.add_argument("--repo-root", default=".")
+
+    ctx_extract = ctx_sub.add_parser("extract")
+    ctx_extract.add_argument("spec_dir")
+    ctx_extract.add_argument("--step", required=True)
+    ctx_extract.add_argument("--entry", default=None)
+    ctx_extract.add_argument("--full", action="store_true")
+    ctx_extract.add_argument("--repo-root", default=".")
+
+    ctx_canon = ctx_sub.add_parser("canon")
+    ctx_canon.add_argument("--step", required=True)
+    ctx_canon.add_argument("--repo-root", default=".")
+
+    ctx_fresh = ctx_sub.add_parser("freshness")
+    ctx_fresh.add_argument("spec_dir")
+    ctx_fresh.add_argument("--repo-root", default=".")
+
+    ctx_review = ctx_sub.add_parser("review")
+    ctx_review.add_argument("artifact_path")
+    ctx_review.add_argument("--step", required=True)
+    ctx_review.add_argument("--entry", default=None)
+    ctx_review.add_argument("--spec-dir", default=None)
+    ctx_review.add_argument("--repo-root", default=".")
+
     args = p.parse_args()
 
     if getattr(args, "repo_root", None) == ".":
@@ -1417,6 +1453,69 @@ def main():
                 print(f"OK (dry-run: {len(added)} would be added, {len(skipped)} skipped, {malformed} malformed)")
             else:
                 print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
+
+    elif args.cmd == "context":
+        from .context import (
+            get_step_structure, resolve_scope, extract_context,
+            extract_canon, check_freshness,
+        )
+        repo_root = os.path.abspath(args.repo_root)
+        context_cmd = getattr(args, "context_cmd", None)
+        if context_cmd is None:
+            ctx_p.print_help()
+        elif context_cmd == "structure":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = get_step_structure(args.step, spec_dir, repo_root)
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "scope":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = resolve_scope(args.entry, spec_dir, repo_root)
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "extract":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = extract_context(
+                args.step, spec_dir, repo_root,
+                entry_id=getattr(args, "entry", None),
+                full=getattr(args, "full", False),
+            )
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "canon":
+            result = extract_canon(args.step, repo_root)
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "freshness":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = check_freshness(spec_dir, repo_root)
+            print(json.dumps(result, indent=2))
+            # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
+            stale_seeds = [
+                sid for sid, info in result.items()
+                if isinstance(info, dict) and info.get("stale")
+            ]
+            if stale_seeds:
+                cfg = get_config()
+                warn_or_error = "error" if cfg.warnings_as_errors else "warning"
+                for sid in stale_seeds:
+                    print(
+                        f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
+                        "re-index with /specdev-step (CONTENT_STALENESS)",
+                        file=sys.stderr,
+                    )
+                if cfg.warnings_as_errors:
+                    sys.exit(1)
+        elif context_cmd == "review":
+            from .context.reviewer import review_artifact
+            import dataclasses
+            artifact_path = os.path.abspath(args.artifact_path)
+            result = review_artifact(
+                artifact_path,
+                args.step,
+                os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
+                repo_root,
+                entry_id=getattr(args, "entry", None),
+            )
+            print(json.dumps(dataclasses.asdict(result), indent=2))
+        else:
+            ctx_p.print_help()
 
     else:
         p.print_help()

@@ -3,434 +3,614 @@
 json_utils.py - Advanced JSON manipulation and discovery tool for AI Agents.
 
 Capabilities:
-- CRUD: read, patch, insert, delete (using jq)
+- CRUD: read, read-multi, patch, insert, delete (using jq)
 - Discovery: keys, structure (skeleton)
-- Schema: Schema-aware property discovery via registry linkage
+- Schema: Schema-aware property discovery with $ref resolution and allOf merging
+
+All public functions raise JsonUtilsError on failure (not sys.exit), and return
+data instead of printing, making them safe to import as a library (e.g. from a
+future extractor.py). The CLI entry point (main) handles printing to stdout.
 """
 
 import argparse
+import glob as glob_mod
 import json
 import os
 import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 # --- Configuration ---
 JQ_INDENT = 4  # Enforce 4-space indent to match repo style
 
 
-def find_file_in_repo(filename: str) -> Optional[str]:
-    """Find a file by name starting from the repository root."""
+# --- Exceptions ---
+
+class JsonUtilsError(Exception):
+    """LLM-friendly error for all json_utils operations.
+
+    Raised instead of sys.exit(1) so callers importing json_utils as a
+    library get catchable exceptions. The CLI main() converts these to
+    stderr output + exit code 1.
+    """
+    pass
+
+
+# --- Helpers ---
+
+def _check_file(file_path: str) -> None:
+    """Verify file exists before operating on it."""
+    if not os.path.isfile(file_path):
+        raise JsonUtilsError(
+            f"File not found: {file_path}. "
+            "Check the path — spec files live in spec/, test fixtures in tests/fixtures/."
+        )
+
+
+def validate_jq_filter(jq_filter: str) -> Optional[str]:
+    """Dry-run a jq filter against null input to catch syntax errors early.
+
+    Returns None on success, or an LLM-actionable error string on failure.
+    """
+    if not jq_filter or not jq_filter.strip():
+        return "Filter is empty. Provide a valid jq expression (e.g. .title, .items[0].name)."
+
     try:
-        # Get the current working directory (where agent runs)
-        cwd = os.getcwd()
-        
-        # Use find from the current working directory to locate the file
-        find_cmd = ['find', cwd, '-name', filename, '-type', 'f', '-print', '-quit']
-        result = subprocess.run(find_cmd, capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except Exception:
-        # If find fails, return None to indicate file not found
-        return None
+        result = subprocess.run(
+            ['jq', '-n', '--argjson', '_x', 'null', jq_filter],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0 and result.stderr:
+            stderr = result.stderr.strip()
+            hint = ""
+            if "unexpected BINDING" in stderr or "try .\\[" in stderr:
+                hint = " Hint: use .[\"$field\"] for fields starting with $."
+            elif "unexpected $end" in stderr:
+                hint = " Hint: filter has unbalanced brackets or quotes."
+            elif "is not defined" in stderr:
+                hint = " Hint: check for typos in function names."
+            return f"jq syntax error in filter '{jq_filter}': {stderr}{hint}"
+    except subprocess.TimeoutExpired:
+        return f"jq filter '{jq_filter}' timed out during syntax check."
+    except FileNotFoundError:
+        return "jq is not installed or not on PATH."
+
     return None
 
 
+def _require_valid_filter(jq_filter: str) -> None:
+    """Validate a jq filter, raising JsonUtilsError on failure."""
+    err = validate_jq_filter(jq_filter)
+    if err:
+        raise JsonUtilsError(err)
+
+
 def run_jq(args: List[str], input_data: Optional[str] = None, file_path: Optional[str] = None, timeout: int = 30) -> str:
-    """Run jq command and return output."""
+    """Run jq command and return output. Raises JsonUtilsError on failure."""
     cmd = ['jq'] + args
     if file_path:
         cmd.append(file_path)
-        
+
     try:
-        if input_data:
+        if input_data is not None:
             result = subprocess.run(cmd, input=input_data, capture_output=True, text=True, check=True, timeout=timeout)
         else:
             result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=timeout)
         return result.stdout.strip()
+    except FileNotFoundError:
+        raise JsonUtilsError("jq is not installed or not on PATH. Install with: brew install jq")
     except subprocess.TimeoutExpired:
-        error_msg = f"jq command timed out after {timeout} seconds: {' '.join(cmd)}"
-        print(f"Error: {error_msg}", file=sys.stderr)
-        sys.exit(1)
+        raise JsonUtilsError(
+            f"jq timed out after {timeout}s. Simplify the filter or target a narrower path."
+        )
     except subprocess.CalledProcessError as e:
-        # More graceful error handling for syntax errors
-        error_msg = f"jq failed with command: {' '.join(cmd)}"
-        if e.stderr:
-            error_msg += f" - stderr: {e.stderr.strip()}"
-        if e.stdout:
-            error_msg += f" - stdout: {e.stdout.strip()}"
-        
-        # Check if this is a syntax error that we can safely ignore in some contexts
-        if "syntax error" in e.stderr.lower() or "unexpected" in e.stderr.lower():
-            # For operations that might have invalid jq paths, still report the error but don't crash
-            print(f"Warning: {error_msg} (continuing execution)", file=sys.stderr)
-            return ""
-        else:
-            print(f"Error: {error_msg}", file=sys.stderr)
-            sys.exit(1)
+        stderr = (e.stderr or "").strip()
+        hint = ""
+        if "unexpected BINDING" in stderr or "try .\\[" in stderr:
+            hint = " Hint: use .[\"$field\"] for fields starting with $."
+        elif "unexpected $end" in stderr:
+            hint = " Hint: unbalanced brackets or quotes in filter."
+        elif "Cannot index" in stderr:
+            hint = " Hint: the path targets a scalar, not an object/array. Check parent path."
+        elif "null" in stderr and "iterate" in stderr:
+            hint = " Hint: an intermediate path is null. Verify the path exists with 'keys' first."
+        elif "Could not open file" in stderr:
+            hint = " Hint: check that the file path is correct and the file exists."
+
+        raise JsonUtilsError(f"jq failed — {stderr}{hint}")
 
 
-def resolve_schema_path(file_path: str, registry_path: Optional[str] = None) -> Optional[str]:
-    """Resolve the local schema file path from the target JSON's $schema field."""
-    # 1. Read $schema url
+# --- Schema Resolution ---
+
+def build_id_index(schema_dir: str) -> Dict[str, str]:
+    """Scan schema dir once, build {$id: file_path} mapping from all *.schema.json files.
+
+    Also scans a sibling canon/ directory if it exists, so that canon schema
+    $id values (vc:canon:kind, vc:canon:aliases) are indexed for $ref resolution.
+    """
+    index = {}
+    # Primary: schema/**/*.schema.json
+    for path in glob_mod.glob(os.path.join(schema_dir, '**/*.schema.json'), recursive=True):
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+                if '$id' in data:
+                    index[data['$id']] = path
+        except (json.JSONDecodeError, OSError):
+            continue
+
+    # Also scan sibling canon/ directory for canon schemas
+    canon_dir = os.path.normpath(os.path.join(schema_dir, '..', 'canon'))
+    if os.path.isdir(canon_dir):
+        for path in glob_mod.glob(os.path.join(canon_dir, '**/*.schema.json'), recursive=True):
+            try:
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                    if '$id' in data:
+                        index[data['$id']] = path
+            except (json.JSONDecodeError, OSError):
+                continue
+
+    return index
+
+
+def resolve_ref(ref: str, id_index: Dict[str, str], cache: Dict[str, dict]) -> Optional[dict]:
+    """Resolve a vc: URN $ref to its schema definition.
+
+    Returns the resolved schema fragment, or None if unresolvable.
+    Local refs (#/$defs/...) return None — caller handles those.
+    """
+    if ref.startswith('#/'):
+        return None  # local ref — handled by caller
+
+    base, _, fragment = ref.partition('#')
+    file_path = id_index.get(base)
+    if not file_path:
+        return None
+
+    if file_path not in cache:
+        try:
+            with open(file_path, 'r') as f:
+                cache[file_path] = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    schema = cache[file_path]
+    if not fragment:
+        return schema  # whole-schema ref
+
+    # Resolve by $anchor match in $defs
+    for _def_name, def_schema in schema.get('$defs', {}).items():
+        if isinstance(def_schema, dict) and def_schema.get('$anchor') == fragment:
+            return def_schema
+    return None
+
+
+def _find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
+    """Locate the schema/ directory.
+
+    Search order:
+    1. repo_root/schema (explicit --repo-root from CLI)
+    2. Relative to this file (tools/core/ -> ../../schema)
+    3. cwd/schema (toolkit IS the repo)
+    4. cwd/devspec_toolkit/schema (toolkit is a submodule)
+    """
+    candidates = []
+    if repo_root:
+        candidates.append(os.path.join(repo_root, 'schema'))
+
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates.append(os.path.normpath(os.path.join(this_dir, '..', '..', 'schema')))
+
+    cwd = os.getcwd()
+    candidates.append(os.path.join(cwd, 'schema'))
+    candidates.append(os.path.join(cwd, 'devspec_toolkit', 'schema'))
+
+    for candidate in candidates:
+        normed = os.path.normpath(candidate)
+        if os.path.isdir(normed):
+            return normed
+    return None
+
+
+def resolve_schema_path(
+    file_path: str,
+    repo_root: Optional[str] = None,
+    id_index: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """Resolve the local schema file path from the target JSON's $schema field.
+
+    Uses $id-index resolution. If id_index is pre-built, reuses it (avoids
+    double scan when called from json_schema_discovery).
+    """
+    # 1. Read $schema URI from the target file
     try:
         schema_url = run_jq(['-r', '.["$schema"]'], file_path=file_path)
         if not schema_url or schema_url == 'null':
             return None
-    except Exception as e:
-        print(f"Error reading $schema from {file_path}: {e}", file=sys.stderr)
+    except JsonUtilsError:
         return None
 
-    # 2. Load registry with dynamic search capability using find for better cross-platform support
-    if not registry_path:
-        # Try to find schema_registry.json using the reusable find function from repo root
-        registry_path = find_file_in_repo('schema_registry.json')
-    
-    if not registry_path or not os.path.exists(registry_path):
-        print(f"Warning: Could not find schema_registry.json. Schema-aware features will be limited.", file=sys.stderr)
-        return None
+    # 2. Build or reuse $id index
+    if id_index is None:
+        schema_dir = _find_schema_dir(repo_root)
+        if schema_dir:
+            id_index = build_id_index(schema_dir)
 
-    try:
-        with open(registry_path, 'r') as f:
-            registry = json.load(f)
-    except Exception as e:
-        print(f"Warning: Failed to load registry {registry_path}: {e}. Schema-aware features will be limited.", file=sys.stderr)
-        return None
+    if id_index:
+        resolved = id_index.get(schema_url)
+        if resolved and os.path.exists(resolved):
+            return resolved
 
-    # 3. Lookup
-    # Registry format is typically { "uri": "path/to/schema" }
-    # Paths in registry are relative to the repo root
-    
-    # Try direct match
-    rel_path = registry.get(schema_url)
-    
-    # Try mapping if registry has a 'mappings' key (common pattern)
-    if not rel_path and 'mappings' in registry:
-         rel_path = registry['mappings'].get(schema_url)
-
-    if not rel_path:
-        print(f"Warning: Schema URL '{schema_url}' not found in registry {registry_path}. Schema-aware features will be limited.", file=sys.stderr)
-        return None
-
-    # Resolve schema path using find_file_in_repo for simplicity and reliability
-    try:
-        # Try to find the schema file directly using our reusable function
-        full_schema_path = find_file_in_repo(os.path.basename(rel_path))
-        if full_schema_path and os.path.exists(full_schema_path):
-            return full_schema_path
-            
-    except Exception as e:
-        print(f"Warning: Failed to resolve schema path '{rel_path}' for URL '{schema_url}': {e}. Schema-aware features will be limited.", file=sys.stderr)
-        pass
-    
-    print(f"Warning: Could not locate schema file '{rel_path}' for URL '{schema_url}'. Schema-aware features will be limited.", file=sys.stderr)
     return None
 
 
 # --- Core Operations ---
 
-def json_read(file_path: str, jq_filter: str) -> None:
-    """Read data using a jq filter."""
-    # Block full JSON reads (filter is ".")
+def json_read(file_path: str, jq_filter: str) -> Optional[str]:
+    """Read data using a jq filter. Returns the result string, or None if empty."""
     if jq_filter == ".":
-        print("Error: Full JSON reads are not allowed because they are inefficient. Please specify a targeted path to read.", file=sys.stderr)
-        sys.exit(1)
-    
-    try:
-        result = run_jq(['-r', jq_filter], file_path=file_path, timeout=10)
-        if result and result != 'null':
-            print(result)
-        elif result == 'null':
-            # Explicitly handle null results
-            pass
-    except Exception as e:
-        print(f"Error reading {file_path} with filter '{jq_filter}': {e}", file=sys.stderr)
-        sys.exit(1)
+        raise JsonUtilsError(
+            "Full JSON reads are not allowed. Specify a targeted path (e.g. .title, .items[0])."
+        )
+
+    _check_file(file_path)
+    _require_valid_filter(jq_filter)
+
+    result = run_jq(['-r', jq_filter], file_path=file_path, timeout=10)
+    if result == 'null':
+        return "null"
+    return result
 
 
-def json_keys(file_path: str, path_selector: str) -> None:
-    """List keys at the given path."""
+def json_read_multi(file_path: str, filters: List[str]) -> Optional[str]:
+    """Read multiple jq filters in a single pass, returning keyed-by-filter JSON.
+
+    Returns the JSON string result. Errors cascade immediately — if any filter
+    fails, the entire call errors rather than falling back to per-filter execution.
+    """
+    if not filters:
+        raise JsonUtilsError("No filters provided.")
+
+    _check_file(file_path)
+
+    for f in filters:
+        if f.strip() == ".":
+            raise JsonUtilsError("Full JSON reads are not allowed. Specify targeted paths.")
+        _require_valid_filter(f)
+
+    # Keys use json.dumps to safely encode filter strings (handles $, quotes, etc.)
+    kv_entries = []
+    for f in filters:
+        safe_key = json.dumps(f)  # produces "...", already quoted
+        kv_entries.append(f'({safe_key}): ({f})')
+    kv_pairs = ",\n  ".join(kv_entries)
+    filter_expr = "{\n  " + kv_pairs + "\n}"
+
+    result = run_jq(["--indent", str(JQ_INDENT), filter_expr], file_path=file_path, timeout=15)
+    return result
+
+
+def json_keys(file_path: str, path_selector: str) -> Optional[str]:
+    """List keys at the given path. Returns JSON array string."""
+    _check_file(file_path)
+    _require_valid_filter(path_selector)
+
     filter_expr = f'({path_selector}) | keys'
-    try:
-        result = run_jq(['-r', filter_expr], file_path=file_path, timeout=10)
-        if result and result != 'null':
-            print(result)
-    except Exception as e:
-         # Fallback if path doesn't return an object
-         print(f"Error listing keys at {path_selector} in {file_path}: {e}", file=sys.stderr)
-         sys.exit(1)
+    result = run_jq([filter_expr], file_path=file_path, timeout=10)
+    if result and result != 'null':
+        return result
+    return None
 
 
 def json_write_atomic(file_path: str, data_str: str) -> None:
     """Write string data to file atomically, enforcing format."""
-    # Ensure it's valid JSON first by piping through jq
+    if not data_str or not data_str.strip():
+        raise JsonUtilsError(
+            f"Refusing to write empty content to {file_path}. "
+            "This usually indicates an upstream jq error — check the filter and input."
+        )
+
     formatted = run_jq(['--indent', str(JQ_INDENT), '.'], input_data=data_str, timeout=10)
-    
+
+    if not formatted or not formatted.strip():
+        raise JsonUtilsError(
+            f"jq formatting produced empty output for {file_path}. Input may be invalid JSON."
+        )
+
     dirname = os.path.dirname(file_path) or '.'
+    # Preserve original file permissions (temp files default to 0o600)
+    try:
+        original_mode = os.stat(file_path).st_mode
+    except OSError:
+        original_mode = None
+
     with tempfile.NamedTemporaryFile('w', dir=dirname, delete=False) as tf:
-        tf.write(formatted)
+        tf.write(formatted + '\n')
         temp_name = tf.name
-    
+
     os.replace(temp_name, file_path)
+    if original_mode is not None:
+        os.chmod(file_path, original_mode)
 
 
-def json_patch(file_path: str, path_selector: str, value: str, is_json: bool = True) -> None:
-    """Update a value at the path."""
-    # Logic: usage of --argjson for typed JSON, --arg for strings if needed
-    # usage: jq --indent 4 --argjson v <value> 'path = $v' file
-    
+def json_patch(file_path: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """Update a value at the path. Returns confirmation message."""
+    _check_file(file_path)
+    _require_valid_filter(path_selector)
+
     args = ['--indent', str(JQ_INDENT)]
     if is_json:
         args.extend(['--argjson', 'v', value])
     else:
         args.extend(['--arg', 'v', value])
-        
+
     filter_expr = f'({path_selector}) = $v'
     args.append(filter_expr)
-    
-    # atomic read-modify-write
-    try:
-        with open(file_path, 'r') as f:
-            content = f.read()
-        
-        new_content = run_jq(args, input_data=content, timeout=10)
-        json_write_atomic(file_path, new_content)
-        print(f"Updated {path_selector} in {file_path}")
-    except Exception as e:
-        print(f"Error patching {file_path} at path '{path_selector}': {e}", file=sys.stderr)
-        sys.exit(1)
+
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    new_content = run_jq(args, input_data=content, timeout=10)
+    json_write_atomic(file_path, new_content)
+    return f"Updated {path_selector} in {file_path}"
 
 
-def json_insert(file_path: str, path_selector: str, value: str, is_json: bool = True) -> None:
-    """Append to array or merge object."""
+def json_insert(file_path: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """Append to array or merge object. Returns confirmation message."""
+    _check_file(file_path)
+    _require_valid_filter(path_selector)
+
     args = ['--indent', str(JQ_INDENT)]
     if is_json:
         args.extend(['--argjson', 'v', value])
     else:
         args.extend(['--arg', 'v', value])
 
-    # Try append first (+= [$v]), if fail, try += $v (object merge) or error
-    # We use a robust filter: 
-    # if type array then += [$v] elif type object then += $v else error("Cannot insert into " + type) end
     filter_expr = f'({path_selector}) |= (if type=="array" then . + [$v] elif type=="object" then . + $v else error("Cannot insert into " + type) end)'
-    
     args.append(filter_expr)
-    
-    try:
-        with open(file_path, 'r') as f:
-            content = f.read()
 
-        new_content = run_jq(args, input_data=content, timeout=10)
-        json_write_atomic(file_path, new_content)
-        print(f"Inserted into {path_selector} in {file_path}")
-    except Exception as e:
-        print(f"Error inserting into {file_path} at path '{path_selector}': {e}", file=sys.stderr)
-        sys.exit(1)
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    new_content = run_jq(args, input_data=content, timeout=10)
+    json_write_atomic(file_path, new_content)
+    return f"Inserted into {path_selector} in {file_path}"
 
 
-def json_delete(file_path: str, path_selector: str) -> None:
-    """Delete item at path."""
+def json_delete(file_path: str, path_selector: str) -> str:
+    """Delete item at path. Returns confirmation message."""
+    _check_file(file_path)
+    _require_valid_filter(path_selector)
+
     args = ['--indent', str(JQ_INDENT)]
     filter_expr = f'del({path_selector})'
     args.append(filter_expr)
-    
-    try:
-        with open(file_path, 'r') as f:
-            content = f.read()
-            
-        new_content = run_jq(args, input_data=content, timeout=10)
-        json_write_atomic(file_path, new_content)
-        print(f"Deleted {path_selector} in {file_path}")
-    except Exception as e:
-        print(f"Error deleting from {file_path} at path '{path_selector}': {e}", file=sys.stderr)
-        sys.exit(1)
+
+    with open(file_path, 'r') as f:
+        content = f.read()
+
+    new_content = run_jq(args, input_data=content, timeout=10)
+    json_write_atomic(file_path, new_content)
+    return f"Deleted {path_selector} in {file_path}"
 
 
+def json_structure(file_path: str, path_selector: str = ".") -> Optional[str]:
+    """Return a visual hierarchical structure of the JSON as a string."""
+    _check_file(file_path)
 
+    if path_selector != ".":
+        _require_valid_filter(path_selector)
 
-def json_structure(file_path: str, path_selector: str = ".") -> None:
-    """Return a visual hierarchical structure of the JSON."""
-    try:
-        # Get the actual data at path
-        result = run_jq(['-c', f'({path_selector})'], file_path=file_path, timeout=30)
-        
-        if result == 'null':
-            print("null")
-            return
-            
-        parsed_data = json.loads(result)
-        
-        # Create a visual tree representation
-        def _print_structure(data, prefix="", is_last=True):
-            if isinstance(data, dict):
-                items = list(data.items())
-                for i, (key, value) in enumerate(items):
-                    is_last_item = (i == len(items) - 1)
-                    connector = "└── " if is_last_item else "├── "
-                    print(f"{prefix}{connector}{key}: {type(value).__name__}")
-                    
-                    if isinstance(value, (dict, list)):
-                        extension = "    " if is_last_item else "│   "
-                        _print_structure(value, prefix + extension, is_last_item)
-                        
-            elif isinstance(data, list):
-                print(f"{prefix}└── array[{len(data)} items]")
-                if len(data) > 0:
-                    # Only show first element type to avoid excessive output
-                    first_elem = data[0]
-                    print(f"{prefix}    ├── [0]: {type(first_elem).__name__}")
-                    if isinstance(first_elem, (dict, list)):
-                        extension = "    "
-                        _print_structure(first_elem, prefix + extension, True)
-                        
-        # Start the visual tree representation
-        if isinstance(parsed_data, dict):
-            items = list(parsed_data.items())
+    result = run_jq(['-c', f'({path_selector})'], file_path=file_path, timeout=30)
+
+    if result == 'null':
+        return "null"
+
+    parsed_data = json.loads(result)
+    lines: List[str] = []
+
+    def _collect(data, prefix=""):
+        if isinstance(data, dict):
+            items = list(data.items())
             for i, (key, value) in enumerate(items):
-                is_last = (i == len(items) - 1)
-                connector = "└── " if is_last else "├── "
-                print(f"{connector}{key}: {type(value).__name__}")
-                
+                last = (i == len(items) - 1)
+                connector = "└── " if last else "├── "
+                lines.append(f"{prefix}{connector}{key}: {type(value).__name__}")
+
                 if isinstance(value, (dict, list)):
-                    extension = "    " if is_last else "│   "
-                    _print_structure(value, extension, is_last)
-        elif isinstance(parsed_data, list):
-            print(f"array[{len(parsed_data)} items]")
-            if len(parsed_data) > 0:
-                first_elem = parsed_data[0]
-                print(f"├── [0]: {type(first_elem).__name__}")
+                    extension = "    " if last else "│   "
+                    _collect(value, prefix + extension)
+
+        elif isinstance(data, list):
+            lines.append(f"{prefix}└── array[{len(data)} items]")
+            if len(data) > 0:
+                first_elem = data[0]
+                lines.append(f"{prefix}    ├── [0]: {type(first_elem).__name__}")
                 if isinstance(first_elem, (dict, list)):
-                    _print_structure(first_elem, "    ", True)
-        else:
-            print(f"{type(parsed_data).__name__}")
-            
-    except Exception as e:
-        # Provide better error messages for debugging
-        if "unexpected" in str(e).lower() or "syntax error" in str(e).lower():
-            print(f"Error: Invalid path '{path_selector}' for structure - {e}")
-        else:
-            print(f"Error showing structure for {file_path} at path '{path_selector}': {e}", file=sys.stderr)
-        sys.exit(1)
+                    _collect(first_elem, prefix + "    ")
+
+    # Build the visual tree representation
+    if isinstance(parsed_data, dict):
+        items = list(parsed_data.items())
+        for i, (key, value) in enumerate(items):
+            last = (i == len(items) - 1)
+            connector = "└── " if last else "├── "
+            lines.append(f"{connector}{key}: {type(value).__name__}")
+
+            if isinstance(value, (dict, list)):
+                extension = "    " if last else "│   "
+                _collect(value, extension)
+    elif isinstance(parsed_data, list):
+        lines.append(f"array[{len(parsed_data)} items]")
+        if len(parsed_data) > 0:
+            first_elem = parsed_data[0]
+            lines.append(f"├── [0]: {type(first_elem).__name__}")
+            if isinstance(first_elem, (dict, list)):
+                _collect(first_elem, "    ")
+    else:
+        lines.append(f"{type(parsed_data).__name__}")
+
+    return "\n".join(lines) if lines else None
 
 
-def json_schema_discovery(file_path: str, path_selector: str) -> None:
-    """Discover allowable fields from the schema."""
-    # Try to find registry in repo root using our reusable function
-    registry_path = find_file_in_repo('schema_registry.json')
-    
-    schema_path = resolve_schema_path(file_path, registry_path)
+# --- Schema Discovery ---
+
+def _effective_schema(node: dict, resolve_fn) -> dict:
+    """Resolve $ref and merge allOf to produce a navigable schema node.
+
+    Handles the two composition patterns in this codebase:
+    - $ref: resolved via resolve_fn (local #/$defs/... or URN vc:...)
+    - allOf: branches resolved and merged (properties unioned, required concatenated)
+
+    Does NOT handle oneOf, anyOf, or if/then/else. In this codebase those are
+    used only for type unions (number|string) and conditional required fields —
+    neither adds navigable properties, so discovery results remain correct.
+    """
+    if not isinstance(node, dict):
+        return node
+
+    # Resolve $ref first
+    if '$ref' in node:
+        node = resolve_fn(node)
+        if not isinstance(node, dict):
+            return node
+
+    # Merge allOf branches
+    if 'allOf' in node:
+        merged_props = {}
+        merged_required = []
+        merged_defs = {}
+        base = {k: v for k, v in node.items() if k != 'allOf'}
+
+        for branch in node['allOf']:
+            branch = _effective_schema(branch, resolve_fn)
+            if 'properties' in branch:
+                merged_props.update(branch['properties'])
+            if 'required' in branch:
+                merged_required.extend(branch['required'])
+            if '$defs' in branch:
+                merged_defs.update(branch['$defs'])
+            # Copy other schema keywords (first-wins for non-mergeable keys)
+            for key in ('type', 'description', 'items', 'additionalProperties'):
+                if key in branch and key not in base:
+                    base[key] = branch[key]
+
+        if merged_props:
+            base['properties'] = merged_props
+        if merged_required:
+            base['required'] = merged_required
+        if merged_defs:
+            base.setdefault('$defs', {}).update(merged_defs)
+        return base
+
+    return node
+
+
+def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optional[str] = None) -> Optional[str]:
+    """Discover allowable fields from the schema, resolving $ref URNs and allOf inline.
+
+    Returns JSON string of discovered schema info.
+    """
+    _check_file(file_path)
+
+    # Build index once — shared between resolve_schema_path and ref resolution
+    schema_dir = _find_schema_dir(repo_root)
+    id_index = build_id_index(schema_dir) if schema_dir else {}
+    ref_cache: Dict[str, dict] = {}
+
+    schema_path = resolve_schema_path(file_path, repo_root=repo_root, id_index=id_index)
     if not schema_path:
-        print(f"Error: Could not resolve schema for {file_path}. Make sure it has a $schema field and registry is properly configured.", file=sys.stderr)
-        sys.exit(1)
-        
-    # We need to map the data path (e.g. .capabilities[0].verb) to schema path (properties.capabilities.items.properties.verb)
-    # This is complex in pure jq.
-    # Simplified approach: 
-    # 1. Load schema
-    # 2. Traverse schema structure corresponding to the path
-    
-    # For now, let's just dump the relevant part of the schema if possible.
-    # We will use a python walker for the path since JSONPath to SchemaPath mapping is non-trivial.
-    
-    # Naive Schema Walker:
-    # 1. Split path_selector into parts.
-    # 2. Walk schema properties/items.
-    
-    try:
-        with open(schema_path, 'r') as f:
-            schema = json.load(f)
-    except Exception as e:
-        print(f"Error loading schema from {schema_path}: {e}", file=sys.stderr)
-        sys.exit(1)
-        
-    # Remove leading '.'
+        raise JsonUtilsError(
+            f"Could not resolve schema for {file_path}. "
+            "Make sure it has a $schema field and the schema directory is accessible."
+        )
+
+    with open(schema_path, 'r') as f:
+        schema = json.load(f)
+
+    def _resolve_node(node: dict) -> dict:
+        """Resolve a single $ref node."""
+        if not isinstance(node, dict) or '$ref' not in node:
+            return node
+        ref = node['$ref']
+        # Local ref: look up in current schema's $defs
+        if ref.startswith('#/$defs/'):
+            def_name = ref.split('/')[-1]
+            resolved = schema.get('$defs', {}).get(def_name)
+            return resolved if resolved else node
+        # URN ref: resolve via $id index
+        resolved = resolve_ref(ref, id_index, ref_cache)
+        return resolved if resolved else node
+
+    # Get the effective root schema (resolves allOf at root level)
+    effective_root = _effective_schema(schema, _resolve_node)
+
+    # Handle root-level query
     clean_path = path_selector.lstrip('.').replace('[]', '')
     if not clean_path:
-        print(json.dumps(schema.get('properties', {}), indent=2))
-        return
+        props = effective_root.get('properties', {})
+        resolved_props = {k: _effective_schema(v, _resolve_node) for k, v in props.items()}
+        return json.dumps({k: _summarise_prop(v) for k, v in resolved_props.items()}, indent=2)
 
-    # Basic approximation of path traversal
-    # Note: proper implementation requires a full JSONPointer parser. 
-    # Here we assume simple dot notation for properties.
-    current = schema
-    
-    # This is a heuristic walker for the tool's v1
+    # Walk the schema path
+    current = effective_root
     parts = clean_path.replace('[', '.').replace(']', '').split('.')
     parts = [p for p in parts if p]
-    
-    # Try to navigate the schema path
+
     path_found = True
     for part in parts:
-        # Move through properties
+        current = _effective_schema(current, _resolve_node)
+
         if 'properties' in current and part in current['properties']:
             current = current['properties'][part]
         elif 'items' in current and isinstance(current['items'], dict):
-            # Array traversal - check if it's an object array
-            if 'properties' in current['items'] and part in current['items']['properties']:
-                current = current['items']['properties'][part]
+            items = _effective_schema(current['items'], _resolve_node)
+            if 'properties' in items and part in items['properties']:
+                current = items['properties'][part]
             else:
-                # If we can't find the specific property, show array structure
-                current = current['items']
-        elif '$ref' in current:
-             # Just warn about ref, we don't resolve deep refs yet in this tool version
-             print(f"Stopped at $ref: {current['$ref']}. (Deep ref resolution not yet supported)", file=sys.stderr)
-             path_found = False
-             break
+                current = items
         else:
-            # Try to find in any level of nested structure
             path_found = False
             break
 
+    current = _effective_schema(current, _resolve_node)
+
     if not path_found:
-        # If we couldn't navigate the exact path, try to get information about the schema structure
-        print(json.dumps({
+        return json.dumps({
             "error": f"Could not navigate to path '{path_selector}' in schema",
             "schema_info": {
                 "type": current.get("type", "unknown"),
                 "description": current.get("description", "No description available")
             }
-        }, indent=2))
-        return
-              
-    # Output useful info about the target
+        }, indent=2)
+
     info = {
         "type": current.get("type"),
         "description": current.get("description"),
-        "allowed_properties": list(current.get("properties", {}).keys()) if current.get("type") == "object" else None,
+        "allowed_properties": list(current.get("properties", {}).keys()) if current.get("type") == "object" or current.get("properties") else None,
         "items": current.get("items", {}).get("type") if current.get("type") == "array" else None,
         "required": current.get("required"),
         "enum": current.get("enum")
     }
-    print(json.dumps(info, indent=2))
+    return json.dumps(info, indent=2)
 
-#Find all occurances of value
-## TODO: Refine and expose as a tool
-def trace_relationship(root_dir: str, value: str) -> None:
-    """
-    Tracing custom ID relationships using ripgrep's JSON output.
-    """
-    # -t json: Search only JSON files
-    # --json: Output machine-readable matches
-    cmd = ['rg', '--json', '-t', 'json', '--fixed-strings', value, root_dir]
-    
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        findings = []
-        
-        for line in result.stdout.strip().split('\n'):
-            msg = json.loads(line)
-            if msg["type"] == "match":
-                findings.append({
-                    "file": msg["data"]["path"]["text"],
-                    "line": msg["data"]["line_number"],
-                    "content": msg["data"]["lines"]["text"].strip()
-                })
-        
-        print(json.dumps(findings, indent=4))
-    except Exception as e:
-        print(f"Discovery error: {e}", file=sys.stderr)
 
+def _summarise_prop(prop: dict) -> dict:
+    """Create a compact summary of a schema property for root-level discovery."""
+    if not isinstance(prop, dict):
+        return prop
+    summary = {}
+    if 'type' in prop:
+        summary['type'] = prop['type']
+    if 'description' in prop:
+        # Truncate long descriptions for overview
+        desc = prop['description']
+        summary['description'] = desc[:120] + '...' if len(desc) > 120 else desc
+    if 'enum' in prop:
+        summary['enum'] = prop['enum']
+    return summary
 
 
 # --- CLI Setup ---
@@ -442,7 +622,12 @@ def main():
     # Read
     p_read = subparsers.add_parser("read", help="Read data (use targeted paths, not '.' for full JSON)")
     p_read.add_argument("file", help="JSON file path")
-    p_read.add_argument("filter", help="jq filter (e.g. .items[0])", default=".", nargs="?")
+    p_read.add_argument("filter", help="jq filter (e.g. .items[0].name, .version)")
+
+    # Read-multi
+    p_readm = subparsers.add_parser("read-multi", help="Read multiple paths in one pass (keyed output)")
+    p_readm.add_argument("file", help="JSON file path")
+    p_readm.add_argument("filters", nargs="+", help="jq filters (e.g. .version .name)")
 
     # Patch
     p_patch = subparsers.add_parser("patch", help="Update value")
@@ -462,38 +647,50 @@ def main():
     p_del = subparsers.add_parser("delete", help="Delete value")
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
-    
+
     # Keys
     p_keys = subparsers.add_parser("keys", help="List keys")
     p_keys.add_argument("file", help="JSON file path")
     p_keys.add_argument("path", help="jq path (optional)", default=".", nargs="?")
-    
+
     # Structure
-    p_struct = subparsers.add_parser("structure", help="Show visual hierarchical structure (use targeted paths, not '.' for full JSON)")
+    p_struct = subparsers.add_parser("structure", help="Show visual hierarchical structure")
     p_struct.add_argument("file", help="JSON file path")
     p_struct.add_argument("path", help="jq path (optional)", default=".", nargs="?")
-    
+
     # Schema
     p_schema = subparsers.add_parser("schema", help="Query schema capabilities")
     p_schema.add_argument("file", help="Source data file (to find $schema)")
     p_schema.add_argument("path", help="Path looking for (e.g. .capabilities)")
+    p_schema.add_argument("--repo-root", help="Toolkit root dir (for submodule deployments)")
 
     args = parser.parse_args()
 
-    if args.command == "read":
-        json_read(args.file, args.filter)
-    elif args.command == "patch":
-        json_patch(args.file, args.path, args.value, not args.raw)
-    elif args.command == "insert":
-        json_insert(args.file, args.path, args.value, not args.raw)
-    elif args.command == "delete":
-        json_delete(args.file, args.path)
-    elif args.command == "keys":
-        json_keys(args.file, args.path)
-    elif args.command == "structure":
-        json_structure(args.file, args.path)
-    elif args.command == "schema":
-        json_schema_discovery(args.file, args.path)
+    try:
+        result = None
+        if args.command == "read":
+            result = json_read(args.file, args.filter)
+        elif args.command == "read-multi":
+            result = json_read_multi(args.file, args.filters)
+        elif args.command == "patch":
+            result = json_patch(args.file, args.path, args.value, not args.raw)
+        elif args.command == "insert":
+            result = json_insert(args.file, args.path, args.value, not args.raw)
+        elif args.command == "delete":
+            result = json_delete(args.file, args.path)
+        elif args.command == "keys":
+            result = json_keys(args.file, args.path)
+        elif args.command == "structure":
+            result = json_structure(args.file, args.path)
+        elif args.command == "schema":
+            result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
+
+        if result is not None:
+            print(result)
+    except JsonUtilsError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

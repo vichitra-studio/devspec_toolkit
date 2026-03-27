@@ -13,6 +13,7 @@ from .lint import lint_canon_dir
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
+from ..core.constants import INFERENCE_RULES
 
 
 def canonical_autofix(
@@ -370,33 +371,5 @@ def _collect_used_refs(node: Any) -> dict[str, dict[str, str]]:
     return refs
 
 
-INFERENCE_RULES = (
-    ("metric", "metric_ref", "metric"),
-    ("term", "term_ref", "term"),
-    ("term", "acronym_ref", "acronym"),
-    ("acronym", "acronym_ref", "acronym"),
-    ("unit", "unit_ref", "unit"),
-    ("interface", "interface_ref", "interface"),
-    ("event", "event_ref", "event"),
-    ("stage", "stage_ref", "stage"),
-    ("stage", "environment_ref", "environment"),
-    ("environment", "environment_ref", "environment"),
-    ("status", "status_ref", "status"),
-    ("state", "state_ref", "status"),
-    ("role", "role_ref", "role"),
-    ("actor", "actor_ref", "role"),
-    ("entity", "entity_ref", "entity"),
-    ("resource", "resource_ref", "entity"),
-    ("capability", "capability_ref", "capability"),
-    ("action", "action_ref", "action"),
-    ("command", "command_ref", "command"),
-    ("policy", "policy_ref", "policy"),
-    ("pattern", "id_pattern_ref", "id_pattern"),
-    ("area_of_concern", "governance_label_ref", "governance_label"),
-    ("name", "tech_stack_ref", "tech_stack"),
-    ("id", "dependency_ref", "dependency"),
-    ("category", "risk_category_ref", "risk_category"),
-    ("category", "completeness_dimension_ref", "completeness_dimension"),
-    ("risk_category", "risk_category_ref", "risk_category"),
-    ("tag", "tag_ref", "tag"),
-)
+# INFERENCE_RULES imported from core.constants to allow reuse in context/canon_extractor.py
+# without circular imports.  The canonical definition lives in core/constants.py.
