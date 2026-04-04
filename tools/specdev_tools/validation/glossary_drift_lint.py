@@ -37,7 +37,11 @@ def lint_glossary_drift(
     # Pass 1 assumes term_id == "term-" + temp_id for kind=="term" proposals.
     # This convention holds for all terms authored via the standard glossary prompt
     # (each term's term_id is the kebab-case term prefixed with "term-").
-    term_defs: dict[str, str] = {t["term_id"]: t.get("definition", "") for t in terms}
+    term_defs: dict[str, str] = {
+        t["term_id"]: t.get("definition", "")
+        for t in terms
+        if t.get("term_id")
+    }
 
     # --- Pass 1: term ↔ proposal (kind == "term" only) ---
     # Acronym proposals (kind == "acronym") are excluded: they have no corresponding
@@ -86,15 +90,18 @@ def lint_glossary_drift(
                 continue
 
         for term in terms:
+            if not term.get("term_id"):
+                continue
             term_ref = term.get("term_ref", {})
             canon_id = term_ref.get("id", "")
             if not canon_id.startswith("cn:project:"):
                 continue
             if canon_id in canon_defs and term.get("definition", "") != canon_defs[canon_id]:
+                term_id = term.get("term_id", "")
                 errors.append(make_error(
                     "E607",
-                    f"GLOSSARY_CANON_DRIFT term={term['term_id']} canon={canon_id}",
-                    path=f"terms[{term['term_id']}]",
+                    f"GLOSSARY_CANON_DRIFT term={term_id} canon={canon_id}",
+                    path=f"terms[{term_id}]",
                 ))
 
     # --- Pass 3: orphan detection ---

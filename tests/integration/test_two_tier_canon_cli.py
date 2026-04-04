@@ -245,6 +245,65 @@ class TestCanonicalIntegrityTwoTier:
         assert not e150, f"Unexpected E150: {e150}"
 
 
+class TestValidateSingleFileTwoTier:
+    """validate (single-file) discovers project canon via --git-root / --spec-root."""
+
+    def test_validate_single_file_discovers_project_canon_via_git_root(self, tmp_path: Path) -> None:
+        host = tmp_path / "host"
+        spec_dir = host / "spec"
+        _make_project_canon(host)
+        _make_spec_with_canon_refs(spec_dir)
+
+        result = _run_specdev(
+            "validate", str(spec_dir / "03_glossary.json"),
+            "--repo-root", str(TOOLKIT_ROOT),
+            "--git-root", str(host),
+            "--json",
+        )
+        payload = json.loads(result.stdout)
+        e110_project = [
+            e for e in payload.get("errors", [])
+            if "E110" in str(e) and "cn:project:" in str(e)
+        ]
+        assert not e110_project, f"E110 for project refs with --git-root: {e110_project}"
+
+    def test_validate_single_file_discovers_project_canon_via_spec_root(self, tmp_path: Path) -> None:
+        host = tmp_path / "host"
+        spec_dir = host / "spec"
+        _make_project_canon(host)
+        _make_spec_with_canon_refs(spec_dir)
+
+        result = _run_specdev(
+            "validate", str(spec_dir / "03_glossary.json"),
+            "--repo-root", str(TOOLKIT_ROOT),
+            "--spec-root", str(spec_dir),
+            "--json",
+        )
+        payload = json.loads(result.stdout)
+        e110_project = [
+            e for e in payload.get("errors", [])
+            if "E110" in str(e) and "cn:project:" in str(e)
+        ]
+        assert not e110_project, f"E110 for project refs with --spec-root: {e110_project}"
+
+    def test_validate_single_file_without_project_canon_is_unchanged(self, tmp_path: Path) -> None:
+        """No --git-root, no --spec-root → single-tier; project refs produce E110."""
+        spec_dir = tmp_path / "spec"
+        _make_spec_with_canon_refs(spec_dir, refs=["cn:project:entity:post"])
+
+        result = _run_specdev(
+            "validate", str(spec_dir / "03_glossary.json"),
+            "--repo-root", str(TOOLKIT_ROOT),
+            "--json",
+        )
+        payload = json.loads(result.stdout)
+        e110_project = [
+            e for e in payload.get("errors", [])
+            if "E110" in str(e) and "cn:project:" in str(e)
+        ]
+        assert e110_project, "Expected E110 for project refs when no canon is discoverable"
+
+
 class TestValidateAllTwoTier:
     """validate-all discovers project canon via --git-root."""
 

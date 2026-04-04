@@ -358,3 +358,58 @@ def test_accepted_from_basename_only(tmp_path):
     orphan_ids = [e.path for e in result if e.code == "W606"]
     assert any("cn:project:term:glossary-sourced" in (p or "") for p in orphan_ids)
     assert not any("cn:project:term:other-sourced" in (p or "") for p in orphan_ids)
+
+
+def test_term_missing_term_id_does_not_crash(tmp_path):
+    """Terms without term_id are skipped gracefully — no KeyError."""
+    spec = tmp_path / "spec"
+    # One valid term and one term with term_id absent
+    terms = [
+        _term("term-valid", "A valid term definition."),
+        {"term": "no-id-term", "definition": "A term that omits term_id."},
+    ]
+    _write(spec / "03_glossary.json", _glossary(terms=terms))
+    result = lint_glossary_drift(str(spec))
+    # Must not raise; no drift errors expected
+    assert isinstance(result, list)
+    assert not any(e.code in ("E606", "E607") for e in result)
+
+
+def test_term_with_term_ref_but_no_term_id_skipped_in_pass2(tmp_path):
+    """Term has term_ref pointing to cn:project: but no term_id → skipped, no malformed E607."""
+    spec = tmp_path / "spec"
+    spec.mkdir()
+    canon = tmp_path / "canon"
+    canon_id = "cn:project:term:noname"
+    terms = [
+        # term_ref present, definition drifts from canon, but term_id absent
+        {"term": "no-id", "definition": "Definition differs.", "term_ref": {"id": canon_id}},
+    ]
+    _write(spec / "03_glossary.json", _glossary(terms=terms))
+    kinds_entry = {"id": canon_id, "kind": "term", "preferred_label": "noname",
+                   "definition": "Canon definition."}
+    _write(canon / "kinds" / "term.json", _kinds_term_file([kinds_entry]))
+    result = lint_glossary_drift(str(spec), project_canon_dir=str(canon))
+    # No E607 because term_id is absent — cannot produce a meaningful error path
+    assert not any(e.code == "E607" for e in result)
+
+
+def test_term_missing_term_id_does_not_suppress_e607(tmp_path):
+    """A term with term_id but a drifted definition still fires E607 when term_id is present."""
+    spec = tmp_path / "spec"
+    canon = tmp_path / "canon"
+    canon_id = "cn:project:term:drifted"
+    terms = [
+        # term with term_id — definition drifts from canon
+        _term("term-drifted", "Drifted definition.", canon_id=canon_id),
+        # term without term_id — should be silently skipped
+        {"term": "no-id", "definition": "No term_id here."},
+    ]
+    _write(spec / "03_glossary.json", _glossary(terms=terms))
+    kinds_entry = {"id": canon_id, "kind": "term", "preferred_label": "drifted",
+                   "definition": "Canon definition differs."}
+    _write(canon / "kinds" / "term.json", _kinds_term_file([kinds_entry]))
+    result = lint_glossary_drift(str(spec), project_canon_dir=str(canon))
+    e607 = [e for e in result if e.code == "E607"]
+    assert len(e607) == 1, f"Expected exactly 1 E607, got {e607}"
+    assert "term-drifted" in e607[0].message

@@ -94,6 +94,7 @@ def validate_file(
     path: str,
     include_quality_lint: bool = True,
     include_canonical_integrity: bool = True,
+    project_canon_dir: str | None = None,
 ) -> list[SpecError]:
     try:
         registry = SchemaRegistry(repo_root)
@@ -182,6 +183,7 @@ def validate_file(
                 path,
                 enforce_unresolved_semantics=False,
                 require_manifest_schema_registration=True,
+                project_canon_dir=project_canon_dir,
             )
             if canonical_errors:
                 enhanced_errors.extend(canonical_errors)
