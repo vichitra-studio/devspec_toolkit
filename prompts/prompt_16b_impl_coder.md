@@ -108,15 +108,29 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 
 ### Extraction Intent
 
-### Primary Sources (directly consumed)
-- `spec/16a_impl_plan.json`: implementation plan tasks to execute
-- `spec/16_impl_context.json`: implementation context, component references, canonical mappings
-- `spec/05_interface_contracts.json`: API contracts to implement exactly
+#### Primary Sources (directly consumed)
+- **16a_impl_planner.json**: implementation plan tasks to execute; task IDs, file patterns, and checklist items that drive code changes for the current cycle
+- **16_impl_context.json**: implementation context including component references, canonical term mappings, scope boundaries, and existing structure state
+- **05_interface_contracts.json**: API contracts to implement exactly; endpoint definitions, request/response schemas, and authentication modes that bind code to the spec
 
-### Reference Sources (context only)
-- `spec/04_functional_requirements.json`: FR acceptance criteria for verification
-- `spec/06_invariants.json`: system invariants that code must not violate
-- `spec/15_scaffold.json`: existing scaffold structure to build on
+#### Reference Sources (context only)
+- **00_charter.json**: Product scope and success criteria used to validate that implemented code stays within declared product boundaries
+- **01_capabilities.json**: Capability identifiers used to verify implemented code covers all declared system capabilities in scope for this cycle
+- **02_system_sketch.json**: Component topology and service boundaries used to ensure implementation respects architectural separation and integration contracts
+- **02a_delivery_baseline.json**: Environment constraints and deployment targets used to ensure code is compatible with the declared delivery environment
+- **03_glossary.json**: Canonical term definitions used to ensure code identifiers, variable names, and comments follow the project's domain vocabulary
+- **04_fr_list.json**: FR acceptance criteria for verification; functional requirement IDs and acceptance conditions used to validate that implemented code satisfies the spec
+- **06_invariants.json**: system invariants that code must not violate; invariant rules and enforcement conditions used to gate implementation correctness
+- **07_nfrs.json**: NFR thresholds and performance targets used to verify implementation decisions respect non-functional constraints
+- **08_fixtures.json**: Test fixture definitions used to verify implemented code has corresponding test harness entries and fixture target coverage
+- **09_impl_plan.json**: Milestone sequencing and technology stack decisions used to ensure implementation follows the declared tech choices and phase ordering
+- **10_governance.json**: Commit message conventions and PR rules that govern how implementation changes are submitted and reviewed
+- **11_redteam.json**: Threat model findings used to ensure security-sensitive code paths have appropriate hardening and no known threat goes unaddressed
+- **12_ci_gates.json**: CI gate definitions and lint/type-check requirements that code changes must satisfy before the gate passes
+- **13_extension_generator.json**: Extension point declarations used to verify implemented extension hooks match declared extension interfaces
+- **13a_completeness_assessment.json**: Coverage gap findings used to prioritize which missing implementations to address first in the current cycle
+- **14_roadmap.json**: Milestone scope and task decomposition used to verify that implementation stays within the current milestone's boundaries
+- **15_scaffold.json**: existing scaffold structure to build on; directory layout and stub files that provide the starting point for implementation
 
 # Operating Flow: Requirement-First Execution
 

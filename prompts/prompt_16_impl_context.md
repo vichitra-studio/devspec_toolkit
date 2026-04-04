@@ -25,25 +25,26 @@ implementation checklist, and review expectations for the *current* execution cy
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- `spec/14_roadmap.json`: active milestone, tasks, and fr_refs — primary source for implementation context; milestone identifiers, deliverables, scheduling, and status fields drive checklist coverage mapping and roadmap sync updates
-- `spec/04_functional_requirements.json`: FR statements and acceptance criteria for the active milestone; functional requirement identifiers, acceptance criteria, and priority levels directly populate checklist spec_ref entries and linked_test_expectations
-- `spec/05_interface_contracts.json`: API contracts to implement; endpoint definitions, request/response schemas, and method constraints bind checklist items to concrete interface contracts
+- **14_roadmap.json**: active milestone, tasks, and fr_refs — primary source for implementation context; milestone identifiers, deliverables, scheduling, and status fields drive checklist coverage mapping and roadmap sync updates
+- **04_fr_list.json**: FR statements and acceptance criteria for the active milestone; functional requirement identifiers, acceptance criteria, and priority levels directly populate checklist spec_ref entries and linked_test_expectations
+- **05_interface_contracts.json**: API contracts to implement; endpoint definitions, request/response schemas, and method constraints bind checklist items to concrete interface contracts
 
 #### Reference Sources (context only)
-- `spec/00_charter.json`: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
-- `spec/01_capabilities.json`: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
-- `spec/02_system_sketch.json`: component boundaries and trust zones; component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
-- `spec/02a_delivery_baseline.json`: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
-- `spec/03_glossary.json`: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
-- `spec/06_invariants.json`, `spec/07_nfrs.json`: constraints to respect during implementation; invariant rules and NFR thresholds inform checklist validation items, nfr_refs, and delivery alert rules
-- `spec/08_fixtures.json`: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
-- `spec/09_implementation_plan.json`: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
-- `spec/10_governance.json`: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
-- `spec/11_redteam.json`: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
-- `spec/12_ci_gates.json`: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
-- `spec/13_extension_generator.json`: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
-- `spec/13a_completeness_assessment.json`: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
-- `spec/15_scaffold.json`: existing scaffold structure; generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
+- **00_charter.json**: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
+- **01_capabilities.json**: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
+- **02_system_sketch.json**: component boundaries and trust zones; component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
+- **02a_delivery_baseline.json**: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
+- **03_glossary.json**: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
+- **06_invariants.json**: system invariants and enforcement conditions that inform checklist validation items and delivery constraints
+- **07_nfrs.json**: NFR thresholds and availability targets that inform checklist nfr_refs and delivery alert rules
+- **08_fixtures.json**: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
+- **09_impl_plan.json**: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
+- **10_governance.json**: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
+- **11_redteam.json**: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
+- **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
+- **13_extension_generator.json**: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
+- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
+- **15_scaffold.json**: existing scaffold structure; generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
 
 # Operating Flow (MANDATORY)
 1. **Context Review**: Ingest required upstream spec artifacts.

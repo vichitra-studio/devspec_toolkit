@@ -42,11 +42,20 @@ The optional `milestone_decomp_completeness` dimension captures W567 INCOMPLETE_
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
-- **04_fr_list.json**: Functional requirement IDs — the `fr_id` values form the universe for `fr_api_coverage`, `fr_fixture_coverage`, and `fr_milestone_coverage`
+- **00_charter.json**: Product scope boundaries and success criteria used to validate that coverage dimensions align with declared goals and no out-of-scope items are counted
 - **01_capabilities.json**: Capability IDs — the `capability_id` values form the universe for `capability_fr_coverage`
+- **02_system_sketch.json**: Component IDs and boundaries used to verify that all declared system components have corresponding FR and API coverage
+- **02a_delivery_baseline.json**: Delivery environment constraints and baseline assumptions used to scope completeness expectations per deployment target
+- **03_glossary.json**: Domain term definitions used to ensure coverage gap descriptions use precise, unambiguous domain vocabulary from the canonical glossary
+- **04_fr_list.json**: Functional requirement IDs — the `fr_id` values form the universe for `fr_api_coverage`, `fr_fixture_coverage`, and `fr_milestone_coverage`
 - **05_interface_contracts.json**: API IDs — used to determine which FRs have an API binding
+- **06_invariants.json**: Invariant IDs and enforcement conditions used to verify that completeness coverage includes checks against invariant-governed behaviors
+- **07_nfrs.json**: NFR IDs and categories used to identify non-functional requirement gaps that are outside the FR-coverage universe but still affect overall spec completeness
 - **08_fixtures.json**: Fixture target IDs — used to determine which FRs have fixture coverage
 - **09_impl_plan.json**: Milestone IDs and fr_refs for fr_milestone_coverage universe
+- **10_governance.json**: Governance labels and commit patterns used to verify that completeness assessment findings are traceable to appropriate governance controls
+- **11_redteam.json**: Threat IDs and mitigations used to check that security-critical FRs have both API and fixture coverage and no threat goes uncovered
+- **12_ci_gates.json**: CI gate definitions used to verify that completeness gaps have corresponding CI enforcement and that all gates reference existing spec artifacts
 - **13_extension_manifest.json**: Extension entries — verify all extensions are implemented on disk
 
 # Operating Flow: Synthesize → Clarify → Emit
