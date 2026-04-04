@@ -4,13 +4,13 @@ from pathlib import Path
 from typing import Iterable
 
 
-def _load_from_canon() -> tuple[tuple[str, ...], dict[str, str]]:
+def _load_from_canon(project_canon_dir: str | None = None) -> tuple[tuple[str, ...], dict[str, str]]:
     """Load trace types from canon/kinds/trace_type.json via CanonicalRegistry."""
     try:
         from ..canonical.registry import CanonicalRegistry
 
         toolkit_root = str(Path(__file__).resolve().parents[3])
-        registry = CanonicalRegistry.load(toolkit_root)
+        registry = CanonicalRegistry.load(toolkit_root, project_canon_dir=project_canon_dir)
         types: set[str] = set()
         aliases: dict[str, str] = {}
         for entry in registry.entries.values():

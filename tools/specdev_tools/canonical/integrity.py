@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urldefrag, urljoin
 
-from .lint import lint_canon_dir
+from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
@@ -33,18 +33,20 @@ def validate_canonical_integrity(
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
+    project_canon_dir: str | None = None,
 ) -> list[SpecError]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
         return [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]
-    preflight_errors = lint_canon_dir(
+    preflight_errors = lint_canon_dirs(
         repo_root,
         canon_dir=canon_dir,
+        project_canon_dir=project_canon_dir,
         require_manifest_schema_registration=require_manifest_schema_registration,
     )
     if preflight_errors:
         return _uniq(preflight_errors)
-    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
+    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     errors: list[SpecError] = list(registry.load_errors)
     schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
     observed: dict[tuple[str, str], dict[str, list[str]]] = {}
@@ -89,15 +91,17 @@ def validate_canonical_integrity_file(
     canon_dir: str = "canon",
     enforce_unresolved_semantics: bool = True,
     require_manifest_schema_registration: bool = True,
+    project_canon_dir: str | None = None,
 ) -> list[SpecError]:
-    preflight_errors = lint_canon_dir(
+    preflight_errors = lint_canon_dirs(
         repo_root,
         canon_dir=canon_dir,
+        project_canon_dir=project_canon_dir,
         require_manifest_schema_registration=require_manifest_schema_registration,
     )
     if preflight_errors:
         return _uniq(preflight_errors)
-    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
+    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     errors: list[SpecError] = list(registry.load_errors)
     schema_registry, schema_registry_error = _try_load_schema_registry(repo_root)
     try:

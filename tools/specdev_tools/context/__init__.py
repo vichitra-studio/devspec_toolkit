@@ -8,7 +8,9 @@ from .scope_resolver import resolve_scope
 from .extractor import extract_context
 from .canon_extractor import extract_canon
 from .freshness import check_freshness
+from .seed_indexer import build_seed_index
 from .reviewer import review_artifact
+from .snapshot import save_snapshot, diff_snapshot
 
 __all__ = [
     "get_step_structure",
@@ -16,5 +18,8 @@ __all__ = [
     "extract_context",
     "extract_canon",
     "check_freshness",
+    "build_seed_index",
     "review_artifact",
+    "save_snapshot",
+    "diff_snapshot",
 ]

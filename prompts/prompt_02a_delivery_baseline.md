@@ -1,6 +1,6 @@
 # Step 02a · Delivery Baseline
 
-> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
 Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
 

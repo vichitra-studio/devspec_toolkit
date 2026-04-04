@@ -1,7 +1,8 @@
-"""canon-accept: Promote canonical_proposals from a spec file to canon/manifest.json.
+"""canon-accept: Promote canonical_proposals from a spec file to canon/manifest.json and canon/kinds/<kind>.json.
 
 Reads the ``canonical_proposals`` array from a spec JSON file and appends any
-new proposals (as fully-formed canon entries) to ``canon/manifest.json``.
+new proposals (as fully-formed canon entries) to both ``canon/manifest.json``
+and the matching ``canon/kinds/<kind>.json`` modular file.
 Proposals whose generated ID already exists in the manifest are skipped.
 
 Entry format mirrors the existing manifest entries:
@@ -43,6 +44,8 @@ def run_canon_accept(
     repo_root: str,
     dry_run: bool = False,
     owner: str | None = None,
+    canon_dir: str | None = None,
+    project_canon: bool = False,
 ) -> dict[str, Any]:
     """Read canonical_proposals from spec_file and promote them to canon/manifest.json.
 
@@ -90,9 +93,17 @@ def run_canon_accept(
     if not ns.startswith("cn:") or len(ns_parts) < 2 or not all(p for p in ns_parts):
         return {"added": [], "skipped": [], "malformed": 0, "error": f"invalid namespace '{namespace}': must start with 'cn:' and have at least two non-empty segments (e.g., 'cn:project:')"}
 
+    # Namespace guard: reject cn:core:* entries in project canon
+    if project_canon and ns.startswith("cn:core:"):
+        return {
+            "added": [], "skipped": [], "malformed": 0,
+            "error": f"E422 CORE_ENTRY_IN_PROJECT_CANON: namespace '{namespace}' targets cn:core:* which cannot be written to project canon",
+        }
+
     # Load manifest
     root = Path(os.path.abspath(repo_root))
-    manifest_path = root / "canon" / "manifest.json"
+    canon_path = Path(os.path.abspath(canon_dir)) if canon_dir else root / "canon"
+    manifest_path = canon_path / "manifest.json"
     if not manifest_path.exists():
         return {"added": [], "skipped": [], "malformed": 0, "error": f"manifest not found: {manifest_path}"}
 
@@ -230,8 +241,44 @@ def run_canon_accept(
                 json.dump(manifest, fh, indent=2, ensure_ascii=False)
                 fh.write("\n")
         except OSError as exc:
-            # `added` holds the IDs that were queued but NOT persisted due to the write failure.
-            # `write_failed: True` signals that these entries were attempted but not saved to disk.
             return {"added": added, "skipped": skipped, "malformed": malformed, "error": f"failed to write manifest {manifest_path}: {exc}", "write_failed": True}
+
+        # Also update the modular kind file (canon/kinds/<kind>.json) for each new entry.
+        # Group new entries by kind so each kind file is opened once.
+        entries_by_kind: dict[str, list[dict[str, Any]]] = {}
+        for entry in new_entries:
+            entries_by_kind.setdefault(entry["kind"], []).append(entry)
+
+        kinds_dir = canon_path / "kinds"
+        kinds_dir.mkdir(parents=True, exist_ok=True)
+
+        for kind, kind_entries in entries_by_kind.items():
+            kind_file = kinds_dir / f"{kind}.json"
+            if kind_file.exists():
+                try:
+                    with kind_file.open("r", encoding="utf-8") as fh:
+                        kind_data = json.load(fh)
+                except (OSError, json.JSONDecodeError) as exc:
+                    logger.warning("canon-accept: could not read kind file %s — skipping modular update: %s", kind_file, exc)
+                    continue
+            else:
+                kind_data = {
+                    "$schema": "vc:canon:kind",
+                    "registry_version": "1.0.0",
+                    "kind": kind,
+                    "entries": [],
+                }
+
+            existing_kind_ids = {e.get("id") for e in kind_data.get("entries", []) if isinstance(e, dict)}
+            for entry in kind_entries:
+                if entry["id"] not in existing_kind_ids:
+                    kind_data.setdefault("entries", []).append(entry)
+
+            try:
+                with kind_file.open("w", encoding="utf-8") as fh:
+                    json.dump(kind_data, fh, indent=2, ensure_ascii=False)
+                    fh.write("\n")
+            except OSError as exc:
+                logger.warning("canon-accept: failed to write kind file %s: %s", kind_file, exc)
 
     return {"added": added, "skipped": skipped, "malformed": malformed, "error": None}

@@ -17,7 +17,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Proof / review closure (3xx)
             "E301", "E302", "E303", "E304", "E305", "E306", "E307", "E310", "E311", "E320",
             # Canonical registry (4xx)
-            "E410", "E420",
+            "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)
             "E510", "E512", "E520", "E521", "E530", "E540", "E541",
             "E550", "E551", "E552", "E553", "E554", "E555",
@@ -26,7 +26,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E571", "E572", "E573",
             "E575", "E576",
             "E580", "E581", "E582", "E585",
-            "W550", "W551", "W552", "W560", "W561", "W562", "W563",
+            "W550", "W551", "W552", "W553", "W560", "W561", "W562", "W563",
             "W564", "W565", "W566", "W567", "W568", "W569",
             "W570", "W571", "W572", "W573", "W574",
             "W575", "W576",
@@ -39,6 +39,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W601", "W602", "W603",
             "E604", "W604",
             "W605",
+            # Glossary parity (6xx)
+            "E606", "E607", "W606",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

@@ -1,6 +1,6 @@
 """Canon vocabulary extractor for the DevSpec Toolkit context package.
 
-Implements ``extract_canon(step_id, repo_root) -> dict``.
+Implements ``extract_canon(step_id, repo_root, spec_root=None) -> dict``.
 
 Schema-driven kind discovery: walks the step's output schema to find _ref
 fields, maps them to canon kinds via INFERENCE_RULES, then loads the relevant
@@ -121,7 +121,7 @@ def _load_kind_entries(kind: str, repo_root: str) -> list[dict[str, Any]]:
     return result
 
 
-def extract_canon(step_id: str, repo_root: str) -> dict[str, Any]:
+def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) -> dict[str, Any]:
     """Extract canon vocabulary needed for a pipeline step.
 
     Parameters
@@ -129,7 +129,12 @@ def extract_canon(step_id: str, repo_root: str) -> dict[str, Any]:
     step_id:
         Pipeline step identifier (e.g. ``"04"``, ``"05"``).
     repo_root:
-        Path to the devspec_toolkit repo root.
+        Path to the devspec_toolkit repo root (toolkit-tier canon).
+    spec_root:
+        Optional path to the host project's spec directory. When provided,
+        project-tier entries from ``{spec_root}/canon/kinds/{kind}.json`` are
+        merged after toolkit entries, so project-specific terms are visible
+        alongside core vocabulary.
 
     Returns
     -------
@@ -164,12 +169,29 @@ def extract_canon(step_id: str, repo_root: str) -> dict[str, Any]:
             seen_kinds.add(kind)
 
     # ------------------------------------------------------------------
-    # 3. Load entries for each kind.
+    # 3. Load entries for each kind — toolkit tier first, then project tier.
     # ------------------------------------------------------------------
+    # Resolve project canon directory: {spec_root}/canon/ when spec_root given.
+    project_canon_root: str | None = None
+    if spec_root:
+        candidate = os.path.join(os.path.abspath(spec_root), "canon")
+        if os.path.isdir(candidate):
+            project_canon_root = candidate
+
     canon_kinds: dict[str, list[dict[str, Any]]] = {}
     total_entries = 0
     for kind in kinds_needed:
+        # Toolkit-tier entries (e.g. devspec_toolkit/canon/kinds/term.json)
         entries = _load_kind_entries(kind, repo_root_abs)
+        # Project-tier entries merged in (e.g. spec/canon/kinds/term.json)
+        if project_canon_root:
+            project_root_for_kind = os.path.dirname(project_canon_root)  # parent of canon/
+            project_entries = _load_kind_entries(kind, project_root_for_kind)
+            # Deduplicate by id — toolkit entries take precedence; project entries whose id
+            # already exists in the toolkit tier are skipped. In practice this is a no-op
+            # because toolkit IDs are cn:core:* and project IDs are cn:project:*.
+            toolkit_ids = {e["id"] for e in entries}
+            entries = entries + [e for e in project_entries if e["id"] not in toolkit_ids]
         canon_kinds[kind] = entries
         total_entries += len(entries)
 

@@ -38,6 +38,25 @@
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
+    },
+    {
+      "id": "cn:core:unit:count",
+      "kind": "unit",
+      "preferred_label": "count",
+      "definition": "Discrete integer count of items. Dimensionless — context (e.g., posts, subscribers, requests) gives semantic meaning.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "count",
+        "items",
+        "number"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-02T00:00:00Z"
+      }
     }
   ]
 }

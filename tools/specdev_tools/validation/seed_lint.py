@@ -65,54 +65,6 @@ def _collect_required_seeds(manifest: Dict, step_id: str) -> Set[str]:
     return set(ordered + remaining)
 
 
-def _extract_step_from_prompt_filename(filename: str) -> str:
-    """Extract step ID from a prompt filename like 'prompt_05_interface_contracts.md' → '05'."""
-    match = _re.match(r"prompt_(\d{2}[a-z]?)_", filename)
-    return match.group(1) if match else "unknown"
-
-
-def _lint_prompt_manifest_refs(
-    repo_root: str, errors: List[SpecError], manifest: Dict | None = None
-) -> None:
-    prompts_dir = os.path.join(repo_root, "prompts")
-    if not os.path.isdir(prompts_dir):
-        errors.append(make_error("E520", f"Missing prompts directory: {prompts_dir}"))
-        return
-
-    # Determine which steps require seeds
-    step_requirements = {}
-    if manifest:
-        step_requirements = manifest.get("step_requirements", {})
-    else:
-        errors.append(make_error("W150", "seed_manifest not provided — skipping prompt seed-section checks"))
-
-    for fn in os.listdir(prompts_dir):
-        if not fn.startswith("prompt_") or not fn.endswith(".md"):
-            continue
-
-        step_id = _extract_step_from_prompt_filename(fn)
-
-        # Only enforce seed sections for steps that have entries in step_requirements
-        requires_seeds = step_id in step_requirements
-        if step_id == "16":
-            requires_seeds = any(
-                k in step_requirements for k in ("16a", "16b", "16c")
-            )
-
-        if not requires_seeds:
-            continue
-
-        path = os.path.join(prompts_dir, fn)
-        try:
-            with open(path, "r", encoding="utf-8") as fh:
-                text = fh.read()
-        except Exception as e:
-            errors.append(make_error("E520", f"Failed to read prompt: {path} ({e})"))
-            continue
-        if "Seed Order & Mandatory Sources" not in text:
-            errors.append(make_error("E520", f"{path}: missing 'Seed Order & Mandatory Sources' section"))
-        if "spec/common/seed_manifest.json" not in text:
-            errors.append(make_error("E520", f"{path}: missing reference to spec/common/seed_manifest.json"))
 
 
 _STOP_WORDS = frozenset({
@@ -260,12 +212,17 @@ def lint_seeds(
         if sid not in seed_id_set:
             errors.append(make_error("E520", f"global_seed_order references unknown seed_id: {sid}"))
 
+    _SEED_ELIGIBLE_STEPS = frozenset(["00", "01", "02", "02a"])
     for step_id, reqs in manifest.get("step_requirements", {}).items():
         for sid in reqs:
             if sid not in seed_id_set:
                 errors.append(make_error("E520", f"step_requirements[{step_id}] references unknown seed_id: {sid}"))
-
-    _lint_prompt_manifest_refs(repo_root, errors, manifest)
+        if step_id not in _SEED_ELIGIBLE_STEPS:
+            errors.append(make_error(
+                "W553",
+                f"SEED_STEP_OUT_OF_RANGE step_requirements[{step_id}] is ignored — "
+                f"seed injection only applies to steps 00–02a",
+            ))
 
     _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
 

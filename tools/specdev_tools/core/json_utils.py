@@ -16,10 +16,16 @@ import argparse
 import glob as glob_mod
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from typing import Dict, List, Optional
+
+# Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
+# Used to guard read-multi, whose {key: value} construct produces one output object per
+# stream element — breaking the single-keyed-object output contract.
+_STREAMING_FILTER_RE = re.compile(r'\[\s*\]')
 
 # --- Configuration ---
 JQ_INDENT = 4  # Enforce 4-space indent to match repo style
@@ -49,7 +55,11 @@ def _check_file(file_path: str) -> None:
 
 
 def validate_jq_filter(jq_filter: str) -> Optional[str]:
-    """Dry-run a jq filter against null input to catch syntax errors early.
+    """Syntax-check a jq filter without executing it against real data.
+
+    Wraps the filter in ``try (...) catch null`` so runtime-only errors
+    (null iteration, missing keys) do not block valid filters — only jq
+    parse errors cause a failure return.
 
     Returns None on success, or an LLM-actionable error string on failure.
     """
@@ -57,8 +67,10 @@ def validate_jq_filter(jq_filter: str) -> Optional[str]:
         return "Filter is empty. Provide a valid jq expression (e.g. .title, .items[0].name)."
 
     try:
+        # Wrap in try/catch so runtime-only errors (null iteration, missing keys)
+        # don't block valid filters — we only want to catch syntax errors here.
         result = subprocess.run(
-            ['jq', '-n', '--argjson', '_x', 'null', jq_filter],
+            ['jq', '-n', f'try ({jq_filter}) catch null'],
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode != 0 and result.stderr:
@@ -181,7 +193,7 @@ def resolve_ref(ref: str, id_index: Dict[str, str], cache: Dict[str, dict]) -> O
         return schema  # whole-schema ref
 
     # Resolve by $anchor match in $defs
-    for _def_name, def_schema in schema.get('$defs', {}).items():
+    for _, def_schema in schema.get('$defs', {}).items():
         if isinstance(def_schema, dict) and def_schema.get('$anchor') == fragment:
             return def_schema
     return None
@@ -279,6 +291,12 @@ def json_read_multi(file_path: str, filters: List[str]) -> Optional[str]:
         if f.strip() == ".":
             raise JsonUtilsError("Full JSON reads are not allowed. Specify targeted paths.")
         _require_valid_filter(f)
+        if _STREAMING_FILTER_RE.search(f):
+            raise JsonUtilsError(
+                f"Filter '{f}' produces a stream of values — not allowed in read-multi. "
+                "read-multi requires each filter to return a single value. "
+                "Use 'json read' for streaming filters (e.g. '.terms[] | select(...)')."
+            )
 
     # Keys use json.dumps to safely encode filter strings (handles $, quotes, etc.)
     kv_entries = []
@@ -468,9 +486,6 @@ def _effective_schema(node: dict, resolve_fn) -> dict:
     used only for type unions (number|string) and conditional required fields —
     neither adds navigable properties, so discovery results remain correct.
     """
-    if not isinstance(node, dict):
-        return node
-
     # Resolve $ref first
     if '$ref' in node:
         node = resolve_fn(node)
@@ -599,8 +614,6 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
 
 def _summarise_prop(prop: dict) -> dict:
     """Create a compact summary of a schema property for root-level discovery."""
-    if not isinstance(prop, dict):
-        return prop
     summary = {}
     if 'type' in prop:
         summary['type'] = prop['type']
@@ -622,12 +635,14 @@ def main():
     # Read
     p_read = subparsers.add_parser("read", help="Read data (use targeted paths, not '.' for full JSON)")
     p_read.add_argument("file", help="JSON file path")
-    p_read.add_argument("filter", help="jq filter (e.g. .items[0].name, .version)")
+    p_read.add_argument("filter", help="jq filter (e.g. .items[0].name, .version, '.items[] | select(.id==\"x\")')")
+    p_read.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read")
 
     # Read-multi
     p_readm = subparsers.add_parser("read-multi", help="Read multiple paths in one pass (keyed output)")
     p_readm.add_argument("file", help="JSON file path")
     p_readm.add_argument("filters", nargs="+", help="jq filters (e.g. .version .name)")
+    p_readm.add_argument("--repo-root", default=".", help="Accepted for CLI consistency; unused by read-multi")
 
     # Patch
     p_patch = subparsers.add_parser("patch", help="Update value")

@@ -39,8 +39,8 @@ or `devspec_toolkit/spec/` when working on the toolkit itself).
 ./tools/run_specdev.sh <subcommand> --repo-root ./devspec_toolkit
 ```
 
-**Seed freshness (steps 00–04 only)**: If authoring or reviewing a step that reads seed
-documents (00–04), verify seeds are current before loading context:
+**Seed freshness (steps 00–02a only)**: If authoring or reviewing a step that reads seed
+documents (00–02a), verify seeds are current before loading context:
 
 ```bash
 ./tools/run_specdev.sh context freshness \
@@ -87,6 +87,15 @@ of `--entry`. Skip entirely when `--scope` is not provided.
   --step <NN> --repo-root ./devspec_toolkit
 ```
 
+For **submodule / product-repo** deployments where `spec/canon/` holds project-specific
+terms (e.g. after running `canon-accept`), add `--spec-root` so project-tier entries are
+merged alongside toolkit-core entries:
+
+```bash
+./tools/run_specdev.sh context canon \
+  --step <NN> --repo-root ./devspec_toolkit --spec-root ./spec
+```
+
 Full definitions are in `devspec_toolkit/canon/kinds/<kind>.json`. Do not read them
 unless a specific term lookup is requested.
 
@@ -110,6 +119,51 @@ Context loaded for step <NN> [scope: full].         # --full used
 
 All loaded data is in working context. Do not echo command outputs unless the user
 asks for something specific.
+
+## Reading the step's own output artifact
+
+These commands are for **post-authoring verification only** — checking specific fields of
+the artifact a step just produced. They do NOT load upstream context.
+
+**For upstream context (what a step needs as inputs), always run the 5-step execution above —
+never substitute `json read` for `/specdev-context`.**
+
+```bash
+# Read a single targeted field or expression — supports streaming filters
+./tools/run_specdev.sh json read <file> '<jq-filter>'
+
+# Examples:
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms | length'
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms[2]'
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms[] | select(.domain == "analytics")'
+
+# Read multiple fields in one pass — returns a keyed JSON object
+# RESTRICTION: each filter must return a single value; streaming filters (.arr[]) are rejected here
+./tools/run_specdev.sh json read-multi <file> '<filter1>' '<filter2>' ...
+./tools/run_specdev.sh json read-multi spec/03_glossary.json '.id' '.version' '.terms | length'
+
+# Tree overview — structure only, no field content
+./tools/run_specdev.sh json structure <file>
+```
+
+Use `json read` for streaming filters (`.arr[] | select(...)`). Use `json read-multi` when
+spot-checking several independent single-value fields after writing an artifact.
+
+## Snapshot and diff
+
+Save a checkpoint of a step artifact and diff it against the current state — without requiring
+a git commit. Useful during iterative authoring or review cycles.
+
+```bash
+# Save current state as a workspace snapshot
+./tools/run_specdev.sh context snapshot <spec_dir> --step <NN> --repo-root ./devspec_toolkit
+
+# Diff current artifact against the saved snapshot
+./tools/run_specdev.sh context diff <spec_dir> --step <NN> --repo-root ./devspec_toolkit
+```
+
+Snapshots are stored in `.specdev/snapshots/` at the git root. Add `.specdev/` to `.gitignore`
+if you do not want snapshots committed.
 
 ## Writing and editing artifacts
 

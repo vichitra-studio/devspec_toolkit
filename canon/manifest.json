@@ -39,6 +39,25 @@
       }
     },
     {
+      "id": "cn:core:unit:count",
+      "kind": "unit",
+      "preferred_label": "count",
+      "definition": "Discrete integer count of items. Dimensionless \u2014 context (e.g., posts, subscribers, requests) gives semantic meaning.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "count",
+        "items",
+        "number"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-02T00:00:00Z"
+      }
+    },
+    {
       "id": "cn:core:stage:dev",
       "kind": "stage",
       "preferred_label": "dev",
@@ -849,7 +868,9 @@
       "owners": [
         "spec-platform"
       ],
-      "aliases": ["inv"],
+      "aliases": [
+        "inv"
+      ],
       "tags": [
         "tracing"
       ],

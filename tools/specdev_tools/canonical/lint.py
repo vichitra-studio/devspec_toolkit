@@ -32,14 +32,16 @@ def lint_canon_dir(
     repo_root: str,
     canon_dir: str = "canon",
     require_manifest_schema_registration: bool = True,
+    schema_registry_root: str | None = None,
 ) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     canon_root = root / canon_dir
     manifest_path = root / canon_dir / "manifest.json"
     aliases_path = canon_root / "aliases.json"
     kinds_dir = canon_root / "kinds"
-    registry_path = root / "tools" / "schema_registry.json"
-    fallback_registry_path = root / "schema_registry.json"
+    sr_root = Path(os.path.abspath(schema_registry_root)) if schema_registry_root else root
+    registry_path = sr_root / "tools" / "schema_registry.json"
+    fallback_registry_path = sr_root / "schema_registry.json"
 
     errs: list[SpecError] = []
     manifest = _load_json_object(manifest_path, "invalid_manifest", errs) if manifest_path.exists() else None
@@ -47,7 +49,7 @@ def lint_canon_dir(
     kind_docs = _load_kind_docs(kinds_dir, errs) if kinds_dir.exists() else []
     canonical_docs_present = manifest is not None or aliases_doc is not None or bool(kind_docs)
 
-    schema_registry = _load_schema_registry_if_available(root, errs)
+    schema_registry = _load_schema_registry_if_available(sr_root, errs)
     if (
         require_manifest_schema_registration
         and canonical_docs_present
@@ -470,6 +472,35 @@ def _validate_doc_schema(
         errs.append(
             make_error("E520", f"UNRESOLVED_INPUT schema_invalid {path} uri={schema_uri} path={error_path or '$'} detail={error.message}")
         )
+    return errs
+
+
+def lint_canon_dirs(
+    repo_root: str,
+    canon_dir: str = "canon",
+    project_canon_dir: str | None = None,
+    schema_registry_root: str | None = None,
+    require_manifest_schema_registration: bool = True,
+) -> list[SpecError]:
+    """Lint core canon and, if present, project canon. Returns combined errors."""
+    errs = lint_canon_dir(
+        repo_root,
+        canon_dir=canon_dir,
+        require_manifest_schema_registration=require_manifest_schema_registration,
+    )
+    if project_canon_dir is not None:
+        project_path = Path(os.path.abspath(project_canon_dir))
+        if project_path.is_dir():
+            # For project canon, use the toolkit root as schema_registry_root
+            sr_root = schema_registry_root or repo_root
+            errs.extend(
+                lint_canon_dir(
+                    str(project_path.parent),
+                    canon_dir=project_path.name,
+                    require_manifest_schema_registration=require_manifest_schema_registration,
+                    schema_registry_root=sr_root,
+                )
+            )
     return errs
 
 

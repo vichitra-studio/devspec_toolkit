@@ -18,13 +18,17 @@ _ENUM_CANON_PAIRINGS = [
 ]
 
 
-def lint_canon_schema_alignment(repo_root: str) -> list[SpecError]:
+def lint_canon_schema_alignment(
+    repo_root: str,
+    canon_dir: str = "canon",
+    project_canon_dir: str | None = None,
+) -> list[SpecError]:
     """Check alignment between canon kinds and JSON Schema enum constraints."""
     errors: list[SpecError] = []
     schema_dir = os.path.join(repo_root, "schema")
 
     # Load canon kinds → {kind: set_of_preferred_labels}
-    registry = CanonicalRegistry.load(repo_root)
+    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     canon_kinds: dict[str, set[str]] = defaultdict(set)
     for entry in registry.entries.values():
         label = entry.payload.get("preferred_label", "")

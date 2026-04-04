@@ -36,9 +36,44 @@ class CanonicalRegistry:
         self.alias_lifecycle = alias_lifecycle or {}
 
     @classmethod
-    def load(cls, repo_root: str, canon_dir: str = "canon") -> "CanonicalRegistry":
+    def load(
+        cls,
+        repo_root: str,
+        canon_dir: str = "canon",
+        project_canon_dir: str | None = None,
+    ) -> "CanonicalRegistry":
         root = Path(os.path.abspath(repo_root))
         manifest, load_errors = _load_merged_manifest(root, canon_dir=canon_dir)
+
+        if project_canon_dir is not None:
+            project_path = Path(os.path.abspath(project_canon_dir))
+            if project_path.is_dir():
+                project_manifest, project_errors = _load_merged_manifest(
+                    project_path.parent, canon_dir=project_path.name,
+                )
+                load_errors.extend(project_errors)
+                if project_manifest is not None:
+                    if manifest is None:
+                        manifest = project_manifest
+                    else:
+                        # Detect collisions before merging (project wins)
+                        core_ids = {
+                            e.get("id")
+                            for e in manifest.get("entries", [])
+                            if isinstance(e, dict) and isinstance(e.get("id"), str)
+                        }
+                        for entry in project_manifest.get("entries", []):
+                            if isinstance(entry, dict):
+                                eid = entry.get("id")
+                                if isinstance(eid, str) and eid in core_ids:
+                                    load_errors.append(
+                                        make_error(
+                                            "W421",
+                                            f"CANON_ID_COLLISION_PROJECT_WINS id={eid} (project entry overrides core)",
+                                        )
+                                    )
+                        manifest = _merge_manifest_data(manifest, project_manifest)
+
         if manifest is None:
             return cls(entries={}, aliases={}, alias_status={}, load_errors=load_errors)
         return cls.from_manifest(manifest, load_errors=load_errors)

@@ -1,6 +1,6 @@
 # Step 16b · Implementation Coder
 
-> **Inherits**: `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` — all directives apply unless explicitly overridden below.
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
 Run `specdev prompt-context 16b` to see downstream consumers.
 

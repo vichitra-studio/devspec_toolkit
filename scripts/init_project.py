@@ -194,7 +194,28 @@ def main():
     else:
         print("spec/common/seed_manifest.json already exists.")
 
-    # 3b. Init spec/impl_context/ directory
+    # 3b. Init spec/canon/ directory (project-level canonical registry)
+    spec_canon_dir = os.path.join(spec_dir, "canon")
+    if not os.path.exists(spec_canon_dir):
+        print("Creating spec/canon/ directory...")
+        os.makedirs(spec_canon_dir)
+        kinds_dir = os.path.join(spec_canon_dir, "kinds")
+        os.makedirs(kinds_dir)
+        manifest = {
+            "$schema": "vc:core:canon",
+            "registry_version": "1.0.0",
+            "entries": [],
+            "aliases": [],
+        }
+        manifest_path = os.path.join(spec_canon_dir, "manifest.json")
+        import json as _json
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            _json.dump(manifest, f, indent=2)
+            f.write("\n")
+    else:
+        print("spec/canon/ directory already exists.")
+
+    # 3c. Init spec/impl_context/ directory
     impl_context_dir = os.path.join(spec_dir, "impl_context")
     if not os.path.exists(impl_context_dir):
         print("Creating spec/impl_context/ directory...")

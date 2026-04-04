@@ -19,7 +19,7 @@ from typing import Any, Callable
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
-from ..canonical.lint import lint_canon_dir
+from ..canonical.lint import lint_canon_dirs
 from .dependency_order_lint import lint_dependency_order
 from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
@@ -195,7 +195,7 @@ def validate_file(
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
         return [make_error("E520", f"{path}: validation_input_error {type(e).__name__}: {str(e)}")]
 
-def validate_dir(repo_root: str, spec_dir: str) -> list[SpecError]:
+def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None) -> list[SpecError]:
     # Reset config to pick up any env var changes since last call
     reset_config()
 
@@ -212,8 +212,9 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[SpecError]:
     failures: list[SpecError] = []
     canonical_preflight_errors: list[SpecError] = list(
         dict.fromkeys(
-            lint_canon_dir(
+            lint_canon_dirs(
                 repo_root,
+                project_canon_dir=project_canon_dir,
                 require_manifest_schema_registration=True,
             )
         )
@@ -245,6 +246,7 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[SpecError]:
                 repo_root=repo_root,
                 require_canon_dir=True,
                 require_manifest_schema_registration=True,
+                project_canon_dir=project_canon_dir,
             )
         )
         failures.extend(
@@ -252,6 +254,7 @@ def validate_dir(repo_root: str, spec_dir: str) -> list[SpecError]:
                 repo_root,
                 spec_dir,
                 require_manifest_schema_registration=True,
+                project_canon_dir=project_canon_dir,
             )
         )
         from .traceability_closure import check_traceability_closure

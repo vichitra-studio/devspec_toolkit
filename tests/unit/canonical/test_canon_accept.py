@@ -982,6 +982,7 @@ class TestCLISubcommandWiring:
         """
         import specdev_tools.cli as cli_module
 
+        monkeypatch.setattr(cli_module, "check_venv", lambda: None)
         monkeypatch.setattr(sys, "argv", ["specdev-tools", "canon-accept", "--help"])
 
         with pytest.raises(SystemExit) as exc_info:
@@ -1124,6 +1125,7 @@ class TestCLIEndToEnd:
         """
         import specdev_tools.cli as cli_module
 
+        monkeypatch.setattr(cli_module, "check_venv", lambda: None)
         repo, _ = self._make_repo(tmp_path)
         spec_file = tmp_path / "spec.json"
         bad = {"temp_id": "bad-term", "kind": "entity", "proposed_label": "Bad"}  # missing definition
@@ -1158,6 +1160,7 @@ class TestCLIEndToEnd:
         """JSON output must include a ``malformed`` key with the correct count."""
         import specdev_tools.cli as cli_module
 
+        monkeypatch.setattr(cli_module, "check_venv", lambda: None)
         repo, _ = self._make_repo(tmp_path)
         spec_file = tmp_path / "spec.json"
         bad1 = {"temp_id": "bad-a", "kind": "entity", "proposed_label": "Bad A"}  # missing definition
@@ -1200,6 +1203,7 @@ class TestCLIEndToEnd:
         """Plain-text mode must print the summary line showing the number added."""
         import specdev_tools.cli as cli_module
 
+        monkeypatch.setattr(cli_module, "check_venv", lambda: None)
         repo, _ = self._make_repo(tmp_path)
         spec_file = tmp_path / "spec.json"
         _write_json(

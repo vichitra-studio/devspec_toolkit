@@ -45,7 +45,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]) as p_quality, \
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]) as p_hall, \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]) as p_integrity, \
-                 patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]) as p_canon, \
+                 patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]) as p_canon, \
                  patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]) as p_dep, \
                  patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
                  patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
@@ -207,7 +207,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-                 patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+                 patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
                  patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
                  patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
@@ -234,7 +234,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-                 patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+                 patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
                  patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
                  patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \
                  patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]):
@@ -263,7 +263,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-                 patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+                 patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
                  patch("specdev_tools.validation.validate._is_git_repo", return_value=False), \
                  patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
@@ -298,7 +298,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                      patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                      patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                      patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-                     patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+                     patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
                      patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
                      patch("specdev_tools.validation.validate._is_git_repo", return_value=False), \
                      patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
@@ -338,7 +338,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                      patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                      patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                      patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-                     patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+                     patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
                      patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
                      patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]) as p_replay, \
                      patch("specdev_tools.validation.traceability_closure.check_traceability_closure", return_value=[]), \

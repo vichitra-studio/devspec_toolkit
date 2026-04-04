@@ -90,9 +90,16 @@ Each prompt's Coverage Closure section contains step-specific rules. In addition
 
 ## 10. Tool Execution
 
-Validate the generated JSON:
+After generating or modifying a spec artifact, run the unified check command to validate schema conformance, canonical integrity, hallucination detection, traceability, and all applicable lints in one pass:
 ```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
+specdev spec-check <spec_dir> --repo-root ./devspec_toolkit
+```
+
+For submodule deployments, add `--spec-root ./spec --git-root .` to resolve seed paths correctly.
+
+For single-file quick validation during iterative editing:
+```bash
+specdev validate <path_to_artifact> --repo-root ./devspec_toolkit
 ```
 
 Step-specific additional commands (e.g., `invariants-check`, `fixtures-lint`, `governance-check`) are listed in each prompt's Tool Execution section.

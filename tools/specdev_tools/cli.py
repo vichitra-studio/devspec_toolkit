@@ -84,6 +84,28 @@ def _json_exit(
     sys.exit(0)
 
 
+def _discover_project_canon_dir(
+    git_root: str | None = None,
+    spec_root: str | None = None,
+    spec_dir: str | None = None,
+) -> str | None:
+    """Discover project-level canon directory from git_root, spec_root, or spec_dir.
+
+    Returns an absolute path to the project canon dir if it exists, else None.
+    """
+    candidates: list[str] = []
+    if git_root:
+        candidates.append(os.path.join(os.path.abspath(git_root), "spec", "canon"))
+    if spec_root:
+        candidates.append(os.path.join(os.path.abspath(spec_root), "canon"))
+    if spec_dir:
+        candidates.append(os.path.join(os.path.abspath(spec_dir), "canon"))
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return None
+
+
 def _derive_step_names(repo_root: str) -> dict[str, str]:
     """Derive step ID -> display name mapping from schema_registry.json.
 
@@ -142,43 +164,65 @@ def main():
     m.add_argument("spec_dir")
     m.add_argument("--out", default="-")
     m.add_argument("--repo-root", default=".")
+    m.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    m.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     m.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     fx = sub.add_parser("fixtures-lint")
     fx.add_argument("spec_dir")
     fx.add_argument("--repo-root", default=".")
+    fx.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    fx.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     fx.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     inv = sub.add_parser("invariants-check")
     inv.add_argument("spec_dir")
     inv.add_argument("--sample", required=True)
     inv.add_argument("--repo-root", default=".")
+    inv.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    inv.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     inv.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     sl = sub.add_parser("seed-lint")
     sl.add_argument("spec_dir")
     sl.add_argument("--repo-root", default=".")
+    sl.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    sl.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     sl.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
+    si = sub.add_parser("seed-index")
+    si.add_argument("spec_dir")
+    si.add_argument("--repo-root", default=".")
+    si.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
+    si.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     ps = sub.add_parser("prompt-sync")
     ps.add_argument("spec_dir", nargs="?")
     ps.add_argument("--repo-root", default=".")
+    ps.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    ps.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     ps.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     cl = sub.add_parser("canonical-lint")
     cl.add_argument("canon_dir", nargs="?", default="canon")
     cl.add_argument("--repo-root", default=".")
+    cl.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    cl.add_argument("--git-root", default=None, help="Host repo git root (for two-tier canon)")
     cl.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     ci = sub.add_parser("canonical-integrity")
     ci.add_argument("spec_dir")
     ci.add_argument("--repo-root", default=".")
+    ci.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    ci.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     ci.add_argument("--canon-dir", default="canon")
     ci.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     ca = sub.add_parser("canonical-autofix")
     ca.add_argument("spec_dir")
     ca.add_argument("--repo-root", default=".")
+    ca.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    ca.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     ca.add_argument("--canon-dir", default="canon")
     ca_mode = ca.add_mutually_exclusive_group()
     ca_mode.add_argument("--write", action="store_true", help="Write changes to files")
@@ -188,23 +232,49 @@ def main():
     sql = sub.add_parser("spec-quality-lint")
     sql.add_argument("spec_dir")
     sql.add_argument("--repo-root", default=".")
+    sql.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    sql.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     sql.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     hl = sub.add_parser("hallucination-lint")
     hl.add_argument("spec_dir")
     hl.add_argument("--repo-root", default=".")
+    hl.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    hl.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     hl.add_argument("--canon-dir", default="canon")
     hl.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
+    gd = sub.add_parser(
+        "glossary-drift-check",
+        help="Validate definition parity across glossary terms, proposals, and canon registry.",
+    )
+    gd.add_argument("spec_dir", help="Path to the spec directory (e.g. spec/)")
+    gd.add_argument("--repo-root", default=".", help="Toolkit repo root (default: .)")
+    gd.add_argument("--spec-root", default=None, help="Host repo spec root for submodule deployments")
+    gd.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
+    gd.add_argument("--json", action="store_true", dest="json_output", help="Emit JSON output")
 
     tc = sub.add_parser("traceability-check")
     tc.add_argument("spec_dir")
     tc.add_argument("--repo-root", default=".")
+    tc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    tc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     tc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     cc = sub.add_parser("completeness-check", help="Run pairwise completeness checks (W564–W568) and report coverage ratios")
     cc.add_argument("spec_dir")
     cc.add_argument("--repo-root", default=".")
+    cc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    cc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     cc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
+    sc = sub.add_parser("spec-check", help="Run all applicable validation/lint checks in one pass with per-check breakdown")
+    sc.add_argument("spec_dir")
+    sc.add_argument("--repo-root", default=".")
+    sc.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    sc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
+    sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Include forward-replay check")
+    sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
@@ -222,6 +292,8 @@ def main():
     gov.add_argument("spec_dir")
     gov.add_argument("--message", required=True)
     gov.add_argument("--repo-root", default=".")
+    gov.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    gov.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     gov.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     ai = sub.add_parser("ai-help")
@@ -260,6 +332,9 @@ def main():
 
     sp_alignment = sub.add_parser("canon-schema-alignment", help="Check canon/schema alignment")
     sp_alignment.add_argument("--repo-root", default=".")
+    sp_alignment.add_argument("--canon-dir", default="canon", help="Canon directory relative to repo root")
+    sp_alignment.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
+    sp_alignment.add_argument("--git-root", default=None, help="Host repo git root (for two-tier canon)")
     sp_alignment.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     # R9: New commands
@@ -279,6 +354,7 @@ def main():
     cca.add_argument("--from", dest="spec_file", required=True, help="Path to spec file (e.g., spec/03_glossary.json)")
     cca.add_argument("--namespace", default="cn:project:", help="Target namespace prefix (default: cn:project:)")
     cca.add_argument("--repo-root", default=".")
+    cca.add_argument("--git-root", default=None, help="Host repo git root (writes to <git-root>/spec/canon/ as project canon)")
     cca.add_argument("--owner", default=None, help="Owner to assign to accepted entries (default: no owner)")
     cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
     cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
@@ -307,6 +383,17 @@ def main():
     ctx_canon = ctx_sub.add_parser("canon")
     ctx_canon.add_argument("--step", required=True)
     ctx_canon.add_argument("--repo-root", default=".")
+    ctx_canon.add_argument("--spec-root", default=None, help="Host project spec dir (e.g. ./spec) to include project-tier canon entries")
+
+    ctx_snap = ctx_sub.add_parser("snapshot", help="Save a workspace snapshot of a step artifact for later diffing")
+    ctx_snap.add_argument("spec_dir")
+    ctx_snap.add_argument("--step", required=True)
+    ctx_snap.add_argument("--repo-root", default=".")
+
+    ctx_diff = ctx_sub.add_parser("diff", help="Diff current step artifact against its last workspace snapshot")
+    ctx_diff.add_argument("spec_dir")
+    ctx_diff.add_argument("--step", required=True)
+    ctx_diff.add_argument("--repo-root", default=".")
 
     ctx_fresh = ctx_sub.add_parser("freshness")
     ctx_fresh.add_argument("spec_dir")
@@ -348,7 +435,10 @@ def main():
         from .validation.validate import validate_dir
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = validate_dir(repo_root, spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
+        errs = validate_dir(repo_root, spec_dir, project_canon_dir=project_canon_dir)
         if getattr(args, "json_output", False):
             _json_exit(errs, "validate-all", {"spec_dir": spec_dir})
         else:
@@ -425,15 +515,38 @@ def main():
         from .validation.seed_lint import lint_seeds
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        errs = lint_seeds(repo_root, spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
+        # In submodule deployments, git_root is the host repo root where seed
+        # files and seed_manifest.json live.  Pass it as project_root so that
+        # seed paths are resolved against the host repo, not the toolkit.
+        errs = lint_seeds(repo_root, spec_dir, project_root=git_root)
         if getattr(args, "json_output", False):
             _json_exit(errs, "seed-lint")
         else:
             _print_and_exit_if_errors(errs)
+    elif args.cmd == "seed-index":
+        from .context.seed_indexer import build_seed_index
+        repo_root = os.path.abspath(args.repo_root)
+        spec_dir = os.path.abspath(args.spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
+        result, warnings = build_seed_index(spec_dir, repo_root, git_root=git_root)
+        if getattr(args, "json_output", False):
+            _json_exit(warnings, "seed-index", extra_context={"result": result})
+        else:
+            if _has_error_messages(warnings):
+                _print_and_exit_if_errors(warnings)
+            if warnings:
+                for w in warnings:
+                    print(w, file=sys.stderr)
+            print(json.dumps(result, indent=2))
     elif args.cmd == "prompt-sync":
         from .generation.prompt_schema_sync import run_prompt_schema_sync
         repo_root = os.path.abspath(args.repo_root)
-        expected_spec_dir = os.path.abspath(os.path.join(repo_root, "spec"))
+        git_root = os.path.abspath(args.git_root) if getattr(args, 'git_root', None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, 'spec_root', None) else None
+        # In submodule deployments, spec_dir lives in the host repo, not the toolkit.
+        effective_spec_base = git_root or repo_root
+        expected_spec_dir = os.path.abspath(os.path.join(effective_spec_base, "spec"))
         if args.spec_dir:
             spec_dir = os.path.abspath(args.spec_dir)
             if spec_dir != expected_spec_dir:
@@ -461,13 +574,25 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "canonical-lint":
-        from .canonical.lint import lint_canon_dir
         repo_root = os.path.abspath(args.repo_root)
-        errs = lint_canon_dir(
-            repo_root,
-            canon_dir=args.canon_dir,
-            require_manifest_schema_registration=True,
-        )
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root)
+        if project_canon_dir:
+            from .canonical.lint import lint_canon_dirs
+            errs = lint_canon_dirs(
+                repo_root,
+                canon_dir=args.canon_dir,
+                project_canon_dir=project_canon_dir,
+                require_manifest_schema_registration=True,
+            )
+        else:
+            from .canonical.lint import lint_canon_dir
+            errs = lint_canon_dir(
+                repo_root,
+                canon_dir=args.canon_dir,
+                require_manifest_schema_registration=True,
+            )
         if getattr(args, "json_output", False):
             _json_exit(errs, "canonical-lint")
         else:
@@ -476,11 +601,15 @@ def main():
         from .canonical.integrity import validate_canonical_integrity
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
         errs = validate_canonical_integrity(
             repo_root,
             spec_dir,
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
+            project_canon_dir=project_canon_dir,
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "canonical-integrity")
@@ -497,6 +626,9 @@ def main():
             else:
                 print(err_msg, file=sys.stderr)
                 sys.exit(1)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
         write = bool(args.write and not args.dry_run)
         changes = canonical_autofix(
             repo_root,
@@ -504,6 +636,7 @@ def main():
             write=write,
             canon_dir=args.canon_dir,
             require_manifest_schema_registration=True,
+            project_canon_dir=project_canon_dir,
         )
         if getattr(args, "json_output", False):
             # Flatten changes dict into a list of SpecError / str items
@@ -592,15 +725,46 @@ def main():
             else:
                 print(err_msg, file=sys.stderr)
                 sys.exit(1)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
         errs = lint_hallucinations(
             spec_dir,
             repo_root=repo_root,
             canon_dir=args.canon_dir,
             require_canon_dir=True,
             require_manifest_schema_registration=True,
+            project_canon_dir=project_canon_dir,
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "hallucination-lint")
+        else:
+            _print_and_exit_if_errors(errs)
+    elif args.cmd == "glossary-drift-check":
+        from .validation.glossary_drift_lint import lint_glossary_drift
+        spec_dir = os.path.abspath(args.spec_dir)
+        repo_root = os.path.abspath(args.repo_root)
+        if not os.path.isdir(spec_dir):
+            err_msg = f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}"
+            if getattr(args, "json_output", False):
+                _json_exit([err_msg], "glossary-drift-check")
+            else:
+                print(err_msg, file=sys.stderr)
+                sys.exit(1)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        # Use _discover_project_canon_dir — same convention as all other lint handlers.
+        # Returns spec/canon (the canon/ dir), NOT spec/canon/kinds.
+        project_canon_dir = _discover_project_canon_dir(
+            git_root=git_root, spec_root=spec_root, spec_dir=spec_dir
+        )
+        errs = lint_glossary_drift(
+            spec_dir,
+            repo_root=repo_root,
+            project_canon_dir=project_canon_dir,
+        )
+        if getattr(args, "json_output", False):
+            _json_exit(errs, "glossary-drift-check")
         else:
             _print_and_exit_if_errors(errs)
     elif args.cmd == "traceability-check":
@@ -1291,7 +1455,14 @@ def main():
     elif args.cmd == "canon-schema-alignment":
         from .validation.canon_schema_alignment import lint_canon_schema_alignment
         repo_root = os.path.abspath(args.repo_root)
-        errors = lint_canon_schema_alignment(repo_root)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root)
+        errors = lint_canon_schema_alignment(
+            repo_root,
+            canon_dir=getattr(args, "canon_dir", "canon"),
+            project_canon_dir=project_canon_dir,
+        )
         if getattr(args, "json_output", False):
             _json_exit(errors, "canon-schema-alignment")
         else:
@@ -1409,12 +1580,21 @@ def main():
         from .canonical.accept import run_canon_accept
         repo_root = os.path.abspath(args.repo_root)
         spec_file = os.path.abspath(args.spec_file)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        if git_root:
+            canon_dir = os.path.join(git_root, "spec", "canon")
+            project_canon = True
+        else:
+            canon_dir = None
+            project_canon = False
         result = run_canon_accept(
             spec_file=spec_file,
             namespace=args.namespace,
             repo_root=repo_root,
             dry_run=args.dry_run,
             owner=getattr(args, "owner", None),
+            canon_dir=canon_dir,
+            project_canon=project_canon,
         )
         if getattr(args, "json_output", False):
             error_str = result.get("error")
@@ -1461,7 +1641,7 @@ def main():
     elif args.cmd == "context":
         from .context import (
             get_step_structure, resolve_scope, extract_context,
-            extract_canon, check_freshness,
+            extract_canon, check_freshness, save_snapshot, diff_snapshot,
         )
         repo_root = os.path.abspath(args.repo_root)
         context_cmd = getattr(args, "context_cmd", None)
@@ -1484,7 +1664,16 @@ def main():
             )
             print(json.dumps(result, indent=2))
         elif context_cmd == "canon":
-            result = extract_canon(args.step, repo_root)
+            spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+            result = extract_canon(args.step, repo_root, spec_root=spec_root)
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "snapshot":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = save_snapshot(args.step, spec_dir, repo_root)
+            print(json.dumps(result, indent=2))
+        elif context_cmd == "diff":
+            spec_dir = os.path.abspath(args.spec_dir)
+            result = diff_snapshot(args.step, spec_dir, repo_root)
             print(json.dumps(result, indent=2))
         elif context_cmd == "freshness":
             spec_dir = os.path.abspath(args.spec_dir)
@@ -1525,6 +1714,21 @@ def main():
         from .core.json_utils import main as json_main
         sys.argv = [sys.argv[0]] + args.args
         json_main()
+
+    elif args.cmd == "spec-check":
+        repo_root = os.path.abspath(args.repo_root)
+        spec_dir = os.path.abspath(args.spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
+        if getattr(args, "json_output", False):
+            from .validation.spec_check import run_spec_check_json
+            errs, ctx = run_spec_check_json(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+            _json_exit(errs, "spec-check", extra_context=ctx)
+        else:
+            from .validation.spec_check import run_spec_check
+            errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
+            _print_and_exit_if_errors(errs)
 
     else:
         p.print_help()

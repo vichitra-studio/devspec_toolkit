@@ -100,6 +100,14 @@
         "deprecation_note": {
           "type": "string",
           "description": "Human-readable explanation of why this entry was deprecated and what to use instead."
+        },
+        "source_field": {
+          "type": "string",
+          "description": "JSON path in the source spec artifact where this entry was proposed (e.g., 'terms[*].term', 'capabilities[*].capability_ref'). Written by canon-accept for provenance tracking."
+        },
+        "accepted_from": {
+          "type": "string",
+          "description": "Path to the spec file this entry was accepted from. Written by canon-accept for provenance tracking."
         }
       },
       "required": [

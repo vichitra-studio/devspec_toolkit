@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "schema_hashes": {
+      "vc:05-interface-contracts": "sha256:5a348bce13141d73ccee2e354b948135774c7496b692a11daaac1e1caa68a1f6",
+      "vc:00-charter": "sha256:e0aa5e991acae65112ec9be774acceee4b9c93cfbd8d802b31c300db52146bba",
+      "vc:01-capabilities": "sha256:9186ee75f6307218feead221c8184144a96ada1ad41deda07817db22b28f5ed7",
+      "vc:02-system-sketch": "sha256:1a61d1fc5381c024d704694332ca622447978da11b36a441ed8cbc4516964799"
+    },
+    "generated_at": "2026-04-03T11:04:16Z"
+  },
+  "05": {
+    "05_interface_contracts.json": [
+      ".apis"
+    ]
+  },
+  "00": {
+    "00_charter.json": [
+      ".problem_statement",
+      ".user_segments",
+      ".success_metrics",
+      ".out_of_scope",
+      ".assumptions",
+      ".in_scope",
+      ".stakeholders",
+      ".links",
+      ".risks",
+      ".title"
+    ]
+  },
+  "01": {
+    "01_capabilities.json": [
+      ".capabilities"
+    ]
+  },
+  "02": {
+    "02_system_sketch.json": [
+      ".tech_stack",
+      ".components",
+      ".connections"
+    ]
+  }
+}

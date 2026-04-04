@@ -23,12 +23,10 @@ from ._utils import (
     get_boilerplate_keys as _u_get_boilerplate_keys,
 )
 
-# Upper-bound set of steps that MAY have seed requirements. The actual
-# requirements are read from seed_manifest.json step_requirements, which
-# currently only covers 00, 01, 02, 02a. Steps 03 and 04 are included
-# here as a forward-compatibility guard (in case the manifest is extended).
-# Steps 05+ never have seed requirements and are skipped entirely.
-_POSSIBLE_SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
+# Steps that MAY have seed requirements. The actual requirements are read
+# from seed_manifest.json step_requirements. Steps 03+ work from prior
+# spec artifacts and never require raw seed docs.
+_POSSIBLE_SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a"])
 
 
 def _load_json(path: str) -> dict:

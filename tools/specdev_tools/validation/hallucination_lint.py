@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any
 
-from ..canonical.lint import lint_canon_dir
+from ..canonical.lint import lint_canon_dirs
 from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.registry import derive_allowed_upstream
@@ -38,6 +38,7 @@ def lint_hallucinations(
     canon_dir: str = "canon",
     require_canon_dir: bool = False,
     require_manifest_schema_registration: bool = True,
+    project_canon_dir: str | None = None,
 ) -> list[SpecError]:
     errors: list[SpecError] = []
     known_ids: set[str] = set()
@@ -47,14 +48,15 @@ def lint_hallucinations(
     if require_canon_dir and not os.path.isdir(canon_root):
         return [make_error("E520", f"UNRESOLVED_INPUT missing_canon_dir {canon_root}")]
     if os.path.isdir(canon_root):
-        preflight_errors = lint_canon_dir(
+        preflight_errors = lint_canon_dirs(
             root,
             canon_dir=canon_dir,
+            project_canon_dir=project_canon_dir,
             require_manifest_schema_registration=require_manifest_schema_registration,
         )
         if preflight_errors:
             return list(dict.fromkeys(preflight_errors))
-    canon = CanonicalRegistry.load(root, canon_dir=canon_dir)
+    canon = CanonicalRegistry.load(root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     if canon.load_errors:
         return list(dict.fromkeys(canon.load_errors))
     known_command_prefixes = _load_command_prefixes(root)
@@ -75,8 +77,12 @@ def lint_hallucinations(
             errors.append(make_error("E520", f"UNRESOLVED_INPUT {rel} invalid_json {exc}"))
             continue
         rel = os.path.relpath(path, spec_dir)
+        is_canon = rel.startswith("canon" + os.sep) or rel.startswith("canon/")
         errors.extend(_scan_node(rel, data, canon, known_command_prefixes, stages=active_stages))
-        errors.extend(_check_free_text_terms(rel, data, canonical_terms))
+        # Skip E541 for canon files — canon definitions ARE the vocabulary;
+        # they cannot bind *_ref to themselves and should not be flagged.
+        if not is_canon:
+            errors.extend(_check_free_text_terms(rel, data, canonical_terms))
         errors.extend(_check_existing_structures_paths(rel, data, root))
         errors.extend(_check_linked_test_expectations(rel, data, root))
         if nfr_ids is not None:
@@ -370,6 +376,24 @@ def _check_content_derivation(
     return errs
 
 
+# Keys whose subtrees are excluded from E541 scanning.  Each of these
+# contains objects whose schema does not support *_ref binding, so the
+# linter cannot request a binding that is structurally impossible.
+#
+# - canonical_proposals / canonical_refs_used / canonical_conflicts:
+#   These ARE canonical vocabulary — definitions naturally reference
+#   sibling terms and have no *_ref field to bind.
+# - tech_stack: Structured technology references (name, version,
+#   rationale) with no *_ref in the schema.
+# - user_segments: Charter persona descriptions — free prose that uses
+#   domain vocabulary with no *_ref in the schema.
+# - seeds: Seed manifest descriptions — metadata, not spec content.
+_E541_SKIP_KEYS = {
+    "canonical_proposals", "canonical_refs_used", "canonical_conflicts",
+    "tech_stack", "user_segments", "seeds",
+}
+
+
 def _check_free_text_terms(
     rel: str,
     obj: Any,
@@ -387,6 +411,10 @@ def _check_free_text_terms(
             if any(k.endswith(s) for s in _REF_SUFFIXES)
         }
         for key, value in obj.items():
+            # Skip canonical metadata subtrees entirely — these are
+            # vocabulary definitions, not spec content that should bind refs.
+            if key in _E541_SKIP_KEYS:
+                continue
             p = f"{path}.{key}" if path else key
             if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:
                 # Skip if there's already a ref binding at this level

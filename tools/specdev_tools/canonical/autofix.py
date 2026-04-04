@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator
-from .lint import lint_canon_dir
+from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.registry import SchemaRegistry
@@ -22,19 +22,21 @@ def canonical_autofix(
     write: bool = False,
     canon_dir: str = "canon",
     require_manifest_schema_registration: bool = True,
+    project_canon_dir: str | None = None,
 ) -> dict[str, list[str | SpecError]]:
     spec_dir_abs = os.path.abspath(spec_dir)
     if not os.path.isdir(spec_dir_abs):
         return {spec_dir_abs: [make_error("E520", f"UNRESOLVED_INPUT missing_spec_dir {spec_dir_abs}")]}
-    preflight_errors = lint_canon_dir(
+    preflight_errors = lint_canon_dirs(
         repo_root,
         canon_dir=canon_dir,
+        project_canon_dir=project_canon_dir,
         require_manifest_schema_registration=require_manifest_schema_registration,
     )
     if preflight_errors:
         canon_root = os.path.join(os.path.abspath(repo_root), canon_dir)
         return {canon_root: _uniq(preflight_errors)}
-    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir)
+    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     schema_registry, schema_registry_error = _load_schema_registry(repo_root)
     changes: dict[str, list[str | SpecError]] = {}
     if registry.load_errors:

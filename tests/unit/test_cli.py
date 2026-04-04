@@ -1310,6 +1310,7 @@ class CliTests(unittest.TestCase):
                     os.path.abspath(str(spec_dir)),
                     canon_dir="canon",
                     require_manifest_schema_registration=True,
+                    project_canon_dir=None,
                 )
 
             with patch("specdev_tools.canonical.autofix.canonical_autofix", return_value={}) as p_autofix:
@@ -1322,6 +1323,7 @@ class CliTests(unittest.TestCase):
                     write=False,
                     canon_dir="canon",
                     require_manifest_schema_registration=True,
+                    project_canon_dir=None,
                 )
 
             with patch("specdev_tools.validation.spec_quality_lint.lint_spec_quality", return_value=[]) as p_quality:
@@ -1340,6 +1342,7 @@ class CliTests(unittest.TestCase):
                     canon_dir="canon",
                     require_canon_dir=True,
                     require_manifest_schema_registration=True,
+                    project_canon_dir=None,
                 )
 
             with patch("specdev_tools.validation.dependency_order_lint.lint_dependency_order", return_value=[]) as p_dep:

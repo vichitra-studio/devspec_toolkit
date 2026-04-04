@@ -1,129 +1,16 @@
-"""Tests for seed propagation trim: manifest, prompt, and helper validation."""
+"""Tests for seed propagation trim: manifest and helper validation."""
 
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import unittest
 
-from specdev_tools.core.errors import render_errors
 from specdev_tools.validation.seed_lint import (
     _collect_required_seeds,
-    _extract_step_from_prompt_filename,
-    _lint_prompt_manifest_refs,
-    lint_seeds,
 )
 
 
-def _make_project(
-    tmpdir,
-    step_requirements=None,
-    global_seed_order=None,
-    spec_files=None,
-    prompt_files=None,
-):
-    """Create a minimal project structure for seed propagation testing."""
-    spec_dir = os.path.join(tmpdir, "spec")
-    os.makedirs(os.path.join(spec_dir, "common"), exist_ok=True)
-    seed_dir = os.path.join(tmpdir, "docs", "seed")
-    os.makedirs(seed_dir, exist_ok=True)
-
-    # Create seed files on disk
-    for name in ("seed_overview.md", "seed_tech_stack.md"):
-        with open(os.path.join(seed_dir, name), "w", encoding="utf-8") as f:
-            f.write(f"# {name}\nSample content for testing purposes with enough words.")
-
-    manifest = {
-        "seed_directory": "docs/seed",
-        "seeds": [
-            {
-                "seed_id": "seed-overview",
-                "path": "docs/seed/seed_overview.md",
-                "description": "Project scope.",
-                "required": True,
-                "source_type": "doc",
-            },
-            {
-                "seed_id": "seed-tech-stack",
-                "path": "docs/seed/seed_tech_stack.md",
-                "description": "Architecture decisions.",
-                "required": True,
-                "source_type": "doc",
-            },
-        ],
-        "global_seed_order": global_seed_order or ["seed-overview", "seed-tech-stack"],
-        "step_requirements": step_requirements or {},
-    }
-    with open(
-        os.path.join(spec_dir, "common", "seed_manifest.json"), "w", encoding="utf-8"
-    ) as f:
-        json.dump(manifest, f)
-
-    # Create spec artifact files
-    if spec_files:
-        for filename, data in spec_files.items():
-            path = os.path.join(spec_dir, filename)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f)
-
-    # Create prompt files
-    if prompt_files:
-        prompts_dir = os.path.join(tmpdir, "prompts")
-        os.makedirs(prompts_dir, exist_ok=True)
-        for filename, content in prompt_files.items():
-            with open(os.path.join(prompts_dir, filename), "w", encoding="utf-8") as f:
-                f.write(content)
-
-    return spec_dir, manifest
-
-
 class TestSeedPropagationTrim(unittest.TestCase):
-    """Verify seed manifest and prompt lint functionality."""
-
-    def test_lint_prompt_refs_step_aware(self):
-        """Prompt lint should only enforce seed sections for seed-required steps."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {"00": ["seed-overview"]}
-            prompt_with_seed = (
-                "# Prompt 00\n"
-                "## Seed Order & Mandatory Sources\n"
-                "Read `spec/common/seed_manifest.json` first.\n"
-            )
-            prompt_without_seed = "# Prompt 05\n## Context To Ingest\nRead upstream specs.\n"
-            prompt_files = {
-                "prompt_00_project_charter.md": prompt_with_seed,
-                "prompt_05_interface_contracts.md": prompt_without_seed,
-            }
-            spec_dir, manifest = _make_project(
-                tmpdir, step_requirements=step_reqs, prompt_files=prompt_files
-            )
-            errors: list = []
-            _lint_prompt_manifest_refs(tmpdir, errors, manifest)
-            step_05_errors = [e for e in render_errors(errors) if "prompt_05" in e]
-            self.assertEqual(
-                step_05_errors,
-                [],
-                f"Step 05 prompt should not require seed section. Got: {step_05_errors}",
-            )
-
-    def test_extract_step_from_prompt_filename(self):
-        """Step extraction from prompt filenames handles all patterns."""
-        cases = {
-            "prompt_00_project_charter.md": "00",
-            "prompt_02a_delivery_baseline.md": "02a",
-            "prompt_05_interface_contracts.md": "05",
-            "prompt_13a_completeness_assessment.md": "13a",
-            "prompt_16a_impl_planner.md": "16a",
-        }
-        for filename, expected in cases.items():
-            result = _extract_step_from_prompt_filename(filename)
-            self.assertEqual(
-                result,
-                expected,
-                f"Expected step '{expected}' from '{filename}', got '{result}'",
-            )
+    """Verify seed manifest and helper validation."""
 
     def test_collect_required_seeds_empty_for_unlisted_step(self):
         """_collect_required_seeds returns empty set for steps not in step_requirements."""
@@ -153,64 +40,6 @@ class TestSeedPropagationTrim(unittest.TestCase):
         }
         result = _collect_required_seeds(manifest, "16")
         self.assertEqual(result, set(), f"Step 16 should have no required seeds. Got: {result}")
-
-    def test_lint_prompt_refs_manifest_none(self):
-        """_lint_prompt_manifest_refs with manifest=None emits warning, not seed errors."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            prompts_dir = os.path.join(tmpdir, "prompts")
-            os.makedirs(prompts_dir, exist_ok=True)
-            with open(
-                os.path.join(prompts_dir, "prompt_05_interface_contracts.md"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                f.write("# Prompt 05\n## Context To Ingest\nRead upstream specs.\n")
-
-            errors: list = []
-            _lint_prompt_manifest_refs(tmpdir, errors, manifest=None)
-            warning = [e for e in render_errors(errors) if "skipping prompt seed-section checks" in e]
-            self.assertEqual(
-                len(warning),
-                1,
-                f"Expected exactly 1 manifest-None warning. Got: {errors}",
-            )
-            seed_section_errors = [
-                e for e in render_errors(errors) if "missing 'Seed Order & Mandatory Sources'" in e
-            ]
-            self.assertEqual(
-                seed_section_errors,
-                [],
-                f"Should not require seed sections when manifest is None. Got: {seed_section_errors}",
-            )
-
-
-    def test_lint_prompt_refs_step_aware_step00_missing_section(self):
-        """Step 00 prompt missing 'Seed Order & Mandatory Sources' should produce an error."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            step_reqs = {"00": ["seed-overview"]}
-            # Prompt for step 00 that is MISSING the seed section
-            prompt_missing_seed_section = (
-                "# Prompt 00 Charter\n"
-                "## Context To Ingest\n"
-                "Read upstream specs.\n"
-            )
-            prompt_files = {
-                "prompt_00_charter.md": prompt_missing_seed_section,
-            }
-            spec_dir, manifest = _make_project(
-                tmpdir, step_requirements=step_reqs, prompt_files=prompt_files
-            )
-            errors: list = []
-            _lint_prompt_manifest_refs(tmpdir, errors, manifest)
-            step_00_errors = [
-                e
-                for e in render_errors(errors)
-                if "prompt_00" in e or "step 00" in e.lower() or "Seed Order" in e
-            ]
-            self.assertTrue(
-                len(step_00_errors) > 0,
-                f"Expected error about missing seed section for step 00 prompt. Got: {errors}",
-            )
 
 
 if __name__ == "__main__":

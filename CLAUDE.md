@@ -27,10 +27,66 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 
 ---
 
+## Querying Spec Artifacts
+
+**NEVER read `spec/*.json` files directly** using the Read tool, `cat`, or ad-hoc scripts. Always use the `specdev-context` skill to load context for a pipeline step before any spec-related work (authoring, reviewing, analysing, debugging).
+
+```
+/specdev-context <NN>                     # load upstream context for step NN
+/specdev-context <NN> --full              # bypass scope filtering
+/specdev-context <NN> --scope <entry-id>  # scope to IDs reachable from a specific entry
+```
+
+The skill runs `context structure`, `context extract`, and `context canon` in sequence and loads all upstream data into working context. Direct file reads bypass schema-aware extraction, miss cross-step dependencies, and risk acting on stale or partial data.
+
+### Viewing a step's own output artifact
+
+To analyse the artifact a step *produced* (not its upstream inputs), use `context review`:
+
+```bash
+./tools/run_specdev.sh context review spec/03_glossary.json --step 03 --repo-root ./devspec_toolkit
+```
+
+This runs a two-pass structural + semantic review of the emitted artifact.
+
+For targeted field reads without a full review, use `json read-multi`:
+
+```bash
+# Read several fields in one pass — output is a keyed JSON object
+# Each filter must return a single value; streaming filters (.arr[]) are rejected
+./tools/run_specdev.sh json read-multi spec/03_glossary.json '.terms | length' '.id' '.owner'
+
+# Read by array index
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms[2]'
+
+# Read with select() filter (streams all matching items) — use json read, not read-multi
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms[] | select(.domain == "analytics")'
+
+# Tree overview — no field content, just structure
+./tools/run_specdev.sh json structure spec/03_glossary.json
+```
+
+### Project-tier canon in context
+
+`context canon` now merges project-scoped terms (from `spec/canon/`) alongside toolkit core terms when `--spec-root` is provided:
+
+```bash
+./tools/run_specdev.sh context canon --step 03 --repo-root ./devspec_toolkit --spec-root ./spec
+```
+
+Without `--spec-root`, only toolkit-core entries (units, owners, etc.) are returned.
+
+---
+
 ## Core CLI Commands
 
 ```bash
-# Validation
+# Unified check (recommended after generating any spec artifact)
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit
+# For submodule deployments:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
+# Single-file validation (for iterative editing)
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 
@@ -40,6 +96,7 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 
 # Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh seed-index spec --repo-root ./devspec_toolkit
 
 # Invariants & Governance
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
@@ -60,6 +117,11 @@ All CLI commands must go through `./tools/run_specdev.sh` — never call interna
 
 # Extraction intent validation (prompts vs step_order.json)
 ./tools/run_specdev.sh extraction-intent-check --repo-root ./devspec_toolkit
+
+# Workspace snapshot and diff (no git commit required)
+./tools/run_specdev.sh context snapshot spec --step 03 --repo-root ./devspec_toolkit   # save checkpoint
+./tools/run_specdev.sh context diff spec --step 03 --repo-root ./devspec_toolkit       # diff vs checkpoint
+# Snapshots are stored in .specdev/snapshots/; add .specdev/ to .gitignore if desired.
 
 # Environment diagnostic (read-only — prints active SPECDEV_* config)
 ./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit

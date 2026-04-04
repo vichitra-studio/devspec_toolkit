@@ -59,9 +59,9 @@
       "properties": {
         "type": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "The relationship type from source artifact to target artifact. Common values: 'derives_from' (this artifact is derived from the target), 'implements' (this implements a requirement or design), 'tests' (this artifact tests the target), 'validates' (this validates the target), 'depends_on' (this depends on the target), 'refines' (this refines or elaborates the target), 'external' (triggers additional required fields: owner, note). Use consistent vocabulary across the spec.",
-          "examples": ["derives_from", "implements", "tests", "validates", "depends_on", "refines", "external"]
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "The trace type identifying what kind of upstream artifact this link points to. Must match a canonical trace type from canon/kinds/trace_type.json. Common values: 'fr' (functional requirement), 'api' (interface contract), 'capability' (system capability), 'charter-goal' (charter goal or in-scope item), 'nfr' (non-functional requirement), 'invariant' (system invariant), 'fixture' (test fixture), 'doc' (documentation), 'component' (system component), 'threat' (security threat), 'glossary' (glossary term). Use 'external' for cross-system references (triggers additional required fields: owner, note).",
+          "examples": ["fr", "api", "capability", "charter-goal", "nfr", "invariant", "fixture", "doc", "component", "threat", "glossary", "external"]
         },
         "id": {
           "$ref": "vc:core:atoms#kebabId",

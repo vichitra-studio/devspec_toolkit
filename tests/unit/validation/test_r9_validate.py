@@ -62,7 +62,7 @@ def _run_validate_dir_with_injected_failures(
          patch("specdev_tools.validation.validate.lint_spec_quality", return_value=injected_failures), \
          patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
          patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-         patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+         patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
          patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
          patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
          patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
@@ -406,7 +406,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-             patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+             patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
              patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
              patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
@@ -423,7 +423,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-             patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+             patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
              patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
              patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
@@ -440,7 +440,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-             patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+             patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
              patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
              patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
@@ -458,7 +458,7 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
              patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
              patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
-             patch("specdev_tools.validation.validate.lint_canon_dir", return_value=[]), \
+             patch("specdev_tools.validation.validate.lint_canon_dirs", return_value=[]), \
              patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
              patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]), \
              patch("specdev_tools.validation.validate.run_prompt_schema_sync", return_value=[]), \
