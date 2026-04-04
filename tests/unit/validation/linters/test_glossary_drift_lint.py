@@ -198,9 +198,9 @@ def test_scss_term_proposal_parity(tmp_path):
     )
 
     result = lint_glossary_drift(str(spec))
-    codes = [e.code for e in result]
-    assert "E606" in codes
-    assert not any(e.code == "E606" and "acronym" in e.message for e in result)
+    e606 = [e for e in result if e.code == "E606"]
+    assert len(e606) == 1, "exactly one E606 expected (term proposal only, not acronym)"
+    assert "term-scss" in e606[0].message
 
 
 def test_core_canon_ids_not_orphaned(tmp_path):
