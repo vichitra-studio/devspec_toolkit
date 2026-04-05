@@ -63,6 +63,7 @@ def _run_checks(
                             include_quality_lint=False,
                             include_canonical_integrity=False,
                             git_root=git_root,
+                            spec_root=spec_root,
                         )
                     )
     checks["schema-validation"] = {**_classify(schema_errs), "errors": schema_errs}

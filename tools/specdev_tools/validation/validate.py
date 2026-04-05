@@ -96,6 +96,7 @@ def validate_file(
     include_canonical_integrity: bool = True,
     project_canon_dir: str | None = None,
     git_root: str | None = None,
+    spec_root: str | None = None,
 ) -> list[SpecError]:
     try:
         registry = SchemaRegistry(repo_root)
@@ -167,7 +168,7 @@ def validate_file(
             enhanced_errors.append(make_error("E520", error_msg))
 
         step = _get_step_from_path(path)
-        deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root)
+        deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root, spec_root=spec_root)
         if deep_errors:
             for de in deep_errors:
                 enhanced_errors.append(
@@ -198,7 +199,7 @@ def validate_file(
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
         return [make_error("E520", f"{path}: validation_input_error {type(e).__name__}: {str(e)}")]
 
-def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None, git_root: str | None = None) -> list[SpecError]:
+def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None, git_root: str | None = None, spec_root: str | None = None) -> list[SpecError]:
     # Reset config to pick up any env var changes since last call
     reset_config()
 
@@ -237,6 +238,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                         include_quality_lint=False,
                         include_canonical_integrity=False,
                         git_root=git_root,
+                        spec_root=spec_root,
                     )
                 )
 
@@ -420,11 +422,18 @@ def _load_monitoring_data(repo_root: str, file_path: str) -> dict[str, Any] | No
     return None
 
 
-def _build_validation_context(repo_root: str, path: str, git_root: str | None = None) -> dict[str, Any]:
-    spec_root: str | None = os.path.join(git_root, "spec") if git_root else None
+def _build_validation_context(
+    repo_root: str,
+    path: str,
+    git_root: str | None = None,
+    spec_root: str | None = None,
+) -> dict[str, Any]:
+    # Prefer an explicitly supplied spec_root (e.g. from --spec-root CLI arg).
+    # Fall back to deriving from git_root so callers that only pass --git-root work.
+    effective_spec_root: str | None = spec_root or (os.path.join(git_root, "spec") if git_root else None)
     return {
         "artifact_path": path,
-        "spec_root": spec_root,
+        "spec_root": effective_spec_root,
         "component_ids": _load_component_ids(repo_root, path),
         "capability_ids": _load_capability_ids(repo_root, path),
         "nfrs_data": _load_nfrs_data(repo_root, path),
@@ -469,11 +478,18 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
 }
 
 
-def _run_deep_validation(step: str, data: dict, repo_root: str, path: str, git_root: str | None = None) -> list[SpecError]:
+def _run_deep_validation(
+    step: str,
+    data: dict,
+    repo_root: str,
+    path: str,
+    git_root: str | None = None,
+    spec_root: str | None = None,
+) -> list[SpecError]:
     validator = DEEP_VALIDATORS.get(step)
     if validator is None:
         return []
-    context = _build_validation_context(repo_root, path, git_root=git_root)
+    context = _build_validation_context(repo_root, path, git_root=git_root, spec_root=spec_root)
     try:
         return validator(data, repo_root, context)
     except Exception as e:

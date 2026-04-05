@@ -417,8 +417,38 @@ class ValidateIntegrationTests(unittest.TestCase):
             ) as p_step:
                 errs = _run_deep_validation("02", instance, str(root), artifact_path)
             self.assertEqual([], errs)
-            p_ctx.assert_called_once_with(str(root), artifact_path, git_root=None)
+            p_ctx.assert_called_once_with(str(root), artifact_path, git_root=None, spec_root=None)
             p_step.assert_called_once_with(instance, str(root), {"cap-a"})
+
+    def test_run_deep_validation_threads_git_root_and_spec_root_to_context(self):
+        """Verify non-None git_root and spec_root are forwarded to _build_validation_context."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            host = root / "host"
+            spec = host / "spec"
+            instance = {"id": "probe"}
+            artifact_path = str(spec / "02_system_sketch.json")
+            context = {
+                "artifact_path": artifact_path,
+                "component_ids": None,
+                "capability_ids": None,
+                "nfrs_data": None,
+                "monitoring_data": None,
+            }
+            with patch("specdev_tools.validation.validate._build_validation_context", return_value=context) as p_ctx, patch(
+                "specdev_tools.validation.validate.step_02.validate_step_02",
+                return_value=[],
+            ):
+                _run_deep_validation(
+                    "02", instance, str(root), artifact_path,
+                    git_root=str(host),
+                    spec_root=str(spec),
+                )
+            p_ctx.assert_called_once_with(
+                str(root), artifact_path,
+                git_root=str(host),
+                spec_root=str(spec),
+            )
 
 
 if __name__ == "__main__":
