@@ -183,6 +183,70 @@ class TestLoadUpstreamIds:
         # Should have found one of the files
         assert len(result) == 1
 
+    def test_spec_root_fallback_used_when_toolkit_spec_missing(self, tmp_path):
+        """spec_root is consulted when toolkit spec/ has no matching file."""
+        toolkit = tmp_path / "toolkit"
+        (toolkit / "spec").mkdir(parents=True)
+        # toolkit spec/ exists but has no step-04 file
+
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "04_frs.json").write_text(
+            json.dumps({"requirements": [{"fr_id": "fr-host"}]}),
+            encoding="utf-8",
+        )
+
+        result = load_upstream_ids(
+            toolkit, "04", "requirements", "fr_id",
+            spec_root=str(host_spec),
+        )
+        assert result == {"fr-host"}
+
+    def test_toolkit_spec_takes_precedence_over_spec_root(self, tmp_path):
+        """Toolkit spec/ is checked first; spec_root is only a fallback."""
+        toolkit = tmp_path / "toolkit"
+        (toolkit / "spec").mkdir(parents=True)
+        (toolkit / "spec" / "04_frs.json").write_text(
+            json.dumps({"requirements": [{"fr_id": "fr-toolkit"}]}),
+            encoding="utf-8",
+        )
+
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "04_frs.json").write_text(
+            json.dumps({"requirements": [{"fr_id": "fr-host"}]}),
+            encoding="utf-8",
+        )
+
+        result = load_upstream_ids(
+            toolkit, "04", "requirements", "fr_id",
+            spec_root=str(host_spec),
+        )
+        assert result == {"fr-toolkit"}
+
+    def test_spec_root_none_skips_fallback(self, tmp_path):
+        """When spec_root is None, the fallback path is not consulted."""
+        toolkit = tmp_path / "toolkit"
+        (toolkit / "spec").mkdir(parents=True)
+        # No step-04 file in toolkit spec, and no spec_root provided
+
+        result = load_upstream_ids(
+            toolkit, "04", "requirements", "fr_id",
+            spec_root=None,
+        )
+        assert result is None
+
+    def test_spec_root_missing_dir_returns_none(self, tmp_path):
+        """spec_root pointing at a non-existent directory falls through to None."""
+        toolkit = tmp_path / "toolkit"
+        (toolkit / "spec").mkdir(parents=True)
+
+        result = load_upstream_ids(
+            toolkit, "04", "requirements", "fr_id",
+            spec_root=str(tmp_path / "nonexistent" / "spec"),
+        )
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # load_sibling_artifact
