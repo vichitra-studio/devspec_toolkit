@@ -95,6 +95,13 @@ def _scan_spec_dir(
     the OS error; the caller (``load_upstream_ids``) treats ``None`` as
     "not found here" and may consult a *spec_root* fallback path.
 
+    When a matching file is found and successfully parsed, returns a
+    ``set[str]`` of extracted IDs — possibly empty if the array exists but
+    contains no entries.  An **empty set is not ``None``**: it signals "file
+    present, no IDs" and prevents ``load_upstream_ids`` from consulting the
+    *spec_root* fallback.  This is intentional — it preserves the precedence
+    of an explicit toolkit-side artifact over a host-repo fallback.
+
     ``json.JSONDecodeError`` is *not* caught and propagates to the caller.
     """
     if not os.path.isdir(spec_dir):
