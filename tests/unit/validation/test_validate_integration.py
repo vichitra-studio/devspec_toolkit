@@ -417,7 +417,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             ) as p_step:
                 errs = _run_deep_validation("02", instance, str(root), artifact_path)
             self.assertEqual([], errs)
-            p_ctx.assert_called_once_with(str(root), artifact_path)
+            p_ctx.assert_called_once_with(str(root), artifact_path, git_root=None)
             p_step.assert_called_once_with(instance, str(root), {"cap-a"})
 
 

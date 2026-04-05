@@ -1268,7 +1268,7 @@ def validate_post_migration(
     errors = []
     
     # 1. Schema Validation
-    schema_failures = validate_dir(str(toolkit_root), str(spec_dir))
+    schema_failures = validate_dir(str(toolkit_root), str(spec_dir), git_root=str(spec_dir.parent))
     if schema_failures:
         for fail in schema_failures:
             errors.append(f"Schema Validation Failed: {fail}")
