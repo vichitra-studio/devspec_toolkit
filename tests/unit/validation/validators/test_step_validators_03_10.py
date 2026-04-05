@@ -70,25 +70,30 @@ class Step0310Tests(unittest.TestCase):
 
     def test_step04_accepts_valid_fr_with_trace(self):
         """Validate that FR items with non-empty trace array pass validation."""
-        errs = validate_step_04(
-            {
-                "functional_requirements": [
-                    {
-                        "fr_id": "fr-test-valid-trace",
-                        "statement": "This FR has a valid non-empty trace array",
-                        "acceptance_criteria": [
-                            {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                            {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                        ],
-                        "trace": [
-                            {"type": "capability", "id": "cap-test", "note": "Links to capability"}
-                        ],
-                        "capability_ref": "cap-test"
-                    }
-                ]
-            },
-            ".",
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Use an isolated tmpdir so load_upstream_ids finds no capabilities file
+            # and skips capability_ref cross-validation (returns None → skip).
+            # Using "." as toolkit_root is fragile: it picks up the host repo's
+            # live spec/01_capabilities.json, which doesn't contain synthetic IDs.
+            errs = validate_step_04(
+                {
+                    "functional_requirements": [
+                        {
+                            "fr_id": "fr-test-valid-trace",
+                            "statement": "This FR has a valid non-empty trace array",
+                            "acceptance_criteria": [
+                                {"criterion_id": "ac-1", "text": "First acceptance criterion"},
+                                {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
+                            ],
+                            "trace": [
+                                {"type": "capability", "id": "cap-test", "note": "Links to capability"}
+                            ],
+                            "capability_ref": "cap-test"
+                        }
+                    ]
+                },
+                tmpdir,
+            )
         self.assertEqual([], errs)
 
     def test_step04_capability_ref_cross_validation(self):
