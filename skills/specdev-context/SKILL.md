@@ -10,9 +10,11 @@ description: >
 
 # /specdev-context — Step Context Loader
 
-**Never read `spec/*.json` files directly.** This skill is the single entry point for all
-spec reads. For any work involving a pipeline step — authoring, reviewing, fixing, debugging,
-or answering questions — load context here first.
+**Never read `spec/*.json` files directly, and never read tool output dump files.** This skill
+is the single entry point for all spec reads. For any work involving a pipeline step —
+authoring, reviewing, fixing, debugging, or answering questions — load context here first.
+For targeted follow-up queries after context is loaded, use `json read` on the source artifact,
+not on saved terminal output. See **Prohibited patterns** below.
 
 For re-reads during a review-refine cycle, re-run with `--scope <entry-id>` to get a fresh
 scoped view of the modified entry. Do not inspect fields directly.
@@ -50,6 +52,28 @@ documents (00–02a), verify seeds are current before loading context:
 A `"stale": true` result on any seed means upstream content has changed since the spec was
 last written. Stale seeds produce misleading context — re-index the affected seed before
 proceeding. Steps 05 and above have no seed dependency; skip this check.
+
+## Prohibited patterns
+
+The following are **hard bans** — never do these regardless of context:
+
+| Banned action | Why | Use instead |
+|---|---|---|
+| `Read` on `spec/*.json` | Bypasses pipeline, no query filtering | `context extract` + `json read` |
+| `Read` on tool output dump files (`*.txt`, `.specdev/`, temp paths) | Reads stale, unfiltered blobs | `json read <source-file> '<jq-filter>'` on the actual artifact |
+| `cat` / `Bash` reads of spec or canon files | Same as above | `json read` |
+| `Read` on `devspec_toolkit/canon/kinds/*.json` | Canon is loaded via `context canon` | `context canon` output |
+| Re-running `context extract` to re-read already-loaded context | Wastes tokens | Use `json read` for targeted follow-up queries |
+
+**If a command output is truncated** (saved to a file because it exceeded terminal limits):
+- Do **not** `Read` the saved dump file.
+- Instead run targeted `json read` queries directly on the upstream source artifact:
+  ```bash
+  # Example: extract output was large — query what you need directly
+  ./tools/run_specdev.sh json read spec/01_capabilities.json '.capabilities[] | {capability_id, scope, name}'
+  ./tools/run_specdev.sh json read spec/00_charter.json '.in_scope'
+  ```
+- Only call `context extract --full` again if the specific field you need is not accessible via `json read`.
 
 ## Execution
 
