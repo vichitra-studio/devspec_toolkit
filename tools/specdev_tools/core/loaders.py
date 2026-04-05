@@ -86,7 +86,17 @@ def _scan_spec_dir(
     id_field: str,
     fallback_keys: tuple[str, ...],
 ) -> Optional[set[str]]:
-    """Scan a single spec directory for a step artifact and extract IDs."""
+    """Scan a single spec directory for a step artifact and extract IDs.
+
+    Returns ``None`` in three situations: the directory does not exist, no
+    file matching ``<step_prefix>_*.json`` is found, or a matching file
+    exists but cannot be opened (``OSError`` — e.g. permission denied).  In
+    the last case ``None`` is returned intentionally rather than propagating
+    the OS error; the caller (``load_upstream_ids``) treats ``None`` as
+    "not found here" and may consult a *spec_root* fallback path.
+
+    ``json.JSONDecodeError`` is *not* caught and propagates to the caller.
+    """
     if not os.path.isdir(spec_dir):
         return None
 

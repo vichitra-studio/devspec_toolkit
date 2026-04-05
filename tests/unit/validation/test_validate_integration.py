@@ -451,5 +451,42 @@ class ValidateIntegrationTests(unittest.TestCase):
             )
 
 
+class BuildValidationContextTests(unittest.TestCase):
+    """Direct unit tests for _build_validation_context spec_root preference logic."""
+
+    def setUp(self):
+        from specdev_tools.validation.validate import _build_validation_context
+        self._fn = _build_validation_context
+
+    def _call(self, **kwargs):
+        # Use a non-existent path so the sibling/fallback loaders return None quickly
+        return self._fn("/repo", "/repo/spec/99_fake.json", **kwargs)
+
+    def test_explicit_spec_root_takes_precedence_over_git_root(self):
+        """When both spec_root and git_root are supplied, spec_root wins."""
+        ctx = self._call(git_root="/host", spec_root="/explicit/spec")
+        self.assertEqual("/explicit/spec", ctx["spec_root"])
+
+    def test_git_root_derived_when_spec_root_absent(self):
+        """spec_root is derived as <git_root>/spec when spec_root is None."""
+        ctx = self._call(git_root="/host", spec_root=None)
+        self.assertEqual(os.path.join("/host", "spec"), ctx["spec_root"])
+
+    def test_neither_set_yields_none(self):
+        """spec_root is None when neither git_root nor spec_root is provided."""
+        ctx = self._call()
+        self.assertIsNone(ctx["spec_root"])
+
+    def test_only_spec_root_set(self):
+        """Explicit spec_root is used even when git_root is absent."""
+        ctx = self._call(spec_root="/only/spec")
+        self.assertEqual("/only/spec", ctx["spec_root"])
+
+    def test_artifact_path_preserved_in_context(self):
+        """artifact_path is always set in the returned context."""
+        ctx = self._call()
+        self.assertEqual("/repo/spec/99_fake.json", ctx["artifact_path"])
+
+
 if __name__ == "__main__":
     unittest.main()
