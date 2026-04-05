@@ -13,7 +13,7 @@ _FR_ID_RE = re.compile(r"^fr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 _NFR_ID_RE = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_12(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("jobs", []), "job_id", "job_id", errors)
     job_ids = {j["job_id"] for j in instance.get("jobs", []) if isinstance(j, dict) and isinstance(j.get("job_id"), str)}
@@ -36,8 +36,8 @@ def validate_step_12(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
         errors.append(make_error("E141", f"Circular dependency detected in job requires graph: {cycle}"))
 
     # Cross-step FR/NFR reference validation
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
-    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
+    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id", spec_root=spec_root)
 
     upstream_map: dict[str, tuple[set[str] | None, str, str]] = {
         "fr-": (fr_ids, "04_fr_list.json", "FR"),

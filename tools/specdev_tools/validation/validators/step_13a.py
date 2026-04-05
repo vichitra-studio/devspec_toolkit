@@ -80,7 +80,7 @@ def _validate_dimension_consistency(
         ))
 
 
-def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_13a(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
 
     dimensions = instance.get("dimensions")
@@ -112,9 +112,9 @@ def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[SpecE
     # Cross-step ID validation
     # Load upstream ID sets; returns None if upstream file is absent.
     # -------------------------------------------------------------------
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
-    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id")
-    cap_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id", spec_root=spec_root)
+    cap_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id", spec_root=spec_root)
 
     # upstream_map: prefix -> (id_set_or_None, source_filename, type_label)
     #
@@ -136,7 +136,7 @@ def validate_step_13a(instance: dict[str, Any], toolkit_root: str) -> list[SpecE
     # dimension against the Step 14 roadmap. Only loaded when the optional dimension
     # is present to avoid spurious W590 in documents that don't use it.
     if isinstance(opt_dim, dict):
-        milestone_ids = load_upstream_ids(toolkit_root, "14", "milestones", "milestone_id")
+        milestone_ids = load_upstream_ids(toolkit_root, "14", "milestones", "milestone_id", spec_root=spec_root)
         upstream_map["ms-"] = (milestone_ids, "14_roadmap.json", "milestone")
 
     # Emit W590 once per missing upstream file (deduplicated by filename)

@@ -9,7 +9,7 @@ from ...validation.linter_utils import check_no_duplicates
 FR_ID_PATTERN = kebab_id_re("fr")
 
 
-def validate_step_04(instance: Dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_04(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     """
     Validate Step 04 (Functional Requirements) logic.
     Checks for duplicate fr_ids, fr_id format convention, trace presence, and capability_ref cross-validation.
@@ -30,7 +30,7 @@ def validate_step_04(instance: Dict[str, Any], toolkit_root: str) -> list[SpecEr
         _validate_trace_presence(req, i, fr_id, errors)
 
     # Cross-step capability_ref validation
-    capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id")
+    capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id", spec_root=spec_root)
     if capability_ids is not None:
         for i, req in enumerate(instance.get("functional_requirements", [])):
             _validate_capability_ref(req, i, capability_ids, errors)

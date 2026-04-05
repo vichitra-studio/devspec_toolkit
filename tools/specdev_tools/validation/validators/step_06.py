@@ -11,7 +11,7 @@ INV_ID_PATTERN = re.compile(r"^inv-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TRACE_TARGET_PATTERN = re.compile(r"^(fr|api|nfr|inv)-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_06(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("rules", []), "inv_id", "inv_id", errors)
     for i, rule in enumerate(instance.get("rules", [])):
@@ -31,8 +31,8 @@ def validate_step_06(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
                     errors.append(make_error("E530", f"Invariant '{inv_id}' has trace target '{t}' that does not match (fr|api|nfr|inv)-* pattern"))
 
     # Cross-step ID validation for trace targets
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
-    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id", spec_root=spec_root)
 
     # Collect inv IDs from this artifact for self-referential validation
     inv_ids = {

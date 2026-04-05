@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_upstream_ids, KEBAB_ID_RE
 
-def validate_step_15(instance: Dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_15(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     """
     Validate Step 15 (Scaffold) logic.
     Checks build_status enum, interface_map uniqueness, and method enums.
@@ -65,7 +65,7 @@ def validate_step_15(instance: Dict[str, Any], toolkit_root: str) -> list[SpecEr
                 errors.append(make_error("E530", f"interface_map[{i}].method '{method}' is invalid. Must be one of {sorted(valid_methods)}"))
 
     # Cross-step validation: verify interface_ref values exist in 05_interface_contracts.json
-    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id", fallback_keys=("contracts",))
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id", fallback_keys=("contracts",), spec_root=spec_root)
     if api_ids is None:
         errors.append(make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 05_interface_contracts.json not found; skipping API reference validation"))
     elif "interface_map" in instance:

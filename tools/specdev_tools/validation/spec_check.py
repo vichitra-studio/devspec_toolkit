@@ -62,6 +62,7 @@ def _run_checks(
                             os.path.join(dirpath, fn),
                             include_quality_lint=False,
                             include_canonical_integrity=False,
+                            git_root=git_root,
                         )
                     )
     checks["schema-validation"] = {**_classify(schema_errs), "errors": schema_errs}

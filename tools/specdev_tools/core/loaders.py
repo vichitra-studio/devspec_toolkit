@@ -37,6 +37,7 @@ def load_upstream_ids(
     id_field: str,
     *,
     fallback_keys: tuple[str, ...] = (),
+    spec_root: str | Path | None = None,
 ) -> Optional[set[str]]:
     """Load IDs from an upstream step artifact.
 
@@ -44,6 +45,11 @@ def load_upstream_ids(
     loads the first match, and extracts *id_field* from each dict in
     *array_key*.  If *fallback_keys* is supplied, those array keys are also
     checked when *array_key* yields nothing.
+
+    For submodule deployments where the host repo's spec lives outside
+    ``toolkit_root``, pass *spec_root* (typically ``<git_root>/spec``) as a
+    fallback search path.  The toolkit's own ``spec/`` directory is tried first;
+    *spec_root* is only consulted when no match is found there.
 
     Returns
     -------
@@ -57,7 +63,30 @@ def load_upstream_ids(
     json.JSONDecodeError
         If the file exists but contains malformed JSON (propagated).
     """
-    spec_dir = os.path.join(str(toolkit_root), "spec")
+    result = _scan_spec_dir(
+        os.path.join(str(toolkit_root), "spec"), step_prefix, array_key, id_field, fallback_keys
+    )
+    if result is not None:
+        return result
+
+    if spec_root:
+        result = _scan_spec_dir(
+            str(spec_root), step_prefix, array_key, id_field, fallback_keys
+        )
+        if result is not None:
+            return result
+
+    return None
+
+
+def _scan_spec_dir(
+    spec_dir: str,
+    step_prefix: str,
+    array_key: str,
+    id_field: str,
+    fallback_keys: tuple[str, ...],
+) -> Optional[set[str]]:
+    """Scan a single spec directory for a step artifact and extract IDs."""
     if not os.path.isdir(spec_dir):
         return None
 

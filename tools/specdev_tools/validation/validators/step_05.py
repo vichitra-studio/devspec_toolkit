@@ -7,7 +7,7 @@ from ...core.loaders import load_upstream_ids
 from ...validation.linter_utils import check_no_duplicates
 
 
-def validate_step_05(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_05(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("apis", []), "api_id", "api_id", errors)
     seen_method_route: set[tuple[str, str]] = set()
@@ -28,7 +28,7 @@ def validate_step_05(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
             )
 
     # Cross-step FR reference validation
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
     if fr_ids is None:
         errors.append(
             make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 04_fr_list.json not found; "

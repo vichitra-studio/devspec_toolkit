@@ -11,7 +11,7 @@ FIXTURE_ID_PATTERN = re.compile(r"^fix-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TARGET_ID_PATTERN = re.compile(r"^(fr|api|nfr|inv)-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_08(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_08(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("fixtures", []), "fixture_id", "fixture_id", errors)
     for i, fixture in enumerate(instance.get("fixtures", [])):
@@ -31,10 +31,10 @@ def validate_step_08(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
                     errors.append(make_error("E530", f"Fixture '{fixture_id}' has target '{t}' that does not match (fr|api|nfr|inv)-* pattern"))
 
     # Cross-step target ID validation against upstream artifacts
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
-    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id")
-    inv_ids = load_upstream_ids(toolkit_root, "06", "rules", "inv_id")
-    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
+    api_ids = load_upstream_ids(toolkit_root, "05", "apis", "api_id", spec_root=spec_root)
+    inv_ids = load_upstream_ids(toolkit_root, "06", "rules", "inv_id", spec_root=spec_root)
+    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id", spec_root=spec_root)
 
     upstream_map: dict[str, tuple[set[str] | None, str, str]] = {
         "fr-": (fr_ids, "04_fr_list.json", "FR"),

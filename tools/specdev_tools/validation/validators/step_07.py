@@ -12,7 +12,7 @@ KNOWN_STAGES = {"dev", "ci", "staging", "prod"}
 NFR_ID_PATTERN = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
-def validate_step_07(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_07(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
 
     check_no_duplicates(instance.get("nfrs", []), "nfr_id", "nfr_id", errors)
@@ -49,7 +49,7 @@ def validate_step_07(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
                     )
 
     # Cross-step FR traceability validation
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id")
+    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
     if fr_ids is not None:
         for nfr in instance.get("nfrs", []):
             nfr_id = nfr.get("nfr_id")

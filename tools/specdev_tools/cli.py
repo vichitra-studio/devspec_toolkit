@@ -430,7 +430,7 @@ def main():
         spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
         spec_dir = os.path.dirname(file_path)
         project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        errs = validate_file(repo_root, file_path, project_canon_dir=project_canon_dir)
+        errs = validate_file(repo_root, file_path, project_canon_dir=project_canon_dir, git_root=git_root)
         if getattr(args, "json_output", False):
             _json_exit(errs, "validate", {"file": file_path})
         else:
@@ -442,7 +442,7 @@ def main():
         git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
         spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
         project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
-        errs = validate_dir(repo_root, spec_dir, project_canon_dir=project_canon_dir)
+        errs = validate_dir(repo_root, spec_dir, project_canon_dir=project_canon_dir, git_root=git_root)
         if getattr(args, "json_output", False):
             _json_exit(errs, "validate-all", {"spec_dir": spec_dir})
         else:

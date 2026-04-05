@@ -95,6 +95,7 @@ def validate_file(
     include_quality_lint: bool = True,
     include_canonical_integrity: bool = True,
     project_canon_dir: str | None = None,
+    git_root: str | None = None,
 ) -> list[SpecError]:
     try:
         registry = SchemaRegistry(repo_root)
@@ -166,7 +167,7 @@ def validate_file(
             enhanced_errors.append(make_error("E520", error_msg))
 
         step = _get_step_from_path(path)
-        deep_errors = _run_deep_validation(step, data, repo_root, path)
+        deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root)
         if deep_errors:
             for de in deep_errors:
                 enhanced_errors.append(
@@ -197,7 +198,7 @@ def validate_file(
     except (OSError, json.JSONDecodeError, ValueError, KeyError, AttributeError, TypeError) as e:
         return [make_error("E520", f"{path}: validation_input_error {type(e).__name__}: {str(e)}")]
 
-def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None) -> list[SpecError]:
+def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None, git_root: str | None = None) -> list[SpecError]:
     # Reset config to pick up any env var changes since last call
     reset_config()
 
@@ -235,6 +236,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                         file_path,
                         include_quality_lint=False,
                         include_canonical_integrity=False,
+                        git_root=git_root,
                     )
                 )
 
@@ -418,9 +420,11 @@ def _load_monitoring_data(repo_root: str, file_path: str) -> dict[str, Any] | No
     return None
 
 
-def _build_validation_context(repo_root: str, path: str) -> dict[str, Any]:
+def _build_validation_context(repo_root: str, path: str, git_root: str | None = None) -> dict[str, Any]:
+    spec_root: str | None = os.path.join(git_root, "spec") if git_root else None
     return {
         "artifact_path": path,
+        "spec_root": spec_root,
         "component_ids": _load_component_ids(repo_root, path),
         "capability_ids": _load_capability_ids(repo_root, path),
         "nfrs_data": _load_nfrs_data(repo_root, path),
@@ -445,19 +449,19 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
         ctx.get("nfrs_data"),
         ctx.get("monitoring_data"),
     ),
-    "04": lambda instance, root, ctx: step_04.validate_step_04(instance, root),
-    "05": lambda instance, root, ctx: step_05.validate_step_05(instance, root),
-    "06": lambda instance, root, ctx: step_06.validate_step_06(instance, root),
-    "07": lambda instance, root, ctx: step_07.validate_step_07(instance, root),
-    "08": lambda instance, root, ctx: step_08.validate_step_08(instance, root),
-    "09": lambda instance, root, ctx: step_09.validate_step_09(instance, root),
+    "04": lambda instance, root, ctx: step_04.validate_step_04(instance, root, ctx.get("spec_root")),
+    "05": lambda instance, root, ctx: step_05.validate_step_05(instance, root, ctx.get("spec_root")),
+    "06": lambda instance, root, ctx: step_06.validate_step_06(instance, root, ctx.get("spec_root")),
+    "07": lambda instance, root, ctx: step_07.validate_step_07(instance, root, ctx.get("spec_root")),
+    "08": lambda instance, root, ctx: step_08.validate_step_08(instance, root, ctx.get("spec_root")),
+    "09": lambda instance, root, ctx: step_09.validate_step_09(instance, root, ctx.get("spec_root")),
     "10": lambda instance, root, ctx: step_10.validate_step_10(instance, root),
     "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root),
-    "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root),
+    "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root, ctx.get("spec_root")),
     "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root),
-    "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root),
+    "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root, ctx.get("spec_root")),
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
-    "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root),
+    "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     "16": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path")),
     "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path")),
@@ -465,11 +469,11 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
 }
 
 
-def _run_deep_validation(step: str, data: dict, repo_root: str, path: str) -> list[SpecError]:
+def _run_deep_validation(step: str, data: dict, repo_root: str, path: str, git_root: str | None = None) -> list[SpecError]:
     validator = DEEP_VALIDATORS.get(step)
     if validator is None:
         return []
-    context = _build_validation_context(repo_root, path)
+    context = _build_validation_context(repo_root, path, git_root=git_root)
     try:
         return validator(data, repo_root, context)
     except Exception as e:

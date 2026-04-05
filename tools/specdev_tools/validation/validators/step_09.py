@@ -8,7 +8,7 @@ from ...core.loaders import load_upstream_ids
 from ...validation.linter_utils import check_no_duplicates
 
 
-def validate_step_09(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_09(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("milestones", []), "milestone_id", "milestone_id", errors)
     dates: list[tuple[str, str]] = []
@@ -25,7 +25,7 @@ def validate_step_09(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
         errors.append(make_error("E520", "Milestone target_date values are not ordered"))
 
     # Cross-step capability reference validation
-    capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id")
+    capability_ids = load_upstream_ids(toolkit_root, "01", "capabilities", "capability_id", spec_root=spec_root)
     if capability_ids is None:
         errors.append(
             make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 01_capabilities.json not found; "
