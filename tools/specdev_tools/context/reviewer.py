@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..core.registry import SchemaRegistry
@@ -289,9 +289,7 @@ def _run_structural_pass(
     # For non-checklist steps, acceptance criteria (ac-*) are child entities of
     # FRs and are covered at FR granularity via trace arrays — not individually.
     # Including them in the coverage denominator causes a false FAIL because
-    # ~80% of upstream IDs would always be "dropped".  Exclude them here; the
-    # AC-coverage structural check (gated on _CHECKLIST_STEPS) handles them
-    # separately for steps that do need individual AC tracing.
+    # ~80% of upstream IDs would always be "dropped".
     if step_id not in _CHECKLIST_STEPS:
         all_upstream_ids = {uid for uid in all_upstream_ids if not uid.startswith("ac-")}
 
@@ -787,8 +785,8 @@ def review_artifact(
         _check_faithfulness(artifact, artifact_path, upstream_specs)
     )
     # acceptance_gap compares AC scenario text to checklist item descriptions via
-    # Jaccard similarity.  It is only meaningful for step 16 (implementation
-    # checklists); for all other steps the vocabulary mismatch produces noise.
+    # Jaccard similarity.  Only meaningful for checklist steps (16/16a/16b/16c);
+    # for all other steps the vocabulary mismatch produces noise.
     if step_id in _CHECKLIST_STEPS:
         semantic_pairs.extend(
             _check_acceptance_gap(artifact, artifact_path, upstream_specs)

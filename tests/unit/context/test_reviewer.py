@@ -257,14 +257,6 @@ class TestScopeCoverage:
 # ---------------------------------------------------------------------------
 
 class TestAcceptanceGapGating:
-    def _make_upstream_with_acs(self):
-        return _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={
-                "fr-post-publish": ["ac-post-publish-1"],
-            },
-        )
-
     def _ac_upstream_with_text(self):
         """Upstream where ACs have description text (for Jaccard matching)."""
         spec_data = {
@@ -296,7 +288,7 @@ class TestAcceptanceGapGating:
 
     def test_review_artifact_no_acceptance_gap_pairs_for_step06(self, tmp_path):
         """review_artifact must not include acceptance_gap pairs for step 06."""
-        import json, os
+        import json
         # Write a minimal upstream spec and artifact to tmp_path.
         spec_dir = tmp_path / "spec"
         spec_dir.mkdir()
@@ -472,8 +464,9 @@ class TestAcceptanceGapGating:
 # ---------------------------------------------------------------------------
 
 class TestVerdict:
-    def test_verdict_pass_when_all_upstream_ids_covered(self):
-        """All FRs + APIs + components covered → PASS."""
+    def test_structural_pass_zero_dropped_when_all_upstream_ids_covered(self):
+        """All FRs + APIs + components covered → dropped is empty.
+        (Verdict computation is tested separately via review_artifact.)"""
         upstream = _upstream(
             frs=["fr-post-publish", "fr-post-read"],
             apis=["api-post-page"],
