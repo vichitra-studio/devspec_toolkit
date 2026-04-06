@@ -17,7 +17,9 @@ from specdev_tools.context.reviewer import (
     _CHECKLIST_STEPS,
     _run_structural_pass,
     _check_acceptance_gap,
+    _compute_verdict,
     review_artifact,
+    StructuralReview,
 )
 
 
@@ -287,14 +289,15 @@ class TestScopeCoverage:
 
 class TestAcceptanceGapGating:
     def _ac_upstream_with_text(self):
-        """Upstream where ACs have description text (for Jaccard matching)."""
+        """Upstream where ACs have description text (for Jaccard matching).
+        Uses canonical step-04 field names: criterion_id + text."""
         spec_data = {
             "functional_requirements": [{
                 "fr_id": "fr-post-publish",
                 "statement": "Publish post",
                 "acceptance_criteria": [{
-                    "id": "ac-post-publish-1",
-                    "description": "Given a creator, when post is published, then HTTP 200",
+                    "criterion_id": "ac-post-publish-1",
+                    "text": "Given a creator, when post is published, then HTTP 200",
                 }],
             }]
         }
@@ -371,6 +374,11 @@ class TestAcceptanceGapGating:
         assert acceptance_gaps == [], (
             f"Expected no acceptance_gap pairs for step 06, got: {acceptance_gaps}"
         )
+        # All other semantic checks also produce no pairs for this data:
+        # faithfulness skips (FR statement too short), quantifier_weakening finds
+        # no upstream metrics, seed_distillation skips (step 06 not in _SEED_STEPS),
+        # scope_completeness returns [] when schema registry is absent.
+        assert result.verdict == "PASS"
 
     @pytest.mark.parametrize("step_id", ["16", "16a", "16b", "16c"])
     def test_review_artifact_acceptance_gap_runs_for_all_checklist_steps(
@@ -443,6 +451,58 @@ class TestAcceptanceGapGating:
 # ---------------------------------------------------------------------------
 
 class TestVerdict:
+    # --- Direct _compute_verdict unit tests ---
+
+    def test_compute_verdict_pass_when_nothing_dropped_no_pairs(self):
+        sr = StructuralReview(
+            upstream_coverage={"covered": ["fr-a"], "dropped": []},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, []) == "PASS"
+
+    def test_compute_verdict_needs_semantic_review_when_pairs_present(self):
+        sr = StructuralReview(
+            upstream_coverage={"covered": ["fr-a"], "dropped": []},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, ["pair"]) == "NEEDS_SEMANTIC_REVIEW"
+
+    def test_compute_verdict_exactly_20pct_dropped_is_pass(self):
+        """Threshold is > 0.20 (strict), so exactly 1/5 = 20% must be PASS, not FAIL."""
+        sr = StructuralReview(
+            upstream_coverage={"covered": ["a", "b", "c", "d"], "dropped": ["e"]},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, []) == "PASS"
+
+    def test_compute_verdict_fail_when_dropped_fraction_exceeds_20pct(self):
+        """2/5 = 40% dropped → FAIL."""
+        sr = StructuralReview(
+            upstream_coverage={"covered": ["a", "b", "c"], "dropped": ["d", "e"]},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, []) == "FAIL"
+
+    def test_compute_verdict_fail_beats_needs_semantic_review(self):
+        """FAIL takes priority over NEEDS_SEMANTIC_REVIEW.
+        When dropped > 20% AND semantic pairs are present, verdict must be FAIL,
+        not NEEDS_SEMANTIC_REVIEW — structural failure is checked first."""
+        sr = StructuralReview(
+            upstream_coverage={"covered": ["a", "b", "c"], "dropped": ["d", "e"]},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, ["pair"]) == "FAIL"
+
+    def test_compute_verdict_empty_upstream_is_pass(self):
+        """Zero total upstream IDs → fraction check skipped → PASS."""
+        sr = StructuralReview(
+            upstream_coverage={"covered": [], "dropped": []},
+            reverse_trace={"unjustified": [], "scope_creep": []},
+        )
+        assert _compute_verdict(sr, []) == "PASS"
+
+    # --- Structural pass helpers ---
+
     def test_structural_pass_zero_dropped_when_all_upstream_ids_covered(self):
         """All FRs + APIs + components covered → dropped is empty.
         (Verdict computation is tested separately via review_artifact.)"""
