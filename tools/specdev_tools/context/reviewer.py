@@ -35,6 +35,15 @@ _STOPWORDS: frozenset[str] = frozenset([
 _SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 
 # ---------------------------------------------------------------------------
+# Steps that produce checklist-style artifacts with linked_test_expectations
+# and acceptance criteria mapped to checklist items.  The acceptance_gap and
+# AC-coverage structural checks only make sense for these steps; running them
+# on invariants (06), NFRs (07), or other non-checklist steps produces false
+# positives because those artifacts use trace arrays, not linked_test_expectations.
+# ---------------------------------------------------------------------------
+_CHECKLIST_STEPS: frozenset[str] = frozenset(["13a", "16a", "16b", "16c"])
+
+# ---------------------------------------------------------------------------
 # Compiled regex patterns used by semantic checks.
 # ---------------------------------------------------------------------------
 _METRIC_PATTERN = re.compile(
@@ -261,6 +270,7 @@ def _run_structural_pass(
     artifact: dict,
     artifact_path: str,
     upstream_specs: list[tuple[str, dict]],
+    step_id: str = "",
 ) -> StructuralReview:
     """Execute Pass 1: automated structural analysis with zero LLM token cost."""
     _ = artifact_path  # currently unused
@@ -271,8 +281,27 @@ def _run_structural_pass(
         ids = _collect_id_values(spec_data, suffix="_id")
         all_upstream_ids.update(ids)
 
+    # For non-checklist steps, acceptance criteria (ac-*) are child entities of
+    # FRs and are covered at FR granularity via trace arrays — not individually.
+    # Including them in the coverage denominator causes a false FAIL because
+    # ~80% of upstream IDs would always be "dropped".  Exclude them here; the
+    # AC-coverage structural check (gated on _CHECKLIST_STEPS) handles them
+    # separately for steps that do need individual AC tracing.
+    if step_id not in _CHECKLIST_STEPS:
+        all_upstream_ids = {uid for uid in all_upstream_ids if not uid.startswith("ac-")}
+
     # --- Collect artifact trace IDs ---
     artifact_trace_ids: set[str] = set(_collect_trace_ids(artifact))
+
+    # Also collect IDs referenced in scope.apis and scope.components fields.
+    # Invariant-style artifacts (step 06) express API and component coverage via
+    # the scope object rather than trace arrays; both are valid traceability refs.
+    for scope_dict in _find_items_by_key(artifact, "scope"):
+        if isinstance(scope_dict, dict):
+            for scope_key in ("apis", "components"):
+                for item in scope_dict.get(scope_key, []):
+                    if isinstance(item, str):
+                        artifact_trace_ids.add(item)
 
     # --- ID coverage ---
     covered = sorted(all_upstream_ids & artifact_trace_ids)
@@ -291,56 +320,59 @@ def _run_structural_pass(
     }
 
     # --- Acceptance criteria coverage ---
-    # Collect FRs with acceptance_criteria from upstream specs.
-    # Collect checklist items with linked_test_expectations from artifact.
+    # Only meaningful for checklist-style artifacts (steps 13a, 16a–16c) that
+    # have linked_test_expectations fields mapping checklist items to AC IDs.
+    # Non-checklist steps (invariants, NFRs, etc.) use trace arrays instead;
+    # running this check on them always reports covered=0 (false positives).
     ac_coverage: dict[str, dict] = {}
 
-    # Build a set of all linked_test_expectation IDs referenced in artifact checklist items.
-    artifact_linked_expectations: set[str] = set()
-    for lte_list in _find_items_by_key(artifact, "linked_test_expectations"):
-        if isinstance(lte_list, list):
-            for item in lte_list:
-                if isinstance(item, str):
-                    artifact_linked_expectations.add(item)
-                elif isinstance(item, dict) and "id" in item:
-                    artifact_linked_expectations.add(item["id"])
+    if step_id in _CHECKLIST_STEPS:
+        # Build a set of all linked_test_expectation IDs referenced in artifact checklist items.
+        artifact_linked_expectations: set[str] = set()
+        for lte_list in _find_items_by_key(artifact, "linked_test_expectations"):
+            if isinstance(lte_list, list):
+                for item in lte_list:
+                    if isinstance(item, str):
+                        artifact_linked_expectations.add(item)
+                    elif isinstance(item, dict) and "id" in item:
+                        artifact_linked_expectations.add(item["id"])
 
-    for _, spec_data in upstream_specs:
-        # Find all objects that have both a key ending in '_id' and 'acceptance_criteria'.
-        fr_dicts = _find_dicts_with_key(spec_data, "acceptance_criteria")
-        for path, fr_dict in fr_dicts:
-            # Attempt to identify the FR id.
-            fr_id = (
-                fr_dict.get("fr_id")
-                or fr_dict.get("id")
-                or fr_dict.get("requirement_id")
-                or path
-            )
-            ac_list = fr_dict.get("acceptance_criteria", [])
-            if not isinstance(ac_list, list):
-                continue
-            total = len(ac_list)
-            if total == 0:
-                continue
-            missing: list[str] = []
-            covered_count = 0
-            for criterion in ac_list:
-                if isinstance(criterion, str):
-                    crit_id = criterion
-                elif isinstance(criterion, dict):
-                    crit_id = criterion.get("id") or criterion.get("criterion_id") or ""
-                else:
+        for _, spec_data in upstream_specs:
+            # Find all objects that have both a key ending in '_id' and 'acceptance_criteria'.
+            fr_dicts = _find_dicts_with_key(spec_data, "acceptance_criteria")
+            for path, fr_dict in fr_dicts:
+                # Attempt to identify the FR id.
+                fr_id = (
+                    fr_dict.get("fr_id")
+                    or fr_dict.get("id")
+                    or fr_dict.get("requirement_id")
+                    or path
+                )
+                ac_list = fr_dict.get("acceptance_criteria", [])
+                if not isinstance(ac_list, list):
                     continue
-                if crit_id and crit_id in artifact_linked_expectations:
-                    covered_count += 1
-                else:
-                    if crit_id:
-                        missing.append(crit_id)
-            ac_coverage[str(fr_id)] = {
-                "total": total,
-                "covered": covered_count,
-                "missing": missing,
-            }
+                total = len(ac_list)
+                if total == 0:
+                    continue
+                missing: list[str] = []
+                covered_count = 0
+                for criterion in ac_list:
+                    if isinstance(criterion, str):
+                        crit_id = criterion
+                    elif isinstance(criterion, dict):
+                        crit_id = criterion.get("id") or criterion.get("criterion_id") or ""
+                    else:
+                        continue
+                    if crit_id and crit_id in artifact_linked_expectations:
+                        covered_count += 1
+                    else:
+                        if crit_id:
+                            missing.append(crit_id)
+                ac_coverage[str(fr_id)] = {
+                    "total": total,
+                    "covered": covered_count,
+                    "missing": missing,
+                }
 
     return StructuralReview(
         upstream_coverage=upstream_coverage,
@@ -798,6 +830,7 @@ def review_artifact(
         artifact=artifact,
         artifact_path=artifact_path,
         upstream_specs=upstream_specs,
+        step_id=step_id,
     )
 
     semantic_pairs: list[ReviewPair] = []
@@ -805,9 +838,13 @@ def review_artifact(
     semantic_pairs.extend(
         _check_faithfulness(artifact, artifact_path, upstream_specs)
     )
-    semantic_pairs.extend(
-        _check_acceptance_gap(artifact, artifact_path, upstream_specs)
-    )
+    # acceptance_gap compares AC scenario text to checklist item descriptions via
+    # Jaccard similarity.  It is only meaningful for checklist-style steps (13a,
+    # 16a–16c); for all other steps the vocabulary mismatch produces noise.
+    if step_id in _CHECKLIST_STEPS:
+        semantic_pairs.extend(
+            _check_acceptance_gap(artifact, artifact_path, upstream_specs)
+        )
     semantic_pairs.extend(
         _check_quantifier_weakening(artifact, artifact_path, upstream_specs)
     )
