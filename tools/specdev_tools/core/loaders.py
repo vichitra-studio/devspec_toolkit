@@ -48,8 +48,11 @@ def load_upstream_ids(
 
     For submodule deployments where the host repo's spec lives outside
     ``toolkit_root``, pass *spec_root* (typically ``<git_root>/spec``) as a
-    fallback search path.  The toolkit's own ``spec/`` directory is tried first;
-    *spec_root* is only consulted when no match is found there.
+    search path.  When *spec_root* is provided AND differs from
+    ``<toolkit_root>/spec``, *spec_root* is searched first so the host repo's
+    artifacts are not shadowed by the toolkit's own fixture specs.  When
+    *spec_root* is absent or identical to ``<toolkit_root>/spec``, the toolkit's
+    own ``spec/`` directory is the sole search path.
 
     Returns
     -------
@@ -63,18 +66,27 @@ def load_upstream_ids(
     json.JSONDecodeError
         If the file exists but contains malformed JSON (propagated).
     """
-    result = _scan_spec_dir(
-        os.path.join(str(toolkit_root), "spec"), step_prefix, array_key, id_field, fallback_keys
-    )
-    if result is not None:
-        return result
+    toolkit_spec = os.path.join(str(toolkit_root), "spec")
 
-    if spec_root:
+    # When spec_root is provided and is a different directory from the toolkit's
+    # own spec dir, prefer spec_root so host-repo artifacts are not shadowed by
+    # the toolkit's internal fixture specs.
+    if spec_root and os.path.realpath(str(spec_root)) != os.path.realpath(toolkit_spec):
         result = _scan_spec_dir(
             str(spec_root), step_prefix, array_key, id_field, fallback_keys
         )
         if result is not None:
             return result
+        # Fall back to toolkit spec only when spec_root yields nothing
+        result = _scan_spec_dir(toolkit_spec, step_prefix, array_key, id_field, fallback_keys)
+        if result is not None:
+            return result
+        return None
+
+    # Original behaviour: toolkit spec only (spec_root absent or same directory)
+    result = _scan_spec_dir(toolkit_spec, step_prefix, array_key, id_field, fallback_keys)
+    if result is not None:
+        return result
 
     return None
 

@@ -179,6 +179,25 @@
               "trace"
             ]
           }
+        },
+        "out_of_scope": {
+          "description": "Functional requirements explicitly excluded from API contract coverage, with rationale. Use when an FR has no observable API boundary — e.g., internal code constraints, CSS rendering concerns, phase-deferred features. Every uncovered FR must appear here or as a trace on an existing API.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fr_id": {
+                "description": "The FR identifier excluded from API coverage.",
+                "type": "string"
+              },
+              "rationale": {
+                "description": "Why this FR has no API contract — e.g., internal constraint, phase deferral, cross-cutting rendering concern.",
+                "type": "string"
+              }
+            },
+            "required": ["fr_id", "rationale"]
+          }
         }
       },
       "required": [
