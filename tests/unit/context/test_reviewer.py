@@ -6,8 +6,8 @@ verdicts when running ``context review`` on non-checklist step artifacts
 
   1. ac-* IDs excluded from upstream coverage denominator for non-checklist steps.
   2. scope.apis / scope.components IDs counted as valid traceability references.
-  3. AC-coverage structural block and _check_acceptance_gap gated on
-     _CHECKLIST_STEPS (steps 16, 16a, 16b, 16c — all share vc:16-impl-context schema).
+  3. _check_acceptance_gap gated on _CHECKLIST_STEPS
+     (steps 16, 16a, 16b, 16c — all share vc:16-impl-context schema).
 """
 from __future__ import annotations
 
@@ -253,86 +253,7 @@ class TestScopeCoverage:
 
 
 # ---------------------------------------------------------------------------
-# 4. AC-coverage structural block gated on _CHECKLIST_STEPS
-# ---------------------------------------------------------------------------
-
-class TestAcCoverageGating:
-    def test_ac_coverage_empty_for_step06(self):
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
-        assert result.acceptance_criteria_coverage == {}
-
-    def test_ac_coverage_empty_for_step07(self):
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/07_nfrs.json", upstream, step_id="07")
-        assert result.acceptance_criteria_coverage == {}
-
-    def test_ac_coverage_populated_for_step16(self):
-        """For step 16, the coverage dict is populated and total/missing are accurate.
-
-        covered is always 0 for real artifacts: the schema's linked_test_expectation
-        field holds test function names (e.g. "test_login_returns_401"), not AC IDs
-        (e.g. "ac-post-publish-1").  The two namespaces never intersect, so the
-        match in _run_structural_pass never fires.  See the KNOWN LIMITATION comment
-        in reviewer.py for the full explanation.
-        """
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
-        assert "fr-post-publish" in result.acceptance_criteria_coverage
-        entry = result.acceptance_criteria_coverage["fr-post-publish"]
-        assert entry["total"] == 2
-        assert entry["covered"] == 0  # always 0; see KNOWN LIMITATION comment in reviewer.py
-        # The AC coverage block uses criterion_id (ends in _id) to identify ACs.
-        assert "ac-post-publish-1" in entry["missing"]
-        assert "ac-post-publish-2" in entry["missing"]
-
-    def test_ac_coverage_populated_for_step16a(self):
-        """Step 16a is in _CHECKLIST_STEPS — its AC coverage dict must be populated
-        just like step 16 (16a shares the vc:16-impl-context schema)."""
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/16a_impl_planner.json", upstream, step_id="16a")
-        assert "fr-post-publish" in result.acceptance_criteria_coverage
-        entry = result.acceptance_criteria_coverage["fr-post-publish"]
-        assert entry["total"] == 1
-        assert "ac-post-publish-1" in entry["missing"]
-
-    def test_ac_coverage_uses_criterion_id_field(self):
-        """AC coverage reads criterion_id (the actual field name in step 04 specs)."""
-        spec_data = {
-            "functional_requirements": [{
-                "fr_id": "fr-post-publish",
-                "acceptance_criteria": [
-                    {"criterion_id": "ac-post-publish-1", "text": "AC 1"},
-                    {"criterion_id": "ac-post-publish-2", "text": "AC 2"},
-                ],
-            }]
-        }
-        upstream = [("spec/04_fr_list.json", spec_data)]
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
-        entry = result.acceptance_criteria_coverage.get("fr-post-publish", {})
-        assert entry.get("total") == 2
-        assert "ac-post-publish-1" in entry.get("missing", [])
-
-
-# ---------------------------------------------------------------------------
-# 5. _check_acceptance_gap gated on _CHECKLIST_STEPS
+# 4. _check_acceptance_gap gated on _CHECKLIST_STEPS
 # ---------------------------------------------------------------------------
 
 class TestAcceptanceGapGating:
@@ -547,7 +468,7 @@ class TestAcceptanceGapGating:
 
 
 # ---------------------------------------------------------------------------
-# 6. Verdict logic
+# 5. Verdict logic
 # ---------------------------------------------------------------------------
 
 class TestVerdict:
@@ -605,22 +526,10 @@ class TestVerdict:
 
 
 # ---------------------------------------------------------------------------
-# 7. Edge cases and additional coverage
+# 6. Edge cases and additional coverage
 # ---------------------------------------------------------------------------
 
 class TestEdgeCases:
-    def test_default_step_id_skips_ac_coverage(self):
-        """Calling _run_structural_pass without step_id uses '' which is not
-        in _CHECKLIST_STEPS — AC coverage block must be skipped."""
-        upstream = _upstream(
-            frs=["fr-post-publish"],
-            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
-        )
-        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        # Call without step_id — uses default ""
-        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream)
-        assert result.acceptance_criteria_coverage == {}
-
     def test_empty_upstream_functional_requirements(self):
         """When upstream has no FRs, all collections are empty and dropped is []."""
         upstream = [("spec/04_fr_list.json", {"functional_requirements": []})]
@@ -628,7 +537,6 @@ class TestEdgeCases:
         result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
         assert result.upstream_coverage["covered"] == []
         assert result.upstream_coverage["dropped"] == []
-        assert result.acceptance_criteria_coverage == {}
 
     def test_scope_and_trace_same_id_not_double_counted(self):
         """If scope.apis and a trace array both reference the same ID, the ID

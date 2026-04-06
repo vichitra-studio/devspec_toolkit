@@ -1,7 +1,7 @@
 """Two-pass structural + semantic review gate for freshly-emitted spec artifacts.
 
 Implements A5 from the toolkit optimisation plan:
-  - Pass 1: Structural review (zero LLM tokens) — ID coverage, reverse trace, AC coverage.
+  - Pass 1: Structural review (zero LLM tokens) — ID coverage, reverse trace.
   - Pass 2: Semantic pair generation (heuristics, no LLM) — faithfulness, acceptance_gap,
             quantifier_weakening, seed_distillation, scope_completeness.
 
@@ -36,17 +36,11 @@ _SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 
 # ---------------------------------------------------------------------------
 # Steps that produce checklist-style artifacts whose items have 'description'
-# fields written to mirror AC scenario text.  Two checks are gated here:
-#
-#   1. _check_acceptance_gap  — Jaccard similarity of AC text vs. item
-#      descriptions.  Only meaningful when items are authored to address ACs
-#      (i.e., step 16 implementation checklists).  Running it on invariants,
-#      NFRs, etc. produces noise because those artifacts use constraint language
-#      rather than Given/When/Then scenario vocabulary.
-#
-#   2. AC-coverage structural block — looks for `linked_test_expectation` IDs
-#      in checklist items to compute per-FR coverage counts.  Only meaningful
-#      for step 16 artifacts; all other steps use trace arrays instead.
+# fields written to mirror AC scenario text.  _check_acceptance_gap is gated
+# here: Jaccard similarity of AC text vs. item descriptions is only meaningful
+# when items are authored to address ACs (i.e., step 16 implementation
+# checklists).  Running it on invariants, NFRs, etc. produces noise because
+# those artifacts use constraint language rather than Given/When/Then vocabulary.
 #
 # Step 13a produces a completeness-assessment (dimension counts), not a
 # checklist — it is NOT in this set.  Steps 16a/16b/16c all use the same
@@ -130,7 +124,6 @@ class StructuralReview:
     """Results from Pass 1 structural analysis."""
     upstream_coverage: dict  # {covered: [id...], dropped: [id...]}
     reverse_trace: dict      # {unjustified: [id...], scope_creep: [id...]}
-    acceptance_criteria_coverage: dict  # {fr_id: {total: N, covered: N, missing: [...]}}
 
 
 @dataclass
@@ -331,79 +324,9 @@ def _run_structural_pass(
         "scope_creep": list(unjustified),
     }
 
-    # --- Acceptance criteria coverage ---
-    # Only meaningful for checklist-style artifacts (step 16) whose items
-    # contain a 'linked_test_expectation' field mapping them to AC IDs.
-    # Non-checklist steps (invariants, NFRs, etc.) use trace arrays instead;
-    # running this check on them always reports covered=0 (false positives).
-    ac_coverage: dict[str, dict] = {}
-
-    if step_id in _CHECKLIST_STEPS:
-        # Collect AC IDs referenced by linked_test_expectation on checklist items.
-        # Note: the schema field is 'linked_test_expectation' (singular), not
-        # 'linked_test_expectations' (plural).
-        #
-        # KNOWN LIMITATION: the vc:16-impl-context schema defines
-        # 'linked_test_expectation' as a test function name or description string
-        # (e.g. "test_login_returns_401") — NOT as an AC ID (e.g. "ac-login-1").
-        # Because of this, the 'covered' count will always be 0 for real artifacts:
-        # AC IDs and test description strings occupy different namespaces and will
-        # never match.  The 'total' and 'missing' counts remain accurate and useful
-        # (they report how many ACs exist in upstream and which ones have no
-        # corresponding checklist item).  A dedicated AC-ref field in the schema
-        # would be required to make 'covered' non-zero.
-        artifact_linked_expectations: set[str] = set()
-        for lte_val in _find_items_by_key(artifact, "linked_test_expectation"):
-            if isinstance(lte_val, str):
-                artifact_linked_expectations.add(lte_val)
-            elif isinstance(lte_val, list):
-                for item in lte_val:
-                    if isinstance(item, str):
-                        artifact_linked_expectations.add(item)
-                    elif isinstance(item, dict) and "id" in item:
-                        artifact_linked_expectations.add(item["id"])
-
-        for _, spec_data in upstream_specs:
-            # Find all objects that have both a key ending in '_id' and 'acceptance_criteria'.
-            fr_dicts = _find_dicts_with_key(spec_data, "acceptance_criteria")
-            for path, fr_dict in fr_dicts:
-                # Attempt to identify the FR id.
-                fr_id = (
-                    fr_dict.get("fr_id")
-                    or fr_dict.get("id")
-                    or fr_dict.get("requirement_id")
-                    or path
-                )
-                ac_list = fr_dict.get("acceptance_criteria", [])
-                if not isinstance(ac_list, list):
-                    continue
-                total = len(ac_list)
-                if total == 0:
-                    continue
-                missing: list[str] = []
-                covered_count = 0
-                for criterion in ac_list:
-                    if isinstance(criterion, str):
-                        crit_id = criterion
-                    elif isinstance(criterion, dict):
-                        crit_id = criterion.get("id") or criterion.get("criterion_id") or ""
-                    else:
-                        continue
-                    if crit_id and crit_id in artifact_linked_expectations:
-                        covered_count += 1
-                    else:
-                        if crit_id:
-                            missing.append(crit_id)
-                ac_coverage[str(fr_id)] = {
-                    "total": total,
-                    "covered": covered_count,
-                    "missing": missing,
-                }
-
     return StructuralReview(
         upstream_coverage=upstream_coverage,
         reverse_trace=reverse_trace,
-        acceptance_criteria_coverage=ac_coverage,
     )
 
 
@@ -839,7 +762,6 @@ def review_artifact(
         empty_structural = StructuralReview(
             upstream_coverage={"covered": [], "dropped": []},
             reverse_trace={"unjustified": [], "scope_creep": []},
-            acceptance_criteria_coverage={},
         )
         return ReviewResult(
             structural=empty_structural,
