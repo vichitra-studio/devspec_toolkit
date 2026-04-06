@@ -276,8 +276,14 @@ class TestAcCoverageGating:
         assert result.acceptance_criteria_coverage == {}
 
     def test_ac_coverage_populated_for_step16(self):
-        """For step 16, the coverage dict is populated (all covered=0 since
-        no linked_test_expectation IDs match the ac ids in this fixture)."""
+        """For step 16, the coverage dict is populated and total/missing are accurate.
+
+        covered is always 0 for real artifacts: the schema's linked_test_expectation
+        field holds test function names (e.g. "test_login_returns_401"), not AC IDs
+        (e.g. "ac-post-publish-1").  The two namespaces never intersect, so the
+        match in _run_structural_pass never fires.  See the KNOWN LIMITATION comment
+        in reviewer.py for the full explanation.
+        """
         upstream = _upstream(
             frs=["fr-post-publish"],
             acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
@@ -287,10 +293,24 @@ class TestAcCoverageGating:
         assert "fr-post-publish" in result.acceptance_criteria_coverage
         entry = result.acceptance_criteria_coverage["fr-post-publish"]
         assert entry["total"] == 2
-        assert entry["covered"] == 0
+        assert entry["covered"] == 0  # always 0; see KNOWN LIMITATION comment in reviewer.py
         # The AC coverage block uses criterion_id (ends in _id) to identify ACs.
         assert "ac-post-publish-1" in entry["missing"]
         assert "ac-post-publish-2" in entry["missing"]
+
+    def test_ac_coverage_populated_for_step16a(self):
+        """Step 16a is in _CHECKLIST_STEPS — its AC coverage dict must be populated
+        just like step 16 (16a shares the vc:16-impl-context schema)."""
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/16a_impl_planner.json", upstream, step_id="16a")
+        assert "fr-post-publish" in result.acceptance_criteria_coverage
+        entry = result.acceptance_criteria_coverage["fr-post-publish"]
+        assert entry["total"] == 1
+        assert "ac-post-publish-1" in entry["missing"]
 
     def test_ac_coverage_uses_criterion_id_field(self):
         """AC coverage reads criterion_id (the actual field name in step 04 specs)."""
@@ -338,14 +358,20 @@ class TestAcceptanceGapGating:
         }
         return [("spec/04_fr_list.json", spec_data)]
 
-    def test_acceptance_gap_not_generated_for_step06(self):
+    def test_check_acceptance_gap_function_has_no_step_id_gate(self):
+        """_check_acceptance_gap has no step_id parameter — it always runs when called.
+        Gating is the caller's responsibility (review_artifact checks _CHECKLIST_STEPS).
+        Calling it directly on a step-06-style artifact produces pairs because the
+        function itself cannot know the step context."""
         upstream = self._ac_upstream_with_text()
         artifact = _artifact(trace_fr_ids=["fr-post-publish"])
         pairs = _check_acceptance_gap(artifact, "spec/06_invariants.json", upstream)
-        # This function itself has no step_id gating — the gating happens in
-        # review_artifact.  Calling it directly will still produce pairs.
-        # The key test is that review_artifact omits them for non-checklist steps.
-        _ = pairs  # result not asserted here; see review_artifact tests below
+        # The invariant artifact has no checklist items with matching descriptions,
+        # so at least one acceptance_gap pair should be generated when called raw.
+        assert len(pairs) >= 1, (
+            "Expected _check_acceptance_gap to produce pairs when called directly "
+            "(gating only exists in review_artifact, not in the function itself)"
+        )
 
     def test_review_artifact_no_acceptance_gap_pairs_for_step06(self, tmp_path):
         """review_artifact must not include acceptance_gap pairs for step 06."""
@@ -460,6 +486,63 @@ class TestAcceptanceGapGating:
         acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
         assert len(acceptance_gaps) >= 1, (
             "Expected at least one acceptance_gap pair for step 16 with unmatched AC"
+        )
+
+    def test_review_artifact_acceptance_gap_runs_for_step16a(self, tmp_path):
+        """review_artifact must generate acceptance_gap pairs for step 16a (now in _CHECKLIST_STEPS)."""
+        import json
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        repo_root = tmp_path / "toolkit"
+        repo_root.mkdir()
+        tools_dir = repo_root / "tools"
+        tools_dir.mkdir()
+
+        step_order = {"downstream_consumers": {"04": ["16a"]}}
+        (tools_dir / "step_order.json").write_text(json.dumps(step_order))
+
+        upstream_spec = {
+            "functional_requirements": [{
+                "fr_id": "fr-post-publish",
+                "statement": "Publish a post",
+                "acceptance_criteria": [{
+                    "id": "ac-post-publish-1",
+                    "description": (
+                        "Given authenticated creator xyzzy, when publish triggered, "
+                        "then GET /xyzzy-post/ returns HTTP 200 to unauthenticated visitor"
+                    ),
+                }],
+            }]
+        }
+        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
+
+        # Step 16a artifact with a checklist item whose description does NOT match the AC
+        artifact = {
+            "id": "impl-context",
+            "plan": {
+                "spec_alignment": {
+                    "checklist": [{
+                        "id": "DEPLOY_CONFIG",
+                        "description": "Deploy configuration is applied correctly",
+                        "type": "behavior",
+                        "layer": "config",
+                        "checklist_status": "pending",
+                    }]
+                }
+            }
+        }
+        artifact_path = str(spec_dir / "16a_impl_planner.json")
+        (spec_dir / "16a_impl_planner.json").write_text(json.dumps(artifact))
+
+        result = review_artifact(
+            artifact_path,
+            step_id="16a",
+            spec_dir=str(spec_dir),
+            repo_root=str(repo_root),
+        )
+        acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
+        assert len(acceptance_gaps) >= 1, (
+            "Expected at least one acceptance_gap pair for step 16a with unmatched AC"
         )
 
 

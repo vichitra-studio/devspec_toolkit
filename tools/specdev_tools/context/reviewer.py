@@ -342,6 +342,16 @@ def _run_structural_pass(
         # Collect AC IDs referenced by linked_test_expectation on checklist items.
         # Note: the schema field is 'linked_test_expectation' (singular), not
         # 'linked_test_expectations' (plural).
+        #
+        # KNOWN LIMITATION: the vc:16-impl-context schema defines
+        # 'linked_test_expectation' as a test function name or description string
+        # (e.g. "test_login_returns_401") — NOT as an AC ID (e.g. "ac-login-1").
+        # Because of this, the 'covered' count will always be 0 for real artifacts:
+        # AC IDs and test description strings occupy different namespaces and will
+        # never match.  The 'total' and 'missing' counts remain accurate and useful
+        # (they report how many ACs exist in upstream and which ones have no
+        # corresponding checklist item).  A dedicated AC-ref field in the schema
+        # would be required to make 'covered' non-zero.
         artifact_linked_expectations: set[str] = set()
         for lte_val in _find_items_by_key(artifact, "linked_test_expectation"):
             if isinstance(lte_val, str):
