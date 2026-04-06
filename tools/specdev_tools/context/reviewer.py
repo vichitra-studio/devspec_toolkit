@@ -35,13 +35,24 @@ _STOPWORDS: frozenset[str] = frozenset([
 _SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 
 # ---------------------------------------------------------------------------
-# Steps that produce checklist-style artifacts with linked_test_expectations
-# and acceptance criteria mapped to checklist items.  The acceptance_gap and
-# AC-coverage structural checks only make sense for these steps; running them
-# on invariants (06), NFRs (07), or other non-checklist steps produces false
-# positives because those artifacts use trace arrays, not linked_test_expectations.
+# Steps that produce checklist-style artifacts whose items have 'description'
+# fields written to mirror AC scenario text.  Two checks are gated here:
+#
+#   1. _check_acceptance_gap  — Jaccard similarity of AC text vs. item
+#      descriptions.  Only meaningful when items are authored to address ACs
+#      (i.e., step 16 implementation checklists).  Running it on invariants,
+#      NFRs, etc. produces noise because those artifacts use constraint language
+#      rather than Given/When/Then scenario vocabulary.
+#
+#   2. AC-coverage structural block — looks for `linked_test_expectation` IDs
+#      in checklist items to compute per-FR coverage counts.  Only meaningful
+#      for step 16 artifacts; all other steps use trace arrays instead.
+#
+# Step 13a produces a completeness-assessment (dimension counts), not a
+# checklist — it is NOT in this set.  Steps 16a/16b/16c do not have schemas
+# in the current toolkit version and are NOT in this set.
 # ---------------------------------------------------------------------------
-_CHECKLIST_STEPS: frozenset[str] = frozenset(["13a", "16a", "16b", "16c"])
+_CHECKLIST_STEPS: frozenset[str] = frozenset(["16"])
 
 # ---------------------------------------------------------------------------
 # Compiled regex patterns used by semantic checks.
@@ -320,18 +331,22 @@ def _run_structural_pass(
     }
 
     # --- Acceptance criteria coverage ---
-    # Only meaningful for checklist-style artifacts (steps 13a, 16a–16c) that
-    # have linked_test_expectations fields mapping checklist items to AC IDs.
+    # Only meaningful for checklist-style artifacts (step 16) whose items
+    # contain a 'linked_test_expectation' field mapping them to AC IDs.
     # Non-checklist steps (invariants, NFRs, etc.) use trace arrays instead;
     # running this check on them always reports covered=0 (false positives).
     ac_coverage: dict[str, dict] = {}
 
     if step_id in _CHECKLIST_STEPS:
-        # Build a set of all linked_test_expectation IDs referenced in artifact checklist items.
+        # Collect AC IDs referenced by linked_test_expectation on checklist items.
+        # Note: the schema field is 'linked_test_expectation' (singular), not
+        # 'linked_test_expectations' (plural).
         artifact_linked_expectations: set[str] = set()
-        for lte_list in _find_items_by_key(artifact, "linked_test_expectations"):
-            if isinstance(lte_list, list):
-                for item in lte_list:
+        for lte_val in _find_items_by_key(artifact, "linked_test_expectation"):
+            if isinstance(lte_val, str):
+                artifact_linked_expectations.add(lte_val)
+            elif isinstance(lte_val, list):
+                for item in lte_val:
                     if isinstance(item, str):
                         artifact_linked_expectations.add(item)
                     elif isinstance(item, dict) and "id" in item:
@@ -839,8 +854,8 @@ def review_artifact(
         _check_faithfulness(artifact, artifact_path, upstream_specs)
     )
     # acceptance_gap compares AC scenario text to checklist item descriptions via
-    # Jaccard similarity.  It is only meaningful for checklist-style steps (13a,
-    # 16a–16c); for all other steps the vocabulary mismatch produces noise.
+    # Jaccard similarity.  It is only meaningful for step 16 (implementation
+    # checklists); for all other steps the vocabulary mismatch produces noise.
     if step_id in _CHECKLIST_STEPS:
         semantic_pairs.extend(
             _check_acceptance_gap(artifact, artifact_path, upstream_specs)

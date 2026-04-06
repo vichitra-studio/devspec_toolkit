@@ -1,0 +1,519 @@
+"""Unit tests for specdev_tools/context/reviewer.py.
+
+Covers the three behaviour changes introduced to fix false-positive FAIL
+verdicts when running ``context review`` on non-checklist step artifacts
+(e.g. step 06 invariants):
+
+  1. ac-* IDs excluded from upstream coverage denominator for non-checklist steps.
+  2. scope.apis / scope.components IDs counted as valid traceability references.
+  3. AC-coverage structural block and _check_acceptance_gap gated on
+     _CHECKLIST_STEPS (only step 16 in the current toolkit).
+"""
+from __future__ import annotations
+
+import pytest
+
+from specdev_tools.context.reviewer import (
+    _CHECKLIST_STEPS,
+    _run_structural_pass,
+    _check_acceptance_gap,
+    review_artifact,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _upstream(frs=None, apis=None, components=None, acs_per_fr=None):
+    """Build a minimal upstream spec tuple list.
+
+    frs        -- list of fr_id strings, e.g. ["fr-post-publish"]
+    apis       -- list of api_id strings, e.g. ["api-post-page"]
+    components -- list of component_id strings, e.g. ["ghost-cms"]
+    acs_per_fr -- dict {fr_id: [ac_id, ...]} to add acceptance_criteria
+    """
+    frs = frs or []
+    apis = apis or []
+    components = components or []
+    acs_per_fr = acs_per_fr or {}
+
+    fr_list = []
+    for fr_id in frs:
+        entry = {"fr_id": fr_id, "statement": f"FR: {fr_id}"}
+        if fr_id in acs_per_fr:
+            # Use criterion_id — the actual field name in step 04 spec ACs,
+            # which ends in _id and is therefore collected by _collect_id_values.
+            entry["acceptance_criteria"] = [
+                {"criterion_id": ac_id, "text": f"AC text for {ac_id}"}
+                for ac_id in acs_per_fr[fr_id]
+            ]
+        fr_list.append(entry)
+
+    api_list = [{"api_id": api_id} for api_id in apis]
+    comp_list = [{"component_id": cid} for cid in components]
+
+    spec_data = {
+        "functional_requirements": fr_list,
+        "apis": api_list,
+        "components": comp_list,
+    }
+    return [("spec/04_fr_list.json", spec_data)]
+
+
+def _artifact(trace_fr_ids=None, scope_apis=None, scope_components=None,
+              rules=None):
+    """Build a minimal invariant-style artifact (step 06)."""
+    trace_fr_ids = trace_fr_ids or []
+    scope_apis = scope_apis or []
+    scope_components = scope_components or []
+    rules = rules or []
+
+    if not rules and trace_fr_ids:
+        rules = [
+            {
+                "inv_id": f"inv-{fr_id}",
+                "description": f"Invariant for {fr_id}",
+                "language": "cel",
+                "expression": "true",
+                "scope": {
+                    "components": scope_components,
+                    "apis": scope_apis,
+                },
+                "trace": [{"type": "fr", "id": fr_id}],
+            }
+            for fr_id in trace_fr_ids
+        ]
+    return {"id": "invariants-catalog", "rules": rules}
+
+
+# ---------------------------------------------------------------------------
+# 1. _CHECKLIST_STEPS constant
+# ---------------------------------------------------------------------------
+
+class TestChecklistSteps:
+    def test_step_16_in_checklist_steps(self):
+        assert "16" in _CHECKLIST_STEPS
+
+    def test_step_06_not_in_checklist_steps(self):
+        assert "06" not in _CHECKLIST_STEPS
+
+    def test_step_07_not_in_checklist_steps(self):
+        assert "07" not in _CHECKLIST_STEPS
+
+    def test_step_13a_not_in_checklist_steps(self):
+        # 13a produces a completeness-assessment, not a checklist.
+        assert "13a" not in _CHECKLIST_STEPS
+
+    def test_step_16a_not_in_checklist_steps(self):
+        # 16a schema does not exist in the current toolkit.
+        assert "16a" not in _CHECKLIST_STEPS
+
+    def test_step_16b_not_in_checklist_steps(self):
+        assert "16b" not in _CHECKLIST_STEPS
+
+    def test_step_16c_not_in_checklist_steps(self):
+        assert "16c" not in _CHECKLIST_STEPS
+
+
+# ---------------------------------------------------------------------------
+# 2. ac-* IDs excluded from coverage denominator for non-checklist steps
+# ---------------------------------------------------------------------------
+
+class TestAcIdExclusion:
+    def test_ac_ids_not_in_dropped_for_step06(self):
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        dropped = result.upstream_coverage["dropped"]
+        assert "ac-post-publish-1" not in dropped
+        assert "ac-post-publish-2" not in dropped
+
+    def test_ac_ids_do_not_inflate_denominator_for_step06(self):
+        """With 1 FR covered and 2 AC IDs excluded, dropped fraction must be 0."""
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        covered = result.upstream_coverage["covered"]
+        dropped = result.upstream_coverage["dropped"]
+        assert "fr-post-publish" in covered
+        assert dropped == []
+
+    def test_ac_ids_remain_in_dropped_for_checklist_step(self):
+        """For step 16, ac-* IDs should appear in dropped when not traced."""
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
+        dropped = result.upstream_coverage["dropped"]
+        assert "ac-post-publish-1" in dropped
+
+    def test_non_ac_ids_always_appear_in_dropped_when_untraced(self):
+        """API and component IDs not referenced in trace or scope appear in dropped."""
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])  # no scope.apis
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        dropped = result.upstream_coverage["dropped"]
+        assert "api-post-page" in dropped
+
+
+# ---------------------------------------------------------------------------
+# 3. scope.apis and scope.components counted as covered
+# ---------------------------------------------------------------------------
+
+class TestScopeCoverage:
+    def test_scope_apis_counted_as_covered(self):
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_apis=["api-post-page"])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        covered = result.upstream_coverage["covered"]
+        dropped = result.upstream_coverage["dropped"]
+        assert "api-post-page" in covered
+        assert "api-post-page" not in dropped
+
+    def test_scope_components_counted_as_covered(self):
+        upstream = _upstream(frs=["fr-post-publish"], components=["ghost-cms"])
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_components=["ghost-cms"])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        covered = result.upstream_coverage["covered"]
+        assert "ghost-cms" in covered
+
+    def test_scope_apis_and_components_both_covered(self):
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            apis=["api-post-page", "api-admin-post-publish"],
+            components=["ghost-cms", "headline-theme"],
+        )
+        artifact = _artifact(
+            trace_fr_ids=["fr-post-publish"],
+            scope_apis=["api-post-page", "api-admin-post-publish"],
+            scope_components=["ghost-cms", "headline-theme"],
+        )
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        covered = result.upstream_coverage["covered"]
+        assert "api-post-page" in covered
+        assert "api-admin-post-publish" in covered
+        assert "ghost-cms" in covered
+        assert "headline-theme" in covered
+        assert result.upstream_coverage["dropped"] == []
+
+    def test_scope_empty_arrays_do_not_crash(self):
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"], scope_apis=[], scope_components=[])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        # api still dropped since scope.apis is empty
+        assert "api-post-page" in result.upstream_coverage["dropped"]
+
+    def test_scope_non_string_items_ignored(self):
+        """Non-string items in scope.apis/components must not crash the collector."""
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        artifact = {
+            "id": "test",
+            "rules": [{
+                "inv_id": "inv-test",
+                "description": "test",
+                "language": "cel",
+                "expression": "true",
+                "scope": {
+                    "apis": [None, 42, {"id": "api-post-page"}, "api-post-page"],
+                    "components": [],
+                },
+                "trace": [{"type": "fr", "id": "fr-post-publish"}],
+            }],
+        }
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        # Only the plain string "api-post-page" should be collected.
+        covered = result.upstream_coverage["covered"]
+        assert "api-post-page" in covered
+
+    def test_artifact_with_no_scope_field_does_not_crash(self):
+        upstream = _upstream(frs=["fr-post-publish"])
+        artifact = {
+            "id": "test",
+            "rules": [{
+                "inv_id": "inv-test",
+                "description": "test",
+                "language": "cel",
+                "expression": "true",
+                "trace": [{"type": "fr", "id": "fr-post-publish"}],
+            }],
+        }
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        assert "fr-post-publish" in result.upstream_coverage["covered"]
+
+
+# ---------------------------------------------------------------------------
+# 4. AC-coverage structural block gated on _CHECKLIST_STEPS
+# ---------------------------------------------------------------------------
+
+class TestAcCoverageGating:
+    def test_ac_coverage_empty_for_step06(self):
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        assert result.acceptance_criteria_coverage == {}
+
+    def test_ac_coverage_empty_for_step07(self):
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/07_nfrs.json", upstream, step_id="07")
+        assert result.acceptance_criteria_coverage == {}
+
+    def test_ac_coverage_populated_for_step16(self):
+        """For step 16, the coverage dict is populated (all covered=0 since
+        no linked_test_expectation IDs match the ac ids in this fixture)."""
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1", "ac-post-publish-2"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
+        assert "fr-post-publish" in result.acceptance_criteria_coverage
+        entry = result.acceptance_criteria_coverage["fr-post-publish"]
+        assert entry["total"] == 2
+        assert entry["covered"] == 0
+        # The AC coverage block uses criterion_id (ends in _id) to identify ACs.
+        assert "ac-post-publish-1" in entry["missing"]
+        assert "ac-post-publish-2" in entry["missing"]
+
+    def test_ac_coverage_uses_criterion_id_field(self):
+        """AC coverage reads criterion_id (the actual field name in step 04 specs)."""
+        spec_data = {
+            "functional_requirements": [{
+                "fr_id": "fr-post-publish",
+                "acceptance_criteria": [
+                    {"criterion_id": "ac-post-publish-1", "text": "AC 1"},
+                    {"criterion_id": "ac-post-publish-2", "text": "AC 2"},
+                ],
+            }]
+        }
+        upstream = [("spec/04_fr_list.json", spec_data)]
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
+        entry = result.acceptance_criteria_coverage.get("fr-post-publish", {})
+        assert entry.get("total") == 2
+        assert "ac-post-publish-1" in entry.get("missing", [])
+
+
+# ---------------------------------------------------------------------------
+# 5. _check_acceptance_gap gated on _CHECKLIST_STEPS
+# ---------------------------------------------------------------------------
+
+class TestAcceptanceGapGating:
+    def _make_upstream_with_acs(self):
+        return _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={
+                "fr-post-publish": ["ac-post-publish-1"],
+            },
+        )
+
+    def _ac_upstream_with_text(self):
+        """Upstream where ACs have description text (for Jaccard matching)."""
+        spec_data = {
+            "functional_requirements": [{
+                "fr_id": "fr-post-publish",
+                "statement": "Publish post",
+                "acceptance_criteria": [{
+                    "id": "ac-post-publish-1",
+                    "description": "Given a creator, when post is published, then HTTP 200",
+                }],
+            }]
+        }
+        return [("spec/04_fr_list.json", spec_data)]
+
+    def test_acceptance_gap_not_generated_for_step06(self):
+        upstream = self._ac_upstream_with_text()
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        pairs = _check_acceptance_gap(artifact, "spec/06_invariants.json", upstream)
+        # This function itself has no step_id gating — the gating happens in
+        # review_artifact.  Calling it directly will still produce pairs.
+        # The key test is that review_artifact omits them for non-checklist steps.
+        _ = pairs  # result not asserted here; see review_artifact tests below
+
+    def test_review_artifact_no_acceptance_gap_pairs_for_step06(self, tmp_path):
+        """review_artifact must not include acceptance_gap pairs for step 06."""
+        import json, os
+        # Write a minimal upstream spec and artifact to tmp_path.
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        repo_root = tmp_path / "toolkit"
+        repo_root.mkdir()
+        tools_dir = repo_root / "tools"
+        tools_dir.mkdir()
+
+        # step_order: 04 is upstream of 06
+        step_order = {
+            "downstream_consumers": {
+                "04": ["06"],
+                "05": ["06"],
+            }
+        }
+        (tools_dir / "step_order.json").write_text(json.dumps(step_order))
+
+        upstream_spec = {
+            "functional_requirements": [{
+                "fr_id": "fr-post-publish",
+                "statement": "Publish a post",
+                "acceptance_criteria": [{
+                    "id": "ac-post-publish-1",
+                    "description": "Given creator, when publish triggered, then HTTP 200",
+                }],
+            }]
+        }
+        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
+
+        artifact = {
+            "id": "invariants-catalog",
+            "rules": [{
+                "inv_id": "inv-post-accessible",
+                "description": "Published post returns HTTP 200 at canonical URL",
+                "language": "cel",
+                "expression": "post.status == 'published' ? response.status == 200 : true",
+                "scope": {"components": [], "apis": []},
+                "trace": [{"type": "fr", "id": "fr-post-publish"}],
+            }],
+        }
+        artifact_path = str(spec_dir / "06_invariants.json")
+        (spec_dir / "06_invariants.json").write_text(json.dumps(artifact))
+
+        result = review_artifact(
+            artifact_path,
+            step_id="06",
+            spec_dir=str(spec_dir),
+            repo_root=str(repo_root),
+        )
+        acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
+        assert acceptance_gaps == [], (
+            f"Expected no acceptance_gap pairs for step 06, got: {acceptance_gaps}"
+        )
+
+    def test_review_artifact_acceptance_gap_runs_for_step16(self, tmp_path):
+        """review_artifact CAN generate acceptance_gap pairs for step 16."""
+        import json
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        repo_root = tmp_path / "toolkit"
+        repo_root.mkdir()
+        tools_dir = repo_root / "tools"
+        tools_dir.mkdir()
+
+        step_order = {"downstream_consumers": {"04": ["16"]}}
+        (tools_dir / "step_order.json").write_text(json.dumps(step_order))
+
+        upstream_spec = {
+            "functional_requirements": [{
+                "fr_id": "fr-post-publish",
+                "statement": "Publish a post",
+                "acceptance_criteria": [{
+                    "id": "ac-post-publish-1",
+                    # Use text with unique words so Jaccard < 0.25 vs any checklist item
+                    "description": (
+                        "Given authenticated creator xyzzy, when publish triggered, "
+                        "then GET /xyzzy-post/ returns HTTP 200 to unauthenticated visitor"
+                    ),
+                }],
+            }]
+        }
+        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
+
+        # Step 16 artifact with a checklist item whose description does NOT match the AC
+        artifact = {
+            "id": "impl-context",
+            "plan": {
+                "spec_alignment": {
+                    "checklist": [{
+                        "id": "DEPLOY_CONFIG",
+                        "description": "Deploy configuration is applied correctly",
+                        "type": "behavior",
+                        "layer": "config",
+                        "checklist_status": "pending",
+                    }]
+                }
+            }
+        }
+        artifact_path = str(spec_dir / "16_impl_context.json")
+        (spec_dir / "16_impl_context.json").write_text(json.dumps(artifact))
+
+        result = review_artifact(
+            artifact_path,
+            step_id="16",
+            spec_dir=str(spec_dir),
+            repo_root=str(repo_root),
+        )
+        acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
+        assert len(acceptance_gaps) >= 1, (
+            "Expected at least one acceptance_gap pair for step 16 with unmatched AC"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 6. Verdict logic
+# ---------------------------------------------------------------------------
+
+class TestVerdict:
+    def test_verdict_pass_when_all_upstream_ids_covered(self):
+        """All FRs + APIs + components covered → PASS."""
+        upstream = _upstream(
+            frs=["fr-post-publish", "fr-post-read"],
+            apis=["api-post-page"],
+            components=["ghost-cms"],
+        )
+        artifact = _artifact(
+            trace_fr_ids=["fr-post-publish", "fr-post-read"],
+            scope_apis=["api-post-page"],
+            scope_components=["ghost-cms"],
+        )
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        assert result.upstream_coverage["dropped"] == []
+
+    def test_verdict_fail_when_more_than_20pct_dropped(self, tmp_path):
+        """Dropped fraction > 20% → FAIL verdict from review_artifact."""
+        import json
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        repo_root = tmp_path / "toolkit"
+        repo_root.mkdir()
+        (repo_root / "tools").mkdir()
+        step_order = {"downstream_consumers": {"04": ["06"]}}
+        ((repo_root / "tools") / "step_order.json").write_text(json.dumps(step_order))
+
+        # 5 FRs upstream; artifact only traces 1 → 4/5 = 80% dropped → FAIL
+        upstream_spec = {
+            "functional_requirements": [
+                {"fr_id": f"fr-req-{i}", "statement": f"Req {i}"}
+                for i in range(5)
+            ]
+        }
+        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
+
+        artifact = {
+            "id": "invariants-catalog",
+            "rules": [{
+                "inv_id": "inv-one",
+                "description": "Only one fr covered",
+                "language": "cel",
+                "expression": "true",
+                "scope": {"components": [], "apis": []},
+                "trace": [{"type": "fr", "id": "fr-req-0"}],
+            }],
+        }
+        artifact_path = str(spec_dir / "06_invariants.json")
+        (spec_dir / "06_invariants.json").write_text(json.dumps(artifact))
+
+        result = review_artifact(artifact_path, "06", str(spec_dir), str(repo_root))
+        assert result.verdict == "FAIL"
