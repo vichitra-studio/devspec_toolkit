@@ -295,7 +295,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                         base_ref=base_ref,
                         diff_error_mode=mode,
                         git_root=str(git_root),
-                        spec_root=str(root / "spec"),
+                        spec_root=spec_root or str(root / "spec"),
                     )
                 )
     # R9/T26: Extraction intent validation (prompts vs step_order.json)
