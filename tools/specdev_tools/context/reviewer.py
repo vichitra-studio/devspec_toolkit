@@ -49,10 +49,11 @@ _SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 #      for step 16 artifacts; all other steps use trace arrays instead.
 #
 # Step 13a produces a completeness-assessment (dimension counts), not a
-# checklist — it is NOT in this set.  Steps 16a/16b/16c do not have schemas
-# in the current toolkit version and are NOT in this set.
+# checklist — it is NOT in this set.  Steps 16a/16b/16c all use the same
+# vc:16-impl-context schema as step 16 (schema is determined by the $schema
+# field in the artifact, not by the step ID), so they ARE in this set.
 # ---------------------------------------------------------------------------
-_CHECKLIST_STEPS: frozenset[str] = frozenset(["16"])
+_CHECKLIST_STEPS: frozenset[str] = frozenset(["16", "16a", "16b", "16c"])
 
 # ---------------------------------------------------------------------------
 # Compiled regex patterns used by semantic checks.

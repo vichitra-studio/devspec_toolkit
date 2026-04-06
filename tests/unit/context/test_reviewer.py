@@ -7,7 +7,7 @@ verdicts when running ``context review`` on non-checklist step artifacts
   1. ac-* IDs excluded from upstream coverage denominator for non-checklist steps.
   2. scope.apis / scope.components IDs counted as valid traceability references.
   3. AC-coverage structural block and _check_acceptance_gap gated on
-     _CHECKLIST_STEPS (only step 16 in the current toolkit).
+     _CHECKLIST_STEPS (steps 16, 16a, 16b, 16c — all share vc:16-impl-context schema).
 """
 from __future__ import annotations
 
@@ -105,15 +105,17 @@ class TestChecklistSteps:
         # 13a produces a completeness-assessment, not a checklist.
         assert "13a" not in _CHECKLIST_STEPS
 
-    def test_step_16a_not_in_checklist_steps(self):
-        # 16a schema does not exist in the current toolkit.
-        assert "16a" not in _CHECKLIST_STEPS
+    def test_step_16a_in_checklist_steps(self):
+        # 16a shares vc:16-impl-context schema — same checklist structure.
+        assert "16a" in _CHECKLIST_STEPS
 
-    def test_step_16b_not_in_checklist_steps(self):
-        assert "16b" not in _CHECKLIST_STEPS
+    def test_step_16b_in_checklist_steps(self):
+        # 16b shares vc:16-impl-context schema — same checklist structure.
+        assert "16b" in _CHECKLIST_STEPS
 
-    def test_step_16c_not_in_checklist_steps(self):
-        assert "16c" not in _CHECKLIST_STEPS
+    def test_step_16c_in_checklist_steps(self):
+        # 16c shares vc:16-impl-context schema — same checklist structure.
+        assert "16c" in _CHECKLIST_STEPS
 
 
 # ---------------------------------------------------------------------------
@@ -517,3 +519,65 @@ class TestVerdict:
 
         result = review_artifact(artifact_path, "06", str(spec_dir), str(repo_root))
         assert result.verdict == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# 7. Edge cases and additional coverage
+# ---------------------------------------------------------------------------
+
+class TestEdgeCases:
+    def test_default_step_id_skips_ac_coverage(self):
+        """Calling _run_structural_pass without step_id uses '' which is not
+        in _CHECKLIST_STEPS — AC coverage block must be skipped."""
+        upstream = _upstream(
+            frs=["fr-post-publish"],
+            acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
+        )
+        artifact = _artifact(trace_fr_ids=["fr-post-publish"])
+        # Call without step_id — uses default ""
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream)
+        assert result.acceptance_criteria_coverage == {}
+
+    def test_empty_upstream_functional_requirements(self):
+        """When upstream has no FRs, all collections are empty and dropped is []."""
+        upstream = [("spec/04_fr_list.json", {"functional_requirements": []})]
+        artifact = _artifact()  # no rules
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        assert result.upstream_coverage["covered"] == []
+        assert result.upstream_coverage["dropped"] == []
+        assert result.acceptance_criteria_coverage == {}
+
+    def test_scope_and_trace_same_id_not_double_counted(self):
+        """If scope.apis and a trace array both reference the same ID, the ID
+        appears exactly once in covered (set semantics prevent duplication)."""
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        # Build artifact where trace AND scope both reference api-post-page
+        artifact = {
+            "id": "test",
+            "rules": [{
+                "inv_id": "inv-test",
+                "description": "test",
+                "language": "cel",
+                "expression": "true",
+                "scope": {"apis": ["api-post-page"], "components": []},
+                "trace": [
+                    {"type": "fr", "id": "fr-post-publish"},
+                    {"type": "api", "id": "api-post-page"},
+                ],
+            }],
+        }
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        covered = result.upstream_coverage["covered"]
+        assert covered.count("api-post-page") == 1
+
+    def test_scope_reference_to_nonexistent_upstream_id_flagged_as_scope_creep(self):
+        """A scope.apis entry that has no matching upstream ID is flagged as
+        unjustified (scope creep) because artifact_trace_ids is used for the
+        reverse-trace check after scope IDs are added."""
+        upstream = _upstream(frs=["fr-post-publish"])  # no apis in upstream
+        artifact = _artifact(
+            trace_fr_ids=["fr-post-publish"],
+            scope_apis=["api-does-not-exist"],
+        )
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        assert "api-does-not-exist" in result.reverse_trace["unjustified"]
