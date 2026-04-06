@@ -302,7 +302,10 @@ def _run_structural_pass(
     for scope_dict in _find_items_by_key(artifact, "scope"):
         if isinstance(scope_dict, dict):
             for scope_key in ("apis", "components"):
-                for item in scope_dict.get(scope_key, []):
+                scope_val = scope_dict.get(scope_key, [])
+                if not isinstance(scope_val, list):
+                    continue  # guard: a string "api-foo" would iterate as chars
+                for item in scope_val:
                     if isinstance(item, str):
                         artifact_trace_ids.add(item)
 

@@ -214,6 +214,35 @@ class TestScopeCoverage:
         # api still dropped since scope.apis is empty
         assert "api-post-page" in result.upstream_coverage["dropped"]
 
+    def test_scope_apis_as_string_is_skipped_not_iterated(self):
+        """If scope.apis is a plain string instead of an array, iterating it would
+        produce single characters ('a', 'p', 'i', ...) as IDs — each a false
+        unjustified reference.  The list guard in the scope collector must skip it."""
+        upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
+        artifact = {
+            "id": "test",
+            "rules": [{
+                "inv_id": "inv-test",
+                "description": "test",
+                "language": "cel",
+                "expression": "true",
+                "scope": {
+                    # Malformed: string instead of array
+                    "apis": "api-post-page",
+                    "components": [],
+                },
+                "trace": [{"type": "fr", "id": "fr-post-publish"}],
+            }],
+        }
+        result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
+        # The string should be ignored — no single-char IDs in unjustified
+        unjustified = result.reverse_trace["unjustified"]
+        assert all(len(uid) > 1 for uid in unjustified), (
+            f"Single-character IDs found in unjustified — string was iterated as chars: {unjustified}"
+        )
+        # api-post-page itself should be in dropped (string wasn't parsed as ID)
+        assert "api-post-page" in result.upstream_coverage["dropped"]
+
     def test_scope_non_string_items_ignored(self):
         """Non-string items in scope.apis/components must not crash the collector."""
         upstream = _upstream(frs=["fr-post-publish"], apis=["api-post-page"])
@@ -311,8 +340,8 @@ class TestAcceptanceGapGating:
                 "fr_id": "fr-post-publish",
                 "statement": "Publish a post",
                 "acceptance_criteria": [{
-                    "id": "ac-post-publish-1",
-                    "description": "Given creator, when publish triggered, then HTTP 200",
+                    "criterion_id": "ac-post-publish-1",
+                    "text": "Given creator, when publish triggered, then HTTP 200",
                 }],
             }]
         }
@@ -343,27 +372,33 @@ class TestAcceptanceGapGating:
             f"Expected no acceptance_gap pairs for step 06, got: {acceptance_gaps}"
         )
 
-    def test_review_artifact_acceptance_gap_runs_for_step16(self, tmp_path):
-        """review_artifact CAN generate acceptance_gap pairs for step 16."""
+    @pytest.mark.parametrize("step_id", ["16", "16a", "16b", "16c"])
+    def test_review_artifact_acceptance_gap_runs_for_all_checklist_steps(
+        self, tmp_path, step_id
+    ):
+        """review_artifact generates acceptance_gap pairs for every step in _CHECKLIST_STEPS.
+        All four (16/16a/16b/16c) share vc:16-impl-context schema and the same checklist
+        structure — the gate must fire for all of them, not just step 16.
+        Uses canonical step-04 field names (criterion_id, text) to match real data shape.
+        """
         import json
         spec_dir = tmp_path / "spec"
         spec_dir.mkdir()
         repo_root = tmp_path / "toolkit"
         repo_root.mkdir()
-        tools_dir = repo_root / "tools"
-        tools_dir.mkdir()
+        (repo_root / "tools").mkdir()
 
-        step_order = {"downstream_consumers": {"04": ["16"]}}
-        (tools_dir / "step_order.json").write_text(json.dumps(step_order))
+        step_order = {"downstream_consumers": {"04": [step_id]}}
+        ((repo_root / "tools") / "step_order.json").write_text(json.dumps(step_order))
 
         upstream_spec = {
             "functional_requirements": [{
                 "fr_id": "fr-post-publish",
                 "statement": "Publish a post",
                 "acceptance_criteria": [{
-                    "id": "ac-post-publish-1",
-                    # Use text with unique words so Jaccard < 0.25 vs any checklist item
-                    "description": (
+                    # Use canonical step-04 field names: criterion_id + text
+                    "criterion_id": "ac-post-publish-1",
+                    "text": (
                         "Given authenticated creator xyzzy, when publish triggered, "
                         "then GET /xyzzy-post/ returns HTTP 200 to unauthenticated visitor"
                     ),
@@ -372,7 +407,8 @@ class TestAcceptanceGapGating:
         }
         (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
 
-        # Step 16 artifact with a checklist item whose description does NOT match the AC
+        # Checklist item whose description deliberately does NOT match the AC text
+        # (Jaccard < 0.25) so an acceptance_gap pair is generated.
         artifact = {
             "id": "impl-context",
             "plan": {
@@ -387,75 +423,18 @@ class TestAcceptanceGapGating:
                 }
             }
         }
-        artifact_path = str(spec_dir / "16_impl_context.json")
-        (spec_dir / "16_impl_context.json").write_text(json.dumps(artifact))
+        artifact_path = str(spec_dir / "impl_context.json")
+        (spec_dir / "impl_context.json").write_text(json.dumps(artifact))
 
         result = review_artifact(
             artifact_path,
-            step_id="16",
+            step_id=step_id,
             spec_dir=str(spec_dir),
             repo_root=str(repo_root),
         )
         acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
         assert len(acceptance_gaps) >= 1, (
-            "Expected at least one acceptance_gap pair for step 16 with unmatched AC"
-        )
-
-    def test_review_artifact_acceptance_gap_runs_for_step16a(self, tmp_path):
-        """review_artifact must generate acceptance_gap pairs for step 16a (now in _CHECKLIST_STEPS)."""
-        import json
-        spec_dir = tmp_path / "spec"
-        spec_dir.mkdir()
-        repo_root = tmp_path / "toolkit"
-        repo_root.mkdir()
-        tools_dir = repo_root / "tools"
-        tools_dir.mkdir()
-
-        step_order = {"downstream_consumers": {"04": ["16a"]}}
-        (tools_dir / "step_order.json").write_text(json.dumps(step_order))
-
-        upstream_spec = {
-            "functional_requirements": [{
-                "fr_id": "fr-post-publish",
-                "statement": "Publish a post",
-                "acceptance_criteria": [{
-                    "id": "ac-post-publish-1",
-                    "description": (
-                        "Given authenticated creator xyzzy, when publish triggered, "
-                        "then GET /xyzzy-post/ returns HTTP 200 to unauthenticated visitor"
-                    ),
-                }],
-            }]
-        }
-        (spec_dir / "04_fr_list.json").write_text(json.dumps(upstream_spec))
-
-        # Step 16a artifact with a checklist item whose description does NOT match the AC
-        artifact = {
-            "id": "impl-context",
-            "plan": {
-                "spec_alignment": {
-                    "checklist": [{
-                        "id": "DEPLOY_CONFIG",
-                        "description": "Deploy configuration is applied correctly",
-                        "type": "behavior",
-                        "layer": "config",
-                        "checklist_status": "pending",
-                    }]
-                }
-            }
-        }
-        artifact_path = str(spec_dir / "16a_impl_planner.json")
-        (spec_dir / "16a_impl_planner.json").write_text(json.dumps(artifact))
-
-        result = review_artifact(
-            artifact_path,
-            step_id="16a",
-            spec_dir=str(spec_dir),
-            repo_root=str(repo_root),
-        )
-        acceptance_gaps = [p for p in result.semantic_pairs if p.check_type == "acceptance_gap"]
-        assert len(acceptance_gaps) >= 1, (
-            "Expected at least one acceptance_gap pair for step 16a with unmatched AC"
+            f"Expected at least one acceptance_gap pair for step {step_id} with unmatched AC"
         )
 
 
@@ -565,3 +544,5 @@ class TestEdgeCases:
         )
         result = _run_structural_pass(artifact, "spec/06_invariants.json", upstream, step_id="06")
         assert "api-does-not-exist" in result.reverse_trace["unjustified"]
+        # scope_creep is kept in sync with unjustified
+        assert "api-does-not-exist" in result.reverse_trace["scope_creep"]
