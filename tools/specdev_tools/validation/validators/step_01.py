@@ -60,8 +60,10 @@ def validate_step_01(
 
     errors: list[SpecError] = []
 
-    # Trace Integrity (if component_ids provided)
-    if component_ids:
+    # Trace Integrity: run whenever the upstream file is present (even if
+    # empty).  ``None`` = upstream absent → skip; ``set()`` = upstream present
+    # but empty → run, so stray refs are still flagged against the empty set.
+    if component_ids is not None:
         custom_errors = validate_trace_integrity(instance, component_ids)
         errors.extend(custom_errors)
 

@@ -107,7 +107,9 @@ class TestNoMitigations:
 
 
 class TestMitigationMissingFields:
-    def test_no_description_or_ref(self, toolkit_root):
+    def test_missing_id(self, toolkit_root):
+        """Mitigation with no `id` should be flagged (schema also enforces this;
+        linter keeps it as a safety net for fixture-based tests)."""
         instance = {
             "threats": [{
                 "threat_id": "threat-01",
@@ -117,7 +119,25 @@ class TestMitigationMissingFields:
         }
         errors = validate_step_11(instance, toolkit_root)
         rendered = _render(errors)
-        assert any("without description or ref" in e for e in rendered)
+        assert any("missing required 'id'" in e for e in rendered)
+
+    def test_current_shape_passes(self, toolkit_root):
+        """The current {type, id, note} mitigation shape must not trip E520."""
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{
+                    "type": "inv",
+                    "id": "inv-auth-required",
+                    "note": "Enforced by auth middleware",
+                }],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert not any("without description or ref" in e for e in rendered)
+        assert not any("missing required 'id'" in e for e in rendered)
 
 
 class TestComponentCrossRef:
@@ -155,6 +175,55 @@ class TestComponentCrossRef:
         errors = validate_step_11(instance, toolkit_root)
         rendered = _render(errors)
         assert not any("unknown component" in e for e in rendered)
+
+
+class TestEmptyUpstreamFlagsStrayRefs:
+    """Regression: when an upstream step file exists but contains an empty
+    ``apis``/``components`` list, any threat targeting an ID from that step
+    must still fire E590. Previously the loaders converted empty-set → None,
+    which silently skipped cross-ref validation against an empty upstream."""
+
+    def test_empty_apis_flags_unknown_api_target(self, tmp_path):
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "05_interface_contracts.json").write_text(json.dumps({"apis": []}))
+        artifact_path = str(host_spec / "11_redteam.json")
+        toolkit_root = tmp_path / "toolkit"
+        (toolkit_root / "spec").mkdir(parents=True)
+
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-ghost"}],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
+        rendered = _render(errors)
+        assert any("api-ghost" in e and "unknown API" in e for e in rendered), (
+            f"empty upstream apis must still flag stray targets: {rendered}"
+        )
+
+    def test_empty_components_flags_unknown_component_target(self, tmp_path):
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "02_system_sketch.json").write_text(json.dumps({"components": []}))
+        artifact_path = str(host_spec / "11_redteam.json")
+        toolkit_root = tmp_path / "toolkit"
+        (toolkit_root / "spec").mkdir(parents=True)
+
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "component", "id": "comp-ghost"}],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
+        rendered = _render(errors)
+        assert any("comp-ghost" in e and "unknown component" in e for e in rendered), (
+            f"empty upstream components must still flag stray targets: {rendered}"
+        )
 
 
 class TestNonObjectMitigation:
@@ -244,3 +313,82 @@ class TestApiCoverageCheck:
         errors = validate_step_11(instance, toolkit_root)
         rendered = _render(errors)
         assert not any("W583" in e for e in rendered)
+
+
+class TestHostSpecSiblingResolution:
+    """Bug 1 regression: when the Step 11 artifact lives in a host spec dir
+    (e.g. ``host_repo/spec/11_redteam.json``) the linter must resolve sibling
+    upstream files from that same directory, not from ``<toolkit_root>/spec``.
+    """
+
+    def test_sibling_dir_wins_over_toolkit_spec(self, tmp_path):
+        # Toolkit-side spec: has fictional APIs that should NOT be consulted
+        toolkit_root = tmp_path / "toolkit"
+        toolkit_spec = toolkit_root / "spec"
+        toolkit_spec.mkdir(parents=True)
+        (toolkit_spec / "05_interface_contracts.json").write_text(json.dumps({
+            "apis": [{"api_id": "api-toolkit-only"}]
+        }))
+
+        # Host-side spec: the real APIs the artifact is cross-referenced against
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "05_interface_contracts.json").write_text(json.dumps({
+            "apis": [{"api_id": "api-host-login"}]
+        }))
+        artifact_path = str(host_spec / "11_redteam.json")
+
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-host-login"}],
+                "mitigations": [{"type": "fr", "id": "fr-login"}],
+            }]
+        }
+
+        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
+        rendered = _render(errors)
+        # Must not flag api-host-login as unknown: sibling dir resolves it.
+        assert not any("api-host-login" in e and "unknown API" in e for e in rendered)
+        # Must not flag api-toolkit-only as uncovered: the toolkit spec must
+        # not shadow the host spec when sibling resolution succeeds.
+        assert not any("api-toolkit-only" in e for e in rendered)
+
+    def test_component_sibling_dir_wins_over_toolkit_spec(self, tmp_path):
+        """Symmetric to the API test: component cross-ref must also resolve
+        from the artifact's sibling dir before falling back to toolkit/spec."""
+        toolkit_root = tmp_path / "toolkit"
+        toolkit_spec = toolkit_root / "spec"
+        toolkit_spec.mkdir(parents=True)
+        (toolkit_spec / "02_system_sketch.json").write_text(json.dumps({
+            "components": [{"component_id": "comp-toolkit-only"}]
+        }))
+
+        host_spec = tmp_path / "host" / "spec"
+        host_spec.mkdir(parents=True)
+        (host_spec / "02_system_sketch.json").write_text(json.dumps({
+            "components": [{"component_id": "comp-host-auth"}]
+        }))
+        artifact_path = str(host_spec / "11_redteam.json")
+
+        # Target BOTH the host component (must resolve) AND the toolkit-only
+        # component (must be flagged unknown — proves the toolkit spec was
+        # NOT consulted as a fallback once the sibling dir resolved).
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [
+                    {"type": "component", "id": "comp-host-auth"},
+                    {"type": "component", "id": "comp-toolkit-only"},
+                ],
+                "mitigations": [{"type": "fr", "id": "fr-auth"}],
+            }]
+        }
+
+        errors = validate_step_11(instance, str(toolkit_root), artifact_path)
+        rendered = _render(errors)
+        # Host-side component must resolve (not flagged unknown).
+        assert not any("comp-host-auth" in e and "unknown component" in e for e in rendered)
+        # Toolkit-side component MUST be flagged unknown: the sibling dir
+        # resolved successfully, so the toolkit spec must not shadow it.
+        assert any("comp-toolkit-only" in e and "unknown component" in e for e in rendered)

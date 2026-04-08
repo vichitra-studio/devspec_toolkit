@@ -393,6 +393,22 @@ _E541_SKIP_KEYS = {
     "tech_stack", "user_segments", "seeds",
 }
 
+# File-scoped exemptions: ``edge_cases`` is an unbindable narrative subtree
+# *only* in 11_redteam.json (schema sets additionalProperties:false and
+# defines no *_ref field on edge_cases items).  Scoping the skip to that
+# file prevents a future step that introduces a literal ``edge_cases`` key
+# from silently inheriting the exemption.
+_E541_SKIP_KEYS_BY_FILE: dict[str, set[str]] = {
+    "11_redteam.json": {"edge_cases"},
+}
+
+
+def _is_e541_skipped(rel: str, key: str) -> bool:
+    if key in _E541_SKIP_KEYS:
+        return True
+    basename = os.path.basename(rel)
+    return key in _E541_SKIP_KEYS_BY_FILE.get(basename, set())
+
 
 def _check_free_text_terms(
     rel: str,
@@ -413,7 +429,7 @@ def _check_free_text_terms(
         for key, value in obj.items():
             # Skip canonical metadata subtrees entirely — these are
             # vocabulary definitions, not spec content that should bind refs.
-            if key in _E541_SKIP_KEYS:
+            if _is_e541_skipped(rel, key):
                 continue
             p = f"{path}.{key}" if path else key
             if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:

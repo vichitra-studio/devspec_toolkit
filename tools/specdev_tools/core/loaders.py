@@ -162,13 +162,25 @@ def load_sibling_artifact(
     id_field: str,
     *,
     fallback_root: str | Path | None = None,
-) -> set[str]:
+) -> set[str] | None:
     """Load IDs from a sibling artifact (same directory as *artifact_path*).
 
     If the sibling is not found beside *artifact_path* and *fallback_root* is
     given, checks ``<fallback_root>/spec/<sibling_prefix>_*.json`` as well.
 
-    Returns an empty set on any failure (never ``None``).
+    Returns
+    -------
+    None
+        No candidate file was found in either the sibling directory or the
+        ``fallback_root`` spec dir.  Callers should treat this as "upstream
+        absent, skip cross-ref check".
+    set[str]
+        A (possibly empty) set of extracted IDs.  An **empty set is not
+        None**: it signals "upstream present but contained no IDs", and
+        callers should still run cross-ref validation (so stray references
+        get flagged) while skipping coverage checks over an empty set.
+        Malformed JSON or read errors also yield an empty set — the file
+        was found but could not be mined, which is distinct from absent.
     """
     candidates: list[Path] = []
     if artifact_path:
@@ -180,9 +192,11 @@ def load_sibling_artifact(
         for fn in _match_prefix(spec_dir, sibling_prefix):
             candidates.append(spec_dir / fn)
 
+    found_any = False
     for path in candidates:
         if not path.exists():
             continue
+        found_any = True
         try:
             with path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -190,7 +204,7 @@ def load_sibling_artifact(
             return set()
         return _extract_ids(data, array_key, id_field)
 
-    return set()
+    return set() if found_any else None
 
 
 def _match_prefix(directory: Path, prefix: str) -> list[str]:

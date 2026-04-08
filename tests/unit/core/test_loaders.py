@@ -265,10 +265,24 @@ class TestLoadSiblingArtifact:
         result = load_sibling_artifact(str(artifact), "04", "requirements", "fr_id")
         assert result == {"fr-x"}
 
-    def test_sibling_not_found_empty_set(self, tmp_path):
+    def test_sibling_not_found_returns_none(self, tmp_path):
+        """No candidate sibling → None, so callers can distinguish
+        "upstream absent" from "upstream present but empty" (which returns set())."""
         artifact = tmp_path / "08_fixtures.json"
         artifact.write_text("{}", encoding="utf-8")
         result = load_sibling_artifact(str(artifact), "99", "items", "id")
+        assert result is None
+
+    def test_sibling_present_but_empty_returns_empty_set(self, tmp_path):
+        """Regression: sibling file exists but contains no IDs must return
+        set(), not None. Callers rely on this to still flag stray references
+        against an empty upstream (instead of silently skipping cross-ref)."""
+        (tmp_path / "04_frs.json").write_text(
+            json.dumps({"requirements": []}), encoding="utf-8"
+        )
+        artifact = tmp_path / "08_fixtures.json"
+        artifact.write_text("{}", encoding="utf-8")
+        result = load_sibling_artifact(str(artifact), "04", "requirements", "fr_id")
         assert result == set()
 
     def test_fallback_root(self, tmp_path):

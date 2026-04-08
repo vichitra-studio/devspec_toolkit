@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
 import warnings
 from typing import Any
 
 from ...core.errors import make_error, SpecError
+from ...core.loaders import load_sibling_artifact
 from ...core.trace_types import is_valid_trace_type, normalize_trace_type
 from ...validation.linter_utils import check_no_duplicates
 
@@ -58,7 +57,11 @@ def _validate_trace_types_once() -> None:
         )
 
 
-def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_11(
+    instance: dict[str, Any],
+    toolkit_root: str,
+    artifact_path: str | None = None,
+) -> list[SpecError]:
     """Validate Step 11 (Red Team / Threat Modeling) logic.
 
     Checks threat_id uniqueness, target ID cross-references against steps 02/05,
@@ -70,8 +73,8 @@ def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     check_no_duplicates(instance.get("threats", []), "threat_id", "threat_id", errors)
 
     # Load cross-reference data for target validation
-    component_ids = _load_component_ids(toolkit_root)
-    api_ids = _load_api_ids(toolkit_root)
+    component_ids = _load_component_ids(toolkit_root, artifact_path)
+    api_ids = _load_api_ids(toolkit_root, artifact_path)
 
     for threat in instance.get("threats", []):
         threat_id = threat.get("threat_id")
@@ -113,10 +116,12 @@ def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
             if t and t not in _ALLOWED_MITIGATION_TYPES:
                 errors.append(make_error("E530", f"Threat '{threat_id}' has invalid mitigation type '{t}'"))
 
-            # Evidence field: mitigations should have a description or ref
-            if not mitigation.get("description") and not mitigation.get("ref"):
+            # Schema guarantees `type` and `id` are present.  Keep a safety
+            # net for the `id` field so fixtures that bypass schema checks
+            # still surface a clear error.
+            if not mitigation.get("id"):
                 errors.append(
-                    make_error("E520", f"Threat '{threat_id}' has mitigation without description or ref")
+                    make_error("E520", f"Threat '{threat_id}' has mitigation missing required 'id'")
                 )
 
     # W583: API-to-threat coverage — each public API should be targeted by at
@@ -139,54 +144,35 @@ def validate_step_11(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
     return errors
 
 
-def _load_component_ids(toolkit_root: str) -> set[str] | None:
-    """Load component IDs from step 02 if available."""
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("02_") and fn.endswith(".json") and not fn.startswith("02a_"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                ids: set[str] = {
-                    c["component_id"]
-                    for c in data.get("components", [])
-                    if isinstance(c, dict) and isinstance(c.get("component_id"), str)
-                }
-                return ids
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
+def _load_component_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
+    """Load component IDs from step 02 if available.
+
+    Delegates to the shared ``load_sibling_artifact`` helper, which searches
+    ``artifact_path``'s sibling directory first and falls back to
+    ``<toolkit_root>/spec``.  Returns ``None`` (not an empty set) when no
+    upstream file is found — callers use ``None`` as "upstream absent, skip
+    cross-ref check" (see the ``component_ids is not None`` guard above).
+    """
+    return load_sibling_artifact(
+        artifact_path or "",
+        "02",
+        "components",
+        "component_id",
+        fallback_root=toolkit_root,
+    )
 
 
-def _load_api_ids(toolkit_root: str) -> set[str] | None:
+def _load_api_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str] | None:
     """Load API IDs from step 05 if available.
 
-    This loader is intentionally NOT migrated to the shared ``load_upstream_ids()``
-    helper (AUDIT-003).  Step 05 artifacts historically use two different schema
-    shapes — ``apis[].api_id`` (current) and ``endpoints[].endpoint_id`` (legacy) —
-    and this function falls back across both array keys AND both id fields.  The
-    shared ``load_upstream_ids()`` supports ``fallback_keys`` for alternate array
-    names but always extracts the same ``id_field``, so it cannot express the
-    ``api_id`` → ``endpoint_id`` field fallback needed here.
+    Delegates to ``load_sibling_artifact``, matching ``_load_component_ids``.
+    Step 05 schema uses ``apis[].api_id`` exclusively; the legacy
+    ``endpoints[].endpoint_id`` shape no longer appears in schema or fixtures.
     """
-    spec_dir = os.path.join(toolkit_root, "spec")
-    if not os.path.isdir(spec_dir):
-        return None
-    for fn in os.listdir(spec_dir):
-        if fn.startswith("05_") and fn.endswith(".json"):
-            path = os.path.join(spec_dir, fn)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                apis = data.get("apis", data.get("endpoints", []))
-                return {
-                    a.get("api_id", a.get("endpoint_id", ""))
-                    for a in apis
-                    if isinstance(a, dict)
-                } - {""}
-            except (OSError, json.JSONDecodeError):
-                pass
-    return None
+    return load_sibling_artifact(
+        artifact_path or "",
+        "05",
+        "apis",
+        "api_id",
+        fallback_root=toolkit_root,
+    )

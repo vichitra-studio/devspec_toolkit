@@ -375,17 +375,19 @@ def _has_canonical_bootstrap_failure(errors: list[SpecError]) -> bool:
 
 
 def _load_component_ids(repo_root: str, file_path: str) -> set[str] | None:
-    """Thin wrapper: adapts ``load_sibling_artifact`` return to ``None``-on-empty
-    (AUDIT-019: kept because ``_build_validation_context`` needs ``None`` to signal
-    "upstream file absent" vs "upstream file present but empty")."""
-    ids = load_sibling_artifact(file_path, "02", "components", "component_id", fallback_root=repo_root)
-    return ids if ids else None
+    """Thin wrapper around ``load_sibling_artifact``.
+
+    ``load_sibling_artifact`` now distinguishes "file absent" (``None``) from
+    "file present but empty" (``set()``); this wrapper simply propagates that
+    contract so ``_build_validation_context`` consumers can run cross-ref
+    validation against a present-but-empty upstream and still flag stray refs.
+    """
+    return load_sibling_artifact(file_path, "02", "components", "component_id", fallback_root=repo_root)
 
 
 def _load_capability_ids(repo_root: str, file_path: str) -> set[str] | None:
-    """Thin wrapper: see ``_load_component_ids`` rationale (AUDIT-019)."""
-    ids = load_sibling_artifact(file_path, "01", "capabilities", "capability_id", fallback_root=repo_root)
-    return ids if ids else None
+    """Thin wrapper: see ``_load_component_ids`` rationale."""
+    return load_sibling_artifact(file_path, "01", "capabilities", "capability_id", fallback_root=repo_root)
 
 
 def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
@@ -465,7 +467,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "08": lambda instance, root, ctx: step_08.validate_step_08(instance, root, ctx.get("spec_root")),
     "09": lambda instance, root, ctx: step_09.validate_step_09(instance, root, ctx.get("spec_root")),
     "10": lambda instance, root, ctx: step_10.validate_step_10(instance, root),
-    "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root),
+    "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root, ctx.get("artifact_path")),
     "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root, ctx.get("spec_root")),
     "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root),
     "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root, ctx.get("spec_root")),
