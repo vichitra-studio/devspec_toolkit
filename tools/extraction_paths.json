@@ -6,9 +6,13 @@
       "vc:01-capabilities": "sha256:9186ee75f6307218feead221c8184144a96ada1ad41deda07817db22b28f5ed7",
       "vc:02-system-sketch": "sha256:1a61d1fc5381c024d704694332ca622447978da11b36a441ed8cbc4516964799",
       "vc:03-glossary": "sha256:1ebdf298beafc54ae0e61eb029a3d6952074808771013ce337e53c7f2c5a525e",
-      "vc:04-fr-list": "sha256:26795a15f10d20eeb94142713d90a3b5837408a5acde5313a664a0d94eed998b"
+      "vc:04-fr-list": "sha256:26795a15f10d20eeb94142713d90a3b5837408a5acde5313a664a0d94eed998b",
+      "vc:02a-delivery-baseline": "sha256:c0a38258af3bfbf62ee36310db342a79f67ed7a497d46ff13ac240ba083cd674",
+      "vc:06-invariants": "sha256:337a372b871dc388960abfbd44201a7bb939f268e890a65f226635886ab010f1",
+      "vc:07-nfrs": "sha256:296e4a358b74e5c0f7fe0cfbccb00c29d91061ca042e1d7425a26bd19ccbe847",
+      "vc:08-fixtures": "sha256:832f2cbd64246636a336514421c97c41a89f360ce5eaafc62576ad85964160fd"
     },
-    "generated_at": "2026-04-06T16:31:04Z"
+    "generated_at": "2026-04-08T06:17:27Z"
   },
   "05": {
     "05_interface_contracts.json": [
@@ -50,6 +54,31 @@
   "04": {
     "04_fr_list.json": [
       ".functional_requirements"
+    ]
+  },
+  "02a": {
+    "02a_delivery_baseline.json": [
+      ".trace",
+      ".ci_gates",
+      ".compliance",
+      ".environment_ref",
+      ".secrets",
+      ".environments"
+    ]
+  },
+  "06": {
+    "06_invariants.json": [
+      ".rules"
+    ]
+  },
+  "07": {
+    "07_nfrs.json": [
+      ".nfrs"
+    ]
+  },
+  "08": {
+    "08_fixtures.json": [
+      ".fixtures"
     ]
   }
 }
