@@ -415,5 +415,70 @@ class CanonicalIntegrityTests(unittest.TestCase):
             self.assertFalse(any(e.code == "E211" for e in errs), f"Did not expect E211 in {errs}")
 
 
+class Step10CanonicalRefsFixtureTests(unittest.TestCase):
+    """Regression: step-10 governance canonical refs (id_pattern_ref, policy_ref,
+    command_ref) must resolve against the core canon without E110/E120."""
+
+    def test_valid_with_canonical_refs_fixture(self):
+        toolkit_root = Path(__file__).resolve().parents[3]
+        fixture = toolkit_root / "tests" / "fixtures" / "step_10" / "valid_with_canonical_refs.json"
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            # Use the real toolkit canon so cn:core:policy:spec-first etc. resolve.
+            canon_src = toolkit_root / "canon"
+            import shutil
+            shutil.copytree(canon_src, root / "canon")
+            (root / "spec").mkdir()
+            (root / "spec" / "10_governance.json").write_text(
+                fixture.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            offending = [e for e in errs if e.code in ("E110", "E120")]
+            self.assertFalse(
+                offending,
+                f"Expected no E110/E120 for step-10 canonical refs, got: {[e.render() for e in offending]}",
+            )
+
+
+class Step10CanonicalRefsNegativeTests(unittest.TestCase):
+    """Regression: a step-10 canonical ref whose kind does not match the canon
+    entry's kind must raise E120 CANONICAL_KIND_MISMATCH."""
+
+    def _run(self, fixture_name: str):
+        toolkit_root = Path(__file__).resolve().parents[3]
+        fixture = toolkit_root / "tests" / "fixtures" / "step_10" / fixture_name
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            import shutil
+            shutil.copytree(toolkit_root / "canon", root / "canon")
+            (root / "spec").mkdir()
+            (root / "spec" / "10_governance.json").write_text(
+                fixture.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            return validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+
+    def test_policy_ref_wrong_kind_raises_e120(self):
+        errs = self._run("invalid_policy_ref_wrong_kind.json")
+        e120 = [e for e in errs if e.code == "E120"]
+        self.assertEqual(len(e120), 1, f"Expected one E120, got: {[e.render() for e in errs]}")
+        self.assertIn("cn:core:policy:spec-first", e120[0].render())
+
+    def test_command_ref_wrong_kind_raises_e120(self):
+        errs = self._run("invalid_command_ref_wrong_kind.json")
+        e120 = [e for e in errs if e.code == "E120"]
+        self.assertEqual(len(e120), 1, f"Expected one E120, got: {[e.render() for e in errs]}")
+        self.assertIn("cn:core:command:governance-check", e120[0].render())
+
+    def test_id_pattern_ref_wrong_kind_raises_e120(self):
+        errs = self._run("invalid_id_pattern_ref_wrong_kind.json")
+        e120 = [e for e in errs if e.code == "E120"]
+        self.assertEqual(len(e120), 1, f"Expected one E120, got: {[e.render() for e in errs]}")
+        self.assertIn("cn:core:id_pattern:conventional-commit", e120[0].render())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -57,7 +57,7 @@
             },
             "id_pattern_ref": {
               "$ref": "vc:core:collections#canonicalRef",
-              "description": "Canonical reference to the ID pattern used in commit messages. Kind must be 'action' or 'term'. Example: {\"id\": \"cn:core:action:governance-check\", \"kind\": \"action\", \"label\": \"governance-check\"}. References the canonical entry for the commit ID pattern enforced by this governance rule. Omit if the pattern is fully defined by the 'pattern' field without a canonical vocabulary reference."
+              "description": "Canonical reference to the ID pattern used in commit messages. Kind must be `id_pattern`. Example: {\"id\": \"cn:core:id_pattern:conventional-commit\", \"kind\": \"id_pattern\", \"label\": \"conventional-commit\"}. The referenced entry's kind in the canon registry must exactly equal `id_pattern` — canonical-integrity lint (E120) rejects any other kind. Omit if the pattern is fully defined by the 'pattern' field without a canonical vocabulary reference. Anti-pattern: fabricating an id_pattern_ref ID — only reference id patterns that exist in the canon."
             },
             "error_message": {
               "type": "string",
@@ -139,11 +139,11 @@
         },
         "policy_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the governance policy in the canonical registry. Kind must be 'risk_category' or 'capability'. Decision rule: use kind='risk_category' when the policy is about risk mitigation (e.g., security policy → {\"id\": \"cn:core:risk_category:authn\", \"kind\": \"risk_category\", \"label\": \"authn\"}). Use kind='capability' when the policy is about a system capability constraint (e.g., deployment policy → {\"id\": \"cn:project:capability:continuous-deployment\", \"kind\": \"capability\", \"label\": \"continuous-deployment\"}). Reference the canonical entry that represents the governance framework this spec enforces. Validated by canonical-integrity lint. Anti-pattern: using kind='term' — governance policies must reference either a risk category or a capability."
+          "description": "Canonical reference to the governance policy in the canonical registry. Kind must be `policy`. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\", \"label\": \"spec-first\"}. The referenced entry's kind in the canon registry must exactly equal `policy` — canonical-integrity lint (E120) rejects any other kind. Omit if no canonical policy entry applies. Anti-pattern: fabricating a policy_ref ID — only reference policies that exist in the canon."
         },
         "command_ref": {
           "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the CLI command this governance rule triggers. Kind must be 'action'. Reference the canonical command this governance rule triggers. Example: {\"id\": \"cn:core:capability:governance-check\", \"kind\": \"capability\", \"label\": \"governance-check\"} for the specdev governance-check command. Omit when the governance rule does not map to an automated command. Validated by canonical-integrity lint. Anti-pattern: fabricating a command_ref ID — only reference commands that exist in the canon."
+          "description": "Canonical reference to the CLI command this governance rule triggers. Kind must be `command`. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\", \"label\": \"governance-check\"} for the specdev governance-check command. The referenced entry's kind in the canon registry must exactly equal `command` — canonical-integrity lint (E120) rejects any other kind. Omit when the governance rule does not map to an automated command. Anti-pattern: fabricating a command_ref ID — only reference commands that exist in the canon."
         }
       },
       "required": [

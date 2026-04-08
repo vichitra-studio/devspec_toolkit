@@ -77,6 +77,7 @@ Before emitting, verify:
 - `spec_first_policy` is explicitly true or false; exceptions documented via PR rules if false.
 - `commit_message_rules` require spec IDs and provide a regex pattern compatible with CI.
 - `reviewers` list includes cross-functional approvers (engineering, QA, security, ops) as needed.
+- **Canonical Refs**: `commit_message_rules.id_pattern_ref` MUST be populated with a canon entry of kind `id_pattern` (e.g., `cn:core:id_pattern:conventional-commit`). `policy_ref` MUST be populated with a canon entry of kind `policy` (e.g., `cn:core:policy:spec-first`) — no other kind is accepted. `command_ref` SHOULD be populated with a canon entry of kind `command` (e.g., `cn:core:command:governance-check`) when the rule maps to a CLI command — no other kind is accepted. All referenced IDs must also appear in `canonical_refs_used`, and canonical-integrity (E120) will reject any kind mismatch against the canon registry.
 
 ## Cross-Step Synthesis Notes
 - pr_rules: Allowed values: `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `test`, `build`, `lint`, `format`, `audit`, `security`.
@@ -116,8 +117,31 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:00:00Z",
   "spec_first_policy": true,
   "commit_message_rules": {
-    "require_spec_ids": true
+    "require_spec_ids": true,
+    "pattern": "^(feat|fix|chore|docs|refactor|test)\\(spec\\): .+ \\[[a-z]+-[a-z0-9-]+\\]$",
+    "id_pattern_ref": {
+      "id": "cn:core:id_pattern:conventional-commit",
+      "kind": "id_pattern",
+      "label": "conventional-commit",
+      "version": "1.0.0"
+    }
   },
-  "canonical_refs_used": []
+  "policy_ref": {
+    "id": "cn:core:policy:spec-first",
+    "kind": "policy",
+    "label": "spec-first",
+    "version": "1.0.0"
+  },
+  "command_ref": {
+    "id": "cn:core:command:governance-check",
+    "kind": "command",
+    "label": "governance-check",
+    "version": "1.0.0"
+  },
+  "canonical_refs_used": [
+    {"id": "cn:core:id_pattern:conventional-commit", "kind": "id_pattern", "version": "1.0.0"},
+    {"id": "cn:core:policy:spec-first", "kind": "policy", "version": "1.0.0"},
+    {"id": "cn:core:command:governance-check", "kind": "command", "version": "1.0.0"}
+  ]
 }
 ```

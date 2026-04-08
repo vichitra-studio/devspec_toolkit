@@ -328,6 +328,21 @@
       }
     },
     {
+      "id": "cn:core:command:governance-check",
+      "kind": "command",
+      "preferred_label": "governance-check",
+      "definition": "Validate commit messages, PR rules, and spec-first policy enforcement for a spec repository.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-04-08T00:00:00Z"
+      }
+    },
+    {
       "id": "cn:core:interface:ask",
       "kind": "interface",
       "preferred_label": "ask",

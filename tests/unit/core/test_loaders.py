@@ -5,9 +5,6 @@ Created by FIX-043 (Batch 5).
 from __future__ import annotations
 
 import json
-import os
-import re
-from pathlib import Path
 
 import pytest
 
@@ -202,8 +199,11 @@ class TestLoadUpstreamIds:
         )
         assert result == {"fr-host"}
 
-    def test_toolkit_spec_takes_precedence_over_spec_root(self, tmp_path):
-        """Toolkit spec/ is checked first; spec_root is only a fallback."""
+    def test_spec_root_takes_precedence_over_toolkit_spec(self, tmp_path):
+        """spec_root is searched first when provided and distinct from toolkit
+        spec/. This prevents the toolkit's own fixture specs from shadowing the
+        host repo's artifacts in submodule deployments (see loaders.load_upstream_ids
+        docstring)."""
         toolkit = tmp_path / "toolkit"
         (toolkit / "spec").mkdir(parents=True)
         (toolkit / "spec" / "04_frs.json").write_text(
@@ -222,7 +222,7 @@ class TestLoadUpstreamIds:
             toolkit, "04", "requirements", "fr_id",
             spec_root=str(host_spec),
         )
-        assert result == {"fr-toolkit"}
+        assert result == {"fr-host"}
 
     def test_spec_root_none_skips_fallback(self, tmp_path):
         """When spec_root is None, the fallback path is not consulted."""
