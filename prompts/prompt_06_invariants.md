@@ -97,6 +97,7 @@ Before emitting, verify:
 - **Scoping**: Describe each invariant in business language first, then map `scope.components` or `scope.apis` to constrain where it applies.
 - **Severity**: Tag severity as `error` for hard guarantees and `warn` for observability alerts to guide escalation paths.
 - **Trace**: Link invariants to FRs, NFRs, or governance rules using `trace` so auditors know why the rule exists.
+- **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample.
 
 **Semantic Drift Prevention**: When tracing an invariant to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Enforces: 'The system shall authenticate a registered user and return a signed session token.'"`. This prevents trace drift when FR text is revised.
 

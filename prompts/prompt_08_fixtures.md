@@ -108,6 +108,33 @@ Before emitting, verify:
 - Which inputs/outputs are necessary and sufficient to prove the behavior? Any non-deterministic fields to ignore?
 - Which scenarios must run as smoke/contract in CI vs e2e? Any red-team cases to add now?
 
+## Invariant Evaluation Sample
+
+If Step 06 declares any invariants in a runtime-evaluable language (`cel` or `jsonlogic`), the project needs a dedicated sample fixture that provides the evaluation context for `invariants-check`. Without it, the CI gate added in Step 12 cannot exercise the rules and will either report zero evaluable rules or fail outright.
+
+**Location.** Write the sample to `spec/samples/invariants_sample.json` in the project's spec directory. This is a dedicated file — do not embed it in `spec/08_fixtures.json`. Its shape (a context-only document) and its lifecycle (tracks Step 06, not Step 05) are different from request/response fixtures.
+
+**Shape.** A single JSON document that populates every variable path referenced by the CEL or JSONLogic expressions in `spec/06_invariants.json`. The sample should represent one consistent happy-path scenario in which every invariant evaluates to `true`.
+
+**Derivation procedure.** Walk every expression in Step 06, extract all variable references (e.g. `post.status`, `request.user.role`, `response.headers.cache_control`), take the union of those paths, and populate each one with a realistic value drawn from Step 05 contracts or Step 08 fixture data. Use concrete values — never `"TBD"` or other sentinels. Keep CEL-compatible key names (alphanumeric plus underscores); map hyphenated header names or similar to underscore form in the sample.
+
+**Maintenance contract.** Any PR that adds, modifies, or removes an invariant in Step 06 MUST update this sample in the same PR. This is part of downstream replay discipline. Once Step 12 wires `invariants-check` into CI, a broken sample breaks CI.
+
+**Verification.** After authoring or updating the sample, run:
+
+```bash
+./tools/run_specdev.sh invariants-check <spec_dir> \
+  --sample spec/samples/invariants_sample.json \
+  --repo-root <toolkit_root> \
+  [--spec-root ./spec] [--git-root .]
+```
+
+Iterate until every rule reports `evaluable=true` and `result=true`. Any rule that stays unevaluable signals either a missing variable path in the sample or a malformed expression in Step 06 — fix the true root cause; do not weaken the sample to hide the problem. Run with `--strict` (or `SPECDEV_INVARIANTS_STRICT=1`) once the sample is complete so unevaluable rules become CI errors.
+
+**When no sample is needed.** If every invariant in Step 06 uses a non-runtime language (`prose`, `informal`, or similar) and none are runtime-evaluable, the sample file is not required. Make this determination explicitly by inspecting `spec/06_invariants.json` — do not assume.
+
+See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 12 (`prompt_12_ci_gates.md`) for the CI gate that consumes this sample.
+
 # Schema Reference
 - Schema URI: vc:08-fixtures
 - Schema File: schema/08_fixtures.schema.json

@@ -1,6 +1,79 @@
 
+# CEL evaluator: uses cel-python (imported as `celpy`, distributed on PyPI as
+# `cel-python`). This library is the maintained pure-Python CEL implementation
+# and supports the features exercised by real-world Step 06 invariants:
+# ternaries, collection macros (.all/.exists/.filter), .contains/.startsWith/
+# .matches, size(...), has(...), and comparison/logical operators.
+#
+# Known gaps (as of cel-python 0.1.5):
+#   - `.split()` is a cel-go extension, not in the CEL spec proper; authors
+#     needing tokenisation should pre-split values in the sample fixture.
+# If cel-python becomes unmaintained or drops features, swap this module for a
+# bind to google-cel or a hand-rolled evaluator — the _cel_eval surface is
+# intentionally narrow to make substitution cheap.
 from __future__ import annotations
-import os, json
+import json
+import os
+
+# Pre-declare with a common base so both the happy path (real celpy classes)
+# and the fallback path (Exception sentinel) are type-compatible.
+_CelParseError: type[Exception]
+_CelEvalError: type[Exception]
+
+try:  # pragma: no cover - import guard
+    import celpy  # type: ignore[import]
+    from celpy.adapter import json_to_cel as _cel_json_to_cel  # type: ignore[import]
+    _CEL_AVAILABLE = True
+    _CEL_ENV = celpy.Environment()
+    # Bind exception classes to module-level names so _cel_eval never needs to
+    # access attributes on the module reference (which Pyright types as optional).
+    _CelParseError = celpy.CELParseError
+    _CelEvalError = celpy.CELEvalError
+except Exception:  # pragma: no cover - library absent or broken at import time
+    _CEL_AVAILABLE = False
+    _CEL_ENV = None
+    _cel_json_to_cel = None  # type: ignore[assignment]
+    # Sentinels: the _CEL_AVAILABLE guard in _cel_eval returns before these are
+    # ever reached, but they must be assigned so the name is always bound.
+    _CelParseError = Exception
+    _CelEvalError = Exception
+
+
+def _cel_eval(expr_str, ctx):
+    """Compile and evaluate a CEL expression string against *ctx*.
+
+    Returns a tuple ``(raw_value, evaluable_flag, reason)`` where ``reason`` is
+    ``None`` on success or a short machine-readable token on failure
+    (``"cel_unavailable"``, ``"cel_parse_error"``, ``"cel_eval_error"``).
+    """
+    if not _CEL_AVAILABLE:
+        return None, False, "cel_unavailable"
+
+    # Bind module-level objects to locals so static analysers can narrow them.
+    # _CEL_AVAILABLE=True guarantees these were set in the try block above.
+    env = _CEL_ENV
+    j2c = _cel_json_to_cel
+    assert env is not None and j2c is not None
+
+    try:
+        ast = env.compile(expr_str)
+        prog = env.program(ast)
+    except _CelParseError:
+        return None, False, "cel_parse_error"
+    try:
+        # celpy rejects identifiers that are not valid CEL names (e.g. keys
+        # containing '-'). Skip those at the activation level so JSONLogic-style
+        # samples (which allow arbitrary keys) do not break CEL evaluation.
+        activation = {
+            k: j2c(v)
+            for k, v in (ctx or {}).items()
+            if isinstance(k, str) and k.replace("_", "").isalnum() and not k[:1].isdigit()
+        }
+        raw = prog.evaluate(activation)
+    except (_CelEvalError, ValueError):
+        return None, False, "cel_eval_error"
+    return raw, True, None
+
 
 def _tiny_eval(expr, ctx):
     # Minimal JSONLogic subset for offline environments.
@@ -46,6 +119,7 @@ def _tiny_eval(expr, ctx):
                 return v is None or v == "" or v == [] or v == {}
     return None
 
+
 def run_invariants(spec_dir: str, sample: dict) -> list[dict]:
     out = []
     # find 06_invariants.json files
@@ -64,10 +138,10 @@ def run_invariants(spec_dir: str, sample: dict) -> list[dict]:
                         lang = rule.get("language", "jsonlogic")
                         expr = rule.get("expression")
                         evaluable = True
-                        if lang != "jsonlogic":
-                            ok = None
-                            evaluable = False
-                        else:
+                        ok = None
+                        reason = None
+                        unsupported_language = None
+                        if lang == "jsonlogic":
                             try:
                                 parsed = (json.loads(expr)
                                           if isinstance(expr, str) and expr.strip()[:1] in ("{", "[")
@@ -76,12 +150,41 @@ def run_invariants(spec_dir: str, sample: dict) -> list[dict]:
                             except (TypeError, ValueError, IndexError, KeyError, AttributeError):
                                 ok = None
                                 evaluable = False
-                        if evaluable and not isinstance(ok, bool):
-                            evaluable = False  # unknown op, unresolved var, or non-boolean result
-                        out.append({
+                                reason = "jsonlogic_eval_error"
+                            if evaluable and not isinstance(ok, bool):
+                                evaluable = False
+                                reason = "non_boolean_result" if ok is not None else "unresolved_expression"
+                        elif lang == "cel":
+                            if not isinstance(expr, str):
+                                evaluable = False
+                                reason = "cel_expression_not_string"
+                            else:
+                                raw, evaluable, reason = _cel_eval(expr, sample)
+                                if evaluable:
+                                    # Only booleans count as evaluated invariant results.
+                                    try:
+                                        is_bool = isinstance(raw, bool) or type(raw).__name__ == "BoolType"
+                                    except Exception:
+                                        is_bool = False
+                                    if not is_bool:
+                                        evaluable = False
+                                        reason = "non_boolean_result"
+                                    else:
+                                        ok = bool(raw)
+                        else:
+                            evaluable = False
+                            unsupported_language = lang
+                            reason = "unsupported_language"
+                        record = {
                             "inv_id": rule.get("inv_id"),
                             "description": rule.get("description"),
                             "result": bool(ok) if evaluable else False,
                             "evaluable": evaluable,
-                        })
+                            "language": lang,
+                        }
+                        if reason is not None:
+                            record["unevaluable_reason"] = reason
+                        if unsupported_language is not None:
+                            record["unsupported_language"] = unsupported_language
+                        out.append(record)
     return out

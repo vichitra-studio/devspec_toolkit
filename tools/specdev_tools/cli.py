@@ -182,6 +182,7 @@ def main():
     inv.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     inv.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     inv.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+    inv.add_argument("--strict", action="store_true", help="Promote unevaluable rules to errors (also: SPECDEV_INVARIANTS_STRICT=1)")
 
     sl = sub.add_parser("seed-lint")
     sl.add_argument("spec_dir")
@@ -503,18 +504,71 @@ def main():
         with open(args.sample, "r", encoding="utf-8") as fh:
             sample = json.load(fh)
         res = run_invariants(spec_dir, sample)
+
+        strict = bool(getattr(args, "strict", False)) or os.environ.get(
+            "SPECDEV_INVARIANTS_STRICT", ""
+        ).lower() in ("1", "true", "yes")
+
+        failed = [r for r in res if r.get("evaluable") and not r.get("result")]
+        unevaluable = [r for r in res if not r.get("evaluable")]
+
+        errors_list = [
+            {
+                "code": "E_INVARIANT_VIOLATION",
+                "inv_id": r.get("inv_id"),
+                "description": r.get("description"),
+            }
+            for r in failed
+        ]
+        warnings_list = [
+            {
+                "code": "W_INVARIANT_UNEVALUABLE",
+                "inv_id": r.get("inv_id"),
+                "description": r.get("description"),
+                "reason": r.get("unevaluable_reason", "unknown"),
+            }
+            for r in unevaluable
+        ]
+
+        if strict:
+            errors_list = errors_list + [
+                {
+                    "code": "E_INVARIANT_UNEVALUABLE",
+                    "inv_id": w["inv_id"],
+                    "description": w["description"],
+                    "reason": w["reason"],
+                }
+                for w in warnings_list
+            ]
+            warnings_list = []
+
+        status = "FAIL" if errors_list else "PASS"
+        exit_code = 1 if errors_list else 0
+
         if getattr(args, "json_output", False):
             envelope = {
-                "status": "PASS",
-                "error_count": 0,
-                "warning_count": 0,
+                "status": status,
+                "error_count": len(errors_list),
+                "warning_count": len(warnings_list),
                 "command": "invariants-check",
-                "errors": [],
+                "errors": errors_list,
+                "warnings": warnings_list,
                 "result": res,
             }
             print(json.dumps(envelope, indent=2))
         else:
-            print(json.dumps(res, indent=2))
+            total = len(res)
+            print(
+                f"invariants-check: {total} rules, "
+                f"{len(failed)} failed, {len(unevaluable)} unevaluable"
+            )
+            for r in failed:
+                print(f"  FAIL {r.get('inv_id')}: {r.get('description')}")
+            for r in unevaluable:
+                reason = r.get("unevaluable_reason", "unknown")
+                label = "ERROR" if strict else "WARN"
+                print(f"  {label} {r.get('inv_id')}: {r.get('description')} ({reason})")
+        sys.exit(exit_code)
     elif args.cmd == "seed-lint":
         from .validation.seed_lint import lint_seeds
         repo_root = os.path.abspath(args.repo_root)
