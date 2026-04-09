@@ -3,25 +3,24 @@ from __future__ import annotations
 import os, json, re
 
 from ..core.errors import SpecError, make_error
+from ..core.loaders import iter_spec_artifacts
 
 def load_governance(spec_dir: str) -> dict | None:
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                p = os.path.join(root, fn)
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                except (OSError, json.JSONDecodeError):
-                    continue
-                
-                # Check by filename pattern (standard)
-                if fn.startswith("10_"):
-                    return data
-                
-                # Fallback: check by ID pattern
-                if isinstance(data, dict) and data.get("id", "").startswith("governance-"):
-                    return data
+    for p in iter_spec_artifacts(spec_dir):
+        fn = os.path.basename(p)
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        # Check by filename pattern (standard)
+        if fn.startswith("10_"):
+            return data
+
+        # Fallback: check by ID pattern
+        if isinstance(data, dict) and data.get("id", "").startswith("governance-"):
+            return data
     return None
 
 def check_commit_message(spec_dir: str, message: str) -> list[SpecError]:

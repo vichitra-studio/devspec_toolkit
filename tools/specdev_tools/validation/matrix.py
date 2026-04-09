@@ -4,6 +4,7 @@ import collections
 import os, json, warnings
 
 from ..core.errors import SpecError, make_error, render_errors
+from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type
 from .cross_artifact_checks import (
     collect_capability_ids,
@@ -131,15 +132,12 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
     defined in :mod:`cross_artifact_checks`.
     """
     artifacts = {}
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                p = os.path.join(root, fn)
-                try:
-                    data = load_json(p)
-                    artifacts[p] = data
-                except (OSError, json.JSONDecodeError):
-                    pass
+    for p in iter_spec_artifacts(spec_dir):
+        try:
+            data = load_json(p)
+            artifacts[p] = data
+        except (OSError, json.JSONDecodeError):
+            pass
 
     known_ids, references = collect_definitions_and_references(artifacts)
 
@@ -175,15 +173,12 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
     
     # Collect step artifacts
     artifacts = {}
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                p = os.path.join(root, fn)
-                try:
-                    data = load_json(p)
-                    artifacts[data.get("id", p)] = data
-                except (OSError, json.JSONDecodeError):
-                    pass
+    for p in iter_spec_artifacts(spec_dir):
+        try:
+            data = load_json(p)
+            artifacts[data.get("id", p)] = data
+        except (OSError, json.JSONDecodeError):
+            pass
 
     # Dynamic entity indexing: discover entities by _id fields + canon trace type validation
     entity_index = collections.defaultdict(list)  # normalized_trace_type -> [entity_objects]

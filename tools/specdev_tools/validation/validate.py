@@ -27,7 +27,7 @@ from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import PROMOTABLE_PAIRS, SpecError, make_error
-from ..core.loaders import load_json_artifact, load_sibling_artifact
+from ..core.loaders import iter_spec_artifacts, load_json_artifact, load_sibling_artifact
 from ..core.registry import SchemaRegistry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
@@ -226,21 +226,17 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
     if _has_canonical_bootstrap_failure(canonical_preflight_errors):
         return canonical_preflight_errors
 
-    for root, dirs, files in os.walk(spec_dir):
-        dirs[:] = [d for d in dirs if d != "migration_backups"]
-        for fn in files:
-            if fn.endswith(".json"):
-                file_path = os.path.join(root, fn)
-                failures.extend(
-                    validate_file(
-                        repo_root,
-                        file_path,
-                        include_quality_lint=False,
-                        include_canonical_integrity=False,
-                        git_root=git_root,
-                        spec_root=spec_root,
-                    )
-                )
+    for file_path in iter_spec_artifacts(spec_dir):
+        failures.extend(
+            validate_file(
+                repo_root,
+                file_path,
+                include_quality_lint=False,
+                include_canonical_integrity=False,
+                git_root=git_root,
+                spec_root=spec_root,
+            )
+        )
 
     failures.extend(lint_spec_quality(spec_dir))
     if canonical_preflight_errors:

@@ -6,6 +6,7 @@ import re as _re
 from typing import Dict, List, Set
 
 from ..core.errors import SpecError, ensure_spec_errors, make_error
+from ..core.loaders import iter_spec_artifacts
 from .validate import validate_file
 
 
@@ -90,36 +91,32 @@ def _check_seed_content_overlap(
             if os.path.isfile(resolved):
                 seed_paths[seed["seed_id"]] = resolved
 
-    for root_dir, _, files in os.walk(spec_dir):
-        for fn in files:
-            if not fn.endswith(".json"):
+    for file_path in iter_spec_artifacts(spec_dir):
+        try:
+            with open(file_path, "r", encoding="utf-8") as fh:
+                instance = json.load(fh)
+        except Exception:
+            continue
+        step_id = _step_from_path(file_path)
+        required_seeds = _collect_required_seeds(manifest, step_id)
+        if not required_seeds:
+            continue
+        spec_text = json.dumps(instance)
+        spec_tokens = _tokenize(spec_text)
+        for sid in required_seeds:
+            if sid not in seed_paths:
                 continue
-            file_path = os.path.join(root_dir, fn)
             try:
-                with open(file_path, "r", encoding="utf-8") as fh:
-                    instance = json.load(fh)
+                with open(seed_paths[sid], "r", encoding="utf-8") as fh:
+                    seed_text = fh.read()
             except Exception:
                 continue
-            step_id = _step_from_path(file_path)
-            required_seeds = _collect_required_seeds(manifest, step_id)
-            if not required_seeds:
-                continue
-            spec_text = json.dumps(instance)
-            spec_tokens = _tokenize(spec_text)
-            for sid in required_seeds:
-                if sid not in seed_paths:
-                    continue
-                try:
-                    with open(seed_paths[sid], "r", encoding="utf-8") as fh:
-                        seed_text = fh.read()
-                except Exception:
-                    continue
-                seed_tokens = _tokenize(seed_text)
-                shared = len(spec_tokens & seed_tokens)
-                if shared < 3:
-                    errors.append(make_error(
-                        "W140", f"SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={fn} shared_tokens={shared}"
-                    ))
+            seed_tokens = _tokenize(seed_text)
+            shared = len(spec_tokens & seed_tokens)
+            if shared < 3:
+                errors.append(make_error(
+                    "W140", f"SEED_CONTENT_OVERLAP_LOW seed_id={sid} artifact={os.path.basename(file_path)} shared_tokens={shared}"
+                ))
 
 
 def lint_seeds(

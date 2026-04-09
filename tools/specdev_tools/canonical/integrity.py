@@ -24,6 +24,7 @@ from urllib.parse import urldefrag, urljoin
 from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
+from ..core.loaders import iter_spec_artifacts
 from ..core.registry import SchemaRegistry
 
 
@@ -137,10 +138,7 @@ def validate_canonical_integrity_file(
 
 
 def _iter_json_files(spec_dir: str):
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                yield os.path.join(root, fn)
+    yield from iter_spec_artifacts(spec_dir)
 
 
 def _uniq(messages: list[SpecError]) -> list[SpecError]:

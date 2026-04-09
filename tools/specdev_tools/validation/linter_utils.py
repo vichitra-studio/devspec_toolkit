@@ -13,6 +13,7 @@ import re
 from typing import Any, Iterator
 
 from ..core.errors import SpecError, make_error
+from ..core.loaders import iter_spec_artifacts
 
 
 # ---------------------------------------------------------------------------
@@ -68,11 +69,13 @@ def tokenize_free_text(text: str, *, stopwords: frozenset[str] | None = None) ->
 # ---------------------------------------------------------------------------
 
 def iter_json(spec_dir: str) -> Iterator[str]:
-    """Yield paths to all ``.json`` files under *spec_dir*, recursively."""
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                yield os.path.join(root, fn)
+    """Yield paths to all ``.json`` spec artifacts under *spec_dir*, recursively.
+
+    Delegates to :func:`~specdev_tools.core.loaders.iter_spec_artifacts` so
+    non-artifact subdirectories (``samples/``, ``migration_backups/``) are
+    excluded consistently across all callers.
+    """
+    yield from iter_spec_artifacts(spec_dir)
 
 
 # ---------------------------------------------------------------------------

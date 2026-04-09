@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os, json, warnings
 from ..core.errors import SpecError, make_error
+from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
 
 # ---------------------------------------------------------------------------
@@ -32,31 +33,28 @@ def lint_fixtures(spec_dir: str) -> list[SpecError]:
     invariants = set()
     nfrs = set()
     fixtures = []
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                p = os.path.join(root, fn)
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                except (OSError, json.JSONDecodeError):
-                    continue
-                s = data.get("$schema","")
-                if s.endswith("/05_interface_contracts.schema.json"):
-                    for a in data.get("apis", []):
-                        if a.get("api_id"):
-                            apis.add(a["api_id"])
-                if s.endswith("/08_fixtures.schema.json"):
-                    fixtures.extend(data.get("fixtures", []))
-                if s.endswith("/04_fr_list.schema.json"):
-                    for item in data.get("functional_requirements", []):
-                        if item.get("fr_id"): frs.add(item["fr_id"])
-                if s.endswith("/06_invariants.schema.json"):
-                    for item in data.get("rules", []):
-                        if item.get("inv_id"): invariants.add(item["inv_id"])
-                if s.endswith("/07_nfrs.schema.json"):
-                    for item in data.get("nfrs", []):
-                        if item.get("nfr_id"): nfrs.add(item["nfr_id"])
+    for p in iter_spec_artifacts(spec_dir):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        s = data.get("$schema","")
+        if s.endswith("/05_interface_contracts.schema.json"):
+            for a in data.get("apis", []):
+                if a.get("api_id"):
+                    apis.add(a["api_id"])
+        if s.endswith("/08_fixtures.schema.json"):
+            fixtures.extend(data.get("fixtures", []))
+        if s.endswith("/04_fr_list.schema.json"):
+            for item in data.get("functional_requirements", []):
+                if item.get("fr_id"): frs.add(item["fr_id"])
+        if s.endswith("/06_invariants.schema.json"):
+            for item in data.get("rules", []):
+                if item.get("inv_id"): invariants.add(item["inv_id"])
+        if s.endswith("/07_nfrs.schema.json"):
+            for item in data.get("nfrs", []):
+                if item.get("nfr_id"): nfrs.add(item["nfr_id"])
 
     for fx in fixtures:
         fid = fx.get("fixture_id","<unknown>")

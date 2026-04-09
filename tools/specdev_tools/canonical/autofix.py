@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
+from ..core.loaders import iter_spec_artifacts
 from ..core.registry import SchemaRegistry
 from ..core.constants import INFERENCE_RULES
 
@@ -149,10 +150,7 @@ def _try_infer_ref(
 
 
 def _iter_json(spec_dir: str):
-    for root, _, files in os.walk(spec_dir):
-        for fn in files:
-            if fn.endswith(".json"):
-                yield os.path.join(root, fn)
+    yield from iter_spec_artifacts(spec_dir)
 
 
 def _load_schema_registry(repo_root: str) -> tuple[SchemaRegistry | None, str | None]:

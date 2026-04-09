@@ -11,7 +11,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +270,42 @@ def check_cross_step_refs(
 # ---------------------------------------------------------------------------
 # load_json_artifact — shared JSON loading with error handling
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# iter_spec_artifacts — canonical spec-dir file discovery
+# ---------------------------------------------------------------------------
+
+def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
+    """Yield paths to all ``.json`` spec artifacts under *spec_dir*, recursively.
+
+    # spec/samples/ holds runtime evaluation contexts (e.g. invariants_sample.json)
+    # consumed by invariants-check. These are NOT spec artifacts — they have no
+    # $schema, do not trace to canonical entries, and must be excluded from
+    # recursive spec-dir scanners. See prompt_08_fixtures.md § "Invariant
+    # Evaluation Sample" for the authoring contract.
+
+    Exclusion rules:
+    - ``<spec_dir>/samples/`` — excluded at the **first level only**; a
+      hypothetical ``spec/03_glossary/samples/`` would still be scanned.
+    - ``migration_backups/`` — excluded at all levels (toolkit convention).
+
+    All callers that need to discover spec artifacts recursively must route
+    through this helper so the exclusion is enforced in exactly one place.
+    """
+    for root, dirnames, files in os.walk(spec_dir):
+        rel = os.path.relpath(root, spec_dir)
+        if rel == ".":
+            # Top-level: exclude both samples/ and migration_backups/
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in ("samples", "migration_backups")
+            ]
+        else:
+            dirnames[:] = [d for d in dirnames if d != "migration_backups"]
+        for fn in files:
+            if fn.endswith(".json"):
+                yield os.path.join(root, fn)
+
 
 def load_json_artifact(path: str | Path) -> dict[str, Any]:
     """Load a JSON file and return its contents as a dict.

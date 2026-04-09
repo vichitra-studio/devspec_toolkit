@@ -15,6 +15,7 @@ from typing import Any
 
 from ..core.config import reset_config
 from ..core.errors import SpecError
+from ..core.loaders import iter_spec_artifacts
 
 
 def _classify(errors: list[SpecError]) -> dict[str, Any]:
@@ -52,20 +53,17 @@ def _run_checks(
 
     schema_errs: list[SpecError] = []
     if os.path.isdir(spec_dir):
-        for dirpath, dirnames, filenames in os.walk(spec_dir):
-            dirnames[:] = [d for d in dirnames if d != "migration_backups"]
-            for fn in filenames:
-                if fn.endswith(".json"):
-                    schema_errs.extend(
-                        validate_file(
-                            repo_root,
-                            os.path.join(dirpath, fn),
-                            include_quality_lint=False,
-                            include_canonical_integrity=False,
-                            git_root=git_root,
-                            spec_root=spec_root,
-                        )
-                    )
+        for file_path in iter_spec_artifacts(spec_dir):
+            schema_errs.extend(
+                validate_file(
+                    repo_root,
+                    file_path,
+                    include_quality_lint=False,
+                    include_canonical_integrity=False,
+                    git_root=git_root,
+                    spec_root=spec_root,
+                )
+            )
     checks["schema-validation"] = {**_classify(schema_errs), "errors": schema_errs}
 
     # --- 2. Spec quality lint ---
