@@ -130,11 +130,19 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     fr_ids: set[str] = set()
     if "frs" in data:
         for fr in data["frs"].get("functional_requirements", []):
-            if "fr_id" in fr:
-                fr_ids.add(fr["fr_id"])
+            # Capability traces are always collected — a `wont-have` FR still
+            # anchors its capability so W568 UNCOVERED_CAPABILITY does not fire.
             for cap_ref in fr.get("trace", []):
                 if isinstance(cap_ref, dict) and normalize_trace_type(cap_ref.get("type") or "") == _CAPABILITY_TRACE_TYPE and "id" in cap_ref:
                     fr_traced_caps.add(cap_ref["id"])
+            # Exclude `wont-have` FRs from downstream coverage checks — they
+            # are explicitly out-of-scope (parked for a later phase) and have
+            # no APIs, fixtures, or milestones by design. Including them
+            # produces false-positive W561/W564/W565/W566 warnings.
+            if fr.get("priority") == "wont-have":
+                continue
+            if "fr_id" in fr:
+                fr_ids.add(fr["fr_id"])
 
     milestone_fr_refs: set[str] = set()
     milestone_ids: set[str] = set()
