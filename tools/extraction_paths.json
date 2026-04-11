@@ -2,7 +2,7 @@
   "_meta": {
     "schema_hashes": {
       "vc:05-interface-contracts": "sha256:6a6d5432769f0940914c1ce3d54c08a5d265d94fc1884b55744995c21852a4a2",
-      "vc:00-charter": "sha256:e0aa5e991acae65112ec9be774acceee4b9c93cfbd8d802b31c300db52146bba",
+      "vc:00-charter": "sha256:142c6f8adfc56dd691e2b5d759b02883f58bca841919f5a736ff3842c13310bc",
       "vc:01-capabilities": "sha256:9707a1256cb76521ee783833aec47634d256d91440741c3758b660cab2a3ce3b",
       "vc:02-system-sketch": "sha256:8388b503298c58c7330b464035a411a311981845d7bce347709f40f26f284d8b",
       "vc:03-glossary": "sha256:1ebdf298beafc54ae0e61eb029a3d6952074808771013ce337e53c7f2c5a525e",
@@ -13,9 +13,11 @@
       "vc:08-fixtures": "sha256:586c2f64c924b7b8370a7112c2067c327309958a59c4972ae4106506aa40041a",
       "vc:09-impl-plan": "sha256:366b4e947d225d189e68db108b6149f639c769c46c3724628a32eeb59077ea28",
       "vc:10-governance": "sha256:1eaa6591462bcebbe7eaf5edb6e7016c434774268f0e419ed2187eb00e563c7d",
-      "vc:11-redteam": "sha256:7f1092d8c13e8cb1d55c40527aa4523894278b08ce781794df5f8c836b92145f"
+      "vc:11-redteam": "sha256:7f1092d8c13e8cb1d55c40527aa4523894278b08ce781794df5f8c836b92145f",
+      "vc:12-ci-gates": "sha256:2bb2bcd233dc9451b76d91462234c613d3110afd03ab1a1097fef86094cd5d8c",
+      "vc:13-extension-generator": "sha256:3a8e61ae195f05c6750d791c540a96ee005be8485fdcc33ef0134e74210def68"
     },
-    "generated_at": "2026-04-11T11:34:38Z"
+    "generated_at": "2026-04-11T12:17:28Z"
   },
   "05": {
     "05_interface_contracts.json": [
@@ -25,16 +27,16 @@
   },
   "00": {
     "00_charter.json": [
-      ".problem_statement",
-      ".user_segments",
-      ".success_metrics",
-      ".out_of_scope",
-      ".assumptions",
-      ".in_scope",
-      ".stakeholders",
       ".links",
-      ".risks",
-      ".title"
+      ".out_of_scope",
+      ".success_metrics",
+      ".stakeholders",
+      ".assumptions",
+      ".user_segments",
+      ".title",
+      ".problem_statement",
+      ".in_scope",
+      ".risks"
     ]
   },
   "01": {
@@ -109,6 +111,18 @@
       ".edge_cases",
       ".threats",
       ".trace"
+    ]
+  },
+  "12": {
+    "12_ci_gates.json": [
+      ".jobs",
+      ".trace"
+    ]
+  },
+  "13": {
+    "13_extension_manifest.json": [
+      ".extensions",
+      ".extension_decision"
     ]
   }
 }

@@ -12,7 +12,7 @@ Run the following commands to obtain machine-computed coverage data before emitt
 ```bash
 ./tools/run_specdev.sh completeness-check spec --repo-root ./devspec_toolkit --json
 ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --json
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/trace_matrix.json
+./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ```
 
 # Role

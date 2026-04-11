@@ -287,6 +287,9 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
     Exclusion rules:
     - ``<spec_dir>/samples/`` — excluded at the **first level only**; a
       hypothetical ``spec/03_glossary/samples/`` would still be scanned.
+    - ``<spec_dir>/extras/`` — excluded at the **first level only**; holds
+      generated toolkit artifacts (e.g. ``trace_matrix.json``) that are not
+      spec artifacts and have no ``$schema``.
     - ``migration_backups/`` — excluded at all levels (toolkit convention).
 
     All callers that need to discover spec artifacts recursively must route
@@ -295,10 +298,10 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
     for root, dirnames, files in os.walk(spec_dir):
         rel = os.path.relpath(root, spec_dir)
         if rel == ".":
-            # Top-level: exclude both samples/ and migration_backups/
+            # Top-level: exclude samples/, extras/, and migration_backups/
             dirnames[:] = [
                 d for d in dirnames
-                if d not in ("samples", "migration_backups")
+                if d not in ("samples", "extras", "migration_backups")
             ]
         else:
             dirnames[:] = [d for d in dirnames if d != "migration_backups"]
