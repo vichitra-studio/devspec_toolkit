@@ -78,7 +78,10 @@
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary domain entity this component owns or manages. Kind must be 'entity'. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"user\"} for a user service; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"order\"} for an order management service. Drives consistent naming in downstream FRs, APIs, and data models. Omit for infrastructure components (db, cache, queue) that don't own a specific domain entity.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
               }
             },
             "required": [
@@ -176,12 +179,18 @@
                 "minItems": 1
               },
               "interface_ref": {
-                "description": "Canonical reference to the named interface in the canonical registry for this connection's API contract. Kind must be 'entity'. Example: {\"id\": \"cn:project:entity:user-auth-api\", \"kind\": \"entity\", \"label\": \"User Auth API\"}. Use when this connection crosses a defined API boundary that will be formally specified in Step 05. If the interface is not yet named in canon, add a canonical_proposals entry. Distinct from schema_ref: interface_ref points to the contract owner; schema_ref points to the payload schema.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to the named interface in the canonical registry for this connection's API contract. Kind must be 'interface'. Example: {\"id\": \"cn:project:interface:user-auth-api\", \"kind\": \"interface\", \"label\": \"User Auth API\"}. Use when this connection crosses a defined API boundary that will be formally specified in Step 05. If the interface is not yet named in canon, add a canonical_proposals entry. Distinct from schema_ref: interface_ref points to the contract owner; schema_ref points to the payload schema.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "interface" } } }
+                ]
               },
               "event_ref": {
                 "description": "Canonical reference to the event type flowing through this connection. Required when protocol is 'event'. Kind must be 'event'. Example: {\"id\": \"cn:project:event:order-placed\", \"kind\": \"event\", \"label\": \"order-placed\"}. The event ID should match the topic or event type name in your message broker. Anti-pattern: using event_ref for REST endpoint connections — event_ref is only for async message-passing.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "event" } } }
+                ]
               }
             },
             "allOf": [

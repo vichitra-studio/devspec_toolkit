@@ -57,8 +57,11 @@
                 }
               },
               "tag_ref": {
-                "description": "Canonical reference to a tag defined in the canonical registry. Kind must be 'term'. Example: {\"id\": \"cn:project:term:smoke-test\", \"kind\": \"term\", \"label\": \"smoke\"}. Add a tag_ref when the tag represents a shared vocabulary term that other fixtures and CI configuration reference by ID. Decision rule: if a tag is used in only one fixture, omit tag_ref; if it's used across 5+ fixtures and referenced in CI config, define it in canon first.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to a tag defined in the canonical registry. Kind is structurally pinned to 'tag'. Example: {\"id\": \"cn:core:tag:critical-path\", \"kind\": \"tag\", \"label\": \"critical-path\"}. Add a tag_ref when the tag represents a shared vocabulary term that other fixtures and CI configuration reference by ID. Decision rule: if a tag is used in only one fixture, omit tag_ref; if it's used across 5+ fixtures and referenced in CI config, define it in canon first.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "tag" } } }
+                ]
               }
             },
             "required": [

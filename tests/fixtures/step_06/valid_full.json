@@ -30,8 +30,8 @@
         }
       ],
       "policy_ref": {
-        "id": "cn:project:term:authentication-policy",
-        "kind": "term"
+        "id": "cn:core:policy:spec-first",
+        "kind": "policy"
       }
     },
     {
@@ -56,10 +56,15 @@
         }
       ],
       "policy_ref": {
-        "id": "cn:project:term:data-consistency-policy",
-        "kind": "term"
+        "id": "cn:core:policy:spec-first",
+        "kind": "policy"
       }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:policy:spec-first",
+      "kind": "policy"
+    }
+  ]
 }

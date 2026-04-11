@@ -104,19 +104,31 @@
               },
               "capability_ref": {
                 "description": "Canonical registry entry for this capability's concept. Ensures the capability name is drawn from shared vocabulary rather than invented ad-hoc. Kind must be 'capability'. Example: {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}. The id must exist in canon/manifest.json before the spec is written, or a corresponding entry must be added to canonical_proposals. Validated by canonical-integrity lint at build time.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "capability" } } }
+                ]
               },
               "action_ref": {
                 "description": "Canonical registry entry for the action verb of this capability. Should align with the value in the 'verb' field. Kind must be 'action'. Example: {\"id\": \"cn:project:action:authenticate\", \"kind\": \"action\", \"label\": \"authenticate\"}. Ensures consistent verb vocabulary across all capabilities and downstream steps. Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "action" } } }
+                ]
               },
               "entity_ref": {
                 "description": "Canonical registry entry for the primary domain entity this capability operates on. Kind must be 'entity'. Examples: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"user\"} for user management capabilities; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"order\"} for order processing capabilities. Drives consistent naming in FRs, APIs, and data models downstream. Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
               },
               "role_ref": {
-                "description": "Canonical registry entry for the actor or role that exercises this capability. Kind must be 'entity' (roles are modelled as entities in the canon). Examples: {\"id\": \"cn:project:entity:end-user\", \"kind\": \"entity\", \"label\": \"end-user\"} for customer-facing capabilities; {\"id\": \"cn:project:entity:admin\", \"kind\": \"entity\", \"label\": \"admin\"} for admin-only capabilities. Should match a role defined in the canon manifest. Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "role" } } }
+                ],
+                "description": "Canonical registry entry for the actor or role that exercises this capability. Kind is structurally pinned to role. Examples: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"reviewer\"} for review capabilities; {\"id\": \"cn:project:role:admin\", \"kind\": \"role\", \"label\": \"admin\"} for admin-only capabilities. Should match a role defined in the canon manifest. Validated by canonical-integrity lint. Use real example ID: cn:core:role:reviewer"
               }
             },
             "required": [

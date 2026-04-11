@@ -465,7 +465,7 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "10": lambda instance, root, ctx: step_10.validate_step_10(instance, root),
     "11": lambda instance, root, ctx: step_11.validate_step_11(instance, root, ctx.get("artifact_path")),
     "12": lambda instance, root, ctx: step_12.validate_step_12(instance, root, ctx.get("spec_root")),
-    "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root),
+    "13": lambda instance, root, ctx: step_13.validate_step_13(instance, root, ctx.get("spec_root")),
     "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root, ctx.get("spec_root")),
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),

@@ -65,8 +65,11 @@
           "description": "Validation checks that have been run against the scaffold to confirm correctness. Each entry is a validator identifier (e.g., 'compile-check', 'lint-pass', 'unit-tests-green'). When build_status is 'green', at least one validator must be present."
         },
         "command_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the CLI command used to generate or validate this scaffold. Kind must be 'action'. Example: {\"id\": \"cn:core:action:specdev-scaffold-generate\", \"kind\": \"action\", \"label\": \"specdev scaffold generate\"}. Reference the specific specdev or build command that produces this scaffold. If the command is project-specific, define it in project canon (canon/manifest.json) before referencing it here. Validated by canonical-integrity lint."
+          "description": "Canonical reference to the CLI command used to generate or validate this scaffold. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:pytest\", \"kind\": \"command\"}. Reference the specific specdev or build command that produces this scaffold. Validated by canonical-integrity lint.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "command" } } }
+          ]
         },
         "build_status": {
           "type": "string",

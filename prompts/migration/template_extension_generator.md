@@ -14,13 +14,15 @@
 - `canonical_refs_used`: array of canonical reference objects used in this artifact
 
 - `$schema`: Must reference the URI above for the target toolkit version.
-- `extensions`: Array of extension descriptor objects (minItems: 1). Each entry requires:
-  - `extension_id`: String matching pattern `^ext-[0-9]{2}-[a-z0-9-]+$` (e.g., `ext-01-database`).
+- `extension_decision`: Required object with `status` (enum: `extensions-required`, `none-required`) and `rationale` (string, minLength: 40).
+- `extensions`: Array of extension descriptor objects (minItems: 0). When `status` is `none-required`, must be empty. Each entry requires:
+  - `extension_id`: String matching pattern `^ext-[0-9]{2}-[a-z0-9-]+$` (e.g., `ext-01-database`). Output filename is derived: hyphens → underscores + `.json`.
   - `title`: String — Title Case human-readable name (e.g., `Database Layer Extension`).
-  - `file_name`: String matching pattern `^ext_[0-9]{2}_[a-z0-9_]+\.json$` — derived from `extension_id` with hyphens replaced by underscores.
   - `area_of_concern`: String — canonical domain category (e.g., `AI`, `ML`, `Payments`, `Data`, `Security`, `Notifications`, `Infrastructure`).
+  - `justification`: String — rationale citing upstream FRs, NFRs, or components.
   - `required_schema_sections`: Array of section name strings — must include `trace` and `validation_rules` at minimum.
-  - `governance_label_ref`: Canonical reference object — required on every extension entry. **Note**: the schema contains an internal inconsistency: the `description` text states `kind: 'capability'`, while the inline example uses `kind: "term"`. Both values appear in the schema source; use whichever resolves correctly in your project's canonical registry and document the choice in `_migration_notes`.
+  - `schema_design_guidelines`: String (minLength: 40) — must contain at least one verification keyword (verif, test, check, validat, assert).
+  - `governance_label_ref`: Canonical reference object with `kind` structurally pinned to `governance_label`. Example: `{"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}`.
 
 ## Output Contract
 
@@ -52,8 +54,8 @@ The extension generator manifest declares all domain-specific spec extensions
 (e.g., database schema, session management) that supplement the core pipeline.
 Each extension produces an `ext_NN_*.json` file that must conform to the
 `required_schema_sections` listed here. During migration, verify that every
-`extension_id` and `file_name` still adhere to their strict regex patterns —
-re-number them if the ordering has changed. The `governance_label_ref` must
+`extension_id` values still adhere to their strict regex pattern —
+re-number them if the ordering has changed. File names are derived from extension_id (hyphens → underscores + `.json`). The `governance_label_ref` must
 resolve in the canonical registry; check that the referenced label still exists
 in the target toolkit version. Extensions are consumed by the completeness
 assessment (Step 13a) so extension IDs should not change after that step has

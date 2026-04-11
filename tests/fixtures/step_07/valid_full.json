@@ -145,5 +145,22 @@
       ]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:environment:prod",
+      "kind": "environment"
+    },
+    {
+      "id": "cn:core:metric:error-rate",
+      "kind": "metric"
+    },
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit"
+    }
+  ]
 }

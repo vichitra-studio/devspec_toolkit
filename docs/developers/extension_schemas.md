@@ -28,19 +28,33 @@ All extensions follow a strict naming pattern to ensure correct ordering and ing
 
 The manifest (`13_extension_manifest.json`) dictates which extensions exist. It validates against `schema/13_extension_generator.schema.json`.
 
+The manifest requires an `extension_decision` field declaring whether extensions are needed. When `status` is `"none-required"`, the `extensions` array must be empty. When `status` is `"extensions-required"`, at least one extension entry is required.
+
+> **Note (Deferred-07)**: Per-project extension schema discovery (`schema/ext_*.schema.json`) is not yet implemented in the toolkit. `tools/schema_registry.json` is a static map. Extension schemas must be manually registered. See [schema_registry.json](../../tools/schema_registry.json).
+
 ```json
 {
   "$schema": "vc:13-extension-generator",
-  "id": "13-extension-manifest",
+  "id": "extension-generator-v1",
+  "owner": "engineering",
+  "created_at": "2025-01-15T00:00:00Z",
+  "extension_decision": {
+    "status": "extensions-required",
+    "rationale": "The Data domain requires dedicated entity-relationship, migration, and index strategy sections."
+  },
   "extensions": [
     {
       "extension_id": "ext-01-database",
       "title": "Database Schema Specification",
-      "file_name": "ext_01_database_schema.json",
       "area_of_concern": "Data Persistence",
-      "justification": "System Sketch defines complex relational + vector data needs.",
-      "required_schema_sections": ["tables", "indexes", "relationships", "vector_config"]
+      "justification": "System Sketch defines complex relational and vector data needs requiring dedicated entity-relationship, migration, and index strategy sections.",
+      "required_schema_sections": ["tables", "indexes", "relationships", "vector_config"],
+      "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Validate foreign key integrity across relationships.",
+      "governance_label_ref": {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
     }
+  ],
+  "canonical_refs_used": [
+    {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
   ]
 }
 ```

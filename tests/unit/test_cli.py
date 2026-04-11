@@ -1715,10 +1715,12 @@ class CliTests(unittest.TestCase):
             env_values = ["dev", "ci", "staging", "prod"]
             stage_values = ["dev", "ci", "staging", "prod"]
             nfr_values = ["latency", "throughput", "availability"]
+            owner_values = ["api", "ui", "system", "ops", "data", "product", "business", "engineering"]
 
             (kinds_dir / "environment.json").write_text(_canon_kind("environment", env_values), encoding="utf-8")
             (kinds_dir / "stage.json").write_text(_canon_kind("stage", stage_values), encoding="utf-8")
             (kinds_dir / "nfr_category.json").write_text(_canon_kind("nfr_category", nfr_values), encoding="utf-8")
+            (kinds_dir / "owner.json").write_text(_canon_kind("owner", owner_values), encoding="utf-8")
 
             # --- schema files matching the three _ENUM_CANON_PAIRINGS ---
             schema_core = root / "schema" / "core"
@@ -1736,6 +1738,7 @@ class CliTests(unittest.TestCase):
                 json.dumps({
                     "$defs": {
                         "nfrCategory": {"enum": nfr_values},
+                        "owner": {"enum": owner_values},
                     },
                 }),
                 encoding="utf-8",

@@ -927,21 +927,6 @@ class SchemaContractsTests(unittest.TestCase):
             f"Expected 'replaced_by' in WARN message, got: {rendered_warns}",
         )
 
-
-def _collect_all_properties(schema: dict) -> dict:
-    """Collect properties from a schema, merging allOf entries if present.
-
-    Handles both legacy flat schemas (properties at top level) and
-    allOf-composed schemas (properties split across allOf entries and
-    inherited from $ref targets like step_base).
-    """
-    props = dict(schema.get("properties", {}))
-    for entry in schema.get("allOf", []):
-        if isinstance(entry, dict) and "properties" in entry:
-            props.update(entry["properties"])
-    return props
-
-
     # ------------------------------------------------------------------
     # M10 — minItems contract tests for Step 11 and Step 12
     # ------------------------------------------------------------------
@@ -974,7 +959,6 @@ def _collect_all_properties(schema: dict) -> dict:
         ) as f:
             payload = json.load(f)
         payload.pop("$schema", None)
-        # Set target_ids to empty on the first threat
         payload["threats"][0]["target_ids"] = []
 
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
@@ -1003,6 +987,34 @@ def _collect_all_properties(schema: dict) -> dict:
         self.assertTrue(jobs_errors, msg="Empty jobs[] must be rejected by minItems constraint")
 
 
+def _collect_all_properties(schema: dict) -> dict:
+    """Collect properties from a schema, merging allOf entries if present.
+
+    Handles both legacy flat schemas (properties at top level) and
+    allOf-composed schemas (properties split across allOf entries and
+    inherited from $ref targets like step_base).
+    """
+    props = dict(schema.get("properties", {}))
+    for entry in schema.get("allOf", []):
+        if isinstance(entry, dict) and "properties" in entry:
+            props.update(entry["properties"])
+    return props
+
+
+def _is_canonical_ref(value: dict) -> bool:
+    """Check if a property value references canonicalRef (direct $ref or allOf pattern)."""
+    if "canonicalRef" in value.get("$ref", ""):
+        return True
+    # FC pattern: allOf: [{$ref: "...canonicalRef..."}, {properties: {kind: {const: ...}}}]
+    all_of = value.get("allOf")
+    if isinstance(all_of, list):
+        return any(
+            isinstance(item, dict) and "canonicalRef" in item.get("$ref", "")
+            for item in all_of
+        )
+    return False
+
+
 def _count_canonical_ref_slots(obj) -> int:
     count = 0
     if isinstance(obj, dict):
@@ -1012,7 +1024,7 @@ def _count_canonical_ref_slots(obj) -> int:
                 if (
                     key.endswith("_ref")
                     and isinstance(value, dict)
-                    and "canonicalRef" in value.get("$ref", "")
+                    and _is_canonical_ref(value)
                 ):
                     count += 1
         for value in obj.values():
@@ -1032,7 +1044,7 @@ def _collect_canonical_ref_kinds(obj) -> set[str]:
                 if (
                     key.endswith("_ref")
                     and isinstance(value, dict)
-                    and "canonicalRef" in value.get("$ref", "")
+                    and _is_canonical_ref(value)
                 ):
                     kinds.add(key[:-4])
                 kinds.update(_collect_canonical_ref_kinds(value))

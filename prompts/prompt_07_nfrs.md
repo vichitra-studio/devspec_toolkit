@@ -126,7 +126,7 @@ Before emitting, verify:
       "target": 200,
       "unit": "ms",
       "metric_ref": { "id": "cn:core:metric:p95-response-time", "kind": "metric" },
-      "unit_ref": { "id": "cn:core:term:ms", "kind": "term" },
+      "unit_ref": { "id": "cn:core:unit:ms", "kind": "unit" },
       "environment_ref": { "id": "cn:core:environment:prod", "kind": "environment" },
       "measurement_method": "P95 latency via APM dashboard, 5-min rolling window",
       "stage": "prod",

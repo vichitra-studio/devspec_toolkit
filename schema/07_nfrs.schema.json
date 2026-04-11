@@ -90,19 +90,31 @@
               },
               "metric_ref": {
                 "description": "Canonical reference binding the 'metric' string to a shared vocabulary entry in the canonical registry. Format rule: use a canonicalRef object with id, kind, and optional label. The id must use the cn: URN scheme. Example: {\"id\": \"cn:core:metric:p95-response-time\", \"kind\": \"metric\", \"label\": \"P95 Response Time\"}. Decision guidance: look up available metric IDs with 'specdev canonical-lint canon --repo-root ./devspec_toolkit' before authoring. Anti-patterns: omitting metric_ref and relying on a free-form metric string (breaks canonical-integrity checks); using a bare string instead of a canonicalRef object; inventing new metric IDs without adding them to the canon registry first.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "metric" } } }
+                ]
               },
               "unit_ref": {
-                "description": "Canonical reference binding the 'unit' string to a normalised unit entry in the canonical registry. Format rule: use a canonicalRef object; the id must use the cn: URN scheme. Always pair with the 'unit' field. Worked examples: if unit is 'ms', use {\"id\": \"cn:core:term:ms\", \"kind\": \"term\", \"label\": \"ms\"}; if unit is 'percent', use {\"id\": \"cn:core:term:percent\", \"kind\": \"term\", \"label\": \"percent\"}; if unit is 'req/s', use {\"id\": \"cn:core:term:req-per-s\", \"kind\": \"term\", \"label\": \"req/s\"}. Decision guidance: always use the canonical abbreviated form (ms, percent, req/s, MB) as the id suffix — not the expanded form — so NFRs across the spec share identical unit references. Anti-patterns: using {\"kind\": \"unit\"} — units are modelled as 'term' not 'unit' in the canon; 'milliseconds' instead of 'ms' as the id suffix; omitting unit_ref when unit is present (breaks canonical-integrity checks).",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference binding the 'unit' string to a normalised unit entry in the canonical registry. Kind is structurally pinned to 'unit'. Always pair with the 'unit' field. Worked examples: if unit is 'ms', use {\"id\": \"cn:core:unit:ms\", \"kind\": \"unit\"}; if unit is 'percent', use {\"id\": \"cn:core:unit:percent\", \"kind\": \"unit\"}; if unit is 'count', use {\"id\": \"cn:core:unit:count\", \"kind\": \"unit\"}. Decision guidance: always use the canonical abbreviated form (ms, percent, count) as the id suffix. Anti-patterns: omitting unit_ref when unit is present (breaks canonical-integrity checks).",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "unit" } } }
+                ]
               },
               "stage_ref": {
                 "description": "Canonical reference binding the 'stage' enum value to its entry in the canonical stage registry. Format rule: use a canonicalRef object with kind 'stage' and a cn: URN id matching the stage value. Worked example: if stage is 'production', use {\"id\": \"cn:core:stage:production\", \"kind\": \"stage\", \"label\": \"production\"}; if stage is 'ci', use {\"id\": \"cn:core:stage:ci\", \"kind\": \"stage\", \"label\": \"CI\"}. Decision guidance: stage_ref must agree with the 'stage' string — mismatches are flagged by canonical-lint. Anti-patterns: using a stage_ref id that differs from the 'stage' field value (e.g., stage='production' but stage_ref id='cn:core:stage:staging' — causes canonical-integrity lint failure); omitting stage_ref while providing stage (partial canonical coverage leaves the entry unverifiable).",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "stage" } } }
+                ]
               },
               "environment_ref": {
                 "description": "Canonical reference to the environment where this NFR is measured. Decision rule: include environment_ref only when the NFR target differs by environment. Worked example: a latency target of 200ms in production but 500ms in staging requires two separate NFR entries — one with environment_ref {\"id\": \"cn:core:environment:production\", \"kind\": \"environment\", \"label\": \"production\"} and target '< 200ms', and another with environment_ref {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"} and target '< 500ms'. Counter-example: a code coverage requirement of >= 80% applies identically in all environments — omit environment_ref entirely. Do NOT use bare environment names — this field requires a full canonicalRef object with id and kind (label recommended). Anti-pattern: including environment_ref set to a value meaning 'all environments' — if the target is the same everywhere, omit the field entirely.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "environment" } } }
+                ]
               }
             },
             "required": [

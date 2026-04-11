@@ -59,8 +59,11 @@
                       "description": "The shell command or CI step definition to execute. Should be reproducible \u2014 an engineer should be able to run this locally. Include: the tool, the arguments, and any required environment variables. Example: 'pytest tests/ --cov=src --cov-fail-under=80'."
                     },
                     "command_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical registry reference linking this step's command to a shared tool or action definition. Decision rule: include command_ref only when this exact command invocation (same flags, same pattern) appears in ≥2 different jobs within this spec; omit for unique one-off commands. The canonical ID must exist in canon/manifest.json before the spec is committed. Example: {\"id\": \"cn:core:action:run-pytest\", \"kind\": \"action\", \"label\": \"Run Pytest\"} for a shared test runner pattern. Anti-pattern: inventing a command_ref canonical ID that does not exist in the registry; including command_ref for every step regardless of reuse."
+                      "description": "Canonical reference linking this step's command to a shared tool definition. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:pytest\", \"kind\": \"command\"}. Include only when this command appears in ≥2 different jobs. The canonical ID must exist in canon/manifest.json.",
+                      "allOf": [
+                        { "$ref": "vc:core:collections#canonicalRef" },
+                        { "properties": { "kind": { "const": "command" } } }
+                      ]
                     }
                   },
                   "required": [
@@ -72,12 +75,18 @@
                 }
               },
               "environment_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical registry reference identifying the deployment environment for this job. The canonicalRef 'id' must follow the format 'cn:<namespace>:<kind>:<slug>' (e.g., id: 'cn:core:environment:ci', kind: 'environment'). Common environment IDs: 'cn:core:environment:dev', 'cn:core:environment:ci', 'cn:core:environment:staging', 'cn:core:environment:prod'. Determines which environment this job targets and which secrets or configuration it inherits."
+                "description": "Canonical registry reference identifying the deployment environment for this job. The canonicalRef 'id' must follow the format 'cn:<namespace>:<kind>:<slug>' (e.g., id: 'cn:core:environment:ci', kind: 'environment'). Common environment IDs: 'cn:core:environment:dev', 'cn:core:environment:ci', 'cn:core:environment:staging', 'cn:core:environment:prod'. Determines which environment this job targets and which secrets or configuration it inherits.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "environment" } } }
+                ]
               },
               "role_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference to the role that owns or approves this CI job. Kind must be 'entity' (roles are modelled as entities). Decision rule: include role_ref when this CI gate requires human approval from a specific role. Example: {\"id\": \"cn:project:entity:security-reviewer\", \"kind\": \"entity\", \"label\": \"security-reviewer\"} for a gate requiring security team sign-off. Omit for fully automated gates (unit tests, linting) that require no human review. Anti-pattern: adding role_ref to automated test jobs — only required_reviewers in environment_protection gates should have role refs."
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "role" } } }
+                ],
+                "description": "Canonical reference to the role that owns or approves this CI job. Kind is structurally pinned to role. Decision rule: include role_ref when this CI gate requires human approval from a specific role. Example: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"reviewer\"} for a gate requiring security team sign-off. Omit for fully automated gates (unit tests, linting) that require no human review. Anti-pattern: adding role_ref to automated test jobs — only required_reviewers in environment_protection gates should have role refs. Use real example ID: cn:core:role:reviewer"
               },
               "security": {
                 "type": "object",

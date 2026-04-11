@@ -25,11 +25,11 @@
 
 ## FIX-048: Stale 13b $schema reference in test fixture
 
-**Status**: PASS
+**Status**: PASS (corrected 2026-04-10)
 
+- **Correction**: original review (2026-03-19) marked PASS while `tests/fixtures/step_13/valid_extension.json` still contained `"$schema": "vc:13b-database-schema"`. The stale reference was removed when `valid_extension.json` was deleted as part of the step 13 hardening pass (F8 Part A). PASS is now accurate.
 - No `13b` reference remains in any JSON file under `tests/` or anywhere in the repo
-- Only mention is in the WIP fix-plan document (describing the fix itself)
-- All step_13 fixtures now reference `13_extension_generator.schema.json`
+- All step_13 fixtures now reference `vc:13-extension-generator`
 
 ## FIX-049: Relative $schema path in test fixture
 
@@ -110,3 +110,14 @@
 | 052 | 16a/16b/16c phase discrimination | PASS |
 
 **Overall**: All 7 fixes verified correct. 1271 tests passing. One advisory note on draft version consistency for FIX-051.
+
+---
+
+## Spot-Check Verification Protocol (added 2026-04-10)
+
+Before marking any fix as PASS in future audit rounds, the auditor must:
+1. Re-run the fix's verification grep/command as an independent pass (not relying on the implementer's output).
+2. Capture verbatim output in the review document.
+3. Confirm zero matches for the defect pattern before marking PASS.
+
+This protocol was added after FIX-048 was marked PASS while the stale `vc:13b-database-schema` reference still existed in `tests/fixtures/step_13/valid_extension.json`.

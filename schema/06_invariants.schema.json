@@ -82,16 +82,25 @@
                 }
               },
               "policy_ref": {
-                "description": "Canonical reference linking this invariant to a governance or compliance policy that mandates it. Use to link the invariant to its compliance or policy rationale so auditors can trace coverage. Worked example: {\"id\": \"cn:core:risk_category:authz\", \"kind\": \"risk_category\", \"label\": \"authz\"} for invariants governing authorization rules (e.g., only the account owner may initiate a withdrawal). Additional examples: {\"id\": \"cn:project:term:pci-dss-requirement-6\", \"kind\": \"term\", \"label\": \"PCI DSS Requirement 6\"} for a payment security invariant; {\"id\": \"cn:project:term:data-retention-policy\", \"kind\": \"term\", \"label\": \"Data Retention Policy\"} for an invariant enforcing maximum data age. Omit when the invariant is a pure business rule with no compliance requirement (e.g., order.total == sum(line_items) — this is a data-integrity rule, not a policy mandate). Anti-patterns: leaving policy_ref absent when the invariant is compliance-driven (breaks audit trails); fabricating a canonical ID that does not exist in canon/manifest.json.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference linking this invariant to a governance or compliance policy. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Omit when the invariant is a pure business rule with no compliance requirement.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "policy" } } }
+                ]
               },
               "risk_category_ref": {
                 "description": "Canonical reference to the risk category this invariant mitigates. Groups invariants by risk domain for audit, reporting, and red-team alignment (Step 11). Use IDs from canon/kinds/risk_category.json. Worked example: {\"id\": \"cn:core:risk_category:business_logic\", \"kind\": \"risk_category\", \"label\": \"business_logic\"} for invariants preventing business logic abuse (e.g., discount cannot exceed 100%, order total must be positive). Additional examples: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"} for auth or injection-prevention invariants; {\"id\": \"cn:core:risk_category:data_integrity\", \"kind\": \"risk_category\", \"label\": \"data_integrity\"} for invariants ensuring consistent data states. Anti-patterns: using 'authz' for invariants about data validity — authz governs who may act, while 'business_logic' governs what values are allowed; omitting risk_category_ref when the invariant clearly mitigates a known risk domain (breaks red-team cross-reference). Decision guidance: check canon/kinds/risk_category.json first; if no matching category exists, add a new entry to that file before referencing it here.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "risk_category" } } }
+                ]
               },
               "status_ref": {
-                "description": "Canonical reference for the lifecycle status of this invariant. Tracks whether the invariant is actively enforced, draft, deprecated, or under review. Lifecycle distinctions: 'draft' = invariant is proposed and documented but not yet wired to an enforcement point in code; 'active' = enforcement is deployed and running in production; 'deprecated' = enforcement has been removed, invariant is retained as a historical record only. Worked example for an active invariant: {\"id\": \"cn:core:stage:active\", \"kind\": \"stage\", \"label\": \"active\"}. Use the stage canon kind when available; fall back to 'term' kind for statuses not yet in the stage registry. Anti-pattern: leaving status_ref as 'draft' after the invariant's enforcement has been shipped to production — stale 'draft' labels make governance reports inaccurate and cause audit failures. Decision guidance: mark as 'deprecated' rather than deleting when an invariant is superseded, so the audit trail is preserved.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference for the lifecycle status of this invariant. Kind is structurally pinned to 'status'. Tracks whether the invariant is actively enforced, draft, or deprecated. Example: {\"id\": \"cn:core:status:active\", \"kind\": \"status\"} for an actively enforced invariant. Mark as 'deprecated' rather than deleting when superseded.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "status" } } }
+                ]
               }
             },
             "required": [

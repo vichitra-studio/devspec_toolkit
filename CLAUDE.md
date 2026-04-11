@@ -23,7 +23,7 @@ pip install -e ./devspec_toolkit/tools
 
 All CLI commands must go through `./tools/run_specdev.sh` — never call internal modules directly. The wrapper enforces virtualenv usage and applies schema registry resolution. It works without activating the venv first.
 
-**Critical flag**: always pass `--repo-root ./devspec_toolkit` when running from the host repo so the schema registry in the toolkit resolves correctly. The locked `spec_dir` for this repo is `devspec_toolkit/spec` (not a top-level `spec/`).
+**Critical flag**: always pass `--repo-root ./devspec_toolkit` when running from the host repo so the schema registry in the toolkit resolves correctly. The host repo's live specs live at `./spec/` — pass that as the positional `<spec_dir>` argument.
 
 ---
 
@@ -258,7 +258,16 @@ Agent protocol metadata lives in `docs/agents/manifest.json`.
 
 ## Submodule Deployments
 
-When the toolkit is vendored as a git submodule, pass `--spec-root` and `--git-root` in addition to `--repo-root`:
+When the toolkit is vendored as a git submodule inside a host repo, run commands from the **host repo root**. The positional `spec_dir` should point at the host repo's live spec directory (typically `./spec`), and `--repo-root ./devspec_toolkit` tells the CLI where to find schemas and the toolkit's core canon.
+
+```bash
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh context structure spec --step 11 --repo-root ./devspec_toolkit
+```
+
+### When `--spec-root` and `--git-root` are needed
+
+These flags are **not accepted on every command** (e.g. `context`, `json`, `ai-help`, `env-check` do not take them). They apply to validators and linters that need to resolve project-tier canon at `<host>/spec/canon/` or run git operations against the host repo:
 
 ```bash
 ./tools/run_specdev.sh validate-all spec \
@@ -266,6 +275,11 @@ When the toolkit is vendored as a git submodule, pass `--spec-root` and `--git-r
   --spec-root ./spec \
   --git-root .
 ```
+
+- `--spec-root ./spec` — lets canonical-lint / canonical-integrity discover project-tier canon under `./spec/canon/` (in addition to toolkit-core canon under `./devspec_toolkit/canon/`).
+- `--git-root .` — points forward-replay and governance-check at the host repo's git history instead of the submodule's.
+
+If a command rejects these flags as "unrecognized arguments", it simply doesn't need them — drop the flags and re-run.
 
 ### Base Ref Resolution Order
 

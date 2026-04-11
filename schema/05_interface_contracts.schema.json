@@ -120,19 +120,31 @@
               },
               "interface_ref": {
                 "description": "Canonical reference linking this API to a shared interface contract. Endpoints that share the same request/response contract — for example, GET /users/{id} and GET /orders/{id}/user both returning the same UserProfile shape — should share one interface_ref. Each genuinely distinct contract gets its own interface_ref entry. Worked example: {\"id\": \"cn:project:capability:user-read\", \"kind\": \"capability\", \"label\": \"user-read\"} for any endpoint that reads and returns a UserProfile. Required — ensures the API is registered in the shared interface vocabulary. Decision rule: check canon/manifest.json for existing capability entries before creating a new one; reuse when the request/response shape is truly shared; create a new entry only when introducing a contract not yet represented. Anti-pattern: one interface_ref for all endpoints in a service — each distinct contract needs its own entry; the interface_ref describes what the contract looks like, not which service owns it.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "interface" } } }
+                ]
               },
               "event_ref": {
                 "description": "Canonical reference to events emitted or consumed by this API after processing a request. Include event_ref when the API endpoint publishes to or subscribes from a message queue as a side effect of handling a request — for example, a POST /orders endpoint that publishes an 'order-confirmed' event after persisting the order. Worked example: {\"id\": \"cn:project:event:order-confirmed\", \"kind\": \"event\", \"label\": \"order-confirmed\"}. The id must correspond to an entry in canon/manifest.json under the 'event' namespace. Omit for pure request-response endpoints with no side-effect events. Anti-pattern: adding event_ref to a GET endpoint — read-only endpoints do not publish events and should not reference the event registry.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "event" } } }
+                ]
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary domain entity this API operates on. Links to the canonical entity registry and helps downstream code generation target the correct model. Example: {\"ref\": \"cn:entity:user\", \"label\": \"User\"} for a user-management API; {\"ref\": \"cn:entity:order\", \"label\": \"Order\"} for an order-management API. The ref must match an entry in canon/manifest.json under the 'entity' namespace. Anti-pattern: listing multiple entities here — use entity_ref for the single primary entity only; secondary entity relationships belong in the API description or trace links.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
               },
               "policy_ref": {
-                "description": "Canonical reference to the access control or governance policy for this API. Use when the endpoint has access control rules beyond simple authentication — for example, role-based access, data residency constraints, or rate-limit policies tied to a specific agreement. Worked examples: {\"id\": \"cn:core:risk_category:authz\", \"kind\": \"risk_category\", \"label\": \"authz\"} for endpoints requiring authorization policy (the authz risk category covers all access-control rules); {\"id\": \"cn:project:term:data-residency-eu\", \"kind\": \"term\", \"label\": \"EU Data Residency Policy\"} for a GDPR-scoped endpoint. Include when the endpoint has access control rules beyond simple authentication. Omit for public endpoints with no authorization logic (e.g., health checks, unauthenticated read endpoints). Anti-pattern: using policy_ref as a duplicate of the security field — security describes the auth mechanism, while policy_ref describes the business-level authorization rule applied on top of that mechanism.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to the access control or governance policy for this API. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Include when the endpoint has access control rules beyond simple authentication. Omit for public endpoints with no authorization logic.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "policy" } } }
+                ]
               },
               "enum_provenance": {
                 "type": "object",

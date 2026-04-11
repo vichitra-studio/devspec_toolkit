@@ -3,29 +3,38 @@
   "id": "extension-generator-manifest",
   "owner": "system",
   "created_at": "2026-01-15T00:00:00Z",
+  "extension_decision": {
+    "status": "extensions-required",
+    "rationale": "The Data domain requires entity-relationship modeling, migration sequencing, and index strategy not expressible in core steps."
+  },
   "extensions": [
     {
       "extension_id": "ext-01-database-schema",
       "title": "Database Schema",
-      "file_name": "ext_01_database_schema.json",
       "area_of_concern": "Data",
+      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy sections.",
       "required_schema_sections": [
         "tables",
         "relationships",
         "database_config"
       ],
-      "governance_label_ref": {"id": "cn:core:term:spec-extension", "kind": "term"}
+      "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Include a validation_rules section with check constraints.",
+      "governance_label_ref": {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
     },
     {
       "extension_id": "ext-02-nonexistent-extension",
       "title": "Non-existent Extension",
-      "file_name": "ext_02_nonexistent_extension.json",
       "area_of_concern": "API",
+      "justification": "Session lifecycle requires dedicated token rotation, revocation, and invalidation schema sections.",
       "required_schema_sections": [
         "session_config"
       ],
-      "governance_label_ref": {"id": "cn:core:term:spec-extension", "kind": "term"}
+      "schema_design_guidelines": "Reuse vc:core:atoms for session fields. Include test coverage for token expiry edge cases.",
+      "governance_label_ref": {"id": "cn:core:governance_label:nonexistent", "kind": "governance_label"}
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"},
+    {"id": "cn:core:governance_label:nonexistent", "kind": "governance_label"}
+  ]
 }

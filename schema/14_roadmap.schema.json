@@ -26,8 +26,11 @@
           ]
         },
         "tech_stack_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the project's technology stack in the canonical registry. Kind must be 'capability'. Example: {\"id\": \"cn:project:capability:tech-stack-web\", \"kind\": \"capability\", \"label\": \"web tech stack\"}. Define this entry in project canon (canon/manifest.json) before referencing it here. Anti-pattern: inventing a cn: ID without a corresponding canon entry — canonical-lint will fail if the ID is not registered."
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "tech_stack" } } }
+          ],
+          "description": "Canonical reference to the project's technology stack in the canonical registry. Kind is structurally pinned to 'tech_stack'. Example: {\"id\": \"cn:core:tech_stack:python\", \"kind\": \"tech_stack\", \"label\": \"Python\"}. Define this entry in project canon (canon/manifest.json) before referencing it here. Anti-pattern: inventing a cn: ID without a corresponding canon entry — canonical-lint will fail if the ID is not registered."
         },
         "milestones": {
           "type": "array",
@@ -141,16 +144,25 @@
                       "description": "Task-level status: 'pending' (not started), 'in_progress' (actively being worked), 'done' (completed and verified). Note: tasks cannot be 'deferred' — only milestones support deferral. If a task's parent milestone is deferred, the task remains 'pending'."
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference to the task status in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"}. Must be consistent with the task's 'status' field value."
+                      "description": "Canonical reference to the task status in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Must be consistent with the task's 'status' field value.",
+                      "allOf": [
+                        { "$ref": "vc:core:collections#canonicalRef" },
+                        { "properties": { "kind": { "const": "status" } } }
+                      ]
                     },
                     "environment_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference to the target environment for this task. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Use to indicate which environment this task targets for deployment or testing. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'."
+                      "description": "Canonical reference to the target environment for this task. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Use to indicate which environment this task targets for deployment or testing. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'.",
+                      "allOf": [
+                        { "$ref": "vc:core:collections#canonicalRef" },
+                        { "properties": { "kind": { "const": "environment" } } }
+                      ]
                     },
                     "metric_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference to the metric used to measure task completion. Kind must be 'term'. Example: {\"id\": \"cn:project:term:api-response-time\", \"kind\": \"term\", \"label\": \"API Response Time\"}. Use when task completion is gated on a measurable metric (e.g., performance benchmark, coverage threshold). Omit for tasks with qualitative acceptance criteria only."
+                      "allOf": [
+                        { "$ref": "vc:core:collections#canonicalRef" },
+                        { "properties": { "kind": { "const": "metric" } } }
+                      ],
+                      "description": "Canonical reference to the metric used to measure task completion. Kind is structurally pinned to 'metric'. Example: {\"id\": \"cn:core:metric:error-rate\", \"kind\": \"metric\", \"label\": \"Error Rate\"}. Use when task completion is gated on a measurable metric (e.g., performance benchmark, coverage threshold). Omit for tasks with qualitative acceptance criteria only."
                     },
                     "depends_on": {
                       "type": "array",
@@ -215,8 +227,11 @@
                 "description": "Time-boxed technical investigations required to resolve specific uncertainties before work can proceed. Decision rule: each spike entry must name (1) the question being answered, (2) the time budget, and (3) the expected output. Examples: 'Evaluate Redis Cluster vs Elasticache for session store — 2-day spike, output: architectural decision record with latency benchmarks.' 'Prototype JWT rotation with zero-downtime rollover — 1-day spike, output: working proof of concept committed to feature branch.' Anti-pattern: 'Investigate performance' or 'Research options' (open-ended spikes with no time box or defined output cannot be completed or reviewed)."
               },
               "status_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference to the milestone status in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"}. Must be consistent with the 'status' field value. Common IDs: 'cn:core:stage:pending', 'cn:core:stage:in-progress', 'cn:core:stage:done', 'cn:core:stage:deferred'."
+                "description": "Canonical reference to the milestone status in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Must be consistent with the 'status' field value.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "status" } } }
+                ]
               }
             },
             "required": [
@@ -243,8 +258,11 @@
           "description": "External or internal dependencies required by the roadmap. Uses structured dependency objects (each with type, id, and optional owner/note fields) — not simple string IDs. Contrast with Step 09 impl_plan which uses dependencyList (mixed string/object). Every entry here must be a full object."
         },
         "dependency_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the primary external or cross-team dependency this roadmap depends on. Kind must be 'dependency'. Decision rule: use this field to reference a single canonical dependency entry that gates the entire roadmap; use the milestone-level `risks` and `deliverables` fields for per-milestone dependency notes. Cross-team example: {\"id\": \"cn:project:dependency:auth-service-api-contract\", \"kind\": \"dependency\", \"label\": \"auth-service-api-contract\"} (a dependency on another team's API contract). External vendor example: {\"id\": \"cn:project:dependency:stripe-api\", \"kind\": \"dependency\", \"label\": \"stripe-api\"} (a third-party payment provider). Omit when the dependency is an internal milestone referenced via a milestone's depends_on field — those are tracked within the roadmap itself, not in the canonical registry."
+          "description": "Canonical reference to the primary external or cross-team dependency this roadmap depends on. Kind must be 'dependency'. Decision rule: use this field to reference a single canonical dependency entry that gates the entire roadmap; use the milestone-level `risks` and `deliverables` fields for per-milestone dependency notes. Cross-team example: {\"id\": \"cn:project:dependency:auth-service-api-contract\", \"kind\": \"dependency\", \"label\": \"auth-service-api-contract\"} (a dependency on another team's API contract). External vendor example: {\"id\": \"cn:project:dependency:stripe-api\", \"kind\": \"dependency\", \"label\": \"stripe-api\"} (a third-party payment provider). Omit when the dependency is an internal milestone referenced via a milestone's depends_on field — those are tracked within the roadmap itself, not in the canonical registry.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "dependency" } } }
+          ]
         },
         "trace": {
           "type": "array",

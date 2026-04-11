@@ -1,23 +1,26 @@
 {
   "_meta": {
     "schema_hashes": {
-      "vc:05-interface-contracts": "sha256:ecd9adb3194fe8c9ce96216220d054df8ff6d0f9698da4c6dec92f972fca20f8",
+      "vc:05-interface-contracts": "sha256:6a6d5432769f0940914c1ce3d54c08a5d265d94fc1884b55744995c21852a4a2",
       "vc:00-charter": "sha256:e0aa5e991acae65112ec9be774acceee4b9c93cfbd8d802b31c300db52146bba",
-      "vc:01-capabilities": "sha256:9186ee75f6307218feead221c8184144a96ada1ad41deda07817db22b28f5ed7",
-      "vc:02-system-sketch": "sha256:1a61d1fc5381c024d704694332ca622447978da11b36a441ed8cbc4516964799",
+      "vc:01-capabilities": "sha256:9707a1256cb76521ee783833aec47634d256d91440741c3758b660cab2a3ce3b",
+      "vc:02-system-sketch": "sha256:8388b503298c58c7330b464035a411a311981845d7bce347709f40f26f284d8b",
       "vc:03-glossary": "sha256:1ebdf298beafc54ae0e61eb029a3d6952074808771013ce337e53c7f2c5a525e",
-      "vc:04-fr-list": "sha256:26795a15f10d20eeb94142713d90a3b5837408a5acde5313a664a0d94eed998b",
+      "vc:04-fr-list": "sha256:d5e95581123c1ee614d583cd6be1cfbdc147bbd030f80b199eae6013c009d17d",
       "vc:02a-delivery-baseline": "sha256:c0a38258af3bfbf62ee36310db342a79f67ed7a497d46ff13ac240ba083cd674",
       "vc:06-invariants": "sha256:337a372b871dc388960abfbd44201a7bb939f268e890a65f226635886ab010f1",
-      "vc:07-nfrs": "sha256:296e4a358b74e5c0f7fe0cfbccb00c29d91061ca042e1d7425a26bd19ccbe847",
-      "vc:08-fixtures": "sha256:832f2cbd64246636a336514421c97c41a89f360ce5eaafc62576ad85964160fd"
+      "vc:07-nfrs": "sha256:80db42beae4fa2b793c4a2ae1a9d3602a911e4e6d3cf7718f6cb999d902601f2",
+      "vc:08-fixtures": "sha256:586c2f64c924b7b8370a7112c2067c327309958a59c4972ae4106506aa40041a",
+      "vc:09-impl-plan": "sha256:366b4e947d225d189e68db108b6149f639c769c46c3724628a32eeb59077ea28",
+      "vc:10-governance": "sha256:1eaa6591462bcebbe7eaf5edb6e7016c434774268f0e419ed2187eb00e563c7d",
+      "vc:11-redteam": "sha256:7f1092d8c13e8cb1d55c40527aa4523894278b08ce781794df5f8c836b92145f"
     },
-    "generated_at": "2026-04-08T06:17:27Z"
+    "generated_at": "2026-04-11T11:34:38Z"
   },
   "05": {
     "05_interface_contracts.json": [
-      ".out_of_scope",
-      ".apis"
+      ".apis",
+      ".out_of_scope"
     ]
   },
   "00": {
@@ -41,8 +44,8 @@
   },
   "02": {
     "02_system_sketch.json": [
-      ".tech_stack",
       ".components",
+      ".tech_stack",
       ".connections"
     ]
   },
@@ -79,6 +82,33 @@
   "08": {
     "08_fixtures.json": [
       ".fixtures"
+    ]
+  },
+  "09": {
+    "09_impl_plan.json": [
+      ".dependencies",
+      ".milestones",
+      ".migration_plan"
+    ]
+  },
+  "10": {
+    "10_governance.json": [
+      ".spec_first_policy",
+      ".command_ref",
+      ".review_policy",
+      ".links",
+      ".pr_rules",
+      ".reviewers",
+      ".policy_ref",
+      ".versioning",
+      ".commit_message_rules"
+    ]
+  },
+  "11": {
+    "11_redteam.json": [
+      ".edge_cases",
+      ".threats",
+      ".trace"
     ]
   }
 }

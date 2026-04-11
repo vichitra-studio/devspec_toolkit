@@ -142,7 +142,7 @@ Before emitting, verify:
       "version": "v1",
       "protocol": "http",
       "owner": "api",
-      "interface_ref": {"id": "cn:project:term:example-resource", "kind": "term"},
+      "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
       "trace": [{"type": "implements", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
       "errors": [
         {"code": "unauthenticated", "message": "No valid auth token provided"},

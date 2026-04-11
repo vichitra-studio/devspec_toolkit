@@ -52,11 +52,11 @@ For each upstream artifact ingested, extract the following:
 - **06_invariants.json**: Invariant IDs and enforcement conditions used to verify that completeness coverage includes checks against invariant-governed behaviors
 - **07_nfrs.json**: NFR IDs and categories used to identify non-functional requirement gaps that are outside the FR-coverage universe but still affect overall spec completeness
 - **08_fixtures.json**: Fixture target IDs — used to determine which FRs have fixture coverage
-- **09_impl_plan.json**: Milestone IDs and fr_refs for fr_milestone_coverage universe
+- **09_impl_plan.json**: Milestone IDs, milestone `fr_refs` arrays, and milestone `deliverables` used to compute the FR-to-milestone coverage universe (which FRs are scheduled in which milestones) and to detect FRs that have been omitted from all milestones
 - **10_governance.json**: Governance labels and commit patterns used to verify that completeness assessment findings are traceable to appropriate governance controls
 - **11_redteam.json**: Threat IDs and mitigations used to check that security-critical FRs have both API and fixture coverage and no threat goes uncovered
 - **12_ci_gates.json**: CI gate definitions used to verify that completeness gaps have corresponding CI enforcement and that all gates reference existing spec artifacts
-- **13_extension_manifest.json**: Extension entries — verify all extensions are implemented on disk
+- **13_extension_manifest.json**: Extension entries and `extension_decision` — if `extension_decision.status == 'none-required'`, treat empty `extensions` as valid terminal state; otherwise, verify every listed extension file exists under `spec/ext_NN_*.json`
 
 # Operating Flow: Synthesize → Clarify → Emit
 1. Run `completeness-check --json` and `traceability-check --json` to get raw coverage data.

@@ -237,8 +237,11 @@
                   }
                 },
                 "status_ref": {
-                  "$ref": "vc:core:collections#canonicalRef",
-                  "description": "Canonical reference for the docs impact status. Recommended canonical ID: cn:core:status:docs-required or cn:core:status:docs-not-required (define status kind in project canon if not yet created). Should match the 'status' field value."
+                  "description": "Canonical reference for the docs impact status. Recommended canonical ID: cn:core:status:docs-required or cn:core:status:docs-not-required (define status kind in project canon if not yet created). Should match the 'status' field value.",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
                 }
               },
               "required": [
@@ -452,8 +455,11 @@
                                   "description": "Evidence proving this action was completed successfully."
                                 },
                                 "command_ref": {
-                                  "$ref": "vc:core:collections#canonicalRef",
-                                  "description": "Canonical reference for the command in the registry."
+                                  "description": "Canonical reference for the command in the registry.",
+                                  "allOf": [
+                                    {"$ref": "vc:core:collections#canonicalRef"},
+                                    {"properties": {"kind": {"const": "command"}}}
+                                  ]
                                 }
                               },
                               "required": [
@@ -509,9 +515,12 @@
                             }
                           },
                           "status_ref": {
-                            "$ref": "vc:core:collections#canonicalRef",
-                            "description": "Canonical reference for this checklist item's implementation status. Recommended canonical ID: cn:core:status:impl-verified or cn:core:status:impl-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/in_progress/verified/deferred)."
-                          }
+                  "description": "Canonical reference for this checklist item's implementation status. Recommended canonical ID: cn:core:status:impl-verified or cn:core:status:impl-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/in_progress/verified/deferred).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                         },
                         "required": [
                           "status",
@@ -678,9 +687,12 @@
                     ]
                   },
                   "status_ref": {
-                    "$ref": "vc:core:collections#canonicalRef",
-                    "description": "Canonical reference for this planning ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Should match the 'status' field value (resolved/tracking/deferred/blocked)."
-                  }
+                  "description": "Canonical reference for this planning ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Should match the 'status' field value (resolved/tracking/deferred/blocked).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                 },
                 "required": [
                   "id",
@@ -853,8 +865,11 @@
                             "description": "Human-readable description of what this test command verifies."
                           },
                           "command_ref": {
-                            "$ref": "vc:core:collections#canonicalRef",
-                            "description": "Canonical reference for the command in the registry."
+                            "description": "Canonical reference for the command in the registry.",
+                            "allOf": [
+                              {"$ref": "vc:core:collections#canonicalRef"},
+                              {"properties": {"kind": {"const": "command"}}}
+                            ]
                           }
                         },
                         "required": [
@@ -889,8 +904,11 @@
                           "description": "Description of how this NFR is measured."
                         },
                         "command_ref": {
-                          "$ref": "vc:core:collections#canonicalRef",
-                          "description": "Canonical reference for the measurement command."
+                          "description": "Canonical reference for the measurement command.",
+                          "allOf": [
+                            {"$ref": "vc:core:collections#canonicalRef"},
+                            {"properties": {"kind": {"const": "command"}}}
+                          ]
                         }
                       }
                     }
@@ -928,9 +946,12 @@
                       "description": "Reason why documentation updates are not applicable."
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the docs not_applicable status. Recommended canonical ID: cn:core:status:docs-not-applicable (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the docs not_applicable status. Recommended canonical ID: cn:core:status:docs-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status",
@@ -970,9 +991,12 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the docs planned status. Recommended canonical ID: cn:core:status:docs-planned (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the docs planned status. Recommended canonical ID: cn:core:status:docs-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status",
@@ -998,9 +1022,12 @@
                       "description": "Reason why security changes are not applicable."
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the security not_applicable status. Recommended canonical ID: cn:core:status:security-not-applicable (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the security not_applicable status. Recommended canonical ID: cn:core:status:security-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status",
@@ -1049,9 +1076,12 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the security planned status. Recommended canonical ID: cn:core:status:security-planned (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the security planned status. Recommended canonical ID: cn:core:status:security-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status"
@@ -1076,9 +1106,12 @@
                       "description": "Reason why delivery observability is not applicable."
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the delivery not_applicable status. Recommended canonical ID: cn:core:status:delivery-not-applicable (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the delivery not_applicable status. Recommended canonical ID: cn:core:status:delivery-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status",
@@ -1152,9 +1185,12 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the delivery planned status. Recommended canonical ID: cn:core:status:delivery-planned (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the delivery planned status. Recommended canonical ID: cn:core:status:delivery-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status"
@@ -1179,9 +1215,12 @@
                       "description": "Reason why drift detection is not applicable."
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the drift not_applicable status. Recommended canonical ID: cn:core:status:drift-not-applicable (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the drift not_applicable status. Recommended canonical ID: cn:core:status:drift-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status",
@@ -1253,9 +1292,12 @@
                       }
                     },
                     "status_ref": {
-                      "$ref": "vc:core:collections#canonicalRef",
-                      "description": "Canonical reference for the drift planned status. Recommended canonical ID: cn:core:status:drift-planned (define status kind in project canon if not yet created)."
-                    }
+                  "description": "Canonical reference for the drift planned status. Recommended canonical ID: cn:core:status:drift-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                   },
                   "required": [
                     "status"
@@ -1348,9 +1390,12 @@
               ]
             },
             "status_ref": {
-              "$ref": "vc:core:collections#canonicalRef",
-              "description": "Canonical reference for the top-level plan status. Recommended canonical ID: cn:core:status:plan-active or cn:core:status:plan-deferred (define status kind in project canon if not yet created). Should match the plan's 'status' field (active/deferred)."
-            }
+                  "description": "Canonical reference for the top-level plan status. Recommended canonical ID: cn:core:status:plan-active or cn:core:status:plan-deferred (define status kind in project canon if not yet created). Should match the plan's 'status' field (active/deferred).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
           },
           "required": [
             "status"
@@ -1509,8 +1554,11 @@
                         "description": "The command that produced this evidence."
                       },
                       "command_ref": {
-                        "$ref": "vc:core:collections#canonicalRef",
-                        "description": "Canonical reference for the command in the registry."
+                        "description": "Canonical reference for the command in the registry.",
+                        "allOf": [
+                          {"$ref": "vc:core:collections#canonicalRef"},
+                          {"properties": {"kind": {"const": "command"}}}
+                        ]
                       }
                     },
                     "required": [
@@ -1520,12 +1568,18 @@
                     ]
                   },
                   "status_ref": {
-                    "$ref": "vc:core:collections#canonicalRef",
-                    "description": "Canonical reference for this execution result's outcome status. Recommended canonical ID: cn:core:status:exec-passed or cn:core:status:exec-failed (define status kind in project canon if not yet created). Should match the 'status' field value (passed/failed/blocked/partial)."
-                  },
+                  "description": "Canonical reference for this execution result's outcome status. Recommended canonical ID: cn:core:status:exec-passed or cn:core:status:exec-failed (define status kind in project canon if not yet created). Should match the 'status' field value (passed/failed/blocked/partial).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                },
                   "command_ref": {
-                    "$ref": "vc:core:collections#canonicalRef",
-                    "description": "Canonical reference for the command in the registry."
+                    "description": "Canonical reference for the command in the registry.",
+                    "allOf": [
+                      {"$ref": "vc:core:collections#canonicalRef"},
+                      {"properties": {"kind": {"const": "command"}}}
+                    ]
                   }
                 },
                 "required": [
@@ -1640,9 +1694,12 @@
                     "description": "Current resolution status of this emergent ambiguity. Must be one of: 'resolved' (issue addressed), 'tracking' (under observation), 'deferred' (postponed to future iteration), 'blocked' (requires external input). Matches the planning-phase ambiguity status values for consistency."
                   },
                   "status_ref": {
-                    "$ref": "vc:core:collections#canonicalRef",
-                    "description": "Canonical reference for this emergent ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Distinct from planning-phase ambiguities, these arise during code execution."
-                  }
+                  "description": "Canonical reference for this emergent ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Distinct from planning-phase ambiguities, these arise during code execution.",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                 },
                 "required": [
                   "id",
@@ -1916,9 +1973,12 @@
                         "description": "Additional notes about this test result."
                       },
                       "status_ref": {
-                        "$ref": "vc:core:collections#canonicalRef",
-                        "description": "Canonical reference for this fixture's test result status. Recommended canonical ID: cn:core:status:test-pass, cn:core:status:test-fail, or cn:core:status:test-skip (define status kind in project canon if not yet created). Should match the 'status' field value (pass/fail/skip)."
-                      }
+                  "description": "Canonical reference for this fixture's test result status. Recommended canonical ID: cn:core:status:test-pass, cn:core:status:test-fail, or cn:core:status:test-skip (define status kind in project canon if not yet created). Should match the 'status' field value (pass/fail/skip).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                     },
                     "required": [
                       "fixture_ref",
@@ -1993,9 +2053,12 @@
                         "description": "Deployment status: pending, success, or failed."
                       },
                       "status_ref": {
-                        "$ref": "vc:core:collections#canonicalRef",
-                        "description": "Canonical reference for this deployment's status. Recommended canonical ID: cn:core:status:deploy-success, cn:core:status:deploy-failed, or cn:core:status:deploy-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/success/failed)."
-                      }
+                  "description": "Canonical reference for this deployment's status. Recommended canonical ID: cn:core:status:deploy-success, cn:core:status:deploy-failed, or cn:core:status:deploy-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/success/failed).",
+                  "allOf": [
+                    { "$ref": "vc:core:collections#canonicalRef" },
+                    { "properties": { "kind": { "const": "status" } } }
+                  ]
+                }
                     },
                     "required": [
                       "env",
@@ -2120,12 +2183,18 @@
           ]
         },
         "policy_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the governance policy applicable to this implementation context. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. References the canonical risk category that represents the compliance or governance framework governing this implementation. Validated by canonical-integrity lint."
+          "description": "Canonical reference to the governance policy applicable to this implementation context. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "policy" } } }
+          ]
         },
         "risk_category_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the primary risk category for this implementation. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:delivery-risk\", \"kind\": \"risk_category\", \"label\": \"delivery risk\"} or {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Validated by canonical-integrity lint."
+          "description": "Canonical reference to the primary risk category for this implementation. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:delivery-risk\", \"kind\": \"risk_category\", \"label\": \"delivery risk\"} or {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Validated by canonical-integrity lint.",
+          "allOf": [
+            {"$ref": "vc:core:collections#canonicalRef"},
+            {"properties": {"kind": {"const": "risk_category"}}}
+          ]
         }
       },
       "required": [

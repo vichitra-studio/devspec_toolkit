@@ -57,15 +57,24 @@
         },
         "environment_ref": {
           "description": "Canonical reference to the environment definitions in the canonical registry. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:prod\", \"kind\": \"environment\", \"label\": \"prod\"}. Common IDs: 'cn:core:environment:prod', 'cn:core:environment:staging', 'cn:core:environment:dev'. Should match one of the keys in the 'environments' object of this artifact. Validated by canonical-integrity lint.",
-          "$ref": "vc:core:collections#canonicalRef"
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "environment" } } }
+          ]
         },
         "command_ref": {
-          "description": "Canonical reference to the CLI command this CI gate invokes. Kind must be 'capability'. Reference the specdev or CI command registered in the canon. Examples: {\"id\": \"cn:core:capability:validate-all\", \"kind\": \"capability\", \"label\": \"validate-all\"} for the specdev validate-all command; {\"id\": \"cn:core:capability:pytest\", \"kind\": \"capability\", \"label\": \"pytest\"} for pytest. Only reference commands that are registered in the canon — do not fabricate IDs. Omit when the CI gate name already implies the command (e.g., ci_gate 'lint' implicitly runs the project lint command). If the command is project-specific, define it in project canon first.",
-          "$ref": "vc:core:collections#canonicalRef"
+          "description": "Canonical reference to the CLI command this CI gate invokes. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:pytest\", \"kind\": \"command\"} for pytest. Only reference commands registered in the canon.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "command" } } }
+          ]
         },
         "policy_ref": {
-          "description": "Canonical reference to the compliance framework or risk category this baseline configuration enforces. Kind must be 'risk_category' (not 'compliance-framework'). Examples: {\"id\": \"cn:core:risk_category:data_privacy\", \"kind\": \"risk_category\", \"label\": \"data_privacy\"} for GDPR-driven environment configuration; {\"id\": \"cn:core:risk_category:transport\", \"kind\": \"risk_category\", \"label\": \"transport\"} for TLS configuration requirements. Anti-pattern: using kind='capability' — policy references must use kind='risk_category'. Validated by canonical-integrity lint.",
-          "$ref": "vc:core:collections#canonicalRef"
+          "description": "Canonical reference to the governance policy this baseline configuration enforces. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "policy" } } }
+          ]
         }
       },
       "required": [

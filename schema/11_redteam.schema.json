@@ -93,12 +93,18 @@
                 "description": "Risk level for this threat. Calibrate using these concrete scenario anchors: 'critical' — auth bypass allows unauthenticated access to all user data or system compromise (e.g., admin takeover); 'high' — authenticated attacker can exfiltrate a significant data set or escalate privileges without additional prerequisites; 'medium' — authenticated attacker can exploit a vulnerability with 2+ additional steps required (requires specific account permissions or unusual timing); 'low' — verbose error messages expose internal paths or versions, exploitable only with significant reconnaissance. Anti-pattern: assigning 'critical' to all threats (use the scenarios above to calibrate — most threats are 'high' or 'medium')."
               },
               "risk_category_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference to the risk category in the canonical registry. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Common IDs: 'cn:core:risk_category:security', 'cn:core:risk_category:data_privacy', 'cn:core:risk_category:business_logic'. Must exist in canon/manifest.json before authoring — validated by canonical-integrity lint."
+                "description": "Canonical reference to the risk category in the canonical registry. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Common IDs: 'cn:core:risk_category:security', 'cn:core:risk_category:data_privacy', 'cn:core:risk_category:business_logic'. Must exist in canon/manifest.json before authoring — validated by canonical-integrity lint.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "risk_category" } } }
+                ]
               },
               "policy_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'risk_category'. policy_ref points to the security policy that mandates this threat be assessed. Example: for a JWT attack threat → {\"id\": \"cn:core:risk_category:authn\", \"kind\": \"risk_category\", \"label\": \"authn\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref."
+                "description": "Canonical reference to the security policy that mandates this threat be assessed. Kind must be 'policy'. Example: for a JWT attack threat → {\"id\": \"cn:core:policy:authn-required\", \"kind\": \"policy\", \"label\": \"authn-required\"}. Distinguish from risk_category_ref: policy_ref identifies the governance requirement to assess this category; risk_category_ref identifies the risk domain of the specific threat. Include policy_ref when a compliance mandate (SOC2, PCI-DSS) requires assessing this category. Anti-pattern: using the same id for both policy_ref and risk_category_ref.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "policy" } } }
+                ]
               }
             },
             "required": [

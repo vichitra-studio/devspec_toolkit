@@ -19,10 +19,15 @@
       },
       "expected": "processed result",
       "tag_ref": {
-        "id": "cn:core:term:data-processing",
-        "kind": "term"
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag"
       }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag"
+    }
+  ]
 }

@@ -52,15 +52,24 @@
               },
               "term_ref": {
                 "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "term" } } }
+                ]
               },
               "acronym_ref": {
                 "description": "Canonical reference to the canon entry for the acronym form of this term. Kind must be 'acronym'. Example: {\"id\": \"cn:project:acronym:jwt\", \"kind\": \"acronym\", \"label\": \"JWT\"}. Only present when the 'acronym' field is also set. Links the short form to the same concept as term_ref, ensuring the acronym resolves to the canonical definition. Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "acronym" } } }
+                ]
               },
               "unit_ref": {
-                "description": "Canonical reference to the unit of measurement for this term. Kind must be 'term' (units are modelled as terms in the canon). Example: {\"id\": \"cn:core:term:ms\", \"kind\": \"term\", \"label\": \"ms\"}. Only present when the 'units' field is also set — they must be consistent. Common unit IDs: 'cn:core:term:ms' (milliseconds), 'cn:core:term:percent' (percentage), 'cn:core:term:req-per-s' (requests per second). Validated by canonical-integrity lint.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to the unit of measurement for this term. Kind is structurally pinned to 'unit'. Example: {\"id\": \"cn:core:unit:ms\", \"kind\": \"unit\"} for milliseconds. Only present when the 'units' field is also set — they must be consistent. Common unit IDs: cn:core:unit:ms, cn:core:unit:percent, cn:core:unit:count. Validated by canonical-integrity lint.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "unit" } } }
+                ]
               }
             },
             "required": [

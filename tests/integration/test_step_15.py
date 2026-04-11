@@ -1,133 +1,27 @@
 #!/usr/bin/env python3
-"""
-Verification script for Step 15 (Scaffold Generation).
-Validates schema compliance, logic rules (uniqueness), and formatting.
+"""Thin CLI wrapper for Step 15 validation.
+
+Invokes the real ``specdev validate`` command against the given fixture.
+Exit code mirrors the validator's exit code (0 = pass, 1 = fail).
 """
 
-import json
+import subprocess
 import sys
-import re
 from pathlib import Path
 
 
-# Enum definitions matching schema
-VALID_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
-VALID_BUILD_STATUS = {"pending", "green", "red"}
-
-def validate_structure(data):
-    """
-    Validate basic structure and required fields.
-    """
-    if not isinstance(data, dict):
-        return False, "Root must be an object"
-    
-    required_fields = ["id", "owner", "created_at", "project_skeleton", "interface_map", "validators", "build_status"]
-    for field in required_fields:
-        if field not in data:
-            return False, f"Missing required field: {field}"
-            
-    # basic types check
-    if not isinstance(data['project_skeleton'], dict):
-        return False, "project_skeleton must be an object"
-    if 'language' not in data['project_skeleton']:
-        return False, "project_skeleton.language is required"
-        
-    if not isinstance(data['interface_map'], list):
-        return False, "interface_map must be an array"
-        
-    if not isinstance(data['validators'], list):
-        return False, "validators must be an array"
-        
-    if data['build_status'] not in VALID_BUILD_STATUS:
-        return False, f"Invalid build_status: {data['build_status']}"
-        
-    return True, "Structure valid"
-
-def validate_interface_map(data):
-    """
-    Validate interface_map items using extracted validator.
-    """
-    from specdev_tools.validation.validators.step_15 import validate_step_15
-    
-    errors = validate_step_15(data, ".")
-    if errors:
-        return False, "; ".join(e.render() if hasattr(e, 'render') else str(e) for e in errors)
-
-    return True, "Logic valid"
-
-def validate_fixture(fixture_path):
-    try:
-        with open(fixture_path, 'r') as f:
-            data = json.load(f)
-    except Exception as e:
-        return False, f"Failed to load JSON: {e}"
-        
-    # Structure
-    ok, msg = validate_structure(data)
-    if not ok:
-        return False, msg
-        
-    # Route Map Logic (passed the whole data object now)
-    ok, msg = validate_interface_map(data)
-    if not ok:
-        return False, msg
-        
-    return True, "Valid"
-
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python verifica_step_15.py <fixture_path_or_dir>")
-        sys.exit(1)
-        
-    target = Path(sys.argv[1])
-    
-    if target.is_file():
-        ok, msg = validate_fixture(target)
-        if ok:
-            pass
-            sys.exit(0)
-        else:
-            print(f"✗ {target.name}: FAIL - {msg}")
-            sys.exit(1)
-            
-    elif target.is_dir():
-        results = []
-        pass
-        for f in sorted(target.glob("*.json")):
-            ok, msg = validate_fixture(f)
-            status = "PASS" if ok else "FAIL"
-            pass
-            if not ok:
-                pass
-            
-            # Smart assertion: 
-            # If filename contains 'invalid', we EXPECT failure.
-            # If filename contains 'valid', we EXPECT pass.
-            is_invalid_file = "invalid" in f.name
-            
-            if is_invalid_file and not ok:
-                # Expected failure
-                results.append(True)
-            elif is_invalid_file and ok:
-                # Unexpected pass
-                print(f"  ERROR: Expected failure for {f.name} but it passed!")
-                results.append(False)
-            elif not is_invalid_file and not ok:
-                # Unexpected failure
-                results.append(False)
-            else:
-                # Expected pass
-                results.append(True)
-                
-        if all(results):
-            pass
-            sys.exit(0)
-        else:
-            print("\nSome expectations failed.")
-            sys.exit(1)
-    else:
-        print(f"Error: {target} not found")
-        sys.exit(1)
+    if len(sys.argv) != 2:
+        sys.exit("Usage: test_step_15.py <fixture>")
+    fixture = Path(sys.argv[1])
+    toolkit_root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, "-m", "specdev_tools.cli", "validate", str(fixture),
+         "--repo-root", str(toolkit_root)],
+        cwd=str(toolkit_root),
+    )
+    sys.exit(result.returncode)
+
 
 if __name__ == "__main__":
     main()

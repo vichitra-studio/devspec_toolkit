@@ -79,7 +79,7 @@ class StepValidatorsTests(unittest.TestCase):
             "extension_id": "ext-01-db",
             "required_schema_sections": ["tables", "indexes", "my-section", "step_13"],
             "justification": "Extends schema with domain-specific sections.",
-            "verification_rules": ["all tables have a primary key"],
+            "schema_design_guidelines": "Verify all tables have a primary key and check referential integrity.",
         }
         errs = step_13.validate_step_13({"extensions": [ext]}, ".")
         section_errs = [e for e in _render(errs) if "not a valid identifier" in e]
@@ -91,7 +91,7 @@ class StepValidatorsTests(unittest.TestCase):
             "extension_id": "ext-02-step",
             "required_schema_sections": ["13_extensions", "04_functional_requirements"],
             "justification": "Extends step-numbered schema sections.",
-            "verification_rules": ["section exists in schema registry"],
+            "schema_design_guidelines": "Verify section exists in schema registry and check naming conventions.",
         }
         errs = step_13.validate_step_13({"extensions": [ext]}, ".")
         section_errs = [e for e in _render(errs) if "not a valid identifier" in e]
@@ -103,7 +103,7 @@ class StepValidatorsTests(unittest.TestCase):
             "extension_id": "ext-03-bad",
             "required_schema_sections": [""],
             "justification": "Testing empty section name.",
-            "verification_rules": ["check"],
+            "schema_design_guidelines": "Verify and check all naming constraints for empty section testing.",
         }
         errs = step_13.validate_step_13({"extensions": [ext]}, ".")
         section_errs = [e for e in _render(errs) if "not a valid identifier" in e]

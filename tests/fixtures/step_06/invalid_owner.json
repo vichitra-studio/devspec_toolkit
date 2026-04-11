@@ -19,7 +19,7 @@
         ]
       },
       "severity": "error",
-      "policy_ref": {"id": "cn:project:term:data-policy", "kind": "term"},
+      "policy_ref": {"id": "cn:core:policy:spec-first", "kind": "policy"},
       "trace": [
         {
           "type": "fr",

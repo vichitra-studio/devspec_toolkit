@@ -205,13 +205,19 @@ def get_step_structure(step_id: str, spec_dir: str, repo_root: str) -> dict[str,
     try:
         canon_result = extract_canon(step_id, repo_root_abs)
         canon_kinds_needed = list(canon_result.get("canon_kinds", {}).keys())
+        canon_kinds_required = canon_result.get("canon_kinds_required", [])
+        canon_kinds_optional = canon_result.get("canon_kinds_optional", [])
     except Exception:
         canon_kinds_needed = []
+        canon_kinds_required = []
+        canon_kinds_optional = []
 
     return {
         "step": step_id,
         "required_inputs": required_inputs,
         "canon_kinds_needed": canon_kinds_needed,
+        "canon_kinds_required": canon_kinds_required,
+        "canon_kinds_optional": canon_kinds_optional,
         "seeds_required": seeds,
         "output_schema_keys": output_keys,
     }

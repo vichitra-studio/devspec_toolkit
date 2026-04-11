@@ -85,19 +85,31 @@
               },
               "capability_ref": {
                 "description": "Canonical reference to the capability this requirement implements. The `kind` must be 'capability'. The `id` follows the pattern cn:<namespace>:capability:<slug>. Example: {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}. The label should copy the capability's preferred_label from the canon registry. Required — every FR must bind to exactly one capability in the canon.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "capability" } } }
+                ]
               },
               "action_ref": {
                 "description": "Canonical reference to the action verb that is the key operation in this requirement's statement. The `kind` must be 'action'. Decision rule: pick the verb that names the primary state mutation this FR produces. When the FR statement contains multiple verbs, choose the outermost action — the one whose outcome defines success. Examples: for 'System validates credentials and creates a session token' → action is 'authenticate' (the overall behaviour), not 'validate' or 'create'. For fr-order-create, the outermost action is 'create' (not 'validate' or 'persist'). Cross-check: action_ref.label must match the capability's verb field. Anti-pattern: 'process' or 'handle' — these are too generic to be a canonical action. Example: {\"id\": \"cn:project:action:authenticate\", \"kind\": \"action\", \"label\": \"authenticate\"}. Ensures consistent verb vocabulary across all FRs, API contracts, and data models downstream.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "action" } } }
+                ]
               },
               "entity_ref": {
                 "description": "Canonical reference to the primary domain entity this requirement operates on. The `kind` must be 'entity'. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"}. Use the entity that is the direct subject or object of the operation — for 'create order', entity_ref points to the Order entity. Drives consistent entity naming in API contracts, data models, and test fixtures downstream.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
               },
               "status_ref": {
-                "description": "Canonical reference to the lifecycle status value this requirement transitions or checks. Named lifecycle statuses requiring a status_ref include: 'active', 'pending', 'suspended', 'archived', 'published', 'draft'. Include when the FR operates on an entity that has a lifecycle status. Example for fr-user-profile-update: status_ref targets the 'active' status — the FR only applies to active users, not suspended or deleted ones. Omit for FRs that apply regardless of entity status. Example: {\"id\": \"cn:core:stage:active\", \"kind\": \"stage\", \"label\": \"active\"}. Anti-pattern: omitting status_ref when the FR explicitly gates behaviour on a named status; inventing a status name not in the canon. Omit when the FR does not reference a lifecycle status.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to the lifecycle status value this requirement transitions or checks. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:active\", \"kind\": \"status\"}. Include when the FR operates on an entity with a lifecycle status. Omit for FRs that apply regardless of entity status.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "status" } } }
+                ]
               }
             },
             "required": [

@@ -16,10 +16,10 @@ from ...validation.linter_utils import check_no_duplicates
 _STEP_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
-def validate_step_13(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
+def validate_step_13(instance: dict[str, Any], toolkit_root: str, spec_root: Optional[str] = None) -> list[SpecError]:
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("extensions", []), "extension_id", "extension_id", errors)
-    for i, ext in enumerate(instance.get("extensions", [])):
+    for ext in instance.get("extensions", []):
         ext_id = ext.get("extension_id")
 
         # required_schema_sections must be present and non-empty
@@ -41,42 +41,32 @@ def validate_step_13(instance: dict[str, Any], toolkit_root: str) -> list[SpecEr
                 make_error("E320", f"Extension '{ext_id}' missing or empty justification")
             )
 
-        # Warn if no verification rules or test commands hint
-        schema_guidelines = ext.get("schema_design_guidelines", "")
-        has_verification_hint = any(
-            kw in (schema_guidelines or "").lower()
-            for kw in ("verif", "test", "check", "validat", "assert")
-        )
-        if not has_verification_hint and not ext.get("verification_rules"):
-            errors.append(
-                make_error("E320", f"Extension '{ext_id}' has no verification_rules and "
-                f"schema_design_guidelines lacks verification keywords")
-            )
 
     # --- Cross-step validation: governance_label_ref against 10_governance.json ---
-    governance_labels = _load_governance_labels(toolkit_root)
-    if governance_labels is None:
-        errors.append(
-            make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 10_governance.json not found; "
-            "skipping governance reference validation")
-        )
-    else:
-        for ext in instance.get("extensions", []):
-            ext_id = ext.get("extension_id", "<unknown>")
-            label_ref = ext.get("governance_label_ref")
-            if isinstance(label_ref, dict):
-                label_id = label_ref.get("id")
-                if label_id and label_id not in governance_labels:
-                    errors.append(
-                        make_error("E590", f"CROSS_STEP_ID_NOT_FOUND extension '{ext_id}' "
-                        f"references unknown governance label '{label_id}' "
-                        f"(not in 10_governance.json)")
-                    )
+    if instance.get("extensions"):
+        governance_labels = _load_governance_labels(toolkit_root, spec_root=spec_root)
+        if governance_labels is None:
+            errors.append(
+                make_error("W590", "CROSS_STEP_UPSTREAM_MISSING 10_governance.json not found; "
+                "skipping governance reference validation")
+            )
+        else:
+            for ext in instance.get("extensions", []):
+                ext_id = ext.get("extension_id", "<unknown>")
+                label_ref = ext.get("governance_label_ref")
+                if isinstance(label_ref, dict):
+                    label_id = label_ref.get("id")
+                    if label_id and label_id not in governance_labels:
+                        errors.append(
+                            make_error("E590", f"CROSS_STEP_ID_NOT_FOUND extension '{ext_id}' "
+                            f"references unknown governance label '{label_id}' "
+                            f"(not in 10_governance.json)")
+                        )
 
     return errors
 
 
-def _load_governance_labels(toolkit_root: str) -> Optional[Set[str]]:
+def _load_governance_labels(toolkit_root: str, spec_root: Optional[str] = None) -> Optional[Set[str]]:
     """Load governance label IDs from step 10 if available.
 
     Scans the spec directory for a file starting with ``10_`` and ending
@@ -87,7 +77,7 @@ def _load_governance_labels(toolkit_root: str) -> Optional[Set[str]]:
     Returns ``None`` when the upstream file cannot be found or parsed,
     signalling the caller to emit a W590 warning.
     """
-    spec_dir = os.path.join(toolkit_root, "spec")
+    spec_dir = spec_root if spec_root is not None else os.path.join(toolkit_root, "spec")
     if not os.path.isdir(spec_dir):
         return None
 

@@ -141,7 +141,7 @@ Before emitting, verify:
           "note": "Enforces: 'The system shall authenticate a registered user and return a signed session token.'"
         }
       ],
-      "policy_ref": { "id": "cn:core:risk_category:authz", "kind": "risk_category" }
+      "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy" }
     }
   ],
   "canonical_refs_used": []

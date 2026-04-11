@@ -76,8 +76,11 @@
                 }
               },
               "role_ref": {
-                "description": "Canonical reference to a role defined in the canonical registry. Kind should be 'entity' (roles are modelled as entities in the canon). Example: {\"id\": \"cn:project:entity:compliance-officer\", \"kind\": \"entity\", \"label\": \"Compliance Officer\"}. Omit if no canon entry exists for this role — do not fabricate an ID. Create a canonical_proposals entry instead.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "role" } } }
+                ],
+                "description": "Canonical reference to a role defined in the canonical registry. Kind is structurally pinned to role. Example: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"Reviewer\"}. Omit if no canon entry exists for this role — do not fabricate an ID. Create a canonical_proposals entry instead. Use real example ID: cn:core:role:reviewer"
               }
             },
             "required": [
@@ -184,8 +187,11 @@
                 "type": "string"
               },
               "unit_ref": {
-                "description": "Canonical reference to the unit defined in the canonical registry. Kind should be 'term' (units are modelled as terms). Example: {\"id\": \"cn:core:term:ms\", \"kind\": \"term\", \"label\": \"ms\"} for milliseconds, {\"id\": \"cn:core:term:percent\", \"kind\": \"term\", \"label\": \"percent\"} for percentages. Must be consistent with the 'unit' field value — if unit is 'ms', unit_ref.id should reference the 'ms' term.",
-                "$ref": "vc:core:collections#canonicalRef"
+                "description": "Canonical reference to the unit defined in the canonical registry. Kind is structurally pinned to 'unit'. Example: {\"id\": \"cn:core:unit:ms\", \"kind\": \"unit\"} for milliseconds, {\"id\": \"cn:core:unit:percent\", \"kind\": \"unit\"} for percentages. Must be consistent with the 'unit' field value.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "unit" } } }
+                ]
               }
             },
             "required": [

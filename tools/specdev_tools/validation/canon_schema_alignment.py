@@ -15,6 +15,7 @@ _ENUM_CANON_PAIRINGS = [
     ("core/collections.schema.json", ["$defs", "environmentName", "enum"], "environment"),
     ("core/collections.schema.json", ["$defs", "stageName", "enum"], "stage"),
     ("core/atoms.schema.json", ["$defs", "nfrCategory", "enum"], "nfr_category"),
+    ("core/atoms.schema.json", ["$defs", "owner", "enum"], "owner"),
 ]
 
 
@@ -74,9 +75,13 @@ def lint_canon_schema_alignment(
             ))
 
     # Category B exclusions: enums that are intentional subsets of a canon kind
+    # or domain-specific enums whose overlap with a canon kind is coincidental.
     _EXCLUDED_DISCOVERY_ENUMS = {
-        ("11_redteam.schema.json", "properties/threats/items/properties/mitigations/items/properties/type/enum"),
+        # step 11 mitigations.type is an artifact-type enum, not a trace_type
+        ("11_redteam.schema.json", "allOf/1/properties/threats/items/properties/mitigations/items/properties/type/enum"),
         ("16_impl_context.schema.json", "$defs/specRef/properties/type/enum"),
+        # build_status is an intentional 3-value subset of the status canon kind
+        ("15_scaffold.schema.json", "allOf/1/properties/build_status/enum"),
     }
 
     # Phase 2: Discovery scan (advisory)
@@ -114,10 +119,23 @@ def _resolve_json_path(data: dict, path: list[str]):
     return current if isinstance(current, list) else None
 
 
+def _is_allof_narrowing(schema: dict) -> bool:
+    """Detect allOf: [{$ref: ...}, {enum: [...]}] — intentional narrowing, not drift."""
+    all_of = schema.get("allOf")
+    if not isinstance(all_of, list) or len(all_of) < 2:
+        return False
+    has_ref = any(isinstance(item, dict) and "$ref" in item for item in all_of)
+    has_enum = any(isinstance(item, dict) and "enum" in item for item in all_of)
+    return has_ref and has_enum
+
+
 def _extract_enums(schema: dict, path: str = "") -> list[tuple[str, list[str]]]:
     """Recursively extract all enum arrays from a JSON Schema."""
     results: list[tuple[str, list[str]]] = []
     if not isinstance(schema, dict):
+        return results
+    # Skip enums inside allOf narrowing patterns (valid semantic composition)
+    if _is_allof_narrowing(schema):
         return results
     if "enum" in schema and isinstance(schema["enum"], list):
         values = [v for v in schema["enum"] if isinstance(v, str)]

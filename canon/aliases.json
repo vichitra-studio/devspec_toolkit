@@ -45,6 +45,60 @@
       "status": "active"
     },
     {
+      "kind": "governance_label",
+      "normalized": "must-have",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "required",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p0",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "critical",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "should-have",
+      "target_id": "cn:core:governance_label:recommended",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p1",
+      "target_id": "cn:core:governance_label:recommended",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "nice-to-have",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "could-have",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p2",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
       "kind": "id_pattern",
       "normalized": "commit pattern",
       "target_id": "cn:core:id_pattern:conventional-commit",

@@ -29,7 +29,7 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 - **10_governance.json**: PR/commit rules that tasks must satisfy; used to ensure roadmap tasks align with governance-compliant delivery workflows and labeling requirements
 - **11_redteam.json**: Identified threats and mitigations used to populate milestone risks and inform task prioritization for security-critical implementation sequences
 - **12_ci_gates.json**: CI pipeline gate definitions used to ensure roadmap milestones include validation tasks that satisfy all required continuous integration quality checks
-- **13_extension_generator.json**: Extension manifest entries used to schedule extension implementation work as dedicated milestones with proper dependency ordering after core infrastructure
+- **13_extension_generator.json**: Extension manifest entries and `extension_decision` used to schedule extension implementation work as dedicated milestones; if `extension_decision.status == 'none-required'`, skip extension milestones entirely — this is correct behavior, not a gap
 - **13a_completeness_assessment.json** (if present): Coverage gaps to address in milestone decomposition; high-priority missing elements used to schedule remediation tasks before implementation begins
 
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
@@ -97,7 +97,7 @@ Before emitting, verify:
 - **Audit Trace**: Use the `milestones[].risks` field to note *why* a complex extension was deferred or split.
 
 ## Common Pitfalls
-- **Ignoring Extensions**: Failing to schedule the work defined in `ext_01_database.json` or `ext_02_security.json`.
+- **Ignoring Extensions**: When `extension_decision.status == 'extensions-required'`, failing to schedule the work defined in extension files (e.g. `ext_01_database.json`). When `status == 'none-required'`, skipping extension milestones is correct behavior — do not flag it as a gap.
 - **Redoing Step 09**: Spending time debating "Python vs Go" (which was settled in Step 09) instead of planning "Sprint 1 vs Sprint 2".
 - **Skipping Completeness**: Creating a roadmap for a spec full of holes; the Roadmap step is the final quality gate before coding.
 

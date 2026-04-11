@@ -51,37 +51,58 @@ def _is_canonical_ref_field(field_schema: dict[str, Any]) -> bool:
 
     Canonical _ref fields have ``$ref`` pointing to the canonicalRef anchor
     in vc:core:collections (e.g. ``"vc:core:collections#canonicalRef"``).
+    Also detects the FC pattern: ``allOf: [{$ref: canonicalRef}, ...]``.
     Non-canonical _ref fields (fixture_ref, interface_ref in step 15, etc.)
     use ``vc:core:atoms#kebabId`` or other targets and must be excluded.
     """
     ref_target = field_schema.get("$ref", "")
-    return ref_target.endswith(_CANONICAL_REF_ANCHOR)
+    if ref_target.endswith(_CANONICAL_REF_ANCHOR):
+        return True
+    # FC pattern: allOf containing a $ref to canonicalRef
+    all_of = field_schema.get("allOf")
+    if isinstance(all_of, list):
+        return any(
+            isinstance(item, dict) and item.get("$ref", "").endswith(_CANONICAL_REF_ANCHOR)
+            for item in all_of
+        )
+    return False
 
 
-def _collect_ref_fields(properties: dict[str, Any]) -> set[str]:
-    """Walk a properties dict (recursively into array/object items) to find
-    canonicalRef fields.
 
-    Only fields whose schema has ``$ref`` ending in ``#canonicalRef`` are
-    included — this matches locked decision 4h ($ref target check, not
-    _ref suffix alone).
+def _collect_ref_fields_split(
+    schema: dict[str, Any],
+) -> tuple[set[str], set[str]]:
+    """Like _collect_ref_fields but splits into required vs optional.
+
+    Walks properties recursively.  A *_ref field is "required" if it
+    appears in a ``required`` array at the same level (or any ancestor
+    that is itself required).
+
+    Returns (required_fields, optional_fields).
     """
-    found: set[str] = set()
-    for field_name, field_schema in properties.items():
-        if field_name.endswith("_ref") and _is_canonical_ref_field(field_schema):
-            found.add(field_name)
-        # Recurse into array item properties.
-        if field_schema.get("type") == "array":
-            items = field_schema.get("items", {})
-            nested_props = items.get("properties", {})
-            if nested_props:
-                found.update(_collect_ref_fields(nested_props))
-        # Recurse into object properties.
-        elif field_schema.get("type") == "object":
-            nested_props = field_schema.get("properties", {})
-            if nested_props:
-                found.update(_collect_ref_fields(nested_props))
-    return found
+    required: set[str] = set()
+    optional: set[str] = set()
+
+    def _walk(obj: dict[str, Any]) -> None:
+        props = obj.get("properties", {})
+        req_keys = set(obj.get("required", []))
+        for field_name, field_schema in props.items():
+            if field_name.endswith("_ref") and _is_canonical_ref_field(field_schema):
+                if field_name in req_keys:
+                    required.add(field_name)
+                else:
+                    optional.add(field_name)
+            # Recurse into array items
+            if isinstance(field_schema, dict) and field_schema.get("type") == "array":
+                items = field_schema.get("items", {})
+                if isinstance(items, dict):
+                    _walk(items)
+            # Recurse into object
+            elif isinstance(field_schema, dict) and field_schema.get("type") == "object":
+                _walk(field_schema)
+
+    _walk(schema)
+    return required, optional
 
 
 def _load_kind_entries(kind: str, repo_root: str) -> list[dict[str, Any]]:
@@ -146,14 +167,16 @@ def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) ->
     # 1. Load the step schema and collect _ref fields.
     # ------------------------------------------------------------------
     ref_fields: set[str] = set()
+    required_ref_fields: set[str] = set()
+    optional_ref_fields: set[str] = set()
     try:
         registry = SchemaRegistry(repo_root_abs)
         uri = _find_step_schema_uri(step_id, registry)
         if uri:
             raw_schema = registry.load(uri)
             merged = _merge_allof(raw_schema, registry)
-            props = merged.get("properties", {})
-            ref_fields = _collect_ref_fields(props)
+            required_ref_fields, optional_ref_fields = _collect_ref_fields_split(merged)
+            ref_fields = required_ref_fields | optional_ref_fields
     except Exception:
         pass
 
@@ -200,9 +223,29 @@ def extract_canon(step_id: str, repo_root: str, spec_root: str | None = None) ->
     # ------------------------------------------------------------------
     token_estimate = len(json.dumps(canon_kinds)) // 4
 
+    # ------------------------------------------------------------------
+    # 5. Required vs optional kind split.
+    # ------------------------------------------------------------------
+    req_kinds: list[str] = []
+    opt_kinds: list[str] = []
+    req_seen: set[str] = set()
+    opt_seen: set[str] = set()
+    for rf in sorted(required_ref_fields):
+        k = _REF_TO_KIND.get(rf)
+        if k and k not in req_seen:
+            req_kinds.append(k)
+            req_seen.add(k)
+    for rf in sorted(optional_ref_fields):
+        k = _REF_TO_KIND.get(rf)
+        if k and k not in opt_seen and k not in req_seen:
+            opt_kinds.append(k)
+            opt_seen.add(k)
+
     return {
         "step": step_id,
         "canon_kinds": canon_kinds,
+        "canon_kinds_required": req_kinds,
+        "canon_kinds_optional": opt_kinds,
         "total_entries": total_entries,
         "token_estimate": token_estimate,
     }

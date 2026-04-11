@@ -116,7 +116,7 @@
         "kind": {
           "type": "string",
           "pattern": "^[a-z_][a-z0-9_]*$",
-          "description": "Canonical kind category, matching the kind field of the targeted canon entry. Common values: 'term' (vocabulary definitions), 'entity' (domain objects: User, Order, Session), 'action' (verbs: authenticate, submit, approve), 'event' (system events: login-succeeded, order-placed), 'acronym' (JWT, API, SLA), 'unit' (ms, req/s, MB), 'stage' (pipeline stages), 'environment' (dev, prod), 'capability', 'dependency', 'risk_category'."
+          "description": "Canonical kind category, matching the kind field of the targeted canon entry. Must match a kind defined under canon/kinds/*.json (or the project canon). See devspec_toolkit/canon/kinds/ for the full list. Examples from registered kinds: 'unit' (ms, percent), 'status' (pending, active), 'tech_stack' (python), 'policy' (spec-first), 'tag' (critical-path), 'governance_label' (mandatory), 'command' (pytest), 'role' (reviewer), 'metric' (error-rate), 'id_pattern' (conventional-commit), 'owner' (api, system), 'environment' (dev, prod), 'stage' (ci, staging)."
         },
         "version": {
           "type": "string",
@@ -161,7 +161,7 @@
         },
         "kind": {
           "type": "string",
-          "description": "Canonical kind category for the proposed entry. Must use underscores not hyphens — 'risk_category' not 'risk-category' (hyphenated kinds are rejected by canon-accept). Decision rule for glossary proposals: 'term' for vocabulary definitions; 'entity' for domain objects (User, Order, Session, Token); 'action' for operations or verbs (authenticate, submit, approve); 'event' for system events (login-succeeded, order-placed); 'acronym' for abbreviations in active use (JWT, API, SLA); 'unit' for measurement units (ms, req/s, MB); 'role' for personas or access roles (admin, end-user); 'risk_category' for threat or risk classifications; 'capability' for system capabilities; 'dependency' for external services or libraries. When in doubt between 'term' and 'entity': use 'entity' if the concept has lifecycle state or identity; use 'term' if it is purely vocabulary."
+          "description": "Canonical kind category for the proposed entry. Must use underscores not hyphens — 'risk_category' not 'risk-category' (hyphenated kinds are rejected by canon-accept). Must match a kind defined under canon/kinds/*.json (or the project canon). See devspec_toolkit/canon/kinds/ for the full registered list. When in doubt between 'term' and 'entity': use 'entity' if the concept has lifecycle state or identity; use 'term' if it is purely vocabulary."
         },
         "proposed_label": {
           "type": "string",
@@ -328,8 +328,11 @@
           "description": "Optional justification for choosing this technology over alternatives. Explain the decision criteria, not just the outcome. Example: 'Chose FastAPI over Flask for built-in OpenAPI generation and async support required by the real-time notification feature'. Distinct from notes: rationale describes WHY it was chosen, notes describe HOW it is used."
         },
         "tech_stack_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Optional canonical reference linking this tech stack item to the canonical registry."
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "tech_stack" } } }
+          ],
+          "description": "Optional canonical reference linking this tech stack item to the canonical registry. Kind is structurally pinned to 'tech_stack'. Example: {\"id\": \"cn:core:tech_stack:python\", \"kind\": \"tech_stack\", \"label\": \"Python\"}."
         }
       },
       "required": [
@@ -402,8 +405,11 @@
           "description": "Free-text description of the dependency relationship — what is needed and when. Minimum two words (enforced). Example: 'Auth service must expose the /token/validate endpoint before Sprint 3 starts. Blocked on mobile team finalising the token schema'. Include: what is needed, which milestone it blocks, and the blocking team contact if known."
         },
         "dependency_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Optional canonical reference linking this dependency to the canonical registry."
+          "description": "Optional canonical reference linking this dependency to the canonical registry.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "dependency" } } }
+          ]
         }
       },
       "required": [

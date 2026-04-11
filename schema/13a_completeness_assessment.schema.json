@@ -29,7 +29,7 @@
             },
             "capability_fr_coverage": {
               "$ref": "#/$defs/coverageDimension",
-              "description": "Fraction of capabilities (from Step 01) that have at least one functional requirement implementing them. uncovered_ids lists capability-* IDs with no FR back-link. Canonical kind referenced: completeness_dimension. Example canonical ref: {\"id\": \"cn:core:term:coverage-completeness\", \"kind\": \"completeness_dimension\", \"label\": \"coverage completeness\"}."
+              "description": "Fraction of capabilities (from Step 01) that have at least one functional requirement implementing them. uncovered_ids lists capability-* IDs with no FR back-link. Canonical kind referenced: completeness_dimension. Example canonical ref: {\"id\": \"cn:core:completeness_dimension:coverage-completeness\", \"kind\": \"completeness_dimension\"}."
             },
             "milestone_decomp_completeness": {
               "$ref": "#/$defs/coverageDimension",

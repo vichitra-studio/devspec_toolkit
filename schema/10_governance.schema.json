@@ -56,8 +56,11 @@
               "description": "Commit message pattern that governance-check validates. Should include step reference in brackets: 'feat(spec): add login flow [fr-user-login]' — enforced at runtime by governance-check. The bracketed IDs should match valid artifact IDs in the spec. Conventional Commits format is recommended: '<type>(<scope>): <summary> [<artifact-id>]'."
             },
             "id_pattern_ref": {
-              "$ref": "vc:core:collections#canonicalRef",
-              "description": "Canonical reference to the ID pattern used in commit messages. Kind must be `id_pattern`. Example: {\"id\": \"cn:core:id_pattern:conventional-commit\", \"kind\": \"id_pattern\", \"label\": \"conventional-commit\"}. The referenced entry's kind in the canon registry must exactly equal `id_pattern` — canonical-integrity lint (E120) rejects any other kind. Omit if the pattern is fully defined by the 'pattern' field without a canonical vocabulary reference. Anti-pattern: fabricating an id_pattern_ref ID — only reference id patterns that exist in the canon."
+              "description": "Canonical reference to the ID pattern used in commit messages. Kind is structurally pinned to 'id_pattern'. Example: {\"id\": \"cn:core:id_pattern:conventional-commit\", \"kind\": \"id_pattern\"}. Omit if the pattern is fully defined by the 'pattern' field.",
+              "allOf": [
+                { "$ref": "vc:core:collections#canonicalRef" },
+                { "properties": { "kind": { "const": "id_pattern" } } }
+              ]
             },
             "error_message": {
               "type": "string",
@@ -138,12 +141,18 @@
           }
         },
         "policy_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the governance policy in the canonical registry. Kind must be `policy`. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\", \"label\": \"spec-first\"}. The referenced entry's kind in the canon registry must exactly equal `policy` — canonical-integrity lint (E120) rejects any other kind. Omit if no canonical policy entry applies. Anti-pattern: fabricating a policy_ref ID — only reference policies that exist in the canon."
+          "description": "Canonical reference to the governance policy. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Omit if no canonical policy entry applies.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "policy" } } }
+          ]
         },
         "command_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the CLI command this governance rule triggers. Kind must be `command`. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\", \"label\": \"governance-check\"} for the specdev governance-check command. The referenced entry's kind in the canon registry must exactly equal `command` — canonical-integrity lint (E120) rejects any other kind. Omit when the governance rule does not map to an automated command. Anti-pattern: fabricating a command_ref ID — only reference commands that exist in the canon."
+          "description": "Canonical reference to the CLI command this governance rule triggers. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:governance-check\", \"kind\": \"command\"}. Omit when the governance rule does not map to an automated command.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "command" } } }
+          ]
         }
       },
       "required": [

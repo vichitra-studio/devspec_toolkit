@@ -334,11 +334,12 @@ def compare_step_inventories(
             if step_id in rename_map:
                 continue  # Already handled above
             
-            # Check if it's a project-specific extension (e.g., 13b_custom, 13c_domain)
-            # These are user-defined specs that extend the toolkit with custom steps.
+            # Check if it's a project-specific extension (e.g., ext_01_database.json).
+            # Per docs/developers/extension_schemas.md, extensions use ext_NN_<topic>.json
+            # naming. This branch catches user-created specs with a numeric step prefix
+            # (e.g., 02b_custom) that have no corresponding toolkit schema.
             # Note: Some extensions like 13a_completeness_assessment ARE in toolkit_ids
-            # and are handled in the first loop above. This branch only catches
-            # user-created extensions that have no corresponding toolkit schema.
+            # and are handled in the first loop above.
             if re.match(r"^\d{2}[a-z]_", step_id):
                 diffs.append(StepDiff(
                     step_id=step_id,

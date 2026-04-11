@@ -28,8 +28,11 @@
           ]
         },
         "tech_stack_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the technology stack entry in the canon registry. Kind must be 'capability' — tech stacks are modelled as capabilities in the canon. Concrete example: {\"id\": \"cn:project:capability:tech-stack-web\", \"kind\": \"capability\", \"label\": \"Web Tech Stack\"}. Decision rule: include this field when the milestone introduces or modifies a technology commitment that is registered in canon/manifest.json; omit when no canon entry exists and the tech stack is purely inherited from the project baseline."
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "tech_stack" } } }
+          ],
+          "description": "Canonical reference for the technology stack entry in the canon registry. Kind is structurally pinned to 'tech_stack'. Concrete example: {\"id\": \"cn:core:tech_stack:python\", \"kind\": \"tech_stack\", \"label\": \"Python\"}. Decision rule: include this field when the milestone introduces or modifies a technology commitment that is registered in canon/manifest.json; omit when no canon entry exists and the tech stack is purely inherited from the project baseline."
         },
         "milestones": {
           "type": "array",
@@ -80,8 +83,11 @@
                 "uniqueItems": true
               },
               "status_ref": {
-                "$ref": "vc:core:collections#canonicalRef",
-                "description": "Canonical reference to the status value in the canonical registry. Kind must be 'stage'. Example: {\"id\": \"cn:core:stage:pending\", \"kind\": \"stage\", \"label\": \"pending\"} or {\"id\": \"cn:core:stage:in-progress\", \"kind\": \"stage\", \"label\": \"in-progress\"}. Should be consistent with the 'status' field value."
+                "description": "Canonical reference to the status value in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Should be consistent with the 'status' field value.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "status" } } }
+                ]
               }
             },
             "required": [
@@ -102,12 +108,18 @@
           "description": "External team or system dependencies that must deliver before this milestone can complete. Each entry should name what is needed, from which team, and by which milestone it is required. Cross-team dependency example: 'Auth service must publish OpenAPI spec before Sprint 3 — blocks ms-checkout-integration milestone'. External dependency: 'Stripe SDK v4 must be stable before payment milestone — currently in beta'. Impact: each dependency should state what milestone it blocks. Examples: ['Auth team must expose /token/validate endpoint before ms-auth-backend', 'Mobile team must finalise token schema before ms-integration']. Distinct from Step 09's depends_on (internal milestone ordering) — this field tracks cross-team external dependencies. Anti-pattern: listing 'internal team alignment' as a dependency (too vague — name the specific artifact or decision needed)."
         },
         "dependency_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference for the dependency when it maps to a registered canon entry (a known external service or cross-team contract). Include when the dependency maps to a registered canon entry. Example: {\"id\": \"cn:project:dependency:auth-service-openapi\", \"kind\": \"dependency\", \"label\": \"auth-service-openapi\"}. Omit for informal dependencies or internal task ordering (use `depends_on` instead). Anti-pattern: using dependency_ref for a milestone in the same impl plan — use `depends_on` with the milestone_id instead."
+          "description": "Canonical reference for the dependency when it maps to a registered canon entry (a known external service or cross-team contract). Include when the dependency maps to a registered canon entry. Example: {\"id\": \"cn:project:dependency:auth-service-openapi\", \"kind\": \"dependency\", \"label\": \"auth-service-openapi\"}. Omit for informal dependencies or internal task ordering (use `depends_on` instead). Anti-pattern: using dependency_ref for a milestone in the same impl plan — use `depends_on` with the milestone_id instead.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "dependency" } } }
+          ]
         },
         "environment_ref": {
-          "$ref": "vc:core:collections#canonicalRef",
-          "description": "Canonical reference to the deployment environment required for this milestone. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'. Use to indicate which environment this milestone targets for delivery or testing."
+          "description": "Canonical reference to the deployment environment required for this milestone. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'. Use to indicate which environment this milestone targets for delivery or testing.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "environment" } } }
+          ]
         },
         "trace": {
           "type": "array",

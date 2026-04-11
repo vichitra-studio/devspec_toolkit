@@ -41,7 +41,7 @@ For each upstream artifact ingested, extract the following:
   - *Infrastructure*: specific K8s configs, Terraform modules, specialized hardware? -> Needs an Infra Spec.
   - *Integration*: Complex 3rd party APIs (Stripe, Twilio, Salesforce)? -> Needs an Integration Spec.
 - **Filter**: Exclude generic items already covered by the core specs (standard REST APIs are in Step 05, standard NFRs in Step 07). Only create extensions when a domain requires >=3 dedicated schema sections not expressible in existing step schemas (05, 06, 07).
-- **Plan**: For each identified need, define the filename and structure. Enforce the naming convention `ext_[0-9]{2}_[topic].json`.
+- **Plan**: For each identified need, define the extension_id and structure. File names are derived from extension_id (hyphens → underscores + `.json`).
 
 ## Heuristics For Completeness
 - **Explicit > Implicit**: If a system has a Vector Database, do not leave it as an "implementation detail". Spec it out in `ext_01_vectordb.json`.
@@ -56,7 +56,7 @@ For each upstream artifact ingested, extract the following:
 - `spec/03_glossary.json` is present with at least one term entry.
 
 ## Negative Constraints
-- If no complex domains are found, return empty array. Do NOT invent trivial extensions.
+- If no complex domains are found, set `extension_decision.status` to `'none-required'` with a rationale citing evaluated components and NFR categories, and return `extensions: []`. Do NOT invent trivial extensions.
 - **DO NOT** create extensions for items expressible via standard Steps 04–10 (library bloat).
 - **DO NOT** redefine standard API routes or create extensions that overlap existing pipeline steps.
 - **DO NOT** ignore the forward-only flow: extensions are for domain-specific verticals only.
@@ -76,7 +76,7 @@ Before emitting, verify:
 - [ ] Every domain evaluated for extension necessity has an explicit accept/reject decision with rationale (no silent omissions)
 - [ ] No extension duplicates coverage already expressible in core step schemas (05, 06, 07)
 - [ ] Generated extension IDs follow the same kebab-case naming convention as existing IDs
-- [ ] All proposed extension file names follow kebab-case naming convention with `ext_` prefix
+- [ ] All extension_id values follow the pattern `ext-{NN}-{topic}` (file names are derived automatically)
 - [ ] No extension redefines an entity or relationship already expressible by existing Step 04–10 artifacts
 - [ ] No extension introduces fields not present in the target step's schema
 - [ ] All extension points reference valid schema-defined extension mechanisms
@@ -84,9 +84,19 @@ Before emitting, verify:
 - [ ] Extension includes validation command and test gate specification
 - [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps
 
+## Governance Label Resolution
+`governance_label_ref` is dual-checked:
+1. The referenced canonical ID must exist in `canon/manifest.json` (verified by `canonical-integrity`, error E110).
+2. The same ID must appear in `spec/10_governance.json` `canonical_refs_used` with `kind: "governance_label"` (verified by `step_13.py`, error E590; missing file yields W590).
+
+Typical values: `cn:core:governance_label:mandatory`, `cn:core:governance_label:recommended`, `cn:core:governance_label:optional`, `cn:core:governance_label:security`.
+
 ## Cross-Step Synthesis Notes
 - extensions[*].justification: MUST reference a specific `component_id` from `spec/02_system_sketch.json` or `nfr_id` from `spec/07_nfrs.json` that necessitates the extension.
-- extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) sourced from `spec/10_governance.json` governance labels. Look up the governance label in `canon/manifest.json` by `kind: governance_label`. Typical values: `cn:core:governance_label:mandatory`, `cn:core:governance_label:recommended`, `cn:core:governance_label:optional`. If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
+- extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in both `canon/manifest.json` and `spec/10_governance.json` (see Governance Label Resolution above). If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
+- extension_decision: **REQUIRED**. When `status` is `'none-required'`, `extensions` must be empty. When `status` is `'extensions-required'`, `extensions` must contain at least one entry.
+- **Optional per-extension fields** (omit when not applicable): `tag_ref` (kind: `"tag"` — for cross-cutting concern tags like `critical-path`), `policy_ref` (kind: `"policy"` — when the extension is governed by a specific policy), `id_pattern_ref` (kind: `"id_pattern"` — only when extension IDs follow a non-standard pattern).
+- Output filename is derived from `extension_id`: replace hyphens with underscores and append `.json` (e.g., `ext-01-database` → `ext_01_database.json`).
 
 ## Step-Specific Output Constraints
 1. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
@@ -100,22 +110,48 @@ Before emitting, verify:
 ```json
 {
   "$schema": "vc:13-extension-generator",
-  "id": "13-extension-manifest",
+  "id": "extension-generator-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
+  "extension_decision": {
+    "status": "extensions-required",
+    "rationale": "The Data domain requires dedicated entity, schema, and migration sections not expressible in core steps 05-07."
+  },
   "extensions": [
     {
       "extension_id": "ext-01-database",
       "title": "Database Schema Specification",
-      "file_name": "ext_01_database_schema.json",
       "area_of_concern": "Data",
+      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy — three dedicated schema sections are needed to cover the data domain.",
       "required_schema_sections": ["entities", "schemas", "migrations"],
+      "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for entity IDs. Each entity must include a validation_rules section with at least one check constraint. Verify referential integrity across entity relationships.",
       "governance_label_ref": {
         "id": "cn:core:governance_label:mandatory",
         "kind": "governance_label"
       }
     }
   ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    }
+  ]
+}
+```
+
+### Example B — None Required
+```json
+{
+  "$schema": "vc:13-extension-generator",
+  "id": "extension-generator-v1",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "extension_decision": {
+    "status": "none-required",
+    "rationale": "Evaluated components ghost-cms, vc-collective-theme, ghost-sqlite-db, zoho-mail-smtp, youtube-oembed, github-scm from 02_system_sketch.json. NFR categories cover latency, usability, availability, durability, maintainability, portability, throughput — zero in security or compliance. No domain requires ≥3 dedicated schema sections beyond core steps."
+  },
+  "extensions": [],
   "canonical_refs_used": []
 }
 ```
