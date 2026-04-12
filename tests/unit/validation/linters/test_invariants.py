@@ -226,10 +226,21 @@ class TestRunInvariants:
 
     # --- Bug 4 regression: non-jsonlogic languages ---
 
-    def test_cel_missing_var_is_unevaluable(self, tmp_path):
-        # CEL is now supported, but a rule referencing an undeclared variable
-        # against an empty sample is unevaluable (celpy raises CELEvalError).
+    def test_cel_missing_var_evaluates_to_false(self, tmp_path):
+        # celpy 0.4.0: missing variables resolve to falsy defaults rather than
+        # raising CELEvalError. The expression evaluates (evaluable=True) and
+        # the result is False because the missing field is not equal to 'x'.
         rule = _single_rule("post.status == 'x'", language="cel")
+        _make_spec_file(tmp_path, [rule])
+        results = run_invariants(str(tmp_path), {})
+        assert len(results) == 1
+        assert results[0]["evaluable"] is True
+        assert results[0]["result"] is False
+
+    def test_cel_function_on_missing_var_is_unevaluable(self, tmp_path):
+        # Calling size() on a missing variable triggers a real CELEvalError
+        # in celpy 0.4.0 — this is the reliable way to test unevaluable paths.
+        rule = _single_rule("size(post.items) > 0", language="cel")
         _make_spec_file(tmp_path, [rule])
         results = run_invariants(str(tmp_path), {})
         assert len(results) == 1
@@ -306,17 +317,14 @@ class TestRunInvariants:
             assert r["evaluable"] is True
             assert r["result"] is True
 
-        # celpy 0.1.5 quirk: comparing two undeclared identifiers
+        # celpy 0.4.0: comparing two undeclared identifiers
         # (transaction.debit_amount == transaction.credit_amount against an empty
-        # sample) evaluates to BoolType(True) rather than raising CELEvalError.
-        # CEL spec says undeclared refs should propagate errors, but celpy
-        # returns True when two error-valued refs are compared for equality.
-        # We assert the observable behaviour so any library upgrade that changes
-        # this is caught immediately.
+        # sample) evaluates to BoolType(True) — both sides resolve to the same
+        # falsy default and are considered equal.
         cel_rules = [r for r in results if r["inv_id"] == "invariant-data-consistency"]
         assert len(cel_rules) == 1
         assert cel_rules[0]["language"] == "cel"
-        assert cel_rules[0]["evaluable"] is True   # celpy quirk — both sides resolve to same error object
+        assert cel_rules[0]["evaluable"] is True
         assert cel_rules[0]["result"] is True
 
     # --- Default language ---

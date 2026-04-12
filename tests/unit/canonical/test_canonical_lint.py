@@ -409,6 +409,17 @@ class CanonicalLintTests(unittest.TestCase):
             errs = lint_canon_dir(str(root), require_manifest_schema_registration=True)
             self.assertTrue(any("schema_uri_not_registered" in e.render() for e in errs))
 
+    def test_missing_canon_dir_returns_e520_with_spec_root_hint(self):
+        """When canon_dir does not exist, lint_canon_dir returns E520 with --spec-root guidance."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            errs = lint_canon_dir(repo_root=str(td), canon_dir="nonexistent",
+                                  require_manifest_schema_registration=False)
+            self.assertEqual(len(errs), 1)
+            self.assertEqual(errs[0].code, "E520")
+            self.assertIn("--spec-root", errs[0].render())
+
     def test_lint_canon_dir_fails_when_strict_and_schema_registry_missing(self):
         import tempfile
 

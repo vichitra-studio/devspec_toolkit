@@ -13,6 +13,7 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from specdev_tools.validation.matrix import (
     _check_coverage_thresholds,
@@ -373,6 +374,106 @@ class TestMilestoneCoverageInMatrixOutput(unittest.TestCase):
             result = build_trace_matrix(repo_root, spec_dir)
             mc = result.get("milestone_coverage", {})
             self.assertEqual(mc.get("fr-x"), ["ms-a", "ms-m", "ms-z"])
+
+
+class TestEntityDedup(unittest.TestCase):
+    """Tests for F20: entity dedup during build_trace_matrix entity collection."""
+
+    _TOOLKIT_ROOT = str(Path(__file__).resolve().parents[4])
+
+    def _write_spec_file(self, spec_dir, filename, data):
+        path = os.path.join(spec_dir, filename)
+        with open(path, "w") as f:
+            json.dump(data, f)
+        return path
+
+    def test_duplicate_fr_dedup(self):
+        """FR appearing in both functional_requirements and out_of_scope is counted once."""
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = os.path.join(td, "spec")
+            os.makedirs(spec_dir)
+
+            fr_obj = {
+                "fr_id": "fr-login",
+                "statement": "User can log in",
+                "acceptance_criteria": ["Given valid creds, login succeeds"],
+                "priority": "must-have",
+            }
+            self._write_spec_file(spec_dir, "04_fr_list.json", {
+                "$schema": "vc:step:04",
+                "functional_requirements": [fr_obj],
+            })
+            self._write_spec_file(spec_dir, "05_interface_contracts.json", {
+                "$schema": "vc:step:05",
+                "out_of_scope": [fr_obj],
+            })
+
+            result = build_trace_matrix(self._TOOLKIT_ROOT, spec_dir)
+            self.assertEqual(result["coverage"]["fr_total"], 1)
+            # No duplicate rows in the matrix
+            fr_ids_in_matrix = [row["fr_id"] for row in result.get("matrix", [])]
+            self.assertEqual(len(fr_ids_in_matrix), len(set(fr_ids_in_matrix)))
+
+    def test_aliased_trace_type_dedup(self):
+        """FR appearing in both functional_requirements and a reference array in another file is counted once."""
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = os.path.join(td, "spec")
+            os.makedirs(spec_dir)
+
+            fr_obj = {
+                "fr_id": "fr-login",
+                "statement": "User can log in",
+                "acceptance_criteria": ["Given valid creds, login succeeds"],
+                "priority": "must-have",
+            }
+            # Canonical FR definition
+            self._write_spec_file(spec_dir, "04_fr_list.json", {
+                "$schema": "vc:step:04",
+                "functional_requirements": [fr_obj],
+            })
+            # Same fr_id referenced in a different step's array (realistic:
+            # Step 07 NFRs can carry fr_id on linked_requirements objects)
+            self._write_spec_file(spec_dir, "07_nfrs.json", {
+                "$schema": "vc:step:07",
+                "nfrs": [],
+                "linked_requirements": [{"fr_id": "fr-login", "rationale": "perf target"}],
+            })
+
+            result = build_trace_matrix(self._TOOLKIT_ROOT, spec_dir)
+            # fr-login should be counted once, not twice
+            self.assertEqual(result["coverage"]["fr_total"], 1)
+            fr_ids = [row["fr_id"] for row in result.get("matrix", [])]
+            self.assertEqual(fr_ids, ["fr-login"])
+
+    def test_no_false_dedup(self):
+        """Two genuinely different FRs both appear in the matrix."""
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = os.path.join(td, "spec")
+            os.makedirs(spec_dir)
+
+            self._write_spec_file(spec_dir, "04_fr_list.json", {
+                "$schema": "vc:step:04",
+                "functional_requirements": [
+                    {
+                        "fr_id": "fr-login",
+                        "statement": "User can log in",
+                        "acceptance_criteria": ["Given valid creds, login succeeds"],
+                        "priority": "must-have",
+                    },
+                    {
+                        "fr_id": "fr-logout",
+                        "statement": "User can log out",
+                        "acceptance_criteria": ["Session is terminated"],
+                        "priority": "must-have",
+                    },
+                ],
+            })
+
+            result = build_trace_matrix(self._TOOLKIT_ROOT, spec_dir)
+            self.assertEqual(result["coverage"]["fr_total"], 2)
+            fr_ids_in_matrix = [row["fr_id"] for row in result.get("matrix", [])]
+            self.assertIn("fr-login", fr_ids_in_matrix)
+            self.assertIn("fr-logout", fr_ids_in_matrix)
 
 
 if __name__ == "__main__":

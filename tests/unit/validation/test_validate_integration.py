@@ -127,7 +127,7 @@ class ValidateIntegrationTests(unittest.TestCase):
             self.assertTrue(any(e.code == "E520" for e in errs))
             self.assertTrue(any("schema_registry_bootstrap_failed" in e.message for e in errs))
 
-    def test_validate_dir_reports_missing_canon_manifest(self):
+    def test_validate_dir_reports_missing_canon(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "spec").mkdir()
@@ -142,7 +142,8 @@ class ValidateIntegrationTests(unittest.TestCase):
                  patch("specdev_tools.validation.validate.lint_dependency_order", return_value=[]), \
                  patch("specdev_tools.validation.validate.check_forward_replay", return_value=[]):
                 errs = validate_dir(str(root), str(root / "spec"))
-            self.assertTrue(any("missing" in e.message and "manifest.json" in e.message for e in errs))
+            # F21: early-exit fires E520 "canon directory not found" before manifest check
+            self.assertTrue(any("canon directory not found" in e.message for e in errs))
 
     def test_validate_dir_short_circuits_on_canonical_bootstrap_failure(self):
         with tempfile.TemporaryDirectory() as td:

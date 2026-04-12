@@ -36,6 +36,10 @@ def lint_canon_dir(
 ) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     canon_root = root / canon_dir
+    if not canon_root.exists():
+        return [make_error("E520", f"UNRESOLVED_INPUT canon directory not found: {canon_root}. "
+                    f"Expected 'canon' (toolkit core) or use --spec-root for project canon. "
+                    f"For submodule deployments: specdev canonical-lint canon --repo-root ./devspec_toolkit --spec-root ./spec")]
     manifest_path = root / canon_dir / "manifest.json"
     aliases_path = canon_root / "aliases.json"
     kinds_dir = canon_root / "kinds"

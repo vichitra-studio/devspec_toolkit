@@ -45,6 +45,13 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - Task acceptance criteria SHOULD be more specific and implementation-testable (e.g., "unit test passes for UserService.deactivate()" refines "user account is deactivated and sessions invalidated").
 - Every task criterion should be verifiable by a specific CI check, unit test, or manual procedure.
 
+### Refinement Decision Rules
+- **Stricter threshold** = refinement: FR says "within 500ms", task says "within 200ms" — OK.
+- **Weaker threshold** = contradiction: FR says "within 500ms", task says "within 1000ms" — FORBIDDEN.
+- **Added edge case** = refinement: FR says "user can login", task adds "invalid credential returns error response" — OK.
+- **Removed condition** = contradiction: FR says "authentication required", task says "authentication optional" — FORBIDDEN.
+- **More specific artifact** = refinement: FR says "page renders", task says "read operation for resource returns success with expected component" — OK.
+
 **Step Authority**: Step 14 is the authoritative source for execution-level `migration_plan` entries and task-level `dependencies`. Step 09 provides the design-level implementation plan. When Step 09 and Step 14 disagree on sequencing or scope, Step 14 takes precedence for execution decisions.
 
 ## Heuristics For Completeness
@@ -69,6 +76,10 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - **NEVER create a `depends_on` cycle**: Task A depending on B which depends on A is forbidden and will fail validation.
 - **NEVER use a `fr_refs` ID not present in `spec/04_fr_list.json`**: All FR references must be grounded in Step 04.
 - **NEVER use a `capability_refs` ID not present in `spec/01_capabilities.json`**: All capability references must be grounded in Step 01.
+- **NEVER weaken an upstream AC**: Task acceptance criteria must be equal to or STRICTER than the originating FR acceptance criteria. A task AC that relaxes a threshold, removes a condition, or contradicts a constraint is a regression, not a refinement.
+- **NO Ambiguous Task Scope**: Task `description` must name the specific deliverable artifact (endpoint, template, table, config, module) being created or modified. "Configure dependencies" is too vague — "Configure OAuth2 client credentials in session middleware settings" is specific.
+- If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
+- If task `status` is 'done', the task MUST have >=1 acceptance criterion documenting what was verified.
 
 ## Coverage Closure
 Before emitting, verify:
@@ -84,9 +95,16 @@ Before emitting, verify:
 - [ ] Task acceptance criteria refine (not contradict) the originating FR acceptance criteria
 - [ ] Every FR from Step 04 appears in at least one task's `fr_refs`
 - [ ] Every milestone's `source_milestones` references valid `milestone_id` values from Step 09
+- [ ] Every fixture from Step 08 with category `contract` or `e2e` is referenced by >=1 task acceptance criterion `fixture_ref`, OR is documented in a deferred milestone with preservation rationale
+- [ ] Every invariant from Step 06 appears in the `trace` array with type='invariant', an `id` matching the invariant's own ID, and a `note` naming the validating task
+- [ ] Every threat from Step 11 appears in the `trace` array with type='threat', an `id` matching the threat's own ID, and a `note` documenting the mitigation task or risk acceptance rationale
+- [ ] Task acceptance criteria referencing interface contracts use the same method/operation and identifier pattern as defined in Step 05 interface contracts
+- [ ] Every NFR from Step 07 appears in the `trace` array with type='nfr' and a note linking to the validating task and acceptance criterion
+- [ ] Every capability_id from `spec/01_capabilities.json` appears in >=1 milestone's `capability_refs`
+- [ ] All required fields for downstream consumers (Step 15 scaffold, Step 16 trinity loop) are populated: `milestones[].tasks[].task_id`, `milestones[].tasks[].description`, `milestones[].tasks[].acceptance_criteria`, and `milestones[].tasks[].fr_refs`
 
 **Extraction Mandate**:
-- Every FR ID from `04_functional_requirements.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
+- Every FR ID from `04_fr_list.json` must appear in ≥1 milestone's `fr_refs`. List any FR not covered.
 
 ## Best Practices
 - **One Milestone = One User Story**: Every milestone must map individually to a specific user story. Do not bundle multiple stories into one vague milestone.
@@ -95,6 +113,8 @@ Before emitting, verify:
 - **Sequence Dependencies**: Ensure "Infrastructure" or "Base API" milestones precede "UI" or "Complex Logic" milestones.
 - **JIT Granularity**: Plan the immediate next 1-2 milestones in high detail (dates, deliverables). Later milestones MUST use tentative target dates and MUST include at minimum a `task_id`, `description` (>=2 words, imperative verb), and `status` for each task, but MAY omit `acceptance_criteria` and `depends_on`.
 - **Audit Trace**: Use the `milestones[].risks` field to note *why* a complex extension was deferred or split.
+- **Atomicity Test**: If a task description contains 'and' connecting two independent work items, split it into two tasks. If a task cannot be merged or demoed independently, split it further. Target: each task completable in 1-3 days by one developer.
+- **Trace Validation**: After emitting the roadmap artifact, run `specdev matrix spec/ --repo-root ./devspec_toolkit` to generate the cross-artifact traceability matrix. Verify that `fr_with_fixture > 0`, `fr_with_nfr > 0`, and `fr_with_threat > 0` in the coverage summary.
 
 ## Common Pitfalls
 - **Ignoring Extensions**: When `extension_decision.status == 'extensions-required'`, failing to schedule the work defined in extension files (e.g. `ext_01_database.json`). When `status == 'none-required'`, skipping extension milestones is correct behavior — do not flag it as a gap.
@@ -174,8 +194,18 @@ Before emitting, verify:
 - For internal dependencies: `{ "type": "milestone", "id": "<milestone_id>" }` (`id` must be kebab-case).
 - For external dependencies: `{ "type": "external", "id": "<dependency>", "owner": "<team-or-system>", "note": "<rationale>" }` (`id` must be kebab-case).
 
+### Invariant-Fixture Cross-Check
+- For each invariant from Step 06 with severity `error`, verify that Step 08 contains >=1 fixture with a target referencing that invariant ID. If missing, note it as a coverage gap in milestone risks rather than silently omitting the invariant from the trace.
+
+### Governance and CI Gate Binding
+- If Step 10 defines PR labeling rules (e.g., `[fr-*]` tags), task descriptions implementing FRs should reference the FR ID to enable governance compliance.
+- If Step 12 defines CI gates gating milestone completion, note them as exit_conditions on the relevant milestone's final task.
+
 ### trace
-- Use traceRef objects to cite upstream specs that shape the roadmap.
+- Populate the `trace` array with one entry per upstream artifact that shapes this roadmap.
+- Include trace entries for every upstream artifact type listed in Extraction Intent (both Primary Sources and Reference Sources). Valid trace types are defined in `$TOOLKIT_ROOT/canon/kinds/trace_type.json` — consult this file for the authoritative list. Typical roadmap trace types: fr, capability, nfr, invariant, threat, fixture, api, charter-goal. Additional types (doc, glossary, component) are valid but less common for roadmaps — include only when a specific upstream artifact of that type directly shaped a task.
+- Each entry must have `type`, `id` (matching the upstream artifact's own ID), and `note` (naming the validating task or acceptance rationale).
+- Coverage goal: every artifact ID consumed from upstream steps should appear as a trace entry. Orphaned upstream IDs indicate incomplete synthesis.
 
 # Note on `$schema`
 The `$schema` field is required in the output and is stripped before validation during prompt-schema sync checks.

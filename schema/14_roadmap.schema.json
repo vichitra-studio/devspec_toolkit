@@ -124,7 +124,7 @@
                           },
                           "fixture_ref": {
                             "$ref": "vc:core:atoms#kebabId",
-                            "description": "Kebab-case ID of the fixture from spec/08_fixtures.json that validates this acceptance criterion. Use the fixture's own fixture_id value. Example: 'fix-checkout-payment-expired' (validates the 402 error case for expired payment tokens), 'fix-cart-boundary-100-items' (validates the 100-item boundary condition). Omit this field if no fixture has been defined for this criterion yet — do not fabricate a fixture ID, as canonical-integrity lint will fail if the referenced fixture does not exist."
+                            "description": "Kebab-case ID of the fixture from spec/08_fixtures.json that validates this acceptance criterion. Before omitting, verify that no matching fixture exists in Step 08 — missing fixture_ref values create coverage gaps detectable by specdev matrix. If no fixture exists yet and one should, note it as a gap in milestone risks."
                           }
                         },
                         "required": [
@@ -199,6 +199,12 @@
                         "description": "An FR ID in the format 'fr-<slug>' referencing a functional requirement."
                       },
                       "uniqueItems": true
+                    },
+                    "invariant_refs": {
+                      "type": "array",
+                      "items": { "$ref": "vc:core:atoms#kebabId" },
+                      "uniqueItems": true,
+                      "description": "Invariant IDs from Step 06 that this task enforces or tests. Enables traceability from roadmap tasks back to system invariant guarantees. Add all invariants this task validates, even partially."
                     }
                   },
                   "required": [
@@ -266,7 +272,7 @@
         },
         "trace": {
           "type": "array",
-          "description": "Traceability links connecting this roadmap to upstream FRs and capabilities it implements or was shaped by. Every roadmap milestone must trace to at least one upstream FR or capability it implements. Use type='implements' for FRs/capabilities being delivered, type='derives_from' for constraints or NFRs that shaped the milestone scope. Example: [{\"type\": \"implements\", \"id\": \"fr-user-login\", \"note\": \"Milestone delivers the authentication endpoint for this FR\"}]. Milestones without trace links are floating delivery units that cannot be validated against the spec. Consult the items description for approved types and ID formats.",
+          "description": "Traceability links connecting this roadmap to all upstream artifacts. Step 14 should include trace entries for each upstream artifact type consumed in Extraction Intent (e.g., FRs from Step 04, NFRs from Step 07, invariants from Step 06, threats from Step 11, capabilities from Step 01, governance/CI references from Steps 10/12). The specific trace types must be valid entries from the canon trace_type registry. Each entry must have type, id (matching the upstream ID), and note (naming the validating task).",
           "items": {
             "$ref": "vc:core:collections#traceRef",
             "description": "A traceability reference for the roadmap."

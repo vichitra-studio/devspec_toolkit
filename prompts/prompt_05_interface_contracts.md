@@ -53,9 +53,9 @@ Before finalizing, ensure these are addressed:
 | DELETE /user/{id} | DELETE /v1/users/{user_id} — deactivates account; 204 on success, 404 if not found, 403 if not admin |
 
 ## Heuristics For Completeness
-- MUST provide `input_schema_ref` and `output_schema_ref` when the corresponding FR in `spec/04_functional_requirements.json` specifies input/output payloads or when fixtures in Step 8 will need payload shapes; MUST include at least one error state for every non-GET mutating operation.
+- MUST provide `input_schema_ref` and `output_schema_ref` when the corresponding FR in `spec/04_fr_list.json` specifies input/output payloads or when fixtures in Step 8 will need payload shapes; MUST include at least one error state for every non-GET mutating operation.
 - Versioning: MUST bump version when request/response formats or semantics change materially.
-- Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_functional_requirements.json` preconditions; MUST align with NFRs and governance.
+- Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_fr_list.json` preconditions; MUST align with NFRs and governance.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -72,12 +72,12 @@ Before finalizing, ensure these are addressed:
 - **DO NOT** use vague or non-specific error codes.
 
 ## Clarification Questions
-- If access control rules, permission boundaries, or identity model are not defined in `spec/04_functional_requirements.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
+- If access control rules, permission boundaries, or identity model are not defined in `spec/04_fr_list.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every FR in `spec/04_functional_requirements.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
-- All `trace` entries on APIs reference valid `fr_id` values from `spec/04_functional_requirements.json`.
+- Every FR in `spec/04_fr_list.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
+- All `trace` entries on APIs reference valid `fr_id` values from `spec/04_fr_list.json`.
 - Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
 - All resource and action names align with `term_id` values from `spec/03_glossary.json`.
 - If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.

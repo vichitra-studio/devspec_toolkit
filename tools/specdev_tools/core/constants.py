@@ -1,4 +1,4 @@
-"""Shared constants for the DevSpec Toolkit.
+"""Shared constants and utilities for the DevSpec Toolkit.
 
 Centralises lookup tables that were previously duplicated across
 ``generation.prompt_generator`` and ``migration.planner``.
@@ -6,6 +6,8 @@ Centralises lookup tables that were previously duplicated across
 Created by FIX-027 (Batch 2).
 """
 from __future__ import annotations
+
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # STEP_TO_TEMPLATE — maps pipeline step number prefixes to migration
@@ -72,3 +74,37 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
     ("risk_category", "risk_category_ref", "risk_category"),
     ("tag", "tag_ref", "tag"),
 )
+
+
+# ---------------------------------------------------------------------------
+# resolve_extras_path — shared logic for locating output files in the
+# spec/extras/ directory (host-repo) with fallback to toolkit tools/.
+# Used by context/extractor.py, context/scope_resolver.py, and
+# validation/validators/step_14.py.
+# ---------------------------------------------------------------------------
+def resolve_extras_path(spec_dir: str, repo_root: str, filename: str) -> str:
+    """Return the path for *filename* preferring ``<spec_dir>/extras/``.
+
+    Resolution order (read-only — never creates directories):
+    1. ``<spec_dir>/extras/`` directory exists → return path there
+       (file may not exist yet — callers writing to this path will create it).
+    2. Submodule deployment (spec_dir outside repo_root) and the specific
+       file already exists at ``<spec_dir>/extras/<filename>`` → return it.
+    3. Fallback: ``<repo_root>/tools/<filename>``.
+    """
+    spec_abs = Path(spec_dir).resolve()
+    repo_abs = Path(repo_root).resolve()
+    extras_dir = spec_abs / "extras"
+    if extras_dir.is_dir():
+        return str(extras_dir / filename)
+    # If spec_dir is outside repo_root (submodule deployment), prefer
+    # extras/ — but only return it if the target file already exists there
+    # or a caller explicitly creates the directory.  Do NOT mkdir here:
+    # this function is called by read-only code paths that should not
+    # create directories as a side effect.
+    if not spec_abs.is_relative_to(repo_abs):
+        target = extras_dir / filename
+        if target.exists():
+            return str(target)
+    # Fallback: toolkit's own tools/ directory.
+    return str(repo_abs / "tools" / filename)

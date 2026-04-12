@@ -29,7 +29,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 - `spec/14_roadmap.json`: active milestone tasks and fr_refs; extract milestone identifiers, task_id lists, deliverable definitions, and acceptance_criteria used to enforce mandatory roadmap-to-checklist coverage mapping
 
 ### Reference Sources (context only)
-- `spec/04_functional_requirements.json`: FR acceptance criteria for verification; extract functional requirement identifiers, acceptance criteria text, and priority rankings that directly populate checklist spec_ref entries and drive linked_test_expectation bindings
+- `spec/04_fr_list.json`: FR acceptance criteria for verification; extract functional requirement identifiers, acceptance criteria text, and priority rankings that directly populate checklist spec_ref entries and drive linked_test_expectation bindings
 - `spec/05_interface_contracts.json`: API contracts to plan against; extract endpoint definitions, HTTP method constraints, request/response payload schemas, and error codes used to generate API-layer checklist items
 - `spec/15_scaffold.json`: existing code structure; extract generated directory structure, file layout conventions, and scaffold template paths that ground target_file_patterns and existing_structures references
 - `spec/00_charter.json`: product vision, success criteria, and stakeholder constraints that define the outer boundary of what the planner may include in scope_in

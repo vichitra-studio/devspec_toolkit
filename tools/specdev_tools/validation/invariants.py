@@ -70,7 +70,11 @@ def _cel_eval(expr_str, ctx):
             if isinstance(k, str) and k.replace("_", "").isalnum() and not k[:1].isdigit()
         }
         raw = prog.evaluate(activation)
-    except (_CelEvalError, ValueError):
+    except (_CelEvalError, ValueError, AttributeError, TypeError):
+        # CELEvalError covers the canonical failure path.  AttributeError
+        # and TypeError guard against internal celpy implementation gaps
+        # (e.g. attribute access on missing activation keys) that surface
+        # across different celpy releases.
         return None, False, "cel_eval_error"
     return raw, True, None
 

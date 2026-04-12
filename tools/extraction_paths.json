@@ -11,13 +11,14 @@
       "vc:06-invariants": "sha256:337a372b871dc388960abfbd44201a7bb939f268e890a65f226635886ab010f1",
       "vc:07-nfrs": "sha256:80db42beae4fa2b793c4a2ae1a9d3602a911e4e6d3cf7718f6cb999d902601f2",
       "vc:08-fixtures": "sha256:586c2f64c924b7b8370a7112c2067c327309958a59c4972ae4106506aa40041a",
-      "vc:09-impl-plan": "sha256:366b4e947d225d189e68db108b6149f639c769c46c3724628a32eeb59077ea28",
+      "vc:09-impl-plan": "sha256:317092cc62fe46f0bac9b285d19188f4e7f34464c3cfcaf650dd3fa0dd861ffe",
       "vc:10-governance": "sha256:1eaa6591462bcebbe7eaf5edb6e7016c434774268f0e419ed2187eb00e563c7d",
       "vc:11-redteam": "sha256:7f1092d8c13e8cb1d55c40527aa4523894278b08ce781794df5f8c836b92145f",
       "vc:12-ci-gates": "sha256:2bb2bcd233dc9451b76d91462234c613d3110afd03ab1a1097fef86094cd5d8c",
-      "vc:13-extension-generator": "sha256:3a8e61ae195f05c6750d791c540a96ee005be8485fdcc33ef0134e74210def68"
+      "vc:13-extension-generator": "sha256:3a8e61ae195f05c6750d791c540a96ee005be8485fdcc33ef0134e74210def68",
+      "vc:13a-completeness-assessment": "sha256:4395cb223d1ee1a9ee7517fec4f25a9bb9bef6026278d9f7117487dffef3a95a"
     },
-    "generated_at": "2026-04-11T12:17:28Z"
+    "generated_at": "2026-04-12T04:33:40Z"
   },
   "05": {
     "05_interface_contracts.json": [
@@ -88,9 +89,10 @@
   },
   "09": {
     "09_impl_plan.json": [
+      ".migration_plan",
       ".dependencies",
-      ".milestones",
-      ".migration_plan"
+      ".trace",
+      ".milestones"
     ]
   },
   "10": {
@@ -123,6 +125,11 @@
     "13_extension_manifest.json": [
       ".extensions",
       ".extension_decision"
+    ]
+  },
+  "13a": {
+    "13a_completeness_assessment.json": [
+      ".dimensions"
     ]
   }
 }

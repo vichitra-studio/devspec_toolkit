@@ -70,7 +70,7 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every constraint in `spec/04_functional_requirements.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR explicitly listed in `out_of_scope` with rationale.
+- Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR explicitly listed in `out_of_scope` with rationale.
 - Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
 - All `trace` entries reference valid `fr_id` or `api_id` values from Steps 04 or 05.
 - No business rule, security boundary, or data integrity constraint is silently omitted.

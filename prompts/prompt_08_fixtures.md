@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fixture-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `targets` referencing every `fr_id`, `api_id`, `inv_id`, or `nfr_id` that the fixture exercises (as identified in `spec/04_functional_requirements.json`, `spec/05_interface_contracts.json`, `spec/06_invariants.json`, `spec/07_nfrs.json`); MUST add `smoke` tag for fixtures covering FRs listed as high-priority in capabilities; MUST add `load` tag for fixtures covering NFRs with `category: latency` or `category: throughput`.
+- MUST add `targets` referencing every `fr_id`, `api_id`, `inv_id`, or `nfr_id` that the fixture exercises (as identified in `spec/04_fr_list.json`, `spec/05_interface_contracts.json`, `spec/06_invariants.json`, `spec/07_nfrs.json`); MUST add `smoke` tag for fixtures covering FRs listed as high-priority in capabilities; MUST add `load` tag for fixtures covering NFRs with `category: latency` or `category: throughput`.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -64,7 +64,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every FR acceptance criterion in `spec/04_functional_requirements.json` has ≥1 fixture with a matching `targets` entry referencing that `fr_id`.
+- Every FR acceptance criterion in `spec/04_fr_list.json` has ≥1 fixture with a matching `targets` entry referencing that `fr_id`.
 - Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
 - Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.

@@ -15,6 +15,7 @@ import json
 import os
 from typing import Any
 
+from ..core.constants import resolve_extras_path
 from ..core.registry import SchemaRegistry
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type
 from .scope_resolver import resolve_scope
@@ -53,9 +54,9 @@ def _sha256_file(path: str) -> str:
     return f"sha256:{h.hexdigest()}"
 
 
-def _load_extraction_paths(repo_root: str) -> dict:
+def _load_extraction_paths(spec_dir: str, repo_root: str) -> dict:
     """Load the extraction_paths.json cache file, returning {} on any error."""
-    path = os.path.join(repo_root, "tools", _EXTRACTION_PATHS_FILENAME)
+    path = resolve_extras_path(spec_dir, repo_root, _EXTRACTION_PATHS_FILENAME)
     if not os.path.isfile(path):
         return {}
     try:
@@ -65,9 +66,9 @@ def _load_extraction_paths(repo_root: str) -> dict:
         return {}
 
 
-def _save_extraction_paths(repo_root: str, cache: dict) -> None:
+def _save_extraction_paths(spec_dir: str, repo_root: str, cache: dict) -> None:
     """Write the extraction_paths.json cache file, silently ignoring errors."""
-    path = os.path.join(repo_root, "tools", _EXTRACTION_PATHS_FILENAME)
+    path = resolve_extras_path(spec_dir, repo_root, _EXTRACTION_PATHS_FILENAME)
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(cache, fh, indent=2)
@@ -259,7 +260,7 @@ def extract_context(
     context: dict[str, Any] = {}
     upstream_files: list[str] = []
 
-    extraction_cache = _load_extraction_paths(repo_root_abs)
+    extraction_cache = _load_extraction_paths(spec_dir_abs, repo_root_abs)
     cache_updated = False
 
     for src_step in upstream_step_ids:
@@ -381,7 +382,7 @@ def extract_context(
                 cache_updated = True
 
     if cache_updated:
-        _save_extraction_paths(repo_root_abs, extraction_cache)
+        _save_extraction_paths(spec_dir_abs, repo_root_abs, extraction_cache)
 
     # ------------------------------------------------------------------
     # 5. Token estimates.

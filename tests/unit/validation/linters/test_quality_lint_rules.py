@@ -201,7 +201,7 @@ class TestVagueLintDirectoryMode(unittest.TestCase):
             artifact = _make_step_artifact(
                 description="The system provides adequate coverage"
             )
-            self._write_spec(spec_dir, "04_functional_requirements.json", artifact)
+            self._write_spec(spec_dir, "04_fr_list.json", artifact)
             errs = lint_spec_quality(str(spec_dir))
             w593_errs = [e for e in render_errors(errs) if "W593" in e]
             self.assertTrue(len(w593_errs) >= 1)
@@ -215,7 +215,7 @@ class TestVagueLintDirectoryMode(unittest.TestCase):
             artifact = _make_step_artifact(
                 assumptions=["Some users are fast"]
             )
-            self._write_spec(spec_dir, "04_functional_requirements.json", artifact)
+            self._write_spec(spec_dir, "04_fr_list.json", artifact)
             errs = lint_spec_quality(str(spec_dir))
             w571_errs = [e for e in render_errors(errs) if "W571" in e]
             w593_errs = [e for e in render_errors(errs) if "W593" in e]
@@ -235,7 +235,7 @@ class TestVagueLintDirectoryMode(unittest.TestCase):
             artifact = _make_step_artifact(
                 description="The system authenticates users via OAuth2 tokens"
             )
-            self._write_spec(spec_dir, "04_functional_requirements.json", artifact)
+            self._write_spec(spec_dir, "04_fr_list.json", artifact)
             errs = lint_spec_quality(str(spec_dir))
             w593_errs = [e for e in render_errors(errs) if "W593" in e]
             self.assertEqual(w593_errs, [])
@@ -250,7 +250,7 @@ class TestVagueLintDirectoryMode(unittest.TestCase):
             # but we explicitly set id to a vague-word-containing value
             artifact["id"] = "fr-some-fast-thing"
             artifact["owner"] = "some-team"
-            self._write_spec(spec_dir, "04_functional_requirements.json", artifact)
+            self._write_spec(spec_dir, "04_fr_list.json", artifact)
             errs = lint_spec_quality(str(spec_dir))
             w593_errs = [e for e in render_errors(errs) if "W593" in e]
             self.assertEqual(w593_errs, [])
@@ -287,7 +287,7 @@ class TestVagueLintSingleFileMode(unittest.TestCase):
 
     def test_w593_emitted_single_file_mode(self):
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "04_functional_requirements.json"
+            p = Path(td) / "04_fr_list.json"
             artifact = _make_step_artifact(
                 rationale="This is a reasonable approach"
             )
@@ -299,7 +299,7 @@ class TestVagueLintSingleFileMode(unittest.TestCase):
 
     def test_w571_for_assumptions_in_single_file_mode(self):
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "04_functional_requirements.json"
+            p = Path(td) / "04_fr_list.json"
             artifact = _make_step_artifact(
                 assumptions=["Several components depend on this"]
             )
@@ -312,7 +312,7 @@ class TestVagueLintSingleFileMode(unittest.TestCase):
 
     def test_clean_single_file_no_w593(self):
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "04_functional_requirements.json"
+            p = Path(td) / "04_fr_list.json"
             artifact = _make_step_artifact(
                 description="Users authenticate with JWT tokens"
             )
@@ -323,7 +323,7 @@ class TestVagueLintSingleFileMode(unittest.TestCase):
 
     def test_multiple_fields_with_vague_terms_single_file(self):
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "04_functional_requirements.json"
+            p = Path(td) / "04_fr_list.json"
             artifact = _make_step_artifact(
                 description="Provides significant value",
                 rationale="Typically this is the approach",
@@ -338,7 +338,7 @@ class TestVagueLintSingleFileMode(unittest.TestCase):
 
     def test_nested_vague_in_single_file_mode(self):
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "04_functional_requirements.json"
+            p = Path(td) / "04_fr_list.json"
             artifact = _make_step_artifact(
                 functional_requirements=[
                     {
@@ -366,7 +366,7 @@ class TestAllVagueTermsEndToEnd(unittest.TestCase):
         for term in ALL_VAGUE_TERMS:
             with self.subTest(term=term):
                 with tempfile.TemporaryDirectory() as td:
-                    p = Path(td) / "04_functional_requirements.json"
+                    p = Path(td) / "04_fr_list.json"
                     artifact = _make_step_artifact(
                         description=f"The system provides {term} behavior"
                     )
@@ -389,7 +389,7 @@ class TestAllVagueTermsEndToEnd(unittest.TestCase):
         for term in ALL_VAGUE_TERMS:
             with self.subTest(term=term):
                 with tempfile.TemporaryDirectory() as td:
-                    p = Path(td) / "04_functional_requirements.json"
+                    p = Path(td) / "04_fr_list.json"
                     artifact = _make_step_artifact(
                         assumptions=[f"The system provides {term} behavior"]
                     )

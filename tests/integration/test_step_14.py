@@ -12,7 +12,7 @@ class Step14IntegrationTests(unittest.TestCase):
         self.fixtures_dir = self.repo_root / "tests" / "fixtures" / "step_14"
 
     def test_valid_roadmap_fixtures_pass_schema_validation(self):
-        for name in ("valid_roadmap.json", "valid_roadmap_migration.json"):
+        for name in ("valid_roadmap.json", "valid_roadmap_migration.json", "valid_with_invariant_refs.json"):
             errors = validate_file(str(self.repo_root), str(self.fixtures_dir / name))
             self.assertEqual([], errors, msg=f"{name} failed validation: {errors}")
 
@@ -28,6 +28,7 @@ class Step14IntegrationTests(unittest.TestCase):
             "invalid_task_acceptance_criteria.json",
             "invalid_tech_mismatch.json",
             "invalid_task_format.json",
+            "invalid_invariant_refs_pattern.json",
         ):
             errors = validate_file(str(self.repo_root), str(self.fixtures_dir / name))
             self.assertTrue(errors, msg=f"{name} unexpectedly passed validation")

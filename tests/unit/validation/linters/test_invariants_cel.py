@@ -72,9 +72,16 @@ class TestCelEval:
 
     # ---- failure modes ----
 
-    def test_missing_var_returns_unevaluable(self):
-        # Undeclared identifier raises CELEvalError.
-        _, evaluable, reason = _cel_eval("post.status == 'x'", {})
+    def test_missing_var_evaluates_to_false(self):
+        # celpy 0.4.0: missing identifiers resolve to falsy defaults.
+        raw, evaluable, reason = _cel_eval("post.status == 'x'", {})
+        assert evaluable is True
+        assert reason is None
+        assert bool(raw) is False
+
+    def test_function_on_missing_var_is_unevaluable(self):
+        # size() on a missing variable triggers a real CELEvalError in 0.4.0.
+        _, evaluable, reason = _cel_eval("size(post.items) > 0", {})
         assert evaluable is False
         assert reason == "cel_eval_error"
 
@@ -212,13 +219,21 @@ class TestRunInvariantsCel:
         assert r["evaluable"] is True
         assert r["result"] is False
 
-    def test_cel_missing_var_unevaluable(self, tmp_path):
+    def test_cel_missing_var_evaluates_to_false(self, tmp_path):
+        # celpy 0.4.0: missing identifiers evaluate to falsy defaults.
         _make_spec_file(tmp_path, [_cel_rule("post.status == 'x'")])
+        res = run_invariants(str(tmp_path), {})
+        r = res[0]
+        assert r["evaluable"] is True
+        assert r["result"] is False
+
+    def test_cel_function_on_missing_var_unevaluable(self, tmp_path):
+        # size() on missing variable triggers real CELEvalError in 0.4.0.
+        _make_spec_file(tmp_path, [_cel_rule("size(post.items) > 0")])
         res = run_invariants(str(tmp_path), {})
         r = res[0]
         assert r["evaluable"] is False
         assert r["unevaluable_reason"] == "cel_eval_error"
-        assert r["result"] is False
 
     def test_cel_parse_error_unevaluable(self, tmp_path):
         _make_spec_file(tmp_path, [_cel_rule("post.status ==")])
@@ -409,7 +424,8 @@ class TestCliInvariantsCheck:
         assert "description" in err
 
     def test_unevaluable_is_warning_by_default(self, tmp_path):
-        r = _cli_run(tmp_path, [_cel_rule("post.status == 'x'")])
+        # size() on a missing variable triggers a real CELEvalError in celpy 0.4.0
+        r = _cli_run(tmp_path, [_cel_rule("size(post.items) > 0")])
         assert r.returncode == 0
         env = json.loads(r.stdout)
         assert env["status"] == "PASS"
@@ -423,7 +439,7 @@ class TestCliInvariantsCheck:
         # Both a failing rule and an unevaluable rule in the same run.
         rules = [
             _cel_rule("1 == 2", inv_id="inv-fail", description="failing"),
-            _cel_rule("post.status == 'x'", inv_id="inv-uneval", description="missing var"),
+            _cel_rule("size(post.items) > 0", inv_id="inv-uneval", description="missing var size"),
         ]
         r = _cli_run(tmp_path, rules)
         assert r.returncode == 1
@@ -438,7 +454,7 @@ class TestCliInvariantsCheck:
 
     def test_strict_flag_promotes_unevaluable_to_error(self, tmp_path):
         r = _cli_run(
-            tmp_path, [_cel_rule("post.status == 'x'")], extra_args=("--strict",)
+            tmp_path, [_cel_rule("size(post.items) > 0")], extra_args=("--strict",)
         )
         assert r.returncode == 1
         env = json.loads(r.stdout)
@@ -452,7 +468,7 @@ class TestCliInvariantsCheck:
     def test_strict_env_var_value_1(self, tmp_path):
         r = _cli_run(
             tmp_path,
-            [_cel_rule("post.status == 'x'")],
+            [_cel_rule("size(post.items) > 0")],
             env_extra={"SPECDEV_INVARIANTS_STRICT": "1"},
         )
         assert r.returncode == 1
@@ -461,7 +477,7 @@ class TestCliInvariantsCheck:
     def test_strict_env_var_value_true(self, tmp_path):
         r = _cli_run(
             tmp_path,
-            [_cel_rule("post.status == 'x'")],
+            [_cel_rule("size(post.items) > 0")],
             env_extra={"SPECDEV_INVARIANTS_STRICT": "true"},
         )
         assert r.returncode == 1
@@ -470,7 +486,7 @@ class TestCliInvariantsCheck:
     def test_strict_env_var_value_yes(self, tmp_path):
         r = _cli_run(
             tmp_path,
-            [_cel_rule("post.status == 'x'")],
+            [_cel_rule("size(post.items) > 0")],
             env_extra={"SPECDEV_INVARIANTS_STRICT": "yes"},
         )
         assert r.returncode == 1
@@ -488,7 +504,7 @@ class TestCliInvariantsCheck:
         for falsy in ("0", "false", "no", "off", ""):
             r = _cli_run(
                 tmp_path,
-                [_cel_rule("post.status == 'x'")],
+                [_cel_rule("size(post.items) > 0")],
                 env_extra={"SPECDEV_INVARIANTS_STRICT": falsy},
             )
             env = json.loads(r.stdout)
@@ -512,7 +528,7 @@ class TestCliInvariantsCheck:
         assert "inv-cel-test" in r.stdout
 
     def test_human_readable_unevaluable_shows_warn(self, tmp_path):
-        r = _cli_run(tmp_path, [_cel_rule("post.status == 'x'")], json_output=False)
+        r = _cli_run(tmp_path, [_cel_rule("size(post.items) > 0")], json_output=False)
         assert r.returncode == 0
         assert "WARN" in r.stdout
         assert "inv-cel-test" in r.stdout
@@ -520,7 +536,7 @@ class TestCliInvariantsCheck:
     def test_human_readable_strict_shows_error(self, tmp_path):
         r = _cli_run(
             tmp_path,
-            [_cel_rule("post.status == 'x'")],
+            [_cel_rule("size(post.items) > 0")],
             json_output=False,
             extra_args=("--strict",),
         )

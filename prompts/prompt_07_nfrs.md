@@ -61,9 +61,9 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every quantitative metric in `spec/00_charter.json` `success_metrics` is encoded as ≥1 `nfr_id` with a numeric `target` and canonical `unit`.
-- Every performance-critical FR in `spec/04_functional_requirements.json` (latency, throughput, availability requirements) has a corresponding `nfr_id`.
+- Every performance-critical FR in `spec/04_fr_list.json` (latency, throughput, availability requirements) has a corresponding `nfr_id`.
 - All `unit` values resolve to canonical units from `spec/03_glossary.json` or the canon registry — no invented units.
-- All `trace` entries reference valid IDs from `spec/00_charter.json` or `spec/04_functional_requirements.json`.
+- All `trace` entries reference valid IDs from `spec/00_charter.json` or `spec/04_fr_list.json`.
 - If any success metric cannot be expressed as a measurable NFR: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)

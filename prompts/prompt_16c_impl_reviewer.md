@@ -171,7 +171,7 @@ You must **VERIFY** that the Coder respected these high-fidelity fields.
 
 ### Primary Sources (directly consumed)
 - `spec/16b_impl_code.json`: implementation artifacts to review
-- `spec/04_functional_requirements.json`: FR acceptance criteria as review checklist
+- `spec/04_fr_list.json`: FR acceptance criteria as review checklist
 - `spec/05_interface_contracts.json`: API contracts to verify implementation against
 
 ### Reference Sources (context only)

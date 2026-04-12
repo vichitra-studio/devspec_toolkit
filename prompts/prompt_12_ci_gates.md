@@ -14,7 +14,7 @@ Translate governance rules and fixture expectations into enforceable CI automati
 
 ### Primary Sources (directly consumed)
 - `spec/10_governance.json`: commit patterns, PR rules, quality gates — these ARE the CI gate definitions
-- `spec/04_functional_requirements.json`: high-priority FRs that must be gated
+- `spec/04_fr_list.json`: high-priority FRs that must be gated
 
 ### Reference Sources (context only)
 - **11_redteam.json**: Security mitigations that require automated verification — referenced to verify completeness of gate coverage

@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from ...core.constants import resolve_extras_path
 from ...core.errors import make_error, SpecError
 from ...core.loaders import KEBAB_ID_RE, load_sibling_artifact
 
@@ -84,19 +85,15 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
                 errors.append(
                     make_error("E142", f"TECH_STACK_MISMATCH: roadmap uses tech '{name}' not present in Step 09 tech_stack")
                 )
-    # AUDIT-034: Step 02 → Step 14 tech stack consistency check (W602)
-    step02_component_names = _load_step02_component_names(toolkit_root, artifact_path)
-    if step02_component_names:
-        roadmap_tech_names = _collect_tech_names(instance.get("tech_stack", {}))
-        for name in roadmap_tech_names:
-            if name not in step02_component_names:
-                errors.append(
-                    make_error("W602", f"TECH_STACK_02_MISMATCH: roadmap uses tech '{name}' not found in Step 02 system_sketch components")
-                )
-    # Step 02 tech_stack inheritance check (W605)
+    # AUDIT-034: Step 02 → Step 14 tech stack consistency checks (W602, W605)
     step02_tech_names = _load_step02_tech_stack_names(toolkit_root, artifact_path)
     if step02_tech_names:
         roadmap_tech_names = _collect_tech_names(instance.get("tech_stack", {}))
+        for name in roadmap_tech_names:
+            if name not in step02_tech_names:
+                errors.append(
+                    make_error("W602", f"TECH_STACK_02_MISMATCH: roadmap uses tech '{name}' not found in Step 02 system_sketch tech_stack")
+                )
         for name in step02_tech_names:
             if name not in roadmap_tech_names:
                 errors.append(
@@ -122,10 +119,13 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
 
 
 def _check_trace_matrix_staleness(toolkit_root: str, artifact_path: str | None) -> list[SpecError]:
-    """Check whether tools/trace_matrix.json is stale relative to the roadmap artifact.
+    """Check whether trace_matrix.json is stale relative to the roadmap artifact.
 
     Emits W604 TRACE_MATRIX_STALE if trace_matrix.json is older than 14_roadmap.json,
     or if trace_matrix.json is missing.
+
+    Looks in ``<spec_dir>/extras/`` first (host-repo location), then falls
+    back to ``<toolkit_root>/tools/`` for backwards compatibility.
 
     Guard conditions (skip silently):
     - artifact_path is None or not named "14_roadmap.json" — only meaningful for the real artifact
@@ -145,12 +145,13 @@ def _check_trace_matrix_staleness(toolkit_root: str, artifact_path: str | None) 
             return errors
         if not roadmap_path.exists():
             return errors
-        # Locate trace_matrix.json under toolkit_root/tools/
-        matrix_path = Path(toolkit_root).resolve() / "tools" / "trace_matrix.json"
+        # Locate trace_matrix.json via shared resolution (extras/ → tools/ fallback)
+        spec_dir = str(roadmap_path.parent)
+        matrix_path = Path(resolve_extras_path(spec_dir, toolkit_root, "trace_matrix.json"))
         if not matrix_path.exists():
             errors.append(make_error(
                 "W604",
-                "TRACE_MATRIX_STALE tools/trace_matrix.json does not exist; "
+                "TRACE_MATRIX_STALE trace_matrix.json does not exist; "
                 "run 'specdev matrix spec' to generate it"
             ))
             return errors
@@ -159,7 +160,7 @@ def _check_trace_matrix_staleness(toolkit_root: str, artifact_path: str | None) 
         if matrix_mtime < roadmap_mtime:
             errors.append(make_error(
                 "W604",
-                "TRACE_MATRIX_STALE tools/trace_matrix.json is older than 14_roadmap.json; "
+                "TRACE_MATRIX_STALE trace_matrix.json is older than 14_roadmap.json; "
                 "run 'specdev matrix spec' to regenerate it"
             ))
     except (OSError, ValueError, TypeError):
@@ -286,42 +287,8 @@ def _load_step09_tech_stack_names(toolkit_root: str, artifact_path: str | None) 
     return set()
 
 
-def _load_step02_component_names(toolkit_root: str, artifact_path: str | None) -> set[str]:
-    """Load component_id names from Step 02 system_sketch for cross-ref validation (AUDIT-034).
-
-    Extracts component_id values from Step 02 components array.
-    Returns empty set if Step 02 artifact is not found or not readable.
-    """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        candidates.append(artifact_dir / "02_system_sketch.json")
-    candidates.append(Path(toolkit_root).resolve() / "spec" / "02_system_sketch.json")
-    for path in candidates:
-        if not path.exists():
-            continue
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return set()
-        names: set[str] = set()
-        for component in data.get("components", []):
-            if not isinstance(component, dict):
-                continue
-            component_id = component.get("component_id")
-            if isinstance(component_id, str) and component_id:
-                names.add(component_id)
-        return names
-    return set()
-
-
 def _load_step02_tech_stack_names(toolkit_root: str, artifact_path: str | None) -> set[str]:
-    """Load tech_stack names from Step 02 system sketch for cross-ref validation.
-
-    Distinct from _load_step02_component_names() which loads component_id values.
-    This function loads technology names from Step 02's tech_stack categories.
-    """
+    """Load tech_stack names from Step 02 system sketch for cross-ref validation."""
     candidates: list[Path] = []
     if artifact_path:
         artifact_dir = Path(artifact_path).resolve().parent

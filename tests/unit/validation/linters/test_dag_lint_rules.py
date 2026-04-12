@@ -390,10 +390,10 @@ class TestIntentEntryRegex(unittest.TestCase):
 
     def test_basic_entry_matches(self):
         """Standard extraction intent entry without parenthetical matches."""
-        line = "- **04_functional_requirements.json**: Extract all FR identifiers and acceptance criteria for traceability"
+        line = "- **04_fr_list.json**: Extract all FR identifiers and acceptance criteria for traceability"
         m = _INTENT_ENTRY_RE.match(line)
         assert m is not None
-        self.assertEqual(m.group(1), "04_functional_requirements.json")
+        self.assertEqual(m.group(1), "04_fr_list.json")
         self.assertIn("Extract all FR identifiers", m.group(2))
 
     def test_entry_with_optional_parenthetical(self):

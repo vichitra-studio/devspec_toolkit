@@ -182,6 +182,7 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
 
     # Dynamic entity indexing: discover entities by _id fields + canon trace type validation
     entity_index = collections.defaultdict(list)  # normalized_trace_type -> [entity_objects]
+    seen_entities: set[tuple[str, str]] = set()   # (normalized_trace_type, id_value)
 
     for data in artifacts.values():
         for key, value in data.items():
@@ -196,7 +197,10 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
                     prefix = field[:-3]  # strip "_id"
                     normalized = normalize_trace_type(prefix)
                     if is_valid_trace_type(normalized):
-                        entity_index[normalized].append(item)
+                        entity_key = (normalized, item[field])
+                        if entity_key not in seen_entities:
+                            entity_index[normalized].append(item)
+                            seen_entities.add(entity_key)
                         break  # one entity type per object
 
     # Bridge to existing variable names (Sections C/D/E unchanged).
