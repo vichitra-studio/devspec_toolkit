@@ -166,10 +166,9 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
     return errors
 
 def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
-    # Reusing the existing matrix logic for 00-09 core steps for visualization purposes
-    # Generalized Matrix visualization is much harder without a schema, so we keep 
-    # the core matrix logic "Classic" for now but ensure it doesn't crash on extensions.
-    # The crucial fix was validate_trace_integrity, which is now generic.
+    # Classic step-00-to-09 link-building kept for visualization; extension artifacts
+    # are indexed but not deeply linked.  FR→API direction: APIs carry the authoritative
+    # FR trace (trace.type="fr"), not vice-versa — FRs trace to capabilities.
     
     # Collect step artifacts
     artifacts = {}
@@ -185,7 +184,7 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
     seen_entities: set[tuple[str, str]] = set()   # (normalized_trace_type, id_value)
 
     for data in artifacts.values():
-        for key, value in data.items():
+        for value in data.values():
             if not isinstance(value, list):
                 continue
             for item in value:
@@ -230,10 +229,13 @@ def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
     fr_to_nfr = collections.defaultdict(set)
     api_to_threat = collections.defaultdict(set)
 
-    for fr in frs:
-        for t in fr.get("trace", []):
-            if t.get("type") == _MATRIX_LINK_API_TYPE:
-                fr_to_api[fr["fr_id"]].add(t["id"])
+    # APIs carry the authoritative FR trace: each API lists the FRs it implements.
+    # Iterating from the API side (rather than the FR side) is the correct direction:
+    # FRs trace to capabilities, not to APIs.
+    for api in apis.values():
+        for t in api.get("trace", []):
+            if t.get("type") == _MATRIX_LINK_FR_TYPE:
+                fr_to_api[t["id"]].add(api["api_id"])
 
     for fx in fixtures:
         for t in fx.get("targets", []):
