@@ -525,7 +525,13 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             fr_coverage = semantic_review.get("fr_coverage", [])
             if isinstance(fr_coverage, list) and fr_coverage:
                 artifact_path = Path(spec_path)
-                fr_list_path = artifact_path.parent / "04_fr_list.json"
+                # When artifact lives inside impl_context/, step 04 is one level up
+                _fr_base = (
+                    artifact_path.parent.parent
+                    if artifact_path.parent.name == "impl_context"
+                    else artifact_path.parent
+                )
+                fr_list_path = _fr_base / "04_fr_list.json"
                 if fr_list_path.exists():
                     try:
                         fr_data = json.loads(fr_list_path.read_text())

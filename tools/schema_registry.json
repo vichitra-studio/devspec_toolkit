@@ -24,6 +24,7 @@
   "vc:14-roadmap": "schema/14_roadmap.schema.json",
   "vc:15-scaffold": "schema/15_scaffold.schema.json",
   "vc:16-impl-context": "schema/16_impl_context.schema.json",
+  "vc:16-anchor": "schema/16_anchor.schema.json",
   "vc:02a-delivery-baseline": "schema/02a_delivery_baseline.schema.json",
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",

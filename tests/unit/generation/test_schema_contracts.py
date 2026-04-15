@@ -105,11 +105,16 @@ class SchemaContractsTests(unittest.TestCase):
         for step, expected_kinds in expected_by_step.items():
             candidates = sorted(self.schema_root.glob(f"{step}_*.schema.json"))
             self.assertTrue(candidates, msg=f"Missing schema for step {step}")
-            with candidates[0].open("r", encoding="utf-8") as f:
+            # When multiple schemas share the same step prefix (e.g. 16_anchor and
+            # 16_impl_context), prefer the impl-context schema for the canonical
+            # ref kind check — the anchor has its own distinct schema contract.
+            impl_context = [c for c in candidates if "anchor" not in c.name]
+            target = impl_context[0] if impl_context else candidates[0]
+            with target.open("r", encoding="utf-8") as f:
                 schema = json.load(f)
             present = _collect_canonical_ref_kinds(schema)
             missing = sorted(expected_kinds - present)
-            self.assertEqual([], missing, msg=f"{candidates[0].name} missing canonical kinds {missing}")
+            self.assertEqual([], missing, msg=f"{target.name} missing canonical kinds {missing}")
 
     def test_d022_targeted_schemas_reuse_shared_environment_stage_and_dependency_anchors(self):
         expected_refs = {

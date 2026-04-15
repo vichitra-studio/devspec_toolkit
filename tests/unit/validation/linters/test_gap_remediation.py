@@ -23,13 +23,13 @@ from specdev_tools.validation.validate import DEEP_VALIDATORS, _get_step_from_pa
 # ---------------------------------------------------------------------------
 
 class TestGetStepFromPathImplContext:
-    """Files inside an ``impl_context/`` directory should map to step 16."""
+    """Files inside an ``impl_context/`` directory should map to step 16a (milestone plans)."""
 
     def test_relative_path(self):
-        assert _get_step_from_path("spec/impl_context/step-api-core.json") == "16"
+        assert _get_step_from_path("spec/impl_context/step-api-core.json") == "16a"
 
     def test_absolute_path(self):
-        assert _get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16"
+        assert _get_step_from_path("/abs/path/spec/impl_context/my-file.json") == "16a"
 
     def test_normal_step_still_works(self):
         assert _get_step_from_path("spec/04_frs.json") == "04"

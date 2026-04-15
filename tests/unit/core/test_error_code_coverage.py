@@ -15,7 +15,9 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Cross-artifact drift (2xx)
             "E210", "E211",
             # Proof / review closure (3xx)
-            "E301", "E302", "E303", "E304", "E305", "E306", "E307", "E310", "E311", "E320",
+            "E301", "E302", "E303", "E304", "E305", "E306", "E307",
+            "E308", "E309",
+            "E310", "E311", "E320",
             # Canonical registry (4xx)
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)

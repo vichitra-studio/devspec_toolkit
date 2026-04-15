@@ -11,7 +11,10 @@ class TestStep16(unittest.TestCase):
         # Resolve to the toolkit root, not the host workspace root
         toolkit_root = Path(__file__).resolve().parents[2]
         self.repo_root = str(toolkit_root)
-        self.fixtures_dir = str(toolkit_root / "tests" / "fixtures" / "step_16")
+        # impl_context/ contains milestone plan fixtures (vc:16-impl-context).
+        # Anchor fixtures live in tests/fixtures/step_16/ root (validated as anchor).
+        self.fixtures_dir = str(toolkit_root / "tests" / "fixtures" / "step_16" / "impl_context")
+        self.step16_dir = str(toolkit_root / "tests" / "fixtures" / "step_16")
 
     def test_valid_minimal(self):
         path = os.path.join(self.fixtures_dir, "valid_minimal.json")
@@ -115,7 +118,7 @@ class TestStep16(unittest.TestCase):
 
     def test_e304_roadmap_task_uncovered(self):
         # E304: roadmap has implement-logout but checklist only covers implement-login
-        path = os.path.join(self.fixtures_dir, "e304_roadmap", "impl_context", "ms_test_plan.json")
+        path = os.path.join(self.step16_dir, "e304_roadmap", "impl_context", "ms_test_plan.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E304 fixture should fail validation")
         self.assertTrue(
@@ -143,10 +146,12 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            # Write the modified fixture
-            fixture_path = tmp_dir / "16_impl_context.json"
+            # Fixture must live inside impl_context/ so it routes to the 16a validator
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Write Step 04
+            # Step 04 lives at spec-root level (parent of impl_context/)
             (tmp_dir / "04_fr_list.json").write_text(json.dumps(step04), encoding="utf-8")
             # Also need a seed_manifest for docs validation
             common_dir = tmp_dir / "common"
@@ -178,8 +183,12 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
+            # Fixture inside impl_context/ so it routes to the 16a validator
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            # Step 04 at spec-root level
             (tmp_dir / "04_fr_list.json").write_text(json.dumps(step04), encoding="utf-8")
             common_dir = tmp_dir / "common"
             common_dir.mkdir()
@@ -276,7 +285,10 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
+            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
             # Create seed_manifest for docs validation
             common_dir = tmp_dir / "common"
@@ -323,7 +335,10 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
+            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
             common_dir = tmp_dir / "common"
             common_dir.mkdir()

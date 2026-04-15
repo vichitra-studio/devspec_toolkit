@@ -52,6 +52,7 @@ from .validators import (
     step_16a,
     step_16b,
     step_16c,
+    step_16_anchor,
 )
 
 
@@ -63,22 +64,40 @@ def _get_step_from_path(path: str) -> str:
     """Extract step number from file path.
 
     Handles standard ``NN_name.json`` filenames, ``step_NN/`` directories,
-    and ``impl_context/`` directories (mapped to step ``"16"``).
+    and ``impl_context/`` directories.
+
+    Routing rules for Step 16 artifacts:
+    - ``16_impl_context.json`` NOT inside ``impl_context/`` → step ``"16"``
+      (Trinity Anchor; dispatches to validate_step_16_anchor).
+    - Any ``.json`` inside an ``impl_context/`` directory → step ``"16a"``
+      (milestone plan/execute/review; dispatches to validate_step_16a which
+      includes the base step_16 checks plus plan-phase checks).
+      NOTE: All impl_context/ artifacts currently route to "16a" regardless of
+      whether they are 16b or 16c artifacts.  Full sub-step routing requires
+      distinguishing by ``$schema`` URI or a ``sub_step`` field — deferred per RFC.
     """
     filename = os.path.basename(path)
+
+    # Anchor: 16_impl_context.json NOT inside impl_context/ → step "16"
+    # Check this before the generic STEP_FILE_RE so the specific filename
+    # takes priority over the numeric-prefix pattern.
+    dirname_full = os.path.dirname(path)
+    if filename == "16_impl_context.json" and os.path.basename(dirname_full) != "impl_context":
+        return "16"
 
     match = STEP_FILE_RE.match(filename)
     if match:
         return match.group(1)
 
-    dirname = os.path.dirname(path)
+    dirname = os.path.basename(dirname_full) if dirname_full else ""
     if dirname:
-        dirname = os.path.basename(dirname)
         match = STEP_DIR_RE.match(dirname)
         if match:
             return match.group(1)
         if IMPL_CONTEXT_DIR_RE.match(dirname):
-            return "16"
+            # Route all impl_context/ artifacts to "16a" so validate_step_16a()
+            # (which calls the base validate_step_16()) runs full checks.
+            return "16a"
 
     return "unknown"
 
@@ -469,7 +488,12 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "13a": lambda instance, root, ctx: step_13a.validate_step_13a(instance, root, ctx.get("spec_root")),
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
-    "16": lambda instance, root, ctx: step_16.validate_step_16(instance, root, ctx.get("artifact_path")),
+    # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
+    # "16a" → milestone plan validator (spec/impl_context/*.json); calls base validate_step_16.
+    # "16b" / "16c" → currently also routed to via "16a" dispatch (impl_context/ → "16a")
+    #   because all three artifact types live in impl_context/.  Sub-step-specific routing
+    #   requires $schema URI or sub_step field distinction — deferred per RFC Task 2.8 note.
+    "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path")),
     "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path")),
     "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path")),

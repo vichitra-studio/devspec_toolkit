@@ -43,6 +43,12 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
         step = Path(schema_file).name.split("_", 1)[0]
         if step == "seed":
             continue
+        # 16_anchor.schema.json and 16_impl_context.schema.json both produce step "16"
+        # via split("_", 1)[0].  Alphabetically anchor comes first, impl-context second,
+        # so impl-context would overwrite anchor in schema_contracts["16"].  Give the anchor
+        # a distinct key so both schemas remain visible.
+        if Path(schema_file).name == "16_anchor.schema.json":
+            step = "16anchor"
         try:
             schema_required, schema_props, schema = _load_contract(schema_file)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
@@ -53,6 +59,11 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
         if not prompt_candidates:
             continue
         for prompt_path in prompt_candidates:
+            # Prompts with a _PROMPT_STEP_OVERRIDE entry are validated by
+            # _validate_output_contracts against their overridden schema — skip
+            # them here to avoid double-validation against the wrong schema.
+            if Path(prompt_path).name in _PROMPT_STEP_OVERRIDE:
+                continue
             schema_ref, schema_ref_line = _extract_schema_reference(prompt_path)
             errors.extend(
                 _schema_reference_errors(
@@ -336,7 +347,7 @@ def _validate_output_contracts(
             f"schema_registry_bootstrap_failed {registry_error}",
         ))
     for prompt_path in sorted(glob.glob(str(prompt_dir / "prompt_*.md"))):
-        step = _step_from_prompt_name(Path(prompt_path).name)
+        step = _PROMPT_STEP_OVERRIDE.get(Path(prompt_path).name) or _step_from_prompt_name(Path(prompt_path).name)
         if not step:
             continue
         base_step = _SUBSTEP_TO_BASE_SCHEMA.get(step, step)
@@ -387,6 +398,15 @@ _SUBSTEP_TO_BASE_SCHEMA = {
     "16a": "16",
     "16b": "16",
     "16c": "16",
+}
+
+# Prompt filename → explicit step key override.  Used when the auto-extracted step
+# key from _step_from_prompt_name() would map to the wrong schema entry.
+# prompt_16_impl_context.md authors the Trinity Anchor (vc:16-anchor), not a
+# milestone plan (vc:16-impl-context).  Its step key must be "16anchor" so
+# _validate_output_contracts validates it against the anchor schema.
+_PROMPT_STEP_OVERRIDE: dict[str, str] = {
+    "prompt_16_impl_context.md": "16anchor",
 }
 
 _SUBSTEP_EXPECTED_KEYS = {
