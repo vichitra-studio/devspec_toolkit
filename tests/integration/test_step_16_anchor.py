@@ -6,6 +6,7 @@ Covers:
   - E309 (ANCHOR_CHECKLIST_DRIFT): cross-milestone checklist ID collision
   - W585 (ANCHOR_DRIFT_SKIP): spec_path is None — filesystem checks skipped
   - W586 (ANCHOR_VALIDATOR_WRONG_ARTIFACT): non-anchor artifact dispatched here
+  - W587 (ANCHOR_DRIFT_CHECKS_STALE): non-empty milestone_index but empty drift.checks
 """
 import json
 import tempfile
@@ -490,6 +491,81 @@ class TestStep16AnchorGuard(unittest.TestCase):
         e_codes = {e.code for e in errors}
         self.assertNotIn("E308", e_codes, f"No E308 expected without impl_context/. Errors: {errors}")
         self.assertNotIn("E309", e_codes, f"No E309 expected without impl_context/. Errors: {errors}")
+
+
+class TestStep16AnchorW587DriftChecksStale(unittest.TestCase):
+    """W587 ANCHOR_DRIFT_CHECKS_STALE — milestone_index populated but drift.checks empty."""
+
+    def setUp(self):
+        toolkit_root = Path(__file__).resolve().parents[2]
+        self.repo_root = str(toolkit_root)
+
+    def _build_anchor(self, milestone_index: list, drift_checks: list) -> dict:
+        return {
+            "$schema": "vc:16-anchor",
+            "id": "anchor-v1",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "artifact_role": "anchor",
+            "canonical_refs_used": [],
+            "plan": {
+                "summary": {
+                    "functional_summary": "Anchor for W587 coverage.",
+                    "scope_in": ["auth"],
+                    "scope_out": [],
+                },
+                "ambiguities": [],
+                "drift": {"checks": drift_checks},
+                "milestone_index": milestone_index,
+            },
+        }
+
+    def _write_and_validate(self, anchor: dict) -> list:
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = tmp_dir / "16_impl_context.json"
+            anchor_path.write_text(json.dumps(anchor), encoding="utf-8")
+            return validate_file(self.repo_root, str(anchor_path))
+
+    def _ms_entry(self, milestone_id: str, fr_refs: Optional[list] = None,
+                  status: str = "active") -> dict:
+        return {
+            "milestone_id": milestone_id,
+            "context_path": f"spec/impl_context/{milestone_id.replace('-', '_')}_plan.json",
+            "status": status,
+            "fr_refs": fr_refs or ["fr-login"],
+            "checklist_id_prefix": milestone_id.upper().replace("-", "_")[:20],
+            "summary": f"{milestone_id} summary line.",
+        }
+
+    def test_w587_fires_when_milestones_indexed_but_no_drift_checks(self):
+        """W587 fires when milestone_index has entries and drift.checks is empty."""
+        anchor = self._build_anchor(
+            milestone_index=[self._ms_entry("ms-auth")],
+            drift_checks=[],
+        )
+        errors = self._write_and_validate(anchor)
+        self.assertTrue(
+            any(e.code == "W587" for e in errors),
+            f"Expected W587 for populated milestone_index + empty drift.checks. Got: {errors}"
+        )
+
+    def test_no_w587_when_drift_checks_populated(self):
+        """W587 does not fire when drift.checks has at least one entry."""
+        anchor = self._build_anchor(
+            milestone_index=[self._ms_entry("ms-auth")],
+            drift_checks=["Verified ms-auth scope alignment (2026-04-15)"],
+        )
+        errors = self._write_and_validate(anchor)
+        w587 = [e for e in errors if e.code == "W587"]
+        self.assertEqual(w587, [], f"W587 should not fire when drift.checks is populated. Got: {w587}")
+
+    def test_no_w587_when_milestone_index_empty(self):
+        """W587 does not fire on a fresh anchor with no milestones yet."""
+        anchor = self._build_anchor(milestone_index=[], drift_checks=[])
+        errors = self._write_and_validate(anchor)
+        w587 = [e for e in errors if e.code == "W587"]
+        self.assertEqual(w587, [], f"W587 should not fire when milestone_index is empty. Got: {w587}")
 
 
 if __name__ == "__main__":

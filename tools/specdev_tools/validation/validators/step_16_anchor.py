@@ -79,11 +79,28 @@ def validate_step_16_anchor(
     anchor_scope_in: list[str] = anchor_summary.get("scope_in", []) or []
     anchor_scope_out: list[str] = anchor_summary.get("scope_out", []) or []
 
+    # ── W587: drift-checks staleness ───────────────────────────────────────────
+    # An anchor that registers one or more milestones but records zero drift checks
+    # is paying its maintenance cost without doing its job.  Fires regardless of
+    # whether impl_context/ exists — the signal is "you have milestones to watch
+    # but no evidence you have watched them".
+    milestone_index: list[dict[str, Any]] = anchor_plan.get("milestone_index", []) or []
+    drift_block = anchor_plan.get("drift", {}) if isinstance(anchor_plan.get("drift"), dict) else {}
+    drift_checks = drift_block.get("checks", []) if isinstance(drift_block.get("checks"), list) else []
+    if milestone_index and not drift_checks:
+        errors.append(
+            make_error(
+                "W587",
+                f"ANCHOR_DRIFT_CHECKS_STALE: milestone_index has "
+                f"{len(milestone_index)} entries but plan.drift.checks is empty — "
+                f"record at least one drift check per Trinity cycle.",
+            )
+        )
+
     # ── E308: FR ownership conflict ────────────────────────────────────────────
     # Uses only anchor data — runs even when impl_context/ is absent or empty.
     # The same FR/API ID must not be active in two milestones simultaneously.
     # Done milestones do not conflict — a FR may be revisited after delivery.
-    milestone_index: list[dict[str, Any]] = anchor_plan.get("milestone_index", []) or []
     fr_to_active_milestone: dict[str, str] = {}
     for entry in milestone_index:
         if not isinstance(entry, dict):
