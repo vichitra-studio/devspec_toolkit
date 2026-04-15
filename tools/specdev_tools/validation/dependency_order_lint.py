@@ -41,6 +41,11 @@ def lint_dependency_order(repo_root: str) -> list[SpecError]:
     errors: list[SpecError] = []
     seen_errors: set[tuple[str, int, str, str, str]] = set()
 
+    # Consistency check: step_metadata.required_spec_inputs must match the inverse
+    # of downstream_consumers.  A producer P lists C in downstream_consumers[P] iff
+    # C lists P in step_metadata[C].required_spec_inputs.
+    errors.extend(_lint_step_metadata_consistency(root / "tools" / "step_order.json"))
+
     for prompt_path in sorted((root / "prompts").glob("prompt_*.md")):
         match = PROMPT_STEP_RE.search(prompt_path.name)
         if not match:
@@ -178,5 +183,64 @@ def _add_error(
     errors.append(make_error(
         "E540", f"SELF_OR_FORWARD_DEPENDENCY {prompt_path}:{line_no} {step}->{ref} {violation_type}"
     ))
+
+
+def _lint_step_metadata_consistency(step_order_path: Path) -> list[SpecError]:
+    """Validate that step_metadata.required_spec_inputs is the inverse of downstream_consumers.
+
+    When step_metadata is absent, returns no errors — the block is optional.
+    When present, every (producer, consumer) edge must appear in both directions:
+      - consumer ∈ downstream_consumers[producer]
+      - producer ∈ step_metadata[consumer].required_spec_inputs
+    """
+    errors: list[SpecError] = []
+    try:
+        with step_order_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return errors  # _load_order already reports this case
+
+    step_metadata = data.get("step_metadata")
+    if not isinstance(step_metadata, dict):
+        return errors  # optional block
+
+    downstream = data.get("downstream_consumers", {})
+    if not isinstance(downstream, dict):
+        return errors
+
+    # Build inverse from downstream_consumers: required_spec_inputs[c] = {p | c ∈ downstream[p]}
+    inverse: dict[str, set[str]] = {}
+    for producer, consumers in downstream.items():
+        if not isinstance(consumers, list):
+            continue
+        for c in consumers:
+            if isinstance(c, str):
+                inverse.setdefault(c, set()).add(producer)
+
+    for step, meta in step_metadata.items():
+        if not isinstance(meta, dict):
+            continue
+        declared = meta.get("required_spec_inputs", []) or []
+        declared_set = {s for s in declared if isinstance(s, str)}
+        expected_set = inverse.get(step, set())
+
+        missing = sorted(expected_set - declared_set)
+        extra = sorted(declared_set - expected_set)
+        if missing:
+            errors.append(make_error(
+                "E540",
+                f"STEP_METADATA_INCONSISTENT {step_order_path}: "
+                f"step_metadata[{step}].required_spec_inputs missing {missing} "
+                f"(present in downstream_consumers but not declared here)",
+            ))
+        if extra:
+            errors.append(make_error(
+                "E540",
+                f"STEP_METADATA_INCONSISTENT {step_order_path}: "
+                f"step_metadata[{step}].required_spec_inputs has extra {extra} "
+                f"(declared here but not in downstream_consumers)",
+            ))
+
+    return errors
 
 

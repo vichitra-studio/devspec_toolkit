@@ -42,6 +42,14 @@
         "description": "A migration annotation string added by canonical-autofix or align tooling."
       },
       "description": "Optional migration annotations added by canonical-autofix or align tooling during schema migrations. Do NOT populate this field manually — it is written exclusively by specdev tooling (canonical-autofix, align apply). Human authors should leave this field absent. If present after a tooling run, it documents what was auto-corrected and should be reviewed before committing."
+    },
+    "spec_refs_ingested": {
+      "$ref": "vc:core:collections#specRefIngestedArray",
+      "description": "Optional record of upstream spec artifacts consumed during generation of this artifact. Each entry captures {step_id, artifact_id, hash?} so drift detection and forward-replay can identify when a downstream artifact was produced against an upstream that has since changed. Populated by AI authoring prompts when producing the artifact; validated by dependency-order-lint. Anti-pattern: listing every upstream step — list only the specific artifacts that shaped this output."
+    },
+    "seed_refs_ingested": {
+      "$ref": "vc:core:collections#seedRefArray",
+      "description": "Optional record of seed documents consumed during generation of this artifact. Each entry captures {seed_id, hash?, version?} so drift detection can identify when the artifact was derived from a seed version that has since changed. Applies mainly to steps 00–02a which read seed documents directly. Anti-pattern: adding entries for seeds the prompt did not actually read — use only for seeds whose content materially shaped this artifact."
     }
   },
   "required": [

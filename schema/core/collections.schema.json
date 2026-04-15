@@ -465,6 +465,71 @@
       },
       "description": "Array of structured dependency items (no simple string entries allowed)."
     },
+    "seedRef": {
+      "$anchor": "seedRef",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed_id": {
+          "$ref": "vc:core:atoms#kebabId",
+          "description": "Kebab-case identifier of the seed document, matching seeds[].seed_id in the seed manifest. Example: 'seed-overview', 'seed-tech-stack'."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Optional SHA-256 content hash (64 hex chars) of the seed file at the time this reference was recorded. Used by drift detection to surface cases where a downstream artifact was generated against a stale seed. Example: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'."
+        },
+        "version": {
+          "type": "string",
+          "description": "Optional version string for the seed document at reference time. Use semver (e.g. '1.2.0') when the seed is versioned, or a freeform identifier (e.g. '2026-04-01', 'rev-42'). Omit when the seed has no formal version."
+        }
+      },
+      "required": ["seed_id"],
+      "description": "Reference to a seed document with optional integrity metadata (hash + version) for cross-step drift detection. Used wherever an artifact needs to record which seeds were consumed during its authoring."
+    },
+    "seedRefArray": {
+      "$anchor": "seedRefArray",
+      "type": "array",
+      "items": {
+        "$ref": "vc:core:collections#seedRef",
+        "description": "A seed reference with optional hash/version integrity metadata."
+      },
+      "uniqueItems": true,
+      "description": "Array of seed references consumed by this artifact, each optionally carrying hash+version for drift detection."
+    },
+    "specRefIngested": {
+      "$anchor": "specRefIngested",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "pattern": "^[0-9]{2}[a-z]?$",
+          "description": "Zero-padded step identifier of the upstream artifact that was ingested (e.g. '04', '05', '16a'). Must match a step key in tools/step_order.json."
+        },
+        "artifact_id": {
+          "$ref": "vc:core:atoms#kebabId",
+          "description": "Kebab-case identifier of the specific upstream artifact that was ingested. Example: 'fr-user-login', 'api-session-create', 'cap-auth'."
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Optional SHA-256 content hash (64 hex chars) of the upstream spec artifact at ingest time. Enables drift detection when the upstream artifact changes after this downstream artifact was produced."
+        }
+      },
+      "required": ["step_id", "artifact_id"],
+      "description": "Record of a single upstream spec artifact consumed during generation of this downstream artifact. Used by forward-replay and drift detection to locate stale derivations."
+    },
+    "specRefIngestedArray": {
+      "$anchor": "specRefIngestedArray",
+      "type": "array",
+      "items": {
+        "$ref": "vc:core:collections#specRefIngested",
+        "description": "An upstream spec artifact reference with optional hash."
+      },
+      "uniqueItems": true,
+      "description": "Array of upstream spec artifacts consumed during generation of this artifact, for drift detection and replay integrity."
+    },
     "anyJson": {
       "$anchor": "anyJson",
       "oneOf": [

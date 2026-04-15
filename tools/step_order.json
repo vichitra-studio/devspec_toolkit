@@ -2,7 +2,8 @@
   "version": "1.0.0",
   "_notes": {
     "status_write_exemptions": "Step 16c writes milestones[].status='done' to Steps 09/14 on verified milestones. Without this exemption, file-level change detection triggers E550 requiring full downstream replay, creating an infinite cycle.",
-    "downstream_consumers": "Records which steps actively consume each step's output. Read by 'specdev prompt-context'. NOT used by the forward-replay check (which uses positional ordering in 'steps')."
+    "downstream_consumers": "Records which steps actively consume each step's output. Read by 'specdev prompt-context'. NOT used by the forward-replay check (which uses positional ordering in 'steps').",
+    "step_metadata": "Per-step declarative metadata. required_spec_inputs is the inverse of downstream_consumers (producers that feed into this step) \u2014 kept redundant for O(1) lookup and consistency validation. required_seed_inputs mirrors seed_manifest.step_requirements. extraction_intent is a one-line human-readable summary for prompt and doc generation."
   },
   "policy": {
     "mode": "strict_waterfall",
@@ -45,6 +46,261 @@
   "coverage_thresholds": {
     "fr_coverage": 80,
     "mode": "warn"
+  },
+  "step_metadata": {
+    "00": {
+      "required_spec_inputs": [],
+      "required_seed_inputs": [
+        "seed-overview",
+        "seed-tech-stack"
+      ],
+      "extraction_intent": "Read seed documents (overview, tech stack) and author the project charter: problem statement, scope, stakeholders, success metrics."
+    },
+    "01": {
+      "required_spec_inputs": [
+        "00"
+      ],
+      "required_seed_inputs": [
+        "seed-overview"
+      ],
+      "extraction_intent": "Ingest charter scope and user segments; derive named capabilities grounded in charter goals."
+    },
+    "02": {
+      "required_spec_inputs": [
+        "01"
+      ],
+      "required_seed_inputs": [
+        "seed-tech-stack"
+      ],
+      "extraction_intent": "Consume capabilities and baseline architecture seed; produce component boundaries, tech stack, and connections."
+    },
+    "02a": {
+      "required_spec_inputs": [
+        "02"
+      ],
+      "required_seed_inputs": [
+        "seed-tech-stack"
+      ],
+      "extraction_intent": "Read system sketch; derive delivery baseline (environments, compliance, CI gates, secrets)."
+    },
+    "03": {
+      "required_spec_inputs": [
+        "00",
+        "01",
+        "02"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Glossary from charter, capabilities, and system-sketch terms; canonicalize vocabulary for downstream steps."
+    },
+    "04": {
+      "required_spec_inputs": [
+        "00",
+        "01",
+        "03"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "FR list derived from charter scope (in/out), capabilities, and glossary; each FR traces to a capability."
+    },
+    "05": {
+      "required_spec_inputs": [
+        "02",
+        "03",
+        "04"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Interface contracts bound to system components (02), FRs (04), and glossary (03)."
+    },
+    "06": {
+      "required_spec_inputs": [
+        "02",
+        "04",
+        "05"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Invariants bound to components (02), FRs (04), and interfaces (05)."
+    },
+    "07": {
+      "required_spec_inputs": [
+        "00",
+        "02",
+        "02a",
+        "03",
+        "04"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "NFRs derived from charter success metrics (00), components (02), delivery baseline (02a), glossary (03), and FRs (04)."
+    },
+    "08": {
+      "required_spec_inputs": [
+        "02",
+        "02a",
+        "04",
+        "05",
+        "06",
+        "07"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Fixtures covering components (02), delivery baseline (02a), FRs (04), interfaces (05), invariants (06), and NFRs (07)."
+    },
+    "09": {
+      "required_spec_inputs": [
+        "00",
+        "01",
+        "02",
+        "02a",
+        "04",
+        "05",
+        "07",
+        "08"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Implementation plan (milestones, tech stack, tasks) derived from charter, capabilities, system sketch, delivery baseline, FRs, interfaces, NFRs, and fixtures."
+    },
+    "10": {
+      "required_spec_inputs": [
+        "00",
+        "02",
+        "02a",
+        "09"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Governance rules (commit patterns, PR rules) derived from charter, system sketch, delivery baseline, and impl plan."
+    },
+    "11": {
+      "required_spec_inputs": [
+        "02",
+        "04",
+        "05",
+        "06",
+        "07"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Red team (threats, mitigations) derived from components (02), FRs (04), interfaces (05), invariants (06), NFRs (07)."
+    },
+    "12": {
+      "required_spec_inputs": [
+        "02a",
+        "10"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "CI gates derived from delivery baseline (02a) and governance (10)."
+    },
+    "13": {
+      "required_spec_inputs": [
+        "01",
+        "02",
+        "04",
+        "05",
+        "07",
+        "08",
+        "11"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Extension generator derived from capabilities, system sketch, FRs, interfaces, NFRs, fixtures, and red team."
+    },
+    "13a": {
+      "required_spec_inputs": [
+        "00",
+        "01",
+        "04",
+        "05",
+        "08",
+        "12",
+        "13"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Completeness assessment derived from charter, capabilities, FRs, interfaces, fixtures, CI gates, and extensions."
+    },
+    "14": {
+      "required_spec_inputs": [
+        "00",
+        "01",
+        "02",
+        "04",
+        "08",
+        "09",
+        "11",
+        "12",
+        "13",
+        "13a"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Roadmap (milestones, tasks) derived from charter, capabilities, system sketch, FRs, fixtures, impl plan, red team, CI gates, extensions, completeness."
+    },
+    "15": {
+      "required_spec_inputs": [
+        "02",
+        "02a",
+        "04",
+        "05",
+        "08",
+        "11",
+        "14"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Scaffold derived from system sketch, delivery baseline, FRs, interfaces, fixtures, red team, and roadmap."
+    },
+    "16": {
+      "required_spec_inputs": [
+        "04",
+        "05",
+        "08",
+        "09",
+        "11",
+        "12",
+        "14",
+        "15"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Trinity Anchor (scope declaration) derived from FRs, interfaces, fixtures, impl plan, red team, CI gates, roadmap, and scaffold."
+    },
+    "16a": {
+      "required_spec_inputs": [
+        "02a",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "11",
+        "12",
+        "13a",
+        "14",
+        "15",
+        "16"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Milestone plan (checklist) derived from delivery baseline, FRs, interfaces, invariants, NFRs, fixtures, red team, CI gates, completeness, roadmap, scaffold, and anchor."
+    },
+    "16b": {
+      "required_spec_inputs": [
+        "02a",
+        "08",
+        "11",
+        "12",
+        "13a",
+        "14",
+        "15",
+        "16",
+        "16a"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Execution evidence derived from delivery baseline, fixtures, red team, CI gates, completeness, roadmap, scaffold, anchor, and 16a plan."
+    },
+    "16c": {
+      "required_spec_inputs": [
+        "02a",
+        "04",
+        "08",
+        "11",
+        "12",
+        "14",
+        "16",
+        "16b"
+      ],
+      "required_seed_inputs": [],
+      "extraction_intent": "Semantic review derived from delivery baseline, FRs, fixtures, red team, CI gates, roadmap, anchor, and 16b execution."
+    }
   },
   "downstream_consumers": {
     "00": [
@@ -175,7 +431,9 @@
       "14"
     ],
     "13a": [
-      "14", "16a", "16b"
+      "14",
+      "16a",
+      "16b"
     ],
     "14": [
       "15",
