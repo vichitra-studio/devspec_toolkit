@@ -169,5 +169,85 @@ class DependencyOrderLintTests(unittest.TestCase):
             self.assertEqual([], errs)
 
 
+class StepMetadataConsistencyTests(unittest.TestCase):
+    """Consistency check: step_metadata.required_spec_inputs must be inverse of downstream_consumers."""
+
+    def _write_order(self, root: Path, data: dict) -> None:
+        (root / "tools").mkdir(exist_ok=True)
+        (root / "prompts").mkdir(exist_ok=True)
+        (root / "tools" / "step_order.json").write_text(
+            json.dumps(data), encoding="utf-8",
+        )
+
+    def test_absent_step_metadata_is_no_op(self):
+        """When step_metadata is absent the consistency check emits no errors."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01", "02"],
+                "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
+            })
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs)
+
+    def test_consistent_step_metadata_passes(self):
+        """Correctly inverted step_metadata produces no errors."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01", "02"],
+                "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
+                    "02": {"required_spec_inputs": ["00", "01"], "required_seed_inputs": [], "extraction_intent": ""},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs)
+
+    def test_missing_required_spec_input_reported(self):
+        """E540 fires when downstream_consumers implies an edge not declared in required_spec_inputs."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01", "02"],
+                "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
+                    # 02 is missing "01" — should trigger E540
+                    "02": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("STEP_METADATA_INCONSISTENT" in e and "missing" in e for e in rendered),
+                f"Expected missing-edge error, got: {rendered}",
+            )
+
+    def test_extra_required_spec_input_reported(self):
+        """E540 fires when required_spec_inputs lists a step not in downstream_consumers."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01", "02"],
+                "downstream_consumers": {"00": ["01"], "01": [], "02": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                    # 01 claims to depend on 02 but downstream_consumers says otherwise
+                    "01": {"required_spec_inputs": ["00", "02"], "required_seed_inputs": [], "extraction_intent": ""},
+                    "02": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("STEP_METADATA_INCONSISTENT" in e and "extra" in e for e in rendered),
+                f"Expected extra-edge error, got: {rendered}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
