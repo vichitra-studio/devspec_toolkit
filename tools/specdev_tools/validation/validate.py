@@ -70,11 +70,11 @@ def _get_step_from_path(path: str) -> str:
     - ``16_impl_context.json`` NOT inside ``impl_context/`` → step ``"16"``
       (Trinity Anchor; dispatches to validate_step_16_anchor).
     - Any ``.json`` inside an ``impl_context/`` directory → step ``"16a"``
-      (milestone plan/execute/review; dispatches to validate_step_16a which
-      includes the base step_16 checks plus plan-phase checks).
-      NOTE: All impl_context/ artifacts currently route to "16a" regardless of
-      whether they are 16b or 16c artifacts.  Full sub-step routing requires
-      distinguishing by ``$schema`` URI or a ``sub_step`` field — deferred per RFC.
+      by default.  ``_refine_impl_context_substep`` promotes to ``"16b"`` or
+      ``"16c"`` based on artifact content (presence of ``execution.execution_results``
+      or ``review.verdict``).  All three sub-step validators now chain up through
+      their predecessors, so dispatching to the highest-phase validator runs
+      every earlier phase's checks as well.
     """
     filename = os.path.basename(path)
 
@@ -95,18 +95,41 @@ def _get_step_from_path(path: str) -> str:
         if match:
             return match.group(1)
         if IMPL_CONTEXT_DIR_RE.match(dirname):
-            # Route all impl_context/ artifacts to "16a" so validate_step_16a()
-            # (which calls the base validate_step_16()) runs full checks.
+            # Default to "16a" for impl_context/ artifacts.  Content-based
+            # refinement (see _refine_impl_context_substep) promotes to
+            # "16b"/"16c" once the artifact is loaded.
             return "16a"
 
     return "unknown"
 
-def _get_prompt_path(path: str) -> str:
-    """Get corresponding prompt file path"""
-    step = _get_step_from_path(path)
-    if step != "unknown":
-        return f"prompts/prompt_{step}*.md"
-    return "prompts/*.md"
+
+def _refine_impl_context_substep(step: str, data: Any) -> str:
+    """Promote ``impl_context/`` dispatch from ``"16a"`` to ``"16b"`` or ``"16c"``.
+
+    All three Trinity sub-step artifacts share ``spec/impl_context/`` and the
+    ``vc:16-impl-context`` schema, so path alone cannot distinguish them.
+    Content signals the highest phase present:
+
+    - ``review.verdict`` present (non-empty string)      → ``"16c"`` (reviewer output)
+    - ``execution.execution_results`` populated (len>0)  → ``"16b"`` (coder output)
+    - otherwise                                          → ``"16a"`` (planner output)
+
+    ``validate_step_16c`` chains through ``validate_step_16b`` → ``validate_step_16a``,
+    so routing to the highest phase runs every earlier phase's checks as well.
+    Non-``"16a"`` inputs are returned unchanged — this function is a no-op for
+    anchor artifacts, charter artifacts, etc.
+    """
+    if step != "16a" or not isinstance(data, dict):
+        return step
+    review = data.get("review")
+    if isinstance(review, dict) and isinstance(review.get("verdict"), str) and review["verdict"].strip():
+        return "16c"
+    execution = data.get("execution")
+    if isinstance(execution, dict):
+        results = execution.get("execution_results")
+        if isinstance(results, list) and len(results) > 0:
+            return "16b"
+    return "16a"
 
 def validate_file(
     repo_root: str,
@@ -173,20 +196,23 @@ def validate_file(
         except Exception as e:
             return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}")]
 
+        # Resolve step once — use content-based refinement for impl_context/
+        # artifacts so 16b/16c sub-step validators actually run during
+        # validate_file (path-only routing always yielded "16a").
+        step = _refine_impl_context_substep(_get_step_from_path(path), data)
+
         # Enhance error messages with context
         enhanced_errors: list[SpecError] = []
         for e in errors:
             error_msg = f"{path}:{'/'.join(map(str, e.path))}: {e.message}"
 
             # Add context about what to do next
-            step = _get_step_from_path(path)
             if step != "unknown":
-                prompt_path = _get_prompt_path(path)
+                prompt_path = f"prompts/prompt_{step}*.md"
                 error_msg += f"\n  See: {prompt_path} for guidance on requirements"
 
             enhanced_errors.append(make_error("E520", error_msg))
 
-        step = _get_step_from_path(path)
         deep_errors = _run_deep_validation(step, data, repo_root, path, git_root=git_root, spec_root=spec_root)
         if deep_errors:
             for de in deep_errors:

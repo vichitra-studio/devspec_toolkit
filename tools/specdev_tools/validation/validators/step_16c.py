@@ -9,14 +9,21 @@ import json
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import validate_step_16, _load_roadmap
+from .step_16 import _load_roadmap
+from .step_16b import validate_step_16b
 
 VALID_VERDICTS = frozenset({"verified", "needs_work", "blocked", "deferred"})
 
 
 def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
-    """Deep validation for Step 16c (Review phase)."""
-    errors = validate_step_16(data, toolkit_root, spec_path)
+    """Deep validation for Step 16c (Review phase).
+
+    A 16c artifact is a 16b execution augmented with a ``review`` section.
+    It must satisfy every 16a- and 16b-phase constraint in addition to the
+    16c-specific verdict + semantic-review checks below.  Chains up through
+    ``validate_step_16b`` → ``validate_step_16a`` → ``validate_step_16``.
+    """
+    errors = validate_step_16b(data, toolkit_root, spec_path)
 
     review = data.get("review", {})
     if not isinstance(review, dict):

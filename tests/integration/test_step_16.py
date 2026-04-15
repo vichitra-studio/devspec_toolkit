@@ -892,6 +892,174 @@ class TestStep16(unittest.TestCase):
             f"Did not expect W582 for 'fr-login'. Got W582 errors: {[e.message for e in w582_errors]}"
         )
 
+    def test_impl_context_16c_dispatch_fires_verdict_enum_check(self):
+        """Content-based dispatch: an impl_context/ artifact with review.verdict
+        must route to validate_step_16c, which enforces the verdict enum.
+
+        Pre-fix, impl_context/*.json always dispatched to validate_step_16a,
+        so 16c-specific checks (like the verdict enum) never fired through
+        the top-level validate_file pipeline.
+        """
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-16c-dispatch-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "16c dispatch test.",
+                    "scope_in": ["auth"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
+                    "checklist": [],
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]},
+            },
+            "review": {
+                "verdict": "TOTALLY_INVALID_VERDICT",  # 16c validator must flag this
+                "fixture_status": {
+                    "implemented_interfaces": [],
+                    "test_results": [],
+                    "ci_status": "green",
+                },
+            },
+            "canonical_refs_used": [],
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_dispatch_review.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": []}), encoding="utf-8"
+            )
+
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        # The 16c validator fires an E520 for the invalid verdict — proof the
+        # content-based dispatch promoted this artifact past 16a.
+        self.assertTrue(
+            any(
+                e.code == "E520" and "invalid verdict" in e.message
+                for e in errors
+            ),
+            f"Expected E520 invalid verdict from validate_step_16c. Got: {errors}"
+        )
+
+    def test_impl_context_16b_dispatch_fires_duplicate_command_check(self):
+        """Content-based dispatch: an impl_context/ artifact with populated
+        execution.execution_results (but no review.verdict) must route to
+        validate_step_16b, which enforces duplicate-command detection.
+        """
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-16b-dispatch-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "16b dispatch test.",
+                    "scope_in": ["auth"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
+                    "checklist": [],
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]},
+            },
+            "execution": {
+                "execution_results": [
+                    {
+                        "command": "pytest tests/",
+                        "status": "passed",
+                        "outcome_description": "Passed.",
+                        "reasoning": "OK.",
+                        "evidence": "1 passed",
+                        "evidence_ref": "ci-001",
+                        "evidence_binding": {
+                            "timestamp": "2024-01-01T00:00:00Z",
+                            "sha256": "a" * 64,
+                            "exit_code": 0,
+                            "command": "pytest tests/",
+                        },
+                    },
+                    {
+                        # Duplicate command — 16b validator flags this
+                        "command": "pytest tests/",
+                        "status": "passed",
+                        "outcome_description": "Duplicate.",
+                        "reasoning": "OK.",
+                        "evidence": "1 passed",
+                        "evidence_ref": "ci-002",
+                        "evidence_binding": {
+                            "timestamp": "2024-01-01T00:00:00Z",
+                            "sha256": "b" * 64,
+                            "exit_code": 0,
+                            "command": "pytest tests/",
+                        },
+                    },
+                ],
+                "final_status": {"ci_status": "green"},
+            },
+            "canonical_refs_used": [],
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_dispatch_exec.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": []}), encoding="utf-8"
+            )
+
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        self.assertTrue(
+            any(
+                e.code == "E520" and "duplicate execution_result command" in e.message
+                for e in errors
+            ),
+            f"Expected E520 duplicate execution_result from validate_step_16b. Got: {errors}"
+        )
+
+    def test_impl_context_16a_dispatch_stays_16a_for_plan_only_artifact(self):
+        """An impl_context/ artifact with no execution.execution_results and
+        no review.verdict stays on the 16a path (default)."""
+        from specdev_tools.validation.validate import _refine_impl_context_substep
+
+        plan_only = {
+            "$schema": "vc:16-impl-context",
+            "plan": {"status": "active"},
+        }
+        plan_plus_empty_exec = {
+            "$schema": "vc:16-impl-context",
+            "plan": {"status": "active"},
+            "execution": {"execution_results": []},
+            "review": {},
+        }
+        self.assertEqual(_refine_impl_context_substep("16a", plan_only), "16a")
+        self.assertEqual(_refine_impl_context_substep("16a", plan_plus_empty_exec), "16a")
+        # Non-impl_context steps are never refined
+        self.assertEqual(_refine_impl_context_substep("04", plan_only), "04")
+        self.assertEqual(_refine_impl_context_substep("unknown", plan_only), "unknown")
+
     def test_step_16c_w582_fires_when_milestone_file_lives_in_impl_context(self):
         """W582 must fire even when the 16c artifact lives inside spec/impl_context/.
 

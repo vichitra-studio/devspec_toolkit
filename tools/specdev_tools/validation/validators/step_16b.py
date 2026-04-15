@@ -8,12 +8,18 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import validate_step_16
+from .step_16a import validate_step_16a
 
 
 def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
-    """Deep validation for Step 16b (Execute phase)."""
-    errors = validate_step_16(data, toolkit_root, spec_path)
+    """Deep validation for Step 16b (Execute phase).
+
+    A 16b artifact is a 16a plan augmented with an ``execution`` section.
+    It must satisfy every 16a-phase constraint in addition to the 16b-specific
+    execution-result checks below.  Chains up through ``validate_step_16a``,
+    which itself chains through ``validate_step_16`` (base).
+    """
+    errors = validate_step_16a(data, toolkit_root, spec_path)
 
     execution = data.get("execution", {})
     if not isinstance(execution, dict):
