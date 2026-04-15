@@ -1,204 +1,149 @@
-# Step 16 · Implementation Context (Trinity Anchor)
+# Step 16 · Trinity Anchor (`vc:16-anchor`)
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
 Run `specdev prompt-context 16` to see downstream consumers.
 
 ## Purpose
-Create or update the **canonical Step 16 anchor** at the Step 16 anchor artifact in the `spec` root.
-This file is the **root reference** for the Trinity Loop and exists alongside per‑milestone execution files in `spec/impl_context/`. It must:
-1. Summarize the current execution scope.
-2. Declare traceable checklist items for the active implementation cycle.
-3. Record documentation impact decisions and spec provenance.
-4. act as the union/root of all active milestone implementation contexts (16a/16b/16c).
+Create or update the **Trinity Anchor** at `spec/16_impl_context.json`. The anchor is the **union/root scope declaration** for a multi-milestone implementation cycle. It is validated against `vc:16-anchor` — a schema distinct from the per-milestone `vc:16-impl-context` used by 16a/16b/16c. The anchor's job is scope + cross-milestone drift detection; it does **not** carry per-FR checklist detail (that lives in each 16a plan).
+
+The anchor must:
+1. Declare the full scope spanning all active milestones (`plan.summary`).
+2. Carry forward unresolved decisions and ambiguities across Trinity cycles (`plan.ambiguities`).
+3. Record drift checks performed across milestone cycles (`plan.drift`).
+4. Register which milestones own which FRs/APIs and under which checklist ID namespace (`plan.milestone_index`).
 
 ## When To Use This Prompt
-- You need a **single, canonical Step 16** artifact in `spec/`.
-- You want a root view of the current Trinity cycle that references active milestone contexts.
-- You are aligning a repo to the toolkit version that expects a Step 16 anchor artifact.
+- You are starting a new Trinity cycle and need the root anchor before any 16a milestone plan.
+- You are regenerating the anchor after scope changes (new milestones, FRs moved between milestones).
+- You are aligning a host repo to a toolkit version that expects the `vc:16-anchor` contract.
+
+## When NOT To Use This Prompt
+- You are authoring a per-milestone **implementation plan** (16a) — use `prompt_16a_impl_planner.md` against `spec/impl_context/<milestone>_plan.json` (schema `vc:16-impl-context`).
+- You are recording execution evidence (16b) or review verdicts (16c) — those write into the same milestone context file.
 
 # Role
 You are a senior software architect producing the Step 16 **Trinity Anchor**.
-Generate a **machine‑checkable JSON artifact** that captures the plan,
-implementation checklist, and review expectations for the *current* execution cycle.
+Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that captures scope, carried-forward ambiguities, drift checks, and the milestone ownership index. Do not emit any fields that belong to the milestone context (`checklist`, `execution`, `review`, `docs_impact`, `review_requirements`, etc.) — the anchor schema forbids them via `unevaluatedProperties: false`.
 
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **14_roadmap.json**: active milestone, tasks, and fr_refs — primary source for implementation context; milestone identifiers, deliverables, scheduling, and status fields drive checklist coverage mapping and roadmap sync updates
-- **04_fr_list.json**: FR statements and acceptance criteria for the active milestone; functional requirement identifiers, acceptance criteria, and priority levels directly populate checklist spec_ref entries and linked_test_expectations
-- **05_interface_contracts.json**: API contracts to implement; endpoint definitions, request/response schemas, and method constraints bind checklist items to concrete interface contracts
+- **14_roadmap.json**: milestone identifiers, statuses, and fr_refs — the authoritative source for which milestones this anchor governs and which FR/API IDs each milestone owns; drives `plan.milestone_index[]` directly
+- **04_fr_list.json**: functional requirement IDs and capability mappings — validates that every FR ID listed in `milestone_index[].fr_refs` resolves to a real requirement and informs `plan.summary.scope_in`/`scope_out` boundaries
+- **05_interface_contracts.json**: API contract identifiers and endpoint boundaries — validates API IDs referenced in `milestone_index[].fr_refs` and anchors the scope declaration against the public surface area
 
 #### Reference Sources (context only)
-- **00_charter.json**: Product vision, success criteria, and stakeholder constraints that bound the execution scope and inform scope_in/scope_out decisions
-- **01_capabilities.json**: Capability identifiers and descriptions used to trace checklist items back to declared product capabilities
-- **02_system_sketch.json**: component boundaries and trust zones; component topology, integration boundaries, and data flow paths that determine target_file_patterns and architecture_sketch content
-- **02a_delivery_baseline.json**: Environment definitions, deployment targets, and infrastructure constraints that inform delivery status and drift check scheduling
-- **03_glossary.json**: Canonical term definitions and domain vocabulary enforced in checklist descriptions and functional_summary text
-- **06_invariants.json**: system invariants and enforcement conditions that inform checklist validation items and delivery constraints
-- **07_nfrs.json**: NFR thresholds and availability targets that inform checklist nfr_refs and delivery alert rules
-- **08_fixtures.json**: Test fixture identifiers, target bindings, and expected outcomes used to populate fixture_ref fields and linked_test_expectation commands
-- **09_impl_plan.json**: Milestone definitions, task decompositions, and tech stack constraints that determine implementation sequencing and milestone status tracking
-- **10_governance.json**: Commit message patterns, PR rules, and approval workflows that constrain how implementation changes are committed and reviewed
-- **11_redteam.json**: Threat identifiers, attack vectors, and severity ratings used to populate security fixture bindings and remediation checklist items
-- **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that inform review_requirements test_commands and verification expectations
-- **13_extension_generator.json**: Extension point declarations and plugin interface contracts used to identify additional target_file_patterns for extensibility concerns
-- **13a_completeness_assessment.json**: Coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions
-- **15_scaffold.json**: existing scaffold structure; generated file structure, directory layout, and scaffold templates that ground target_file_patterns and existing_structures references
+- **00_charter.json**: product vision, success criteria, and stakeholder constraints that bound the execution scope and inform `plan.summary.scope_in`/`scope_out` decisions at the anchor level
+- **01_capabilities.json**: capability identifiers and descriptions used to ground scope strings and to sanity-check that milestone fr_refs roll up into declared product capabilities
+- **02_system_sketch.json**: component boundaries and trust zones; component topology, integration boundaries, and data flow paths that inform the anchor's scope boundary decisions across milestones
+- **02a_delivery_baseline.json**: environment definitions, deployment targets, and infrastructure constraints that inform what a cross-milestone rollout must respect in scope_in/scope_out statements
+- **03_glossary.json**: canonical term definitions and domain vocabulary enforced in the anchor's `functional_summary` text and ambiguity descriptions to prevent term drift across cycles
+- **06_invariants.json**: system invariants and enforcement conditions that bound what the anchor may declare as scope_in without violating cross-cutting contracts
+- **07_nfrs.json**: NFR thresholds and availability targets that bound the anchor scope — NFR breaches disqualify certain implementation paths before milestones are cut
+- **08_fixtures.json**: test fixture identifiers, target bindings, and expected outcomes used to sanity-check that in-scope FRs have a path to verifiable tests at the milestone level
+- **09_impl_plan.json**: milestone definitions, task decompositions, and tech stack constraints that determine how many milestones this anchor should index and what their tentative statuses are
+- **10_governance.json**: commit message patterns, PR rules, and approval workflows that constrain how cross-milestone changes must be committed and reviewed during the cycle
+- **11_redteam.json**: threat identifiers, attack vectors, and severity ratings that inform anchor-level scope_out decisions when the threat surface argues for excluding certain capabilities this cycle
+- **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that establish the verification contract milestone plans will ultimately reference via their own test_commands
+- **13_extension_generator.json**: extension point declarations and plugin interface contracts that inform scope boundaries when extensibility concerns cut across multiple milestones
+- **13a_completeness_assessment.json**: coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions before committing to a milestone index
+- **15_scaffold.json**: generated file structure, directory layout, and scaffold templates that ground the anchor's optional `target_file_patterns` when a cross-milestone file boundary is declared
 
 # Operating Flow (MANDATORY)
-1. **Context Review**: Ingest required upstream spec artifacts.
-2. **Scope**: Identify the exact execution scope for the current cycle.
-3. **Active Contexts**: List `spec/impl_context/*.json` files in `plan.context.existing_structures`.
-4. **Drift Check**: MUST verify that no `checklist[].id`, `scope_in`, or `scope_out` value in this Anchor contradicts the corresponding values in any active Milestone context (16a/b/c) under `spec/impl_context/`.
-5. **Checklist**: Convert relevant spec requirements into atomic checklist items.
-6. **Docs Impact**: Decide whether docs updates are required and list impacted docs.
-7. **Roadmap Sync**: If you identify that milestones are fully completed based on the ingested context, you MUST update:
-    - `spec/14_roadmap.json`: Statuses to `done`.
-    - `spec/09_impl_plan.json`: Statuses to `done`.
-8. **Emit**: Write the Step 16 anchor artifact in the `spec` root.
+1. **Context Review**: Ingest `14_roadmap.json` (milestone list, fr_refs, status), `04_fr_list.json` (FR IDs), `05_interface_contracts.json` (API IDs). Load any existing `spec/impl_context/*.json` milestone plans to understand what is already under way.
+2. **Scope**: Derive `plan.summary.functional_summary`, `scope_in`, `scope_out` spanning **all** active and planned milestones in this cycle. The anchor is the union of milestone scope — not a milestone plan itself.
+3. **Milestone Index**: For each milestone in `14_roadmap.json` that is active, done, or planned in this cycle, emit one `plan.milestone_index[]` entry with `milestone_id`, `context_path` (pointing at the 16a plan file), `status`, `fr_refs`, `checklist_id_prefix` (SCREAMING_SNAKE namespace the 16a plan will use for its checklist IDs), and a one-line `summary`.
+4. **Ambiguities**: Carry forward unresolved ambiguities from prior Trinity cycles and surface any new cross-milestone decisions that are not yet resolved. Each entry: `id`, `description`, `severity` (`low`/`medium`/`high`/`critical`), optional `impact`, optional `status` (`resolved`/`tracking`/`deferred`/`blocked`), optional `status_ref` (canonical status ref).
+5. **Drift**: Record drift checks performed in this session and previous cycles in `plan.drift.checks` as short, dated human-readable strings (e.g., `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`). May be `[]` on a fresh anchor.
+6. **Emit**: Write the JSON artifact to `spec/16_impl_context.json`. Do not write any fields not listed in the Output Contract — the schema uses `unevaluatedProperties: false` and `additionalProperties: false` on `plan`, so extraneous keys fail validation.
 
 ## Self-Audit Gate
-> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- `spec/14_roadmap.json` is present and contains at least one milestone entry.
-- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
-- `spec/05_interface_contracts.json` is present and contains at least one api entry.
-- `spec/15_scaffold.json` is present and contains at least one file entry.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode and emit gap questions only — do not write the artifact.
+- `spec/14_roadmap.json` is present and contains at least one milestone.
+- `spec/04_fr_list.json` is present and contains at least one `functional_requirements` entry.
+- `spec/05_interface_contracts.json` is present and contains at least one `apis` entry.
+- Every `milestone_id` you plan to list in `plan.milestone_index` exists in `14_roadmap.json`.
+- Every FR/API ID in any `plan.milestone_index[].fr_refs` resolves to a real ID in Step 04 or Step 05.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `milestone_id` from `spec/14_roadmap.json` that is in scope for this session has ≥1 `checklist` item in `plan.spec_alignment.checklist`.
-- All `spec_ref.id` values in the checklist resolve to IDs present in their referenced upstream spec files (`fr_id`, `api_id`, `inv_id`, `nfr_id`, `fixture_id`).
-- Every selected FR, API, invariant, and NFR in scope has a corresponding checklist item or explicit `out_of_scope` entry with rationale.
-- No milestone from `spec/14_roadmap.json` is silently excluded from scheduling without `out_of_scope` documentation.
-- If any spec reference is ambiguous or the scope boundary is unclear: add a gap question (Clarify mode) rather than assuming inclusion or exclusion.
-- [ ] All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`
-- [ ] Every implementation context links to the active Step 14 milestone
-- [ ] All cross-references resolve to valid IDs in the referenced spec files
-- [ ] The `semantic_review` section covers all major implementation concerns (naming, structure, coverage) — not just surface-level checks
-- [ ] Every `plan.spec_alignment.checklist` item has a corresponding `execution.execution_results` entry (no planned item left without an execution record)
-- [ ] No active Milestone Contexts (16a/b/c) conflict with this Anchor — all checklist IDs and scope_in/scope_out values are consistent with spec/impl_context/*.json
+- Every active milestone in `14_roadmap.json` appears in `plan.milestone_index` (or is explicitly listed in `scope_out` with a rationale carried in `plan.ambiguities`).
+- No FR/API ID appears in `fr_refs` of two milestones whose `status` is `active` (this triggers **E308** FR ownership conflict).
+- No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's `scope_in`/`scope_out` under `spec/impl_context/*.json` (triggers **E308** scope drift).
+- Each `checklist_id_prefix` is unique across `plan.milestone_index` — 16a plans will allocate their checklist IDs from this namespace; duplicates collide and trigger **E309**.
+- All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.
 
 ## Negative Constraints
-1. **NEVER** hallucinate `step_id` or use loose references.
-2. **NEVER** omit `commit_hash` in `spec_ref`.
-3. **NEVER** emit incomplete JSON or use placeholder values.
-4. **NEVER** use `plan.tasks` or `metadata`.
+1. **NEVER** emit `plan.spec_alignment`, `plan.review_requirements`, `plan.docs_impact`, `plan.solution`, `plan.context`, `plan.security`, `plan.delivery`, `plan.docs`, `plan.coverage_status`, or `plan.scope_validation` — these belong on 16a/16b/16c milestone contexts, not on the anchor.
+2. **NEVER** emit an `execution` or `review` top-level section — the anchor schema forbids them (`unevaluatedProperties: false`).
+3. **NEVER** author a per-FR checklist on the anchor — per-milestone checklist detail lives in each 16a plan.
+4. **NEVER** set `artifact_role` to anything other than `"anchor"` — the value is a JSON Schema `const`.
+5. **NEVER** emit placeholder or empty-string values where content is required (e.g., `functional_summary` must be ≥20 chars; each `drift.checks[]` string must be ≥5 chars; each `milestone_index[].summary` must be ≥10 chars).
 
 # Field Definitions & Rules (MANDATORY)
-**Crucial**: Use the following exact definitions to ensure compliance:
+**Crucial**: Use the following exact definitions to ensure compliance with `vc:16-anchor`:
 
-## 1. `plan.summary` (The Step Summary)
-*   `functional_summary`: A 1-paragraph summary of what this step accomplishes in the global architecture.
-*   `scope_in`: List explicit concerns that are IN scope.
-*   `scope_out`: List explicit concerns that are OUT of scope.
-*   `target_file_patterns`: List **ALL** likely files that will be modified.
-    *   *Rule*: Use glob patterns (e.g. `src/auth/*.py`).
-    *   *Expectation*: If a file is not matched here, the coder is forbidden from touching it.
+## 1. `artifact_role` (Required)
+*   Always the literal string `"anchor"`. This is a JSON Schema `const` — any other value fails validation. Routing (`validate.py`) and `_is_anchor()` read this field to dispatch to the anchor validator.
 
-## 2. `plan.spec_alignment.checklist` (The Contract)
-*   `checklist`: A list of **Atomic Requirements**.
-    *   `id`: Uppercase snake-case ID (stable, e.g. `CHK_AUTH_01`).
-    *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
-        *   *Rule*: `commit_hash` is MANDATORY. Do not use placeholders.
-    *   `description`: **Verbose, Atomic, and Self-Explanatory**.
-        *   *Rule*: Use "Subject-Action-Constraint" format.
-    *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
-        *   *Expectation*: This serves as the "contract" for verification.
-    *   `implementation`: **Execution Slots**.
-        *   `status`: `pending`, `in_progress`, `verified`, `deferred`.
-        *   `files_touched`: Files explicitly modified.
-        *   `actions`: Atomic implementation steps.
-            *   `type`: `file_create`, `file_edit`, `run_command`, `manual_verification`.
-            *   `description`: Verbose action description.
-            *   `target` / `command`: Mandatory based on type.
+## 2. `plan.summary` (Required)
+Scope declaration spanning all milestones in this cycle. `additionalProperties: false` — only the four fields below.
+*   `functional_summary` *(required, string, minLength 20)*: 1–3 sentences stating the capability delivered across all milestones, primary actors, and hard constraints. Example: *"Implements JWT authentication and session management across two milestones. Covers token issuance, validation, revocation. Excludes OAuth flows and third-party SSO."*
+*   `scope_in` *(required, array of strings, each minLength 3)*: concrete capabilities, endpoints, or system boundaries included. E308 uses this to detect milestone↔anchor contradictions.
+*   `scope_out` *(required, array of strings, each minLength 3)*: concrete items explicitly excluded. A milestone `scope_in` value that appears here triggers E308.
+*   `target_file_patterns` *(optional, array of strings)*: glob patterns for files touched across all milestones. The anchor may leave this empty or broad; each 16a plan carries its own tighter patterns.
 
-## 3. `plan.ambiguities` (Risk Management)
-*   List ANY ambiguity that would affect implementation.
-    *   `id`: unique kebab-case identifier.
-    *   `description`: What is unclear?
-    *   `source`: `spec`, `code`, `plan`, `mixed`, `review`.
-    *   `severity`: `blocking` or `non_blocking`.
-    *   `mitigation`: Required for non_blocking.
-    *   `impact`: List of affected components/flows.
-    *   `status`: `resolved`, `tracking`, `deferred`, `blocked`.
+## 3. `plan.ambiguities` (Required, can be `[]`)
+Accumulated unresolved decisions carried across Trinity cycles. Each item (`additionalProperties: false`):
+*   `id` *(required)*: kebab-case identifier.
+*   `description` *(required, string)*: what is unclear and what decision is needed.
+*   `severity` *(required)*: `low` | `medium` | `high` | `critical` (from `vc:core:atoms#severityLevel`). **Do not use `blocking`/`non_blocking`** — those are milestone-plan values, not anchor severities.
+*   `impact` *(optional, array of strings)*: affected areas or milestones.
+*   `status` *(optional)*: `resolved` | `tracking` | `deferred` | `blocked`.
+*   `status_ref` *(optional)*: canonical ref object `{ id, kind: "status" }`.
 
-## 4. `plan.drift` (Sustainment)
-*   `checks`: Define periodic drift checks.
-    *   `target`: `api`, `schema`, `nfr`, `invariant`, `fixture`, `config`.
-    *   `method`: `runtime-sample`, `log-diff`, `schema-diff`, `trace-replay`.
-    *   `schedule`: hourly/daily/weekly/monthly or cron expression.
-    *   `remediation_policy`: Explicit steps to fix.
+## 4. `plan.drift` (Required)
+Drift monitoring log. `additionalProperties: false`.
+*   `checks` *(required, array of strings, each minLength 5, may be empty)*: one short human-readable string per drift check performed or scheduled. Example: `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`. **Not objects** — the anchor records what was checked, not how; the executable check lives in `step_16_anchor.py` (E308/E309).
 
-## 5. `plan.review_requirements` (Verification Plan)
-*   `test_commands`: Precision commands to run tests.
-    *   *Rule*: must match `linked_test_expectation` commands.
-
-## 6. `plan.docs_impact` (Documentation Update)
-*   `status`: `required` or `not_required`.
-    *   *Rule*: If code changes are planned, you MUST set `status: required` and list doc paths in `docs_touched`.
-
-## 7. `plan.solution` (Architecture Sketch)
-*   `architecture_sketch`: High-level description of the technical approach.
-*   `sequence_of_concerns`: Ordered list of implementation phases (e.g., ["Models", "Views", "Tests"]).
-*   `risks`: Array of identified technical risks.
-
-## 8. `plan.context` (Existing Codebase Context)
-*   `existing_structures`: Array of known code or non-code structures.
-    *   *Rule*: Use strings for non-code artifacts, objects for code signatures.
-    *   For code objects: `{ signature, source_file, line_range }` are required.
-*   `coding_examples`: Optional array of illustrative code snippets.
-
-## 9. `plan.security` (Security Considerations)
-*   `status`: `not_applicable` or `planned`.
-    *   If `not_applicable`: Provide `reason`.
-    *   If `planned`: List `new_fixtures` (IDs) and `spec_mutations` (changes to specs).
-
-## 10. `plan.delivery` (Observability & Monitoring)
-*   `status`: `not_applicable` or `planned`.
-    *   If `planned`: Define `dashboards` (with dashboard_id, nfr_refs) and `alerts` (with alert_id, nfr_ref, rule, severity).
-
-## 11. `plan.docs` (Documentation Plan)
-*   `status`: `not_applicable` or `planned`.
-    *   If `not_applicable`: Provide `reason`.
-    *   If `planned`: List `required_updates` with `path` and `update_summary`.
-
-## 12. `plan.coverage_status` (Checklist Coverage Metrics)
-*   `total`: Total checklist items.
-*   `verified`: Count of verified items.
-*   `deferred`: Count of deferred items.
-*   `pending`: Count of pending items.
-
-## 13. `plan.scope_validation` (Scope Acknowledgment)
-*   `in_scope`: List of concerns IN scope.
-*   `out_of_scope`: List of concerns OUT of scope.
-*   `acknowledged`: Boolean, must be true if `out_of_scope` is non-empty.
+## 5. `plan.milestone_index` (Required, can be `[]`)
+Registry of every milestone this anchor governs. Used by validators to detect cross-milestone FR ownership conflicts (E308) and checklist ID collisions (E309). Each item (`additionalProperties: false`):
+*   `milestone_id` *(required, kebab-case)*: must match a `milestone_id` in `14_roadmap.json`.
+*   `context_path` *(required, string)*: relative path to the milestone's 16a plan (e.g. `"spec/impl_context/ms_auth_plan.json"`).
+*   `status` *(required)*: `active` | `done` | `planned`. Done milestones do **not** block FR ownership conflict detection (the FR has been delivered and may legitimately be re-referenced in a follow-on milestone).
+*   `fr_refs` *(required, array of kebabIds)*: FR and API IDs this milestone owns. Two active milestones claiming the same ID triggers E308.
+*   `checklist_id_prefix` *(required, pattern `^[A-Z][A-Z0-9_]{1,19}$`)*: SCREAMING_SNAKE namespace for the 16a plan's checklist IDs (e.g. `AUTH`, `PAYMENT`). Must be unique across the milestone index — duplicates let two plans collide on the same checklist ID, triggering E309.
+*   `summary` *(required, string, minLength 10)*: one-line status (e.g. *"Auth token issuance — 3/5 items verified, CI green"*).
 
 # Heuristics For Completeness
-1. **Every checklist item has a concrete `linked_test_expectation`** (not generic like "run tests").
-2. **Every `spec_ref` has a valid 40-char SHA commit_hash** (no placeholders or zeros).
-3. **`target_file_patterns` use explicit globs** (avoid `**/*` or empty arrays unless deferred).
-4. **`docs_impact.status` is `required` if any non-doc file is in `target_file_patterns`**.
-5. **Anchor (Step 16) MUST NOT contradict any `checklist[].id`, `scope_in`, or `scope_out` value in active Milestone contexts (16a/b/c)** — run drift comparison against each `spec/impl_context/*.json`.
+1. **Every `milestone_index[].milestone_id` exists in `14_roadmap.json`** — invent no IDs.
+2. **Every `fr_refs` ID resolves in Step 04 (FRs) or Step 05 (APIs)** — invent no IDs.
+3. **`scope_in` and `scope_out` are disjoint** on the anchor, and consistent with every milestone's own `scope_in`/`scope_out`.
+4. **`checklist_id_prefix` values are pairwise unique** across milestones.
+5. **`ambiguities[]` carries forward** unresolved items from prior cycles — do not silently drop them.
+6. **`drift.checks[]` is not a TODO list** — record checks that were actually performed, with a date if possible.
 
 # Best Practices
-1. **Always validate drift** between Step 16 Anchor and active 16a/b/c contexts before emit.
-2. **Use specific test commands**, not vague placeholders (e.g., `pytest tests/auth/test_login.py::test_success`).
-3. **Document EVERY environmental dependency** in `docs_impact` (env vars, secrets, config files).
-4. **Prefer atomic checklist items** (one testable behavior per item, not compound requirements).
-5. **Link evidence explicitly** when marking items as `verified` (use `evidence_ref` field).
+1. **Keep the anchor small.** A well-formed anchor fits on one screen — the schema enforces this by forbidding checklist and implementation detail. If you feel the urge to add fields, you are conflating the anchor with a 16a plan.
+2. **Update the anchor whenever a milestone is added, completed, or scope shifts** — it is the cross-cycle record.
+3. **Use concrete scope strings** (`"login-endpoint"`, `"jwt-token-validation"`) not vague labels (`"auth"`).
+4. **Prefix checklist IDs by milestone** in the 16a plans (via `checklist_id_prefix`) so E309 collision detection is trivially satisfied.
+5. **When deleting an ambiguity, set its `status` to `resolved`** rather than removing the entry — preserves the cross-cycle decision log.
 
 # Failure Modes (Pitfalls)
-*   **Anchor Drift**: Producing a Step 16 context that conflicts with the specific Milestone contexts (16a/b/c). *Fix*: Anchor must be the union/root, not a distinct implementation plan.
-*   **Lazy Scope**: Leaving `target_file_patterns` empty or using broad `**/*` patterns. *Fix*: Must be explicit glob patterns based on `spec/impl_context/*.json`.
-*   **Hidden Dependencies**: Introducing code changes that require new env vars or secrets without documenting them in `docs_impact`. *Fix*: Check `env` usage.
-*   **JSON dumps**: Dumping the JSON in the chat output. *Fix*: Only write the file.
-*   **Schema Hallucination**: Using fields like `plan.tasks` (deprecated) or `metadata` (untyped). *Fix*: Strict adherence to the referenced step schema.
+*   **Schema rejection from extra fields**: Emitting `checklist`, `review_requirements`, or `docs_impact` on the anchor. *Fix*: Author only the four fields `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`.
+*   **FR ownership conflict (E308)**: Two active milestones both listing the same FR in `fr_refs`. *Fix*: Move the FR to one milestone; mark the other `done` if already delivered.
+*   **Checklist ID collision (E309)**: Two milestones using the same `checklist_id_prefix`. *Fix*: Assign distinct prefixes per milestone.
+*   **Scope drift (E308)**: A milestone's `scope_in` contains a string in the anchor's `scope_out`, or vice versa. *Fix*: Decide whether the item is in or out, update both places to agree.
+*   **Wrong severity enum**: Using `blocking`/`non_blocking` in `ambiguities[].severity`. *Fix*: Use `low`/`medium`/`high`/`critical`.
+*   **Drift checks as objects**: Emitting `{target, method, schedule, ...}` inside `drift.checks`. *Fix*: Each check is a short human-readable string.
+*   **JSON dumps**: Printing the JSON in chat. *Fix*: Only write the file.
 
 # Clarification Questions
-- "Are there any active Milestone Contexts (16a/16b/16c) I should merge?"
-- "Does this Step 16 Anchor require specific documentation updates beyond the standard set?"
-- "Are there specific file patterns that should be strictly OUT of scope?"
+- "Which milestones from `14_roadmap.json` should this anchor cover in the current cycle?"
+- "Are any previously-resolved ambiguities now open again (e.g., due to scope change)?"
+- "What `checklist_id_prefix` should each milestone use? (Must be unique, SCREAMING_SNAKE, ≤20 chars.)"
 
 # Schema Reference
 - Schema URI: vc:16-anchor
