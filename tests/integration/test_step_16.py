@@ -33,51 +33,43 @@ class TestStep16(unittest.TestCase):
         path = os.path.join(self.fixtures_dir, "invalid_missing_evidence.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (missing evidence) should fail validation")
-        # Optional: check message content
-        # print(f"Invalid Evidence Errors: {errors}")
+        self.assertTrue(any(e.code == "E301" for e in errors), f"Expected E301. Got: {errors}")
 
     def test_invalid_bad_enum(self):
         # Expect failure due to bad enum
         path = os.path.join(self.fixtures_dir, "invalid_bad_enum.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (bad enum) should fail validation")
+        self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
     
     def test_invalid_missing_nfr_refs(self):
         # Expect failure because non-deferred item has no nfr_refs
         path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (missing nfr_refs) should fail validation")
+        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
     
     def test_invalid_missing_fixture_ref(self):
         # Expect failure because non-deferred item has no fixture_ref
         path = os.path.join(self.fixtures_dir, "invalid_missing_fixture_ref.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (missing fixture_ref) should fail validation")
+        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
     
     def test_invalid_invalid_type(self):
         # Expect failure due to invalid type
         path = os.path.join(self.fixtures_dir, "invalid_invalid_type.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (invalid type) should fail validation")
+        self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
     
     def test_invalid_invalid_layer(self):
         # Expect failure due to invalid layer
         path = os.path.join(self.fixtures_dir, "invalid_invalid_layer.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (invalid layer) should fail validation")
+        self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
     
-    def test_valid_with_new_fields(self):
-        # Test that valid fixtures with new fields pass validation
-        path = os.path.join(self.fixtures_dir, "valid_minimal.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertEqual(errors, [], f"Valid minimal fixture with new fields should pass. Errors: {errors}")
-
-    def test_valid_full_with_new_fields(self):
-        # Test that valid_full fixture with new fields passes validation
-        path = os.path.join(self.fixtures_dir, "valid_full.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertEqual(errors, [], f"Valid full fixture with new fields should pass. Errors: {errors}")
-
     def test_invalid_verified_red_ci(self):
         # E303: verdict=verified but ci_status=red should fail
         path = os.path.join(self.fixtures_dir, "invalid_verified_red_ci.json")
@@ -109,6 +101,7 @@ class TestStep16(unittest.TestCase):
         path = os.path.join(self.fixtures_dir, "invalid_missing_semantic_review.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Missing semantic_review on verified verdict should fail validation")
+        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
 
     def test_invalid_verified_no_fixture_status(self):
         # E303: verified verdict with absent fixture_status should fire E303
@@ -122,7 +115,7 @@ class TestStep16(unittest.TestCase):
 
     def test_e304_roadmap_task_uncovered(self):
         # E304: roadmap has implement-logout but checklist only covers implement-login
-        path = os.path.join(self.fixtures_dir, "e304_roadmap", "16_impl_context.json")
+        path = os.path.join(self.fixtures_dir, "e304_roadmap", "impl_context", "ms_test_plan.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E304 fixture should fail validation")
         self.assertTrue(
@@ -211,7 +204,9 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
             fixture_path.write_text(json.dumps(data), encoding="utf-8")
             (tmp_dir / "14_roadmap.json").write_text(json.dumps(malformed_roadmap), encoding="utf-8")
             common_dir = tmp_dir / "common"
@@ -231,7 +226,9 @@ class TestStep16(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td2:
             tmp_dir2 = Path(td2)
-            fixture_path2 = tmp_dir2 / "16_impl_context.json"
+            impl_context_dir2 = tmp_dir2 / "impl_context"
+            impl_context_dir2.mkdir()
+            fixture_path2 = impl_context_dir2 / "ms_test_plan.json"
             fixture_path2.write_text(json.dumps(data), encoding="utf-8")
             (tmp_dir2 / "14_roadmap.json").write_text("{invalid json", encoding="utf-8")
             common_dir2 = tmp_dir2 / "common"
@@ -259,7 +256,7 @@ class TestStep16(unittest.TestCase):
             {
                 "id": "REQ_ONLY_BEHAVIOR",
                 "spec_ref": {
-                    "type": "code",
+                    "type": "fr",
                     "id": "task-login-impl",
                     "line_range": "L1-L50",
                     "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -296,6 +293,49 @@ class TestStep16(unittest.TestCase):
             f"Expected E307 BEHAVIOR_VALIDATION_PAIRING error. Got: {errors}"
         )
 
+    def test_e307_code_spec_ref_type_excluded(self):
+        """E307 does NOT fire when spec_ref.type is 'code' — non-behavioral work items are excluded."""
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # code-type spec_ref with behavior-only checklist — should NOT trigger E307
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "WORK_ITEM_B",
+                "spec_ref": {
+                    "type": "code",
+                    "id": "task-code-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Implement code change",
+                "type": "behavior",
+                "layer": "api",
+                "linked_test_expectation": "passes tests",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "fixture_ref": "fixture-impl"
+            }
+        ]
+        data.pop("execution", None)
+        data["review"] = {}
+        data["plan"].pop("review_requirements", None)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e307_errors = [e for e in errors if e.code == "E307"]
+        self.assertEqual(e307_errors, [], f"Did not expect E307 for code spec_ref.type. Got: {e307_errors}")
+
     def _make_milestone_ref_fixture(self, tmpdir, checklist_items, roadmap_milestones):
         """Helper to create a step_16 fixture with roadmap for milestone_ref tests."""
         tmp_dir = Path(tmpdir)
@@ -327,7 +367,9 @@ class TestStep16(unittest.TestCase):
             "canonical_proposals": [],
             "canonical_conflicts": []
         }
-        fixture_path = tmp_dir / "16_impl_context.json"
+        impl_context_dir = tmp_dir / "impl_context"
+        impl_context_dir.mkdir(exist_ok=True)
+        fixture_path = impl_context_dir / "ms_test_plan.json"
         fixture_path.write_text(json.dumps(data), encoding="utf-8")
 
         roadmap = {"milestones": roadmap_milestones}
@@ -448,14 +490,21 @@ class TestStep16(unittest.TestCase):
         )
 
     def _make_e304_fixture(self, tmpdir, impl_context_data, roadmap_milestones):
-        """Helper to write a step_16 fixture + roadmap for E304 tests."""
+        """Helper to write a step_16 fixture + roadmap for E304 tests.
+
+        The fixture is placed inside impl_context/ so _is_anchor() correctly
+        identifies it as a 16a plan (not an anchor) and E304/W581 fire as expected.
+        The roadmap is at the parent level (tmp_dir/14_roadmap.json).
+        """
         tmp_dir = Path(tmpdir)
-        fixture_path = tmp_dir / "16_impl_context.json"
+        impl_context_dir = tmp_dir / "impl_context"
+        impl_context_dir.mkdir(exist_ok=True)
+        fixture_path = impl_context_dir / "ms_test_plan.json"
         fixture_path.write_text(json.dumps(impl_context_data), encoding="utf-8")
         roadmap = {"milestones": roadmap_milestones}
         (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
         common_dir = tmp_dir / "common"
-        common_dir.mkdir()
+        common_dir.mkdir(exist_ok=True)
         (common_dir / "seed_manifest.json").write_text(
             json.dumps({"doc_paths": []}),
             encoding="utf-8"
@@ -630,6 +679,7 @@ class TestStep16(unittest.TestCase):
             len(errors) > 0,
             "Invalid emergent_ambiguity severity fixture should fail validation"
         )
+        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
 
     def test_e582_artifact_milestone_ref_not_in_roadmap(self):
         """E582: top-level milestone_ref pointing to a non-existent roadmap milestone fires E582."""

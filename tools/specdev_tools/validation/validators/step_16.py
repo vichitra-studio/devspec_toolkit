@@ -48,11 +48,54 @@ def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional
     return None
 
 
-def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: list[SpecError]) -> None:
-    """E307: For every roadmap task, ensure at least one behavior and one validation item.
+def _is_anchor(spec_path: Optional[str], data: Optional[Dict[str, Any]] = None) -> bool:
+    """Detect whether this artifact is the Step 16 Trinity Anchor (vs. a 16a/16b/16c plan).
 
-    Groups non-deferred checklist items by their spec_ref.id (roadmap task)
-    and checks that each group has both a 'behavior' and a 'validation' type item.
+    Prefers field-based detection (artifact_role) when available;
+    falls back to path heuristic: anchor lives at spec/16_impl_context.json,
+    plans live inside spec/impl_context/.
+    # TODO: upgrade to artifact_role field check exclusively after Task 2.7 (vc:16-anchor schema).
+    """
+    if data and data.get("artifact_role") == "anchor":
+        return True
+    if not spec_path:
+        return False
+    p = Path(spec_path)
+    return p.name == "16_impl_context.json" and p.parent.name != "impl_context"
+
+
+def _load_roadmap(spec_path: str) -> Optional[Dict[str, Any]]:
+    """Load 14_roadmap.json relative to spec_path with correct path resolution.
+
+    Resolves correctly for both anchor and milestone plan artifacts:
+    - Anchor (spec/16_impl_context.json) → spec/14_roadmap.json
+    - 16a plan (spec/impl_context/ms_auth_plan.json) → spec/14_roadmap.json
+
+    Returns:
+        Parsed roadmap dict, or None if 14_roadmap.json does not exist.
+
+    Raises:
+        OSError: If the file exists but cannot be read.
+        json.JSONDecodeError: If the file is not valid JSON.
+    """
+    artifact_path = Path(spec_path)
+    if artifact_path.parent.name == "impl_context":
+        roadmap_path = artifact_path.parent.parent / "14_roadmap.json"
+    else:
+        roadmap_path = artifact_path.parent / "14_roadmap.json"
+
+    if not roadmap_path.exists():
+        return None
+    return json.loads(roadmap_path.read_text())
+
+
+def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: list[SpecError]) -> None:
+    """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
+
+    Groups non-deferred checklist items by their spec_ref.id and checks that each
+    group has both a 'behavior' and a 'validation' type item.
+    Non-behavioral spec_ref types ('doc', 'code') are excluded — these are work items,
+    not testable behaviors, and do not require behavior+validation pairing.
     """
     from collections import defaultdict
 
@@ -68,6 +111,9 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
         ref_id = spec_ref.get("id")
         if not ref_id:
             continue
+        # Skip non-behavioral spec_ref types (doc, code) — work items, not testable behaviors
+        if spec_ref.get("type") in {"doc", "code"}:
+            continue
         item_type = item.get("type", "")
         if item_type:
             groups[ref_id].add(item_type)
@@ -80,7 +126,7 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
             missing.append("validation")
         if missing:
             errors.append(
-                make_error("E307", f"BEHAVIOR_VALIDATION_PAIRING: roadmap task '{ref_id}' "
+                make_error("E307", f"BEHAVIOR_VALIDATION_PAIRING: spec ref '{ref_id}' "
                 f"is missing checklist item(s) of type: {', '.join(missing)}")
             )
 
@@ -359,15 +405,11 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                 "set fixture_status.ci_status to 'green' or change verdict")
             )
 
-    # E304 -- roadmap-to-checklist coverage
-    if spec_path:
-        artifact_path = Path(spec_path)
-        roadmap_path = artifact_path.parent / "14_roadmap.json"
-        if not roadmap_path.exists():
-            pass  # Roadmap is optional in pre-roadmap phases -- skip E304 silently
-        else:
-            try:
-                roadmap_data = json.loads(roadmap_path.read_text())
+    # E304 -- roadmap-to-checklist coverage (fires on 16a plans, NOT on the anchor)
+    if spec_path and not _is_anchor(spec_path, data):
+        try:
+            roadmap_data = _load_roadmap(spec_path)
+            if roadmap_data is not None:
                 # Get milestone_ref from the artifact
                 milestone_ref = data.get("milestone_ref", "")
                 roadmap_task_ids = set()
@@ -407,22 +449,20 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                     errors.append(
                         make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' has no checklist item with matching spec_ref.id")
                     )
-            except (OSError, json.JSONDecodeError) as exc:
-                errors.append(
-                    make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}")
-                )
-            except (KeyError, TypeError) as exc:
-                errors.append(
-                    make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
-                )
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(
+                make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}")
+            )
+        except (KeyError, TypeError) as exc:
+            errors.append(
+                make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
+            )
 
-    # W581 -- milestone_ref binding validation
-    if spec_path:
-        artifact_path_ms = Path(spec_path)
-        roadmap_path_ms = artifact_path_ms.parent / "14_roadmap.json"
-        if roadmap_path_ms.exists():
-            try:
-                roadmap_data_ms = json.loads(roadmap_path_ms.read_text())
+    # W581 -- milestone_ref binding validation (skips anchor artifacts)
+    if spec_path and not _is_anchor(spec_path, data):
+        try:
+            roadmap_data_ms = _load_roadmap(spec_path)
+            if roadmap_data_ms is not None:
                 task_to_milestone: dict[str, str] = {}
                 for ms in roadmap_data_ms.get("milestones", []):
                     ms_id = ms.get("milestone_id", "")
@@ -450,8 +490,8 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                                 make_error("E582", f"UNCOVERED_FR_REVIEW_COVERAGE milestone_ref mismatch item={item_id} "
                                 f"expected={expected_ms} got={milestone_ref}")
                             )
-            except (OSError, json.JSONDecodeError, KeyError, TypeError):
-                pass  # Roadmap parse errors already handled by E304
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            pass  # Roadmap parse errors already handled by E304
 
     # E305 -- planned-vs-executed diff
     final_status = data.get("execution", {}).get("final_status", {}) if isinstance(data.get("execution"), dict) else {}
