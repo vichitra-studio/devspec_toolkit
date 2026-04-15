@@ -11,3 +11,51 @@ changes:
     migration:
       action: ai_assisted
       note: "Use template_infer_missing.md prompt to populate all 4 required tech_stack categories"
+  - type: add_schema
+    path: "schema/16_anchor.schema.json"
+    description: "vc:16-anchor schema for the Trinity Anchor artifact (spec/16_impl_context.json). Requires artifact_role:'anchor', plan.summary/ambiguities/drift/milestone_index; forbids execution/review via unevaluatedProperties:false."
+    migration:
+      action: automatic
+      note: "Existing spec/16_impl_context.json anchor files that include execution or review sections will fail validation. Migrate: move execution/review data to per-milestone files in spec/impl_context/."
+  - type: add_validator
+    path: "tools/specdev_tools/validation/validators/step_16_anchor.py"
+    description: "Cross-milestone drift validator. E308 ANCHOR_SCOPE_DRIFT (scope contradiction + FR ownership conflict), E309 ANCHOR_CHECKLIST_DRIFT (same checklist id → different spec_ref.id across milestones), W580 guard."
+    migration:
+      action: automatic
+      note: "No author-facing migration. Validator runs automatically via DEEP_VALIDATORS['16']."
+  - type: add_field
+    path: "schema/core/collections.schema.json#seedRef"
+    description: "New reusable $anchor seedRef with required seed_id and optional hash (SHA-256) and version for drift detection."
+    migration:
+      action: automatic
+      note: "Optional new type — no existing artifacts are affected."
+  - type: add_field
+    path: "schema/core/collections.schema.json#specRefIngested"
+    description: "New reusable $anchor specRefIngested with required step_id + artifact_id and optional hash, for recording upstream artifacts consumed during generation."
+    migration:
+      action: automatic
+      note: "Optional new type — no existing artifacts are affected."
+  - type: add_field
+    path: "step_base.spec_refs_ingested"
+    description: "Optional array inherited by all 20 step schemas via allOf composition. Records upstream spec artifacts consumed during generation."
+    migration:
+      action: ai_assisted
+      note: "Populate in future regenerations. Absence is allowed — existing artifacts remain valid."
+  - type: add_field
+    path: "step_base.seed_refs_ingested"
+    description: "Optional array inherited by all 20 step schemas via allOf composition. Records seed documents consumed during generation."
+    migration:
+      action: ai_assisted
+      note: "Populate in future regenerations for steps 00–02a. Absence is allowed — existing artifacts remain valid."
+  - type: add_field
+    path: "step_order.step_metadata"
+    description: "Per-step declarative metadata (required_spec_inputs, required_seed_inputs, extraction_intent). Consistency-linted against downstream_consumers by dependency-order-lint."
+    migration:
+      action: automatic
+      note: "Populated for all 22 steps. Bidirectional consistency enforced by _lint_step_metadata_consistency — mismatches emit E540 STEP_METADATA_INCONSISTENT."
+  - type: add_field
+    path: "seed_manifest.seeds[*]"
+    description: "Optional hash (SHA-256) and version fields on each seed entry for content-integrity tracking by seed-index tooling."
+    migration:
+      action: automatic
+      note: "Optional new fields — existing manifests remain valid. Populate via `specdev seed-index` to record current hashes."
