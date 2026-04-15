@@ -62,7 +62,7 @@ specdev align status
 
 ```yaml
 # Example spec/specdev_version
-toolkit_version: "0.3.0"
+toolkit_version: "0.5.1"
 created_at: "2026-01-14T00:00:00Z"
 last_migration: null
 ```

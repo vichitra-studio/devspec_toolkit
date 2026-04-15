@@ -6,6 +6,29 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### Trinity Anchor Schema Split (Phase 2 — anchor hardening)
+
+- **`vc:16-anchor` schema** (`schema/16_anchor.schema.json`): dedicated schema for the Step 16 Trinity Anchor artifact (`spec/16_impl_context.json`). Requires `artifact_role: "anchor"`, `plan.summary`, `plan.ambiguities`, `plan.drift`, and `plan.milestone_index`. Forbids `execution` and `review` via `unevaluatedProperties: false` — these sections belong only to milestone plans (16a/16b/16c).
+- **`step_16_anchor` validator** (`validation/validators/step_16_anchor.py`): cross-milestone drift detection.
+  - **E308 ANCHOR_SCOPE_DRIFT**: bidirectional scope contradiction (milestone `scope_in` ∩ anchor `scope_out`, or reverse) and FR ownership conflict (same FR active in two simultaneous milestones).
+  - **E309 ANCHOR_CHECKLIST_DRIFT**: same checklist `id` maps to different `spec_ref.id` across milestone context files.
+  - **W580 ANCHOR_DRIFT_SKIP**: guard for routing errors or missing spec_path.
+- **Routing fix** (`validation/validate.py`): files in `impl_context/` now route to step `"16a"` (milestone plans); `16_impl_context.json` at the spec root routes to step `"16"` (anchor). Fixes long-standing routing bug where every impl_context artifact silently used the base validator.
+- **E306 path fix** (`validation/validators/step_16.py`): when an artifact lives in `impl_context/`, `04_fr_list.json` is now resolved from the parent spec directory instead of from `impl_context/` itself.
+- **`prompt_schema_sync` step-key collision fix**: `16_anchor.schema.json` and `16_impl_context.schema.json` both derive step `"16"` via filename split; the anchor now gets a distinct `"16anchor"` step key, and `_PROMPT_STEP_OVERRIDE` maps `prompt_16_impl_context.md` to validate against the anchor schema.
+- **Fixture reorganization**: `tests/fixtures/step_16/impl_context/` holds all 17 milestone-plan fixtures; 4 new anchor fixtures live at the root of `tests/fixtures/step_16/`.
+- **14 new anchor integration tests** (`tests/integration/test_step_16_anchor.py`): schema pass/fail, E308 scope contradiction and FR ownership, E309 checklist drift, W580 guard paths.
+
+### Phase 1 — Seed & Spec Dependency Hardening
+
+- **`seedRef` / `seedRefArray`** (`schema/core/collections.schema.json`): new reusable type with `seed_id` (required) plus optional `hash` (SHA-256) and `version` for drift detection against seed content changes.
+- **`specRefIngested` / `specRefIngestedArray`** (`schema/core/collections.schema.json`): new reusable type recording `{step_id, artifact_id, hash?}` so downstream artifacts can declare which upstream artifacts they were derived from.
+- **`spec_refs_ingested` and `seed_refs_ingested`** (`schema/core/step_base.schema.json`): optional properties inherited by all 20 step schemas composed via `allOf` — no per-step changes required.
+- **`seed_manifest` optional `hash` and `version` fields** on each seed entry — populated by `seed-index` tooling for integrity tracking.
+- **`step_metadata` block in `tools/step_order.json`** (schema-validated): for all 22 steps, declares `required_spec_inputs` (inverse of `downstream_consumers`), `required_seed_inputs` (mirror of seed manifest step_requirements), and a one-line `extraction_intent` summary. Prevents drift between forward/reverse DAG views.
+- **`_lint_step_metadata_consistency`** (`validation/dependency_order_lint.py`): new consistency validator that rejects any `step_metadata.required_spec_inputs` that is not the exact inverse of `downstream_consumers`. Emits E540 STEP_METADATA_INCONSISTENT.
+- **4 new unit tests** for the consistency linter (absent/consistent/missing/extra cases).
+
 ### R9 Validator & CI Enforcement
 
 - **8 cross-step validators enhanced** (steps 05, 06, 08, 09, 12, 13, 13a, 15): each now loads upstream artifacts and validates referenced IDs exist. E590 CROSS_STEP_ID_NOT_FOUND when a ref is broken; W590 CROSS_STEP_UPSTREAM_MISSING when the upstream file is absent.
