@@ -6,12 +6,10 @@ verdict enums, and semantic coverage on top of the base step_16 checks.
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import validate_step_16
+from .step_16 import validate_step_16, _load_roadmap
 
 VALID_VERDICTS = frozenset({"verified", "needs_work", "blocked", "deferred"})
 
@@ -58,11 +56,12 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
     # W582 -- FR coverage completeness against the corresponding Step 14 milestone
     # Only runs when verdict is "verified" and spec_path is available
     if verdict == "verified" and spec_path:
-        spec_dir = os.path.dirname(spec_path)
-        roadmap_path = Path(spec_dir) / "14_roadmap.json"
-        if roadmap_path.exists():
+        try:
+            roadmap_data = _load_roadmap(spec_path)
+        except (OSError, json.JSONDecodeError):
+            roadmap_data = None
+        if roadmap_data is not None:
             try:
-                roadmap_data = json.loads(roadmap_path.read_text())
                 # milestone_ref is not a root field in the 16c schema — scan ALL
                 # checklist items to collect unique planning milestone references.
                 checklist = (

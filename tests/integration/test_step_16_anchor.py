@@ -4,7 +4,8 @@ Covers:
   - Schema validation: valid fixtures pass, invalid fixtures fail
   - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction and FR ownership conflict
   - E309 (ANCHOR_CHECKLIST_DRIFT): cross-milestone checklist ID collision
-  - W580 (ANCHOR_DRIFT_SKIP / ANCHOR_VALIDATOR_WRONG_ARTIFACT): guard paths
+  - W585 (ANCHOR_DRIFT_SKIP): spec_path is None — filesystem checks skipped
+  - W586 (ANCHOR_VALIDATOR_WRONG_ARTIFACT): non-anchor artifact dispatched here
 """
 import json
 import tempfile
@@ -415,15 +416,15 @@ class TestStep16AnchorE309ChecklistDrift(unittest.TestCase):
         self.assertEqual(e309_errors, [], f"Did not expect E309. Got: {e309_errors}")
 
 
-class TestStep16AnchorW580Guard(unittest.TestCase):
-    """W580 guard tests — wrong artifact type and missing spec_path."""
+class TestStep16AnchorGuard(unittest.TestCase):
+    """W585/W586 guard tests — wrong artifact type and missing spec_path."""
 
     def setUp(self):
         toolkit_root = Path(__file__).resolve().parents[2]
         self.repo_root = str(toolkit_root)
 
-    def test_w580_non_anchor_routed_to_anchor_validator(self):
-        """W580 fires when anchor validator receives a non-anchor artifact."""
+    def test_w586_non_anchor_routed_to_anchor_validator(self):
+        """W586 fires when anchor validator receives a non-anchor artifact."""
         from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
 
         # Pass a plain impl-context artifact (no artifact_role) with no path
@@ -434,12 +435,12 @@ class TestStep16AnchorW580Guard(unittest.TestCase):
         }
         errors = validate_step_16_anchor(data, self.repo_root, spec_path=None)
         self.assertTrue(
-            any(e.code == "W580" for e in errors),
-            f"Expected W580 for non-anchor artifact. Got: {errors}"
+            any(e.code == "W586" for e in errors),
+            f"Expected W586 for non-anchor artifact. Got: {errors}"
         )
 
-    def test_w580_spec_path_none_skips_drift_checks(self):
-        """W580 fires when spec_path is None and artifact_role is 'anchor'."""
+    def test_w585_spec_path_none_skips_drift_checks(self):
+        """W585 fires when spec_path is None and artifact_role is 'anchor'."""
         from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
 
         data = {
@@ -454,8 +455,8 @@ class TestStep16AnchorW580Guard(unittest.TestCase):
         }
         errors = validate_step_16_anchor(data, self.repo_root, spec_path=None)
         self.assertTrue(
-            any(e.code == "W580" for e in errors),
-            f"Expected W580 for None spec_path. Got: {errors}"
+            any(e.code == "W585" for e in errors),
+            f"Expected W585 for None spec_path. Got: {errors}"
         )
 
     def test_no_e308_e309_when_no_impl_context_dir(self):

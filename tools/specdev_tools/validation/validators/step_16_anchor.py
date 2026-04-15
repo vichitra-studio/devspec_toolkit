@@ -52,7 +52,7 @@ def validate_step_16_anchor(
     if not _is_anchor(spec_path, data):
         errors.append(
             make_error(
-                "W580",
+                "W586",
                 "ANCHOR_VALIDATOR_WRONG_ARTIFACT: validate_step_16_anchor called on "
                 "a non-anchor artifact (artifact_role != 'anchor' and path heuristic "
                 "does not match 16_impl_context.json outside impl_context/).  "
@@ -65,7 +65,7 @@ def validate_step_16_anchor(
         # Cannot perform filesystem-dependent drift checks without a path.
         errors.append(
             make_error(
-                "W580",
+                "W585",
                 "ANCHOR_DRIFT_SKIP: spec_path is None — cross-milestone drift checks "
                 "skipped.  Pass spec_path to validate_step_16_anchor to enable E308/E309.",
             )

@@ -892,6 +892,88 @@ class TestStep16(unittest.TestCase):
             f"Did not expect W582 for 'fr-login'. Got W582 errors: {[e.message for e in w582_errors]}"
         )
 
+    def test_step_16c_w582_fires_when_milestone_file_lives_in_impl_context(self):
+        """W582 must fire even when the 16c artifact lives inside spec/impl_context/.
+
+        Before the _load_roadmap DRY refactor, step_16c looked for 14_roadmap.json
+        as a direct sibling of the artifact — which meant 16c reviews under
+        spec/impl_context/ silently skipped W582 because the roadmap is one
+        directory up.  This test pins the corrected path resolution.
+        """
+        from specdev_tools.validation.validators.step_16c import validate_step_16c
+
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w582-impl-context-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "W582 test inside impl_context/.",
+                    "scope_in": ["auth-api"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
+                    "checklist": [],
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]},
+            },
+            "review": {
+                "verdict": "verified",
+                "fixture_status": {
+                    "implemented_interfaces": [],
+                    "test_results": [],
+                    "ci_status": "green",
+                },
+                "semantic_review": {
+                    # fr-login covered, fr-logout not
+                    "fr_coverage": [
+                        {
+                            "fr_id": "fr-login",
+                            "satisfied": True,
+                            "evidence_summary": "Login verified.",
+                            "checklist_ids": [],
+                        }
+                    ],
+                    "hallucinated_features": [],
+                    "scope_delta": "None.",
+                },
+            },
+            "canonical_refs_used": [],
+            "milestone_ref": "ms-v1",
+        }
+        roadmap = {
+            "milestones": [
+                {
+                    "milestone_id": "ms-v1",
+                    "fr_refs": ["fr-login", "fr-logout"],
+                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}],
+                }
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_v1_review.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            # Roadmap lives at spec-root level (one dir up from impl_context/)
+            (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+
+            errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
+
+        w582_errors = [e for e in errors if e.code == "W582"]
+        self.assertTrue(
+            any("fr-logout" in e.message for e in w582_errors),
+            f"Expected W582 for 'fr-logout' when 16c lives in impl_context/. "
+            f"Got W582 errors: {[e.message for e in w582_errors]}"
+        )
+
     def test_step_16c_w582_does_not_fire_when_verdict_is_not_verified(self):
         """W582 must NOT fire when verdict is needs_work, blocked, or deferred."""
         from specdev_tools.validation.validators.step_16c import validate_step_16c
