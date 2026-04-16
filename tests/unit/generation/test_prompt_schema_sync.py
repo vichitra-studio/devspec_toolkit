@@ -537,6 +537,44 @@ class PromptSchemaSyncTests(unittest.TestCase):
         self.assertEqual(_step_from_prompt_name("prompt_04_functional_requirements.md"), "04")
         self.assertIsNone(_step_from_prompt_name("not_a_prompt.md"))
 
+    def test_substep_drift_16a_emitting_anchor_milestone_index_triggers_w580(self):
+        """W580: a 16a prompt that accidentally emits the anchor-only field
+        `milestone_index` should fire SUBSTEP_DRIFT, catching the mistake before
+        the anchor/milestone contract drifts silently.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "schema").mkdir()
+            (root / "prompts").mkdir()
+            (root / "schema" / "16_impl_context.schema.json").write_text(
+                json.dumps({
+                    "type": "object",
+                    "properties": {
+                        "plan": {"type": "object"},
+                        "milestone_index": {"type": "array"},
+                    },
+                    "required": [],
+                }),
+                encoding="utf-8",
+            )
+            (root / "prompts" / "prompt_16a_impl_planner.md").write_text(
+                (
+                    "# Output Contract\n"
+                    "```json\n"
+                    "{\"plan\": {\"status\": \"active\"}, "
+                    "\"milestone_index\": [{\"milestone_id\": \"ms-x\"}]}\n"
+                    "```\n"
+                ),
+                encoding="utf-8",
+            )
+            errs = run_prompt_schema_sync(str(root))
+            w580 = [e for e in render_errors(errs) if "W580" in e]
+            self.assertTrue(
+                any("milestone_index" in e and "16anchor" in e for e in w580),
+                f"Expected W580 citing 'milestone_index' as a 16anchor-domain "
+                f"key leaking into 16a. Got: {w580}",
+            )
+
     def test_substep_drift_detection_w580(self):
         """W580: sub-step prompt with keys from another sub-step's domain triggers warning."""
         with tempfile.TemporaryDirectory() as td:
@@ -651,6 +689,55 @@ class PromptSchemaSyncTests(unittest.TestCase):
                 w580_errs, [],
                 f"Upstream keys should not trigger W580. Got: {w580_errs}"
             )
+
+    def test_prompt_step_override_files_exist(self):
+        """Every filename key in _PROMPT_STEP_OVERRIDE must refer to a real prompt on disk.
+
+        The override maps prompts that would resolve to the wrong schema via the
+        default filename-prefix rule. If someone renames the underlying prompt
+        file without updating the override, the mapping silently stops applying
+        and the validator picks the wrong schema, producing a false E310
+        PROMPT_SCHEMA_DRIFT on the next run. This test pins the reality check
+        so the drift is caught at commit time.
+        """
+        from specdev_tools.generation.prompt_schema_sync import _PROMPT_STEP_OVERRIDE
+        repo_root = Path(__file__).resolve().parents[3]
+        prompts_dir = repo_root / "prompts"
+        missing = [
+            name for name in _PROMPT_STEP_OVERRIDE
+            if not (prompts_dir / name).is_file()
+        ]
+        self.assertEqual(
+            missing, [],
+            f"_PROMPT_STEP_OVERRIDE references prompts that do not exist: {missing}. "
+            f"Either rename the prompt back, or update the override dict.",
+        )
+
+    def test_anchor_prompt_validates_against_vc_16_anchor_schema(self):
+        """Regression test: prompt_16_impl_context.md must validate against vc:16-anchor,
+        not vc:16-impl-context, after the anchor/milestone-plan schema split.
+
+        This is the load-bearing contract of _PROMPT_STEP_OVERRIDE. A rename of
+        the prompt file (or removal of the override entry) would silently route
+        the anchor prompt's Output Contract through the milestone-plan schema
+        and produce either a false pass or a false E310 drift signal.
+        """
+        from specdev_tools.generation.prompt_schema_sync import _PROMPT_STEP_OVERRIDE
+        self.assertEqual(
+            _PROMPT_STEP_OVERRIDE.get("prompt_16_impl_context.md"),
+            "16anchor",
+            "prompt_16_impl_context.md must map to '16anchor' step key so its "
+            "Output Contract is validated against schema/16_anchor.schema.json",
+        )
+        # And the repo-level sync must be clean — this is the end-to-end proof
+        # that the override is working.
+        repo_root = Path(__file__).resolve().parents[3]
+        errs = run_prompt_schema_sync(str(repo_root))
+        e310 = [e for e in render_errors(errs) if "E310" in e and "prompt_16_impl_context" in e]
+        self.assertEqual(
+            e310, [],
+            f"prompt_16_impl_context.md must not fire E310 PROMPT_SCHEMA_DRIFT. Got: {e310}",
+        )
 
 
 if __name__ == "__main__":

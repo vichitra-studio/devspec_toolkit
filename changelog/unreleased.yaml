@@ -143,7 +143,7 @@ changes:
       note: "No author migration. W582 may now fire on 16c review artifacts that were previously silently passing."
   - type: reorganization
     path: "tests/fixtures/step_16/"
-    description: "Milestone-plan fixtures moved from tests/fixtures/step_16/ root to tests/fixtures/step_16/impl_context/ to match the anchor/milestone-plan split. Four new anchor fixtures (valid_anchor_minimal.json, valid_anchor_with_milestones.json, invalid_anchor_has_execution.json, invalid_anchor_missing_drift.json) live at the root."
+    description: "Milestone-plan fixtures moved from tests/fixtures/step_16/ root to tests/fixtures/step_16/impl_context/ to match the anchor/milestone-plan split. Six anchor fixtures live at the root: valid_anchor_minimal.json, valid_anchor_with_milestones.json, invalid_anchor_missing_drift.json, invalid_anchor_missing_milestone_index.json, invalid_anchor_has_execution.json, invalid_anchor_has_milestone_ref.json."
     migration:
       action: automatic
       note: "Test-only reorganization. Does not affect live specs."
@@ -159,6 +159,110 @@ changes:
     migration:
       action: automatic
       note: "No author migration. Memory-bound fix for long-lived processes."
+
+  # ── Trinity Anchor Review Pass (cross-tool consistency sweep) ──────────────
+  - type: update_validator
+    path: "tools/specdev_tools/validation/traceability_closure.py"
+    description: "Removed phantom 16a_impl_planner.json/16b_code.json entries from SPEC_FILES and the fallback that silently read the anchor as a 16a planner post-split. Checklist/execution data is now loaded from each spec/impl_context/<plan>.json declared in plan.milestone_index[].context_path; unreadable or missing declared plans emit W588 ANCHOR_MILESTONE_UNREADABLE. The anchor is the single source of truth — no glob, no auto-derivation."
+    migration:
+      action: automatic
+      note: "Host repos will no longer see false W562/W563 coverage noise after the anchor/milestone-plan split."
+  - type: update_validator
+    path: "tools/specdev_tools/context/reviewer.py"
+    description: "_CHECKLIST_STEPS drops '16' — the anchor is no longer a checklist step post-split. ac-* retention and the acceptance-gap Jaccard check run only on 16a/16b/16c."
+    migration:
+      action: automatic
+      note: "No author migration. Surface-level cleanup of context review output on anchor artifacts."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/_extraction_intent_parser.py"
+    description: "INTENT_ENTRY_RE accepts a `spec/` prefix alongside `docs/seed/` and bare forms. New IMPL_CONTEXT_ENTRY_RE routes `spec/impl_context/<anything>.json` references to BOTH step 16a and step 16b (the shared Trinity artifact convention). Unblocks extraction-intent-check after the prompt_16b refactor in 779378d."
+    migration:
+      action: automatic
+      note: "Prompts using spec/-prefixed or impl_context/ extraction-intent bullets now register correctly with dep coverage."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/extraction_intent_check.py"
+    description: "E597 coverage check uses step_metadata.required_spec_inputs (authoritative consumption set) as the source of truth when present; falls back to derive_allowed_upstream otherwise. Error message wording updated from 'allowed upstream' to 'required upstream'."
+    migration:
+      action: automatic
+      note: "Prompts that previously over-declared upstream entries (beyond required_spec_inputs) remain clean. Prompts under-declaring required entries now surface E597 accurately."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/dag_lint.py"
+    description: "W596 UNDECLARED_UPSTREAM_REF tolerates intra-Trinity cross-references. 16a/16b/16c referencing spec/impl_context/... no longer fires W596 when the credit target (16a or 16b) is the referencing step or one of its Trinity siblings — the shared milestone-plan file is a legitimate read, not a DAG violation."
+    migration:
+      action: automatic
+      note: "No author migration. Noise-suppression only."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validators/step_16.py"
+    description: "E304 scoping now aggregates milestone_ref from checklist ITEMS (matching step_16c.py). Previously read a root-level milestone_ref that the schema forbids (always empty). E582 now reports every checklist-declared milestone_ref not found in the roadmap (previously only the first) — the change is detection-strengthening, not relaxation."
+    migration:
+      action: automatic
+      note: "No author migration. 16a plans with checklist milestone_ref values now get correct E304 scoping."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validators/step_16_anchor.py"
+    description: "Silent-skip for files in spec/impl_context/ whose $schema is not vc:16-impl-context replaced with W589 ANCHOR_MILESTONE_MISSCHEMAED. Missing or wrong $schema declarations now surface instead of hiding authoring mistakes."
+    migration:
+      action: automatic
+      note: "Host repos with impl_context/ files missing $schema or declaring the wrong URI will now see W589 warnings."
+  - type: update_validator
+    path: "tools/specdev_tools/generation/prompt_schema_sync.py"
+    description: "_SUBSTEP_EXPECTED_KEYS covers the anchor domain via a new _ANCHOR_EXCLUSIVE_KEYS set ({artifact_role, milestone_index}). A 16a/16b/16c prompt whose Output Contract emits anchor-only keys now fires W580 SUBSTEP_DRIFT."
+    migration:
+      action: automatic
+      note: "No author migration. Drift-check strengthening."
+  - type: add_field
+    path: "schema/16_anchor.schema.json"
+    description: "milestone_index[].context_path now enforces pattern `^(spec/)?impl_context/[a-z0-9_]+\\.json$`. Field is load-bearing for traceability_closure and the anchor drift check; typos and mislocations are rejected at author time."
+    migration:
+      action: ai_assisted
+      note: "Review any existing anchor and correct context_path values that don't point at impl_context/ with a lowercase/underscore/digit filename."
+  - type: add_error_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "W589 ANCHOR_MILESTONE_MISSCHEMAED registered. Emitted by step_16_anchor.py when a file in spec/impl_context/ parses as JSON but declares the wrong $schema (or none)."
+    migration:
+      action: automatic
+      note: "No author migration. Surface for a previously-silent class of authoring errors."
+  - type: doc_update
+    path: "prompts/prompt_16a_impl_planner.md"
+    description: "Extraction Intent promoted from `##` to `### Extraction Intent` with `####` Primary/Reference sub-sections (parser requires `### Extraction Intent`). Bullet entries converted from backtick to bold. Checklist `id` rule now requires the `milestone_index[<this milestone>].checklist_id_prefix` from the anchor. Self-Audit Gate adds anchor registration precondition. Coverage Closure adds E309 guard. Negative Constraints forbid `artifact_role` on milestone plans. Behaviour-pairing rule softened to match E307's doc/code exemption. Phantom filenames fixed (09_implementation_plan → 09_impl_plan, 13_extension_generator → 13_extension_manifest). Example id updated to AUTH_LOGIN_01."
+    migration:
+      action: automatic
+      note: "No author migration. Prompt authoring clarity."
+  - type: doc_update
+    path: "prompts/prompt_16c_impl_reviewer.md"
+    description: "Extraction Intent promoted from `##` to `### Extraction Intent` with `####` sub-sections. Bullet entries converted to bold. Added missing Reference-Source entries for 02a, 08, 11 (required_spec_inputs for 16c)."
+    migration:
+      action: automatic
+      note: "No author migration. Reviewer now has accurate upstream coverage."
+  - type: doc_update
+    path: "prompts/prompt_16_impl_context.md"
+    description: "Coverage Closure: milestone_index[].status enum check corrected (`active` → `not done`, matching step_16_anchor.py:111). Negative Constraint added forbidding the anchor inside spec/impl_context/. Example id updated to anchor-v1."
+    migration:
+      action: automatic
+      note: "No author migration."
+  - type: doc_update
+    path: "prompts/migration/template_impl_context.md"
+    description: "Rewritten to document the anchor/milestone-plan split, the migration procedure from a pre-split spec/16_impl_context.json (single vc:16-impl-context artifact) to the two-artifact post-split form, and the full E308/E309/W585-W589 error surface."
+    migration:
+      action: automatic
+      note: "Host repos migrating from 0.5.0 should follow this template for the anchor split."
+  - type: doc_update
+    path: "prompts/prompt_13_extension_generator.md, prompt_14_roadmap.md, prompt_15_scaffold.md, prompt_16b_impl_coder.md"
+    description: "Phantom filenames corrected: 09_implementation_plan.json → 09_impl_plan.json, 13_extension_generator.json → 13_extension_manifest.json. The artifacts emitted by step 09 and step 13 never used the generator-name filenames."
+    migration:
+      action: automatic
+      note: "No author migration. Prompt-reference accuracy."
+  - type: doc_update
+    path: "schema/16_anchor.schema.json"
+    description: "Schema title corrected from '16_impl_context (Trinity Anchor)' to '16_anchor (Trinity Anchor)'."
+    migration:
+      action: automatic
+      note: "Cosmetic."
+  - type: add_fixture
+    path: "tests/fixtures/step_16/e304_roadmap/impl_context/ms_test_plan.json"
+    description: "E304 test fixture rewritten to be schema-valid except for the intended E304 gap (checklist covers implement-login as a behavior+validation pair; implement-logout is intentionally uncovered). Previously the fixture fired 3 unrelated E520s plus E307 on top of E304 — the E304 integration test was passing on a false witness."
+    migration:
+      action: automatic
+      note: "Test-only fixture hygiene."
 
 deferred:
   - ref: "F-S3 / Phase 1 Task 1.2"

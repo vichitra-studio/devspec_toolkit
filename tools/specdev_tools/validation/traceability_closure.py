@@ -52,9 +52,105 @@ SPEC_FILES = {
     "governance": "10_governance.json",
     "ci_gates": "12_ci_gates.json",
     "roadmap": "14_roadmap.json",
-    "impl_planner": "16a_impl_planner.json",
-    "code_execution": "16b_code.json",
 }
+# Keys that are silently optional — coverage checks fire only when present.
+_OPTIONAL_KEYS = {"charter", "apis", "fixtures", "impl_plan", "governance", "ci_gates"}
+
+# Anchor artifact (`vc:16-anchor`) lives at a fixed path under spec_dir.
+ANCHOR_FILENAME = "16_impl_context.json"
+
+
+def _resolve_context_path(spec_dir: str, context_path: str) -> str:
+    """Resolve a milestone_index[].context_path to an absolute filesystem path.
+
+    The anchor schema allows two conventions:
+      - `spec/impl_context/<plan>.json` (repo-root relative; the `spec/` segment
+        mirrors spec_dir's basename).
+      - `impl_context/<plan>.json` (spec_dir relative).
+
+    This helper accepts either form by stripping a leading `spec/` segment when
+    the spec_dir basename is `spec` and the path begins with `spec/`.
+    """
+    if os.path.isabs(context_path):
+        return context_path
+    spec_basename = os.path.basename(os.path.normpath(spec_dir))
+    prefix = spec_basename + "/"
+    if context_path.startswith(prefix):
+        context_path = context_path[len(prefix):]
+    return os.path.join(spec_dir, context_path)
+
+
+def _load_milestone_plans_from_anchor(
+    spec_dir: str,
+) -> tuple[list[dict[str, Any]], list[SpecError]]:
+    """Load each milestone plan the Trinity Anchor registers.
+
+    Returns (milestone_plans, errors):
+      - milestone_plans: list of parsed 16a plan dicts for each
+        `plan.milestone_index[]` entry in `16_impl_context.json` whose
+        `context_path` resolves to a readable JSON file.
+      - errors: W570 when the anchor itself is absent or unreadable; W588
+        (ANCHOR_MILESTONE_UNREADABLE) for each declared `context_path` that is
+        missing or not valid JSON.
+
+    Design: the anchor is the authoritative registry of which milestone plans
+    exist. This function does not glob the `impl_context/` directory — it reads
+    only what the anchor declares. Orphan plans on disk are outside this
+    validator's scope (see step_16_anchor.py for cross-milestone drift).
+    """
+    errors: list[SpecError] = []
+    anchor_path = os.path.join(spec_dir, ANCHOR_FILENAME)
+    if not os.path.isfile(anchor_path):
+        errors.append(make_error(
+            "W570",
+            f"GRACEFUL_SKIP missing_spec_file {ANCHOR_FILENAME} "
+            f"(Trinity Anchor — required for milestone plan registry)",
+        ))
+        return [], errors
+    try:
+        with open(anchor_path, encoding="utf-8") as f:
+            anchor_data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        errors.append(make_error(
+            "W570",
+            f"GRACEFUL_SKIP unreadable_spec_file {ANCHOR_FILENAME}",
+        ))
+        return [], errors
+
+    if not isinstance(anchor_data, dict):
+        return [], errors
+    milestone_index = anchor_data.get("plan", {}).get("milestone_index", [])
+    if not isinstance(milestone_index, list):
+        return [], errors
+
+    plans: list[dict[str, Any]] = []
+    for entry in milestone_index:
+        if not isinstance(entry, dict):
+            continue
+        context_path = entry.get("context_path")
+        if not isinstance(context_path, str) or not context_path:
+            continue
+        resolved = _resolve_context_path(spec_dir, context_path)
+        milestone_id = entry.get("milestone_id", "<unknown>")
+        if not os.path.isfile(resolved):
+            errors.append(make_error(
+                "W588",
+                f"ANCHOR_MILESTONE_UNREADABLE {milestone_id}: "
+                f"declared context_path '{context_path}' does not exist on disk",
+            ))
+            continue
+        try:
+            with open(resolved, encoding="utf-8") as f:
+                plans.append(json.load(f))
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(make_error(
+                "W588",
+                f"ANCHOR_MILESTONE_UNREADABLE {milestone_id}: "
+                f"{context_path} is not valid JSON ({exc})",
+            ))
+            continue
+    return plans, errors
+
 
 def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> list[SpecError]:
     errors: list[SpecError] = []
@@ -64,18 +160,10 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         spec_dir = os.path.join(repo_root, spec_dir)
 
     data: dict[str, Any] = {}
-    # Keys that are silently optional — coverage checks fire only when present.
-    _optional_keys = {"charter", "apis", "fixtures", "impl_plan", "governance", "ci_gates", "code_execution"}
     for key, filename in SPEC_FILES.items():
-        # I5: fallback for impl_planner: try 16a first, then 16_impl_context.json
-        if key == "impl_planner":
-            primary_path = os.path.join(spec_dir, filename)
-            fallback_path = os.path.join(spec_dir, "16_impl_context.json")
-            if not os.path.isfile(primary_path) and os.path.isfile(fallback_path):
-                filename = "16_impl_context.json"
         path = os.path.join(spec_dir, filename)
         if not os.path.isfile(path):
-            if key in _optional_keys:
+            if key in _OPTIONAL_KEYS:
                 continue  # Silently skip optional spec files
             errors.append(make_error("W570", f"GRACEFUL_SKIP missing_spec_file {filename}"))
             continue
@@ -83,10 +171,37 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             with open(path, encoding="utf-8") as f:
                 data[key] = json.load(f)
         except (OSError, json.JSONDecodeError):
-            if key in _optional_keys:
+            if key in _OPTIONAL_KEYS:
                 continue
             errors.append(make_error("W570", f"GRACEFUL_SKIP unreadable_spec_file {filename}"))
             continue
+
+    # Load the Trinity Anchor (`vc:16-anchor`) and each milestone plan it
+    # declares via `plan.milestone_index[].context_path`. Merged checklist and
+    # execution data surface under the legacy `impl_planner` / `code_execution`
+    # keys so the downstream coverage checks read from a single source.
+    milestone_plans, registry_errors = _load_milestone_plans_from_anchor(spec_dir)
+    errors.extend(registry_errors)
+    if milestone_plans:
+        data["impl_planner"] = {
+            "plan": {
+                "spec_alignment": {
+                    "checklist": [
+                        item
+                        for plan in milestone_plans
+                        for item in plan.get("plan", {}).get("spec_alignment", {}).get("checklist", [])
+                        if isinstance(item, dict)
+                    ]
+                }
+            }
+        }
+        execution_results: list[dict[str, Any]] = []
+        for plan in milestone_plans:
+            results = plan.get("execution", {}).get("execution_results", [])
+            if isinstance(results, list):
+                execution_results.extend(r for r in results if isinstance(r, dict))
+        if execution_results:
+            data["code_execution"] = {"execution": {"execution_results": execution_results}}
 
     capability_ids: set[str] = set()
     if "capabilities" in data:

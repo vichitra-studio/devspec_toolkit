@@ -6,7 +6,7 @@
   "plan": {
     "status": "active",
     "summary": {
-      "functional_summary": "E304 test: checklist covers implement-login but not implement-logout from roadmap.",
+      "functional_summary": "E304 test: checklist covers implement-login (behavior+validation pair) but not implement-logout — an uncovered roadmap task from 14_roadmap.json.",
       "scope_in": [
         "auth-api"
       ],
@@ -21,32 +21,73 @@
       "requirements_summary": [
         {
           "theme": "Authentication",
-          "summary": "Implement login endpoint only"
+          "summary": "Implement login endpoint (logout is intentionally uncovered to trigger E304)"
         }
       ],
       "checklist": [
         {
-          "id": "cl-001",
+          "id": "AUTH_LOGIN_01",
           "spec_ref": {
             "type": "fr",
             "id": "implement-login",
             "line_range": "L1-L10",
             "commit_hash": "1111111111111111111111111111111111111111"
           },
-          "description": "Implement user login endpoint",
+          "milestone_ref": "m1-auth",
+          "description": "Implement user login endpoint returning a signed JWT on valid credentials.",
           "type": "behavior",
           "layer": "api",
           "linked_test_expectation": "POST /auth/login returns 200 with JWT",
           "nfr_refs": [
             "nfr-availability-uptime"
           ],
-          "fixture_ref": "fixture-auth-login"
+          "fixture_ref": "fixture-auth-login",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/api/auth.py",
+                "description": "Add POST /auth/login handler"
+              }
+            ]
+          }
+        },
+        {
+          "id": "AUTH_LOGIN_01_VAL",
+          "spec_ref": {
+            "type": "fr",
+            "id": "implement-login",
+            "line_range": "L1-L10",
+            "commit_hash": "1111111111111111111111111111111111111111"
+          },
+          "milestone_ref": "m1-auth",
+          "description": "Validate login endpoint returns expected JWT payload and status code.",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "pytest tests/api/test_auth.py::test_login_success",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-auth-login",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify JWT payload schema"
+              }
+            ]
+          }
         }
       ]
     },
     "docs_impact": {
-      "status": "not_required",
-      "rationale": "No public API surface changes."
+      "status": "required",
+      "rationale": "Code changes to the auth API require updates to the auth docs for traceability.",
+      "docs_touched": [
+        "docs/api/auth.md"
+      ]
     },
     "review_requirements": {
       "test_commands": [

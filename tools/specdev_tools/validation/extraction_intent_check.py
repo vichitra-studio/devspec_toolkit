@@ -28,12 +28,16 @@ def check_extraction_intent(
 
     For each prompt file that contains a ``### Extraction Intent`` section:
     1. Parse declared upstream artifact references from the section.
-    2. Cross-reference against the derived allowed upstream steps (computed at runtime via derive_allowed_upstream).
+    2. Cross-reference against the step's declared consumption set — preferring
+       ``step_metadata[step_id].required_spec_inputs`` (the authoritative
+       "what this step actually reads" list). When no metadata is present for
+       the step (e.g. in ad-hoc test fixtures), fall back to the broader DAG
+       ancestor set via ``derive_allowed_upstream``.
     3. Report missing intent entries, invalid references, and vague descriptions.
 
     Error codes:
         E591 — required extraction intent field missing or empty
-        E597 — an allowed_upstream_dep has no corresponding extraction intent entry
+        E597 — a required upstream dep has no corresponding extraction intent entry
         W597 — intent text is vague (<10 words or contains "relevant"/"as needed")
         E598 — intent references an artifact not in step_order.json steps list
 
@@ -55,9 +59,23 @@ def check_extraction_intent(
 
     steps_list: list[str] = step_order.get("steps", [])
     valid_steps: set[str] = set(steps_list)
-    allowed_deps: dict[str, list[str]] = {
-        s: derive_allowed_upstream(s, steps_list) for s in steps_list
-    }
+    step_metadata: dict = step_order.get("step_metadata", {}) or {}
+
+    def _required_deps(step_id: str) -> list[str]:
+        """Resolve the upstream deps a prompt's Extraction Intent must cover.
+
+        Prefer ``step_metadata[step_id].required_spec_inputs`` (authoritative
+        declared consumption set — what the step actually reads). Respect an
+        explicit empty list as a valid "no upstream deps" declaration. Only
+        fall back to ``derive_allowed_upstream`` when the metadata is absent
+        (key missing or not a dict), not when it is deliberately empty.
+        """
+        meta = step_metadata.get(step_id)
+        if isinstance(meta, dict) and isinstance(meta.get("required_spec_inputs"), list):
+            return meta["required_spec_inputs"]
+        return derive_allowed_upstream(step_id, steps_list)
+
+    allowed_deps: dict[str, list[str]] = {s: _required_deps(s) for s in steps_list}
 
     # Scan prompt files
     if not os.path.isdir(prompts_path):
@@ -91,14 +109,14 @@ def check_extraction_intent(
             ))
             continue
 
-        # E597: each allowed_upstream_dep should have an intent entry
+        # E597: each required_spec_input should have an intent entry
         step_deps = allowed_deps.get(step_id, [])
         for dep in step_deps:
             if dep not in intent_entries:
                 errors.append(make_error(
                     "E597",
                     f"EXTRACTION_INTENT_UPSTREAM_GAP prompt_{step_id} "
-                    f"has no extraction intent for allowed upstream "
+                    f"has no extraction intent for required upstream "
                     f"dependency '{dep}'",
                 ))
 

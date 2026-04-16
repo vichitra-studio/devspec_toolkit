@@ -45,6 +45,14 @@ def lint_dependency_order(repo_root: str) -> list[SpecError]:
     # of downstream_consumers.  A producer P lists C in downstream_consumers[P] iff
     # C lists P in step_metadata[C].required_spec_inputs.
     errors.extend(_lint_step_metadata_consistency(root / "tools" / "step_order.json"))
+    # Parallel check on the seed side: step_metadata.required_seed_inputs must match
+    # seed_manifest.step_requirements.  Symmetric to the spec-edge check above.
+    errors.extend(
+        _lint_step_metadata_seed_consistency(
+            root / "tools" / "step_order.json",
+            root / "spec" / "common" / "seed_manifest.json",
+        )
+    )
 
     for prompt_path in sorted((root / "prompts").glob("prompt_*.md")):
         match = PROMPT_STEP_RE.search(prompt_path.name)
@@ -228,17 +236,80 @@ def _lint_step_metadata_consistency(step_order_path: Path) -> list[SpecError]:
         extra = sorted(declared_set - expected_set)
         if missing:
             errors.append(make_error(
-                "E540",
+                "E543",
                 f"STEP_METADATA_INCONSISTENT {step_order_path}: "
                 f"step_metadata[{step}].required_spec_inputs missing {missing} "
                 f"(present in downstream_consumers but not declared here)",
             ))
         if extra:
             errors.append(make_error(
-                "E540",
+                "E543",
                 f"STEP_METADATA_INCONSISTENT {step_order_path}: "
                 f"step_metadata[{step}].required_spec_inputs has extra {extra} "
                 f"(declared here but not in downstream_consumers)",
+            ))
+
+    return errors
+
+
+def _lint_step_metadata_seed_consistency(
+    step_order_path: Path, seed_manifest_path: Path
+) -> list[SpecError]:
+    """Validate that step_metadata.required_seed_inputs mirrors seed_manifest.step_requirements.
+
+    When either file is absent or its relevant block is missing, returns no errors —
+    both sides are optional at their own layer.  When both are present, the set of
+    seed IDs declared per step must match exactly (unordered).
+    """
+    errors: list[SpecError] = []
+    try:
+        with step_order_path.open("r", encoding="utf-8") as f:
+            order_data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return errors
+
+    step_metadata = order_data.get("step_metadata")
+    if not isinstance(step_metadata, dict):
+        return errors
+
+    if not seed_manifest_path.exists():
+        return errors
+    try:
+        with seed_manifest_path.open("r", encoding="utf-8") as f:
+            seed_data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return errors
+
+    step_requirements = seed_data.get("step_requirements")
+    if not isinstance(step_requirements, dict):
+        return errors
+
+    # A step may appear in either map alone (no seed inputs at all vs. unlisted here) —
+    # treat both sides' absence or empty list as the same semantic ("no seed requirements").
+    all_steps = set(step_metadata.keys()) | set(step_requirements.keys())
+    for step in sorted(all_steps):
+        meta = step_metadata.get(step)
+        declared_raw = meta.get("required_seed_inputs", []) if isinstance(meta, dict) else []
+        declared_set = {s for s in (declared_raw or []) if isinstance(s, str)}
+
+        manifest_raw = step_requirements.get(step, [])
+        manifest_set = {s for s in (manifest_raw or []) if isinstance(s, str)}
+
+        missing = sorted(manifest_set - declared_set)
+        extra = sorted(declared_set - manifest_set)
+        if missing:
+            errors.append(make_error(
+                "E543",
+                f"STEP_METADATA_INCONSISTENT {step_order_path}: "
+                f"step_metadata[{step}].required_seed_inputs missing {missing} "
+                f"(present in seed_manifest.step_requirements but not declared here)",
+            ))
+        if extra:
+            errors.append(make_error(
+                "E543",
+                f"STEP_METADATA_INCONSISTENT {step_order_path}: "
+                f"step_metadata[{step}].required_seed_inputs has extra {extra} "
+                f"(declared here but not in seed_manifest.step_requirements)",
             ))
 
     return errors

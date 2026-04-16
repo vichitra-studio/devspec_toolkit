@@ -118,7 +118,7 @@
     },
     "step_metadata": {
       "type": "object",
-      "description": "Per-step declarative metadata: upstream spec inputs, seed inputs, and a one-line extraction intent summary. Optional — when present, the consistency linter validates required_spec_inputs against the inverse of downstream_consumers.",
+      "description": "Per-step declarative metadata: upstream spec inputs and seed inputs. Optional — when present, the consistency linter validates required_spec_inputs against the inverse of downstream_consumers.",
       "additionalProperties": {
         "type": "object",
         "description": "Metadata block for a single step.",
@@ -143,16 +143,11 @@
               "description": "A kebab-case seed_id from seed_manifest.json."
             },
             "uniqueItems": true
-          },
-          "extraction_intent": {
-            "type": "string",
-            "description": "Single-sentence human-readable summary of what this step extracts from its upstream inputs. Rendered into prompts and documentation. May be an empty string while being populated; the consistency linter does not enforce content."
           }
         },
         "required": [
           "required_spec_inputs",
-          "required_seed_inputs",
-          "extraction_intent"
+          "required_seed_inputs"
         ]
       }
     }

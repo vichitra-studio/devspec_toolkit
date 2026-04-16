@@ -283,6 +283,37 @@ class TestDagLint(unittest.TestCase):
             self.assertTrue(len(w596_errors) >= 1)
             self.assertTrue(any("'02'" in e for e in w596_errors))
 
+    def test_trinity_substeps_shared_artifact_no_w596(self):
+        """Intra-Trinity cross-references via spec/impl_context/ do NOT trigger W596.
+
+        16a/16b/16c share a single milestone plan file — the parser credits an
+        ``impl_context`` bullet to both 16a and 16b so coverage works for 16c.
+        When that bullet appears in a 16b prompt, the 16b self-credit would fire
+        a spurious W596 under the strict DAG-ancestor rule. The W596 check
+        tolerates intra-Trinity cross-refs because they describe reads from the
+        shared artifact, not DAG violations.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "16", "16a", "16b", "16c"],
+                consumers={"00": ["16"], "16": ["16a"], "16a": ["16b"], "16b": ["16c"], "16c": []},
+            )
+            self._make_prompt(tmp, "16b", "impl_coder", (
+                "# Prompt for Step 16b\n\n"
+                "### Extraction Intent\n\n"
+                "- **spec/impl_context/{step_id}.json**: the shared milestone "
+                "context 16a authored and this step writes execution results into\n"
+                "- **spec/16_impl_context.json**: Trinity Anchor scope and "
+                "milestone_index for this cycle\n"
+            ))
+            errors = lint_dag(tmp)
+            w596_errors = [e for e in render_errors(errors) if "W596" in e]
+            self.assertEqual(
+                w596_errors, [],
+                f"Intra-Trinity impl_context references must not trigger W596. Got: {w596_errors}",
+            )
+
 
     # ------------------------------------------------------------------
     # 7. Edge cases: missing step_order.json, parse error (E520)

@@ -46,7 +46,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 - **10_governance.json**: commit message patterns, PR rules, and approval workflows that constrain how cross-milestone changes must be committed and reviewed during the cycle
 - **11_redteam.json**: threat identifiers, attack vectors, and severity ratings that inform anchor-level scope_out decisions when the threat surface argues for excluding certain capabilities this cycle
 - **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that establish the verification contract milestone plans will ultimately reference via their own test_commands
-- **13_extension_generator.json**: extension point declarations and plugin interface contracts that inform scope boundaries when extensibility concerns cut across multiple milestones
+- **13_extension_manifest.json**: extension point declarations and plugin interface contracts that inform scope boundaries when extensibility concerns cut across multiple milestones
 - **13a_completeness_assessment.json**: coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions before committing to a milestone index
 - **15_scaffold.json**: generated file structure, directory layout, and scaffold templates that ground the anchor's optional `target_file_patterns` when a cross-milestone file boundary is declared
 
@@ -69,7 +69,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 ## Coverage Closure
 Before emitting, verify:
 - Every active milestone in `14_roadmap.json` appears in `plan.milestone_index` (or is explicitly listed in `scope_out` with a rationale carried in `plan.ambiguities`).
-- No FR/API ID appears in `fr_refs` of two milestones whose `status` is `active` (this triggers **E308** FR ownership conflict).
+- No FR/API ID appears in `fr_refs` of two milestones whose `status` is **not** `done` — `pending`, `in_progress`, and `deferred` all participate in the conflict check (this triggers **E308** FR ownership conflict). `done` milestones are exempt because the ID has been delivered and may legitimately be revisited in a follow-on milestone.
 - No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's `scope_in`/`scope_out` under `spec/impl_context/*.json` (triggers **E308** scope drift).
 - Each `checklist_id_prefix` is unique across `plan.milestone_index` — 16a plans will allocate their checklist IDs from this namespace; duplicates collide and trigger **E309**.
 - All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.
@@ -81,6 +81,7 @@ Before emitting, verify:
 4. **NEVER** author a per-FR checklist on the anchor — per-milestone checklist detail lives in each 16a plan.
 5. **NEVER** set `artifact_role` to anything other than `"anchor"` — the value is a JSON Schema `const`.
 6. **NEVER** emit placeholder or empty-string values where content is required (e.g., `functional_summary` must be ≥20 chars; each `drift.checks[]` string must be ≥5 chars; each `milestone_index[].summary` must be ≥10 chars).
+7. **NEVER** place `16_impl_context.json` inside `spec/impl_context/`. The anchor lives at `spec/16_impl_context.json` at the spec directory root. Files in `spec/impl_context/` are milestone plans (`vc:16-impl-context`). If an anchor is misfiled there, the content-based dispatch demotes it and emits **W586** ANCHOR_VALIDATOR_WRONG_ARTIFACT.
 
 # Field Definitions & Rules (MANDATORY)
 **Crucial**: Use the following exact definitions to ensure compliance with `vc:16-anchor`:
@@ -159,7 +160,7 @@ Registry of every milestone this anchor governs. Used by validators to detect cr
 ```json
 {
   "$schema": "vc:16-anchor",
-  "id": "step-16-example",
+  "id": "anchor-v1",
   "owner": "api",
   "created_at": "2026-02-08T00:00:00Z",
   "artifact_role": "anchor",

@@ -43,11 +43,12 @@ _SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 # those artifacts use constraint language rather than Given/When/Then vocabulary.
 #
 # Step 13a produces a completeness-assessment (dimension counts), not a
-# checklist — it is NOT in this set.  Steps 16a/16b/16c all use the same
-# vc:16-impl-context schema as step 16 (schema is determined by the $schema
-# field in the artifact, not by the step ID), so they ARE in this set.
+# checklist — it is NOT in this set.  Step 16 is the Trinity Anchor
+# (vc:16-anchor) — a scope/ownership/drift declaration with no checklist — so
+# it is NOT in this set either. Steps 16a/16b/16c share the vc:16-impl-context
+# schema and carry the implementation checklist, so they ARE in this set.
 # ---------------------------------------------------------------------------
-_CHECKLIST_STEPS: frozenset[str] = frozenset(["16", "16a", "16b", "16c"])
+_CHECKLIST_STEPS: frozenset[str] = frozenset(["16a", "16b", "16c"])
 
 # ---------------------------------------------------------------------------
 # Compiled regex patterns used by semantic checks.

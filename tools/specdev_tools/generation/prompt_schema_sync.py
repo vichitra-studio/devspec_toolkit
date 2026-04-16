@@ -391,6 +391,15 @@ def _validate_output_contracts(
                         f"sub-step '{step}' output contract contains keys "
                         f"from '{other_step}' domain: {sorted(foreign_keys)}",
                     ))
+            # Anchor-exclusive keys are never legitimate in 16a/16b/16c payloads.
+            anchor_leak = payload_keys & _ANCHOR_EXCLUSIVE_KEYS
+            if anchor_leak:
+                errors.append(make_error(
+                    "W580",
+                    f"SUBSTEP_DRIFT {prompt_path}:{line_no} "
+                    f"sub-step '{step}' output contract contains keys "
+                    f"from '16anchor' domain: {sorted(anchor_leak)}",
+                ))
     return errors
 
 
@@ -409,13 +418,24 @@ _PROMPT_STEP_OVERRIDE: dict[str, str] = {
     "prompt_16_impl_context.md": "16anchor",
 }
 
+# Forward-drift domains for W580 within the Trinity Loop (16a → 16b → 16c).
+# Each set is the keys UNIQUELY written by that step. Shared keys (top-level
+# `plan`, `plan.summary`, `plan.ambiguities`) are intentionally absent because
+# they legitimately appear in multiple artifacts with different semantics.
 _SUBSTEP_EXPECTED_KEYS = {
-    "16a": {"plan", "spec_alignment", "checklist"},
+    "16a": {"spec_alignment", "checklist"},
     "16b": {"execution", "implementation", "evidence"},
     "16c": {"review", "verdict", "semantic_review"},
 }
 
 _SUBSTEP_ORDER = ["16a", "16b", "16c"]
+
+# Anchor-exclusive keys — no Trinity sub-step (16a/16b/16c) should emit these.
+# Unlike the Trinity forward-drift relationship, the anchor is an independent
+# artifact (vc:16-anchor) read by 16a/b/c but never written by them, so the
+# check here is direction-free: any presence in a Trinity sub-step payload is a
+# contract violation routed via W580 SUBSTEP_DRIFT.
+_ANCHOR_EXCLUSIVE_KEYS: frozenset[str] = frozenset({"artifact_role", "milestone_index"})
 
 
 def _step_from_prompt_name(name: str) -> str | None:

@@ -53,13 +53,34 @@ IMPL_EMPTY = {"id": "ms-v1", "plan": {"spec_alignment": {"checklist": []}}}
 IMPL_UNRELATED_TASK = {"id": "ms-v1", "plan": {"spec_alignment": {"checklist": [{"spec_ref": {"id": "task-UNRELATED"}}]}}}
 
 
+def _write_anchor_with_plan(d: str, milestone_id: str, plan: dict, plan_filename: str = "ms_v1_plan.json") -> None:
+    """Write a Trinity Anchor registering one milestone plan, and the plan file itself.
+
+    Uses the `spec/impl_context/...` path convention accepted by
+    `_resolve_context_path` — callers are not required to name their spec dir
+    "spec" because the resolver also accepts paths relative to spec_dir.
+    """
+    os.makedirs(os.path.join(d, "impl_context"), exist_ok=True)
+    plan_path = os.path.join("impl_context", plan_filename)
+    anchor = {
+        "plan": {
+            "milestone_index": [{
+                "milestone_id": milestone_id,
+                "context_path": plan_path,
+            }]
+        }
+    }
+    _write(d, "16_impl_context.json", anchor)
+    _write(d, plan_path, plan)
+
+
 class TestTraceabilityClosure(unittest.TestCase):
 
     def _write_all(self, d: str, caps=CAPS, frs=FRS_FULL, roadmap=ROADMAP_FULL, impl=IMPL_FULL):
         _write(d, "01_capabilities.json", caps)
         _write(d, "04_fr_list.json", frs)
         _write(d, "14_roadmap.json", roadmap)
-        _write(d, "16a_impl_planner.json", impl)
+        _write_anchor_with_plan(d, "ms-v1", impl)
 
     def test_complete_chain_no_gaps(self):
         with tempfile.TemporaryDirectory() as d:
@@ -201,16 +222,131 @@ class TestTraceabilityClosure(unittest.TestCase):
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            # 16a_impl_planner.json intentionally absent
+            # 16_impl_context.json (Trinity Anchor) intentionally absent
             errs = check_traceability_closure(d)
-            # B5 fix: missing files now emit W570 warnings instead of silent pass
             w570 = [e for e in render_errors(errs) if "W570" in e]
             hard_errors = [e for e in render_errors(errs) if not e.startswith("W")]
             self.assertEqual(hard_errors, [])
-            # Should warn about the missing impl_planner file
             self.assertTrue(
-                any("16a_impl_planner" in w or "16_impl_context" in w for w in w570),
-                f"Expected W570 for missing impl_planner, got: {w570}",
+                any("16_impl_context.json" in w for w in w570),
+                f"Expected W570 for missing anchor file, got: {w570}",
+            )
+
+    def test_anchor_declares_missing_context_path_fires_w588(self):
+        """Anchor registers a milestone_index entry whose context_path does not exist on disk."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            anchor = {
+                "plan": {
+                    "milestone_index": [{
+                        "milestone_id": "ms-v1",
+                        "context_path": "impl_context/ms_missing_plan.json",
+                    }]
+                }
+            }
+            _write(d, "16_impl_context.json", anchor)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W588" in e and "ms-v1" in e and "does not exist" in e for e in rendered),
+                f"Expected W588 for ms-v1 declared-but-missing plan. Got: {rendered}",
+            )
+
+    def test_anchor_declares_unparseable_context_path_fires_w588(self):
+        """Anchor registers a context_path that is not valid JSON."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            anchor = {
+                "plan": {
+                    "milestone_index": [{
+                        "milestone_id": "ms-v1",
+                        "context_path": "impl_context/ms_broken_plan.json",
+                    }]
+                }
+            }
+            _write(d, "16_impl_context.json", anchor)
+            os.makedirs(os.path.join(d, "impl_context"), exist_ok=True)
+            with open(os.path.join(d, "impl_context", "ms_broken_plan.json"), "w", encoding="utf-8") as f:
+                f.write("{ not: valid json,")
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W588" in e and "ms-v1" in e and "not valid JSON" in e for e in rendered),
+                f"Expected W588 for ms-v1 unparseable plan. Got: {rendered}",
+            )
+
+    def test_anchor_merges_checklists_across_milestones(self):
+        """Two milestone plans contribute independent checklist items; both cover their tasks."""
+        roadmap = {"milestones": [
+            {
+                "milestone_id": "ms-auth",
+                "fr_refs": ["fr-login"],
+                "tasks": [{"task_id": "task-auth-1", "fr_refs": ["fr-login"]}],
+            },
+            {
+                "milestone_id": "ms-session",
+                "fr_refs": ["fr-session"],
+                "tasks": [{"task_id": "task-session-1", "fr_refs": ["fr-session"]}],
+            },
+        ]}
+        frs = {"functional_requirements": [
+            {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
+            {"fr_id": "fr-session", "trace": [{"type": "capability", "id": "cap-auth"}]},
+        ]}
+        plan_auth = {"plan": {"spec_alignment": {"checklist": [{"spec_ref": {"id": "task-auth-1"}}]}}}
+        plan_session = {"plan": {"spec_alignment": {"checklist": [{"spec_ref": {"id": "task-session-1"}}]}}}
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "04_fr_list.json", frs)
+            _write(d, "14_roadmap.json", roadmap)
+            os.makedirs(os.path.join(d, "impl_context"), exist_ok=True)
+            anchor = {
+                "plan": {
+                    "milestone_index": [
+                        {"milestone_id": "ms-auth", "context_path": "impl_context/ms_auth_plan.json"},
+                        {"milestone_id": "ms-session", "context_path": "impl_context/ms_session_plan.json"},
+                    ]
+                }
+            }
+            _write(d, "16_impl_context.json", anchor)
+            _write(d, os.path.join("impl_context", "ms_auth_plan.json"), plan_auth)
+            _write(d, os.path.join("impl_context", "ms_session_plan.json"), plan_session)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            # Neither ORPHAN_MILESTONE nor CHECKLIST_ROADMAP_MISMATCH should fire — each plan
+            # covers its milestone's task.
+            self.assertFalse(
+                any("W562" in e for e in rendered),
+                f"Did not expect any W562 ORPHAN_MILESTONE. Got: {rendered}",
+            )
+            self.assertFalse(
+                any("W563" in e for e in rendered),
+                f"Did not expect any W563 CHECKLIST_ROADMAP_MISMATCH. Got: {rendered}",
+            )
+
+    def test_anchor_without_milestone_index_skips_checklist_checks(self):
+        """An anchor with empty milestone_index has no plans; W562/W563 should not fire.
+
+        Rationale: an empty milestone_index represents the 'Trinity Loop has not
+        yet run' state for this cycle. Checklist-coverage errors against the
+        roadmap are not meaningful in that state and belong to a separate code
+        (the anchor is already responsible for carrying that state across
+        cycles via W587 ANCHOR_DRIFT_CHECKS_STALE when non-empty).
+        """
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write(d, "16_impl_context.json", {"plan": {"milestone_index": []}})
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W562" in e or "W563" in e for e in rendered),
+                f"Did not expect W562/W563 on empty milestone_index. Got: {rendered}",
             )
 
 
@@ -413,7 +549,7 @@ class TestSuccessMetricsTraceability(unittest.TestCase):
             _write(d, "01_capabilities.json", caps)
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -429,7 +565,7 @@ class TestSuccessMetricsTraceability(unittest.TestCase):
             _write(d, "01_capabilities.json", caps)
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             matching = [e for e in rendered if "E560" in e and "charter_success_metric_without_capability" in e and "metric-perf" in e]
@@ -447,7 +583,7 @@ class TestSuccessMetricsTraceability(unittest.TestCase):
             _write(d, "01_capabilities.json", caps)
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -462,7 +598,7 @@ class TestSuccessMetricsTraceability(unittest.TestCase):
             # No 01_capabilities.json written — charter+capabilities guard not met
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -482,7 +618,7 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -499,7 +635,7 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             matching = [e for e in rendered if "W569" in e and "matrix" in e]
@@ -512,7 +648,7 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -529,7 +665,7 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(
@@ -545,7 +681,7 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             _write(d, "04_fr_list.json", FRS_FULL)
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "14_roadmap.json", ROADMAP_FULL)
-            _write(d, "16a_impl_planner.json", IMPL_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
             self.assertFalse(

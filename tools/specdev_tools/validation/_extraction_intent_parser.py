@@ -21,10 +21,28 @@ from pathlib import Path
 
 # Matches extraction intent bullet entries like:
 #   - **00_charter.json**: Project scope boundaries ...
+#   - **spec/00_charter.json**: Project scope boundaries ... (spec-prefixed form)
 #   - **docs/seed/seed_overview.md**: Scope boundaries ...
 #   - **03_glossary.json** (optional): Domain terms ...
+#   - **spec/16_impl_context.json**: Trinity Anchor scope ...
+# The optional prefix group tolerates `docs/seed/` and `spec/` — the two
+# in-prompt conventions used across the toolkit. A bare filename is also
+# accepted.
 INTENT_ENTRY_RE = re.compile(
-    r"^\s*-\s+\*\*(?:docs/seed/)?(\d{2}[a-z]?_[a-z0-9_]+\.\w+|seed_\w+\.md)\*\*"
+    r"^\s*-\s+\*\*(?:docs/seed/|spec/)?(\d{2}[a-z]?_[a-z0-9_]+\.\w+|seed_\w+\.md)\*\*"
+    r"(?:\s*\([^)]*\))?\s*:\s*(.+)",
+    re.IGNORECASE,
+)
+
+# Matches bullet entries that reference per-milestone 16a plan files living in
+# spec/impl_context/. The filename varies per milestone (and is often a
+# template placeholder like `{step_id}.json` in the prompt source), so we do
+# not extract a step number from it — these entries map to step 16a directly.
+# Example:
+#   - **spec/impl_context/{step_id}.json**: milestone context 16a authored ...
+#   - **spec/impl_context/ms_auth_plan.json**: ...
+IMPL_CONTEXT_ENTRY_RE = re.compile(
+    r"^\s*-\s+\*\*spec/impl_context/[^*]+\.json\*\*"
     r"(?:\s*\([^)]*\))?\s*:\s*(.+)",
     re.IGNORECASE,
 )
@@ -96,6 +114,20 @@ def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
         # Check for seed document references first
         if SEED_ENTRY_RE.match(line):
             has_seed_entries = True
+            continue
+
+        # Per-milestone plan files in spec/impl_context/ are the shared Trinity
+        # artifact — 16a authors it, 16b writes execution evidence into it,
+        # 16c writes review findings into it. A single reference therefore
+        # covers both upstream contributions (16a and 16b); 16c is not
+        # registered from this path because 16c is only a writer, never
+        # consumed by downstream Trinity steps.
+        impl_match = IMPL_CONTEXT_ENTRY_RE.match(line)
+        if impl_match:
+            description = impl_match.group(1).strip()
+            for covered_step in ("16a", "16b"):
+                step_entries[covered_step] = description
+                referenced_steps.add(covered_step)
             continue
 
         match = INTENT_ENTRY_RE.match(line)

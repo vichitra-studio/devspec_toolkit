@@ -190,7 +190,21 @@ def validate_step_16_anchor(
             continue
         if not isinstance(ms_data, dict):
             continue
-        if ms_data.get("$schema") != "vc:16-impl-context":
+        declared_schema = ms_data.get("$schema")
+        if declared_schema != "vc:16-impl-context":
+            # File parses as JSON but isn't declared as a milestone plan.
+            # Silent-skipping it would hide authoring mistakes (missing or
+            # wrong `$schema`) and drop the file from every drift check.
+            # Surface the mismatch so the author can either fix the $schema
+            # or move the file out of impl_context/.
+            errors.append(
+                make_error(
+                    "W589",
+                    f"ANCHOR_MILESTONE_MISSCHEMAED: '{ms_file.name}' in "
+                    f"impl_context/ has $schema={declared_schema!r} — expected "
+                    f"'vc:16-impl-context'. Drift checks skipped this file.",
+                )
+            )
             continue
         milestone_contexts[str(ms_file)] = ms_data
 

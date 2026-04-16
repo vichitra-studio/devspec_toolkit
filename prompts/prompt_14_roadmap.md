@@ -29,7 +29,7 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 - **10_governance.json**: PR/commit rules that tasks must satisfy; used to ensure roadmap tasks align with governance-compliant delivery workflows and labeling requirements
 - **11_redteam.json**: Identified threats and mitigations used to populate milestone risks and inform task prioritization for security-critical implementation sequences
 - **12_ci_gates.json**: CI pipeline gate definitions used to ensure roadmap milestones include validation tasks that satisfy all required continuous integration quality checks
-- **13_extension_generator.json**: Extension manifest entries and `extension_decision` used to schedule extension implementation work as dedicated milestones; if `extension_decision.status == 'none-required'`, skip extension milestones entirely — this is correct behavior, not a gap
+- **13_extension_manifest.json**: Extension manifest entries and `extension_decision` used to schedule extension implementation work as dedicated milestones; if `extension_decision.status == 'none-required'`, skip extension milestones entirely — this is correct behavior, not a gap
 - **13a_completeness_assessment.json** (if present): Coverage gaps to address in milestone decomposition; high-priority missing elements used to schedule remediation tasks before implementation begins
 
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit

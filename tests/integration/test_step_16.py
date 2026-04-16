@@ -1060,6 +1060,163 @@ class TestStep16(unittest.TestCase):
         self.assertEqual(_refine_impl_context_substep("04", plan_only), "04")
         self.assertEqual(_refine_impl_context_substep("unknown", plan_only), "unknown")
 
+    def test_e307_doc_spec_ref_type_excluded(self):
+        """E307 does NOT fire when spec_ref.type is 'doc' — task references are work
+        items, not testable behaviors, and must not require behavior+validation pairing.
+        """
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # doc-type spec_ref with behavior-only checklist — should NOT trigger E307
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "WORK_ITEM_D",
+                "spec_ref": {
+                    "type": "doc",
+                    "id": "task-doc-impl",
+                },
+                "description": "Implement documentation work item.",
+                "type": "behavior",
+                "layer": "api",
+                "linked_test_expectation": "passes tests",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "fixture_ref": "fixture-impl",
+            }
+        ]
+        data.pop("execution", None)
+        data["review"] = {}
+        data["plan"].pop("review_requirements", None)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            # Fixture inside impl_context/ so it routes to the 16a validator (not anchor)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8",
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e307_errors = [e for e in errors if e.code == "E307"]
+        self.assertEqual(
+            e307_errors, [],
+            f"Did not expect E307 for doc spec_ref.type. Got: {e307_errors}"
+        )
+
+    def test_impl_context_16a_dispatch_e2e_routes_through_16a_validator(self):
+        """End-to-end counterpart to the refiner-only 16a dispatch test.
+
+        Writes a plan-only artifact (no execution.execution_results, no
+        review.verdict) through the full validate_file pipeline and pins
+        that the 16a-specific checklist-id-uniqueness check fires via
+        dispatch — proving content refinement leaves plan-only artifacts
+        on the 16a path rather than demoting to the base or promoting to
+        16b/16c.
+        """
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Induce a 16a-specific failure: duplicate checklist IDs (checked by
+        # validate_step_16a, not the base validator).
+        original = data["plan"]["spec_alignment"]["checklist"][0]
+        duplicate = json.loads(json.dumps(original))
+        duplicate["id"] = original["id"]  # force exact id collision
+        data["plan"]["spec_alignment"]["checklist"].append(duplicate)
+        data.pop("execution", None)
+        data["review"] = {}
+        data["plan"].pop("review_requirements", None)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_16a_e2e.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": []}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        # Duplicate checklist id is pinned by validate_step_16a (E520).
+        dup_id_errors = [
+            e for e in errors
+            if e.code == "E520" and "duplicate checklist id" in e.message.lower()
+        ]
+        self.assertEqual(
+            len(dup_id_errors), 1,
+            f"Expected exactly one duplicate-checklist-id error from the "
+            f"16a dispatch path. Got: {errors}"
+        )
+
+    def test_step_16c_chain_up_deduplicates_base_checks(self):
+        """Chain-up (16c → 16b → 16a → base) must not cause base checks to
+        fire multiple times on the same artifact.
+
+        _step16_cache (MD5 on data+path) deduplicates the base pass.  Without
+        it, calling validate_step_16c would re-run validate_step_16's checks
+        three times — once per layer — and any base-level error (here E307)
+        would appear triplicated in the returned list.  This test pins the
+        cache behavior by asserting the error appears exactly once.
+        """
+        from specdev_tools.validation.validators.step_16c import validate_step_16c
+
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Force an E307 (base-level) pairing failure: FR ref with only a
+        # behavior item and no validation partner.
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "FR_ONLY_BEHAVIOR",
+                "spec_ref": {"type": "fr", "id": "fr-solo-behavior"},
+                "description": "Behavior item without validation partner.",
+                "type": "behavior",
+                "layer": "api",
+                "linked_test_expectation": "passes tests",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "fixture_ref": "fixture-impl",
+            }
+        ]
+        # Make the artifact 16c-shaped so chain-up runs all three layers.
+        data["review"] = {
+            "verdict": "verified",
+            "fixture_status": {
+                "implemented_interfaces": [],
+                "test_results": [],
+                "ci_status": "green",
+            },
+        }
+        data["execution"] = {"execution_results": []}
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_chainup.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+
+            errors = validate_step_16c(data, self.repo_root, str(fixture_path))
+
+        e307_errors = [
+            e for e in errors
+            if e.code == "E307" and "fr-solo-behavior" in e.message
+        ]
+        self.assertEqual(
+            len(e307_errors), 1,
+            f"Chain-up must fire base-level E307 exactly once (cache dedup). "
+            f"Got {len(e307_errors)} occurrences. Full errors: {errors}"
+        )
+
     def test_step_16c_w582_fires_when_milestone_file_lives_in_impl_context(self):
         """W582 must fire even when the 16c artifact lives inside spec/impl_context/.
 

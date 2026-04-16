@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:16-anchor",
-  "title": "16_impl_context (Trinity Anchor)",
+  "title": "16_anchor (Trinity Anchor)",
   "description": "Trinity Anchor artifact for Step 16. Declares the full scope of a multi-milestone implementation, tracks which milestones own which FRs, and is the cross-milestone drift-detection surface. Does NOT carry a per-FR checklist — that detail lives in each 16a milestone plan. Does NOT carry execution or review sections — those are milestone-plan concerns.",
   "unevaluatedProperties": false,
   "allOf": [
@@ -162,7 +162,8 @@
                   },
                   "context_path": {
                     "type": "string",
-                    "description": "Relative path to this milestone's 16a plan from the spec directory root. Example: 'spec/impl_context/ms_auth_plan.json'."
+                    "pattern": "^(spec/)?impl_context/[a-z0-9_]+\\.json$",
+                    "description": "Relative path to this milestone's 16a plan from either the repo root (with `spec/` prefix) or the spec directory root. Must point at a file inside `impl_context/` with a lowercase/underscore/digit filename ending in `.json`. Example: 'spec/impl_context/ms_auth_plan.json' or 'impl_context/ms_auth_plan.json'. The pattern is enforced because downstream validators (traceability_closure, step_16_anchor) read this path directly — a typo silently drops the plan from coverage and drift checks."
                   },
                   "status": {
                     "$ref": "vc:core:atoms#milestoneStatus",

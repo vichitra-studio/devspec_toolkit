@@ -193,15 +193,29 @@ def _check_extraction_intents(
         if intent is not None:
             prompt_intents[step] = intent
 
+    # Trinity Loop sub-steps (16a/16b/16c) share a single artifact at
+    # spec/impl_context/<plan>.json — 16a writes the plan, 16b writes execution
+    # evidence into the same file, 16c writes review findings into the same
+    # file. The extraction-intent parser credits a spec/impl_context/... bullet
+    # to both 16a and 16b so coverage works for 16c; when that bullet appears
+    # in a 16a/16b prompt, the 16b self-credit becomes a spurious W596 under
+    # the DAG-ancestor rule (a step can't be upstream of itself).
+    # Tolerate those intra-Trinity cross-refs: they describe reads from the
+    # shared artifact, not DAG violations.
+    _TRINITY_SUBSTEPS: frozenset[str] = frozenset({"16a", "16b", "16c"})
+
     # W596: Prompt references artifact not in the runtime-computed allowed upstream steps
     for step, intent in prompt_intents.items():
         upstream_deps = set(allowed_deps.get(step, []))
         for ref_step in intent.referenced_steps:
-            if ref_step in step_set and ref_step not in upstream_deps:
-                errors.append(make_error(
-                    "W596",
-                    f"UNDECLARED_UPSTREAM_REF prompt for step '{step}' "
-                    f"({intent.prompt_path.name}) references artifact for "
-                    f"step '{ref_step}' which is not in the "
-                    f"computed allowed upstream steps",
-                ))
+            if ref_step not in step_set or ref_step in upstream_deps:
+                continue
+            if step in _TRINITY_SUBSTEPS and ref_step in _TRINITY_SUBSTEPS:
+                continue  # shared-artifact self/cross-reference — not a DAG violation
+            errors.append(make_error(
+                "W596",
+                f"UNDECLARED_UPSTREAM_REF prompt for step '{step}' "
+                f"({intent.prompt_path.name}) references artifact for "
+                f"step '{ref_step}' which is not in the "
+                f"computed allowed upstream steps",
+            ))

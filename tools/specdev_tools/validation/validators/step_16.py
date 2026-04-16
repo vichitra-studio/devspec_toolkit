@@ -51,10 +51,13 @@ def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional
 def _is_anchor(spec_path: Optional[str], data: Optional[Dict[str, Any]] = None) -> bool:
     """Detect whether this artifact is the Step 16 Trinity Anchor (vs. a 16a/16b/16c plan).
 
-    Prefers field-based detection (artifact_role) when available;
-    falls back to path heuristic: anchor lives at spec/16_impl_context.json,
-    plans live inside spec/impl_context/.
-    # TODO: upgrade to artifact_role field check exclusively after Task 2.7 (vc:16-anchor schema).
+    Two-tier detection (defence-in-depth): prefers the `artifact_role` field
+    declared on the vc:16-anchor schema when the artifact is structurally
+    parseable, and falls back to a path heuristic for cases where the field
+    is absent (malformed artifact, pre-schema fixture, routing probe before
+    full parse). The path heuristic keeps validators safe even when an author
+    omits `artifact_role` — the schema will reject it, but routing still
+    needs a correct yes/no answer before schema errors surface.
     """
     if data and data.get("artifact_role") == "anchor":
         return True
@@ -410,33 +413,46 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         try:
             roadmap_data = _load_roadmap(spec_path)
             if roadmap_data is not None:
-                # Get milestone_ref from the artifact
-                milestone_ref = data.get("milestone_ref", "")
+                # Collect milestone refs from checklist items. The schema defines
+                # `milestone_ref` on each checklist item — never at root
+                # (unevaluatedProperties: false on vc:16-impl-context rejects it).
+                # If any items declare a milestone_ref, scope E304 to that
+                # milestone's tasks; otherwise fall back to "all non-done
+                # milestones" (conservative first-Trinity-cycle coverage).
+                milestone_refs: set[str] = set()
+                for item in checklist:
+                    if isinstance(item, dict):
+                        ref = item.get("milestone_ref")
+                        if isinstance(ref, str) and ref:
+                            milestone_refs.add(ref)
                 roadmap_task_ids = set()
-                milestone_found = False
+                found_refs: set[str] = set()
                 for milestone in roadmap_data.get("milestones", []):
                     mid = milestone.get("milestone_id", "")
                     mstatus = milestone.get("status", "")
-                    if milestone_ref:
-                        # If milestone_ref is set, only include tasks from that milestone
-                        if mid != milestone_ref:
+                    if milestone_refs:
+                        # Scope to milestones declared on checklist items
+                        if mid not in milestone_refs:
                             continue
-                        milestone_found = True
+                        found_refs.add(mid)
                     else:
-                        # If milestone_ref is absent (first Trinity cycle), include only
-                        # milestones that are not yet done (active/in-progress)
+                        # No scoping signal — include non-done milestones
                         if mstatus in ("done", "completed"):
                             continue
                     for task in milestone.get("tasks", []):
                         tid = task.get("task_id")
                         if tid:
                             roadmap_task_ids.add(tid)
-                # E582 -- milestone_ref points to a non-existent roadmap milestone
-                roadmap_milestones = roadmap_data.get("milestones", [])
-                if milestone_ref and not milestone_found and len(roadmap_milestones) > 0:
-                    errors.append(
-                        make_error("E582", f"UNCOVERED_FR_REVIEW_COVERAGE: milestone_ref '{milestone_ref}' not found in roadmap milestones")
-                    )
+                # E582 -- a declared milestone_ref points to a non-existent roadmap milestone
+                if roadmap_data.get("milestones") and milestone_refs:
+                    for missing in sorted(milestone_refs - found_refs):
+                        errors.append(
+                            make_error(
+                                "E582",
+                                f"UNCOVERED_FR_REVIEW_COVERAGE: milestone_ref '{missing}' "
+                                f"(from checklist) not found in roadmap milestones",
+                            )
+                        )
                 checklist_refs = {
                     item["spec_ref"]["id"]
                     for item in checklist

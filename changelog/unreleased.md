@@ -16,8 +16,8 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 - **Routing fix** (`validation/validate.py`): files in `impl_context/` now route to step `"16a"` (milestone plans); `16_impl_context.json` at the spec root routes to step `"16"` (anchor). Fixes long-standing routing bug where every impl_context artifact silently used the base validator.
 - **E306 path fix** (`validation/validators/step_16.py`): when an artifact lives in `impl_context/`, `04_fr_list.json` is now resolved from the parent spec directory instead of from `impl_context/` itself.
 - **`prompt_schema_sync` step-key collision fix**: `16_anchor.schema.json` and `16_impl_context.schema.json` both derive step `"16"` via filename split; the anchor now gets a distinct `"16anchor"` step key, and `_PROMPT_STEP_OVERRIDE` maps `prompt_16_impl_context.md` to validate against the anchor schema.
-- **Fixture reorganization**: `tests/fixtures/step_16/impl_context/` holds all 17 milestone-plan fixtures; 4 new anchor fixtures live at the root of `tests/fixtures/step_16/`.
-- **18 new anchor integration tests** (`tests/integration/test_step_16_anchor.py`): schema pass/fail, E308 scope contradiction and FR ownership, E309 checklist drift, W585/W586/W587 guard paths.
+- **Fixture reorganization**: `tests/fixtures/step_16/impl_context/` holds all 17 milestone-plan fixtures; 6 anchor fixtures live at the root of `tests/fixtures/step_16/` (2 valid: minimal + with_milestones; 4 invalid: missing_drift, missing_milestone_index, has_execution, has_milestone_ref).
+- **28 new anchor integration tests** (`tests/integration/test_step_16_anchor.py`): schema pass/fail, E308 scope contradiction and FR ownership (forward/reverse/done-exempt), E309 checklist drift (cross-milestone + prefix-collision), W585/W586/W587/W588 guard paths, misfiled-anchor routing, and content-based sub-step dispatch.
 
 ### Phase 1 — Seed & Spec Dependency Hardening
 
@@ -40,6 +40,32 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 - **Prompt rewrite** (`prompts/prompt_16_impl_context.md`): all prose re-authored to describe only the anchor contract (`artifact_role`, `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`). Previous prose described the shared `vc:16-impl-context` shape and would lead LLM authors to emit fields the new schema forbids.
 - **Orphan fixture cleanup**: 17 top-level `tests/fixtures/step_16/*.json` fixtures deleted after the `impl_context/` subdirectory migration — all tests now read from the new location.
 - **`_step16_cache.clear()` on `validate_dir` entry** (`validation/validate.py`): prevents cross-run accumulation of content-hash cache entries in long-lived processes. The cache is a correctness-neutral optimisation for chain-up dedup within one `validate_dir` invocation; clearing between runs keeps memory bounded.
+
+### Trinity Anchor Review Pass (cross-tool consistency sweep)
+
+- **`traceability_closure.py` drives off the anchor registry** — removed the phantom `16a_impl_planner.json`/`16b_code.json` entries from `SPEC_FILES` and the fallback that silently read the anchor as a 16a planner post-split. Checklist/execution data is now loaded from each `spec/impl_context/<plan>.json` declared in `plan.milestone_index[].context_path`; unreadable or missing declared plans emit **W588 ANCHOR_MILESTONE_UNREADABLE**. No glob, no auto-derivation — the anchor is the single source of truth.
+- **`context/reviewer.py` `_CHECKLIST_STEPS` drops `"16"`** — the anchor is no longer a checklist step post-split. `ac-*` retention and the acceptance-gap Jaccard check now run only on 16a/16b/16c.
+- **Extraction-intent parser accepts `spec/` prefix and routes `spec/impl_context/...` to both 16a and 16b** — the shared Trinity artifact convention. Unblocks `extraction-intent-check` (was previously exit-1 after the `779378d` prompt refactor).
+- **Extraction-intent-check uses `step_metadata.required_spec_inputs`** (authoritative consumption set) as its coverage source of truth. Falls back to `derive_allowed_upstream` (DAG-ancestor set) when metadata is absent — preserves prior behaviour for test fixtures that don't declare metadata, narrows the check for real prompts.
+- **Extraction Intent section format** on `prompt_16a_impl_planner.md` and `prompt_16c_impl_reviewer.md` — promoted `##` → `###` and `###` Primary/Reference sub-sections to `####`. The parser requires `### Extraction Intent`; before this change the two prompts were silently skipped. Bullet entries converted from backtick to bold to match the parser's `**filename**` contract.
+- **Prompt phantom filenames fixed** — `09_implementation_plan.json` → `09_impl_plan.json` and `13_extension_generator.json` → `13_extension_manifest.json` across `prompt_13_extension_generator.md`, `prompt_14_roadmap.md`, `prompt_15_scaffold.md`, `prompt_16_impl_context.md`, `prompt_16a_impl_planner.md`, `prompt_16b_impl_coder.md`.
+- **16a prompt** — checklist `id` rule now requires the `milestone_index[<this milestone>].checklist_id_prefix` from the anchor; Self-Audit Gate pins the anchor registration precondition; Coverage Closure adds an E309 guard; Negative Constraints forbid `artifact_role` on milestone plans. Example id updated from `CHK_AUTH_01` to `AUTH_LOGIN_01` to model the prefix convention. Behaviour-pairing rule softened to match E307's `{doc, code}` exemption.
+- **Anchor prompt** — corrected `milestone_index[].status` enum in Coverage Closure (`active` → `not done`, aligned with `step_16_anchor.py:111`); added Negative Constraint forbidding the anchor inside `spec/impl_context/`; example `id` updated to `anchor-v1` to match the `{noun}-v{N}` convention.
+- **`milestone_index[].context_path` pattern** (`schema/16_anchor.schema.json`): added `^(spec/)?impl_context/[a-z0-9_]+\.json$` so typos and mislocations are rejected at author time — the field is now load-bearing for traceability_closure and the anchor drift check.
+- **Schema title fix** (`schema/16_anchor.schema.json`): `"16_impl_context (Trinity Anchor)"` → `"16_anchor (Trinity Anchor)"`.
+- **W589 ANCHOR_MILESTONE_MISSCHEMAED**: new warning — fires when a file in `spec/impl_context/` parses as JSON but declares the wrong `$schema` (or none at all). Previously such files were silently skipped by the anchor drift check, hiding authoring mistakes.
+- **W596 shared-artifact tolerance** (`dag_lint.py`): intra-Trinity cross-references through `spec/impl_context/...` no longer trigger UNDECLARED_UPSTREAM_REF for 16b/16c citing 16a/16b via the shared milestone plan file.
+- **`prompt_schema_sync._SUBSTEP_EXPECTED_KEYS` covers the anchor domain**: anchor-exclusive keys (`artifact_role`, `milestone_index`) now forward-check against 16a/16b/16c payloads. A 16a prompt that accidentally emits `milestone_index` now fires W580 SUBSTEP_DRIFT instead of silently drifting.
+- **`step_16.py` E304 scoping** — replaced the dead root `milestone_ref` read with checklist-item aggregation (matching the `step_16c.py` pattern). E304 now scopes to the milestones declared on checklist items; E582 reports every checklist-declared milestone_ref not found in the roadmap (previously only the first).
+- **`e304_roadmap/impl_context/ms_test_plan.json` fixture** rewritten to be schema-valid except for the intended E304 gap (checklist covers `implement-login` as a behavior+validation pair; `implement-logout` is intentionally uncovered). The E304 integration test is no longer passing on a false witness.
+- **Migration template** (`prompts/migration/template_impl_context.md`) rewritten to document the anchor/milestone-plan split, the migration procedure from a pre-split `spec/16_impl_context.json`, and the new E308/E309/W585–W589 error codes.
+- **Changelog counts corrected**: anchor fixtures at `tests/fixtures/step_16/` (6, not 4); anchor integration tests in `test_step_16_anchor.py` (33 after this pass, not 18).
+- **Tests added**:
+  - `test_traceability_closure.py`: 4 new tests covering anchor-missing, declared context_path missing/unparseable, multi-milestone merge, empty milestone_index.
+  - `test_extraction_intent_rules.py`: 3 new tests covering `spec/` prefix, `impl_context/` → 16a/16b credit, and the `step_metadata.required_spec_inputs` source of truth.
+  - `test_step_16_anchor.py`: deferred-milestone E308, `context_path` pattern, W589 mis-schemaed (3 cases).
+  - `test_prompt_schema_sync.py`: `_PROMPT_STEP_OVERRIDE` integrity, anchor prompt → `vc:16-anchor` validation, and 16a leaking `milestone_index` → W580.
+  - `test_dag_lint_rules.py`: Trinity shared-artifact tolerance for W596.
 
 ### Known follow-ups (not in this release)
 

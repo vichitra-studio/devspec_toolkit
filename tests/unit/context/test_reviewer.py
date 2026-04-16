@@ -94,8 +94,10 @@ def _artifact(trace_fr_ids=None, scope_apis=None, scope_components=None,
 # ---------------------------------------------------------------------------
 
 class TestChecklistSteps:
-    def test_step_16_in_checklist_steps(self):
-        assert "16" in _CHECKLIST_STEPS
+    def test_step_16_not_in_checklist_steps(self):
+        # Step 16 is the Trinity Anchor (vc:16-anchor) — scope/ownership/drift,
+        # no checklist. The anchor split removed step 16 from this set.
+        assert "16" not in _CHECKLIST_STEPS
 
     def test_step_06_not_in_checklist_steps(self):
         assert "06" not in _CHECKLIST_STEPS
@@ -108,15 +110,15 @@ class TestChecklistSteps:
         assert "13a" not in _CHECKLIST_STEPS
 
     def test_step_16a_in_checklist_steps(self):
-        # 16a shares vc:16-impl-context schema — same checklist structure.
+        # 16a uses vc:16-impl-context and authors the checklist.
         assert "16a" in _CHECKLIST_STEPS
 
     def test_step_16b_in_checklist_steps(self):
-        # 16b shares vc:16-impl-context schema — same checklist structure.
+        # 16b uses vc:16-impl-context and populates execution evidence.
         assert "16b" in _CHECKLIST_STEPS
 
     def test_step_16c_in_checklist_steps(self):
-        # 16c shares vc:16-impl-context schema — same checklist structure.
+        # 16c uses vc:16-impl-context and records the review verdict.
         assert "16c" in _CHECKLIST_STEPS
 
 
@@ -150,13 +152,20 @@ class TestAcIdExclusion:
         assert dropped == []
 
     def test_ac_ids_remain_in_dropped_for_checklist_step(self):
-        """For step 16, ac-* IDs should appear in dropped when not traced."""
+        """For checklist steps (16a/16b/16c), ac-* IDs appear in dropped when not traced.
+
+        Step 16 (anchor) is intentionally NOT a checklist step post-split — its
+        exclusion from the ac-* denominator is covered by
+        test_step_16_not_in_checklist_steps.
+        """
         upstream = _upstream(
             frs=["fr-post-publish"],
             acs_per_fr={"fr-post-publish": ["ac-post-publish-1"]},
         )
         artifact = _artifact(trace_fr_ids=["fr-post-publish"])
-        result = _run_structural_pass(artifact, "spec/16_impl_context.json", upstream, step_id="16")
+        result = _run_structural_pass(
+            artifact, "spec/impl_context/ms_post_plan.json", upstream, step_id="16a",
+        )
         dropped = result.upstream_coverage["dropped"]
         assert "ac-post-publish-1" in dropped
 
@@ -380,13 +389,14 @@ class TestAcceptanceGapGating:
         # scope_completeness returns [] when schema registry is absent.
         assert result.verdict == "PASS"
 
-    @pytest.mark.parametrize("step_id", ["16", "16a", "16b", "16c"])
+    @pytest.mark.parametrize("step_id", ["16a", "16b", "16c"])
     def test_review_artifact_acceptance_gap_runs_for_all_checklist_steps(
         self, tmp_path, step_id
     ):
         """review_artifact generates acceptance_gap pairs for every step in _CHECKLIST_STEPS.
-        All four (16/16a/16b/16c) share vc:16-impl-context schema and the same checklist
-        structure — the gate must fire for all of them, not just step 16.
+        16a/16b/16c share vc:16-impl-context and author the checklist — the gate must
+        fire for all three. Step 16 is the anchor and has no checklist; it is not in
+        the set, tested separately in TestChecklistSteps.
         Uses canonical step-04 field names (criterion_id, text) to match real data shape.
         """
         import json

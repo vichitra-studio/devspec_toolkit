@@ -126,6 +126,34 @@ class TestStep16AnchorSchema(_AnchorTestBase):
             f"Expected E520 'milestone_index' required-property error. Got: {errors}"
         )
 
+    def test_invalid_context_path_pattern_rejected(self):
+        """milestone_index[].context_path must match ^(spec/)?impl_context/<file>.json$.
+
+        Downstream validators (traceability_closure, anchor drift checks) read
+        this path directly — a path that doesn't resolve to impl_context/ would
+        silently skip the milestone from coverage. The schema pattern catches
+        typos and mislocations at author time.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            (tmp_dir / "impl_context").mkdir()
+            # Valid anchor shape except for the bogus context_path.
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry(
+                        "ms-auth",
+                        # Not under impl_context/ — pattern must reject.
+                        context_path="spec/plans/ms_auth_plan.json",
+                    ),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertTrue(
+            any(e.code == "E520" and "context_path" in e.message for e in errors),
+            f"Expected E520 rejecting non-impl_context context_path. Got: {errors}",
+        )
+
 
 class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
     """E308 ANCHOR_SCOPE_DRIFT — bidirectional scope check + FR/API ownership."""
@@ -249,6 +277,48 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
 
         e308 = [e for e in errors if e.code == "E308"]
         self.assertEqual(e308, [], f"Done milestone should not trigger E308. Got: {e308}")
+        # Pin that no OTHER error codes start masquerading here. If a future
+        # regression re-labels the FR-ownership signal under a different code
+        # (e.g. re-uses E309), this test would otherwise still appear green.
+        non_w587 = [e for e in errors if e.code not in ("W587",)]
+        self.assertEqual(
+            non_w587, [],
+            f"Only W587 (drift-checks-stale) is expected when milestone_index is "
+            f"non-empty but drift.checks is empty. Got: {[e.code for e in errors]}",
+        )
+
+    def test_e308_deferred_milestone_still_conflicts(self):
+        """A 'deferred' milestone still claims FR ownership — must trigger E308.
+
+        Only 'done' milestones are exempt from ownership conflict detection (the FR
+        has been delivered and may legitimately be revisited later). 'deferred'
+        represents a consciously postponed but still-owned commitment, so the same
+        FR in another active/pending milestone is a real contradiction.
+        Validator contract pinned at step_16_anchor.py:111.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            (tmp_dir / "impl_context").mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-deferred", status="deferred",
+                                         fr_refs=["fr-login"], checklist_id_prefix="DEFER"),
+                    make_milestone_entry("ms-active", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
+                ],
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        e308 = [e for e in errors if e.code == "E308" and "fr-login" in e.message]
+        self.assertEqual(
+            len(e308), 1,
+            f"Deferred + active milestone sharing fr-login should fire exactly one "
+            f"E308 FR-ownership conflict. Got: {[e.message for e in errors]}",
+        )
 
     def test_no_e308_when_no_scope_overlap(self):
         """No E308 when milestone scope does not overlap anchor scope."""
@@ -668,6 +738,72 @@ class TestStep16AnchorW588UnreadableMilestone(_AnchorTestBase):
 
         w588 = [e for e in errors if e.code == "W588"]
         self.assertEqual(w588, [], f"W588 should not fire when files parse. Got: {w588}")
+
+
+class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
+    """W589 ANCHOR_MILESTONE_MISSCHEMAED — parseable JSON in impl_context/ with wrong $schema.
+
+    Background: the anchor validator silently skipped files in impl_context/ whose
+    `$schema` wasn't `vc:16-impl-context`. That hid two common authoring mistakes:
+    a missing `$schema` declaration, and an out-of-place artifact filed under
+    impl_context/. W589 surfaces the mismatch so drift checks can't be bypassed
+    by a typo.
+    """
+
+    def test_w589_fires_on_missing_schema_field(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            bad = impl_context_dir / "ms_no_schema.json"
+            bad.write_text(
+                json.dumps({"plan": {"spec_alignment": {"checklist": []}}}),
+                encoding="utf-8",
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "W589" and "ms_no_schema.json" in e.message for e in errors),
+            f"Expected W589 for missing $schema. Got: {errors}",
+        )
+
+    def test_w589_fires_on_wrong_schema_uri(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            bad = impl_context_dir / "ms_wrong_schema.json"
+            bad.write_text(
+                json.dumps({"$schema": "vc:16-anchor", "plan": {}}),
+                encoding="utf-8",
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "W589" and "ms_wrong_schema.json" in e.message for e in errors),
+            f"Expected W589 for wrong $schema. Got: {errors}",
+        )
+
+    def test_no_w589_when_schema_correct(self):
+        """W589 does not fire when every file declares the expected `vc:16-impl-context`."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_clean.json", scope_in=["auth"])
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        w589 = [e for e in errors if e.code == "W589"]
+        self.assertEqual(w589, [], f"W589 should not fire on correct $schema. Got: {w589}")
 
 
 if __name__ == "__main__":

@@ -412,6 +412,173 @@ class TestExtractionIntentCheck(unittest.TestCase):
             errors = check_extraction_intent(tmp, prompts_dir=custom_prompts)
             self.assertEqual(errors, [])
 
+    def test_spec_prefixed_artifact_ref_parsed(self):
+        """Entries like **spec/00_charter.json** are parsed the same as bare filename.
+
+        Authors across the toolkit use both conventions — bare (`**00_charter.json**`)
+        and spec-prefixed (`**spec/00_charter.json**`). Both must register as step
+        references so upstream-dep coverage (E597) is accurate.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "01"],
+                prompts={
+                    "prompt_01_capabilities.md": (
+                        "# Step 01 Capabilities\n\n"
+                        "### Extraction Intent\n\n"
+                        "- **spec/00_charter.json**: Extract the project name, "
+                        "vision statement, and success criteria for system boundaries\n"
+                    ),
+                },
+            )
+            errors = check_extraction_intent(tmp)
+            # spec-prefixed entry must count as a valid reference to step 00,
+            # so neither E597 (missing upstream) nor E591 (empty section) fires.
+            self.assertEqual(errors, [])
+
+    def test_spec_impl_context_reference_maps_to_step_16a(self):
+        """References to **spec/impl_context/<anything>.json** map to step 16a.
+
+        The per-milestone plan filename varies (often a template placeholder), so
+        the parser routes any `spec/impl_context/` entry to step 16a directly
+        without attempting to extract a step number from the filename.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "01", "14", "16", "16a", "16b"],
+                prompts={
+                    "prompt_16b_impl_coder.md": (
+                        "# Step 16b Coder\n\n"
+                        "### Extraction Intent\n\n"
+                        "- **spec/impl_context/{step_id}.json**: the milestone "
+                        "context file 16a authored — read the checklist and write "
+                        "execution results back into the same file\n"
+                        "- **spec/16_impl_context.json**: Trinity Anchor — read "
+                        "scope_in/scope_out to confirm code changes stay within "
+                        "anchor-declared scope for this milestone cycle\n"
+                    ),
+                },
+            )
+            errors = check_extraction_intent(tmp)
+            # Both "16" (from spec/16_impl_context.json) and "16a" (from
+            # spec/impl_context/...) must register so upstream-dep coverage
+            # is satisfied for 16b.
+            e597 = [e for e in render_errors(errors) if e.startswith("E597")]
+            missing_16 = [e for e in e597 if "'16'" in e]
+            missing_16a = [e for e in e597 if "'16a'" in e]
+            self.assertEqual(missing_16, [], f"'16' unexpectedly missing: {errors}")
+            self.assertEqual(missing_16a, [], f"'16a' unexpectedly missing: {errors}")
+
+    def test_step_metadata_required_spec_inputs_used_when_present(self):
+        """When step_order declares step_metadata[step].required_spec_inputs, the
+        validator treats THAT set (not derive_allowed_upstream) as the authoritative
+        coverage requirement.
+
+        Setup: steps = [00, 01, 02]. DAG-allowed upstream for step 02 is {00, 01}
+        (both ancestors). But step_metadata[02].required_spec_inputs = [01] — only
+        step 01 is actually consumed. A prompt declaring only step 01 must pass.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tools_dir = os.path.join(tmp, "tools")
+            os.makedirs(tools_dir, exist_ok=True)
+            step_order = {
+                "steps": ["00", "01", "02"],
+                "step_metadata": {
+                    "02": {"required_spec_inputs": ["01"]},
+                },
+            }
+            with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
+                json.dump(step_order, f)
+            prompts_dir = os.path.join(tmp, "prompts")
+            os.makedirs(prompts_dir, exist_ok=True)
+            with open(os.path.join(prompts_dir, "prompt_02_system_sketch.md"), "w") as f:
+                f.write(
+                    "### Extraction Intent\n\n"
+                    "- **01_capabilities.json**: Extract capability IDs and "
+                    "descriptions used for system sketch component boundaries\n"
+                )
+            errors = check_extraction_intent(tmp)
+            # Step 00 is a DAG ancestor but not a required_spec_input — must NOT fire E597
+            self.assertEqual(errors, [])
+
+    def test_step_metadata_empty_required_spec_inputs_respected(self):
+        """An explicit `required_spec_inputs: []` means 'no upstream deps required'.
+
+        The validator must respect this as a valid declaration (not fall back to
+        derive_allowed_upstream). E.g., step 00 legitimately has no upstream.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tools_dir = os.path.join(tmp, "tools")
+            os.makedirs(tools_dir, exist_ok=True)
+            step_order = {
+                "steps": ["00", "01"],
+                "step_metadata": {
+                    "01": {"required_spec_inputs": []},
+                },
+            }
+            with open(os.path.join(tools_dir, "step_order.json"), "w") as f:
+                json.dump(step_order, f)
+            prompts_dir = os.path.join(tmp, "prompts")
+            os.makedirs(prompts_dir, exist_ok=True)
+            # Prompt declares step 00 — but required is []. Intent for 00 becomes
+            # unrequired noise but should not trigger E597 (no gap). E598 also
+            # should not fire (00 is a valid step).
+            with open(os.path.join(prompts_dir, "prompt_01_capabilities.md"), "w") as f:
+                f.write(
+                    "### Extraction Intent\n\n"
+                    "- **00_charter.json**: Extract the project scope and "
+                    "success criteria used as contextual framing only\n"
+                )
+            errors = check_extraction_intent(tmp)
+            e597 = [e for e in render_errors(errors) if e.startswith("E597")]
+            self.assertEqual(e597, [])
+
+    def test_impl_context_reference_credits_both_16a_and_16b(self):
+        """A single `spec/impl_context/...` bullet covers BOTH 16a and 16b upstreams.
+
+        Rationale: post-anchor-split, the milestone plan file is a shared Trinity
+        artifact — 16a authors it, 16b writes execution evidence into it. Any
+        caller (e.g., 16c) that references `spec/impl_context/...` is reading
+        both contributions through a single path.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make_repo(
+                tmp,
+                steps=["00", "14", "16", "16a", "16b", "16c"],
+                prompts={
+                    "prompt_16c_impl_reviewer.md": (
+                        "# Step 16c Reviewer\n\n"
+                        "### Extraction Intent\n\n"
+                        "- **spec/impl_context/{step_id}.json**: the shared "
+                        "milestone context carrying the 16a plan and 16b "
+                        "execution evidence; read checklist, execution "
+                        "results, and write review findings\n"
+                        "- **spec/16_impl_context.json**: Trinity Anchor "
+                        "scope and milestone_index for FR ownership context\n"
+                        "- **spec/14_roadmap.json**: roadmap milestone "
+                        "definitions used to verify coverage for this cycle\n"
+                    ),
+                },
+            )
+            # Declare required_spec_inputs for 16c that includes both 16a and 16b.
+            step_order_path = os.path.join(tmp, "tools", "step_order.json")
+            with open(step_order_path) as f:
+                step_order = json.load(f)
+            step_order["step_metadata"] = {
+                "16c": {"required_spec_inputs": ["14", "16", "16a", "16b"]},
+            }
+            with open(step_order_path, "w") as f:
+                json.dump(step_order, f)
+            errors = check_extraction_intent(tmp)
+            e597 = [e for e in render_errors(errors) if e.startswith("E597")]
+            # impl_context reference should have satisfied both 16a and 16b
+            self.assertEqual(
+                e597, [],
+                f"Expected impl_context reference to cover 16a and 16b. Got: {errors}",
+            )
+
     def test_combined_errors_multiple_codes(self):
         """A single prompt can produce E597, W597, and E598 simultaneously."""
         with tempfile.TemporaryDirectory() as tmp:

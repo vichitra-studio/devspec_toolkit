@@ -167,19 +167,22 @@ You must **VERIFY** that the Coder respected these high-fidelity fields.
         *   `source`: Where did you find this issue? (e.g. "Manual Audit", "CI Log").
         *   `impact`: What is the risk? (e.g. "Data Loss", "Security Bypass").
 
-## Extraction Intent
+### Extraction Intent
 
-### Primary Sources (directly consumed)
-- `spec/impl_context/{step_id}.json`: the milestone context file you are reviewing — the same artifact 16a authored and 16b populated with execution evidence. 16c reads `plan.spec_alignment.checklist[]`, `execution.execution_results[]`, and `execution.critical_evidence` and writes `review.verdict`, `review.findings`, `review.semantic_review`, and `review.fixture_status` into the same file.
-- `spec/16_impl_context.json`: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (FR ownership for this milestone), and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
-- `spec/04_fr_list.json`: FR acceptance criteria as review checklist
-- `spec/05_interface_contracts.json`: API contracts to verify implementation against
+#### Primary Sources (directly consumed)
+- **spec/impl_context/{step_id}.json**: the milestone context file you are reviewing — the same artifact 16a authored and 16b populated with execution evidence. 16c reads `plan.spec_alignment.checklist[]`, `execution.execution_results[]`, and `execution.critical_evidence` and writes `review.verdict`, `review.findings`, `review.semantic_review`, and `review.fixture_status` into the same file.
+- **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (FR ownership for this milestone), and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
+- **spec/04_fr_list.json**: FR acceptance criteria as review checklist — extract criterion_id and text for the AC-gap semantic pass and for verifying that every checklist item links back to an AC-traceable FR
+- **spec/05_interface_contracts.json**: API contracts to verify implementation against — extract api_id, method, path, and request/response schemas used to reconcile endpoint fixtures against declared contracts
 
-### Reference Sources (context only)
-- `spec/06_invariants.json`: system invariants to check are not violated
-- `spec/07_nfrs.json`: NFR thresholds to verify
-- `spec/14_roadmap.json`: roadmap milestone definitions used to verify that this milestone's checklist actually covers every `tasks[].task_id` declared for it
-- `spec/12_ci_gates.json`: CI gate definitions used when reconciling `review.fixture_status.ci_status` against the configured pipeline expectations
+#### Reference Sources (context only)
+- **spec/02a_delivery_baseline.json**: environment constraints and deployment targets used to verify that implementation evidence (e.g. CI commands, environment refs) aligns with the declared delivery baseline
+- **spec/06_invariants.json**: system invariants to check are not violated — extract invariant_id and rule text for validation-type checklist items
+- **spec/07_nfrs.json**: NFR thresholds to verify — extract nfr_id, measurement method, and threshold values used to cross-check performance and security evidence
+- **spec/08_fixtures.json**: fixture identifiers and target bindings used to verify that every checklist's `linked_test_expectation` maps to a real fixture and that `review.fixture_status` covers every declared fixture
+- **spec/11_redteam.json**: threat identifiers and severity ratings used to verify that security-sensitive code paths declared in scope have matching mitigation evidence or remediation tasks in `review.findings`
+- **spec/12_ci_gates.json**: CI gate definitions used when reconciling `review.fixture_status.ci_status` against the configured pipeline expectations
+- **spec/14_roadmap.json**: roadmap milestone definitions used to verify that this milestone's checklist actually covers every `tasks[].task_id` declared for it
 
 # Operating Flow: Evidence-Based Audit
 
