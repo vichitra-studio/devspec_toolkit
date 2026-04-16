@@ -503,9 +503,8 @@
       "additionalProperties": false,
       "properties": {
         "step_id": {
-          "type": "string",
-          "pattern": "^[0-9]{2}[a-z]?$",
-          "description": "Zero-padded step identifier of the upstream artifact that was ingested (e.g. '04', '05', '16a'). Must match a step key in tools/step_order.json."
+          "$ref": "vc:core:atoms#stepId",
+          "description": "Zero-padded step identifier of the upstream artifact that was ingested (e.g. '04', '05', '16a'). Must match a step key in tools/step_order.json. (Enforced by the shared `vc:core:atoms#stepId` atom — pattern `^[0-9]{2}[a-c]?$` so `04d` or other free-form letter suffixes are rejected at author time.)"
         },
         "artifact_id": {
           "$ref": "vc:core:atoms#kebabId",

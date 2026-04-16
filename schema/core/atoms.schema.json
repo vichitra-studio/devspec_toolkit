@@ -61,6 +61,13 @@
         "FR_USER_LOGIN"
       ]
     },
+    "stepId": {
+      "$anchor": "stepId",
+      "type": "string",
+      "pattern": "^[0-9]{2}[a-c]?$",
+      "description": "Canonical pipeline step identifier. Two digits, optionally followed by a single suffix letter from a/b/c (sub-step letters are restricted because the pipeline only declares 02a/13a/16a/16b/16c). Examples: '00', '02a', '16c'. Anti-pattern: free-form letter suffixes ('04d', '16z') — these would never resolve to a real step in step_order.json. Used everywhere a step needs to be referenced (downstream_consumers, required_spec_inputs, specRefIngested.step_id) so the validation surface stays in lockstep across spec/, tools/, and host repos.",
+      "examples": ["00", "01", "02a", "13a", "16", "16a", "16b", "16c"]
+    },
     "milestoneStatus": {
       "$anchor": "milestoneStatus",
       "type": "string",

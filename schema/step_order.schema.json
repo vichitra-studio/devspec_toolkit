@@ -73,8 +73,7 @@
       "description": "Ordered list of step IDs defining the strict waterfall sequence. Position determines dependency eligibility.",
       "minItems": 1,
       "items": {
-        "type": "string",
-        "pattern": "^[0-9]{2}[a-c]?$",
+        "$ref": "vc:core:atoms#stepId",
         "description": "Step identifier: two-digit number optionally followed by a single lowercase letter suffix (a, b, or c)."
       }
     },
@@ -109,8 +108,7 @@
       "additionalProperties": {
         "type": "array",
         "items": {
-          "type": "string",
-          "pattern": "^[0-9]{2}[a-c]?$",
+          "$ref": "vc:core:atoms#stepId",
           "description": "A step ID (two-digit, optionally with letter suffix) that consumes this step's output."
         },
         "description": "Array of step IDs that consume output from this step."
@@ -128,8 +126,7 @@
             "type": "array",
             "description": "Step IDs whose output this step ingests as input. Must match the inverse of downstream_consumers (a step is listed here iff the producer lists this step in its downstream_consumers). Optional — when omitted, the linter treats this side as empty and surfaces any missing edge via E543.",
             "items": {
-              "type": "string",
-              "pattern": "^[0-9]{2}[a-c]?$",
+              "$ref": "vc:core:atoms#stepId",
               "description": "A step ID that produces upstream input for this step."
             },
             "uniqueItems": true
