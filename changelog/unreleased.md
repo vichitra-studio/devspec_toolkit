@@ -126,6 +126,16 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
 
 **Scope note (H1)**: this fix is anchor-only.  The same `unevaluatedProperties` placement pattern exists in `16_impl_context.schema.json` (and many other step schemas) but predates the Trinity Anchor split (commit 36cbbe6, 2026-03-19). A systemic fix across all 20 step schemas is recommended as a separate follow-up.
 
+#### Prompt + migration template corrections
+
+- **H3 — `prompts/prompt_16_impl_context.md` "active milestone" wording drift**: lines 11, 55, 56, 71 used `"active"` / `"active and planned"` / `"active, done, or planned"` — none of which are valid `milestoneStatus` enum values. The schema enum is `pending | in_progress | done | deferred`. An LLM following the prose verbatim could interpret "active" as `in_progress`-only and silently drop `pending`/`deferred` milestones from the index — breaking E308 FR-ownership detection on entire milestone lifecycles. Rewrote each occurrence to enumerate the real enum values and clarify the cumulative-ledger semantics ("the anchor is the cumulative ledger across cycles, not a snapshot of what's in flight right now"). The Failure Modes line at L144 already correctly *rejected* `active`/`planned` as anti-patterns and is unchanged.
+- **H4 — `prompts/migration/template_extension_generator.md` phantom artifact path**: line 48 referenced `spec/13_extension_generator.json`. The real artifact name is `spec/13_extension_manifest.json` (commit 875dc2c renamed three other prompts but missed this template). LLMs running the template would `validate` against a non-existent file. Corrected to the real artifact name.
+- **M2 — anchor prompt Failure Modes complete**: previously documented W586 / W587 / W588 but never mentioned W589, W607, W608, or the new W609. Authors had no advance warning of these triggers (the migration template covered them, but the anchor prompt itself did not). Added one Failure Mode entry per code with the exact Fix path:
+  - W589 ANCHOR_MILESTONE_MISSCHEMAED — set `$schema` correctly or remove the file
+  - W607 ANCHOR_CONTEXT_PATH_MISSING — create the file at the declared path or fix the index entry
+  - W608 ANCHOR_LEGACY_SCHEMA — follow the breaking-change migration in `changelog/unreleased.md`
+  - W609 ANCHOR_MISFILED — move the file to `spec/16_impl_context.json`
+
 ### Known follow-ups (not in this release)
 
 - **F-S3 / Phase 1 Task 1.2 — Prompt emission of `spec_refs_ingested` / `seed_refs_ingested`.** The schema hook is live on `step_base` and inherited by all 20 step schemas, but no prompt is yet authored to emit these fields. Until prompts populate them, downstream drift detection based on ingested-ref hashes has nothing to read. Tracked for a follow-up feat pass that will coordinate prompt updates across the pipeline.
