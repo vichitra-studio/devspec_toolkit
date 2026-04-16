@@ -47,7 +47,8 @@
               "items": {
                 "type": "string",
                 "minLength": 3,
-                "description": "A concrete scope item included in this implementation."
+                "pattern": "\\S",
+                "description": "A concrete scope item included in this implementation. Must contain at least one non-whitespace character — pure-whitespace strings (e.g. '   ') would otherwise pass minLength but contribute nothing to the E308 comparison."
               }
             },
             "scope_out": {
@@ -57,7 +58,8 @@
               "items": {
                 "type": "string",
                 "minLength": 3,
-                "description": "A concrete scope item excluded from this implementation."
+                "pattern": "\\S",
+                "description": "A concrete scope item excluded from this implementation. Must contain at least one non-whitespace character (see scope_in.items rationale)."
               }
             }
           }
@@ -84,8 +86,9 @@
               "minItems": 0,
               "items": {
                 "type": "string",
-                "minLength": 5,
-                "description": "Description of a drift check performed or scheduled. Example: 'Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-10)'."
+                "minLength": 20,
+                "pattern": "\\S\\s+\\S",
+                "description": "Description of a drift check performed or scheduled. Must be a meaningful prose entry (minLength 20, must contain at least one whitespace-separated pair of non-whitespace runs — i.e. at least two words). Example: 'Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-10)'. Anti-pattern: short tokens like 'none', 'check', 'valid' that pass schema but document nothing."
               },
               "description": "Drift checks performed or planned across milestone cycles. Each string documents what was checked and when."
             }

@@ -417,7 +417,10 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W576: Step 14 task → Step 16b execution pairwise completeness.
     # For each Step 14 task with status != "done", verify that at least one Step 16b
     # execution entry references that task_id.
-    # Guard: only fires when code_execution (16b_code.json) is present — skip entirely otherwise.
+    # Guard: only fires when execution data was loaded from any milestone plan (the
+    # `code_execution` key is synthesized from spec/impl_context/<milestone>_plan.json
+    # files; post-Trinity-Anchor split there is no longer a separate 16b_code.json
+    # artifact — the same milestone-plan file accumulates plan/execution/review).
     if "code_execution" in data and "roadmap" in data:
         code_exec_data = data["code_execution"]
         # Collect all task_ids referenced in 16b execution entries

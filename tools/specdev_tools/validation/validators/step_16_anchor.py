@@ -246,6 +246,12 @@ def validate_step_16_anchor(
 
     # ── Filesystem-dependent checks (E308 scope drift, E309 checklist drift) ──
     # These require loading milestone context files from impl_context/.
+    # NOTE: W607 above intentionally already ran inside the milestone_index
+    # sweep, so a missing ``impl_context/`` directory still surfaces W607 for
+    # every declared milestone — the sweep does not depend on the directory
+    # existing, only on the declarations existing.  This early return only
+    # short-circuits the cross-file E308/E309/W588/W589 checks that genuinely
+    # need a populated directory.
     if not impl_context_dir.exists():
         # No milestone contexts yet — valid state for a fresh anchor.
         return errors
@@ -278,8 +284,13 @@ def validate_step_16_anchor(
             continue
         if not isinstance(ms_data, dict):
             continue
-        declared_schema = ms_data.get("$schema")
-        if declared_schema != "vc:16-impl-context":
+        # Rename to ms_declared_schema to avoid shadowing the outer-scope
+        # ``declared_schema`` variable used by the W608 check earlier in this
+        # function (line ~86).  The two variables have unrelated semantics —
+        # the outer is the ANCHOR's $schema (legacy detection); this one is
+        # each MILESTONE PLAN's $schema (mis-schemaed detection).
+        ms_declared_schema = ms_data.get("$schema")
+        if ms_declared_schema != "vc:16-impl-context":
             # File parses as JSON but isn't declared as a milestone plan.
             # Silent-skipping it would hide authoring mistakes (missing or
             # wrong `$schema`) and drop the file from every drift check.
@@ -289,7 +300,7 @@ def validate_step_16_anchor(
                 make_error(
                     "W589",
                     f"ANCHOR_MILESTONE_MISSCHEMAED: '{ms_file.name}' in "
-                    f"impl_context/ has $schema={declared_schema!r} — expected "
+                    f"impl_context/ has $schema={ms_declared_schema!r} — expected "
                     f"'vc:16-impl-context'. Drift checks skipped this file.",
                 )
             )

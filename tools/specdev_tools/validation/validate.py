@@ -137,7 +137,12 @@ def _refine_impl_context_substep(step: str, data: Any) -> str:
     """
     if step != "16a" or not isinstance(data, dict):
         return step
-    if data.get("artifact_role") == "anchor":
+    # ``.strip()`` for consistency with the verdict check below — schema enforces
+    # the const ``"anchor"`` exactly, but defensive normalisation keeps routing
+    # symmetric (a stray trailing space in either field shouldn't break dispatch
+    # silently while the schema validator separately complains).
+    artifact_role = data.get("artifact_role")
+    if isinstance(artifact_role, str) and artifact_role.strip() == "anchor":
         return "16"
     review = data.get("review")
     if isinstance(review, dict) and isinstance(review.get("verdict"), str) and review["verdict"].strip():

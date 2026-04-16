@@ -104,7 +104,7 @@ class SourceRef:
 class TargetRef:
     """Reference to a target element in the artifact under review."""
     id: str          # e.g., "checklist-item-03"
-    file: str        # e.g., "spec/16a_impl_planner.json"
+    file: str        # e.g., "spec/impl_context/ms_auth_plan.json"
     path: str        # e.g., ".plan.checklist[3].description"
     text: str        # the actual text content
 
