@@ -20,10 +20,6 @@
           "const": "anchor",
           "description": "Identifies this artifact as the Trinity Anchor. Required. Enables validators to distinguish the anchor from 16a/16b/16c milestone plans without relying on file path heuristics. Must always be the string 'anchor' — any other value fails schema validation."
         },
-        "milestone_ref": {
-          "type": "string",
-          "description": "Not used on the anchor (it spans all milestones). Defined here only to prevent spurious unevaluatedProperties failures if the field is accidentally present. Should be absent on well-formed anchors."
-        },
         "plan": {
           "type": "object",
           "additionalProperties": false,
@@ -81,7 +77,7 @@
             "ambiguities": {
               "type": "array",
               "minItems": 0,
-              "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Uses the same item shape as emergent_ambiguities in 16a/16b/16c plans. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
+              "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Item shape is intentionally narrower than emergent_ambiguities in 16b (no `source` field) and planning ambiguities in 16a (severity uses severityLevel, not blocking/non_blocking) — the anchor carries cross-milestone decisions only. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
@@ -110,9 +106,8 @@
                     "description": "Areas or milestones affected by this ambiguity."
                   },
                   "status": {
-                    "type": "string",
-                    "enum": ["resolved", "tracking", "deferred", "blocked"],
-                    "description": "Current resolution status."
+                    "$ref": "vc:core:atoms#ambiguityStatus",
+                    "description": "Current resolution status. Uses the shared ambiguityStatus atom — same enum as planning ambiguities and emergent_ambiguities."
                   },
                   "status_ref": {
                     "description": "Canonical reference for the resolution status.",
@@ -170,22 +165,23 @@
                     "description": "Relative path to this milestone's 16a plan from the spec directory root. Example: 'spec/impl_context/ms_auth_plan.json'."
                   },
                   "status": {
-                    "type": "string",
-                    "enum": ["active", "done", "planned"],
-                    "description": "Lifecycle status of this milestone. 'planned' = not yet started; 'active' = currently being worked; 'done' = all checklist items satisfied and review verdict is 'verified'. Done milestones do not block FR ownership conflict detection — active milestones do."
+                    "$ref": "vc:core:atoms#milestoneStatus",
+                    "description": "Lifecycle status of this milestone, reusing the shared milestoneStatus atom (the same enum 14_roadmap.json uses). Values: 'pending' = not yet started; 'in_progress' = currently being worked; 'done' = all checklist items satisfied and review verdict is 'verified'; 'deferred' = consciously postponed. Only 'done' milestones are exempt from FR ownership conflict detection — pending, in_progress, and deferred all participate."
                   },
                   "fr_refs": {
                     "type": "array",
+                    "uniqueItems": true,
                     "items": {
                       "$ref": "vc:core:atoms#kebabId",
                       "description": "A FR or API ID owned by this milestone."
                     },
-                    "description": "FR and API IDs owned by this milestone. Used by E308 to detect the same FR being active in two milestones simultaneously."
+                    "description": "FR and API IDs owned by this milestone. Array is a set — duplicates are a schema error. Used by E308 to detect the same FR being active in two milestones simultaneously."
                   },
                   "checklist_id_prefix": {
                     "type": "string",
-                    "pattern": "^[A-Z][A-Z0-9_]{1,19}$",
-                    "description": "SCREAMING_SNAKE prefix namespace for checklist IDs in this milestone's 16a plan (e.g., 'AUTH', 'PAYMENT'). Must be unique across milestones to prevent E309 collisions. Example: milestone ms-auth uses prefix 'AUTH_' — all its checklist IDs start with 'AUTH_'."
+                    "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$",
+                    "maxLength": 20,
+                    "description": "SCREAMING_SNAKE prefix namespace for checklist IDs in this milestone's 16a plan (e.g., 'AUTH', 'PAYMENT', 'USER_MGMT'). Must start with an uppercase letter, may contain uppercase/digits, and underscore-delimited segments may follow but must each contain at least one character. Trailing underscores are rejected to prevent double-underscored IDs (e.g. 'AUTH__LOGIN'). Must be unique across milestone_index entries to prevent E309 collisions."
                   },
                   "summary": {
                     "type": "string",

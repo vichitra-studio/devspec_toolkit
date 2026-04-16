@@ -38,21 +38,47 @@ class TestStep16AnchorSchema(unittest.TestCase):
         self.assertEqual(errors, [], f"Expected no errors. Got: {errors}")
 
     def test_invalid_anchor_missing_drift_fails(self):
-        """Anchor without plan.drift field should fail schema validation."""
+        """Anchor without plan.drift field should fail schema validation.
+
+        Assert on the specific signal ('drift' required-property error) so a
+        different unrelated failure (e.g. missing owner) cannot satisfy this
+        test — the point is to pin the drift-required contract.
+        """
         path = self.fixtures_dir / "invalid_anchor_missing_drift.json"
         errors = validate_file(self.repo_root, str(path))
         self.assertTrue(
-            len(errors) > 0,
-            "Expected schema errors for missing plan.drift. Got no errors."
+            any(e.code == "E520" and "'drift'" in e.message for e in errors),
+            f"Expected E520 'drift' required-property error. Got: {errors}"
         )
 
     def test_invalid_anchor_has_execution_fails(self):
-        """Anchor with forbidden execution section should fail (unevaluatedProperties)."""
+        """Anchor with forbidden execution section should fail (unevaluatedProperties).
+
+        Assert on the specific signal ('execution' rejected as unevaluated) so
+        a different unrelated failure cannot satisfy this test — the point is
+        to pin the anchor's unevaluatedProperties:false contract.
+        """
         path = self.fixtures_dir / "invalid_anchor_has_execution.json"
         errors = validate_file(self.repo_root, str(path))
         self.assertTrue(
-            len(errors) > 0,
-            "Expected schema errors for forbidden execution section. Got no errors."
+            any(e.code == "E520" and "execution" in e.message for e in errors),
+            f"Expected E520 'execution' unevaluatedProperties error. Got: {errors}"
+        )
+
+    def test_invalid_anchor_has_milestone_ref_fails(self):
+        """Anchor with a top-level milestone_ref should fail (unevaluatedProperties).
+
+        The anchor spans all milestones and has no single owning milestone, so
+        the anchor schema deliberately does NOT declare milestone_ref. Presence
+        must be rejected by `unevaluatedProperties: false` at the artifact root.
+        This pins that contract so future schema edits can't silently
+        re-introduce the loophole.
+        """
+        path = self.fixtures_dir / "invalid_anchor_has_milestone_ref.json"
+        errors = validate_file(self.repo_root, str(path))
+        self.assertTrue(
+            any(e.code == "E520" and "milestone_ref" in e.message for e in errors),
+            f"Expected E520 'milestone_ref' unevaluatedProperties error. Got: {errors}"
         )
 
 
@@ -185,7 +211,7 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
                     {
                         "milestone_id": "ms-a",
                         "context_path": "spec/impl_context/ms_a.json",
-                        "status": "active",
+                        "status": "in_progress",
                         "fr_refs": ["fr-login"],
                         "checklist_id_prefix": "MSA",
                         "summary": "Milestone A implements login.",
@@ -193,7 +219,7 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
                     {
                         "milestone_id": "ms-b",
                         "context_path": "spec/impl_context/ms_b.json",
-                        "status": "active",
+                        "status": "in_progress",
                         "fr_refs": ["fr-login"],  # same FR — conflict
                         "checklist_id_prefix": "MSB",
                         "summary": "Milestone B also implements login.",
@@ -231,7 +257,7 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
                     {
                         "milestone_id": "ms-active",
                         "context_path": "spec/impl_context/ms_active.json",
-                        "status": "active",
+                        "status": "in_progress",
                         "fr_refs": ["fr-login"],
                         "checklist_id_prefix": "ACTIVE",
                         "summary": "Active milestone revisiting login.",
@@ -460,6 +486,86 @@ class TestStep16AnchorGuard(unittest.TestCase):
             f"Expected W585 for None spec_path. Got: {errors}"
         )
 
+    def test_non_milestone_file_in_impl_context_is_ignored(self):
+        """A file in impl_context/ whose $schema != vc:16-impl-context must NOT
+        contribute to drift detection.  Catches misfiled docs, backups, or
+        non-milestone artifacts from polluting the E308/E309 registries.
+        """
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor = {
+                "$schema": "vc:16-anchor",
+                "id": "anchor-v1",
+                "owner": "api",
+                "created_at": "2024-01-01T00:00:00Z",
+                "artifact_role": "anchor",
+                "canonical_refs_used": [],
+                "plan": {
+                    "summary": {
+                        "functional_summary": "Anchor with stray non-milestone files.",
+                        "scope_in": ["auth"],
+                        "scope_out": ["payments"],
+                    },
+                    "ambiguities": [],
+                    "drift": {"checks": []},
+                    "milestone_index": [],
+                },
+            }
+            anchor_path = tmp_dir / "16_impl_context.json"
+            anchor_path.write_text(json.dumps(anchor), encoding="utf-8")
+
+            # Stray file: schema mismatch — must be ignored.
+            (impl_context_dir / "notes.json").write_text(
+                json.dumps({
+                    "$schema": "vc:draft-notes",
+                    "plan": {
+                        "summary": {
+                            # Would trigger E308 if it were counted.
+                            "scope_in": ["payments"],
+                        },
+                        "spec_alignment": {
+                            "checklist": [
+                                # Would trigger E309 if it were counted against a
+                                # real milestone with the same checklist id.
+                                {"id": "AUTH_LOGIN", "spec_ref": {"id": "fr-ghost"}}
+                            ]
+                        },
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            # Real milestone: same AUTH_LOGIN id but mapped to fr-login — alone
+            # this should NOT fire E309 (one-source-of-truth), and scope_in
+            # does not contradict anchor scope_out.
+            (impl_context_dir / "ms_real.json").write_text(
+                json.dumps({
+                    "$schema": "vc:16-impl-context",
+                    "id": "ms-real",
+                    "plan": {
+                        "summary": {"scope_in": ["auth"], "scope_out": []},
+                        "spec_alignment": {
+                            "checklist": [
+                                {"id": "AUTH_LOGIN", "spec_ref": {"id": "fr-login"}}
+                            ]
+                        },
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            errors = validate_step_16_anchor(anchor, self.repo_root, str(anchor_path))
+
+        e308 = [e for e in errors if e.code == "E308"]
+        e309 = [e for e in errors if e.code == "E309"]
+        self.assertEqual(e308, [], f"Stray file must not trigger E308. Got: {e308}")
+        self.assertEqual(e309, [], f"Stray file must not trigger E309. Got: {e309}")
+
     def test_no_e308_e309_when_no_impl_context_dir(self):
         """No E308/E309 when impl_context/ directory does not exist yet."""
         with tempfile.TemporaryDirectory() as td:
@@ -528,7 +634,7 @@ class TestStep16AnchorW587DriftChecksStale(unittest.TestCase):
             return validate_file(self.repo_root, str(anchor_path))
 
     def _ms_entry(self, milestone_id: str, fr_refs: Optional[list] = None,
-                  status: str = "active") -> dict:
+                  status: str = "in_progress") -> dict:
         return {
             "milestone_id": milestone_id,
             "context_path": f"spec/impl_context/{milestone_id.replace('-', '_')}_plan.json",

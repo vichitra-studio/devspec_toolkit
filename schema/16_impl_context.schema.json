@@ -660,14 +660,8 @@
                     "description": "Mitigation strategy for non-blocking ambiguities (minimum 10 characters)."
                   },
                   "status": {
-                    "type": "string",
-                    "enum": [
-                      "resolved",
-                      "tracking",
-                      "deferred",
-                      "blocked"
-                    ],
-                    "description": "Current resolution status of this ambiguity."
+                    "$ref": "vc:core:atoms#ambiguityStatus",
+                    "description": "Current resolution status of this ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches emergent_ambiguities and the anchor's ambiguities."
                   },
                   "decision": {
                     "type": "string",
@@ -1689,9 +1683,8 @@
                     }
                   },
                   "status": {
-                    "type": "string",
-                    "enum": ["resolved", "tracking", "deferred", "blocked"],
-                    "description": "Current resolution status of this emergent ambiguity. Must be one of: 'resolved' (issue addressed), 'tracking' (under observation), 'deferred' (postponed to future iteration), 'blocked' (requires external input). Matches the planning-phase ambiguity status values for consistency."
+                    "$ref": "vc:core:atoms#ambiguityStatus",
+                    "description": "Current resolution status of this emergent ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches the planning-phase ambiguities status and the anchor's ambiguities status."
                   },
                   "status_ref": {
                   "description": "Canonical reference for this emergent ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Distinct from planning-phase ambiguities, these arise during code execution.",

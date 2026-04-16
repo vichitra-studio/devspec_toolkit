@@ -84,6 +84,17 @@
       ],
       "description": "Severity or risk level across threat assessments, milestone risk ratings, and review findings. Decision rules: 'critical' — system cannot operate or data is permanently corrupted (e.g., auth bypass, data loss); 'high' — significant customer-visible impact or security vulnerability exploitable without authentication; 'medium' — degraded functionality with a workaround available, or authenticated exploit only; 'low' — cosmetic or UX issues, or theoretical attack paths with significant attacker prerequisites."
     },
+    "ambiguityStatus": {
+      "$anchor": "ambiguityStatus",
+      "type": "string",
+      "enum": [
+        "resolved",
+        "tracking",
+        "deferred",
+        "blocked"
+      ],
+      "description": "Resolution status for an ambiguity across planning, execution, and anchor contexts. Decision rules: 'resolved' — decision recorded and no further action needed; 'tracking' — under observation, revisit each cycle; 'deferred' — consciously postponed to a later milestone; 'blocked' — cannot proceed without external input. Shared by planning ambiguities (16 anchor, 16a plan), emergent ambiguities (16b execution), and any future ambiguity-bearing artifact — change this enum in one place, not per schema."
+    },
     "httpMethod": {
       "$anchor": "httpMethod",
       "type": "string",

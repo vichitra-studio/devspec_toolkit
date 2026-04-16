@@ -77,9 +77,10 @@ Before emitting, verify:
 ## Negative Constraints
 1. **NEVER** emit `plan.spec_alignment`, `plan.review_requirements`, `plan.docs_impact`, `plan.solution`, `plan.context`, `plan.security`, `plan.delivery`, `plan.docs`, `plan.coverage_status`, or `plan.scope_validation` — these belong on 16a/16b/16c milestone contexts, not on the anchor.
 2. **NEVER** emit an `execution` or `review` top-level section — the anchor schema forbids them (`unevaluatedProperties: false`).
-3. **NEVER** author a per-FR checklist on the anchor — per-milestone checklist detail lives in each 16a plan.
-4. **NEVER** set `artifact_role` to anything other than `"anchor"` — the value is a JSON Schema `const`.
-5. **NEVER** emit placeholder or empty-string values where content is required (e.g., `functional_summary` must be ≥20 chars; each `drift.checks[]` string must be ≥5 chars; each `milestone_index[].summary` must be ≥10 chars).
+3. **NEVER** emit a top-level `milestone_ref` — the anchor spans all milestones and has no single owning milestone. The schema's `unevaluatedProperties: false` rejects it.
+4. **NEVER** author a per-FR checklist on the anchor — per-milestone checklist detail lives in each 16a plan.
+5. **NEVER** set `artifact_role` to anything other than `"anchor"` — the value is a JSON Schema `const`.
+6. **NEVER** emit placeholder or empty-string values where content is required (e.g., `functional_summary` must be ≥20 chars; each `drift.checks[]` string must be ≥5 chars; each `milestone_index[].summary` must be ≥10 chars).
 
 # Field Definitions & Rules (MANDATORY)
 **Crucial**: Use the following exact definitions to ensure compliance with `vc:16-anchor`:
@@ -192,7 +193,7 @@ Registry of every milestone this anchor governs. Used by validators to detect cr
       {
         "milestone_id": "ms-session",
         "context_path": "spec/impl_context/ms_session_plan.json",
-        "status": "active",
+        "status": "in_progress",
         "fr_refs": ["fr-session-create", "fr-session-revoke"],
         "checklist_id_prefix": "SESSION",
         "summary": "Session management — 2/4 checklist items in progress"

@@ -37,7 +37,7 @@
       {
         "milestone_id": "ms-session",
         "context_path": "spec/impl_context/ms_session_plan.json",
-        "status": "active",
+        "status": "in_progress",
         "fr_refs": ["fr-session-create", "fr-session-revoke"],
         "checklist_id_prefix": "SESSION",
         "summary": "Session management — 2/4 checklist items in progress"
