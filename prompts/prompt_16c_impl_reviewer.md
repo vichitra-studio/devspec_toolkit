@@ -170,14 +170,16 @@ You must **VERIFY** that the Coder respected these high-fidelity fields.
 ## Extraction Intent
 
 ### Primary Sources (directly consumed)
-- `spec/16b_impl_code.json`: implementation artifacts to review
+- `spec/impl_context/{step_id}.json`: the milestone context file you are reviewing — the same artifact 16a authored and 16b populated with execution evidence. 16c reads `plan.spec_alignment.checklist[]`, `execution.execution_results[]`, and `execution.critical_evidence` and writes `review.verdict`, `review.findings`, `review.semantic_review`, and `review.fixture_status` into the same file.
+- `spec/16_impl_context.json`: Trinity Anchor — read `plan.summary` (scope), `plan.milestone_index[<this milestone>]` (FR ownership for this milestone), and `plan.ambiguities` (cross-cycle decisions) so the review verdict is bounded by anchor-declared scope.
 - `spec/04_fr_list.json`: FR acceptance criteria as review checklist
 - `spec/05_interface_contracts.json`: API contracts to verify implementation against
 
 ### Reference Sources (context only)
 - `spec/06_invariants.json`: system invariants to check are not violated
 - `spec/07_nfrs.json`: NFR thresholds to verify
-- `spec/16a_impl_plan.json`: planned tasks to verify all were completed
+- `spec/14_roadmap.json`: roadmap milestone definitions used to verify that this milestone's checklist actually covers every `tasks[].task_id` declared for it
+- `spec/12_ci_gates.json`: CI gate definitions used when reconciling `review.fixture_status.ci_status` against the configured pipeline expectations
 
 # Operating Flow: Evidence-Based Audit
 

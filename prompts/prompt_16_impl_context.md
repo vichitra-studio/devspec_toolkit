@@ -56,7 +56,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 3. **Milestone Index**: For each milestone in `14_roadmap.json` that is active, done, or planned in this cycle, emit one `plan.milestone_index[]` entry with `milestone_id`, `context_path` (pointing at the 16a plan file), `status`, `fr_refs`, `checklist_id_prefix` (SCREAMING_SNAKE namespace the 16a plan will use for its checklist IDs), and a one-line `summary`.
 4. **Ambiguities**: Carry forward unresolved ambiguities from prior Trinity cycles and surface any new cross-milestone decisions that are not yet resolved. Each entry: `id`, `description`, `severity` (`low`/`medium`/`high`/`critical`), optional `impact`, optional `status` (`resolved`/`tracking`/`deferred`/`blocked`), optional `status_ref` (canonical status ref).
 5. **Drift**: Record drift checks performed in this session and previous cycles in `plan.drift.checks` as short, dated human-readable strings (e.g., `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`). May be `[]` on a fresh anchor.
-6. **Emit**: Write the JSON artifact to `spec/16_impl_context.json`. Do not write any fields not listed in the Output Contract — the schema uses `unevaluatedProperties: false` and `additionalProperties: false` on `plan`, so extraneous keys fail validation.
+6. **Emit**: Write the JSON artifact to `spec/16_impl_context.json`. Do not write any fields not listed in the Output Contract — the schema uses `unevaluatedProperties: false` at the artifact root and `additionalProperties: false` on `plan`, so extraneous keys at either level fail validation.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode and emit gap questions only — do not write the artifact.
@@ -112,9 +112,9 @@ Drift monitoring log. `additionalProperties: false`.
 Registry of every milestone this anchor governs. Used by validators to detect cross-milestone FR ownership conflicts (E308) and checklist ID collisions (E309). Each item (`additionalProperties: false`):
 *   `milestone_id` *(required, kebab-case)*: must match a `milestone_id` in `14_roadmap.json`.
 *   `context_path` *(required, string)*: relative path to the milestone's 16a plan (e.g. `"spec/impl_context/ms_auth_plan.json"`).
-*   `status` *(required)*: `active` | `done` | `planned`. Done milestones do **not** block FR ownership conflict detection (the FR has been delivered and may legitimately be re-referenced in a follow-on milestone).
-*   `fr_refs` *(required, array of kebabIds)*: FR and API IDs this milestone owns. Two active milestones claiming the same ID triggers E308.
-*   `checklist_id_prefix` *(required, pattern `^[A-Z][A-Z0-9_]{1,19}$`)*: SCREAMING_SNAKE namespace for the 16a plan's checklist IDs (e.g. `AUTH`, `PAYMENT`). Must be unique across the milestone index — duplicates let two plans collide on the same checklist ID, triggering E309.
+*   `status` *(required)*: `pending` | `in_progress` | `done` | `deferred` (the shared `vc:core:atoms#milestoneStatus` enum — same as `14_roadmap.json`). Only `done` milestones are exempt from FR/API ownership conflict detection (the ID was delivered and may be revisited in a follow-on cycle); pending, in_progress, and deferred all participate.
+*   `fr_refs` *(required, array of kebabIds, `uniqueItems: true`)*: FR and API IDs this milestone owns. Duplicates within the array are a schema error. Two non-done milestones claiming the same ID triggers E308.
+*   `checklist_id_prefix` *(required, pattern `^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$`, max 20 chars)*: SCREAMING_SNAKE namespace for the 16a plan's checklist IDs (e.g. `AUTH`, `PAYMENT`, `USER_MGMT`). Trailing underscores are rejected to prevent double-underscored IDs. Must be unique across `milestone_index` — duplicates trigger E309 immediately at anchor authoring time, before the colliding 16a plans are even written.
 *   `summary` *(required, string, minLength 10)*: one-line status (e.g. *"Auth token issuance — 3/5 items verified, CI green"*).
 
 # Heuristics For Completeness
@@ -134,10 +134,14 @@ Registry of every milestone this anchor governs. Used by validators to detect cr
 
 # Failure Modes (Pitfalls)
 *   **Schema rejection from extra fields**: Emitting `checklist`, `review_requirements`, or `docs_impact` on the anchor. *Fix*: Author only the four fields `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`.
-*   **FR ownership conflict (E308)**: Two active milestones both listing the same FR in `fr_refs`. *Fix*: Move the FR to one milestone; mark the other `done` if already delivered.
-*   **Checklist ID collision (E309)**: Two milestones using the same `checklist_id_prefix`. *Fix*: Assign distinct prefixes per milestone.
+*   **FR/API ownership conflict (E308)**: Two non-done milestones both listing the same FR or API in `fr_refs`. *Fix*: Move the ID to one milestone; mark the other `done` if already delivered, or `deferred` if postponed.
+*   **Checklist namespace collision (E309)**: Two `milestone_index` entries using the same `checklist_id_prefix`. *Fix*: Assign distinct prefixes per milestone (e.g. `AUTH`, `SESSION`, `BILLING`).
+*   **Cross-milestone checklist drift (E309)**: Two milestone-plan files in `spec/impl_context/` allocate the same checklist `id` to different `spec_ref.id` values. *Fix*: Use distinct `checklist_id_prefix` namespaces (the anchor's job to enforce) so the colliding IDs cannot occur.
 *   **Scope drift (E308)**: A milestone's `scope_in` contains a string in the anchor's `scope_out`, or vice versa. *Fix*: Decide whether the item is in or out, update both places to agree.
+*   **Stale drift log (W587)**: `milestone_index` is non-empty but `drift.checks` is empty. *Fix*: Record at least one drift check string per Trinity cycle (e.g. `"Verified <milestone> scope alignment (<date>)"`) — the anchor's load-bearing job is monitoring drift, not just listing milestones.
+*   **Unreadable milestone (W588)**: A `*.json` file in `impl_context/` cannot be parsed and was skipped from drift detection. *Fix*: Repair or remove the offending file — it contributes nothing to E308/E309 while broken.
 *   **Wrong severity enum**: Using `blocking`/`non_blocking` in `ambiguities[].severity`. *Fix*: Use `low`/`medium`/`high`/`critical`.
+*   **Wrong milestone status enum**: Using `active`/`planned` in `milestone_index[].status`. *Fix*: Use `pending`/`in_progress`/`done`/`deferred` — the same enum `14_roadmap.json` uses.
 *   **Drift checks as objects**: Emitting `{target, method, schedule, ...}` inside `drift.checks`. *Fix*: Each check is a short human-readable string.
 *   **JSON dumps**: Printing the JSON in chat. *Fix*: Only write the file.
 

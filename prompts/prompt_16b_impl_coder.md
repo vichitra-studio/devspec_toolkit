@@ -109,8 +109,8 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **16a_impl_planner.json**: implementation plan tasks to execute; task IDs, file patterns, and checklist items that drive code changes for the current cycle
-- **16_impl_context.json**: implementation context including component references, canonical term mappings, scope boundaries, and existing structure state
+- **spec/impl_context/{step_id}.json**: the milestone context file 16a authored — read `plan.spec_alignment.checklist[]` (each item with `spec_ref`, `linked_test_expectation`, `implementation.actions[]`, `target_file_patterns`) and write `execution.execution_results[]`, `execution.critical_evidence`, `execution.final_status`, and per-checklist `implementation.status`/`implementation.evidence` back into the same file. There is no separate `16a_impl_planner.json`; planner, coder, and reviewer all share this single artifact.
+- **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary.scope_in`/`scope_out` to confirm code changes stay within anchor-declared scope, `plan.milestone_index[<this milestone>].checklist_id_prefix` to verify the milestone's checklist namespace, and `plan.ambiguities` for any cross-cycle decisions still in flight. The anchor does not carry component references or canonical term mappings — those live in steps 02 and 03.
 - **05_interface_contracts.json**: API contracts to implement exactly; endpoint definitions, request/response schemas, and authentication modes that bind code to the spec
 
 #### Reference Sources (context only)
