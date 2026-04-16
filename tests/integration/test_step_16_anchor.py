@@ -1,29 +1,59 @@
 """Integration tests for the Step 16 Trinity Anchor validator.
 
 Covers:
-  - Schema validation: valid fixtures pass, invalid fixtures fail
-  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction and FR ownership conflict
+  - Schema validation: valid fixtures pass; invalid fixtures fail on the right signal
+  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction + FR/API ownership conflict
   - E309 (ANCHOR_CHECKLIST_DRIFT): cross-milestone checklist ID collision
+                                  + checklist_id_prefix collision in milestone_index
   - W585 (ANCHOR_DRIFT_SKIP): spec_path is None — filesystem checks skipped
   - W586 (ANCHOR_VALIDATOR_WRONG_ARTIFACT): non-anchor artifact dispatched here
   - W587 (ANCHOR_DRIFT_CHECKS_STALE): non-empty milestone_index but empty drift.checks
+  - W588 (ANCHOR_MILESTONE_UNREADABLE): unparseable milestone in impl_context/
+  - Misfiled-anchor demotion routes to anchor validator and fires W586
+  - Anchor never emits E304 (which is a 16a-plan signal)
+
+Real filesystem only — no mocks. All tests use ``tempfile.TemporaryDirectory`` +
+real JSON files + the real ``validate_file`` orchestrator. Anchor + milestone
+artifacts are constructed via the shared factories in ``_anchor_factories.py``
+to keep schema-evolution churn in one place.
 """
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import List, Optional
 
 from specdev_tools.validation.validate import validate_file
 
+# tests/integration/ has no __init__.py (pytest picks tests up via rootdir
+# discovery, not as a package), so relative imports don't work.  Add the
+# directory to sys.path and import the factory module directly.
+_INTEGRATION_DIR = Path(__file__).resolve().parent
+if str(_INTEGRATION_DIR) not in sys.path:
+    sys.path.insert(0, str(_INTEGRATION_DIR))
 
-class TestStep16AnchorSchema(unittest.TestCase):
+from _anchor_factories import (  # noqa: E402  — sys.path tweak above
+    make_anchor,
+    make_checklist_item,
+    make_milestone_entry,
+    make_milestone_plan,
+)
+
+
+_TOOLKIT_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = str(_TOOLKIT_ROOT)
+_FIXTURES_DIR = _TOOLKIT_ROOT / "tests" / "fixtures" / "step_16"
+
+
+class _AnchorTestBase(unittest.TestCase):
+    """Common base — every anchor test class needs the same toolkit + fixture paths."""
+
+    repo_root = _REPO_ROOT
+    fixtures_dir = _FIXTURES_DIR
+
+
+class TestStep16AnchorSchema(_AnchorTestBase):
     """Schema-level tests using pre-built fixture files."""
-
-    def setUp(self):
-        toolkit_root = Path(__file__).resolve().parents[2]
-        self.repo_root = str(toolkit_root)
-        self.fixtures_dir = toolkit_root / "tests" / "fixtures" / "step_16"
 
     def test_valid_anchor_minimal_passes(self):
         """Minimal valid anchor with empty milestone_index should pass."""
@@ -81,70 +111,24 @@ class TestStep16AnchorSchema(unittest.TestCase):
             f"Expected E520 'milestone_ref' unevaluatedProperties error. Got: {errors}"
         )
 
+    def test_invalid_anchor_missing_milestone_index_fails(self):
+        """Anchor without plan.milestone_index field should fail schema validation.
 
-class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
-    """E308 ANCHOR_SCOPE_DRIFT tests — require filesystem setup."""
+        L3 (RFC Task 2.8 plan): the milestone_index is the load-bearing
+        registry that drives E308 FR-ownership detection and E309
+        prefix-collision detection. Schema must reject its absence with the
+        specific 'milestone_index' required-property signal.
+        """
+        path = self.fixtures_dir / "invalid_anchor_missing_milestone_index.json"
+        errors = validate_file(self.repo_root, str(path))
+        self.assertTrue(
+            any(e.code == "E520" and "milestone_index" in e.message for e in errors),
+            f"Expected E520 'milestone_index' required-property error. Got: {errors}"
+        )
 
-    def setUp(self):
-        toolkit_root = Path(__file__).resolve().parents[2]
-        self.repo_root = str(toolkit_root)
 
-    def _make_anchor(self, tmp_dir: Path, scope_in: list, scope_out: list,
-                     milestone_index: Optional[list] = None) -> Path:
-        anchor = {
-            "$schema": "vc:16-anchor",
-            "id": "anchor-v1",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "artifact_role": "anchor",
-            "canonical_refs_used": [],
-            "plan": {
-                "summary": {
-                    "functional_summary": "Test anchor for E308 scope drift.",
-                    "scope_in": scope_in,
-                    "scope_out": scope_out,
-                },
-                "ambiguities": [],
-                "drift": {"checks": []},
-                "milestone_index": milestone_index or [],
-            },
-        }
-        path = tmp_dir / "16_impl_context.json"
-        path.write_text(json.dumps(anchor), encoding="utf-8")
-        return path
-
-    def _make_milestone(self, impl_context_dir: Path, filename: str,
-                        scope_in: list, scope_out: list,
-                        checklist: Optional[list] = None) -> None:
-        ms = {
-            "$schema": "vc:16-impl-context",
-            "id": "ms-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "Test milestone for scope drift.",
-                    "scope_in": scope_in,
-                    "scope_out": scope_out,
-                    "target_file_patterns": ["src/**/*.py"],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": checklist or [],
-                },
-                "docs_impact": {
-                    "status": "not-required",
-                    "rationale": "No doc changes needed.",
-                    "docs_touched": [],
-                },
-                "review_requirements": {"test_commands": ["pytest tests/"]},
-            },
-            "canonical_refs_used": [],
-            "canonical_proposals": [],
-            "canonical_conflicts": [],
-        }
-        (impl_context_dir / filename).write_text(json.dumps(ms), encoding="utf-8")
+class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
+    """E308 ANCHOR_SCOPE_DRIFT — bidirectional scope check + FR/API ownership."""
 
     def test_e308_milestone_scope_in_contradicts_anchor_scope_out(self):
         """E308 fires when milestone scope_in item appears in anchor scope_out."""
@@ -153,12 +137,12 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(
+            anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
             )
-            self._make_milestone(
+            make_milestone_plan(
                 impl_context_dir, "ms_oauth.json",
                 scope_in=["oauth-flows"],  # contradicts anchor scope_out
                 scope_out=[],
@@ -178,12 +162,12 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(
+            anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
             )
-            self._make_milestone(
+            make_milestone_plan(
                 impl_context_dir, "ms_jwt.json",
                 scope_in=[],
                 scope_out=["jwt-token-validation"],  # contradicts anchor scope_in
@@ -196,79 +180,75 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
             f"Expected E308 for reverse scope contradiction. Got: {errors}"
         )
 
-    def test_e308_fr_ownership_conflict_two_active_milestones(self):
-        """E308 fires when the same FR is owned by two active milestones."""
+    def test_e308_fr_ownership_conflict_two_in_flight_milestones(self):
+        """E308 fires when the same FR is owned by two non-done milestones."""
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
+            (tmp_dir / "impl_context").mkdir()
 
-            anchor_path = self._make_anchor(
+            anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["auth"],
-                scope_out=[],
                 milestone_index=[
-                    {
-                        "milestone_id": "ms-a",
-                        "context_path": "spec/impl_context/ms_a.json",
-                        "status": "in_progress",
-                        "fr_refs": ["fr-login"],
-                        "checklist_id_prefix": "MSA",
-                        "summary": "Milestone A implements login.",
-                    },
-                    {
-                        "milestone_id": "ms-b",
-                        "context_path": "spec/impl_context/ms_b.json",
-                        "status": "in_progress",
-                        "fr_refs": ["fr-login"],  # same FR — conflict
-                        "checklist_id_prefix": "MSB",
-                        "summary": "Milestone B also implements login.",
-                    },
+                    make_milestone_entry("ms-a", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="MSB"),
                 ],
             )
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
         self.assertTrue(
-            any(e.code == "E308" for e in errors),
-            f"Expected E308 for FR ownership conflict. Got: {errors}"
+            any(e.code == "E308" and "FR" in e.message for e in errors),
+            f"Expected E308 with FR ownership conflict marker. Got: {errors}"
         )
 
-    def test_e308_done_milestone_does_not_conflict(self):
-        """A 'done' milestone does not block the same FR in an active milestone."""
+    def test_e308_api_ownership_conflict_uses_api_in_message(self):
+        """E308 ownership-conflict message says 'API' when the conflicting ID starts with api-."""
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
+            (tmp_dir / "impl_context").mkdir()
 
-            anchor_path = self._make_anchor(
+            anchor_path = make_anchor(
                 tmp_dir,
-                scope_in=["auth"],
-                scope_out=[],
+                scope_in=["api"],
                 milestone_index=[
-                    {
-                        "milestone_id": "ms-done",
-                        "context_path": "spec/impl_context/ms_done.json",
-                        "status": "done",  # done — not a conflict source
-                        "fr_refs": ["fr-login"],
-                        "checklist_id_prefix": "DONE",
-                        "summary": "Completed milestone.",
-                    },
-                    {
-                        "milestone_id": "ms-active",
-                        "context_path": "spec/impl_context/ms_active.json",
-                        "status": "in_progress",
-                        "fr_refs": ["fr-login"],
-                        "checklist_id_prefix": "ACTIVE",
-                        "summary": "Active milestone revisiting login.",
-                    },
+                    make_milestone_entry("ms-a", status="in_progress",
+                                         fr_refs=["api-session-create"], checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status="pending",
+                                         fr_refs=["api-session-create"], checklist_id_prefix="MSB"),
                 ],
             )
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
-        e308_errors = [e for e in errors if e.code == "E308"]
-        self.assertEqual(e308_errors, [], f"Done milestone should not trigger E308. Got: {e308_errors}")
+        self.assertTrue(
+            any(e.code == "E308" and "API" in e.message for e in errors),
+            f"Expected E308 with 'API' marker for api- ID conflict. Got: {errors}"
+        )
+
+    def test_e308_done_milestone_does_not_conflict(self):
+        """A 'done' milestone does not block the same FR in an in-flight milestone."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            (tmp_dir / "impl_context").mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-done", status="done",
+                                         fr_refs=["fr-login"], checklist_id_prefix="DONE"),
+                    make_milestone_entry("ms-active", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
+                ],
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        e308 = [e for e in errors if e.code == "E308"]
+        self.assertEqual(e308, [], f"Done milestone should not trigger E308. Got: {e308}")
 
     def test_no_e308_when_no_scope_overlap(self):
         """No E308 when milestone scope does not overlap anchor scope."""
@@ -277,12 +257,12 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(
+            anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
             )
-            self._make_milestone(
+            make_milestone_plan(
                 impl_context_dir, "ms_jwt.json",
                 scope_in=["jwt-token-validation"],  # matches anchor scope_in — fine
                 scope_out=[],
@@ -290,88 +270,12 @@ class TestStep16AnchorE308ScopeDrift(unittest.TestCase):
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
-        e308_errors = [e for e in errors if e.code == "E308"]
-        self.assertEqual(e308_errors, [], f"Did not expect E308. Got: {e308_errors}")
+        e308 = [e for e in errors if e.code == "E308"]
+        self.assertEqual(e308, [], f"Did not expect E308. Got: {e308}")
 
 
-class TestStep16AnchorE309ChecklistDrift(unittest.TestCase):
-    """E309 ANCHOR_CHECKLIST_DRIFT — cross-milestone checklist ID conflict."""
-
-    def setUp(self):
-        toolkit_root = Path(__file__).resolve().parents[2]
-        self.repo_root = str(toolkit_root)
-
-    def _make_anchor(self, tmp_dir: Path) -> Path:
-        anchor = {
-            "$schema": "vc:16-anchor",
-            "id": "anchor-v1",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "artifact_role": "anchor",
-            "canonical_refs_used": [],
-            "plan": {
-                "summary": {
-                    "functional_summary": "Test anchor for E309 checklist drift.",
-                    "scope_in": ["auth"],
-                    "scope_out": [],
-                },
-                "ambiguities": [],
-                "drift": {"checks": []},
-                "milestone_index": [],
-            },
-        }
-        path = tmp_dir / "16_impl_context.json"
-        path.write_text(json.dumps(anchor), encoding="utf-8")
-        return path
-
-    def _make_milestone_with_checklist(self, impl_context_dir: Path, filename: str,
-                                       checklist: list) -> None:
-        ms = {
-            "$schema": "vc:16-impl-context",
-            "id": "ms-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "Test milestone for E309.",
-                    "scope_in": ["auth"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/**/*.py"],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": checklist,
-                },
-                "docs_impact": {
-                    "status": "not-required",
-                    "rationale": "No doc changes.",
-                    "docs_touched": [],
-                },
-                "review_requirements": {"test_commands": ["pytest tests/"]},
-            },
-            "canonical_refs_used": [],
-            "canonical_proposals": [],
-            "canonical_conflicts": [],
-        }
-        (impl_context_dir / filename).write_text(json.dumps(ms), encoding="utf-8")
-
-    def _checklist_item(self, item_id: str, spec_ref_id: str, item_type: str = "behavior") -> dict:
-        return {
-            "id": item_id,
-            "spec_ref": {
-                "type": "fr",
-                "id": spec_ref_id,
-                "line_range": "L1-L10",
-                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678",
-            },
-            "description": f"Checklist item {item_id}.",
-            "type": item_type,
-            "layer": "api",
-            "linked_test_expectation": "pytest test_auth",
-            "nfr_refs": [],
-            "fixture_ref": "fixture-auth",
-        }
+class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
+    """E309 ANCHOR_CHECKLIST_DRIFT — cross-milestone checklist ID + prefix collisions."""
 
     def test_e309_same_id_different_spec_ref(self):
         """E309 fires when same checklist ID maps to different spec_ref.id across milestones."""
@@ -380,15 +284,15 @@ class TestStep16AnchorE309ChecklistDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(tmp_dir)
-            self._make_milestone_with_checklist(
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            make_milestone_plan(
                 impl_context_dir, "ms_a.json",
-                checklist=[self._checklist_item("AUTH_LOGIN", "fr-login-v1")],
+                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
             )
-            self._make_milestone_with_checklist(
+            make_milestone_plan(
                 impl_context_dir, "ms_b.json",
                 # Same ID "AUTH_LOGIN" but different spec_ref.id — E309
-                checklist=[self._checklist_item("AUTH_LOGIN", "fr-login-v2")],
+                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v2")],
             )
 
             errors = validate_file(self.repo_root, str(anchor_path))
@@ -405,20 +309,20 @@ class TestStep16AnchorE309ChecklistDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(tmp_dir)
-            self._make_milestone_with_checklist(
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            make_milestone_plan(
                 impl_context_dir, "ms_a.json",
-                checklist=[self._checklist_item("AUTH_LOGIN", "fr-login-v1")],
+                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
             )
-            self._make_milestone_with_checklist(
+            make_milestone_plan(
                 impl_context_dir, "ms_b.json",
-                checklist=[self._checklist_item("AUTH_LOGIN", "fr-login-v1")],  # same — ok
+                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],  # same — ok
             )
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
-        e309_errors = [e for e in errors if e.code == "E309"]
-        self.assertEqual(e309_errors, [], f"Did not expect E309. Got: {e309_errors}")
+        e309 = [e for e in errors if e.code == "E309"]
+        self.assertEqual(e309, [], f"Did not expect E309. Got: {e309}")
 
     def test_no_e309_different_ids_different_spec_refs(self):
         """No E309 when checklist IDs are unique across milestones."""
@@ -427,34 +331,77 @@ class TestStep16AnchorE309ChecklistDrift(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = self._make_anchor(tmp_dir)
-            self._make_milestone_with_checklist(
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            make_milestone_plan(
                 impl_context_dir, "ms_a.json",
-                checklist=[self._checklist_item("AUTH_LOGIN", "fr-login")],
+                checklist=[make_checklist_item("AUTH_LOGIN", "fr-login")],
             )
-            self._make_milestone_with_checklist(
+            make_milestone_plan(
                 impl_context_dir, "ms_b.json",
-                checklist=[self._checklist_item("AUTH_SESSION", "fr-session")],
+                checklist=[make_checklist_item("AUTH_SESSION", "fr-session")],
             )
 
             errors = validate_file(self.repo_root, str(anchor_path))
 
-        e309_errors = [e for e in errors if e.code == "E309"]
-        self.assertEqual(e309_errors, [], f"Did not expect E309. Got: {e309_errors}")
+        e309 = [e for e in errors if e.code == "E309"]
+        self.assertEqual(e309, [], f"Did not expect E309. Got: {e309}")
+
+    def test_e309_fires_for_duplicate_checklist_id_prefix_in_milestone_index(self):
+        """E309 fires at anchor authoring time when two milestone_index entries share checklist_id_prefix.
+
+        H4: prompt_16 promises the anchor validator catches this; previously
+        only the after-the-fact cross-plan ID collision was caught.  Scope check
+        runs from anchor data alone — no impl_context/ tree needed.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-auth-v1", status="done",
+                                         fr_refs=["fr-login"], checklist_id_prefix="AUTH"),
+                    make_milestone_entry("ms-auth-v2", status="in_progress",
+                                         fr_refs=["fr-mfa"], checklist_id_prefix="AUTH"),
+                ],
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "E309" and "checklist_id_prefix" in e.message for e in errors),
+            f"Expected E309 for duplicate checklist_id_prefix. Got: {errors}"
+        )
+
+    def test_no_e309_when_checklist_id_prefix_is_unique(self):
+        """E309 does not fire when every milestone uses a distinct checklist_id_prefix."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status="pending",
+                                         fr_refs=["fr-signup"], checklist_id_prefix="MSB"),
+                ],
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        e309 = [e for e in errors if e.code == "E309"]
+        self.assertEqual(e309, [], f"Did not expect E309 with unique prefixes. Got: {e309}")
 
 
-class TestStep16AnchorGuard(unittest.TestCase):
-    """W585/W586 guard tests — wrong artifact type and missing spec_path."""
-
-    def setUp(self):
-        toolkit_root = Path(__file__).resolve().parents[2]
-        self.repo_root = str(toolkit_root)
+class TestStep16AnchorGuards(_AnchorTestBase):
+    """W585 / W586 guards plus the "anchor route never emits E304" contract."""
 
     def test_w586_non_anchor_routed_to_anchor_validator(self):
         """W586 fires when anchor validator receives a non-anchor artifact."""
         from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
 
-        # Pass a plain impl-context artifact (no artifact_role) with no path
+        # Plain impl-context artifact (no artifact_role) with no path
         data = {
             "$schema": "vc:16-impl-context",
             "id": "ms-test",
@@ -498,26 +445,13 @@ class TestStep16AnchorGuard(unittest.TestCase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor = {
-                "$schema": "vc:16-anchor",
-                "id": "anchor-v1",
-                "owner": "api",
-                "created_at": "2024-01-01T00:00:00Z",
-                "artifact_role": "anchor",
-                "canonical_refs_used": [],
-                "plan": {
-                    "summary": {
-                        "functional_summary": "Anchor with stray non-milestone files.",
-                        "scope_in": ["auth"],
-                        "scope_out": ["payments"],
-                    },
-                    "ambiguities": [],
-                    "drift": {"checks": []},
-                    "milestone_index": [],
-                },
-            }
-            anchor_path = tmp_dir / "16_impl_context.json"
-            anchor_path.write_text(json.dumps(anchor), encoding="utf-8")
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                scope_out=["payments"],
+                functional_summary="Anchor with stray non-milestone files.",
+            )
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
 
             # Stray file: schema mismatch — must be ignored.
             (impl_context_dir / "notes.json").write_text(
@@ -540,9 +474,7 @@ class TestStep16AnchorGuard(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            # Real milestone: same AUTH_LOGIN id but mapped to fr-login — alone
-            # this should NOT fire E309 (one-source-of-truth), and scope_in
-            # does not contradict anchor scope_out.
+            # Real milestone: same AUTH_LOGIN id mapped to fr-login — by itself no E309.
             (impl_context_dir / "ms_real.json").write_text(
                 json.dumps({
                     "$schema": "vc:16-impl-context",
@@ -559,7 +491,7 @@ class TestStep16AnchorGuard(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            errors = validate_step_16_anchor(anchor, self.repo_root, str(anchor_path))
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
 
         e308 = [e for e in errors if e.code == "E308"]
         e309 = [e for e in errors if e.code == "E309"]
@@ -570,26 +502,11 @@ class TestStep16AnchorGuard(unittest.TestCase):
         """No E308/E309 when impl_context/ directory does not exist yet."""
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            anchor = {
-                "$schema": "vc:16-anchor",
-                "id": "anchor-v1",
-                "owner": "api",
-                "created_at": "2024-01-01T00:00:00Z",
-                "artifact_role": "anchor",
-                "canonical_refs_used": [],
-                "plan": {
-                    "summary": {
-                        "functional_summary": "Fresh anchor, no milestones yet.",
-                        "scope_in": ["auth"],
-                        "scope_out": [],
-                    },
-                    "ambiguities": [],
-                    "drift": {"checks": []},
-                    "milestone_index": [],
-                },
-            }
-            anchor_path = tmp_dir / "16_impl_context.json"
-            anchor_path.write_text(json.dumps(anchor), encoding="utf-8")
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                functional_summary="Fresh anchor, no milestones yet.",
+            )
             # No impl_context/ directory — fresh anchor
 
             errors = validate_file(self.repo_root, str(anchor_path))
@@ -598,59 +515,97 @@ class TestStep16AnchorGuard(unittest.TestCase):
         self.assertNotIn("E308", e_codes, f"No E308 expected without impl_context/. Errors: {errors}")
         self.assertNotIn("E309", e_codes, f"No E309 expected without impl_context/. Errors: {errors}")
 
+    def test_anchor_route_never_emits_e304(self):
+        """L4: E304 ROADMAP_TASK_UNCOVERED is a 16a-plan signal and must never appear on the anchor route.
 
-class TestStep16AnchorW587DriftChecksStale(unittest.TestCase):
-    """W587 ANCHOR_DRIFT_CHECKS_STALE — milestone_index populated but drift.checks empty."""
-
-    def setUp(self):
-        toolkit_root = Path(__file__).resolve().parents[2]
-        self.repo_root = str(toolkit_root)
-
-    def _build_anchor(self, milestone_index: list, drift_checks: list) -> dict:
-        return {
-            "$schema": "vc:16-anchor",
-            "id": "anchor-v1",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "artifact_role": "anchor",
-            "canonical_refs_used": [],
-            "plan": {
-                "summary": {
-                    "functional_summary": "Anchor for W587 coverage.",
-                    "scope_in": ["auth"],
-                    "scope_out": [],
-                },
-                "ambiguities": [],
-                "drift": {"checks": drift_checks},
-                "milestone_index": milestone_index,
-            },
-        }
-
-    def _write_and_validate(self, anchor: dict) -> list:
+        Even with milestone_index entries that reference real-looking IDs, the
+        anchor validator skips E304 entirely (E304 lives in step_16.py and is
+        gated on _is_anchor).  A regression that re-routes the anchor through
+        validate_step_16 would re-introduce false E304s; this test pins the
+        contract.
+        """
         with tempfile.TemporaryDirectory() as td:
             tmp_dir = Path(td)
-            anchor_path = tmp_dir / "16_impl_context.json"
-            anchor_path.write_text(json.dumps(anchor), encoding="utf-8")
-            return validate_file(self.repo_root, str(anchor_path))
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-auth", status="in_progress",
+                                         fr_refs=["fr-login"], checklist_id_prefix="AUTH"),
+                ],
+                drift_checks=["Verified ms-auth scope (2026-04-15)"],
+            )
 
-    def _ms_entry(self, milestone_id: str, fr_refs: Optional[list] = None,
-                  status: str = "in_progress") -> dict:
-        return {
-            "milestone_id": milestone_id,
-            "context_path": f"spec/impl_context/{milestone_id.replace('-', '_')}_plan.json",
-            "status": status,
-            "fr_refs": fr_refs or ["fr-login"],
-            "checklist_id_prefix": milestone_id.upper().replace("-", "_")[:20],
-            "summary": f"{milestone_id} summary line.",
-        }
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        e304 = [e for e in errors if e.code == "E304"]
+        self.assertEqual(e304, [], f"Anchor route must never emit E304. Got: {e304}")
+
+    def test_misfiled_anchor_inside_impl_context_dir_routes_to_anchor_validator(self):
+        """M5: an anchor file misplaced under impl_context/ should be demoted to the anchor route.
+
+        Without the demotion in _refine_impl_context_substep, the file would be
+        deep-validated by validate_step_16a and emit confusing 16a-specific
+        errors (missing plan.status, missing spec_alignment.checklist).  After
+        the fix, the anchor validator sees the file via the proper route and
+        the schema-required `plan.summary.functional_summary` etc. are checked
+        against vc:16-anchor instead.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            misfiled_path = impl_context_dir / "16_impl_context.json"
+            misfiled_path.write_text(
+                json.dumps({
+                    "$schema": "vc:16-anchor",
+                    "id": "anchor-test",
+                    "owner": "api",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "artifact_role": "anchor",
+                    "canonical_refs_used": [],
+                    "plan": {
+                        "summary": {
+                            "functional_summary": "Misfiled anchor inside impl_context/.",
+                            "scope_in": ["auth"],
+                            "scope_out": [],
+                        },
+                        "ambiguities": [],
+                        "drift": {"checks": []},
+                        "milestone_index": [],
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            errors = validate_file(self.repo_root, str(misfiled_path))
+
+        # No 16a-specific errors should fire; the file is recognized as the anchor.
+        # Two acceptable observable signals:
+        #   - The file passes the anchor schema (artifact_role + plan are valid)
+        #   - No E305 PLANNED_UNEXECUTED, no E307 BEHAVIOR_VALIDATION_PAIRING,
+        #     no W581 MILESTONE_REF_MISSING — those are all 16a/16b/16c codes
+        sub_step_only = {"E305", "E307", "W581", "W582"}
+        emitted_sub_step = {e.code for e in errors} & sub_step_only
+        self.assertEqual(
+            emitted_sub_step, set(),
+            f"Misfiled anchor must not emit 16a/b/c-specific codes. Got: {[e for e in errors if e.code in sub_step_only]}"
+        )
+
+
+class TestStep16AnchorW587DriftChecksStale(_AnchorTestBase):
+    """W587 ANCHOR_DRIFT_CHECKS_STALE — milestone_index populated but drift.checks empty."""
 
     def test_w587_fires_when_milestones_indexed_but_no_drift_checks(self):
         """W587 fires when milestone_index has entries and drift.checks is empty."""
-        anchor = self._build_anchor(
-            milestone_index=[self._ms_entry("ms-auth")],
-            drift_checks=[],
-        )
-        errors = self._write_and_validate(anchor)
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(
+                Path(td),
+                scope_in=["auth"],
+                milestone_index=[make_milestone_entry("ms-auth")],
+                drift_checks=[],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
         self.assertTrue(
             any(e.code == "W587" for e in errors),
             f"Expected W587 for populated milestone_index + empty drift.checks. Got: {errors}"
@@ -658,20 +613,61 @@ class TestStep16AnchorW587DriftChecksStale(unittest.TestCase):
 
     def test_no_w587_when_drift_checks_populated(self):
         """W587 does not fire when drift.checks has at least one entry."""
-        anchor = self._build_anchor(
-            milestone_index=[self._ms_entry("ms-auth")],
-            drift_checks=["Verified ms-auth scope alignment (2026-04-15)"],
-        )
-        errors = self._write_and_validate(anchor)
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(
+                Path(td),
+                scope_in=["auth"],
+                milestone_index=[make_milestone_entry("ms-auth")],
+                drift_checks=["Verified ms-auth scope alignment (2026-04-15)"],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
         w587 = [e for e in errors if e.code == "W587"]
         self.assertEqual(w587, [], f"W587 should not fire when drift.checks is populated. Got: {w587}")
 
     def test_no_w587_when_milestone_index_empty(self):
         """W587 does not fire on a fresh anchor with no milestones yet."""
-        anchor = self._build_anchor(milestone_index=[], drift_checks=[])
-        errors = self._write_and_validate(anchor)
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(Path(td), scope_in=["auth"])
+            errors = validate_file(self.repo_root, str(anchor_path))
         w587 = [e for e in errors if e.code == "W587"]
         self.assertEqual(w587, [], f"W587 should not fire when milestone_index is empty. Got: {w587}")
+
+
+class TestStep16AnchorW588UnreadableMilestone(_AnchorTestBase):
+    """W588 ANCHOR_MILESTONE_UNREADABLE — corrupt or unparseable milestone files."""
+
+    def test_w588_fires_on_unparseable_milestone_json(self):
+        """W588 fires (with the offending filename) when a milestone file in impl_context/ is malformed JSON."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            broken_path = impl_context_dir / "ms_broken.json"
+            broken_path.write_text("{not: valid json,", encoding="utf-8")
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "W588" and "ms_broken.json" in e.message for e in errors),
+            f"Expected W588 mentioning ms_broken.json. Got: {errors}"
+        )
+
+    def test_no_w588_when_all_milestone_files_parse(self):
+        """W588 does not fire when every milestone file in impl_context/ parses cleanly."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_clean.json", scope_in=["auth"])
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        w588 = [e for e in errors if e.code == "W588"]
+        self.assertEqual(w588, [], f"W588 should not fire when files parse. Got: {w588}")
 
 
 if __name__ == "__main__":

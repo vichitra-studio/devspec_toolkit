@@ -179,6 +179,14 @@ class StepMetadataConsistencyTests(unittest.TestCase):
             json.dumps(data), encoding="utf-8",
         )
 
+    def _write_seed_manifest(self, root: Path, step_requirements: dict) -> None:
+        """Write a minimal seed_manifest.json under spec/common/ for the seed-consistency check."""
+        (root / "spec" / "common").mkdir(parents=True, exist_ok=True)
+        (root / "spec" / "common" / "seed_manifest.json").write_text(
+            json.dumps({"step_requirements": step_requirements}),
+            encoding="utf-8",
+        )
+
     def test_absent_step_metadata_is_no_op(self):
         """When step_metadata is absent the consistency check emits no errors."""
         with tempfile.TemporaryDirectory() as td:
@@ -198,26 +206,26 @@ class StepMetadataConsistencyTests(unittest.TestCase):
                 "steps": ["00", "01", "02"],
                 "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
                 "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
-                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
-                    "02": {"required_spec_inputs": ["00", "01"], "required_seed_inputs": [], "extraction_intent": ""},
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": []},
+                    "02": {"required_spec_inputs": ["00", "01"], "required_seed_inputs": []},
                 },
             })
             errs = lint_dependency_order(str(root))
             self.assertEqual([], errs)
 
     def test_missing_required_spec_input_reported(self):
-        """E540 fires when downstream_consumers implies an edge not declared in required_spec_inputs."""
+        """E543 fires when downstream_consumers implies an edge not declared in required_spec_inputs."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_order(root, {
                 "steps": ["00", "01", "02"],
                 "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
                 "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
-                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
-                    # 02 is missing "01" — should trigger E540
-                    "02": {"required_spec_inputs": ["00"], "required_seed_inputs": [], "extraction_intent": ""},
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": []},
+                    # 02 is missing "01" — should trigger E543
+                    "02": {"required_spec_inputs": ["00"], "required_seed_inputs": []},
                 },
             })
             errs = lint_dependency_order(str(root))
@@ -228,17 +236,17 @@ class StepMetadataConsistencyTests(unittest.TestCase):
             )
 
     def test_extra_required_spec_input_reported(self):
-        """E540 fires when required_spec_inputs lists a step not in downstream_consumers."""
+        """E543 fires when required_spec_inputs lists a step not in downstream_consumers."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_order(root, {
                 "steps": ["00", "01", "02"],
                 "downstream_consumers": {"00": ["01"], "01": [], "02": []},
                 "step_metadata": {
-                    "00": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
                     # 01 claims to depend on 02 but downstream_consumers says otherwise
-                    "01": {"required_spec_inputs": ["00", "02"], "required_seed_inputs": [], "extraction_intent": ""},
-                    "02": {"required_spec_inputs": [], "required_seed_inputs": [], "extraction_intent": ""},
+                    "01": {"required_spec_inputs": ["00", "02"], "required_seed_inputs": []},
+                    "02": {"required_spec_inputs": [], "required_seed_inputs": []},
                 },
             })
             errs = lint_dependency_order(str(root))
@@ -246,6 +254,92 @@ class StepMetadataConsistencyTests(unittest.TestCase):
             self.assertTrue(
                 any("STEP_METADATA_INCONSISTENT" in e and "extra" in e for e in rendered),
                 f"Expected extra-edge error, got: {rendered}",
+            )
+
+    def test_seed_consistency_no_manifest_is_no_op(self):
+        """When seed_manifest.json is absent the seed-consistency check emits no errors."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01"],
+                "downstream_consumers": {"00": ["01"], "01": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": ["seed-overview"]},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": []},
+                },
+            })
+            # No seed_manifest.json written — seed-consistency branch must skip silently.
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs)
+
+    def test_seed_consistency_consistent_passes(self):
+        """Matching required_seed_inputs and seed_manifest.step_requirements produces no errors."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01"],
+                "downstream_consumers": {"00": ["01"], "01": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": ["seed-overview", "seed-tech-stack"]},
+                    "01": {"required_spec_inputs": ["00"], "required_seed_inputs": ["seed-overview"]},
+                },
+            })
+            self._write_seed_manifest(root, {
+                "00": ["seed-overview", "seed-tech-stack"],
+                "01": ["seed-overview"],
+            })
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs)
+
+    def test_seed_consistency_missing_reported(self):
+        """E543 fires when seed_manifest declares a seed dependency that step_metadata omits."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00"],
+                "downstream_consumers": {"00": []},
+                "step_metadata": {
+                    # step_metadata declares no seeds for 00
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": []},
+                },
+            })
+            # seed_manifest says 00 needs seed-overview — this is a missing edge
+            self._write_seed_manifest(root, {"00": ["seed-overview"]})
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any(
+                    "STEP_METADATA_INCONSISTENT" in e
+                    and "required_seed_inputs" in e
+                    and "missing" in e
+                    for e in rendered
+                ),
+                f"Expected missing seed-edge error, got: {rendered}",
+            )
+
+    def test_seed_consistency_extra_reported(self):
+        """E543 fires when step_metadata lists a seed that seed_manifest does not require."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00"],
+                "downstream_consumers": {"00": []},
+                "step_metadata": {
+                    # step_metadata claims 00 needs seed-bogus, but seed_manifest disagrees
+                    "00": {"required_spec_inputs": [], "required_seed_inputs": ["seed-overview", "seed-bogus"]},
+                },
+            })
+            self._write_seed_manifest(root, {"00": ["seed-overview"]})
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any(
+                    "STEP_METADATA_INCONSISTENT" in e
+                    and "required_seed_inputs" in e
+                    and "extra" in e
+                    for e in rendered
+                ),
+                f"Expected extra seed-edge error, got: {rendered}",
             )
 
 
