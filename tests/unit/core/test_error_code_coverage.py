@@ -21,7 +21,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Canonical registry (4xx)
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)
-            "E510", "E512", "E520", "E521", "E530", "E540", "E541",
+            "E510", "E512", "E520", "E521", "E530", "E540", "E541", "E543",
             "E550", "E551", "E552", "E553", "E554", "E555",
             "E560", "E561", "E562", "E563",
             "E564", "E565", "E566", "E567", "E568", "E569",
@@ -32,7 +32,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W564", "W565", "W566", "W567", "W568", "W569",
             "W570", "W571", "W572", "W573", "W574",
             "W575", "W576",
-            "W580", "W581", "W582", "W583", "W584", "W585", "W586", "W587",
+            "W580", "W581", "W582", "W583", "W584", "W585", "W586", "W587", "W588",
             # R9: Cross-step validation (59x)
             "E590", "E591", "E592", "E593", "E594", "E595",
             "E596", "E597", "E598", "E599",

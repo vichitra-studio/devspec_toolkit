@@ -54,9 +54,10 @@ def validate_step_16_anchor(
             make_error(
                 "W586",
                 "ANCHOR_VALIDATOR_WRONG_ARTIFACT: validate_step_16_anchor called on "
-                "a non-anchor artifact (artifact_role != 'anchor' and path heuristic "
-                "does not match 16_impl_context.json outside impl_context/).  "
-                "Check validate.py dispatch routing.",
+                "an artifact that is neither field-marked (artifact_role == 'anchor') "
+                "nor path-marked (spec/16_impl_context.json outside impl_context/). "
+                "Both signals failed — this indicates a routing bug in validate.py "
+                "dispatch or a mis-authored artifact that should not have reached here.",
             )
         )
         return errors
@@ -97,34 +98,62 @@ def validate_step_16_anchor(
             )
         )
 
-    # ── E308: FR ownership conflict ────────────────────────────────────────────
+    # ── E308: FR/API ownership conflict ───────────────────────────────────────
     # Uses only anchor data — runs even when impl_context/ is absent or empty.
-    # The same FR/API ID must not be active in two milestones simultaneously.
-    # Done milestones do not conflict — a FR may be revisited after delivery.
-    fr_to_active_milestone: dict[str, str] = {}
+    # The same FR/API ID must not be in-flight in two milestones simultaneously.
+    # Done milestones do not conflict — an ID may be revisited after delivery.
+    id_to_milestone: dict[str, str] = {}
     for entry in milestone_index:
         if not isinstance(entry, dict):
             continue
         ms_id = entry.get("milestone_id", "")
         status = entry.get("status", "")
         if status == "done":
-            continue  # Done milestones do not block
+            continue  # Done milestones do not block (delivered, may be revisited)
         fr_refs: list[str] = entry.get("fr_refs", []) or []
-        for fr_id in fr_refs:
-            if not isinstance(fr_id, str):
+        for ref_id in fr_refs:
+            if not isinstance(ref_id, str):
                 continue
-            if fr_id in fr_to_active_milestone:
-                prev_ms = fr_to_active_milestone[fr_id]
+            if ref_id in id_to_milestone:
+                prev_ms = id_to_milestone[ref_id]
+                kind = "API" if ref_id.startswith("api-") else "FR"
                 errors.append(
                     make_error(
                         "E308",
-                        f"ANCHOR_SCOPE_DRIFT: FR ownership conflict — '{fr_id}' is "
-                        f"claimed by both active milestone '{prev_ms}' and '{ms_id}'.  "
-                        f"Only one active milestone may own a given FR at a time.",
+                        f"ANCHOR_SCOPE_DRIFT: {kind} ownership conflict — '{ref_id}' is "
+                        f"claimed by both in-flight milestone '{prev_ms}' and '{ms_id}'.  "
+                        f"Only one non-done milestone may own a given {kind} at a time.",
                     )
                 )
             else:
-                fr_to_active_milestone[fr_id] = ms_id
+                id_to_milestone[ref_id] = ms_id
+
+    # ── E309: checklist_id_prefix collision (anchor milestone_index) ──────────
+    # Two milestone_index entries sharing the same checklist_id_prefix will
+    # allocate checklist IDs from the same namespace in their 16a plans; this
+    # is the authoring-time equivalent of the cross-milestone ID collision
+    # E309 below catches at plan time.  Detecting it here stops the drift at
+    # its root and is what prompt_16 promises.
+    prefix_to_milestone: dict[str, str] = {}
+    for entry in milestone_index:
+        if not isinstance(entry, dict):
+            continue
+        prefix = entry.get("checklist_id_prefix")
+        ms_id = entry.get("milestone_id", "")
+        if not isinstance(prefix, str) or not prefix:
+            continue
+        if prefix in prefix_to_milestone:
+            prev_ms = prefix_to_milestone[prefix]
+            errors.append(
+                make_error(
+                    "E309",
+                    f"ANCHOR_CHECKLIST_DRIFT: checklist_id_prefix '{prefix}' is shared by "
+                    f"milestone_index entries '{prev_ms}' and '{ms_id}' — two milestones "
+                    f"cannot allocate checklist IDs from the same namespace.",
+                )
+            )
+        else:
+            prefix_to_milestone[prefix] = ms_id
 
     # ── Filesystem-dependent checks (E308 scope drift, E309 checklist drift) ──
     # These require loading milestone context files from impl_context/.
@@ -133,14 +162,37 @@ def validate_step_16_anchor(
         # No milestone contexts yet — valid state for a fresh anchor.
         return errors
 
+    # Only milestone-plan artifacts declaring $schema == "vc:16-impl-context" count
+    # for drift detection.  Stray files in impl_context/ (temp drafts, backups,
+    # non-JSON-object roots) are silently skipped — they have their own validators
+    # or should not be there.  Filtering by $schema prevents a misfiled document
+    # from polluting the E308/E309 registries.
+    #
+    # A file that *should* be a milestone plan but cannot be read or parsed is a
+    # different case: silently dropping it would hide the file from E308/E309
+    # entirely, so emit W588 and continue.  In ``validate_dir`` that same file
+    # will also be picked up by its own dispatcher (with a richer error); in
+    # ``validate_file`` on the anchor alone, W588 is the only diagnostic the
+    # author sees.
     milestone_contexts: dict[str, dict[str, Any]] = {}
     for ms_file in sorted(impl_context_dir.glob("*.json")):
         try:
             ms_data = json.loads(ms_file.read_text(encoding="utf-8"))
-            if isinstance(ms_data, dict):
-                milestone_contexts[str(ms_file)] = ms_data
-        except (OSError, json.JSONDecodeError):
-            continue  # Unreadable milestone files are reported by their own validators.
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(
+                make_error(
+                    "W588",
+                    f"ANCHOR_MILESTONE_UNREADABLE: '{ms_file.name}' in impl_context/ "
+                    f"could not be read or parsed ({type(exc).__name__}: {exc}); "
+                    f"drift detection skipped this file.",
+                )
+            )
+            continue
+        if not isinstance(ms_data, dict):
+            continue
+        if ms_data.get("$schema") != "vc:16-impl-context":
+            continue
+        milestone_contexts[str(ms_file)] = ms_data
 
     if not milestone_contexts:
         return errors

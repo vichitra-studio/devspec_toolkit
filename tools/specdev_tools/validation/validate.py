@@ -104,12 +104,13 @@ def _get_step_from_path(path: str) -> str:
 
 
 def _refine_impl_context_substep(step: str, data: Any) -> str:
-    """Promote ``impl_context/`` dispatch from ``"16a"`` to ``"16b"`` or ``"16c"``.
+    """Promote/demote ``impl_context/`` dispatch by artifact content.
 
     All three Trinity sub-step artifacts share ``spec/impl_context/`` and the
     ``vc:16-impl-context`` schema, so path alone cannot distinguish them.
     Content signals the highest phase present:
 
+    - ``artifact_role == "anchor"``                      → ``"16"`` (misfiled anchor)
     - ``review.verdict`` present (non-empty string)      → ``"16c"`` (reviewer output)
     - ``execution.execution_results`` populated (len>0)  → ``"16b"`` (coder output)
     - otherwise                                          → ``"16a"`` (planner output)
@@ -117,10 +118,27 @@ def _refine_impl_context_substep(step: str, data: Any) -> str:
     ``validate_step_16c`` chains through ``validate_step_16b`` → ``validate_step_16a``,
     so routing to the highest phase runs every earlier phase's checks as well.
     Non-``"16a"`` inputs are returned unchanged — this function is a no-op for
-    anchor artifacts, charter artifacts, etc.
+    charter artifacts, scaffold artifacts, etc.
+
+    Anchor demotion rationale: when an author drops the anchor file inside
+    ``spec/impl_context/`` by mistake, ``_get_step_from_path`` classifies it as
+    ``"16a"`` by directory.  Without this demotion the file would be deep-validated
+    by ``validate_step_16a`` and emit confusing 16a-specific errors (missing
+    ``plan.status``, missing ``spec_alignment.checklist``) instead of being
+    routed to the anchor validator.  The anchor validator's ``_is_anchor`` + W586
+    signal then surfaces the real problem — wrong location for this artifact_role.
+
+    Note on invalid verdicts: promotion triggers on *any* non-empty string in
+    ``review.verdict`` — including values outside the ``VALID_VERDICTS`` enum
+    (e.g. ``"TOTALLY_INVALID"``).  This is intentional: the enum check lives
+    inside ``validate_step_16c``, so routing must reach it *first* for the
+    E520 signal to fire.  Demoting unknown verdicts back to 16a would silence
+    that diagnostic.
     """
     if step != "16a" or not isinstance(data, dict):
         return step
+    if data.get("artifact_role") == "anchor":
+        return "16"
     review = data.get("review")
     if isinstance(review, dict) and isinstance(review.get("verdict"), str) and review["verdict"].strip():
         return "16c"
@@ -247,6 +265,13 @@ def validate_file(
 def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = None, git_root: str | None = None, spec_root: str | None = None) -> list[SpecError]:
     # Reset config to pick up any env var changes since last call
     reset_config()
+    # Clear the step-16 content-hash cache so long-lived processes do not
+    # accumulate entries across successive validate_dir invocations.  The cache
+    # is a correctness-neutral optimisation for chain-up (16c→16b→16a→base);
+    # keeping it across runs would leak memory without benefit because each
+    # validate_dir walks a fresh set of artifacts.
+    from .validators.step_16 import _step16_cache
+    _step16_cache.clear()
 
     # Early exit: no JSON files in spec dir means nothing to validate
     if os.path.isdir(spec_dir) and not any(
@@ -515,10 +540,12 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "14": lambda instance, root, ctx: step_14.validate_step_14(instance, root, ctx.get("artifact_path")),
     "15": lambda instance, root, ctx: step_15.validate_step_15(instance, root, ctx.get("spec_root")),
     # "16" → Trinity Anchor validator (spec/16_impl_context.json, not in impl_context/).
-    # "16a" → milestone plan validator (spec/impl_context/*.json); calls base validate_step_16.
-    # "16b" / "16c" → currently also routed to via "16a" dispatch (impl_context/ → "16a")
-    #   because all three artifact types live in impl_context/.  Sub-step-specific routing
-    #   requires $schema URI or sub_step field distinction — deferred per RFC Task 2.8 note.
+    # "16a" / "16b" / "16c" → all live under spec/impl_context/ and initially land on "16a"
+    #   via path regex. _refine_impl_context_substep(step, data) then promotes the step
+    #   based on content:  non-empty review.verdict → "16c",  non-empty
+    #   execution.execution_results → "16b",  else stays at "16a". Chain-up inside the
+    #   validators (16c→16b→16a→base) preserves downstream checks; _step16_cache
+    #   deduplicates the base pass so chain-up is O(1) in base work.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
     "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path")),
     "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path")),
