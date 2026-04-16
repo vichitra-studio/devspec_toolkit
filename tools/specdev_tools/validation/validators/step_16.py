@@ -59,7 +59,7 @@ def _is_anchor(spec_path: Optional[str], data: Optional[Dict[str, Any]] = None) 
     omits `artifact_role` — the schema will reject it, but routing still
     needs a correct yes/no answer before schema errors surface.
     """
-    if data and data.get("artifact_role") == "anchor":
+    if isinstance(data, dict) and data.get("artifact_role") == "anchor":
         return True
     if not spec_path:
         return False

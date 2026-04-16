@@ -48,7 +48,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 - **12_ci_gates.json**: CI pipeline stage definitions, gate conditions, and required checks that establish the verification contract milestone plans will ultimately reference via their own test_commands
 - **13_extension_manifest.json**: extension point declarations and plugin interface contracts that inform scope boundaries when extensibility concerns cut across multiple milestones
 - **13a_completeness_assessment.json**: coverage gap analysis, missing spec items, and completeness scores used to inform scope boundary decisions before committing to a milestone index
-- **15_scaffold.json**: generated file structure, directory layout, and scaffold templates that ground the anchor's optional `target_file_patterns` when a cross-milestone file boundary is declared
+- **15_scaffold.json**: generated file structure, directory layout, and scaffold templates that ground the per-milestone `target_file_patterns` declared in each 16a plan (the anchor itself does not carry file globs)
 
 # Operating Flow (MANDATORY)
 1. **Context Review**: Ingest `14_roadmap.json` (milestone list, fr_refs, status), `04_fr_list.json` (FR IDs), `05_interface_contracts.json` (API IDs). Load any existing `spec/impl_context/*.json` milestone plans to understand what is already under way.
@@ -90,11 +90,10 @@ Before emitting, verify:
 *   Always the literal string `"anchor"`. This is a JSON Schema `const` — any other value fails validation. Routing (`validate.py`) and `_is_anchor()` read this field to dispatch to the anchor validator.
 
 ## 2. `plan.summary` (Required)
-Scope declaration spanning all milestones in this cycle. `additionalProperties: false` — only the four fields below.
+Scope declaration spanning all milestones in this cycle. `additionalProperties: false` — only the three fields below; the anchor does **not** carry `target_file_patterns` (each 16a plan carries its own).
 *   `functional_summary` *(required, string, minLength 20)*: 1–3 sentences stating the capability delivered across all milestones, primary actors, and hard constraints. Example: *"Implements JWT authentication and session management across two milestones. Covers token issuance, validation, revocation. Excludes OAuth flows and third-party SSO."*
-*   `scope_in` *(required, array of strings, each minLength 3)*: concrete capabilities, endpoints, or system boundaries included. E308 uses this to detect milestone↔anchor contradictions.
-*   `scope_out` *(required, array of strings, each minLength 3)*: concrete items explicitly excluded. A milestone `scope_in` value that appears here triggers E308.
-*   `target_file_patterns` *(optional, array of strings)*: glob patterns for files touched across all milestones. The anchor may leave this empty or broad; each 16a plan carries its own tighter patterns.
+*   `scope_in` *(required, array of strings, each minLength 3, minItems 1, uniqueItems)*: concrete capabilities, endpoints, or system boundaries included. E308 uses this to detect milestone↔anchor contradictions; an empty list would silently no-op the check, so the schema requires at least one entry.
+*   `scope_out` *(required, array of strings, each minLength 3, uniqueItems)*: concrete items explicitly excluded. A milestone `scope_in` value that appears here triggers E308. May be empty.
 
 ## 3. `plan.ambiguities` (Required, can be `[]`)
 Accumulated unresolved decisions carried across Trinity cycles. Each item (`additionalProperties: false`):
@@ -169,8 +168,7 @@ Registry of every milestone this anchor governs. Used by validators to detect cr
     "summary": {
       "functional_summary": "Implement Core Authentication flow — login, logout, and session management across two milestones.",
       "scope_in": ["login-endpoint", "logout-endpoint", "session-management"],
-      "scope_out": ["oauth-flows", "mfa", "third-party-sso"],
-      "target_file_patterns": ["src/auth/*.py", "tests/auth/*.py"]
+      "scope_out": ["oauth-flows", "mfa", "third-party-sso"]
     },
     "ambiguities": [
       {

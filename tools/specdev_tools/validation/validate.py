@@ -158,6 +158,16 @@ def validate_file(
     git_root: str | None = None,
     spec_root: str | None = None,
 ) -> list[SpecError]:
+    # Clear the step-16 chain-up cache so long-lived processes that call
+    # validate_file repeatedly do not accumulate cached entries.  The cache's
+    # only role is deduplicating the 16c→16b→16a→base chain inside ONE
+    # artifact; entries from prior artifacts are never queried again because
+    # the cache key includes spec_path.  validate_dir already clears it once
+    # per run; this clear protects single-file callers (CLI ``validate``, IDE
+    # integrations, daemon-mode hosts).
+    from .validators.step_16 import _step16_cache
+    _step16_cache.clear()
+
     try:
         registry = SchemaRegistry(repo_root)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
@@ -273,12 +283,13 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
     from .validators.step_16 import _step16_cache
     _step16_cache.clear()
 
-    # Early exit: no JSON files in spec dir means nothing to validate
-    if os.path.isdir(spec_dir) and not any(
-        fn.endswith(".json")
-        for fn in os.listdir(spec_dir)
-        if os.path.isfile(os.path.join(spec_dir, fn))
-    ):
+    # Early exit: no JSON spec artifacts anywhere under spec_dir means nothing
+    # to validate.  Use ``iter_spec_artifacts`` so the guard matches the main
+    # walk's exclusion rules (``samples/``, ``extras/``, ``migration_backups/``)
+    # and — critically — recurses into ``impl_context/``.  A flat
+    # ``os.listdir`` guard would short-circuit on any host repo whose only
+    # spec artifacts are per-milestone plans inside ``impl_context/``.
+    if os.path.isdir(spec_dir) and next(iter_spec_artifacts(spec_dir), None) is None:
         import sys as _sys
         print(f"specdev: {spec_dir} contains no .json files; nothing to validate.", file=_sys.stderr)
         return []

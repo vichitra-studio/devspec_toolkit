@@ -48,7 +48,9 @@
                 },
                 "scope_in": {
                   "type": "array",
-                  "description": "Items explicitly included across all milestones. Each string should name a concrete capability, endpoint, or system boundary. The drift check (E308) uses this to detect milestone scope contradictions.",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Items explicitly included across all milestones. Each string should name a concrete capability, endpoint, or system boundary. Required (minItems=1) so the drift check (E308) has a non-empty surface to compare milestone scope_in/out against; an empty scope_in would silently no-op the check.",
                   "items": {
                     "type": "string",
                     "minLength": 3,
@@ -57,19 +59,12 @@
                 },
                 "scope_out": {
                   "type": "array",
-                  "description": "Items explicitly excluded from all milestones. The drift check (E308) fires if a milestone's scope_in contradicts this list.",
+                  "uniqueItems": true,
+                  "description": "Items explicitly excluded from all milestones. The drift check (E308) fires if a milestone's scope_in contradicts this list. May be empty on a fresh anchor with no exclusions.",
                   "items": {
                     "type": "string",
                     "minLength": 3,
                     "description": "A concrete scope item excluded from this implementation."
-                  }
-                },
-                "target_file_patterns": {
-                  "type": "array",
-                  "description": "Glob patterns for files touched across all milestones. Optional on the anchor; each milestone plan carries its own target_file_patterns.",
-                  "items": {
-                    "type": "string",
-                    "description": "A glob pattern identifying files in scope."
                   }
                 }
               }
@@ -77,46 +72,10 @@
             "ambiguities": {
               "type": "array",
               "minItems": 0,
-              "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Item shape is intentionally narrower than emergent_ambiguities in 16b (no `source` field) and planning ambiguities in 16a (severity uses severityLevel, not blocking/non_blocking) — the anchor carries cross-milestone decisions only. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
+              "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Reuses the shared `crossCycleAmbiguityItem` shape (same as 16b emergent_ambiguities) — distinct from planning-phase ambiguities (16a) which use a richer shape (source/proposed_assumption/mitigation/decision/resolved) and a binary severity. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "id",
-                  "description",
-                  "severity"
-                ],
-                "description": "A cross-milestone ambiguity or unresolved architectural decision.",
-                "properties": {
-                  "id": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Unique kebab-case identifier for this ambiguity."
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Description of the ambiguity and what decision is needed."
-                  },
-                  "severity": {
-                    "$ref": "vc:core:atoms#severityLevel",
-                    "description": "Severity: 'low' (clarification only), 'medium' (needs resolution before next cycle), 'high' (blocks milestone), 'critical' (may require spec revision)."
-                  },
-                  "impact": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "description": "Areas or milestones affected by this ambiguity."
-                  },
-                  "status": {
-                    "$ref": "vc:core:atoms#ambiguityStatus",
-                    "description": "Current resolution status. Uses the shared ambiguityStatus atom — same enum as planning ambiguities and emergent_ambiguities."
-                  },
-                  "status_ref": {
-                    "description": "Canonical reference for the resolution status.",
-                    "allOf": [
-                      { "$ref": "vc:core:collections#canonicalRef" },
-                      { "properties": { "kind": { "const": "status" } } }
-                    ]
-                  }
-                }
+                "$ref": "vc:core:collections#crossCycleAmbiguityItem",
+                "description": "A cross-milestone ambiguity or unresolved architectural decision."
               }
             },
             "drift": {
@@ -173,10 +132,11 @@
                     "type": "array",
                     "uniqueItems": true,
                     "items": {
-                      "$ref": "vc:core:atoms#kebabId",
-                      "description": "A FR or API ID owned by this milestone."
+                      "type": "string",
+                      "pattern": "^(fr|api)-[a-z0-9]+(?:-[a-z0-9]+)*$",
+                      "description": "An FR or API ID owned by this milestone. Must start with 'fr-' or 'api-' so E308 ownership conflict detection can distinguish behavioural specs from typos or non-spec IDs."
                     },
-                    "description": "FR and API IDs owned by this milestone. Array is a set — duplicates are a schema error. Used by E308 to detect the same FR being active in two milestones simultaneously."
+                    "description": "FR and API IDs owned by this milestone. Array is a set — duplicates are a schema error. Used by E308 to detect the same FR/API being active in two milestones simultaneously. Pattern restricts entries to fr-* or api-* IDs (cross-checked against 04_fr_list.json and 05_interface_contracts.json by traceability_closure)."
                   },
                   "checklist_id_prefix": {
                     "type": "string",

@@ -64,6 +64,8 @@ Applying the split to an existing host repo:
 
    `spec-check` surfaces any new E308 (scope/FR-ownership conflict), E309 (checklist ID drift), W587 (stale drift checks), W588 (unreadable milestone), and W589 (mis-schemaed milestone) signals introduced by the split.
 
+   **Curing W589 on legacy files moved into `impl_context/`**: the anchor validator scans every `*.json` under `spec/impl_context/` and treats files whose `$schema` is not exactly `"vc:16-impl-context"` as mis-schemaed. If step 1 above moved a legacy artifact in but the `$schema` is missing, blank, or set to anything else (a stray draft, a backup, a doc index), either set `"$schema": "vc:16-impl-context"` on the file or remove it from `impl_context/`. Anchor `$schema: vc:16-anchor` files are NOT placed under `impl_context/` — the anchor lives at `spec/16_impl_context.json`.
+
 ## Optional Fields (milestone plan only)
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.

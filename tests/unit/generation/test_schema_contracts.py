@@ -72,8 +72,19 @@ class SchemaContractsTests(unittest.TestCase):
 
     def test_all_step_schemas_have_at_least_one_canonical_ref_slot(self):
         # Steps whose canonical refs are inherited entirely via step_base (canonical_refs_used)
-        # and have no step-specific *_ref properties of their own.
-        no_step_specific_refs = {"13a_completeness_assessment.schema.json"}
+        # or via shared $defs (e.g. crossCycleAmbiguityItem in collections.schema.json),
+        # with no inline step-specific *_ref properties of their own.  The visitor
+        # below counts inline _ref slots only — it does not follow $refs into
+        # collections.schema.json — so schemas that delegate all their canonical
+        # references through shared $defs would otherwise fail this guard.
+        no_step_specific_refs = {
+            "13a_completeness_assessment.schema.json",
+            # vc:16-anchor's only canonical-ref slot (`status_ref` on ambiguity
+            # items) is inherited through the `crossCycleAmbiguityItem` $def in
+            # vc:core:collections.  Inline counter would report 0 even though
+            # the slot exists.
+            "16_anchor.schema.json",
+        }
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
             if path.name in no_step_specific_refs:
                 continue

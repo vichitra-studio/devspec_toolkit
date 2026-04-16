@@ -29,6 +29,26 @@ DRIFT_SENSITIVE_FIELDS = (
     "canonical_refs_used",
 )
 
+# Schema-filename → step-key override.  ``schema_contracts`` is keyed by the
+# numeric prefix of the schema filename (``Path(schema_file).name.split("_", 1)[0]``).
+# Two schemas with the same prefix will silently overwrite each other unless one
+# is given an explicit, distinct key here.  Currently:
+#
+#   - ``16_anchor.schema.json`` and ``16_impl_context.schema.json`` both yield
+#     ``"16"``.  Without the override below, alphabetical sort processes the
+#     anchor first, then impl-context overwrites ``schema_contracts["16"]``,
+#     making the anchor schema invisible to ``_validate_output_contracts`` and
+#     causing false E310 fires when ``prompt_16_impl_context.md`` is checked
+#     against the anchor schema.
+#
+# Add new entries when a future schema collides on numeric prefix.  Keep the
+# overridden key prefixed by the numeric step (e.g. ``"16anchor"``) so it
+# remains adjacent to the family it belongs to in ``DEEP_VALIDATORS`` and any
+# downstream consumer that scans ``schema_contracts`` keys alphabetically.
+_SCHEMA_FILE_TO_STEP_KEY: dict[str, str] = {
+    "16_anchor.schema.json": "16anchor",
+}
+
 
 def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
@@ -40,15 +60,13 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
 
     schema_files = sorted(glob.glob(str(schema_dir / "*.schema.json")))
     for schema_file in schema_files:
-        step = Path(schema_file).name.split("_", 1)[0]
+        schema_filename = Path(schema_file).name
+        if schema_filename in _SCHEMA_FILE_TO_STEP_KEY:
+            step = _SCHEMA_FILE_TO_STEP_KEY[schema_filename]
+        else:
+            step = schema_filename.split("_", 1)[0]
         if step == "seed":
             continue
-        # 16_anchor.schema.json and 16_impl_context.schema.json both produce step "16"
-        # via split("_", 1)[0].  Alphabetically anchor comes first, impl-context second,
-        # so impl-context would overwrite anchor in schema_contracts["16"].  Give the anchor
-        # a distinct key so both schemas remain visible.
-        if Path(schema_file).name == "16_anchor.schema.json":
-            step = "16anchor"
         try:
             schema_required, schema_props, schema = _load_contract(schema_file)
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:

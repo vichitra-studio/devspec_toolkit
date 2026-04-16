@@ -51,6 +51,14 @@ class _AnchorTestBase(unittest.TestCase):
     repo_root = _REPO_ROOT
     fixtures_dir = _FIXTURES_DIR
 
+    def setUp(self):
+        # Clear the step-16 chain-up cache so a previous test that invoked
+        # validate_step_16{a,b,c} directly (bypassing validate_file's clear)
+        # cannot pollute anchor tests through the module-global hash table.
+        from specdev_tools.validation.validators.step_16 import _step16_cache
+        _step16_cache.clear()
+        super().setUp()
+
 
 class TestStep16AnchorSchema(_AnchorTestBase):
     """Schema-level tests using pre-built fixture files."""

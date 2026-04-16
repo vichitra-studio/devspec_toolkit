@@ -8,7 +8,7 @@ Run `specdev prompt-context 16b` to see downstream consumers.
 Execute the plan defined in Step 16a. This step acts as the "Builder" that turns the Plan into Reality (Code + Configs + Docs), ensuring rigor and adherence to the specified file boundaries and test contracts.
 
 # Role
-You are a senior implementation engineer. Your job is to **Process** a single Implementation Context artifact (`spec/impl_context/{step_id}.json`) and **Execute** the plan defined within it.
+You are a senior implementation engineer. Your job is to **Process** a single Implementation Context artifact (`spec/impl_context/{milestone_snake}_plan.json`) and **Execute** the plan defined within it.
 
 **CRITICAL**: You are the "Ambiguity Gatekeeper". If the plan contains vagueness, missing variable names, or "implementation details tbd", you MUST **REJECT** the plan by returning an artifact with `emergent_ambiguities` and NO code changes.
 
@@ -16,10 +16,10 @@ You are a senior implementation engineer. Your job is to **Process** a single Im
 
 Instead of outputting code directly to the user, you:
 1.  **Write Code Files** (using tool calls).
-2.  **Update the Artifact** (`spec/impl_context/{step_id}.json`) to record your execution results.
+2.  **Update the Artifact** (`spec/impl_context/{milestone_snake}_plan.json`) to record your execution results.
 
 # Task
-- **Input context:** `spec/impl_context/{step_id}.json` (The Plan).
+- **Input context:** `spec/impl_context/{milestone_snake}_plan.json` (The Plan).
 - **Objective:** Implement the `plan.spec_alignment.checklist` by filling `implementation` slots.
 - **Output Artifact:** A modified version of the input JSON, with the `execution` object populated.
 - **Guide:** `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md`.
@@ -109,7 +109,7 @@ You must **READ** and **ACT** on these fields to ensure high-fidelity implementa
 ### Extraction Intent
 
 #### Primary Sources (directly consumed)
-- **spec/impl_context/{step_id}.json**: the milestone context file 16a authored — read `plan.spec_alignment.checklist[]` (each item with `spec_ref`, `linked_test_expectation`, `implementation.actions[]`, `target_file_patterns`) and write `execution.execution_results[]`, `execution.critical_evidence`, `execution.final_status`, and per-checklist `implementation.status`/`implementation.evidence` back into the same file. There is no separate `16a_impl_planner.json`; planner, coder, and reviewer all share this single artifact.
+- **spec/impl_context/{milestone_snake}_plan.json**: the milestone context file 16a authored — read `plan.spec_alignment.checklist[]` (each item with `spec_ref`, `linked_test_expectation`, `implementation.actions[]`, `target_file_patterns`) and write `execution.execution_results[]`, `execution.critical_evidence`, `execution.final_status`, and per-checklist `implementation.status`/`implementation.evidence` back into the same file. There is no separate `16a_impl_planner.json`; planner, coder, and reviewer all share this single artifact.
 - **spec/16_impl_context.json**: Trinity Anchor — read `plan.summary.scope_in`/`scope_out` to confirm code changes stay within anchor-declared scope, `plan.milestone_index[<this milestone>].checklist_id_prefix` to verify the milestone's checklist namespace, and `plan.ambiguities` for any cross-cycle decisions still in flight. The anchor does not carry component references or canonical term mappings — those live in steps 02 and 03.
 - **05_interface_contracts.json**: API contracts to implement exactly; endpoint definitions, request/response schemas, and authentication modes that bind code to the spec
 
@@ -163,14 +163,15 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
-- The Step 16a plan artifact (`spec/impl_context/{step_id}.json`) is present.
+- The Step 16a plan artifact (`spec/impl_context/{milestone_snake}_plan.json`) is present and validates against `vc:16-impl-context`.
+- The Trinity Anchor (`spec/16_impl_context.json`) is present and lists this milestone in `plan.milestone_index[]` with the expected `checklist_id_prefix`.
 - `spec/05_interface_contracts.json` is present and contains at least one api entry.
-- `spec/08_fixtures.json` is present and contains at least one fixture entry.
-- `spec/15_scaffold.json` is present and contains at least one file entry.
+- `spec/08_fixtures.json` is present and contains at least one fixture entry **if** any checklist item declares a `fixture_ref`. (Early-cycle plans without fixture bindings may run before Step 08 is authored — log an `emergent_ambiguity` rather than blocking.)
+- `spec/15_scaffold.json` is present and contains at least one file entry **if** the plan declares `existing_structures` or `target_file_patterns` that reference scaffold-generated paths. (Early-cycle plans that touch hand-rolled paths only do not require scaffold output — log an `emergent_ambiguity` rather than blocking.)
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `checklist` item in `spec/impl_context/{step_id}.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
+- Every `checklist` item in `spec/impl_context/{milestone_snake}_plan.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
 - All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
 - No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
@@ -222,7 +223,7 @@ Before emitting, verify:
 ```json
 {
   "$schema": "vc:16-impl-context",
-  "id": "step-api-core",
+  "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
   "plan": {
@@ -236,7 +237,7 @@ Before emitting, verify:
     "spec_alignment": {
       "checklist": [
         {
-          "id": "CHK_AUTH_01",
+          "id": "AUTH_LOGIN_01",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
           "implementation": {
             "status": "in_progress",
@@ -256,7 +257,7 @@ Before emitting, verify:
 ```json
 {
   "$schema": "vc:16-impl-context",
-  "id": "step-api-core",
+  "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
   "plan": {
@@ -265,7 +266,7 @@ Before emitting, verify:
     "spec_alignment": {
       "checklist": [
         {
-          "id": "CHK_AUTH_01",
+          "id": "AUTH_LOGIN_01",
           "spec_ref": {
             "type": "fr",
             "id": "fr-user-login",

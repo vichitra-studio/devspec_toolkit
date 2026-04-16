@@ -69,18 +69,16 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
             roadmap_data = None
         if roadmap_data is not None:
             try:
-                # milestone_ref is not a root field in the 16c schema — scan ALL
-                # checklist items to collect unique planning milestone references.
+                # The vc:16-impl-context schema places milestone_ref only on
+                # individual checklist items (root has unevaluatedProperties: false
+                # and never declares it).  Scan checklist items to collect the
+                # unique planning milestone references this 16c artifact covers.
                 checklist = (
                     data.get("plan", {})
                     .get("spec_alignment", {})
                     .get("checklist", [])
                 )
-                # Collect ALL unique milestone_ref values from ALL checklist items
                 milestone_refs: set[str] = set()
-                root_milestone_ref = data.get("milestone_ref", "")
-                if root_milestone_ref:
-                    milestone_refs.add(root_milestone_ref)
                 if isinstance(checklist, list):
                     for item in checklist:
                         if isinstance(item, dict):

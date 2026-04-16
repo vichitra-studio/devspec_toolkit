@@ -137,93 +137,87 @@ def validate_step_16_anchor(
             )
         )
 
-    # ── E308: FR/API ownership conflict ───────────────────────────────────────
-    # Uses only anchor data — runs even when impl_context/ is absent or empty.
-    # The same FR/API ID must not be in-flight in two milestones simultaneously.
-    # Done milestones do not conflict — an ID may be revisited after delivery.
-    id_to_milestone: dict[str, str] = {}
+    # ── Single-pass milestone_index sweep (E308 ownership / E309 prefix / W607 path) ──
+    # All three checks iterate the same list with the same dict-validity guard.
+    # Combining them keeps the semantics identical (each check still owns its
+    # registry) while avoiding 3× iteration and 3× repetition of the
+    # ``isinstance(entry, dict)`` skip.  The schema enforces presence + pattern
+    # of every field touched here; the guards below are defence-in-depth in case
+    # routing ever reaches this validator with schema-bypassing data.
+    #
+    # Done milestones are exempt from FR/API ownership conflict (delivered IDs
+    # may be referenced again in follow-on work) but still participate in the
+    # prefix-collision and context-path checks (a done milestone's namespace
+    # is still allocated, and its plan file must still exist on disk).
+    impl_context_dir = anchor_path.parent / "impl_context"
+    id_to_milestone: dict[str, str] = {}        # FR/API ID → first-seen milestone_id (E308)
+    prefix_to_milestone: dict[str, str] = {}    # checklist_id_prefix → first-seen milestone_id (E309)
     for entry in milestone_index:
         if not isinstance(entry, dict):
             continue
         ms_id = entry.get("milestone_id", "")
         status = entry.get("status", "")
-        if status == "done":
-            continue  # Done milestones do not block (delivered, may be revisited)
-        fr_refs: list[str] = entry.get("fr_refs", []) or []
-        for ref_id in fr_refs:
-            if not isinstance(ref_id, str):
-                continue
-            if ref_id in id_to_milestone:
-                prev_ms = id_to_milestone[ref_id]
-                kind = "API" if ref_id.startswith("api-") else "FR"
+
+        # ── E308: FR/API ownership conflict (skip done milestones) ───────────
+        if status != "done":
+            for ref_id in entry.get("fr_refs", []) or []:
+                if not isinstance(ref_id, str):
+                    continue
+                if ref_id in id_to_milestone:
+                    prev_ms = id_to_milestone[ref_id]
+                    kind = "API" if ref_id.startswith("api-") else "FR"
+                    errors.append(
+                        make_error(
+                            "E308",
+                            f"ANCHOR_SCOPE_DRIFT: {kind} ownership conflict — '{ref_id}' is "
+                            f"claimed by both non-done milestone '{prev_ms}' and '{ms_id}'.  "
+                            f"Only one non-done milestone may own a given {kind} at a time.",
+                        )
+                    )
+                else:
+                    id_to_milestone[ref_id] = ms_id
+
+        # ── E309: checklist_id_prefix collision (applies to all milestones) ──
+        # Two milestone_index entries sharing a prefix would allocate checklist
+        # IDs from the same namespace in their 16a plans — the authoring-time
+        # equivalent of the cross-milestone ID collision E309 catches below at
+        # plan-comparison time.
+        prefix = entry.get("checklist_id_prefix")
+        if isinstance(prefix, str) and prefix:
+            if prefix in prefix_to_milestone:
+                prev_ms = prefix_to_milestone[prefix]
                 errors.append(
                     make_error(
-                        "E308",
-                        f"ANCHOR_SCOPE_DRIFT: {kind} ownership conflict — '{ref_id}' is "
-                        f"claimed by both in-flight milestone '{prev_ms}' and '{ms_id}'.  "
-                        f"Only one non-done milestone may own a given {kind} at a time.",
+                        "E309",
+                        f"ANCHOR_CHECKLIST_DRIFT: checklist_id_prefix '{prefix}' is shared by "
+                        f"milestone_index entries '{prev_ms}' and '{ms_id}' — two milestones "
+                        f"cannot allocate checklist IDs from the same namespace.",
                     )
                 )
             else:
-                id_to_milestone[ref_id] = ms_id
+                prefix_to_milestone[prefix] = ms_id
 
-    # ── E309: checklist_id_prefix collision (anchor milestone_index) ──────────
-    # Two milestone_index entries sharing the same checklist_id_prefix will
-    # allocate checklist IDs from the same namespace in their 16a plans; this
-    # is the authoring-time equivalent of the cross-milestone ID collision
-    # E309 below catches at plan time.  Detecting it here stops the drift at
-    # its root and is what prompt_16 promises.
-    prefix_to_milestone: dict[str, str] = {}
-    for entry in milestone_index:
-        if not isinstance(entry, dict):
-            continue
-        prefix = entry.get("checklist_id_prefix")
-        ms_id = entry.get("milestone_id", "")
-        if not isinstance(prefix, str) or not prefix:
-            continue
-        if prefix in prefix_to_milestone:
-            prev_ms = prefix_to_milestone[prefix]
-            errors.append(
-                make_error(
-                    "E309",
-                    f"ANCHOR_CHECKLIST_DRIFT: checklist_id_prefix '{prefix}' is shared by "
-                    f"milestone_index entries '{prev_ms}' and '{ms_id}' — two milestones "
-                    f"cannot allocate checklist IDs from the same namespace.",
-                )
-            )
-        else:
-            prefix_to_milestone[prefix] = ms_id
-
-    # ── W607: declared context_path must exist on disk ───────────────────────
-    # Every milestone_index entry carries a ``context_path`` constrained by
-    # schema to ``^(spec/)?impl_context/<filename>.json$``.  The pattern
-    # guarantees the trailing segment resolves under the anchor's own
-    # ``impl_context/`` dir, so the presence check is pattern-agnostic: take the
-    # filename portion and append it to the impl_context_dir below.  A typo
-    # (``ms_auht_plan.json`` vs ``ms_auth_plan.json``) silently drops the
-    # milestone from E308/E309 drift detection today — W607 surfaces that at
-    # author time.  We emit the warning even if ``impl_context/`` itself is
-    # absent, because a non-empty milestone_index with no directory means the
-    # anchor is making claims about plans that cannot exist yet.
-    impl_context_dir = anchor_path.parent / "impl_context"
-    for entry in milestone_index:
-        if not isinstance(entry, dict):
-            continue
+        # ── W607: declared context_path must exist on disk ───────────────────
+        # Schema pins context_path to ``^(spec/)?impl_context/<filename>.json$``,
+        # so the trailing filename resolves under the anchor's own impl_context
+        # dir regardless of the optional ``spec/`` prefix.  A typo silently drops
+        # the milestone from E308/E309 cross-file drift detection — W607
+        # surfaces that at author time.  Emitted even when ``impl_context/`` is
+        # absent (a non-empty milestone_index with no directory means the anchor
+        # is making claims about plans that cannot exist yet).
         ctx_path = entry.get("context_path")
-        if not isinstance(ctx_path, str) or not ctx_path:
-            continue  # schema already enforces presence + pattern
-        declared_path = impl_context_dir / Path(ctx_path).name
-        if not declared_path.exists():
-            ms_id = entry.get("milestone_id", "")
-            errors.append(
-                make_error(
-                    "W607",
-                    f"ANCHOR_CONTEXT_PATH_MISSING: milestone_index entry "
-                    f"'{ms_id}' declares context_path '{ctx_path}' but the "
-                    f"file does not exist at '{declared_path}'. Drift detection "
-                    f"will silently skip this milestone until the plan is authored.",
+        if isinstance(ctx_path, str) and ctx_path:
+            declared_path = impl_context_dir / Path(ctx_path).name
+            if not declared_path.exists():
+                errors.append(
+                    make_error(
+                        "W607",
+                        f"ANCHOR_CONTEXT_PATH_MISSING: milestone_index entry "
+                        f"'{ms_id}' declares context_path '{ctx_path}' but the "
+                        f"file does not exist at '{declared_path}'. Drift detection "
+                        f"will silently skip this milestone until the plan is authored.",
+                    )
                 )
-            )
 
     # ── Filesystem-dependent checks (E308 scope drift, E309 checklist drift) ──
     # These require loading milestone context files from impl_context/.

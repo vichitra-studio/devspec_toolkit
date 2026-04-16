@@ -458,13 +458,15 @@ Cross-milestone drift detection (E309, see Task 2.8) is implemented by comparing
 {
   "milestone_id": "ms-auth",
   "context_path": "spec/impl_context/ms_auth_plan.json",
-  "status": "active | done | planned",
+  "status": "pending | in_progress | done | deferred",
   "fr_refs": ["fr-login", "fr-signup"],
   "checklist_id_prefix": "AUTH",
   "summary": "One-line status"
 }
 ```
-`fr_refs` enables cross-milestone FR ownership conflict detection (same FR active in two milestones). `checklist_id_prefix` gives 16a the namespace it needs to allocate IDs without collisions.
+`fr_refs` enables cross-milestone FR ownership conflict detection (same FR in-flight in two milestones). `checklist_id_prefix` gives 16a the namespace it needs to allocate IDs without collisions.
+
+> **Implementation note (2026-04-16):** the original RFC draft listed the status enum as `"active | done | planned"`. The implemented schema reuses `vc:core:atoms#milestoneStatus` (the same atom `14_roadmap.json` uses) so the enum is `pending | in_progress | done | deferred`. Only `done` is exempt from FR ownership conflict detection; `pending`, `in_progress`, and `deferred` all participate. This deviation is intentional — sharing the atom keeps the anchor and roadmap milestone vocabulary in lockstep.
 
 ---
 
@@ -645,11 +647,11 @@ No code change needed. The `"16"` dispatch entry and `impl_context/` path mappin
   ```
   Note: `minItems: 0` allows an initial anchor with no milestone contexts yet to be valid. Drift checks are populated as milestone plans are created and drift is detected.
 
-  Define `plan.ambiguities` item schema — **reuse the `emergent_ambiguities` item shape from `16_impl_context.schema.json`** (fields: `id`, `description`, `severity`, plus optional `impact`, `status`, `status_ref`). Note: the RFC previously listed `context` and `resolution` as field names — these are wrong. Use `description` instead of `context`; use `status`/`status_ref` for resolution tracking. There is no standalone `$def` for the item shape; define it inline in `16_anchor.schema.json`. The anchor accumulates unresolved decisions across Trinity cycles — same structure, same semantics. `plan.ambiguities` is **required** in `vc:16-anchor`, can be empty array (`minItems: 0`).
+  Define `plan.ambiguities` item schema — **reuse the shared `crossCycleAmbiguityItem` $def in `vc:core:collections`** (fields: `id`, `description`, `severity`, plus optional `impact`, `status`, `status_ref`). Note: the RFC previously listed `context` and `resolution` as field names — these are wrong. Use `description` instead of `context`; use `status`/`status_ref` for resolution tracking. The `crossCycleAmbiguityItem` $def was extracted (2026-04-16) from the previously-inlined emergent ambiguities shape so the anchor and `emergent_ambiguities` (16b) share one source of truth. `plan.ambiguities` is **required** in `vc:16-anchor`, can be empty array (`minItems: 0`).
 - Define `vc:16-anchor` schema with the contract in Section 17.4:
   - Root-level `artifact_role: { "const": "anchor" }` — **required**, enables `_is_anchor()` upgrade in Task 2.8
   - `plan.ambiguities` and `plan.drift` as **required** (enforced by schema, not re-checked by validator)
-  - `plan.milestone_index`: **required** array (`minItems: 0` — empty on initial anchor is valid). Each item: `milestone_id` (string, required), `context_path` (string, required), `status` (enum: `"active" | "done" | "planned"`, required), `fr_refs` (array of FR/API IDs, required), `checklist_id_prefix` (string, required — the namespace 16a uses to allocate IDs without collision), `summary` (string, required, `minLength: 10`)
+  - `plan.milestone_index`: **required** array (`minItems: 0` — empty on initial anchor is valid). Each item: `milestone_id` (string, required), `context_path` (string, required), `status` (enum from `vc:core:atoms#milestoneStatus` — `pending | in_progress | done | deferred`, required; only `done` is exempt from FR-ownership conflict detection), `fr_refs` (array of `^(fr|api)-` IDs, required), `checklist_id_prefix` (string, required — the namespace 16a uses to allocate IDs without collision), `summary` (string, required, `minLength: 10`)
   - `plan.spec_alignment.checklist`: **absent** — do not define this field in `vc:16-anchor`. The anchor does not maintain a per-FR checklist; that detail lives in 16a. The `plan.milestone_index[].fr_refs` and `plan.milestone_index[].checklist_id_prefix` fields replace what 16a needs from the anchor for scope comparison and ID allocation.
   - `execution` and `review` sections: **forbidden** (`unevaluatedProperties: false` or `not` pattern)
 - **Add `vc:16-anchor` entry to `schema_registry.json`:**

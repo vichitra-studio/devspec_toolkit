@@ -1657,48 +1657,9 @@
             },
             "emergent_ambiguities": {
               "type": "array",
-              "description": "Ambiguities discovered during execution that were not anticipated in planning.",
+              "description": "Ambiguities discovered during execution that were not anticipated in planning. Reuses the shared `crossCycleAmbiguityItem` shape (same as the anchor's ambiguities) — distinct from planning-phase ambiguities which carry richer 16a-only fields (source/proposed_assumption/mitigation/decision/resolved) and a blocking/non_blocking binary severity.",
               "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "id": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Unique kebab-case identifier for this emergent ambiguity."
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Description of the ambiguity discovered during execution."
-                  },
-                  "severity": {
-                    "$ref": "vc:core:atoms#severityLevel",
-                    "description": "Severity of this emergent ambiguity using the shared severityLevel scale. 'low': minor clarification needed, non-blocking. 'medium': needs resolution before coding but not urgent. 'high': blocks implementation, needs immediate resolution. 'critical': fundamental design issue, may require spec revision. Note: distinct from planning-phase ambiguities[].severity which uses a blocking/non_blocking binary."
-                  },
-                  "impact": {
-                    "type": "array",
-                    "description": "Areas or artifacts affected by this ambiguity.",
-                    "items": {
-                      "type": "string",
-                      "description": "An area or artifact affected by this emergent ambiguity."
-                    }
-                  },
-                  "status": {
-                    "$ref": "vc:core:atoms#ambiguityStatus",
-                    "description": "Current resolution status of this emergent ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches the planning-phase ambiguities status and the anchor's ambiguities status."
-                  },
-                  "status_ref": {
-                  "description": "Canonical reference for this emergent ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Distinct from planning-phase ambiguities, these arise during code execution.",
-                  "allOf": [
-                    { "$ref": "vc:core:collections#canonicalRef" },
-                    { "properties": { "kind": { "const": "status" } } }
-                  ]
-                }
-                },
-                "required": [
-                  "id",
-                  "description",
-                  "severity"
-                ],
+                "$ref": "vc:core:collections#crossCycleAmbiguityItem",
                 "description": "An ambiguity discovered during execution that was not anticipated in planning."
               }
             },

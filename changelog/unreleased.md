@@ -79,6 +79,39 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
   - `test_prompt_schema_sync.py`: `_PROMPT_STEP_OVERRIDE` integrity, anchor prompt → `vc:16-anchor` validation, and 16a leaking `milestone_index` → W580.
   - `test_dag_lint_rules.py`: Trinity shared-artifact tolerance for W596.
 
+### Trinity Anchor Audit Follow-up (2026-04-16 — gap closure pass)
+
+This pass closed the remaining audit findings against the unpushed Trinity Anchor split commits without altering 16a/16b/16c behaviour.
+
+- **Schema hardening (`schema/16_anchor.schema.json`)**:
+  - `plan.summary.scope_in` now `minItems: 1` + `uniqueItems: true` — an empty list silently no-op'd the E308 drift comparison.
+  - `plan.summary.scope_out` now `uniqueItems: true` (still allowed empty).
+  - `plan.summary.target_file_patterns` removed from the anchor schema — it was declared but no validator consumed it; per-milestone target_file_patterns live on each 16a plan. Prompt example and prose updated.
+  - `milestone_index[].fr_refs[]` now `pattern: ^(fr|api)-…` instead of bare `kebabId` — typos and non-spec IDs are rejected at author time so E308 ownership conflict only operates on real FR/API references.
+- **Shared `crossCycleAmbiguityItem` $def** (`schema/core/collections.schema.json`): extracted the previously-inlined ambiguity item shape (id/description/severity/impact/status/status_ref). Both the anchor's `plan.ambiguities` and the impl-context schema's `emergent_ambiguities` now reference the shared $def — one source of truth. Planning-phase `ambiguities` (16a) keep their richer shape (source/proposed_assumption/mitigation/decision/resolved + binary severity) and remain inline.
+- **Validator hardening (`step_16.py`, `step_16_anchor.py`, `step_16c.py`)**:
+  - `_is_anchor` adds `isinstance(data, dict)` guard before `.get("artifact_role")` — defence-in-depth in case routing ever reaches with non-dict data.
+  - `step_16_anchor.py` collapses three sequential `for entry in milestone_index` loops (E308 ownership / E309 prefix / W607 path) into a single pass — same semantics, identical error sets, fewer guards. Comment block updated to flag that `done` milestones are exempt from E308 only (still participate in E309 + W607).
+  - `step_16c.py` removes a dead root-level `milestone_ref` read — the schema places that field only on checklist items.
+  - `validators/__init__.py` docstring updated to mention all four Step-16 validators (anchor + 16a/b/c) instead of just the sub-steps.
+- **Dispatch + cache lifecycle (`validation/validate.py`)**:
+  - `validate_dir` early-exit guard now uses `iter_spec_artifacts` (recursive) instead of a flat `os.listdir`. A host repo with only `spec/impl_context/*.json` and no top-level `spec/*.json` previously short-circuited and validated nothing.
+  - `_step16_cache.clear()` now also runs at `validate_file` entry — protects single-file callers (CLI `validate`, IDE integrations, daemon-mode hosts) from cache accumulation across calls.
+- **Generation tooling (`generation/prompt_schema_sync.py`)**: replaced the hard-coded `if Path(schema_file).name == "16_anchor.schema.json"` collision fix with a generic `_SCHEMA_FILE_TO_STEP_KEY` map. Future schema files that share a numeric prefix (e.g. another `16_*` artifact) can be disambiguated by adding a single dict entry.
+- **Trinity prompt corrections (16a / 16b / 16c)**:
+  - **Filename convention** — replaced `spec/impl_context/{step_id}.json` with `spec/impl_context/{milestone_snake}_plan.json` across all three sub-step prompts (and their Output Contract examples). The anchor schema's `context_path` pattern is `^(spec/)?impl_context/[a-z0-9_]+\.json$` (no hyphens); the previous `step-api-core.json` example would have produced files the anchor cannot reference, silently dropping milestones from drift detection. Example artifact `id` updated from `step-api-core` to `ms-auth-plan`.
+  - **16a Self-Audit Gate** — added an explicit "Validator codes you are gating" block naming E304/E307/W581/E309. Previously only E309 was named; authors had no direct map from gate item to validator code.
+  - **16c Self-Audit Gate** — added the same block for E303/E305/E306/E307/W582. Replaced the misleading "every checklist item has a corresponding entry in `review.findings`" wording with the correct contract: clean items go in `critical_evidence.satisfied_checklist_ids`; `findings` is for issues only.
+  - **16c "Crucial Side Effect"** — extended to require updating the anchor's `plan.milestone_index[<this milestone>].status` to `done` when the verdict is verified. The anchor governs milestone lifecycle now; skipping the anchor update silently leaves a stale `in_progress` flag and triggers W587 on the next `spec-check`.
+  - **16c stale "Step 17" reference** corrected to "Step 11 (red team) and Step 12 (CI gates)".
+  - **16b/16c Self-Audit Gate** — softened the hard requirement that `08_fixtures.json` and `15_scaffold.json` must be present + non-empty. Early-cycle host repos that haven't authored those steps yet are now told to log an `emergent_ambiguity` instead of blocking the gate.
+  - **Migration template** (`prompts/migration/template_impl_context.md`) — added explicit cure for W589 (set `$schema: vc:16-impl-context` on legacy files moved into `impl_context/`, or remove them).
+- **Test hardening (`tests/integration/test_step_16.py` + `test_step_16_anchor.py`)**: both `setUp` methods now clear `_step16_cache` so direct validator calls in one test cannot leak cached results to the next.
+- **Test contract (`tests/unit/generation/test_schema_contracts.py`)**: `test_all_step_schemas_have_at_least_one_canonical_ref_slot` now allow-lists `16_anchor.schema.json` (its only `_ref` slot is inherited via the shared `crossCycleAmbiguityItem` $def — the inline counter doesn't follow $refs into collections.schema.json).
+- **RFC text updates (`WIP/rfc_devspec_toolkit_review_report.md`)**: Section 17.4's `milestone_index[].status` enum corrected from the stale `"active | done | planned"` to the implemented `pending | in_progress | done | deferred` (shared `milestoneStatus` atom). Task 2.7's ambiguity-item description updated to reference the shared `crossCycleAmbiguityItem` $def + the new `^(fr|api)-` constraint on `fr_refs`.
+
+Test suite remains at 1761 passing.
+
 ### Known follow-ups (not in this release)
 
 - **F-S3 / Phase 1 Task 1.2 — Prompt emission of `spec_refs_ingested` / `seed_refs_ingested`.** The schema hook is live on `step_base` and inherited by all 20 step schemas, but no prompt is yet authored to emit these fields. Until prompts populate them, downstream drift detection based on ingested-ref hashes has nothing to read. Tracked for a follow-up feat pass that will coordinate prompt updates across the pipeline.
