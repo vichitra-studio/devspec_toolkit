@@ -232,8 +232,17 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Expected W570 for missing anchor file, got: {w570}",
             )
 
-    def test_anchor_declares_missing_context_path_fires_w588(self):
-        """Anchor registers a milestone_index entry whose context_path does not exist on disk."""
+    def test_anchor_declares_missing_context_path_silently_skipped(self):
+        """Missing declared context_path is owned by W607 (step_16_anchor), not W588 here.
+
+        traceability_closure deliberately stays silent when a declared plan file is
+        absent — the anchor validator emits W607 ANCHOR_CONTEXT_PATH_MISSING for the
+        exact same condition. Double-reporting the same root cause from two
+        validators under different codes would clutter spec-check output.
+
+        This test pins the quiet contract so a future regression that re-introduces
+        a W588 "does not exist" emission here surfaces immediately.
+        """
         with tempfile.TemporaryDirectory() as d:
             _write(d, "01_capabilities.json", CAPS)
             _write(d, "04_fr_list.json", FRS_FULL)
@@ -249,9 +258,11 @@ class TestTraceabilityClosure(unittest.TestCase):
             _write(d, "16_impl_context.json", anchor)
             errs = check_traceability_closure(d)
             rendered = render_errors(errs)
-            self.assertTrue(
-                any("W588" in e and "ms-v1" in e and "does not exist" in e for e in rendered),
-                f"Expected W588 for ms-v1 declared-but-missing plan. Got: {rendered}",
+            self.assertFalse(
+                any("W588" in e and "does not exist" in e for e in rendered),
+                f"traceability_closure must not emit W588 for a missing declared "
+                f"context_path — that signal belongs to W607 on the anchor validator. "
+                f"Got: {rendered}",
             )
 
     def test_anchor_declares_unparseable_context_path_fires_w588(self):

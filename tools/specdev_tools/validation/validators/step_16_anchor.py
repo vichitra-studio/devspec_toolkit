@@ -62,6 +62,45 @@ def validate_step_16_anchor(
         )
         return errors
 
+    # ── W608: legacy schema at the anchor path ────────────────────────────────
+    # The Trinity Anchor split (0.6.0) moved per-milestone checklist content
+    # out of ``spec/16_impl_context.json`` and into ``spec/impl_context/*.json``.
+    # The anchor artifact itself now validates against ``vc:16-anchor``.
+    #
+    # Host repos that pre-date the split still declare ``$schema:
+    # vc:16-impl-context`` on their anchor file. That schema is still registered
+    # (for milestone-plan artifacts inside ``impl_context/``), so schema
+    # validation passes. The routing layer dispatches to this validator based on
+    # the anchor *path* regardless of the declared schema — which means the
+    # legacy anchor silently bypasses E308/E309/W587 (all of which key off
+    # ``milestone_index``, a field the legacy shape does not carry).
+    #
+    # Without an explicit signal, host repos have no forcing function to
+    # migrate. W608 surfaces the mismatch at ``spec-check`` time, pointing at
+    # the migration steps documented in ``prompt_16_impl_context.md`` and the
+    # breaking-change changelog entry. The check is intentionally *after* the
+    # W586 routing guard (a non-anchor artifact should surface the routing bug
+    # first, not a schema-migration hint) and *before* the drift checks (which
+    # are no-ops on legacy shapes anyway — emitting W608 first makes the
+    # dominant cause of an otherwise-clean legacy anchor obvious).
+    declared_schema = data.get("$schema") if isinstance(data, dict) else None
+    if declared_schema == "vc:16-impl-context":
+        errors.append(
+            make_error(
+                "W608",
+                "ANCHOR_LEGACY_SCHEMA: artifact at the anchor path declares "
+                "$schema='vc:16-impl-context' (the pre-split milestone-plan "
+                "schema). The Trinity Anchor is now a distinct contract "
+                "(vc:16-anchor). Migrate: (1) move per-milestone checklist "
+                "content to spec/impl_context/<milestone>_plan.json; "
+                "(2) rewrite this file against vc:16-anchor with plan.summary, "
+                "plan.ambiguities, plan.drift, plan.milestone_index; "
+                "(3) set artifact_role='anchor'. "
+                "See prompts/prompt_16_impl_context.md and "
+                "changelog/unreleased.md (breaking_schema_swap entry).",
+            )
+        )
+
     if spec_path is None:
         # Cannot perform filesystem-dependent drift checks without a path.
         errors.append(

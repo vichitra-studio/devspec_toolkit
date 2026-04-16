@@ -123,7 +123,7 @@ def make_milestone_plan(
                 "checklist": checklist or [],
             },
             "docs_impact": {
-                "status": "not-required",
+                "status": "not_required",
                 "rationale": "No doc changes needed.",
                 "docs_touched": [],
             },

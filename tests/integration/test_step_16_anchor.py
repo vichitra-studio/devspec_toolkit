@@ -1012,5 +1012,112 @@ class TestStep16AnchorW589MisSchemaedMilestone(_AnchorTestBase):
         self.assertEqual(w589, [], f"W589 should not fire on correct $schema. Got: {w589}")
 
 
+class TestStep16AnchorW608LegacySchema(_AnchorTestBase):
+    """W608 ANCHOR_LEGACY_SCHEMA — anchor path declares the pre-split milestone-plan schema.
+
+    Background: the 0.6.0 Trinity Anchor split moved per-milestone content out
+    of ``spec/16_impl_context.json`` into ``spec/impl_context/*.json`` and
+    introduced ``vc:16-anchor`` for the root artifact. Host repos that
+    pre-date the split still carry a legacy ``$schema: vc:16-impl-context`` at
+    the anchor path — schema validation still passes (the old schema is still
+    registered for milestone plans), and the anchor route's E308/E309/W587
+    silently no-op because the legacy shape has no ``milestone_index``. Without
+    W608 the author has no signal that a migration is needed.
+    """
+
+    def _legacy_anchor_data(self) -> dict:
+        """Pre-split shape: $schema='vc:16-impl-context', carries plan.status
+        and plan.summary but no artifact_role, milestone_index, or drift.
+        """
+        return {
+            "$schema": "vc:16-impl-context",
+            "id": "step-legacy-anchor",
+            "owner": "system",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "Legacy anchor still on the pre-split schema.",
+                    "scope_in": ["auth"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/auth.py"],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Auth", "summary": "Login"}],
+                    "checklist": [],
+                },
+                "review_requirements": {"test_commands": ["pytest tests/"]},
+            },
+            "canonical_refs_used": [],
+        }
+
+    def test_w608_fires_on_legacy_schema_at_anchor_path(self):
+        """W608 fires for a file at the anchor path declaring the legacy schema."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = tmp_dir / "16_impl_context.json"
+            anchor_path.write_text(json.dumps(self._legacy_anchor_data()), encoding="utf-8")
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "W608" for e in errors),
+            f"Expected W608 for legacy schema at anchor path. Got: {errors}",
+        )
+
+    def test_w608_does_not_fire_for_new_anchor_schema(self):
+        """W608 stays quiet when the anchor declares the new `vc:16-anchor` schema."""
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(Path(td), scope_in=["auth"])
+            errors = validate_file(self.repo_root, str(anchor_path))
+        w608 = [e for e in errors if e.code == "W608"]
+        self.assertEqual(
+            w608, [],
+            f"W608 should not fire on vc:16-anchor artifacts. Got: {w608}",
+        )
+
+    def test_w608_does_not_fire_for_milestone_plan_inside_impl_context(self):
+        """W608 only fires on the anchor route — not on legitimate milestone plans.
+
+        A milestone plan at ``spec/impl_context/<x>.json`` legitimately declares
+        ``$schema: vc:16-impl-context``. It does not route through the anchor
+        validator, so W608 must stay silent.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            plan_path = make_milestone_plan(
+                impl_context_dir, "ms_clean.json", scope_in=["auth"]
+            )
+            errors = validate_file(self.repo_root, str(plan_path))
+        w608 = [e for e in errors if e.code == "W608"]
+        self.assertEqual(
+            w608, [],
+            f"W608 must not fire on legitimate milestone plans inside "
+            f"impl_context/. Got: {w608}",
+        )
+
+    def test_w608_message_cites_migration_path(self):
+        """W608 message must point at the migration steps so the author can act.
+
+        Pins the actionability contract — a bare "legacy schema" hint without
+        a migration path would force every host repo to hunt through docs.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = tmp_dir / "16_impl_context.json"
+            anchor_path.write_text(json.dumps(self._legacy_anchor_data()), encoding="utf-8")
+            errors = validate_file(self.repo_root, str(anchor_path))
+        w608_messages = [e.message for e in errors if e.code == "W608"]
+        self.assertTrue(w608_messages, "Expected at least one W608 for this legacy anchor.")
+        msg = w608_messages[0]
+        # Must name the new schema, the migration artifacts location, and the
+        # author-facing prompt so the fix path is discoverable from the warning alone.
+        self.assertIn("vc:16-anchor", msg)
+        self.assertIn("spec/impl_context/", msg)
+        self.assertIn("prompt_16_impl_context.md", msg)
+
+
 if __name__ == "__main__":
     unittest.main()

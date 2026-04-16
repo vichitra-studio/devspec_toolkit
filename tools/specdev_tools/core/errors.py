@@ -154,6 +154,11 @@ ERROR_CODES = {
     # Anchor context_path integrity (follows the W585-W589 anchor group;
     # W590-W606 are already allocated to unrelated semantics).
     "W607": "ANCHOR_CONTEXT_PATH_MISSING",
+    # Legacy schema surfaced when a post-split host repo still declares the
+    # pre-split schema on its anchor artifact.  Soft-warn only — schema
+    # validation against vc:16-impl-context still passes, but host repos
+    # need the signal to migrate per the 0.6.0 breaking-change entry.
+    "W608": "ANCHOR_LEGACY_SCHEMA",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

@@ -46,6 +46,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Anchor context_path integrity (follows the W585-W589 anchor
             # group; W590-W606 are already allocated to unrelated semantics).
             "W607",
+            # Legacy anchor schema migration signal (post-split transition).
+            "W608",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

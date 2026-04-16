@@ -90,8 +90,18 @@ def _load_milestone_plans_from_anchor(
         `plan.milestone_index[]` entry in `16_impl_context.json` whose
         `context_path` resolves to a readable JSON file.
       - errors: W570 when the anchor itself is absent or unreadable; W588
-        (ANCHOR_MILESTONE_UNREADABLE) for each declared `context_path` that is
-        missing or not valid JSON.
+        (ANCHOR_MILESTONE_UNREADABLE) for each declared `context_path` that
+        exists on disk but cannot be parsed as JSON.
+
+    Responsibility split with ``step_16_anchor.py``:
+      - Missing declared ``context_path`` files are surfaced by **W607
+        ANCHOR_CONTEXT_PATH_MISSING** from the anchor validator (sole owner of
+        the "declared but absent" signal). This function therefore silently
+        skips missing files to avoid double-reporting.
+      - Parse failures (file exists but is not valid JSON) are owned here:
+        the anchor validator emits W588 for parse failures found via directory
+        globbing; this function emits W588 for parse failures found via the
+        anchor's explicit registry. Same code, different discovery path.
 
     Design: the anchor is the authoritative registry of which milestone plans
     exist. This function does not glob the `impl_context/` directory — it reads
@@ -133,11 +143,8 @@ def _load_milestone_plans_from_anchor(
         resolved = _resolve_context_path(spec_dir, context_path)
         milestone_id = entry.get("milestone_id", "<unknown>")
         if not os.path.isfile(resolved):
-            errors.append(make_error(
-                "W588",
-                f"ANCHOR_MILESTONE_UNREADABLE {milestone_id}: "
-                f"declared context_path '{context_path}' does not exist on disk",
-            ))
+            # Missing file is owned by W607 (emitted by step_16_anchor.py).
+            # Silently skip here to avoid double-reporting the same condition.
             continue
         try:
             with open(resolved, encoding="utf-8") as f:

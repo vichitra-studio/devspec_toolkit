@@ -4,7 +4,7 @@
   "owner": "api",
   "created_at": "2024-01-01T00:00:00Z",
   "plan": {
-    "status": "done",
+    "status": "active",
     "summary": {
       "functional_summary": "JWT issuance and refresh endpoints for the ms-auth milestone.",
       "scope_in": [
@@ -17,7 +17,8 @@
         "mobile-push-auth"
       ],
       "target_file_patterns": [
-        "src/auth.py"
+        "src/auth.py",
+        "tests/test_auth.py"
       ]
     },
     "spec_alignment": {
