@@ -1,0 +1,17 @@
+{
+  "$schema": "vc:16-anchor",
+  "id": "anchor-v1",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "canonical_refs_used": [],
+  "plan": {
+    "summary": {
+      "functional_summary": "Anchor that omits the required artifact_role const field.",
+      "scope_in": ["jwt-token-validation"],
+      "scope_out": ["oauth-flows"]
+    },
+    "ambiguities": [],
+    "drift": { "checks": [] },
+    "milestone_index": []
+  }
+}

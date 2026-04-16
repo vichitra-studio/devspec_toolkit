@@ -11,6 +11,13 @@ from ...core.errors import make_error, SpecError
 from .step_16a import validate_step_16a
 
 
+# Mirrors the ``executionStatus`` atom in ``schema/16_impl_context.schema.json``
+# (``$defs.executionStatus.enum``). Any drift between this set and the schema
+# enum silently flips which statuses the deep validator accepts vs what the
+# schema rejects — keep them synchronized.
+_EXECUTION_STATUSES = frozenset({"passed", "failed", "blocked", "partial"})
+
+
 def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
     """Deep validation for Step 16b (Execute phase).
 
@@ -44,9 +51,13 @@ def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Option
                 seen_commands.add(cmd_stripped)
 
             status = result.get("status")
-            if status and status not in {"passed", "failed", "skipped", "error"}:
+            if status and status not in _EXECUTION_STATUSES:
                 errors.append(
-                    make_error("E520", f"Step 16b: execution_result at index {i} has invalid status '{status}'")
+                    make_error(
+                        "E520",
+                        f"Step 16b: execution_result at index {i} has invalid status "
+                        f"'{status}'. Must be one of: {', '.join(sorted(_EXECUTION_STATUSES))}",
+                    )
                 )
 
     return errors

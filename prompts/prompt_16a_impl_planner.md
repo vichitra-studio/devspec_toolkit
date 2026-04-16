@@ -174,10 +174,11 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
 *   List ANY ambiguity that would affect implementation.
     *   `id`: kebab-case identifier (e.g. `amb-storage-device`).
     *   `description`: What is unclear?
-    *   `severity`: `blocking` or `non_blocking`.
+    *   `severity`: `blocking` or `non_blocking`. **This is the planning-phase severity enum — distinct from the anchor's ambiguities severity (`severityLevel` — low/medium/high/critical) and from emergent_ambiguities severity. Do not mix them.**
     *   `mitigation`: How should the coder handle this? (e.g., "Assume X specifically").
     *   `decision`: The decision made to resolve the ambiguity.
-    *   `resolved`: The resolution status or outcome.
+    *   `resolved`: A string explanation OR a boolean flag indicating whether the ambiguity has been resolved.
+    *   `status`: Current resolution state. **Values come from the canonical `vc:core:atoms#ambiguityStatus` atom — currently `resolved`, `tracking`, `deferred`, `blocked`. Do not invent alternatives; consult the atom if this list drifts.** Pair with `status_ref` (a canonical reference of kind `status`) for registry-backed tracking.
     *   *Rule*: If `blocking`, you must still plan the rest of the step but flag the blocker.
     *   *Rule*: For `non_blocking`, you MUST provide a `mitigation` or `assumption`.
     *   *Rule*: Use the `source` and `impact` fields to capture provenance and risk.

@@ -151,6 +151,9 @@ ERROR_CODES = {
     "E606": "GLOSSARY_PROPOSAL_DRIFT",
     "E607": "GLOSSARY_CANON_DRIFT",
     "W606": "GLOSSARY_CANON_ORPHAN",
+    # Anchor context_path integrity (follows the W585-W589 anchor group;
+    # W590-W606 are already allocated to unrelated semantics).
+    "W607": "ANCHOR_CONTEXT_PATH_MISSING",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

@@ -163,7 +163,7 @@
                   "context_path": {
                     "type": "string",
                     "pattern": "^(spec/)?impl_context/[a-z0-9_]+\\.json$",
-                    "description": "Relative path to this milestone's 16a plan from either the repo root (with `spec/` prefix) or the spec directory root. Must point at a file inside `impl_context/` with a lowercase/underscore/digit filename ending in `.json`. Example: 'spec/impl_context/ms_auth_plan.json' or 'impl_context/ms_auth_plan.json'. The pattern is enforced because downstream validators (traceability_closure, step_16_anchor) read this path directly — a typo silently drops the plan from coverage and drift checks."
+                    "description": "Relative path to this milestone's 16a plan from either the repo root (with `spec/` prefix) or the spec directory root. Must point at a file inside `impl_context/` with a lowercase/underscore/digit filename ending in `.json`. Example: 'spec/impl_context/ms_auth_plan.json' or 'impl_context/ms_auth_plan.json'. Downstream validators consume this field directly: `traceability_closure` reads it to build the milestone→checklist map, and `step_16_anchor` (W607) verifies the declared file exists on disk so a typo surfaces at author time instead of silently dropping the milestone from drift detection."
                   },
                   "status": {
                     "$ref": "vc:core:atoms#milestoneStatus",

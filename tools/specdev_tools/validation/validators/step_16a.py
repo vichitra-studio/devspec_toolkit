@@ -5,9 +5,6 @@ FR references, and dependency validation on top of the base step_16 checks.
 """
 from __future__ import annotations
 
-import json
-import os
-from pathlib import Path
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
@@ -47,27 +44,30 @@ def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Option
                     make_error("E590", f"Step 16a: checklist item '{item_id or i}' is active but missing spec_ref.id")
                 )
 
-    # W584: 16c→16a feedback loop — remediation tasks from prior review must appear in checklist
-    if spec_path:
-        spec_dir = os.path.dirname(spec_path)
-        review_path = Path(spec_dir) / "16c_review.json"
-        if review_path.exists():
-            try:
-                review_data = json.loads(review_path.read_text(encoding="utf-8"))
-                for finding in review_data.get("review", {}).get("findings", []):
-                    if not isinstance(finding, dict):
-                        continue
-                    rem = finding.get("remediation_task")
-                    if not isinstance(rem, dict):
-                        continue
-                    task_id = rem.get("task_id")
-                    if isinstance(task_id, str) and task_id and task_id not in seen_ids:
-                        errors.append(make_error(
-                            "W584",
-                            f"REMEDIATION_TASK_MISSING: 16c remediation task '{task_id}' "
-                            f"is not referenced in any 16a checklist item id",
-                        ))
-            except (OSError, json.JSONDecodeError, TypeError):
-                pass  # 16c parse errors handled elsewhere
+    # W584: review→plan feedback loop.  Under the post-split model (16a/16b/16c
+    # all share one ``spec/impl_context/{milestone_id}.json`` artifact that
+    # grows as phases execute), a ``review`` section populated by 16c lives on
+    # the same ``data`` dict as the 16a plan.  When chain-up validation reaches
+    # ``validate_step_16a`` for a 16c-phase artifact, any remediation_task
+    # surfaced by the reviewer must be represented as a checklist item in the
+    # plan — otherwise the planner has accepted a review without incorporating
+    # the remediation work.  No sibling file lookup is needed; the pre-split
+    # ``16c_review.json`` path resolution was phantom and silently disabled
+    # this check in every real Trinity run.
+    review = data.get("review")
+    if isinstance(review, dict):
+        for finding in review.get("findings", []):
+            if not isinstance(finding, dict):
+                continue
+            rem = finding.get("remediation_task")
+            if not isinstance(rem, dict):
+                continue
+            task_id = rem.get("task_id")
+            if isinstance(task_id, str) and task_id and task_id not in seen_ids:
+                errors.append(make_error(
+                    "W584",
+                    f"REMEDIATION_TASK_MISSING: review remediation task '{task_id}' "
+                    f"is not referenced in any checklist item id",
+                ))
 
     return errors

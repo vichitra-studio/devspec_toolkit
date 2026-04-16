@@ -126,6 +126,57 @@ class TestStep16AnchorSchema(_AnchorTestBase):
             f"Expected E520 'milestone_index' required-property error. Got: {errors}"
         )
 
+    def test_invalid_anchor_missing_artifact_role_fails(self):
+        """Anchor without the required artifact_role field should fail schema validation.
+
+        ``artifact_role: "anchor"`` is const-locked and required on vc:16-anchor
+        artifacts. It is the canonical signal used by ``_is_anchor()`` (field-first,
+        path-fallback) to distinguish the anchor from 16a/16b/16c milestone plans.
+        A missing field must fail schema validation with the specific
+        'artifact_role' required-property signal — without this pin, a schema
+        edit that relaxed the requirement would silently re-open the routing
+        ambiguity the split was introduced to close.
+        """
+        path = self.fixtures_dir / "invalid_anchor_missing_artifact_role.json"
+        errors = validate_file(self.repo_root, str(path))
+        self.assertTrue(
+            any(e.code == "E520" and "artifact_role" in e.message for e in errors),
+            f"Expected E520 'artifact_role' required-property error. Got: {errors}"
+        )
+
+    def test_invalid_anchor_has_review_fails(self):
+        """Anchor with a top-level review section should fail (unevaluatedProperties).
+
+        Parallel to ``test_invalid_anchor_has_execution_fails``: review is a
+        milestone-plan concern (16c), not an anchor concern. ``unevaluatedProperties:
+        false`` at the artifact root rejects stray ``review``. Pinning both the
+        ``execution`` and ``review`` rejections keeps the two-section contract
+        airtight — one test alone would allow a regression on the untested side.
+        """
+        path = self.fixtures_dir / "invalid_anchor_has_review.json"
+        errors = validate_file(self.repo_root, str(path))
+        self.assertTrue(
+            any(e.code == "E520" and "review" in e.message for e in errors),
+            f"Expected E520 'review' unevaluatedProperties error. Got: {errors}"
+        )
+
+    def test_invalid_anchor_has_checklist_fails(self):
+        """Anchor with plan.spec_alignment.checklist should fail (additionalProperties on plan).
+
+        The anchor deliberately does not carry a per-FR checklist — that detail
+        lives in each 16a milestone plan. ``plan.additionalProperties: false``
+        (``schema/16_anchor.schema.json:25``) rejects any leak of
+        ``spec_alignment`` into the anchor. Without this pin, a schema edit that
+        allowed extra plan properties would silently re-introduce the 130-item
+        bloat described in ``WIP/step16_anchor_bloat_report.md``.
+        """
+        path = self.fixtures_dir / "invalid_anchor_has_checklist.json"
+        errors = validate_file(self.repo_root, str(path))
+        self.assertTrue(
+            any(e.code == "E520" and "spec_alignment" in e.message for e in errors),
+            f"Expected E520 'spec_alignment' additionalProperties error. Got: {errors}"
+        )
+
     def test_invalid_context_path_pattern_rejected(self):
         """milestone_index[].context_path must match ^(spec/)?impl_context/<file>.json$.
 
@@ -152,6 +203,64 @@ class TestStep16AnchorSchema(_AnchorTestBase):
         self.assertTrue(
             any(e.code == "E520" and "context_path" in e.message for e in errors),
             f"Expected E520 rejecting non-impl_context context_path. Got: {errors}",
+        )
+
+    def test_w607_fires_when_declared_context_path_is_missing_on_disk(self):
+        """W607 fires when milestone_index declares a context_path that does not exist.
+
+        The schema pattern only catches malformed paths (wrong directory, wrong
+        extension).  A well-formed path pointing at a filename that was never
+        created on disk passes the pattern but silently drops the milestone
+        from drift detection.  W607 surfaces that mismatch at author time.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            (tmp_dir / "impl_context").mkdir()
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry(
+                        "ms-ghost",
+                        context_path="spec/impl_context/ms_ghost_plan.json",
+                    ),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertTrue(
+            any(
+                e.code == "W607"
+                and "ms-ghost" in e.message
+                and "ms_ghost_plan.json" in e.message
+                for e in errors
+            ),
+            f"Expected W607 identifying the missing ms-ghost plan. Got: {errors}",
+        )
+
+    def test_w607_does_not_fire_when_declared_context_path_exists(self):
+        """W607 stays quiet when every declared context_path resolves on disk."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            make_milestone_plan(
+                impl_context_dir,
+                "ms_present.json",
+                scope_in=["scope-present"],
+                scope_out=[],
+            )
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry(
+                        "ms-present",
+                        context_path="spec/impl_context/ms_present.json",
+                    ),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertFalse(
+            any(e.code == "W607" for e in errors),
+            f"W607 should not fire when the declared context_path exists. Got: {errors}",
         )
 
 
@@ -280,11 +389,17 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
         # Pin that no OTHER error codes start masquerading here. If a future
         # regression re-labels the FR-ownership signal under a different code
         # (e.g. re-uses E309), this test would otherwise still appear green.
-        non_w587 = [e for e in errors if e.code not in ("W587",)]
+        # W587 (drift-checks-stale) fires because drift.checks is intentionally
+        # empty in this factory, and W607 fires because the factory declares
+        # milestone context_paths without authoring the backing files.  Neither
+        # is an FR-ownership signal; both are orthogonal anchor-hygiene codes
+        # exercised by their own dedicated tests.
+        allowed_orthogonal = {"W587", "W607"}
+        unexpected = [e for e in errors if e.code not in allowed_orthogonal]
         self.assertEqual(
-            non_w587, [],
-            f"Only W587 (drift-checks-stale) is expected when milestone_index is "
-            f"non-empty but drift.checks is empty. Got: {[e.code for e in errors]}",
+            unexpected, [],
+            f"Only W587/W607 (anchor-hygiene orthogonal signals) are expected here. "
+            f"Got unexpected codes: {[e.code for e in unexpected]}",
         )
 
     def test_e308_deferred_milestone_still_conflicts(self):
@@ -660,6 +775,97 @@ class TestStep16AnchorGuards(_AnchorTestBase):
         self.assertEqual(
             emitted_sub_step, set(),
             f"Misfiled anchor must not emit 16a/b/c-specific codes. Got: {[e for e in errors if e.code in sub_step_only]}"
+        )
+
+    def test_misfiled_anchor_with_non_anchor_filename_relies_on_artifact_role_demotion(self):
+        """Misfiled anchor whose filename does not start with `16_` must still route via artifact_role.
+
+        Filename-based routing (``_get_step_from_path``) returns ``"16"`` only
+        for ``16_impl_context.json`` — any other filename in ``impl_context/``
+        (``ms_foo.json``, ``anchor_backup.json``, ...) returns ``"16a"``.
+        Content-based demotion in ``_refine_impl_context_substep`` is the
+        only signal that can rescue the routing.  Pin that path.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            misfiled_path = impl_context_dir / "anchor_backup.json"
+            misfiled_path.write_text(
+                json.dumps({
+                    "$schema": "vc:16-anchor",
+                    "id": "anchor-misfiled",
+                    "owner": "api",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    "artifact_role": "anchor",
+                    "canonical_refs_used": [],
+                    "plan": {
+                        "summary": {
+                            "functional_summary": "Backup anchor saved under impl_context/ with an arbitrary name.",
+                            "scope_in": ["auth"],
+                            "scope_out": [],
+                        },
+                        "ambiguities": [],
+                        "drift": {"checks": []},
+                        "milestone_index": [],
+                    },
+                }),
+                encoding="utf-8",
+            )
+            errors = validate_file(self.repo_root, str(misfiled_path))
+
+        sub_step_only = {"E305", "E307", "W581", "W582"}
+        emitted_sub_step = {e.code for e in errors} & sub_step_only
+        self.assertEqual(
+            emitted_sub_step, set(),
+            "Misfiled anchor (non-16 filename) must be demoted to the anchor route via "
+            f"artifact_role. Got unexpected 16a/b/c codes: "
+            f"{[e for e in errors if e.code in sub_step_only]}"
+        )
+
+    def test_misfiled_anchor_without_artifact_role_fails_schema_not_routing(self):
+        """Misfiled anchor missing ``artifact_role`` must fail schema before confusing routing errors escape.
+
+        If both the filename and the ``artifact_role`` signal are absent, the
+        file routes to the 16a validator (path-based default).  Schema
+        validation against ``vc:16-anchor`` is still applied because of the
+        ``$schema`` URI, so E520 for the missing ``artifact_role`` must fire
+        — giving the author a clear "this isn't a valid anchor" signal before
+        any 16a-phase diagnostics surface.  Without this pin, a future schema
+        relaxation could silently route such a file through the wrong
+        validator and emit misleading ``plan.status`` / checklist errors.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            misfiled_path = impl_context_dir / "anchor_backup.json"
+            misfiled_path.write_text(
+                json.dumps({
+                    "$schema": "vc:16-anchor",
+                    "id": "anchor-misfiled-no-role",
+                    "owner": "api",
+                    "created_at": "2024-01-01T00:00:00Z",
+                    # No artifact_role — schema-required const is absent.
+                    "canonical_refs_used": [],
+                    "plan": {
+                        "summary": {
+                            "functional_summary": "Misfiled anchor missing artifact_role.",
+                            "scope_in": ["auth"],
+                            "scope_out": [],
+                        },
+                        "ambiguities": [],
+                        "drift": {"checks": []},
+                        "milestone_index": [],
+                    },
+                }),
+                encoding="utf-8",
+            )
+            errors = validate_file(self.repo_root, str(misfiled_path))
+
+        self.assertTrue(
+            any(e.code == "E520" and "artifact_role" in e.message for e in errors),
+            f"Expected E520 'artifact_role' schema error. Got: {errors}",
         )
 
 

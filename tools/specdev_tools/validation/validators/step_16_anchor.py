@@ -155,9 +155,39 @@ def validate_step_16_anchor(
         else:
             prefix_to_milestone[prefix] = ms_id
 
+    # ── W607: declared context_path must exist on disk ───────────────────────
+    # Every milestone_index entry carries a ``context_path`` constrained by
+    # schema to ``^(spec/)?impl_context/<filename>.json$``.  The pattern
+    # guarantees the trailing segment resolves under the anchor's own
+    # ``impl_context/`` dir, so the presence check is pattern-agnostic: take the
+    # filename portion and append it to the impl_context_dir below.  A typo
+    # (``ms_auht_plan.json`` vs ``ms_auth_plan.json``) silently drops the
+    # milestone from E308/E309 drift detection today — W607 surfaces that at
+    # author time.  We emit the warning even if ``impl_context/`` itself is
+    # absent, because a non-empty milestone_index with no directory means the
+    # anchor is making claims about plans that cannot exist yet.
+    impl_context_dir = anchor_path.parent / "impl_context"
+    for entry in milestone_index:
+        if not isinstance(entry, dict):
+            continue
+        ctx_path = entry.get("context_path")
+        if not isinstance(ctx_path, str) or not ctx_path:
+            continue  # schema already enforces presence + pattern
+        declared_path = impl_context_dir / Path(ctx_path).name
+        if not declared_path.exists():
+            ms_id = entry.get("milestone_id", "")
+            errors.append(
+                make_error(
+                    "W607",
+                    f"ANCHOR_CONTEXT_PATH_MISSING: milestone_index entry "
+                    f"'{ms_id}' declares context_path '{ctx_path}' but the "
+                    f"file does not exist at '{declared_path}'. Drift detection "
+                    f"will silently skip this milestone until the plan is authored.",
+                )
+            )
+
     # ── Filesystem-dependent checks (E308 scope drift, E309 checklist drift) ──
     # These require loading milestone context files from impl_context/.
-    impl_context_dir = anchor_path.parent / "impl_context"
     if not impl_context_dir.exists():
         # No milestone contexts yet — valid state for a fresh anchor.
         return errors

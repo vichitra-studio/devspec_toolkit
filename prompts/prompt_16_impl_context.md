@@ -102,7 +102,7 @@ Accumulated unresolved decisions carried across Trinity cycles. Each item (`addi
 *   `description` *(required, string)*: what is unclear and what decision is needed.
 *   `severity` *(required)*: `low` | `medium` | `high` | `critical` (from `vc:core:atoms#severityLevel`). **Do not use `blocking`/`non_blocking`** — those are milestone-plan values, not anchor severities.
 *   `impact` *(optional, array of strings)*: affected areas or milestones.
-*   `status` *(optional)*: `resolved` | `tracking` | `deferred` | `blocked`.
+*   `status` *(optional)*: `resolved` | `tracking` | `deferred` | `blocked` (from `vc:core:atoms#ambiguityStatus` — the shared atom used by the anchor, 16a planning ambiguities, and 16b emergent_ambiguities). If this list drifts, consult the atom; do not invent alternatives.
 *   `status_ref` *(optional)*: canonical ref object `{ id, kind: "status" }`.
 
 ## 4. `plan.drift` (Required)
