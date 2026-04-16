@@ -114,6 +114,31 @@ def validate_step_16_anchor(
 
     anchor_path = Path(spec_path)
 
+    # ── W609: misfiled anchor ──────────────────────────────────────────────────
+    # An artifact_role="anchor" file living inside spec/impl_context/ is routed
+    # back to "16" by validate.py:_refine_impl_context_substep so this validator
+    # runs.  But every downstream drift check resolves
+    # ``impl_context_dir = anchor_path.parent / "impl_context"`` to
+    # spec/impl_context/impl_context/ — which does not exist — so E308/E309/W588/
+    # W589/W607 all silently no-op.  Without this warning the file looks fine
+    # (passes schema, zero errors) while contributing nothing to drift detection.
+    # Fire W609 so the author sees the routing mismatch and the canonical
+    # location, regardless of whether the rest of the drift logic finds
+    # anything to compare against.
+    if anchor_path.parent.name == "impl_context":
+        errors.append(
+            make_error(
+                "W609",
+                f"ANCHOR_MISFILED: '{anchor_path.name}' has artifact_role='anchor' "
+                f"but lives inside '{anchor_path.parent}'.  The Trinity Anchor must "
+                f"sit at spec/16_impl_context.json (one level up); files inside "
+                f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
+                f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
+                f"so cross-milestone drift checks (E308/E309/W588/W589/W607) can "
+                f"resolve the impl_context/ sibling directory correctly.",
+            )
+        )
+
     anchor_plan = data.get("plan", {}) if isinstance(data.get("plan"), dict) else {}
     anchor_summary = anchor_plan.get("summary", {}) if isinstance(anchor_plan.get("summary"), dict) else {}
     anchor_scope_in: list[str] = anchor_summary.get("scope_in", []) or []

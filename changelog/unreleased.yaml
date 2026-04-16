@@ -275,6 +275,18 @@ changes:
     migration:
       action: automatic
       note: "Test-only fixture hygiene."
+  - type: schema_restructure
+    path: "schema/16_anchor.schema.json"
+    description: "H1 fix: lifted type/required/properties/unevaluatedProperties to schema root so root annotations always apply to unevaluatedProperties. Previously placed at root *outside* the allOf, which dropped the failing inner branch's properties annotations and produced phantom 'artifact_role'/'plan' unevaluatedProperties companion errors on every inner-field failure (verified live: 3 errors before, 1 after, on a single bad-enum input). The vc:core:step-base $ref remains in allOf — its annotations propagate via the $ref applicator."
+    migration:
+      action: automatic
+      note: "Schema rewrite is wire-compatible. Authors see only the real error now (no phantom companions). Same behaviour for clean and obviously-broken inputs."
+  - type: add_validator
+    path: "tools/specdev_tools/validation/validators/step_16_anchor.py"
+    description: "H2 fix: W609 ANCHOR_MISFILED registered. Fires when an artifact_role='anchor' file lives inside spec/impl_context/ instead of at spec/ root. The drift-check directory then resolves to spec/impl_context/impl_context/ (which never exists) and E308/E309/W588/W589/W607 silently no-op — making the misfiling invisible. W609 message names the canonical location and the codes that silently no-op."
+    migration:
+      action: automatic
+      note: "New warning. Existing canonically-located anchors are unaffected; misfiled anchors that previously emitted zero diagnostics now surface W609 with the move target."
 
 deferred:
   - ref: "F-S3 / Phase 1 Task 1.2"

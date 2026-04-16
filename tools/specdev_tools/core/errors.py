@@ -159,6 +159,18 @@ ERROR_CODES = {
     # validation against vc:16-impl-context still passes, but host repos
     # need the signal to migrate per the 0.6.0 breaking-change entry.
     "W608": "ANCHOR_LEGACY_SCHEMA",
+    # Misfiled anchor: an artifact_role="anchor" file landed inside
+    # spec/impl_context/ instead of at spec/ root.  Routing
+    # (validate.py:_refine_impl_context_substep) demotes the dispatch back
+    # to "16" so the anchor validator runs, but every drift check then
+    # resolves impl_context_dir to spec/impl_context/impl_context/ — which
+    # does not exist — so E308/E309/W607/W588/W589 silently no-op.  Without
+    # this warning the misfiling is invisible: the file passes the anchor
+    # schema and emits zero drift errors despite contributing nothing to
+    # cross-milestone drift detection.  W609 makes the misfiling
+    # discoverable at spec-check time and tells the author where to move
+    # the file.
+    "W609": "ANCHOR_MISFILED",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

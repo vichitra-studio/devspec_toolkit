@@ -112,6 +112,20 @@ This pass closed the remaining audit findings against the unpushed Trinity Ancho
 
 Test suite remains at 1761 passing.
 
+### Trinity Anchor Audit Pass 2 (2026-04-16 — review of unpushed commits)
+
+A second deep-review pass against the unpushed Trinity Anchor commits found two HIGH-severity gaps the audit-follow-up commit (a289085) did not catch.  Both close here without altering 16a/16b/16c behaviour.  1763 tests pass.
+
+- **H1 — `vc:16-anchor` schema noisy `unevaluatedProperties` companion errors (`schema/16_anchor.schema.json`)**: `unevaluatedProperties: false` was placed at the schema root *outside* the `allOf`. JSON Schema 2020-12 drops a failing subschema's `properties` annotations, so any inner-branch failure (e.g. `plan.ambiguities[].severity: "INVALID"`) caused the root check to flag every legitimate top-level property (`artifact_role`, `plan`) as "unexpected" — producing 2 noise errors on top of the 1 real error.  Restructured: lift `type` / `required` / `properties` / `unevaluatedProperties` to the schema root (root annotations always apply); keep only the `vc:core:step-base` `$ref` inside `allOf` (its annotations propagate via the `$ref` applicator).  Verified live: bad-enum input now emits 1 clean error instead of 3.
+- **H2 — misfiled-anchor diagnostic gap (`validation/validators/step_16_anchor.py` + `core/errors.py`)**: an `artifact_role: "anchor"` file landing inside `spec/impl_context/` was correctly demoted to step `"16"` by `_refine_impl_context_substep`, but the anchor validator then resolved `impl_context_dir = anchor_path.parent / "impl_context"` to `spec/impl_context/impl_context/` (which never exists) — so E308/E309/W588/W589/W607 all silently no-op'd.  The misfiling produced zero diagnostics (file passes schema, no errors), making the routing mismatch invisible.
+  - **W609 ANCHOR_MISFILED** registered in `errors.py` with rationale comment.
+  - Validator fires W609 with an actionable message: names the offending file's directory, points at the canonical `spec/16_impl_context.json` location, and lists the drift-check codes (E308/E309/W588/W589/W607) that silently no-op without the move.
+  - Existing two misfiled-anchor tests strengthened to assert exactly one W609 fires + the message names the canonical filename.
+  - New negative test `test_no_w609_when_anchor_at_canonical_location` pins the W609 trigger is scoped to `impl_context/`-located anchors only.
+- **Regression test added (H1)**: `test_inner_field_failure_does_not_emit_phantom_unevaluated_companion` injects a single bad-enum severity into the anchor's ambiguities and asserts exactly one severity error fires with no `'artifact_role'`/`'plan'` companion `unevaluatedProperties` error.  Pins the H1 contract so future schema edits cannot silently re-introduce the noise.
+
+**Scope note (H1)**: this fix is anchor-only.  The same `unevaluatedProperties` placement pattern exists in `16_impl_context.schema.json` (and many other step schemas) but predates the Trinity Anchor split (commit 36cbbe6, 2026-03-19). A systemic fix across all 20 step schemas is recommended as a separate follow-up.
+
 ### Known follow-ups (not in this release)
 
 - **F-S3 / Phase 1 Task 1.2 — Prompt emission of `spec_refs_ingested` / `seed_refs_ingested`.** The schema hook is live on `step_base` and inherited by all 20 step schemas, but no prompt is yet authored to emit these fields. Until prompts populate them, downstream drift detection based on ingested-ref hashes has nothing to read. Tracked for a follow-up feat pass that will coordinate prompt updates across the pipeline.

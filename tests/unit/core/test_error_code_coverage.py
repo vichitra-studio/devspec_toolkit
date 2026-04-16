@@ -48,6 +48,9 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W607",
             # Legacy anchor schema migration signal (post-split transition).
             "W608",
+            # Misfiled anchor detection — anchor file landed inside
+            # spec/impl_context/ where its drift checks silently no-op.
+            "W609",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

@@ -833,6 +833,21 @@ class TestStep16AnchorGuards(_AnchorTestBase):
             emitted_sub_step, set(),
             f"Misfiled anchor must not emit 16a/b/c-specific codes. Got: {[e for e in errors if e.code in sub_step_only]}"
         )
+        # H2: the misfiling itself must produce a load-bearing diagnostic.
+        # Without W609 the anchor's drift checks silently no-op (impl_context
+        # resolves to impl_context/impl_context/ which doesn't exist) and the
+        # file looks "clean" despite contributing nothing to drift detection.
+        w609 = [e for e in errors if e.code == "W609"]
+        self.assertEqual(
+            len(w609), 1,
+            "Misfiled anchor inside impl_context/ must emit exactly one W609 "
+            f"ANCHOR_MISFILED so the routing mismatch is discoverable. Got: {errors}"
+        )
+        self.assertIn(
+            "16_impl_context.json", w609[0].message,
+            "W609 message must name the canonical filename so the author "
+            f"knows where to move the file. Got: {w609[0].message}"
+        )
 
     def test_misfiled_anchor_with_non_anchor_filename_relies_on_artifact_role_demotion(self):
         """Misfiled anchor whose filename does not start with `16_` must still route via artifact_role.
@@ -878,6 +893,40 @@ class TestStep16AnchorGuards(_AnchorTestBase):
             "Misfiled anchor (non-16 filename) must be demoted to the anchor route via "
             f"artifact_role. Got unexpected 16a/b/c codes: "
             f"{[e for e in errors if e.code in sub_step_only]}"
+        )
+        # H2: location-mismatch warning must fire even when the filename also
+        # diverges from the canonical 16_impl_context.json convention — both
+        # the wrong directory AND the wrong filename matter.
+        w609 = [e for e in errors if e.code == "W609"]
+        self.assertEqual(
+            len(w609), 1,
+            "Misfiled anchor (non-16 filename, inside impl_context/) must "
+            f"emit exactly one W609 ANCHOR_MISFILED. Got: {errors}"
+        )
+
+    def test_no_w609_when_anchor_at_canonical_location(self):
+        """W609 must NOT fire when the anchor sits at the canonical spec/16_impl_context.json path.
+
+        Negative test for the H2 fix: pin that the misfiling diagnostic is
+        scoped to files inside impl_context/.  A clean anchor at the canonical
+        location must produce zero W609 noise even when other anchor-only
+        warnings (W587 stale drift, etc.) fire.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[make_milestone_entry("ms-auth")],
+                drift_checks=["Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-16)"],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        w609 = [e for e in errors if e.code == "W609"]
+        self.assertEqual(
+            w609, [],
+            "Anchor at canonical spec/16_impl_context.json location must not "
+            f"emit W609 ANCHOR_MISFILED. Got: {w609}"
         )
 
     def test_misfiled_anchor_without_artifact_role_fails_schema_not_routing(self):
