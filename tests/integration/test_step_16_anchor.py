@@ -134,6 +134,55 @@ class TestStep16AnchorSchema(_AnchorTestBase):
             f"Expected E520 'milestone_index' required-property error. Got: {errors}"
         )
 
+    def test_inner_field_failure_does_not_emit_phantom_unevaluated_companion(self):
+        """Regression for the H1 noisy-companion-error issue.
+
+        Previously the anchor schema placed ``unevaluatedProperties: false`` at
+        the root *outside* the ``allOf``. When any inner-branch field failed
+        validation, JSON Schema 2020-12 dropped the failing branch's
+        ``properties`` annotations, and the root's ``unevaluatedProperties``
+        check then flagged every legitimate top-level property
+        (``artifact_role``, ``plan``) as "unexpected" — producing 2 noise
+        errors on top of the 1 real one.
+
+        After lifting ``properties``/``required`` to the root and keeping only
+        the step-base ``$ref`` inside ``allOf``, a single inner failure must
+        produce a single error and NOT mention ``artifact_role`` or ``plan``
+        as "unevaluated". This test pins that contract so future schema edits
+        cannot silently re-introduce the noise.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                ambiguities=[{
+                    "id": "amb-noise-test",
+                    "description": "An ambiguity with an enum-violating severity value.",
+                    "severity": "INVALID_SEVERITY",
+                    "status": "tracking",
+                }],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        # Exactly one error should fire — the real one for the bad enum.
+        severity_errors = [e for e in errors if "severity" in e.message and "INVALID_SEVERITY" in e.message]
+        self.assertEqual(
+            len(severity_errors), 1,
+            f"Expected exactly one severity-enum error. Got: {errors}"
+        )
+        # No phantom 'artifact_role' or 'plan' unevaluatedProperties companion.
+        phantom = [
+            e for e in errors
+            if "Unevaluated properties" in e.message
+            and ("artifact_role" in e.message or "plan" in e.message)
+        ]
+        self.assertEqual(
+            phantom, [],
+            "Inner-branch failure must not emit a phantom 'artifact_role'/'plan' "
+            f"unevaluatedProperties error. Got: {errors}"
+        )
+
     def test_invalid_anchor_missing_artifact_role_fails(self):
         """Anchor without the required artifact_role field should fail schema validation.
 

@@ -3,158 +3,156 @@
   "$id": "vc:16-anchor",
   "title": "16_anchor (Trinity Anchor)",
   "description": "Trinity Anchor artifact for Step 16. Declares the full scope of a multi-milestone implementation, tracks which milestones own which FRs, and is the cross-milestone drift-detection surface. Does NOT carry a per-FR checklist — that detail lives in each 16a milestone plan. Does NOT carry execution or review sections — those are milestone-plan concerns.",
-  "unevaluatedProperties": false,
-  "allOf": [
-    {
-      "$ref": "vc:core:step-base",
-      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
+  "type": "object",
+  "required": [
+    "artifact_role",
+    "plan"
+  ],
+  "properties": {
+    "artifact_role": {
+      "const": "anchor",
+      "description": "Identifies this artifact as the Trinity Anchor. Required. Enables validators to distinguish the anchor from 16a/16b/16c milestone plans without relying on file path heuristics. Must always be the string 'anchor' — any other value fails schema validation."
     },
-    {
+    "plan": {
       "type": "object",
+      "additionalProperties": false,
       "required": [
-        "artifact_role",
-        "plan"
+        "summary",
+        "ambiguities",
+        "drift",
+        "milestone_index"
       ],
+      "description": "Anchor-level plan: scope declaration, accumulated ambiguities, drift monitoring schedule, and milestone ownership registry.",
       "properties": {
-        "artifact_role": {
-          "const": "anchor",
-          "description": "Identifies this artifact as the Trinity Anchor. Required. Enables validators to distinguish the anchor from 16a/16b/16c milestone plans without relying on file path heuristics. Must always be the string 'anchor' — any other value fails schema validation."
-        },
-        "plan": {
+        "summary": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "summary",
-            "ambiguities",
-            "drift",
-            "milestone_index"
+            "functional_summary",
+            "scope_in",
+            "scope_out"
           ],
-          "description": "Anchor-level plan: scope declaration, accumulated ambiguities, drift monitoring schedule, and milestone ownership registry.",
+          "description": "High-level scope summary for the full multi-milestone implementation.",
           "properties": {
-            "summary": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "functional_summary",
-                "scope_in",
-                "scope_out"
-              ],
-              "description": "High-level scope summary for the full multi-milestone implementation.",
-              "properties": {
-                "functional_summary": {
+            "functional_summary": {
+              "type": "string",
+              "minLength": 20,
+              "description": "1–3 sentences describing the full implementation scope: the capability delivered, primary actors, and key constraints across all milestones. Example: 'Implements JWT authentication and session management for the mobile API across two milestones. Covers token issuance, validation, and revocation. Excludes OAuth flows and third-party SSO.'"
+            },
+            "scope_in": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "Items explicitly included across all milestones. Each string should name a concrete capability, endpoint, or system boundary. Required (minItems=1) so the drift check (E308) has a non-empty surface to compare milestone scope_in/out against; an empty scope_in would silently no-op the check.",
+              "items": {
+                "type": "string",
+                "minLength": 3,
+                "description": "A concrete scope item included in this implementation."
+              }
+            },
+            "scope_out": {
+              "type": "array",
+              "uniqueItems": true,
+              "description": "Items explicitly excluded from all milestones. The drift check (E308) fires if a milestone's scope_in contradicts this list. May be empty on a fresh anchor with no exclusions.",
+              "items": {
+                "type": "string",
+                "minLength": 3,
+                "description": "A concrete scope item excluded from this implementation."
+              }
+            }
+          }
+        },
+        "ambiguities": {
+          "type": "array",
+          "minItems": 0,
+          "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Reuses the shared `crossCycleAmbiguityItem` shape (same as 16b emergent_ambiguities) — distinct from planning-phase ambiguities (16a) which use a richer shape (source/proposed_assumption/mitigation/decision/resolved) and a binary severity. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
+          "items": {
+            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
+            "description": "A cross-milestone ambiguity or unresolved architectural decision."
+          }
+        },
+        "drift": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "checks"
+          ],
+          "description": "Drift monitoring schedule for the anchor. 'checks' records the drift checks that have been run across milestone cycles. An empty array is valid on a fresh anchor — populate as milestone plans are created and drift is monitored.",
+          "properties": {
+            "checks": {
+              "type": "array",
+              "minItems": 0,
+              "items": {
+                "type": "string",
+                "minLength": 5,
+                "description": "Description of a drift check performed or scheduled. Example: 'Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-10)'."
+              },
+              "description": "Drift checks performed or planned across milestone cycles. Each string documents what was checked and when."
+            }
+          }
+        },
+        "milestone_index": {
+          "type": "array",
+          "minItems": 0,
+          "description": "Registry of all milestones covered by this anchor. Each entry declares which FRs/APIs a milestone owns and the checklist ID namespace it uses. Used by validators to detect cross-milestone FR ownership conflicts (E308) and checklist ID collisions (E309). An empty array is valid on a fresh anchor before any milestone plans are created.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "milestone_id",
+              "context_path",
+              "status",
+              "fr_refs",
+              "checklist_id_prefix",
+              "summary"
+            ],
+            "description": "A milestone entry in the anchor index.",
+            "properties": {
+              "milestone_id": {
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Kebab-case ID matching the milestone_id in 14_roadmap.json."
+              },
+              "context_path": {
+                "type": "string",
+                "pattern": "^(spec/)?impl_context/[a-z0-9_]+\\.json$",
+                "description": "Relative path to this milestone's 16a plan from either the repo root (with `spec/` prefix) or the spec directory root. Must point at a file inside `impl_context/` with a lowercase/underscore/digit filename ending in `.json`. Example: 'spec/impl_context/ms_auth_plan.json' or 'impl_context/ms_auth_plan.json'. Downstream validators consume this field directly: `traceability_closure` reads it to build the milestone→checklist map, and `step_16_anchor` (W607) verifies the declared file exists on disk so a typo surfaces at author time instead of silently dropping the milestone from drift detection."
+              },
+              "status": {
+                "$ref": "vc:core:atoms#milestoneStatus",
+                "description": "Lifecycle status of this milestone, reusing the shared milestoneStatus atom (the same enum 14_roadmap.json uses). Values: 'pending' = not yet started; 'in_progress' = currently being worked; 'done' = all checklist items satisfied and review verdict is 'verified'; 'deferred' = consciously postponed. Only 'done' milestones are exempt from FR ownership conflict detection — pending, in_progress, and deferred all participate."
+              },
+              "fr_refs": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
                   "type": "string",
-                  "minLength": 20,
-                  "description": "1–3 sentences describing the full implementation scope: the capability delivered, primary actors, and key constraints across all milestones. Example: 'Implements JWT authentication and session management for the mobile API across two milestones. Covers token issuance, validation, and revocation. Excludes OAuth flows and third-party SSO.'"
+                  "pattern": "^(fr|api)-[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "description": "An FR or API ID owned by this milestone. Must start with 'fr-' or 'api-' so E308 ownership conflict detection can distinguish behavioural specs from typos or non-spec IDs."
                 },
-                "scope_in": {
-                  "type": "array",
-                  "minItems": 1,
-                  "uniqueItems": true,
-                  "description": "Items explicitly included across all milestones. Each string should name a concrete capability, endpoint, or system boundary. Required (minItems=1) so the drift check (E308) has a non-empty surface to compare milestone scope_in/out against; an empty scope_in would silently no-op the check.",
-                  "items": {
-                    "type": "string",
-                    "minLength": 3,
-                    "description": "A concrete scope item included in this implementation."
-                  }
-                },
-                "scope_out": {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "description": "Items explicitly excluded from all milestones. The drift check (E308) fires if a milestone's scope_in contradicts this list. May be empty on a fresh anchor with no exclusions.",
-                  "items": {
-                    "type": "string",
-                    "minLength": 3,
-                    "description": "A concrete scope item excluded from this implementation."
-                  }
-                }
-              }
-            },
-            "ambiguities": {
-              "type": "array",
-              "minItems": 0,
-              "description": "Accumulated unresolved decisions and ambiguities across all Trinity cycles. Reuses the shared `crossCycleAmbiguityItem` shape (same as 16b emergent_ambiguities) — distinct from planning-phase ambiguities (16a) which use a richer shape (source/proposed_assumption/mitigation/decision/resolved) and a binary severity. Populated incrementally as ambiguities surface; an empty array on a fresh anchor is valid.",
-              "items": {
-                "$ref": "vc:core:collections#crossCycleAmbiguityItem",
-                "description": "A cross-milestone ambiguity or unresolved architectural decision."
-              }
-            },
-            "drift": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "checks"
-              ],
-              "description": "Drift monitoring schedule for the anchor. 'checks' records the drift checks that have been run across milestone cycles. An empty array is valid on a fresh anchor — populate as milestone plans are created and drift is monitored.",
-              "properties": {
-                "checks": {
-                  "type": "array",
-                  "minItems": 0,
-                  "items": {
-                    "type": "string",
-                    "minLength": 5,
-                    "description": "Description of a drift check performed or scheduled. Example: 'Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-10)'."
-                  },
-                  "description": "Drift checks performed or planned across milestone cycles. Each string documents what was checked and when."
-                }
-              }
-            },
-            "milestone_index": {
-              "type": "array",
-              "minItems": 0,
-              "description": "Registry of all milestones covered by this anchor. Each entry declares which FRs/APIs a milestone owns and the checklist ID namespace it uses. Used by validators to detect cross-milestone FR ownership conflicts (E308) and checklist ID collisions (E309). An empty array is valid on a fresh anchor before any milestone plans are created.",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "milestone_id",
-                  "context_path",
-                  "status",
-                  "fr_refs",
-                  "checklist_id_prefix",
-                  "summary"
-                ],
-                "description": "A milestone entry in the anchor index.",
-                "properties": {
-                  "milestone_id": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Kebab-case ID matching the milestone_id in 14_roadmap.json."
-                  },
-                  "context_path": {
-                    "type": "string",
-                    "pattern": "^(spec/)?impl_context/[a-z0-9_]+\\.json$",
-                    "description": "Relative path to this milestone's 16a plan from either the repo root (with `spec/` prefix) or the spec directory root. Must point at a file inside `impl_context/` with a lowercase/underscore/digit filename ending in `.json`. Example: 'spec/impl_context/ms_auth_plan.json' or 'impl_context/ms_auth_plan.json'. Downstream validators consume this field directly: `traceability_closure` reads it to build the milestone→checklist map, and `step_16_anchor` (W607) verifies the declared file exists on disk so a typo surfaces at author time instead of silently dropping the milestone from drift detection."
-                  },
-                  "status": {
-                    "$ref": "vc:core:atoms#milestoneStatus",
-                    "description": "Lifecycle status of this milestone, reusing the shared milestoneStatus atom (the same enum 14_roadmap.json uses). Values: 'pending' = not yet started; 'in_progress' = currently being worked; 'done' = all checklist items satisfied and review verdict is 'verified'; 'deferred' = consciously postponed. Only 'done' milestones are exempt from FR ownership conflict detection — pending, in_progress, and deferred all participate."
-                  },
-                  "fr_refs": {
-                    "type": "array",
-                    "uniqueItems": true,
-                    "items": {
-                      "type": "string",
-                      "pattern": "^(fr|api)-[a-z0-9]+(?:-[a-z0-9]+)*$",
-                      "description": "An FR or API ID owned by this milestone. Must start with 'fr-' or 'api-' so E308 ownership conflict detection can distinguish behavioural specs from typos or non-spec IDs."
-                    },
-                    "description": "FR and API IDs owned by this milestone. Array is a set — duplicates are a schema error. Used by E308 to detect the same FR/API being active in two milestones simultaneously. Pattern restricts entries to fr-* or api-* IDs (cross-checked against 04_fr_list.json and 05_interface_contracts.json by traceability_closure)."
-                  },
-                  "checklist_id_prefix": {
-                    "type": "string",
-                    "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$",
-                    "maxLength": 20,
-                    "description": "SCREAMING_SNAKE prefix namespace for checklist IDs in this milestone's 16a plan (e.g., 'AUTH', 'PAYMENT', 'USER_MGMT'). Must start with an uppercase letter, may contain uppercase/digits, and underscore-delimited segments may follow but must each contain at least one character. Trailing underscores are rejected to prevent double-underscored IDs (e.g. 'AUTH__LOGIN'). Must be unique across milestone_index entries to prevent E309 collisions."
-                  },
-                  "summary": {
-                    "type": "string",
-                    "minLength": 10,
-                    "description": "One-line status summary for this milestone. Example: 'Auth token issuance — 3/5 checklist items verified, CI green'."
-                  }
-                }
+                "description": "FR and API IDs owned by this milestone. Array is a set — duplicates are a schema error. Used by E308 to detect the same FR/API being active in two milestones simultaneously. Pattern restricts entries to fr-* or api-* IDs (cross-checked against 04_fr_list.json and 05_interface_contracts.json by traceability_closure)."
+              },
+              "checklist_id_prefix": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$",
+                "maxLength": 20,
+                "description": "SCREAMING_SNAKE prefix namespace for checklist IDs in this milestone's 16a plan (e.g., 'AUTH', 'PAYMENT', 'USER_MGMT'). Must start with an uppercase letter, may contain uppercase/digits, and underscore-delimited segments may follow but must each contain at least one character. Trailing underscores are rejected to prevent double-underscored IDs (e.g. 'AUTH__LOGIN'). Must be unique across milestone_index entries to prevent E309 collisions."
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 10,
+                "description": "One-line status summary for this milestone. Example: 'Auth token issuance — 3/5 checklist items verified, CI green'."
               }
             }
           }
         }
       }
+    }
+  },
+  "unevaluatedProperties": false,
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used). Kept inside `allOf` so the root's `properties` block always evaluates (its annotations propagate to `unevaluatedProperties` regardless of whether `plan` validation succeeds — preventing the noisy 'plan was unexpected' duplicate error that arose with the previous `allOf`-wrapped layout)."
     }
   ]
 }
