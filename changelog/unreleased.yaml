@@ -11,15 +11,25 @@ changes:
     migration:
       action: ai_assisted
       note: "Use template_infer_missing.md prompt to populate all 4 required tech_stack categories"
+  - type: breaking_schema_swap
+    path: "spec/16_impl_context.json"
+    description: "BREAKING: Step 16 artifact at spec/16_impl_context.json now validates against vc:16-anchor instead of vc:16-impl-context. The Trinity Anchor is a scope/ownership/drift declaration spanning all milestones; per-milestone implementation plans (16a/16b/16c) continue to use vc:16-impl-context but live in spec/impl_context/{step_id}.json. Existing host repos that authored spec/16_impl_context.json under the old schema will fail validation: missing required artifact_role:'anchor', forbidden plan.spec_alignment.checklist + plan.review_requirements + plan.docs_impact + plan.solution + plan.context + plan.security + plan.delivery + plan.coverage_status + plan.scope_validation, forbidden top-level execution + review + milestone_ref, and missing required plan.ambiguities + plan.drift + plan.milestone_index."
+    migration:
+      action: ai_assisted
+      note: |
+        1. Move milestone-plan content to spec/impl_context/<milestone_id>_plan.json (still vc:16-impl-context).
+        2. Rewrite spec/16_impl_context.json against vc:16-anchor — see prompts/prompt_16_impl_context.md and schema/16_anchor.schema.json. Carry only plan.summary, plan.ambiguities, plan.drift.checks, and plan.milestone_index entries (milestone_id + context_path + status + fr_refs + checklist_id_prefix + summary).
+        3. Use shared milestone_index status enum: pending | in_progress | done | deferred (vc:core:atoms#milestoneStatus). Earlier draft values 'active' / 'planned' are now schema-rejected.
+        4. Re-run ./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit, then ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit to surface E308/E309/W587/W588.
   - type: add_schema
     path: "schema/16_anchor.schema.json"
-    description: "vc:16-anchor schema for the Trinity Anchor artifact (spec/16_impl_context.json). Requires artifact_role:'anchor', plan.summary/ambiguities/drift/milestone_index; forbids execution/review via unevaluatedProperties:false."
+    description: "vc:16-anchor schema for the Trinity Anchor artifact. Requires artifact_role:'anchor', plan.summary/ambiguities/drift/milestone_index; forbids execution/review/milestone_ref via unevaluatedProperties:false at root. milestone_index[].status uses shared atoms#milestoneStatus; ambiguities[].status uses shared atoms#ambiguityStatus."
     migration:
-      action: automatic
-      note: "Existing spec/16_impl_context.json anchor files that include execution or review sections will fail validation. Migrate: move execution/review data to per-milestone files in spec/impl_context/."
+      action: ai_assisted
+      note: "See breaking_schema_swap entry above for the spec/16_impl_context.json migration."
   - type: add_validator
     path: "tools/specdev_tools/validation/validators/step_16_anchor.py"
-    description: "Cross-milestone drift validator. E308 ANCHOR_SCOPE_DRIFT (scope contradiction + FR ownership conflict), E309 ANCHOR_CHECKLIST_DRIFT (same checklist id → different spec_ref.id across milestones), W580 guard."
+    description: "Cross-milestone drift validator. E308 ANCHOR_SCOPE_DRIFT (scope contradiction + FR/API ownership conflict between in-flight milestones), E309 ANCHOR_CHECKLIST_DRIFT (cross-milestone checklist ID collision OR duplicate checklist_id_prefix in milestone_index). (W580 retains its prior meaning SUBSTEP_DRIFT and is unchanged.)"
     migration:
       action: automatic
       note: "No author-facing migration. Validator runs automatically via DEEP_VALIDATORS['16']."
@@ -49,13 +59,108 @@ changes:
       note: "Populate in future regenerations for steps 00–02a. Absence is allowed — existing artifacts remain valid."
   - type: add_field
     path: "step_order.step_metadata"
-    description: "Per-step declarative metadata (required_spec_inputs, required_seed_inputs, extraction_intent). Consistency-linted against downstream_consumers by dependency-order-lint."
+    description: "Per-step declarative metadata (required_spec_inputs, required_seed_inputs). Consistency-linted against downstream_consumers by dependency-order-lint."
     migration:
       action: automatic
-      note: "Populated for all 22 steps. Bidirectional consistency enforced by _lint_step_metadata_consistency — mismatches emit E540 STEP_METADATA_INCONSISTENT."
+      note: "Populated for all 22 steps. Bidirectional consistency enforced by _lint_step_metadata_consistency — mismatches emit E543 STEP_METADATA_INCONSISTENT."
   - type: add_field
     path: "seed_manifest.seeds[*]"
     description: "Optional hash (SHA-256) and version fields on each seed entry for content-integrity tracking by seed-index tooling."
     migration:
       action: automatic
       note: "Optional new fields — existing manifests remain valid. Populate via `specdev seed-index` to record current hashes."
+  - type: update_prompt
+    path: "prompts/prompt_16_impl_context.md"
+    description: "Rewritten end-to-end to describe only the Trinity Anchor contract: artifact_role='anchor', plan.summary/ambiguities/drift/milestone_index. Removes all milestone-plan prose (checklist, docs_impact, review_requirements, solution, context). Updates Field Definitions, Operating Flow, Self-Audit Gate, Negative Constraints, Heuristics, and Extraction Intent sections. Output Contract block already matched the anchor shape."
+    migration:
+      action: ai_assisted
+      note: "LLM authors following the prior prose would emit fields forbidden by vc:16-anchor (unevaluatedProperties:false). No artifact migration required; next anchor regeneration will consume the new prompt."
+  - type: add_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "W585 ANCHOR_DRIFT_SKIP — fires when validate_step_16_anchor is called without spec_path (cross-milestone drift checks require filesystem access). Previously would silently skip; now surfaces a warning."
+    migration:
+      action: automatic
+      note: "Warning only — no behavior break. Callers that intentionally omit spec_path will now see W585 in error lists."
+  - type: add_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "W586 ANCHOR_VALIDATOR_WRONG_ARTIFACT — fires when the anchor validator is invoked on an artifact that is neither field-marked (artifact_role='anchor') nor path-marked (spec/16_impl_context.json outside impl_context/). Routing-bug signal."
+    migration:
+      action: automatic
+      note: "Warning only — surfaces routing regressions. Should never fire under correct dispatch."
+  - type: add_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "W587 ANCHOR_DRIFT_CHECKS_STALE — fires when plan.milestone_index has at least one entry but plan.drift.checks is empty. The anchor is recording active milestones without performing its one load-bearing job (cross-cycle drift monitoring)."
+    migration:
+      action: automatic
+      note: "Existing anchors with populated milestone_index should add at least one drift.checks entry describing what cross-milestone invariant is being monitored."
+  - type: add_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "W588 ANCHOR_MILESTONE_UNREADABLE — fires when a *.json file in spec/impl_context/ cannot be read or parsed during anchor drift detection. Previously the file was silently dropped from the E308/E309 registries; now the offending filename is reported."
+    migration:
+      action: automatic
+      note: "Repair or remove the unreadable file. Under validate_dir the file's own dispatcher will also surface a richer error; under single-file validate_file on the anchor, W588 is the only diagnostic the author sees."
+  - type: refactor_atom
+    path: "schema/core/atoms.schema.json#ambiguityStatus"
+    description: "New shared atom $anchor: ambiguityStatus = ['resolved','tracking','deferred','blocked']. Three previously-inline copies in 16_anchor (ambiguities.status), 16_impl_context (planning ambiguities.status), and 16_impl_context (emergent_ambiguities.status) now $ref this atom. Single source of truth for ambiguity resolution status across the pipeline."
+    migration:
+      action: automatic
+      note: "Enum values unchanged — purely a structural unification. Existing artifacts validate identically."
+  - type: refactor_field
+    path: "schema/16_anchor.schema.json#milestone_index[].status"
+    description: "milestone_index[].status now $refs vc:core:atoms#milestoneStatus instead of an inline ['active','done','planned'] enum. Aligns the anchor's milestone status vocabulary with 14_roadmap.json so authors do not need to translate between vocabularies."
+    migration:
+      action: ai_assisted
+      note: "BREAKING for in-progress draft anchors only. Translate: 'active' → 'in_progress', 'planned' → 'pending'. 'done' is unchanged. New 'deferred' value is now available."
+  - type: tighten_schema
+    path: "schema/16_anchor.schema.json#milestone_index[]"
+    description: "fr_refs gains uniqueItems:true (intra-milestone duplicates now a schema error). checklist_id_prefix pattern tightened to '^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$' with maxLength:20 — trailing underscores now rejected to prevent double-underscored IDs (e.g. 'AUTH__LOGIN')."
+    migration:
+      action: automatic
+      note: "Existing well-formed anchors are unaffected. Authors who copy-pasted entries will see schema errors on duplicates and trailing underscores."
+  - type: add_code
+    path: "tools/specdev_tools/core/errors.py"
+    description: "E543 STEP_METADATA_INCONSISTENT — dedicated code for dependency_order_lint._lint_step_metadata_consistency. Previously shared E540 with SELF_OR_FORWARD_DEPENDENCY, which broke selective error-code promotion."
+    migration:
+      action: automatic
+      note: "Any automation that filtered on E540 to catch step_metadata mismatches must switch to E543."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validate.py"
+    description: "Content-based sub-step dispatch for impl_context/ artifacts. _refine_impl_context_substep(step, data) promotes the initial 16a routing to 16b (when execution.execution_results is non-empty) or 16c (when review.verdict is a non-empty string). Previously path-based routing always dispatched to 16a, silently skipping 16b/16c-specific checks (duplicate commands, verdict enum, W582 FR coverage) when invoked via validate_file."
+    migration:
+      action: automatic
+      note: "No author migration. Previously-undetected violations in 16b/16c artifacts will now surface as errors — treat as bugs, not regressions."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validators/step_16b.py tools/specdev_tools/validation/validators/step_16c.py"
+    description: "Chain-up semantics: validate_step_16b now transitively invokes validate_step_16a (plan-level checks); validate_step_16c invokes validate_step_16b. A 16b artifact IS also a valid 16a plan; a 16c artifact IS also a valid 16b execution. _step16_cache (MD5-keyed on data+path) deduplicates the base pass so chain-up does not triple-execute."
+    migration:
+      action: automatic
+      note: "No author migration. Strengthens downstream validation: milestone execution and review artifacts are now checked against the full cumulative contract."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validators/step_16.py tools/specdev_tools/validation/validators/step_16c.py"
+    description: "_load_roadmap() helper extracted to step_16.py and reused by step_16c.py W582. Resolves 14_roadmap.json correctly whether the artifact lives at spec/ root or inside spec/impl_context/. Previously step_16c resolved it as a direct sibling of spec_path, which silently no-op'd W582 for review artifacts under impl_context/."
+    migration:
+      action: automatic
+      note: "No author migration. W582 may now fire on 16c review artifacts that were previously silently passing."
+  - type: reorganization
+    path: "tests/fixtures/step_16/"
+    description: "Milestone-plan fixtures moved from tests/fixtures/step_16/ root to tests/fixtures/step_16/impl_context/ to match the anchor/milestone-plan split. Four new anchor fixtures (valid_anchor_minimal.json, valid_anchor_with_milestones.json, invalid_anchor_has_execution.json, invalid_anchor_missing_drift.json) live at the root."
+    migration:
+      action: automatic
+      note: "Test-only reorganization. Does not affect live specs."
+  - type: add_validator
+    path: "tools/specdev_tools/validation/dependency_order_lint.py"
+    description: "_lint_step_metadata_seed_consistency — symmetric check that step_metadata.required_seed_inputs matches seed_manifest.step_requirements exactly (unordered set equality). Silently skips when either file or block is absent. Emits E543 STEP_METADATA_INCONSISTENT with a message distinguishing required_seed_inputs from required_spec_inputs."
+    migration:
+      action: automatic
+      note: "Existing projects where step_metadata.required_seed_inputs drifted from seed_manifest will now see E543 errors. Reconcile the two sources."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/validate.py"
+    description: "_step16_cache.clear() called at the start of validate_dir. Prevents cross-run accumulation of content-hash cache entries in long-lived processes; the cache remains beneficial as a chain-up dedup within one invocation."
+    migration:
+      action: automatic
+      note: "No author migration. Memory-bound fix for long-lived processes."
+
+deferred:
+  - ref: "F-S3 / Phase 1 Task 1.2"
+    description: "Prompt-side emission of spec_refs_ingested / seed_refs_ingested not yet wired. Schema hook exists on step_base; all 20 step schemas inherit the optional fields. Prompts must be updated across the pipeline in a coordinated pass to populate them during generation. Until then, downstream drift detection for these fields has nothing to read."
+    tracked_as: "follow-up feat pass for Phase 1 closure"

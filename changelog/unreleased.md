@@ -12,12 +12,12 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 - **`step_16_anchor` validator** (`validation/validators/step_16_anchor.py`): cross-milestone drift detection.
   - **E308 ANCHOR_SCOPE_DRIFT**: bidirectional scope contradiction (milestone `scope_in` ∩ anchor `scope_out`, or reverse) and FR ownership conflict (same FR active in two simultaneous milestones).
   - **E309 ANCHOR_CHECKLIST_DRIFT**: same checklist `id` maps to different `spec_ref.id` across milestone context files.
-  - **W580 ANCHOR_DRIFT_SKIP**: guard for routing errors or missing spec_path.
+  - **W585 ANCHOR_DRIFT_SKIP**: guard for routing errors or missing spec_path. (Note: `W580` retains its prior meaning `SUBSTEP_DRIFT` and is unchanged.)
 - **Routing fix** (`validation/validate.py`): files in `impl_context/` now route to step `"16a"` (milestone plans); `16_impl_context.json` at the spec root routes to step `"16"` (anchor). Fixes long-standing routing bug where every impl_context artifact silently used the base validator.
 - **E306 path fix** (`validation/validators/step_16.py`): when an artifact lives in `impl_context/`, `04_fr_list.json` is now resolved from the parent spec directory instead of from `impl_context/` itself.
 - **`prompt_schema_sync` step-key collision fix**: `16_anchor.schema.json` and `16_impl_context.schema.json` both derive step `"16"` via filename split; the anchor now gets a distinct `"16anchor"` step key, and `_PROMPT_STEP_OVERRIDE` maps `prompt_16_impl_context.md` to validate against the anchor schema.
 - **Fixture reorganization**: `tests/fixtures/step_16/impl_context/` holds all 17 milestone-plan fixtures; 4 new anchor fixtures live at the root of `tests/fixtures/step_16/`.
-- **14 new anchor integration tests** (`tests/integration/test_step_16_anchor.py`): schema pass/fail, E308 scope contradiction and FR ownership, E309 checklist drift, W580 guard paths.
+- **18 new anchor integration tests** (`tests/integration/test_step_16_anchor.py`): schema pass/fail, E308 scope contradiction and FR ownership, E309 checklist drift, W585/W586/W587 guard paths.
 
 ### Phase 1 — Seed & Spec Dependency Hardening
 
@@ -25,9 +25,25 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 - **`specRefIngested` / `specRefIngestedArray`** (`schema/core/collections.schema.json`): new reusable type recording `{step_id, artifact_id, hash?}` so downstream artifacts can declare which upstream artifacts they were derived from.
 - **`spec_refs_ingested` and `seed_refs_ingested`** (`schema/core/step_base.schema.json`): optional properties inherited by all 20 step schemas composed via `allOf` — no per-step changes required.
 - **`seed_manifest` optional `hash` and `version` fields** on each seed entry — populated by `seed-index` tooling for integrity tracking.
-- **`step_metadata` block in `tools/step_order.json`** (schema-validated): for all 22 steps, declares `required_spec_inputs` (inverse of `downstream_consumers`), `required_seed_inputs` (mirror of seed manifest step_requirements), and a one-line `extraction_intent` summary. Prevents drift between forward/reverse DAG views.
-- **`_lint_step_metadata_consistency`** (`validation/dependency_order_lint.py`): new consistency validator that rejects any `step_metadata.required_spec_inputs` that is not the exact inverse of `downstream_consumers`. Emits E540 STEP_METADATA_INCONSISTENT.
-- **4 new unit tests** for the consistency linter (absent/consistent/missing/extra cases).
+- **`step_metadata` block in `tools/step_order.json`** (schema-validated): for all 22 steps, declares `required_spec_inputs` (inverse of `downstream_consumers`) and `required_seed_inputs` (mirror of seed manifest step_requirements). Prevents drift between forward/reverse DAG views.
+- **`_lint_step_metadata_consistency`** (`validation/dependency_order_lint.py`): new consistency validator that rejects any `step_metadata.required_spec_inputs` that is not the exact inverse of `downstream_consumers`. Emits **E543 STEP_METADATA_INCONSISTENT** (dedicated code — previously shared E540 with `SELF_OR_FORWARD_DEPENDENCY`, which broke selective error-code promotion).
+- **`_lint_step_metadata_seed_consistency`** (`validation/dependency_order_lint.py`): symmetric check on the seed side — `step_metadata.required_seed_inputs` must match `seed_manifest.step_requirements` exactly. Silently skips when either file or block is absent. Also emits E543 STEP_METADATA_INCONSISTENT with a message distinguishing `required_seed_inputs` from `required_spec_inputs`.
+- **8 new unit tests** for the consistency linters (4 spec-edge + 4 seed-edge: absent/consistent/missing/extra cases).
+
+### Trinity Anchor Follow-on (Phase 2 polish)
+
+- **W586 ANCHOR_VALIDATOR_WRONG_ARTIFACT**: fires when the anchor validator is invoked on an artifact that is neither field-marked (`artifact_role == "anchor"`) nor path-marked (`spec/16_impl_context.json` outside `impl_context/`). Routing-bug signal.
+- **W587 ANCHOR_DRIFT_CHECKS_STALE**: fires when `plan.milestone_index` is non-empty but `plan.drift.checks` is empty — the anchor is paying its maintenance cost without performing its one load-bearing job (cross-cycle drift monitoring).
+- **Content-based sub-step dispatch** (`validation/validate.py::_refine_impl_context_substep`): artifacts in `impl_context/` initially land on `"16a"` via path regex, then are promoted to `"16b"` (when `execution.execution_results` is non-empty) or `"16c"` (when `review.verdict` is a non-empty string). Previously 16b/16c-specific checks (duplicate commands, verdict enum, W582 FR coverage) were only reachable by calling the validators directly.
+- **Chain-up semantics** (`step_16b.py`, `step_16c.py`): `validate_step_16b` now transitively invokes `validate_step_16a`; `validate_step_16c` invokes `validate_step_16b`. `_step16_cache` (MD5-keyed on data+path) deduplicates the base pass so chain-up is O(1) in base work.
+- **`_load_roadmap()` DRY helper** (`step_16.py`, reused by `step_16c.py` W582): resolves `14_roadmap.json` correctly whether the artifact lives at `spec/` root or inside `spec/impl_context/`. Previously `step_16c` used a sibling-only resolver that silently no-op'd W582 for review artifacts under `impl_context/`.
+- **Prompt rewrite** (`prompts/prompt_16_impl_context.md`): all prose re-authored to describe only the anchor contract (`artifact_role`, `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`). Previous prose described the shared `vc:16-impl-context` shape and would lead LLM authors to emit fields the new schema forbids.
+- **Orphan fixture cleanup**: 17 top-level `tests/fixtures/step_16/*.json` fixtures deleted after the `impl_context/` subdirectory migration — all tests now read from the new location.
+- **`_step16_cache.clear()` on `validate_dir` entry** (`validation/validate.py`): prevents cross-run accumulation of content-hash cache entries in long-lived processes. The cache is a correctness-neutral optimisation for chain-up dedup within one `validate_dir` invocation; clearing between runs keeps memory bounded.
+
+### Known follow-ups (not in this release)
+
+- **F-S3 / Phase 1 Task 1.2 — Prompt emission of `spec_refs_ingested` / `seed_refs_ingested`.** The schema hook is live on `step_base` and inherited by all 20 step schemas, but no prompt is yet authored to emit these fields. Until prompts populate them, downstream drift detection based on ingested-ref hashes has nothing to read. Tracked for a follow-up feat pass that will coordinate prompt updates across the pipeline.
 
 ### R9 Validator & CI Enforcement
 
@@ -83,6 +99,36 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
   Migration: add a `tech_stack` object with at least one entry per category (`languages`,
   `frameworks`, `infrastructure`, `tools`). Re-run `specdev validate spec/02_system_sketch.json`
   to verify.
+- **`spec/16_impl_context.json` reshaped from `vc:16-impl-context` to `vc:16-anchor`** (BREAKING):
+  Step 16 is now the **Trinity Anchor** — a scope/ownership/drift declaration that spans all
+  milestones — and uses a dedicated schema. The 16a/16b/16c milestone artifacts continue to
+  use `vc:16-impl-context` and have moved to `spec/impl_context/{step_id}.json`. Existing host
+  repos that authored `spec/16_impl_context.json` against `vc:16-impl-context` will fail
+  validation on multiple counts: missing required `artifact_role: "anchor"`, forbidden
+  `plan.spec_alignment.checklist` / `plan.review_requirements` / `plan.docs_impact` /
+  `plan.solution` / `plan.context` / `plan.security` / `plan.delivery` / `plan.coverage_status`
+  / `plan.scope_validation`, forbidden top-level `execution` / `review` / `milestone_ref`,
+  and missing required `plan.ambiguities` / `plan.drift` / `plan.milestone_index`.
+  Migration:
+    1. **Move milestone-plan content out** — copy the existing `spec/16_impl_context.json`
+       to `spec/impl_context/<milestone_id>_plan.json` (the per-milestone 16a artifact); leave
+       its `$schema` as `vc:16-impl-context`.
+    2. **Rewrite `spec/16_impl_context.json` against the anchor contract** — see
+       `prompts/prompt_16_impl_context.md` and `schema/16_anchor.schema.json`. The new file
+       carries only `plan.summary` (scope), `plan.ambiguities`, `plan.drift.checks`, and
+       `plan.milestone_index`. Each `milestone_index` entry registers
+       `{milestone_id, context_path, status, fr_refs, checklist_id_prefix, summary}`.
+    3. **Use the shared milestone status enum** — `milestone_index[].status` is
+       `pending` | `in_progress` | `done` | `deferred` (from `vc:core:atoms#milestoneStatus`);
+       the earlier draft used `active` / `planned` and those values are now schema-rejected.
+    4. **Re-run `./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit`**
+       to confirm the anchor passes; then run `./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit`
+       to surface any new E308 / E309 / W587 / W588 signals from the anchor's drift check.
+  New error codes for this surface: **E308** ANCHOR_SCOPE_DRIFT (scope contradiction or
+  FR/API ownership conflict between in-flight milestones), **E309** ANCHOR_CHECKLIST_DRIFT
+  (cross-milestone checklist ID collision or duplicate `checklist_id_prefix` in
+  `milestone_index`), **W585** ANCHOR_DRIFT_SKIP, **W586** ANCHOR_VALIDATOR_WRONG_ARTIFACT,
+  **W587** ANCHOR_DRIFT_CHECKS_STALE, **W588** ANCHOR_MILESTONE_UNREADABLE.
 
 ## Pre-R8 / R8 Changes (carried forward)
 
