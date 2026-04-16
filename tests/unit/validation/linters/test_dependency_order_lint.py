@@ -342,6 +342,147 @@ class StepMetadataConsistencyTests(unittest.TestCase):
                 f"Expected extra seed-edge error, got: {rendered}",
             )
 
+    # ── M3: incremental adoption — both inner fields independently optional ──
+
+    def test_step_metadata_with_only_required_spec_inputs_passes(self):
+        """M3: a step_metadata entry with only required_spec_inputs is valid.
+
+        Both inner fields are optional independently. Omitting required_seed_inputs
+        is treated as an empty list and no E543 should fire as long as the seed-side
+        comparison source (seed_manifest.step_requirements) is also empty for the step.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01"],
+                "downstream_consumers": {"00": ["01"], "01": []},
+                "step_metadata": {
+                    # required_seed_inputs intentionally omitted — incremental adoption
+                    "00": {"required_spec_inputs": []},
+                    "01": {"required_spec_inputs": ["00"]},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs, f"Expected no errors. Got: {errs}")
+
+    def test_step_metadata_with_only_required_seed_inputs_passes(self):
+        """M3: a step_metadata entry with only required_seed_inputs is valid.
+
+        Symmetric to the spec-side test: omitting required_spec_inputs is valid
+        as long as downstream_consumers also implies no spec-side edge.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00"],
+                "downstream_consumers": {"00": []},
+                "step_metadata": {
+                    # required_spec_inputs intentionally omitted
+                    "00": {"required_seed_inputs": ["seed-overview"]},
+                },
+            })
+            self._write_seed_manifest(root, {"00": ["seed-overview"]})
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs, f"Expected no errors. Got: {errs}")
+
+    def test_step_metadata_with_empty_inner_block_passes(self):
+        """M3: an entirely empty inner block (`{}`) is valid for steps with no edges.
+
+        Equivalent to {required_spec_inputs: [], required_seed_inputs: []} but lets
+        a partial migration land step-by-step without forcing every entry to fully
+        declare both arrays at once.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00"],
+                "downstream_consumers": {"00": []},
+                "step_metadata": {"00": {}},
+            })
+            errs = lint_dependency_order(str(root))
+            self.assertEqual([], errs, f"Expected no errors. Got: {errs}")
+
+    # ── M4: phantom step keys ────────────────────────────────────────────────
+
+    def test_step_metadata_phantom_step_key_reported(self):
+        """M4: E543 fires when step_metadata contains a key not declared in steps[].
+
+        Without this check, step_metadata['99']={} silently passes both schema and
+        the inverse check (the inverse for an unlisted step is always empty).
+        Phantom keys mask typos and stale entries — surface them at lint time.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01"],
+                "downstream_consumers": {"00": ["01"], "01": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": []},
+                    "01": {"required_spec_inputs": ["00"]},
+                    # Phantom — "99" is not in steps[]
+                    "99": {"required_spec_inputs": []},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any(
+                    "STEP_METADATA_INCONSISTENT" in e
+                    and "'99'" in e
+                    and "not declared in the top-level 'steps' array" in e
+                    for e in rendered
+                ),
+                f"Expected phantom-key error naming step '99'. Got: {rendered}",
+            )
+
+    def test_step_metadata_phantom_step_key_typo_caught(self):
+        """M4: a typo'd step ID (e.g. '02b' instead of '02a') is flagged as phantom.
+
+        This is the realistic failure mode the check protects against: an author
+        adds a step_metadata entry for a step that LOOKS like a real ID but does
+        not exist in the canonical steps[] array.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "02a"],
+                "downstream_consumers": {"00": ["02a"], "02a": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": []},
+                    "02a": {"required_spec_inputs": ["00"]},
+                    # Typo: meant 02a, wrote 02b
+                    "02b": {"required_spec_inputs": ["00"]},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("'02b'" in e and "not declared" in e for e in rendered),
+                f"Expected phantom-key error naming step '02b'. Got: {rendered}",
+            )
+
+    def test_step_metadata_no_phantom_keys_passes(self):
+        """M4: when every step_metadata key is in steps[], no phantom error fires.
+
+        Negative test ensuring the M4 check is scoped to truly unknown keys and
+        doesn't false-positive on the canonical configuration (the toolkit's own
+        step_order.json declares step_metadata for all 22 listed steps).
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_order(root, {
+                "steps": ["00", "01", "02"],
+                "downstream_consumers": {"00": ["01", "02"], "01": ["02"], "02": []},
+                "step_metadata": {
+                    "00": {"required_spec_inputs": []},
+                    "01": {"required_spec_inputs": ["00"]},
+                    "02": {"required_spec_inputs": ["00", "01"]},
+                },
+            })
+            errs = lint_dependency_order(str(root))
+            phantom = [e for e in errs if "not declared in the top-level 'steps' array" in e.message]
+            self.assertEqual(phantom, [], f"Expected no phantom-key errors. Got: {phantom}")
+
 
 if __name__ == "__main__":
     unittest.main()

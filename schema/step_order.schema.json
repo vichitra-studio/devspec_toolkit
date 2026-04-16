@@ -118,15 +118,15 @@
     },
     "step_metadata": {
       "type": "object",
-      "description": "Per-step declarative metadata: upstream spec inputs and seed inputs. Optional — when present, the consistency linter validates required_spec_inputs against the inverse of downstream_consumers.",
+      "description": "Per-step declarative metadata: upstream spec inputs and seed inputs. Optional — when present, the consistency linter validates each declared field against the inverse of downstream_consumers (required_spec_inputs) or seed_manifest.step_requirements (required_seed_inputs). Both inner fields are independently optional so a step may opt in to one side without the other; the linter treats omitted fields as empty lists and still catches missing edges via the cross-source comparison.",
       "additionalProperties": {
         "type": "object",
-        "description": "Metadata block for a single step.",
+        "description": "Metadata block for a single step. Both inner fields are optional to allow incremental per-step migration; the linter validates whatever is declared and treats absence as an empty list. Keys at this level must reference steps declared in the top-level `steps` array — phantom step keys are caught by `_lint_step_metadata_consistency` (E543).",
         "additionalProperties": false,
         "properties": {
           "required_spec_inputs": {
             "type": "array",
-            "description": "Step IDs whose output this step ingests as input. Must match the inverse of downstream_consumers (a step is listed here iff the producer lists this step in its downstream_consumers).",
+            "description": "Step IDs whose output this step ingests as input. Must match the inverse of downstream_consumers (a step is listed here iff the producer lists this step in its downstream_consumers). Optional — when omitted, the linter treats this side as empty and surfaces any missing edge via E543.",
             "items": {
               "type": "string",
               "pattern": "^[0-9]{2}[a-c]?$",
@@ -136,7 +136,7 @@
           },
           "required_seed_inputs": {
             "type": "array",
-            "description": "Seed document IDs required by this step. Must match a subset of seed_manifest.seeds[*].seed_id and should mirror seed_manifest.step_requirements[<this step>] when present.",
+            "description": "Seed document IDs required by this step. Must match a subset of seed_manifest.seeds[*].seed_id and should mirror seed_manifest.step_requirements[<this step>] when present. Optional — when omitted, the linter treats this side as empty and surfaces any missing seed edge via E543.",
             "items": {
               "type": "string",
               "pattern": "^[a-z0-9][a-z0-9-]*$",
@@ -144,11 +144,7 @@
             },
             "uniqueItems": true
           }
-        },
-        "required": [
-          "required_spec_inputs",
-          "required_seed_inputs"
-        ]
+        }
       }
     }
   }

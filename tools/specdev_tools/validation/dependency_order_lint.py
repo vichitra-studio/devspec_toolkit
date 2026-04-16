@@ -216,6 +216,26 @@ def _lint_step_metadata_consistency(step_order_path: Path) -> list[SpecError]:
     if not isinstance(downstream, dict):
         return errors
 
+    # M4: reject phantom step keys.  step_metadata keys must reference steps
+    # declared in the canonical top-level `steps` array — otherwise an entry
+    # like step_metadata["99"] = {} would pass schema validation AND silently
+    # pass the inverse check (its inverse for "99" is also empty), letting a
+    # typo or stale entry sit undetected.  Catch it here so the canonical
+    # source-of-truth (steps[]) governs which entries may exist.
+    declared_steps = data.get("steps", [])
+    if isinstance(declared_steps, list):
+        steps_set = {s for s in declared_steps if isinstance(s, str)}
+        phantom = sorted(set(step_metadata.keys()) - steps_set)
+        for ghost in phantom:
+            errors.append(make_error(
+                "E543",
+                f"STEP_METADATA_INCONSISTENT {step_order_path}: "
+                f"step_metadata['{ghost}'] references a step not declared in the "
+                f"top-level 'steps' array — remove the entry or add the step to "
+                f"steps[].  Phantom keys silently bypass downstream-edge checks "
+                f"because the inverse for an unlisted step is always empty.",
+            ))
+
     # Build inverse from downstream_consumers: required_spec_inputs[c] = {p | c ∈ downstream[p]}
     inverse: dict[str, set[str]] = {}
     for producer, consumers in downstream.items():
