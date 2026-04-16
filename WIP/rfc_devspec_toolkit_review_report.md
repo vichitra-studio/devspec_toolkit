@@ -440,12 +440,16 @@ Option A (role inference in validator via path heuristic) is a viable stopgap bu
 | Field | `vc:16-anchor` | `vc:16-impl-context` (16a/16b/16c) |
 |-------|---------------|--------------------------------------|
 | `plan.summary` | required | required |
+| `plan.summary.scope_in` / `scope_out` | required (capability categories) | required (per-milestone scope categories) |
+| `plan.summary.target_file_patterns` | **absent** (per-milestone concern) | **required** (E520 file-scope guard in step_16.py) |
 | `plan.ambiguities` | **required** | optional |
 | `plan.drift` | **required** | optional |
 | `plan.milestone_index` | **required** (can be `[]`) | **absent** |
 | `plan.spec_alignment.checklist` | **absent** — replaced by `plan.milestone_index` | required (full detail) |
 | `execution` | **forbidden** | optional (added by 16b) |
 | `review` | **forbidden** | optional (added by 16c) |
+
+> **Why `target_file_patterns` is per-milestone, not anchor-level (audit follow-up, 2026-04-16):** the anchor describes scope at the *category* level (`auth`, `payments`) so it can detect cross-milestone conflicts in `scope_in` ∩ `scope_out` without needing to know what files exist on disk. File-level enforcement is the per-milestone validator's job: `step_16.py` checks `implementation.files_touched ⊆ plan.summary.target_file_patterns` and fires E520 on violations. Putting `target_file_patterns` on the anchor would force the anchor to enumerate every file across every milestone (the bloat problem `WIP/step16_anchor_bloat_report.md` set out to eliminate) without adding any check the per-milestone validator does not already perform on a more targeted surface.
 
 **Why checklist is absent from the anchor:**
 

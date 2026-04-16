@@ -200,7 +200,7 @@
                     "type": "string",
                     "description": "Glob pattern relative to repo root. Examples: 'src/auth/**/*.py', 'tests/unit/auth/test_*.py'. Anti-pattern: '*.py' (matches entire repo)."
                   },
-                  "description": "Glob patterns for files to modify or create, relative to repo root."
+                  "description": "Per-milestone file globs that bound execution.files_touched (E520 file-scope guard in step_16.py). Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) deliberately does NOT carry this field — scope at the anchor level is expressed via scope_in/scope_out (capability categories), file-level enforcement is per-milestone. See RFC §17.4 and prompt_16_impl_context.md L93 for the split rationale."
                 }
               },
               "required": [
