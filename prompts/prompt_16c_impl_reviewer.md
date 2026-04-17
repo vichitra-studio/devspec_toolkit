@@ -22,10 +22,10 @@ Before marking a milestone complete, verify all deliverables listed in `14_roadm
 
 ## Crucial Side Effect (Anchor + Roadmap Sync)
 - If your `verdict` is `verified`, you **MUST** also update:
-    - `spec/16_impl_context.json` (Trinity Anchor): Set the corresponding `plan.milestone_index[<this milestone>].status` to `done` and update its `summary` line. The anchor is the single source of truth for milestone lifecycle state — `spec_check` reads `milestone_index[].status` to gate cross-milestone E308 FR ownership conflict (done milestones are exempt).
+    - `spec/16_impl_context.json` (Trinity Anchor): Set the corresponding `plan.milestone_index[<this milestone>].status` to `done` and update its `summary` line.
     - `spec/14_roadmap.json`: Set the corresponding milestone's status to `done`.
     - `spec/09_impl_plan.json`: Set the corresponding milestone's status to `done`.
-- This ensures the anchor's milestone_index, the high-level roadmap, and the implementation plan stay in sync with implementation reality. Skipping the anchor update leaves a stale `in_progress` flag that triggers W587 ANCHOR_DRIFT_CHECKS_STALE on the next `spec-check` run and silently blocks the next milestone from claiming the same FRs.
+- This ensures the anchor, roadmap, and implementation plan stay in sync with implementation reality. Skipping the anchor update leaves a stale status that blocks the next milestone from claiming the same FRs.
 
 # Field Definitions & Rules (MANDATORY)
 
@@ -216,7 +216,7 @@ For each `checklist[]` item:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every checklist item in `spec/impl_context/{milestone_snake}_plan.json` has a per-item verdict in either (a) `execution.critical_evidence.satisfied_checklist_ids` (passed items) or (b) `review.findings` (failing items). `findings` is for issues only — clean items do **not** require an invented finding entry; they are recorded in `satisfied_checklist_ids` and `semantic_review.fr_coverage[*].checklist_ids`. Failing E305 PLANNED_UNEXECUTED indicates an item that is neither satisfied nor flagged.
+- Every checklist item in `spec/impl_context/{milestone_snake}_plan.json` has a per-item verdict in either (a) `execution.critical_evidence.satisfied_checklist_ids` (passed items) or (b) `review.findings` (failing items). `findings` is for issues only — clean items do **not** require an invented finding entry; they are recorded in `satisfied_checklist_ids` and `semantic_review.fr_coverage[*].checklist_ids`. No active checklist item should be left unaddressed.
 - All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
 - Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
 - No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
@@ -227,15 +227,7 @@ Before emitting, verify:
 - [ ] Verdict is based on measurable criteria from FR acceptance criteria — not subjective quality judgment
 - [ ] Every high-severity finding has a remediation_task with a specific, actionable fix description (not "fix the issue")
 - [ ] `semantic_review.fr_coverage` is populated for every FR listed in the active milestone's `fr_refs` (no FR left without a coverage verdict)
-- [ ] When `verdict == "verified"`: anchor's `plan.milestone_index[<this milestone>].status` was updated to `done` (see "Crucial Side Effect" above). Skipping fires W587 on the next `spec-check`.
-
-### Validator codes you are gating
-Author the review so the following deep-validator codes do NOT fire:
-- **E303 CI_GATE_VIOLATION** — `verdict: verified` is forbidden when `review.fixture_status.ci_status != "green"`.
-- **E305 PLANNED_UNEXECUTED** — every active checklist item must appear in `execution.critical_evidence.satisfied_checklist_ids` (or be marked `deferred`).
-- **E306 SEMANTIC_REVIEW_FR_MISMATCH** — every `semantic_review.fr_coverage[].fr_id` must exist in `04_fr_list.json`.
-- **E307 BEHAVIOR_VALIDATION_PAIRING** — every behavioural `spec_ref` (fr/api/inv/nfr/fixture) needs both a `behavior` and a `validation` checklist item.
-- **W582 SEMANTIC_REVIEW_FR_COVERAGE_INCOMPLETE** — every FR listed in the active milestone's `fr_refs` (per `14_roadmap.json`) must appear in `semantic_review.fr_coverage`.
+- [ ] When `verdict == "verified"`: anchor's `plan.milestone_index[<this milestone>].status` was updated to `done` (see "Crucial Side Effect" above).
 
 ## Negative Constraints
 

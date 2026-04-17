@@ -28,6 +28,22 @@ from ...core.errors import make_error, SpecError
 from .step_16 import _is_anchor
 
 
+def _resolve_context_path(ctx_path: str, anchor_path: Path) -> Path:
+    """Resolve a milestone_index context_path to an absolute path.
+
+    Strips an optional leading segment matching the anchor's parent directory
+    name (typically ``spec/``) or a literal ``spec/`` prefix, then joins
+    relative to the anchor's parent.
+    """
+    resolved = ctx_path
+    anchor_parent_name = anchor_path.parent.name
+    if resolved.startswith(anchor_parent_name + "/"):
+        resolved = resolved[len(anchor_parent_name) + 1:]
+    elif resolved.startswith("spec/"):
+        resolved = resolved[len("spec/"):]
+    return anchor_path.parent / resolved
+
+
 def validate_step_16_anchor(
     data: dict[str, Any],
     _toolkit_root: str,
@@ -134,10 +150,15 @@ def validate_step_16_anchor(
                 f"sit at spec/16_impl_context.json (one level up); files inside "
                 f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
                 f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
-                f"so cross-milestone drift checks (E308/E309/W588/W589/W607) can "
-                f"resolve the impl_context/ sibling directory correctly.",
+                f"so cross-milestone drift checks can resolve the impl_context/ "
+                f"sibling directory correctly.",
             )
         )
+        # All downstream drift checks resolve impl_context_dir relative to
+        # anchor_path.parent — which for a misfiled anchor points at
+        # impl_context/impl_context/ (non-existent).  Return early to avoid
+        # spurious W607 warnings for every milestone_index entry.
+        return errors
 
     anchor_plan = data.get("plan", {}) if isinstance(data.get("plan"), dict) else {}
     anchor_summary = anchor_plan.get("summary", {}) if isinstance(anchor_plan.get("summary"), dict) else {}
@@ -233,20 +254,7 @@ def validate_step_16_anchor(
         # ``impl_context/foo.json`` forms.
         ctx_path = entry.get("context_path")
         if isinstance(ctx_path, str) and ctx_path:
-            resolved_ctx = ctx_path
-            # Strip optional leading segment matching the anchor's parent
-            # directory name (typically ``spec/``).  Uses the actual dirname
-            # so the logic works in test fixtures whose spec dir is named
-            # differently.
-            anchor_parent_name = anchor_path.parent.name
-            if resolved_ctx.startswith(anchor_parent_name + "/"):
-                resolved_ctx = resolved_ctx[len(anchor_parent_name) + 1:]
-            # Also strip a literal ``spec/`` prefix when the anchor's parent
-            # has a different name (e.g. test fixtures).  The schema allows
-            # ``spec/impl_context/...`` as a repo-root-relative convention.
-            elif resolved_ctx.startswith("spec/"):
-                resolved_ctx = resolved_ctx[len("spec/"):]
-            declared_path = anchor_path.parent / resolved_ctx
+            declared_path = _resolve_context_path(ctx_path, anchor_path)
             if not declared_path.exists():
                 errors.append(
                     make_error(
@@ -430,13 +438,7 @@ def validate_step_16_anchor(
         ctx_path = entry.get("context_path")
         prefix = entry.get("checklist_id_prefix")
         if isinstance(ctx_path, str) and isinstance(prefix, str) and prefix:
-            resolved_ctx = ctx_path
-            anchor_parent_name = anchor_path.parent.name
-            if resolved_ctx.startswith(anchor_parent_name + "/"):
-                resolved_ctx = resolved_ctx[len(anchor_parent_name) + 1:]
-            elif resolved_ctx.startswith("spec/"):
-                resolved_ctx = resolved_ctx[len("spec/"):]
-            abs_path = str(anchor_path.parent / resolved_ctx)
+            abs_path = str(_resolve_context_path(ctx_path, anchor_path))
             ms_path_to_prefix[abs_path] = prefix
 
     for ms_file, ms_data in milestone_contexts.items():

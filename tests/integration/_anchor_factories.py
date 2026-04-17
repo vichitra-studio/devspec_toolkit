@@ -48,7 +48,7 @@ def make_anchor(
         "plan": {
             "summary": {
                 "functional_summary": functional_summary,
-                "scope_in": scope_in or [],
+                "scope_in": scope_in if scope_in is not None else ["test-scope-default"],
                 "scope_out": scope_out or [],
             },
             "ambiguities": ambiguities or [],

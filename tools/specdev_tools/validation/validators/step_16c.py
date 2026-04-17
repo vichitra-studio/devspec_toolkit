@@ -9,7 +9,7 @@ import json
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import _load_roadmap
+from .step_16 import _collect_milestone_refs, _load_roadmap
 from .step_16b import validate_step_16b
 
 VALID_VERDICTS = frozenset({"verified", "needs_work", "blocked", "deferred"})
@@ -69,23 +69,8 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
             roadmap_data = None
         if roadmap_data is not None:
             try:
-                # The vc:16-impl-context schema places milestone_ref only on
-                # individual checklist items (root has unevaluatedProperties: false
-                # and never declares it).  Scan checklist items to collect the
-                # unique planning milestone references this 16c artifact covers.
-                checklist = (
-                    data.get("plan", {})
-                    .get("spec_alignment", {})
-                    .get("checklist", [])
-                )
-                milestone_refs: set[str] = set()
-                if isinstance(checklist, list):
-                    for item in checklist:
-                        if isinstance(item, dict):
-                            ref = item.get("milestone_ref", "")
-                            if ref:
-                                milestone_refs.add(ref)
-                # If milestone_refs is empty (checklist absent and no root milestone_ref),
+                milestone_refs = _collect_milestone_refs(data)
+                # If milestone_refs is empty (checklist absent and no milestone_ref on items),
                 # W582 runs against ALL milestones in the roadmap — a conservative "all coverage required"
                 # fallback. This is intentional: without a scoped milestone, we verify the full roadmap.
                 # The W582 message uses "(all)" as the milestone label in this case.

@@ -93,6 +93,23 @@ def _load_roadmap(spec_path: str) -> Optional[Dict[str, Any]]:
     return json.loads(roadmap_path.read_text())
 
 
+def _collect_milestone_refs(data: Dict[str, Any]) -> set[str]:
+    """Extract unique milestone_ref values from checklist items."""
+    checklist = (
+        data.get("plan", {})
+        .get("spec_alignment", {})
+        .get("checklist", [])
+    )
+    refs: set[str] = set()
+    if isinstance(checklist, list):
+        for item in checklist:
+            if isinstance(item, dict):
+                ref = item.get("milestone_ref")
+                if isinstance(ref, str) and ref:
+                    refs.add(ref)
+    return refs
+
+
 def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
 
@@ -409,23 +426,28 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                 "set fixture_status.ci_status to 'green' or change verdict")
             )
 
-    # E304 -- roadmap-to-checklist coverage (fires on 16a plans, NOT on the anchor)
+    # E304 + W581 -- roadmap-related checks (fire on 16a plans, NOT on the anchor)
+    # Load roadmap once for both E304 (task coverage) and W581 (milestone_ref binding).
     if spec_path and not _is_anchor(spec_path, data):
+        roadmap_data = None
         try:
             roadmap_data = _load_roadmap(spec_path)
-            if roadmap_data is not None:
-                # Collect milestone refs from checklist items. The schema defines
-                # `milestone_ref` on each checklist item — never at root
-                # (unevaluatedProperties: false on vc:16-impl-context rejects it).
-                # If any items declare a milestone_ref, scope E304 to that
-                # milestone's tasks; otherwise fall back to "all non-done
-                # milestones" (conservative first-Trinity-cycle coverage).
-                milestone_refs: set[str] = set()
-                for item in checklist:
-                    if isinstance(item, dict):
-                        ref = item.get("milestone_ref")
-                        if isinstance(ref, str) and ref:
-                            milestone_refs.add(ref)
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(
+                make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}")
+            )
+        except (KeyError, TypeError) as exc:
+            errors.append(
+                make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
+            )
+
+        # E304 -- roadmap-to-checklist coverage
+        if roadmap_data is not None:
+            try:
+                # Scope E304 to milestones declared on checklist items; fall
+                # back to "all non-done milestones" when no milestone_ref is set
+                # (conservative first-Trinity-cycle coverage).
+                milestone_refs = _collect_milestone_refs(data)
                 roadmap_task_ids = set()
                 found_refs: set[str] = set()
                 for milestone in roadmap_data.get("milestones", []):
@@ -466,22 +488,16 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                     errors.append(
                         make_error("E304", f"ROADMAP_TASK_UNCOVERED: roadmap task '{task_id}' has no checklist item with matching spec_ref.id")
                     )
-        except (OSError, json.JSONDecodeError) as exc:
-            errors.append(
-                make_error("E304", f"ROADMAP_PARSE_ERROR: could not load 14_roadmap.json: {exc}")
-            )
-        except (KeyError, TypeError) as exc:
-            errors.append(
-                make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
-            )
+            except (KeyError, TypeError) as exc:
+                errors.append(
+                    make_error("E304", f"ROADMAP_STRUCTURE_ERROR: unexpected roadmap structure: {exc}")
+                )
 
-    # W581 -- milestone_ref binding validation (skips anchor artifacts)
-    if spec_path and not _is_anchor(spec_path, data):
-        try:
-            roadmap_data_ms = _load_roadmap(spec_path)
-            if roadmap_data_ms is not None:
+        # W581 -- milestone_ref binding validation
+        if roadmap_data is not None:
+            try:
                 task_to_milestone: dict[str, str] = {}
-                for ms in roadmap_data_ms.get("milestones", []):
+                for ms in roadmap_data.get("milestones", []):
                     ms_id = ms.get("milestone_id", "")
                     for task in ms.get("tasks", []):
                         if isinstance(task, dict) and "task_id" in task:
@@ -507,8 +523,8 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
                                 make_error("E582", f"UNCOVERED_FR_REVIEW_COVERAGE milestone_ref mismatch item={item_id} "
                                 f"expected={expected_ms} got={milestone_ref}")
                             )
-        except (OSError, json.JSONDecodeError, KeyError, TypeError):
-            pass  # Roadmap parse errors already handled by E304
+            except (KeyError, TypeError):
+                pass  # Structure errors already handled by E304
 
     # E305 -- planned-vs-executed diff
     final_status = data.get("execution", {}).get("final_status", {}) if isinstance(data.get("execution"), dict) else {}
