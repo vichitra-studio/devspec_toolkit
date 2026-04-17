@@ -1775,5 +1775,473 @@ class TestStep16(unittest.TestCase):
         )
 
 
+    # --- W601 tests ---
+
+    def test_w601_fires_when_evidence_has_no_artifact_ref(self):
+        """W601 fires when evidence content contains no spec artifact ID (fr-*, api-*, etc.)."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Action with evidence lacking artifact refs",
+                "evidence": {"type": "log", "content": "All tests passed successfully, no issues found in the output logs"}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W601_NO_REF", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w601_errors = [e for e in errors if e.code == "W601"]
+        self.assertTrue(
+            len(w601_errors) > 0,
+            f"Expected W601 for evidence without artifact ID refs. Got errors: {[e.code for e in errors]}"
+        )
+        self.assertTrue(
+            any("EVIDENCE_NO_ARTIFACT_REF" in e.message for e in w601_errors),
+            f"Expected W601 message to contain EVIDENCE_NO_ARTIFACT_REF. Got: {[e.message for e in w601_errors]}"
+        )
+
+    def test_w601_does_not_fire_when_evidence_has_artifact_ref(self):
+        """W601 must not fire when evidence content references a spec artifact ID."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Action with artifact ref in evidence",
+                "evidence": {"type": "log", "content": "Verified fr-user-login endpoint returns 200 with valid token as per api-session-create contract"}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W601_HAS_REF", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w601_errors = [e for e in errors if e.code == "W601"]
+        self.assertEqual(
+            w601_errors, [],
+            f"W601 must not fire when evidence references a spec artifact ID. Got: {w601_errors}"
+        )
+
+    # --- W603 tests ---
+
+    def test_w603_fires_for_execution_file_outside_task_scope(self):
+        """W603 fires when execution.files_touched has a file not in any checklist item's files_touched."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w603-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "W603 test for files outside task scope.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/**", "infra/**"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": [
+                        {
+                            "id": "CHK_W603",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Login feature",
+                            "type": "behavior",
+                            "layer": "api",
+                            "linked_test_expectation": "pytest test_login",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login",
+                            "implementation": {
+                                "status": "in_progress",
+                                "files_touched": ["src/auth.py"],
+                                "actions": []
+                            }
+                        },
+                        {
+                            "id": "CHK_W603_VAL",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Validate login",
+                            "type": "validation",
+                            "layer": "tests",
+                            "linked_test_expectation": "pytest test_login_val",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login"
+                        }
+                    ]
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."}
+            },
+            "execution": {
+                "files_touched": ["src/auth.py", "infra/deploy.sh"]
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w603_errors = [e for e in errors if e.code == "W603"]
+        self.assertTrue(
+            any("infra/deploy.sh" in e.message for e in w603_errors),
+            f"Expected W603 for 'infra/deploy.sh' outside any checklist item's files_touched. "
+            f"Got W603 errors: {[e.message for e in w603_errors]}"
+        )
+        self.assertFalse(
+            any("src/auth.py" in e.message for e in w603_errors),
+            f"src/auth.py is in checklist files_touched, should not fire W603. Got: {[e.message for e in w603_errors]}"
+        )
+
+    def test_w603_does_not_fire_when_all_files_in_scope(self):
+        """W603 must not fire when all execution.files_touched are declared in checklist items."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w603-pass-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "W603 negative test.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/**"]
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": [
+                        {
+                            "id": "CHK_W603_OK",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Login feature",
+                            "type": "behavior",
+                            "layer": "api",
+                            "linked_test_expectation": "pytest test_login",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login",
+                            "implementation": {
+                                "status": "in_progress",
+                                "files_touched": ["src/auth.py", "src/utils.py"],
+                                "actions": []
+                            }
+                        },
+                        {
+                            "id": "CHK_W603_OK_VAL",
+                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                            "description": "Validate login",
+                            "type": "validation",
+                            "layer": "tests",
+                            "linked_test_expectation": "pytest test_login_val",
+                            "nfr_refs": ["nfr-availability-uptime"],
+                            "fixture_ref": "fixture-login"
+                        }
+                    ]
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No doc changes."}
+            },
+            "execution": {
+                "files_touched": ["src/auth.py", "src/utils.py"]
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w603_errors = [e for e in errors if e.code == "W603"]
+        self.assertEqual(
+            w603_errors, [],
+            f"W603 must not fire when all execution files are in checklist scope. Got: {w603_errors}"
+        )
+
+    # --- E302 tests ---
+
+    def test_e302_fires_verified_verdict_no_execution(self):
+        """E302 fires when review.verdict is 'verified' but no execution section exists."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-e302-no-exec",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "E302 test — verified verdict without execution.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": []
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No changes."}
+            },
+            "review": {
+                "verdict": "verified",
+                "findings": [],
+                "fixture_status": {"ci_status": "green"}
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e302_errors = [e for e in errors if e.code == "E302"]
+        self.assertTrue(
+            any("no execution section" in e.message for e in e302_errors),
+            f"Expected E302 for verified verdict without execution. Got: {[e.code + ': ' + e.message for e in errors if e.code == 'E302']}"
+        )
+
+    def test_e302_fires_verified_verdict_empty_results(self):
+        """E302 fires when review.verdict is 'verified' but execution_results is empty."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-e302-empty-results",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "E302 test — verified verdict with empty execution_results.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": []
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No changes."},
+                "review_requirements": {"test_commands": ["pytest tests/"]}
+            },
+            "execution": {
+                "execution_results": [],
+                "critical_evidence": {
+                    "passed_test_commands": [],
+                    "satisfied_checklist_ids": []
+                }
+            },
+            "review": {
+                "verdict": "verified",
+                "findings": [],
+                "fixture_status": {"ci_status": "green"}
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e302_errors = [e for e in errors if e.code == "E302"]
+        self.assertTrue(
+            any("execution_results is empty" in e.message for e in e302_errors),
+            f"Expected E302 for verified verdict with empty execution_results. Got: {[e.code + ': ' + e.message for e in errors if e.code == 'E302']}"
+        )
+
+    def test_e302_fires_unproven_test_commands(self):
+        """E302 fires when review.verdict is 'verified' but test commands lack proof."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-e302-unproven-cmds",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "E302 test — unproven test commands.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": []
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No changes."},
+                "review_requirements": {"test_commands": ["pytest tests/", "npm test"]}
+            },
+            "execution": {
+                "execution_results": [
+                    {"command": "pytest tests/", "status": "passed", "output": "ok"}
+                ],
+                "critical_evidence": {
+                    "passed_test_commands": ["pytest tests/"],
+                    "satisfied_checklist_ids": []
+                }
+            },
+            "review": {
+                "verdict": "verified",
+                "findings": [],
+                "fixture_status": {"ci_status": "green"}
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e302_errors = [e for e in errors if e.code == "E302"]
+        self.assertTrue(
+            any("npm test" in e.message for e in e302_errors),
+            f"Expected E302 for unproven 'npm test' command. Got E302: {[e.message for e in e302_errors]}"
+        )
+
+    def test_e302_fires_missing_passed_test_commands(self):
+        """E302 fires when test command not in critical_evidence.passed_test_commands."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-e302-missing-passed",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "E302 test — missing passed_test_commands.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": []
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": []
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No changes."},
+                "review_requirements": {"test_commands": ["pytest tests/", "npm test"]}
+            },
+            "execution": {
+                "execution_results": [
+                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
+                    {"command": "npm test", "status": "passed", "output": "ok"}
+                ],
+                "critical_evidence": {
+                    "passed_test_commands": ["pytest tests/"],
+                    "satisfied_checklist_ids": []
+                }
+            },
+            "review": {
+                "verdict": "verified",
+                "findings": [],
+                "fixture_status": {"ci_status": "green"}
+            },
+            "canonical_refs_used": []
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e302_errors = [e for e in errors if e.code == "E302"]
+        self.assertTrue(
+            any("npm test" in e.message and "passed_test_commands" in e.message for e in e302_errors),
+            f"Expected E302 for 'npm test' not in passed_test_commands. Got E302: {[e.message for e in e302_errors]}"
+        )
+
+    # --- E307 reverse direction test ---
+
+    def test_e307_fires_for_validation_only_without_behavior(self):
+        """E307 fires when a spec_ref.id has only validation items but no behavior item."""
+        data = self._minimal_impl_context(checklist_items=[
+            {
+                "id": "CHK_VAL_ONLY",
+                "spec_ref": {"type": "fr", "id": "fr-orphan", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+                "description": "Validation without paired behavior",
+                "type": "validation",
+                "layer": "tests",
+                "linked_test_expectation": "pytest test_orphan",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "fixture_ref": "fixture-orphan"
+            }
+        ])
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        e307_errors = [e for e in errors if e.code == "E307"]
+        self.assertTrue(
+            any("fr-orphan" in e.message for e in e307_errors),
+            f"Expected E307 for fr-orphan (validation only, no behavior). Got E307: {[e.message for e in e307_errors]}"
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

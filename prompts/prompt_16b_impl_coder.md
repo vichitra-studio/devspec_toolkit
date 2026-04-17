@@ -181,7 +181,7 @@ Before emitting, verify:
 - [ ] Error handling covers all failure modes identified in FR acceptance criteria
 - [ ] Implementation contracts match the interfaces defined in Step 05 API spec
 - [ ] Every implementation action in execution_results has evidence linking to a specific file path or commit (no action recorded without evidence)
-- [ ] Every implementation action stays within the target_file_patterns scope defined in the Step 16 anchor — no out-of-scope file modifications recorded in execution_results
+- [ ] Every implementation action stays within the target_file_patterns scope defined in the 16a milestone plan — no out-of-scope file modifications recorded in execution_results
 
 ## Negative Constraints
 
