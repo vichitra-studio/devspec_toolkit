@@ -56,6 +56,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # All milestone files in impl_context/ were filtered by W588/W589,
             # suppressing E308/E309 drift detection entirely.
             "W611",
+            # Milestone ID in milestone_index not found in 14_roadmap.json.
+            "W612",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

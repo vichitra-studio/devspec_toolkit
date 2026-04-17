@@ -244,6 +244,34 @@ def validate_step_16_anchor(
                     )
                 )
 
+    # ── W612: phantom milestone_id (not in 14_roadmap.json) ─────────────────
+    roadmap_path = anchor_path.parent / "14_roadmap.json"
+    if roadmap_path.exists():
+        try:
+            roadmap_data = json.loads(roadmap_path.read_text())
+            roadmap_milestones = {
+                m.get("milestone_id", "")
+                for m in roadmap_data.get("milestones", [])
+                if isinstance(m, dict)
+            }
+            for entry in milestone_index:
+                if not isinstance(entry, dict):
+                    continue
+                ms_id = entry.get("milestone_id", "")
+                if ms_id and ms_id not in roadmap_milestones:
+                    errors.append(
+                        make_error(
+                            "W612",
+                            f"ANCHOR_PHANTOM_MILESTONE: milestone_index entry "
+                            f"'{ms_id}' does not match any milestone_id in "
+                            f"14_roadmap.json. Verify the ID is not a typo — "
+                            f"phantom milestones bypass ownership, prefix, and "
+                            f"scope drift detection.",
+                        )
+                    )
+        except (json.JSONDecodeError, OSError):
+            pass  # Roadmap unreadable — other validators surface this.
+
     # ── Cross-file checks (E308 scope drift, E309 checklist drift) ────────────
     if not impl_context_dir.exists():
         # No milestone contexts yet — valid state for a fresh anchor.

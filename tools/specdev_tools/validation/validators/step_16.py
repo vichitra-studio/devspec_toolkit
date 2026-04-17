@@ -10,11 +10,11 @@ from pathlib import Path
 from ...core.errors import make_error, SpecError
 
 # Checklist type and layer enums — currently hardcoded.  These values mirror the
-# enum constraints in schema/16_scaffold.schema.json (``checklist[].type`` and
-# ``checklist[].layer``).  Loading them dynamically from canon/kinds/ is not
+# enum constraints in schema/16_impl_context.schema.json (``checklist[].type``
+# and ``checklist[].layer``).  Loading them dynamically from canon/kinds/ is not
 # practical: the values are schema-level enums, not canonical vocabulary entries,
 # and the schema is the single source of truth.  See AUDIT-023.
-VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security", "config"})
+VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "metadata", "perf", "logging", "docs", "security"})
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
 

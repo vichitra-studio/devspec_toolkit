@@ -183,6 +183,11 @@ ERROR_CODES = {
     # Without this warning, the anchor appears clean while contributing nothing
     # to drift detection.
     "W611": "ANCHOR_DRIFT_SUPPRESSED",
+    # Milestone ID declared in milestone_index does not match any milestone in
+    # 14_roadmap.json.  Phantom milestones bypass all downstream checks —
+    # ownership, prefix, and scope drift detection are silently skipped for IDs
+    # that don't exist in the roadmap.
+    "W612": "ANCHOR_PHANTOM_MILESTONE",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

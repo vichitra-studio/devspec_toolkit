@@ -221,9 +221,7 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
     *   *Heuristic*: **Actionability**: Alerts must include clear thresholds (e.g. "p99 > 200ms", not "latency is high").
 
 ## 10. `plan.drift` (Sustainment)
-*   `checks`: Define periodic drift checks.
-    *   *Target*: `api`, `schema`, `nfr`, `invariant`.
-    *   *Method*: `runtime-sample`, `schema-diff`, `trace-replay`, `log-diff`.
+*   `checks`: Define periodic drift checks. Target and method enums are defined in `schema/16_impl_context.schema.json` — refer to the schema for allowed values.
     *   *Heuristic*: **Risk-Based Scheduling**: High-risk areas (Public APIs, Payment NFRs) need frequent checks (e.g. `hourly` or `daily`).
     *   *Heuristic*: **Concrete Remediation**: Remediation steps must specify *actions* and *owners* (e.g. "Rollback release", not "Fix it").
     *   *Pitfall*: Do not schedule checks using methods that don't exist in the tooling.

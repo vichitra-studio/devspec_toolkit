@@ -321,6 +321,79 @@ class TestStep16AnchorSchema(_AnchorTestBase):
         )
 
 
+class TestStep16AnchorW612PhantomMilestone(_AnchorTestBase):
+    """W612 ANCHOR_PHANTOM_MILESTONE — milestone_id not in 14_roadmap.json."""
+
+    def _write_roadmap(self, parent: Path, milestone_ids: list[str]) -> None:
+        """Write a minimal 14_roadmap.json with the given milestone IDs."""
+        roadmap = {
+            "$schema": "vc:14-roadmap",
+            "id": "roadmap",
+            "owner": "product",
+            "milestones": [
+                {"milestone_id": mid, "title": mid, "status": "active",
+                 "deliverables": [{"id": f"task-{mid}", "title": "t"}]}
+                for mid in milestone_ids
+            ],
+        }
+        (parent / "14_roadmap.json").write_text(json.dumps(roadmap))
+
+    def test_w612_fires_when_milestone_id_not_in_roadmap(self):
+        """W612 fires when a milestone_index entry has no match in the roadmap."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            self._write_roadmap(tmp_dir, ["ms-real"])
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry("ms-typo"),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertTrue(
+            any(
+                e.code == "W612" and "ms-typo" in e.message
+                for e in errors
+            ),
+            f"Expected W612 for phantom milestone 'ms-typo'. Got: {errors}",
+        )
+
+    def test_w612_silent_when_milestone_id_matches_roadmap(self):
+        """W612 stays quiet when every milestone_id exists in 14_roadmap.json."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            self._write_roadmap(tmp_dir, ["ms-auth", "ms-payments"])
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry("ms-auth"),
+                    make_milestone_entry("ms-payments", checklist_id_prefix="PAY"),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertFalse(
+            any(e.code == "W612" for e in errors),
+            f"W612 should not fire when all IDs match roadmap. Got: {errors}",
+        )
+
+    def test_w612_silent_when_no_roadmap_file(self):
+        """W612 stays quiet when 14_roadmap.json does not exist (no cross-check possible)."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            # No roadmap written
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[
+                    make_milestone_entry("ms-anything"),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertFalse(
+            any(e.code == "W612" for e in errors),
+            f"W612 should not fire when 14_roadmap.json is absent. Got: {errors}",
+        )
+
+
 class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
     """E308 ANCHOR_SCOPE_DRIFT — bidirectional scope check + FR/API ownership."""
 

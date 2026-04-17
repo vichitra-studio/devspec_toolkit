@@ -44,7 +44,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 2. **Scope**: Derive `plan.summary.functional_summary`, `scope_in`, `scope_out` spanning **every milestone in this cycle**. The anchor is the union of milestone scope — not a milestone plan itself.
 3. **Milestone Index**: For every milestone in `14_roadmap.json` that participates in this cycle, emit one `plan.milestone_index[]` entry with `milestone_id`, `context_path`, `status`, `fr_refs`, `checklist_id_prefix`, and a one-line `summary`. Drop a milestone from the index only when it has been removed from the roadmap entirely.
 4. **Ambiguities**: Carry forward unresolved ambiguities from prior Trinity cycles and surface any new cross-milestone decisions that are not yet resolved.
-5. **Drift**: Record drift checks performed in this session and previous cycles in `plan.drift.checks` as short, dated human-readable strings (e.g., `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`). May be `[]` on a fresh anchor.
+5. **Drift**: Record drift checks performed in this session and previous cycles in `plan.drift.checks` as short, dated human-readable strings (e.g., `"Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-14)"`). May be `[]` only when `plan.milestone_index` is also empty (fresh anchor with no milestones yet); otherwise at least one drift check is expected (W587).
 6. **Emit**: Write the JSON artifact to `spec/16_impl_context.json`. The schema forbids extra fields at both the root and `plan` level — only emit the fields in the Output Contract.
 
 ## Self-Audit Gate
