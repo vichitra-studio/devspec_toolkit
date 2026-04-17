@@ -51,6 +51,11 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Misfiled anchor detection — anchor file landed inside
             # spec/impl_context/ where its drift checks silently no-op.
             "W609",
+            # Milestone plan checklist IDs violate the declared prefix.
+            "W610",
+            # All milestone files in impl_context/ were filtered by W588/W589,
+            # suppressing E308/E309 drift detection entirely.
+            "W611",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

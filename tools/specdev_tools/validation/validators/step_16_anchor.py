@@ -223,16 +223,30 @@ def validate_step_16_anchor(
                 prefix_to_milestone[prefix] = ms_id
 
         # ── W607: declared context_path must exist on disk ───────────────────
-        # Schema pins context_path to ``^(spec/)?impl_context/<filename>.json$``,
-        # so the trailing filename resolves under the anchor's own impl_context
-        # dir regardless of the optional ``spec/`` prefix.  A typo silently drops
-        # the milestone from E308/E309 cross-file drift detection — W607
-        # surfaces that at author time.  Emitted even when ``impl_context/`` is
-        # absent (a non-empty milestone_index with no directory means the anchor
-        # is making claims about plans that cannot exist yet).
+        # Schema pins context_path to ``^(spec/)?impl_context/<filename>.json$``.
+        # Resolve using the same logic as ``traceability_closure._resolve_context_path``:
+        # strip an optional leading directory segment that matches the anchor's
+        # parent dir name (the ``spec/`` convention), then join relative to
+        # the anchor's parent dir (= spec_dir).  This keeps resolution
+        # consistent between the anchor validator and traceability_closure,
+        # and correctly handles both ``spec/impl_context/foo.json`` and
+        # ``impl_context/foo.json`` forms.
         ctx_path = entry.get("context_path")
         if isinstance(ctx_path, str) and ctx_path:
-            declared_path = impl_context_dir / Path(ctx_path).name
+            resolved_ctx = ctx_path
+            # Strip optional leading segment matching the anchor's parent
+            # directory name (typically ``spec/``).  Uses the actual dirname
+            # so the logic works in test fixtures whose spec dir is named
+            # differently.
+            anchor_parent_name = anchor_path.parent.name
+            if resolved_ctx.startswith(anchor_parent_name + "/"):
+                resolved_ctx = resolved_ctx[len(anchor_parent_name) + 1:]
+            # Also strip a literal ``spec/`` prefix when the anchor's parent
+            # has a different name (e.g. test fixtures).  The schema allows
+            # ``spec/impl_context/...`` as a repo-root-relative convention.
+            elif resolved_ctx.startswith("spec/"):
+                resolved_ctx = resolved_ctx[len("spec/"):]
+            declared_path = anchor_path.parent / resolved_ctx
             if not declared_path.exists():
                 errors.append(
                     make_error(
@@ -269,7 +283,9 @@ def validate_step_16_anchor(
     # ``validate_file`` on the anchor alone, W588 is the only diagnostic the
     # author sees.
     milestone_contexts: dict[str, dict[str, Any]] = {}
+    files_seen = 0
     for ms_file in sorted(impl_context_dir.glob("*.json")):
+        files_seen += 1
         try:
             ms_data = json.loads(ms_file.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -308,10 +324,34 @@ def validate_step_16_anchor(
         milestone_contexts[str(ms_file)] = ms_data
 
     if not milestone_contexts:
+        # ── W611: drift detection suppressed ────────────────────────────��────
+        # If impl_context/ contained JSON files but none survived filtering
+        # (all hit W588/W589), cross-milestone E308/E309 checks are completely
+        # suppressed.  Without this warning the anchor looks clean while
+        # contributing nothing to drift detection.  When files_seen==0 the
+        # directory is genuinely empty — a valid state for a fresh anchor.
+        if files_seen > 0:
+            errors.append(
+                make_error(
+                    "W611",
+                    f"ANCHOR_DRIFT_SUPPRESSED: impl_context/ contains "
+                    f"{files_seen} JSON file(s) but none declare "
+                    f"$schema='vc:16-impl-context' — E308/E309 cross-milestone "
+                    f"drift detection is completely suppressed.  Fix the W588/W589 "
+                    f"warnings above to restore drift checks.",
+                )
+            )
         return errors
 
     # ── E308: ANCHOR_SCOPE_DRIFT (bidirectional scope check) ──────────────────
     # milestone scope_in must not overlap anchor scope_out, and vice versa.
+    # Normalisation: lowercase + strip for case-insensitive comparison.  The
+    # schema's ``uniqueItems: true`` is case-sensitive (``"Auth"`` and ``"auth"``
+    # are distinct items), but for drift detection purposes they describe the
+    # same scope category.  This means an anchor with both ``"Auth"`` and
+    # ``"auth"`` in scope_in passes schema validation but collapses to one
+    # entry here — intentional, since the drift check cares about semantic
+    # overlap, not string identity.
     anchor_scope_in_set = {s.strip().lower() for s in anchor_scope_in if isinstance(s, str)}
     anchor_scope_out_set = {s.strip().lower() for s in anchor_scope_out if isinstance(s, str)}
 
@@ -375,5 +415,56 @@ def validate_step_16_anchor(
                     )
             else:
                 id_registry[item_id] = (spec_ref_id, ms_file)
+
+    # ── W610: ANCHOR_PREFIX_VIOLATION ───────────────────────────────────────
+    # The anchor declares a checklist_id_prefix per milestone (e.g. "AUTH").
+    # 16a planners are told to name checklist IDs starting with that prefix.
+    # Schema cannot enforce this cross-artifact contract — verify it here by
+    # matching each loaded milestone plan to its anchor index entry via
+    # context_path and checking every checklist ID against the prefix.
+    # Build reverse map: ms filename → declared prefix (from the milestone_index sweep).
+    ms_path_to_prefix: dict[str, str] = {}
+    for entry in milestone_index:
+        if not isinstance(entry, dict):
+            continue
+        ctx_path = entry.get("context_path")
+        prefix = entry.get("checklist_id_prefix")
+        if isinstance(ctx_path, str) and isinstance(prefix, str) and prefix:
+            resolved_ctx = ctx_path
+            anchor_parent_name = anchor_path.parent.name
+            if resolved_ctx.startswith(anchor_parent_name + "/"):
+                resolved_ctx = resolved_ctx[len(anchor_parent_name) + 1:]
+            elif resolved_ctx.startswith("spec/"):
+                resolved_ctx = resolved_ctx[len("spec/"):]
+            abs_path = str(anchor_path.parent / resolved_ctx)
+            ms_path_to_prefix[abs_path] = prefix
+
+    for ms_file, ms_data in milestone_contexts.items():
+        expected_prefix = ms_path_to_prefix.get(ms_file)
+        if not expected_prefix:
+            continue
+        ms_plan = ms_data.get("plan", {}) if isinstance(ms_data.get("plan"), dict) else {}
+        checklist = (
+            ms_plan.get("spec_alignment", {}).get("checklist", [])
+            if isinstance(ms_plan.get("spec_alignment"), dict)
+            else []
+        )
+        ms_name = Path(ms_file).name
+        prefix_with_sep = expected_prefix + "_"
+        for item in checklist:
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get("id")
+            if isinstance(item_id, str) and not item_id.startswith(prefix_with_sep):
+                errors.append(
+                    make_error(
+                        "W610",
+                        f"ANCHOR_PREFIX_VIOLATION: checklist id '{item_id}' in "
+                        f"'{ms_name}' does not start with the declared "
+                        f"checklist_id_prefix '{expected_prefix}_' from "
+                        f"milestone_index.  Namespace violations undermine "
+                        f"E309 collision prevention.",
+                    )
+                )
 
     return errors

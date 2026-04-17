@@ -171,6 +171,18 @@ ERROR_CODES = {
     # discoverable at spec-check time and tells the author where to move
     # the file.
     "W609": "ANCHOR_MISFILED",
+    # Milestone plan checklist IDs that don't start with the prefix declared
+    # in the anchor's milestone_index[].checklist_id_prefix.  Soft-warn
+    # because the prefix is a namespace convention that prevents E309
+    # collisions — violating it doesn't break anything immediately but
+    # undermines the anchor's drift-prevention guarantee.
+    "W610": "ANCHOR_PREFIX_VIOLATION",
+    # All JSON files in impl_context/ were filtered out by W588/W589 (parse
+    # failures or wrong $schema).  Cross-milestone E308/E309 drift detection
+    # is completely suppressed because no milestone contexts survived filtering.
+    # Without this warning, the anchor appears clean while contributing nothing
+    # to drift detection.
+    "W611": "ANCHOR_DRIFT_SUPPRESSED",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

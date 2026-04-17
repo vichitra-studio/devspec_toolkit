@@ -1263,5 +1263,166 @@ class TestStep16AnchorW608LegacySchema(_AnchorTestBase):
         self.assertIn("prompt_16_impl_context.md", msg)
 
 
+class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
+    """W610 ANCHOR_PREFIX_VIOLATION — milestone plan checklist IDs must start with declared prefix."""
+
+    def test_w610_fires_when_checklist_id_violates_prefix(self):
+        """W610 fires when a milestone plan's checklist ID doesn't start with the declared prefix."""
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry(
+                        "ms-auth", status="in_progress",
+                        fr_refs=["fr-login"], checklist_id_prefix="AUTH",
+                        context_path="impl_context/ms_auth_plan.json",
+                    ),
+                ],
+                drift_checks=["Verified ms-auth scope (2026-04-17)"],
+            )
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
+
+            # Milestone plan with IDs that DON'T start with "AUTH_"
+            make_milestone_plan(
+                impl_context_dir, "ms_auth_plan.json",
+                scope_in=["auth"],
+                checklist=[
+                    make_checklist_item("BILLING_LOGIN_01", spec_ref_id="fr-login"),
+                ],
+            )
+
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
+
+        w610 = [e for e in errors if e.code == "W610"]
+        self.assertTrue(
+            len(w610) >= 1,
+            f"Expected W610 for checklist ID 'BILLING_LOGIN_01' violating prefix 'AUTH_'. Got: {errors}",
+        )
+        self.assertIn("BILLING_LOGIN_01", w610[0].message)
+        self.assertIn("AUTH_", w610[0].message)
+
+    def test_no_w610_when_checklist_ids_respect_prefix(self):
+        """W610 does not fire when all checklist IDs properly start with the declared prefix."""
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry(
+                        "ms-auth", status="in_progress",
+                        fr_refs=["fr-login"], checklist_id_prefix="AUTH",
+                        context_path="impl_context/ms_auth_plan.json",
+                    ),
+                ],
+                drift_checks=["Verified ms-auth scope (2026-04-17)"],
+            )
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
+
+            make_milestone_plan(
+                impl_context_dir, "ms_auth_plan.json",
+                scope_in=["auth"],
+                checklist=[
+                    make_checklist_item("AUTH_LOGIN_01", spec_ref_id="fr-login"),
+                    make_checklist_item("AUTH_LOGIN_02", spec_ref_id="fr-login"),
+                ],
+            )
+
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
+
+        w610 = [e for e in errors if e.code == "W610"]
+        self.assertEqual(w610, [], f"W610 should not fire when IDs respect prefix. Got: {w610}")
+
+
+class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
+    """W611 ANCHOR_DRIFT_SUPPRESSED — all milestone files filtered, E308/E309 silently suppressed."""
+
+    def test_w611_fires_when_all_files_misschemaed(self):
+        """W611 fires when impl_context/ has files but none survive $schema filtering."""
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                drift_checks=["Verified scope (2026-04-17)"],
+            )
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
+
+            # Two files, both with wrong $schema — triggers W589 for each
+            (impl_context_dir / "ms_a.json").write_text(
+                json.dumps({"$schema": "vc:wrong", "plan": {}}), encoding="utf-8",
+            )
+            (impl_context_dir / "ms_b.json").write_text(
+                json.dumps({"$schema": "vc:also-wrong", "plan": {}}), encoding="utf-8",
+            )
+
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
+
+        w611 = [e for e in errors if e.code == "W611"]
+        self.assertEqual(len(w611), 1, f"Expected exactly one W611. Got: {errors}")
+        self.assertIn("2 JSON file(s)", w611[0].message)
+
+    def test_no_w611_when_at_least_one_valid_milestone(self):
+        """W611 does not fire when at least one milestone file passes $schema filtering."""
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                drift_checks=["Verified scope (2026-04-17)"],
+            )
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
+
+            # One bad, one good
+            (impl_context_dir / "ms_bad.json").write_text(
+                json.dumps({"$schema": "vc:wrong"}), encoding="utf-8",
+            )
+            make_milestone_plan(impl_context_dir, "ms_good.json", scope_in=["auth"])
+
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
+
+        w611 = [e for e in errors if e.code == "W611"]
+        self.assertEqual(w611, [], f"W611 should not fire when valid milestones exist. Got: {w611}")
+
+    def test_no_w611_when_impl_context_empty(self):
+        """W611 does not fire when impl_context/ exists but has no JSON files (files_seen==0)."""
+        from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
+
+            errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
+
+        w611 = [e for e in errors if e.code == "W611"]
+        self.assertEqual(w611, [], f"W611 should not fire on empty impl_context/. Got: {w611}")
+
+
 if __name__ == "__main__":
     unittest.main()
