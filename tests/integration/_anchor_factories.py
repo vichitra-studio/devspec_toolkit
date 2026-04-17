@@ -100,10 +100,14 @@ def make_milestone_plan(
     scope_out: Optional[list[str]] = None,
     checklist: Optional[list[dict[str, Any]]] = None,
 ) -> Path:
-    """Write a ``vc:16-impl-context`` milestone-plan artifact and return its path.
+    """Write a milestone-plan artifact for anchor drift-check tests.
 
-    Mirrors the minimal shape ``test_step_16_anchor.py`` previously inlined
-    twice (once for E308 scope tests, once for E309 checklist tests).
+    Produces the minimal shape the anchor validator reads during E308 scope
+    drift and E309 checklist drift checks: ``$schema``, ``plan.summary``
+    (scope_in/scope_out), and ``plan.spec_alignment.checklist``.  This is
+    **not** a fully schema-valid ``vc:16-impl-context`` artifact — optional
+    fields like ``milestone_ref`` and ``implementation`` are omitted because
+    the anchor validator never schema-validates the milestone files it loads.
     """
     ms: dict[str, Any] = {
         "$schema": "vc:16-impl-context",
@@ -144,7 +148,14 @@ def make_checklist_item(
     *,
     item_type: str = "behavior",
 ) -> dict[str, Any]:
-    """Build one valid ``plan.spec_alignment.checklist[]`` item for a milestone plan."""
+    """Build one ``plan.spec_alignment.checklist[]`` item for a milestone plan.
+
+    Produces a structurally sufficient item for the anchor validator's
+    cross-file drift checks (E309, W610).  The anchor validator reads
+    ``id`` and ``spec_ref.id`` — it does not schema-validate the milestone
+    plan itself.  Optional fields (``nfr_refs``, ``implementation``) are
+    omitted rather than populated with schema-invalid defaults.
+    """
     return {
         "id": item_id,
         "spec_ref": {
@@ -157,6 +168,5 @@ def make_checklist_item(
         "type": item_type,
         "layer": "api",
         "linked_test_expectation": "pytest test_auth",
-        "nfr_refs": [],
         "fixture_ref": "fixture-auth",
     }

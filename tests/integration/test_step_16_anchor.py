@@ -374,6 +374,31 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
             f"Expected E308 for reverse scope contradiction. Got: {errors}"
         )
 
+    def test_e308_scope_drift_is_case_insensitive(self):
+        """E308 fires even when scope items differ only in case."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["JWT-Token-Validation"],
+                scope_out=["OAuth-Flows"],
+            )
+            make_milestone_plan(
+                impl_context_dir, "ms_oauth.json",
+                scope_in=["oauth-flows"],  # differs in case from anchor scope_out
+                scope_out=[],
+            )
+
+            errors = validate_file(self.repo_root, str(anchor_path))
+
+        self.assertTrue(
+            any(e.code == "E308" for e in errors),
+            f"Expected E308 for case-insensitive scope contradiction. Got: {errors}"
+        )
+
     def test_e308_fr_ownership_conflict_two_in_flight_milestones(self):
         """E308 fires when the same FR is owned by two non-done milestones."""
         with tempfile.TemporaryDirectory() as td:
@@ -655,21 +680,22 @@ class TestStep16AnchorGuards(_AnchorTestBase):
             f"Expected W586 for non-anchor artifact. Got: {errors}"
         )
 
-    def test_w585_spec_path_none_skips_drift_checks(self):
-        """W585 fires when spec_path is None and drift checks are actually skipped.
+    def test_w585_spec_path_none_skips_filesystem_checks(self):
+        """W585 fires when spec_path is None — filesystem checks are skipped.
 
-        L10 (audit follow-up): the prior version asserted only that W585 fires.
-        That allowed a regression where W585 fires AND E308/E309 also fire (e.g.
-        if the validator added an in-memory drift check that didn't depend on
-        spec_path). Strengthen by constructing data that *would* trigger E308
-        if drift checks ran (FR-ownership conflict between two non-done
-        milestones in milestone_index), then assert E308/E309 are absent — pins
-        the contract that None spec_path skips ALL filesystem-dependent checks.
+        In-memory checks (E308 ownership, E309 prefix) still run because they
+        operate purely on the anchor's milestone_index data.  Only filesystem-
+        dependent checks (W607 path existence, E308 scope drift, E309 checklist
+        mapping, W610 prefix violations) are skipped.
+
+        This test constructs data with FR-ownership and prefix conflicts to
+        verify that in-memory E308/E309 fire even without spec_path, while W585
+        confirms the filesystem checks were skipped.
         """
         from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
 
-        # Two non-done milestones claiming the same FR — would fire E308 if
-        # drift checks ran.  Also share checklist_id_prefix to provoke E309.
+        # Two non-done milestones claiming the same FR → E308 ownership.
+        # Same checklist_id_prefix → E309 prefix.
         data = {
             "$schema": "vc:16-anchor",
             "artifact_role": "anchor",
@@ -684,7 +710,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                         "status": "in_progress",
                         "fr_refs": ["fr-shared"],
                         "checklist_id_prefix": "SHARED",
-                        "summary": "Milestone A shares FR with B (would trigger E308).",
+                        "summary": "Milestone A shares FR with B.",
                     },
                     {
                         "milestone_id": "ms-b",
@@ -692,25 +718,32 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                         "status": "in_progress",
                         "fr_refs": ["fr-shared"],
                         "checklist_id_prefix": "SHARED",
-                        "summary": "Milestone B shares FR with A and same prefix (would trigger E309).",
+                        "summary": "Milestone B shares FR with A and same prefix.",
                     },
                 ],
             },
         }
         errors = validate_step_16_anchor(data, self.repo_root, spec_path=None)
 
-        # W585 must fire — the load-bearing positive signal.
+        # W585 must fire — signals filesystem checks were skipped.
         self.assertTrue(
             any(e.code == "W585" for e in errors),
             f"Expected W585 for None spec_path. Got: {errors}"
         )
-        # And the spec_path=None branch must early-return BEFORE the in-memory
-        # checks that would otherwise fire E308/E309 on this milestone_index.
-        # If those checks also fire here, the early-return contract is broken.
-        self.assertEqual(
-            [e for e in errors if e.code in {"E308", "E309"}], [],
-            "spec_path=None must early-return before in-memory milestone_index "
-            f"checks; E308/E309 should not fire. Got: {errors}"
+        # In-memory E308 ownership conflict must fire (no filesystem needed).
+        self.assertTrue(
+            any(e.code == "E308" for e in errors),
+            f"Expected E308 ownership conflict from in-memory check. Got: {errors}"
+        )
+        # In-memory E309 prefix collision must fire (no filesystem needed).
+        self.assertTrue(
+            any(e.code == "E309" for e in errors),
+            f"Expected E309 prefix collision from in-memory check. Got: {errors}"
+        )
+        # W607 must NOT fire — it requires filesystem access.
+        self.assertFalse(
+            any(e.code == "W607" for e in errors),
+            f"W607 requires spec_path; should not fire. Got: {errors}"
         )
 
     def test_non_milestone_file_in_impl_context_is_ignored(self):

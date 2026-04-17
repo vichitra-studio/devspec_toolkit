@@ -46,7 +46,7 @@ def _resolve_context_path(ctx_path: str, anchor_path: Path) -> Path:
 
 def validate_step_16_anchor(
     data: dict[str, Any],
-    _toolkit_root: str,
+    toolkit_root: str,  # noqa: ARG001 — kept for DEEP_VALIDATORS API symmetry
     spec_path: Optional[str] = None,
 ) -> list[SpecError]:
     """Deep validation for the Step 16 Trinity Anchor artifact.
@@ -55,7 +55,7 @@ def validate_step_16_anchor(
         data:         Parsed JSON content of the anchor artifact.
         toolkit_root: Toolkit root directory (unused directly, kept for API symmetry).
         spec_path:    Absolute path to the artifact file.  Required for drift checks;
-                      without it only the _is_anchor guard can run.
+                      without it only in-memory checks run (E308 ownership, E309 prefix).
 
     Returns:
         List of SpecError objects.  Empty list when valid.
@@ -117,49 +117,10 @@ def validate_step_16_anchor(
             )
         )
 
-    if spec_path is None:
-        # Cannot perform filesystem-dependent drift checks without a path.
-        errors.append(
-            make_error(
-                "W585",
-                "ANCHOR_DRIFT_SKIP: spec_path is None — cross-milestone drift checks "
-                "skipped.  Pass spec_path to validate_step_16_anchor to enable E308/E309.",
-            )
-        )
-        return errors
-
-    anchor_path = Path(spec_path)
-
-    # ── W609: misfiled anchor ──────────────────────────────────────────────────
-    # An artifact_role="anchor" file living inside spec/impl_context/ is routed
-    # back to "16" by validate.py:_refine_impl_context_substep so this validator
-    # runs.  But every downstream drift check resolves
-    # ``impl_context_dir = anchor_path.parent / "impl_context"`` to
-    # spec/impl_context/impl_context/ — which does not exist — so E308/E309/W588/
-    # W589/W607 all silently no-op.  Without this warning the file looks fine
-    # (passes schema, zero errors) while contributing nothing to drift detection.
-    # Fire W609 so the author sees the routing mismatch and the canonical
-    # location, regardless of whether the rest of the drift logic finds
-    # anything to compare against.
-    if anchor_path.parent.name == "impl_context":
-        errors.append(
-            make_error(
-                "W609",
-                f"ANCHOR_MISFILED: '{anchor_path.name}' has artifact_role='anchor' "
-                f"but lives inside '{anchor_path.parent}'.  The Trinity Anchor must "
-                f"sit at spec/16_impl_context.json (one level up); files inside "
-                f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
-                f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
-                f"so cross-milestone drift checks can resolve the impl_context/ "
-                f"sibling directory correctly.",
-            )
-        )
-        # All downstream drift checks resolve impl_context_dir relative to
-        # anchor_path.parent — which for a misfiled anchor points at
-        # impl_context/impl_context/ (non-existent).  Return early to avoid
-        # spurious W607 warnings for every milestone_index entry.
-        return errors
-
+    # ── In-memory checks (no filesystem access required) ─────────────────────
+    # Extract plan data and run checks that operate purely on the anchor's own
+    # milestone_index — E308 ownership conflicts, E309 prefix collisions, W587
+    # staleness.  These run even when spec_path is None.
     anchor_plan = data.get("plan", {}) if isinstance(data.get("plan"), dict) else {}
     anchor_summary = anchor_plan.get("summary", {}) if isinstance(anchor_plan.get("summary"), dict) else {}
     anchor_scope_in: list[str] = anchor_summary.get("scope_in", []) or []
@@ -183,19 +144,12 @@ def validate_step_16_anchor(
             )
         )
 
-    # ── Single-pass milestone_index sweep (E308 ownership / E309 prefix / W607 path) ──
-    # All three checks iterate the same list with the same dict-validity guard.
-    # Combining them keeps the semantics identical (each check still owns its
-    # registry) while avoiding 3× iteration and 3× repetition of the
-    # ``isinstance(entry, dict)`` skip.  The schema enforces presence + pattern
-    # of every field touched here; the guards below are defence-in-depth in case
-    # routing ever reaches this validator with schema-bypassing data.
-    #
-    # Done milestones are exempt from FR/API ownership conflict (delivered IDs
-    # may be referenced again in follow-on work) but still participate in the
-    # prefix-collision and context-path checks (a done milestone's namespace
-    # is still allocated, and its plan file must still exist on disk).
-    impl_context_dir = anchor_path.parent / "impl_context"
+    # ── Milestone_index sweep: in-memory checks (E308 ownership / E309 prefix) ──
+    # These checks operate purely on the anchor's milestone_index data — no
+    # filesystem access required.  Done milestones are exempt from FR/API
+    # ownership conflict (delivered IDs may be referenced again in follow-on
+    # work) but still participate in the prefix-collision check (a done
+    # milestone's namespace is still allocated).
     id_to_milestone: dict[str, str] = {}        # FR/API ID → first-seen milestone_id (E308)
     prefix_to_milestone: dict[str, str] = {}    # checklist_id_prefix → first-seen milestone_id (E309)
     for entry in milestone_index:
@@ -215,7 +169,7 @@ def validate_step_16_anchor(
                     errors.append(
                         make_error(
                             "E308",
-                            f"ANCHOR_SCOPE_DRIFT: {kind} ownership conflict — '{ref_id}' is "
+                            f"ANCHOR_SCOPE_DRIFT [ownership]: {kind} ownership conflict — '{ref_id}' is "
                             f"claimed by both non-done milestone '{prev_ms}' and '{ms_id}'.  "
                             f"Only one non-done milestone may own a given {kind} at a time.",
                         )
@@ -224,10 +178,6 @@ def validate_step_16_anchor(
                     id_to_milestone[ref_id] = ms_id
 
         # ── E309: checklist_id_prefix collision (applies to all milestones) ──
-        # Two milestone_index entries sharing a prefix would allocate checklist
-        # IDs from the same namespace in their 16a plans — the authoring-time
-        # equivalent of the cross-milestone ID collision E309 catches below at
-        # plan-comparison time.
         prefix = entry.get("checklist_id_prefix")
         if isinstance(prefix, str) and prefix:
             if prefix in prefix_to_milestone:
@@ -235,7 +185,7 @@ def validate_step_16_anchor(
                 errors.append(
                     make_error(
                         "E309",
-                        f"ANCHOR_CHECKLIST_DRIFT: checklist_id_prefix '{prefix}' is shared by "
+                        f"ANCHOR_CHECKLIST_DRIFT [prefix]: checklist_id_prefix '{prefix}' is shared by "
                         f"milestone_index entries '{prev_ms}' and '{ms_id}' — two milestones "
                         f"cannot allocate checklist IDs from the same namespace.",
                     )
@@ -243,15 +193,43 @@ def validate_step_16_anchor(
             else:
                 prefix_to_milestone[prefix] = ms_id
 
-        # ── W607: declared context_path must exist on disk ───────────────────
-        # Schema pins context_path to ``^(spec/)?impl_context/<filename>.json$``.
-        # Resolve using the same logic as ``traceability_closure._resolve_context_path``:
-        # strip an optional leading directory segment that matches the anchor's
-        # parent dir name (the ``spec/`` convention), then join relative to
-        # the anchor's parent dir (= spec_dir).  This keeps resolution
-        # consistent between the anchor validator and traceability_closure,
-        # and correctly handles both ``spec/impl_context/foo.json`` and
-        # ``impl_context/foo.json`` forms.
+    # ── Filesystem-dependent checks ───────────────────────────────────────────
+    # Everything below requires spec_path for path resolution and file I/O.
+    if spec_path is None:
+        errors.append(
+            make_error(
+                "W585",
+                "ANCHOR_DRIFT_SKIP: spec_path is None — filesystem drift checks "
+                "skipped (W607/E308-scope/E309-mapping/W610).  "
+                "Pass spec_path to validate_step_16_anchor to enable them.",
+            )
+        )
+        return errors
+
+    anchor_path = Path(spec_path)
+
+    # ── W609: misfiled anchor ──────────────────────────────────────────────────
+    if anchor_path.parent.name == "impl_context":
+        errors.append(
+            make_error(
+                "W609",
+                f"ANCHOR_MISFILED: '{anchor_path.name}' has artifact_role='anchor' "
+                f"but lives inside '{anchor_path.parent}'.  The Trinity Anchor must "
+                f"sit at spec/16_impl_context.json (one level up); files inside "
+                f"spec/impl_context/ are per-milestone plans (vc:16-impl-context).  "
+                f"Move this file to '{anchor_path.parent.parent}/16_impl_context.json' "
+                f"so cross-milestone drift checks can resolve the impl_context/ "
+                f"sibling directory correctly.",
+            )
+        )
+        return errors
+
+    # ── W607: declared context_path must exist on disk ────────────────────────
+    impl_context_dir = anchor_path.parent / "impl_context"
+    for entry in milestone_index:
+        if not isinstance(entry, dict):
+            continue
+        ms_id = entry.get("milestone_id", "")
         ctx_path = entry.get("context_path")
         if isinstance(ctx_path, str) and ctx_path:
             declared_path = _resolve_context_path(ctx_path, anchor_path)
@@ -266,14 +244,7 @@ def validate_step_16_anchor(
                     )
                 )
 
-    # ── Filesystem-dependent checks (E308 scope drift, E309 checklist drift) ──
-    # These require loading milestone context files from impl_context/.
-    # NOTE: W607 above intentionally already ran inside the milestone_index
-    # sweep, so a missing ``impl_context/`` directory still surfaces W607 for
-    # every declared milestone — the sweep does not depend on the directory
-    # existing, only on the declarations existing.  This early return only
-    # short-circuits the cross-file E308/E309/W588/W589 checks that genuinely
-    # need a populated directory.
+    # ── Cross-file checks (E308 scope drift, E309 checklist drift) ────────────
     if not impl_context_dir.exists():
         # No milestone contexts yet — valid state for a fresh anchor.
         return errors
@@ -375,7 +346,7 @@ def validate_step_16_anchor(
                 errors.append(
                     make_error(
                         "E308",
-                        f"ANCHOR_SCOPE_DRIFT: milestone '{ms_name}' has scope_in item "
+                        f"ANCHOR_SCOPE_DRIFT [scope]: milestone '{ms_name}' has scope_in item "
                         f"'{item}' that appears in anchor scope_out — scope contradiction",
                     )
                 )
@@ -385,7 +356,7 @@ def validate_step_16_anchor(
                 errors.append(
                     make_error(
                         "E308",
-                        f"ANCHOR_SCOPE_DRIFT: milestone '{ms_name}' has scope_out item "
+                        f"ANCHOR_SCOPE_DRIFT [scope]: milestone '{ms_name}' has scope_out item "
                         f"'{item}' that appears in anchor scope_in — scope contradiction",
                     )
                 )
@@ -416,7 +387,7 @@ def validate_step_16_anchor(
                     errors.append(
                         make_error(
                             "E309",
-                            f"ANCHOR_CHECKLIST_DRIFT: checklist id '{item_id}' maps to "
+                            f"ANCHOR_CHECKLIST_DRIFT [mapping]: checklist id '{item_id}' maps to "
                             f"'{spec_ref_id}' in '{ms_name}' but '{prev_ref}' in "
                             f"'{Path(prev_file).name}' — same ID, different spec_ref",
                         )
