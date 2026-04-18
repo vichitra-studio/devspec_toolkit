@@ -39,11 +39,15 @@ def lint_hallucinations(
     require_canon_dir: bool = False,
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
+    git_root: str | None = None,
 ) -> list[SpecError]:
     errors: list[SpecError] = []
     known_ids: set[str] = set()
     refs: list[tuple[str, str, str]] = []
     root = repo_root or spec_dir
+    # path_root: for host-file existence checks in submodule deployments,
+    # resolve against git_root (host repo root) not the toolkit submodule root.
+    path_root = git_root or root
     canon_root = os.path.join(root, canon_dir)
     if require_canon_dir and not os.path.isdir(canon_root):
         return [make_error("E520", f"UNRESOLVED_INPUT missing_canon_dir {canon_root}")]
@@ -83,10 +87,12 @@ def lint_hallucinations(
         # they cannot bind *_ref to themselves and should not be flagged.
         if not is_canon:
             errors.extend(_check_free_text_terms(rel, data, canonical_terms))
-        errors.extend(_check_existing_structures_paths(rel, data, root))
-        errors.extend(_check_linked_test_expectations(rel, data, root))
+        errors.extend(_check_existing_structures_paths(rel, data, path_root))
+        errors.extend(_check_linked_test_expectations(rel, data, path_root))
         if nfr_ids is not None:
             errors.extend(_check_nfr_refs(rel, data, nfr_ids))
+        # Derivation reads step_order.json from the toolkit (repo_root/tools/),
+        # not the host repo, so it uses `root` (toolkit root), not `path_root`.
         errors.extend(_check_content_derivation(rel, data, spec_dir, root))
         collect_ids_and_refs(data, rel, known_ids, refs)
     for rel, p, ref_id in refs:
@@ -235,20 +241,64 @@ def _collect_values_under_key(obj: Any, target_key: str) -> list[str]:
     return results
 
 
-def _check_existing_structures_paths(rel: str, data: Any, repo_root: str) -> list[SpecError]:
+def _extract_path_from_string(value: str) -> str:
+    """Extract the file path portion from a composite string.
+
+    Handles four cases:
+    - Em-dash composite "path/to/file.ext \u2014 description": splits on the
+      em-dash (with or without surrounding spaces) and returns the left side.
+    - Compound shell command containing &&, ||, or " ; ": returns "" because
+      there is no single authoritative file path to validate.
+    - Single command "npx playwright test path/to/file.ext --grep '...'":
+      returns the first token that passes _looks_like_path. Tokens that
+      immediately follow a long option (--name) are treated as option values
+      and skipped, preventing false positives from --prefix <dir> patterns.
+    - Bare path or no path-like token found: returns the first path-like token
+      or "" if none exists.
+
+    Returns "" when no path can be extracted so callers receive a falsy
+    value that _looks_like_path rejects, preventing a bogus os.path.exists call.
+    """
+    # Em-dash separator: path is everything before the em-dash (spaces optional).
+    if "\u2014" in value:
+        return value.split("\u2014")[0].strip()
+    # Compound commands have no single path to validate — skip entirely.
+    if "&&" in value or "||" in value or " ; " in value:
+        return ""
+    # Single command or bare path: first token that looks like a file path.
+    # Skip long-option argument values (e.g. --prefix <dir>) to avoid treating
+    # directory arguments as file paths to validate.
+    prev_was_long_opt = False
+    for token in value.split():
+        if token.startswith(("-", "'", '"')):
+            prev_was_long_opt = token.startswith("--")
+            continue
+        if prev_was_long_opt:
+            prev_was_long_opt = False
+            continue
+        prev_was_long_opt = False
+        if _looks_like_path(token):
+            return token
+    return ""
+
+
+def _check_path_values(
+    rel: str, data: Any, path_root: str, key: str, error_tag: str
+) -> list[SpecError]:
     errs: list[SpecError] = []
-    for path in _collect_values_under_key(data, "existing_structures"):
-        if _looks_like_path(path) and not os.path.exists(os.path.join(repo_root, path)):
-            errs.append(make_error("E530", f"EXISTING_STRUCTURE_PATH_NOT_FOUND {rel}:existing_structures path={path}"))
+    for value in _collect_values_under_key(data, key):
+        path = _extract_path_from_string(value)
+        if _looks_like_path(path) and not os.path.exists(os.path.join(path_root, path)):
+            errs.append(make_error("E530", f"{error_tag} {rel}:{key} path={path}"))
     return errs
 
 
-def _check_linked_test_expectations(rel: str, data: Any, repo_root: str) -> list[SpecError]:
-    errs: list[SpecError] = []
-    for path in _collect_values_under_key(data, "linked_test_expectation"):
-        if _looks_like_path(path) and not os.path.exists(os.path.join(repo_root, path)):
-            errs.append(make_error("E530", f"LINKED_TEST_FILE_NOT_FOUND {rel}:linked_test_expectation path={path}"))
-    return errs
+def _check_existing_structures_paths(rel: str, data: Any, path_root: str) -> list[SpecError]:
+    return _check_path_values(rel, data, path_root, "existing_structures", "EXISTING_STRUCTURE_PATH_NOT_FOUND")
+
+
+def _check_linked_test_expectations(rel: str, data: Any, path_root: str) -> list[SpecError]:
+    return _check_path_values(rel, data, path_root, "linked_test_expectation", "LINKED_TEST_FILE_NOT_FOUND")
 
 
 def _load_nfr_ids(spec_dir: str) -> set[str] | None:
@@ -391,6 +441,16 @@ def _check_content_derivation(
 _E541_SKIP_KEYS = {
     "canonical_proposals", "canonical_refs_used", "canonical_conflicts",
     "tech_stack", "user_segments", "seeds",
+    # Step 16a/16b implementation subtrees.  Both keys appear exclusively in
+    # Step 16 schemas (16_impl_context.schema.json) which define no *_ref field
+    # on these items, making a canonical binding structurally impossible.
+    # Per-file scoping (like edge_cases → 11_redteam.json) is impractical here
+    # because Step 16a artifacts live in impl_context/ with variable filenames
+    # (e.g. impl_context/ms_bootstrap_local_ghost_plan.json).  No other current
+    # pipeline step defines these keys; if a future step introduces either key
+    # with bindable vocabulary, add an explicit E541 test to catch it.
+    "actions",
+    "coding_examples",
 }
 
 # File-scoped exemptions: ``edge_cases`` is an unbindable narrative subtree

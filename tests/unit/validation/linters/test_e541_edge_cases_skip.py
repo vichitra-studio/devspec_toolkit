@@ -66,6 +66,76 @@ def test_other_file_edge_cases_still_flagged():
 
 
 # ---------------------------------------------------------------------------
+# Step 16a/16b: actions[] and coding_examples[] E541 skip (Bug 3 — global)
+# ---------------------------------------------------------------------------
+
+def test_actions_description_exempt_from_e541():
+    """Bug 3 regression: actions[].description must not fire E541.
+    Step 16a schema defines no *_ref field on action items; the linter
+    cannot demand a canonical binding that the schema cannot express."""
+    canonical_terms = {
+        "post": {"cn:project:term:post"},
+        "ghost": {"cn:project:term:ghost"},
+    }
+    obj = {
+        "actions": [
+            {
+                "type": "file_edit",
+                "description": "Add Ghost post import handler to bootstrap.sh",
+            },
+            {
+                "type": "manual_verification",
+                "description": "Verify post count matches demo-content.json seed",
+            },
+        ]
+    }
+    errs = _check_free_text_terms("impl_context/ms_bootstrap_local_ghost_plan.json", obj, canonical_terms)
+    assert "E541" not in _codes(errs), f"actions subtree must skip E541: {[e.render() for e in errs]}"
+
+
+def test_actions_skip_applies_globally():
+    """The actions skip is global (not scoped to a specific filename) because
+    Step 16a artifacts have variable names in impl_context/."""
+    canonical_terms = {"post": {"cn:project:term:post"}}
+    obj = {"actions": [{"type": "file_edit", "description": "Edit post template"}]}
+    for rel in ("impl_context/any_plan.json", "16_impl_context.json", "16a_plan.json"):
+        errs = _check_free_text_terms(rel, obj, canonical_terms)
+        assert "E541" not in _codes(errs), (
+            f"actions skip must be global (failed for rel={rel!r}): {[e.render() for e in errs]}"
+        )
+
+
+def test_coding_examples_description_exempt_from_e541():
+    """coding_examples[].description must not fire E541 — code examples
+    demonstrate patterns and have no *_ref field in the schema."""
+    canonical_terms = {"theme": {"cn:project:term:theme"}}
+    obj = {
+        "coding_examples": [
+            {
+                "title": "Theme upload",
+                "description": "Shows how to upload a theme via the Ghost Admin API",
+                "code": "curl -X POST ...",
+            }
+        ]
+    }
+    errs = _check_free_text_terms("impl_context/ms_bootstrap_local_ghost_plan.json", obj, canonical_terms)
+    assert "E541" not in _codes(errs), (
+        f"coding_examples subtree must skip E541: {[e.render() for e in errs]}"
+    )
+
+
+def test_non_actions_field_still_flagged_in_16a():
+    """Sanity: exemption is scoped to actions/coding_examples subtrees.
+    A top-level description in a Step 16a artifact must still fire E541."""
+    canonical_terms = {"post": {"cn:project:term:post"}}
+    obj = {"description": "Implements the post bootstrap flow"}
+    errs = _check_free_text_terms("impl_context/ms_plan.json", obj, canonical_terms)
+    assert "E541" in _codes(errs), (
+        "top-level description in Step 16a must still fire E541"
+    )
+
+
+# ---------------------------------------------------------------------------
 # End-to-end test via the public ``lint_hallucinations`` entrypoint.
 #
 # The unit tests above exercise ``_check_free_text_terms`` directly.  This
@@ -164,4 +234,104 @@ def test_lint_hallucinations_still_flags_non_exempt_fields_end_to_end():
         rendered = _render(errs)
         assert any("E541" in r and "post" in r for r in rendered), (
             f"non-exempt field with canonical term must still fire E541: {rendered}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# End-to-end tests for actions / coding_examples E541 skip via the public
+# lint_hallucinations entrypoint (Bug 3 — Step 16a/16b global skip).
+#
+# The unit tests above exercise _check_free_text_terms directly.  These tests
+# drive the full orchestration path: canon load → term index build → per-file
+# scan → E541 skip, so a regression where the skip is bypassed at any layer
+# will be caught here.
+# ---------------------------------------------------------------------------
+
+def test_lint_hallucinations_skips_actions_e541_end_to_end():
+    """actions[].description must not fire E541 via the public entrypoint.
+    Full orchestration: canon load → term index → per-file scan → skip."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        _write_minimal_canon_with_post_term(root)
+        spec = root / "spec"
+        spec.mkdir()
+        (spec / "16a_plan.json").write_text(
+            json.dumps({
+                "actions": [
+                    {
+                        "type": "file_edit",
+                        "description": "Add Ghost post import handler to bootstrap.sh",
+                    },
+                    {
+                        "type": "manual_verification",
+                        "description": "Verify post count matches demo-content.json",
+                    },
+                ]
+            }),
+            encoding="utf-8",
+        )
+        errs = lint_hallucinations(
+            str(spec),
+            repo_root=str(root),
+            require_manifest_schema_registration=False,
+        )
+        rendered = _render(errs)
+        assert not any("E541" in r for r in rendered), (
+            f"actions subtree must be exempt from E541 end-to-end: {rendered}"
+        )
+
+
+def test_lint_hallucinations_skips_coding_examples_e541_end_to_end():
+    """coding_examples[].description must not fire E541 via the public entrypoint."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        _write_minimal_canon_with_post_term(root)
+        spec = root / "spec"
+        spec.mkdir()
+        (spec / "16a_plan.json").write_text(
+            json.dumps({
+                "coding_examples": [
+                    {
+                        "title": "Post import",
+                        "description": "Shows how to import a post via Ghost Admin API",
+                        "code": "curl -X POST ...",
+                    }
+                ]
+            }),
+            encoding="utf-8",
+        )
+        errs = lint_hallucinations(
+            str(spec),
+            repo_root=str(root),
+            require_manifest_schema_registration=False,
+        )
+        rendered = _render(errs)
+        assert not any("E541" in r for r in rendered), (
+            f"coding_examples subtree must be exempt from E541 end-to-end: {rendered}"
+        )
+
+
+def test_lint_hallucinations_top_level_description_still_flags_e541_end_to_end():
+    """Sanity: the actions/coding_examples exemption is scoped to those subtrees.
+    A top-level description in the same artifact must still fire E541."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        _write_minimal_canon_with_post_term(root)
+        spec = root / "spec"
+        spec.mkdir()
+        (spec / "16a_plan.json").write_text(
+            json.dumps({
+                "description": "Implements the post bootstrap flow",
+                "actions": [],
+            }),
+            encoding="utf-8",
+        )
+        errs = lint_hallucinations(
+            str(spec),
+            repo_root=str(root),
+            require_manifest_schema_registration=False,
+        )
+        rendered = _render(errs)
+        assert any("E541" in r and "post" in r for r in rendered), (
+            f"top-level description in Step 16a artifact must still fire E541: {rendered}"
         )

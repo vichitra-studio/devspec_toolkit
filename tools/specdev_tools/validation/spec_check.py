@@ -118,6 +118,7 @@ def _run_checks(
             require_canon_dir=True,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            git_root=git_root,
         )
         checks["hallucination-lint"] = {**_classify(hall_errs), "errors": hall_errs}
     else:
