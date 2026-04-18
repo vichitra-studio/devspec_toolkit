@@ -538,7 +538,7 @@
         "description",
         "severity"
       ],
-      "description": "Shared shape for cross-cycle ambiguity entries: emergent ambiguities discovered during 16b execution and anchor-level ambiguities accumulated across Trinity cycles. Distinct from planning-phase ambiguities (16a) which use a richer shape (source/proposed_assumption/mitigation/decision/resolved) and a binary severity (blocking|non_blocking). All consumers using this $def share the severityLevel scale (low|medium|high|critical) and the ambiguityStatus enum.",
+      "description": "Shared shape for cross-cycle and emergent ambiguity entries: emergent ambiguities discovered during 16b execution and anchor-level ambiguities accumulated across Trinity cycles. Uses severityLevel (low|medium|high|critical) and ambiguityStatus enum. Optionally carries decision/resolved to record resolution outcomes. Planning-phase ambiguities (16a) use a separate local shape with additional required workflow fields (source/proposed_assumption/mitigation) and binary severity (blocking|non_blocking).",
       "properties": {
         "id": {
           "$ref": "vc:core:atoms#kebabId",
@@ -570,6 +570,17 @@
             { "$ref": "vc:core:collections#canonicalRef" },
             { "properties": { "kind": { "const": "status" } } }
           ]
+        },
+        "decision": {
+          "type": "string",
+          "description": "Optional resolution decision recorded on this ambiguity (written by 16a carry-over or 16c adjudication)."
+        },
+        "resolved": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "boolean" }
+          ],
+          "description": "Optional resolution outcome: boolean (resolved yes/no) or descriptive string."
         }
       }
     },

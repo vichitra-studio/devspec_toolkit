@@ -124,6 +124,7 @@ You must populate the JSON fields according to these specific definitions and ex
 *   `target_file_patterns`: List **ALL** likely files that will be modified.
     *   *Rule*: Use glob patterns (e.g. `src/auth/*.py`).
     *   *Expectation*: If a file is not matched here, the coder is forbidden from touching it.
+*   `milestone_supporting_files` (optional): Array of file paths that span multiple checklist items (READMEs, shared fixtures, build config, cross-cutting e2e specs). Files listed here are exempt from per-checklist-item scope tracking (W603). Use sparingly — prefer pinning files to a specific checklist item when possible.
 
 ## 2. `plan.spec_alignment.checklist` (The Contract)
 

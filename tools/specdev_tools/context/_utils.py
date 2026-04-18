@@ -53,32 +53,34 @@ def find_step_schema_uri(step_id: str, registry: SchemaRegistry) -> str | None:
 
 
 def merge_allof(schema: dict, registry: SchemaRegistry) -> dict:
-    """Merge allOf branches into a single ``{properties, required}`` dict.
+    """Merge allOf branches with root-level properties into a single ``{properties, required}`` dict.
 
     Uses ``SchemaRegistry.to_referencing_registry()`` for ``$ref`` resolution
     per locked decision 4f — handles anchor-based ``$ref``s correctly.
-    allOf[2] ``if``/``then`` branches (steps 02, 15) have no ``properties``
-    at top-level and are safely yielded as empty.
+    allOf branches with ``if``/``then`` (no ``properties`` at top-level) yield
+    empty props and are safely skipped.
+
+    Schemas may declare step-specific properties either at the root (alongside
+    an ``allOf`` that $refs ``vc:core:step-base``) or inside an ``allOf`` branch.
+    Both shapes are merged into a single property set.
     """
-    if "allOf" not in schema:
-        return schema
-
     ref_registry = registry.to_referencing_registry()
-    merged_props: dict[str, Any] = {}
-    merged_required: list[str] = []
+    merged_props: dict[str, Any] = dict(schema.get("properties", {}))
+    merged_required: list[str] = list(schema.get("required", []))
 
-    for branch in schema["allOf"]:
+    for branch in schema.get("allOf", []) or []:
         resolved = branch
-        if "$ref" in branch:
+        if isinstance(branch, dict) and "$ref" in branch:
             ref_uri = branch["$ref"]
             try:
-                # Prefer referencing.Registry for proper anchor resolution.
                 resolved = ref_registry.contents(ref_uri)
             except Exception:
                 try:
                     resolved = registry.load(ref_uri)
                 except Exception:
                     continue
+        if not isinstance(resolved, dict):
+            continue
         merged_props.update(resolved.get("properties", {}))
         merged_required.extend(resolved.get("required", []))
 

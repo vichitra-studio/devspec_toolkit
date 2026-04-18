@@ -35,7 +35,11 @@ def _make_minimal_16a() -> dict:
     }
 
 
-def _review_with_remediation(task_ids: list[str]) -> dict:
+def _review_with_remediation(
+    task_ids: list[str],
+    linked_checklist_ids: dict[str, list[str]] | None = None,
+) -> dict:
+    linked = linked_checklist_ids or {}
     findings = []
     for task_id in task_ids:
         findings.append({
@@ -44,8 +48,8 @@ def _review_with_remediation(task_ids: list[str]) -> dict:
             "remediation_task": {
                 "task_id": task_id,
                 "summary": f"Fix for {task_id}",
-                "files_to_modify": [],
-                "checklist_item_ids": [],
+                "files_to_touch": [],
+                "checklist_ids": linked.get(task_id, [task_id]),
             },
         })
     return {"verdict": "needs_work", "findings": findings}
@@ -90,6 +94,20 @@ class TestStep16aFeedbackLoop(unittest.TestCase):
         errors = validate_step_16a(data, ".", spec_path=None)
         w584_messages = {e.message for e in errors if e.code == "W584"}
         self.assertEqual(len(w584_messages), 2)
+
+    def test_w584_silent_when_checklist_ids_all_valid(self):
+        """W584 stays quiet when every remediation.checklist_ids entry resolves."""
+        data = _make_minimal_16a()
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {"id": "cl-real", "spec_ref": {"type": "fr", "id": "fr-real"}, "description": "Real work"},
+        ]
+        data["review"] = _review_with_remediation(
+            ["task-xyz"],
+            linked_checklist_ids={"task-xyz": ["cl-real"]},
+        )
+        errors = validate_step_16a(data, ".", spec_path=None)
+        codes = [e.code for e in errors]
+        self.assertNotIn("W584", codes)
 
     def test_review_feedback_does_not_require_spec_path(self):
         """W584 depends only on ``data`` — passing or omitting spec_path is equivalent."""

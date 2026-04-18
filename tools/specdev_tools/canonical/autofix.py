@@ -333,13 +333,26 @@ def _sync_canonical_refs_used(data: Any, registry: CanonicalRegistry, file_chang
     if not isinstance(declared, list):
         return
     used_refs = _collect_used_refs(data)
-    if not used_refs:
-        return
     declared_ids = {
         item.get("id")
         for item in declared
         if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].startswith("cn:")
     }
+    # Prune stale cn:* entries that no longer appear in the artifact.  Non-cn:*
+    # entries are out of scope for the *_ref collector and must be left alone.
+    stale_ids = declared_ids - set(used_refs.keys())
+    if stale_ids:
+        retained: list = []
+        for item in declared:
+            item_id = item.get("id") if isinstance(item, dict) else None
+            if isinstance(item_id, str) and item_id in stale_ids:
+                file_changes.append(f"$ remove canonical_refs_used id={item_id}")
+                continue
+            retained.append(item)
+        declared[:] = retained
+        declared_ids -= stale_ids
+    if not used_refs:
+        return
     for cid in sorted(used_refs.keys()):
         if cid in declared_ids:
             continue

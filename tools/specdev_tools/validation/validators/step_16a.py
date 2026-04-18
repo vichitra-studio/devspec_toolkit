@@ -62,12 +62,14 @@ def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Option
             rem = finding.get("remediation_task")
             if not isinstance(rem, dict):
                 continue
-            task_id = rem.get("task_id")
-            if isinstance(task_id, str) and task_id and task_id not in seen_ids:
+            task_id = rem.get("task_id", "<unknown>")
+            linked_ids = rem.get("checklist_ids") or []
+            unknown = [cid for cid in linked_ids if cid not in seen_ids]
+            if unknown:
                 errors.append(make_error(
                     "W584",
-                    f"REMEDIATION_TASK_MISSING: review remediation task '{task_id}' "
-                    f"is not referenced in any checklist item id",
+                    f"REMEDIATION_TASK_LINK_UNKNOWN: review remediation task '{task_id}' "
+                    f"references unknown checklist ids: {', '.join(str(c) for c in unknown)}",
                 ))
 
     return errors

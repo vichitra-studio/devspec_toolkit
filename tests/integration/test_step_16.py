@@ -2243,5 +2243,269 @@ class TestStep16(unittest.TestCase):
         )
 
 
+    # --- Schema root-properties shape: no phantom unevaluated-properties companion ---
+
+    def test_schema_accepts_all_root_properties_plan_execution_review(self):
+        """After schema restructure, plan/execution/review all evaluate at root; no phantom unevaluated companion."""
+        path = os.path.join(self.fixtures_dir, "valid_empty_execution_review.json")
+        errors = validate_file(self.repo_root, path)
+        unevaluated = [e for e in errors if "Unevaluated properties" in e.message or "unevaluated properties" in e.message.lower()]
+        self.assertEqual(unevaluated, [], f"Unexpected phantom unevaluated-properties errors: {[e.message for e in unevaluated]}")
+
+    def test_invalid_fixture_emits_only_real_error_not_phantom(self):
+        """Invalid 16-impl-context fixture surfaces a real schema error but no phantom unevaluated companion."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-invalid-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": "Invalid test.",
+                    "scope_in": ["core"],
+                    "scope_out": [],
+                    "target_file_patterns": ["src/**"],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": [{"id": "CHK", "spec_ref": {"type": "not-a-valid-enum", "id": "fr-x"}, "description": "d", "type": "behavior", "layer": "api"}],
+                },
+                "docs_impact": {"status": "not_required", "rationale": "n/a"},
+            },
+            "canonical_refs_used": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "16_impl_context.json"
+            p.write_text(json.dumps(data), encoding="utf-8")
+            (Path(td) / "common").mkdir()
+            (Path(td) / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(p))
+        unevaluated = [e for e in errors if "Unevaluated properties" in e.message]
+        self.assertEqual(unevaluated, [], f"Phantom unevaluated companion on invalid fixture: {[e.message for e in errors]}")
+
+    def test_invalid_fixtures_09_13_15_emit_no_phantom_unevaluated_companion(self):
+        """Steps 09/13/15 share the same schema restructure as 16 — invalid fixtures must surface
+        their real errors without triggering a phantom 'Unevaluated properties' companion."""
+        cases = [
+            "tests/fixtures/step_09/invalid_bad_depends_on.json",
+            "tests/fixtures/step_13/invalid_empty_no_decision.json",
+            "tests/fixtures/step_15/invalid_green_no_validators.json",
+        ]
+        for rel in cases:
+            with self.subTest(fixture=rel):
+                errors = validate_file(self.repo_root, rel)
+                unevaluated = [e for e in errors if "Unevaluated properties" in e.message]
+                self.assertEqual(
+                    unevaluated, [],
+                    f"Phantom unevaluated companion on {rel}: {[e.message for e in errors]}",
+                )
+                self.assertTrue(
+                    any(e.code == "E520" for e in errors),
+                    f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
+                )
+
+    # --- crossCycleAmbiguityItem accepts optional resolved/decision ---
+
+    def test_emergent_ambiguity_with_resolved_and_decision(self):
+        """crossCycleAmbiguityItem accepts optional resolved + decision fields."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-amb-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {"functional_summary": "amb test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
+                "spec_alignment": {"requirements_summary": [{"theme": "Core", "summary": "x"}], "checklist": []},
+                "docs_impact": {"status": "not_required", "rationale": "n/a"},
+            },
+            "execution": {
+                "emergent_ambiguities": [
+                    {
+                        "id": "amb-1",
+                        "description": "Ambiguity surfaced during execution",
+                        "severity": "medium",
+                        "resolved": True,
+                        "decision": "accepted",
+                    }
+                ]
+            },
+            "canonical_refs_used": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "16_impl_context.json"
+            p.write_text(json.dumps(data), encoding="utf-8")
+            (Path(td) / "common").mkdir()
+            (Path(td) / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(p))
+        e520 = [e for e in errors if e.code == "E520"]
+        e530 = [e for e in errors if e.code == "E530"]
+        self.assertFalse(
+            any("resolved" in e.message or "decision" in e.message for e in e520 + e530),
+            f"resolved/decision must validate. Got: {[e.message for e in errors]}"
+        )
+
+    def test_emergent_ambiguity_still_valid_without_resolved(self):
+        """crossCycleAmbiguityItem without resolved/decision still validates (fields optional)."""
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": "step-amb-min",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {"functional_summary": "amb test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
+                "spec_alignment": {"requirements_summary": [{"theme": "Core", "summary": "x"}], "checklist": []},
+                "docs_impact": {"status": "not_required", "rationale": "n/a"},
+            },
+            "execution": {
+                "emergent_ambiguities": [
+                    {"id": "amb-2", "description": "Minimal ambiguity shape", "severity": "low"}
+                ]
+            },
+            "canonical_refs_used": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "16_impl_context.json"
+            p.write_text(json.dumps(data), encoding="utf-8")
+            (Path(td) / "common").mkdir()
+            (Path(td) / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(p))
+        ambiguity_errors = [e for e in errors if "emergent_ambiguities" in e.message]
+        self.assertEqual(ambiguity_errors, [], f"Minimal ambiguity must validate. Got: {[e.message for e in ambiguity_errors]}")
+
+    # --- docs_touched accepts any file whose basename is a canonical doc name ---
+
+    def _docs_touched_impl_context(self, docs_touched: list) -> dict:
+        return {
+            "$schema": "vc:16-impl-context",
+            "id": "step-doc-test",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {"functional_summary": "doc test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "x"}],
+                    "checklist": [{
+                        "id": "CHK_D",
+                        "spec_ref": {"type": "fr", "id": "fr-x", "line_range": "L1-L10", "commit_hash": "a" * 40},
+                        "description": "implement x",
+                        "type": "behavior",
+                        "layer": "api",
+                        "linked_test_expectation": "pytest x",
+                        "nfr_refs": ["nfr-availability-uptime"],
+                        "fixture_ref": "fixture-x",
+                        "implementation": {
+                            "status": "in_progress",
+                            "files_touched": ["src/x.py"],
+                            "actions": [{"type": "file_edit", "target": "src/x.py", "description": "edit"}],
+                        },
+                    }],
+                },
+                "docs_impact": {"status": "required", "rationale": "Code change requires doc update.", "docs_touched": docs_touched},
+            },
+            "canonical_refs_used": [],
+        }
+
+    def _run_docs_test(self, docs_touched: list):
+        data = self._docs_touched_impl_context(docs_touched)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "16_impl_context.json"
+            p.write_text(json.dumps(data), encoding="utf-8")
+            (Path(td) / "common").mkdir()
+            (Path(td) / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["docs/**/*.md", "CHANGELOG.md"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            return validate_step_16(data, self.repo_root, spec_path=str(p))
+
+    def test_docs_touched_accepts_component_readme(self):
+        errors = self._run_docs_test(["theme/README.md"])
+        bad = [e for e in errors if "non-doc path" in e.message]
+        self.assertEqual(bad, [], f"component README should be accepted. Got: {[e.message for e in bad]}")
+
+    def test_docs_touched_accepts_root_readme(self):
+        errors = self._run_docs_test(["README.md"])
+        bad = [e for e in errors if "non-doc path" in e.message]
+        self.assertEqual(bad, [], f"root README should be accepted. Got: {[e.message for e in bad]}")
+
+    def test_docs_touched_rejects_non_doc_path(self):
+        errors = self._run_docs_test(["src/app.py"])
+        bad = [e for e in errors if "non-doc path" in e.message and "src/app.py" in e.message]
+        self.assertTrue(bad, f"non-doc path must be rejected. Got errors: {[e.message for e in errors]}")
+
+    # --- milestone_supporting_files exempts cross-cutting files from W603 ---
+
+    def _w603_data(self, milestone_supporting_files=None):
+        plan = {
+            "status": "active",
+            "summary": {
+                "functional_summary": "W603 fix test.",
+                "scope_in": ["core"],
+                "scope_out": [],
+                "target_file_patterns": ["src/**", "tests/**"],
+            },
+            "spec_alignment": {
+                "requirements_summary": [{"theme": "Core", "summary": "x"}],
+                "checklist": [{
+                    "id": "CHK_W603_FIX",
+                    "spec_ref": {"type": "fr", "id": "fr-x", "line_range": "L1-L10", "commit_hash": "a" * 40},
+                    "description": "work",
+                    "type": "behavior",
+                    "layer": "api",
+                    "linked_test_expectation": "pytest x",
+                    "nfr_refs": ["nfr-availability-uptime"],
+                    "fixture_ref": "fixture-x",
+                    "implementation": {
+                        "status": "in_progress",
+                        "files_touched": ["src/x.py"],
+                        "actions": [],
+                    },
+                }],
+            },
+            "docs_impact": {"status": "not_required", "rationale": "n/a"},
+        }
+        if milestone_supporting_files is not None:
+            plan["summary"]["milestone_supporting_files"] = milestone_supporting_files
+        return {
+            "$schema": "vc:16-impl-context",
+            "id": "step-w603-fix",
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": plan,
+            "execution": {"files_touched": ["src/x.py", "tests/README.md"]},
+            "canonical_refs_used": [],
+        }
+
+    def _run_w603(self, data):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "16_impl_context.json"
+            p.write_text(json.dumps(data), encoding="utf-8")
+            (Path(td) / "common").mkdir()
+            (Path(td) / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            return validate_step_16(data, self.repo_root, spec_path=str(p))
+
+    def test_w603_does_not_fire_for_milestone_supporting_file(self):
+        data = self._w603_data(milestone_supporting_files=["tests/README.md"])
+        w603 = [e for e in self._run_w603(data) if e.code == "W603" and "tests/README.md" in e.message]
+        self.assertEqual(w603, [], f"milestone_supporting_files entry must exempt W603. Got: {[e.message for e in w603]}")
+
+    def test_w603_still_fires_for_truly_undeclared_file(self):
+        data = self._w603_data(milestone_supporting_files=[])
+        w603 = [e for e in self._run_w603(data) if e.code == "W603" and "tests/README.md" in e.message]
+        self.assertTrue(w603, "W603 must still fire for undeclared file not in milestone_supporting_files.")
+
+
 if __name__ == '__main__':
     unittest.main()

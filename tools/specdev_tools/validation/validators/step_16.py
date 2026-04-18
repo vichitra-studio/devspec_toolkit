@@ -24,6 +24,15 @@ _SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failu
 # Spec artifact ID pattern for evidence binding validation (AUDIT-032)
 _ARTIFACT_ID_RE = re.compile(r'\b(?:fr|api|nfr|inv)-[a-z0-9-]+\b')
 
+# Built-in doc basenames — any file whose basename matches is treated as a doc
+# regardless of directory depth.  Covers the common case of per-component
+# README/CHANGELOG files that seed_manifest glob patterns (e.g. ``**/README.md``)
+# do not reliably match via Python's ``fnmatch`` (which does not match ``**``
+# against bare root basenames).
+_BUILTIN_DOC_BASENAMES: frozenset[str] = frozenset({
+    "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "AUTHORS.md", "LICENSE.md",
+})
+
 # Cache for step_16 validation results by content hash.  When step_16a, 16b,
 # and 16c each call validate_step_16(), the first call computes the result and
 # subsequent calls for the same artifact return cached results.  This prevents
@@ -278,9 +287,17 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         for f in impl.get("files_touched", []):
             if isinstance(f, str):
                 checklist_declared_files.add(f)
+    milestone_files: set[str] = set(
+        (plan.get("summary", {}).get("milestone_supporting_files") or [])
+    )
     for f in execution_files:
-        if f not in checklist_declared_files:
-            errors.append(make_error("W603", f"FILES_OUTSIDE_TASK_SCOPE: execution file '{f}' is not declared in any checklist item's files_touched — may be outside task scope"))
+        if f not in checklist_declared_files and f not in milestone_files:
+            errors.append(make_error(
+                "W603",
+                f"FILES_OUTSIDE_TASK_SCOPE: execution file '{f}' is not declared in "
+                f"any checklist item's files_touched or plan.summary.milestone_supporting_files "
+                f"— may be outside task scope",
+            ))
 
     # Logic: Warn if files are touched but not in target_file_patterns
     import fnmatch
@@ -314,9 +331,11 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
     def is_doc_path(path: str) -> bool:
         if not path:
             return False
+        norm = path.replace("\\", "/").lstrip("./")
+        if os.path.basename(norm) in _BUILTIN_DOC_BASENAMES:
+            return True
         if not doc_patterns_valid:
             return False
-        norm = path.replace("\\", "/").lstrip("./")
         for pattern in doc_patterns:
             if fnmatch.fnmatch(norm, pattern):
                 return True

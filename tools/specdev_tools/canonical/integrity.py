@@ -181,11 +181,19 @@ def _validate_document_integrity(
     extra_ids = sorted(declared_ids - observed_ids)
     if missing_ids:
         errors.append(
-            make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids}")
+            make_error(
+                "E210",
+                f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids} "
+                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync"
+            )
         )
     if extra_ids:
         errors.append(
-            make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids}")
+            make_error(
+                "E210",
+                f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids} "
+                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync"
+            )
         )
     if enforce_unresolved_semantics:
         errors.extend(

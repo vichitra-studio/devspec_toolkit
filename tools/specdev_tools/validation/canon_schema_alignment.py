@@ -81,7 +81,7 @@ def lint_canon_schema_alignment(
         ("11_redteam.schema.json", "allOf/1/properties/threats/items/properties/mitigations/items/properties/type/enum"),
         ("16_impl_context.schema.json", "$defs/specRef/properties/type/enum"),
         # build_status is an intentional 3-value subset of the status canon kind
-        ("15_scaffold.schema.json", "allOf/1/properties/build_status/enum"),
+        ("15_scaffold.schema.json", "properties/build_status/enum"),
     }
 
     # Phase 2: Discovery scan (advisory)

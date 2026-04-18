@@ -82,11 +82,12 @@ def _find_step_schema_uri(step_id: str, registry: SchemaRegistry) -> str | None:
 
 
 def _output_schema_keys(step_id: str, registry: SchemaRegistry) -> list[str]:
-    """Discover step-specific output schema keys by walking allOf[1].properties.
+    """Discover step-specific output schema keys from the step's output schema.
 
-    The step schema has structure:
-      allOf[0]: $ref to step-base
-      allOf[1]: step-specific object with properties
+    Step schemas declare step-specific properties either at the root (alongside
+    an ``allOf`` that $refs ``vc:core:step-base``) or inside an ``allOf``
+    branch. ``merge_allof`` handles both shapes; boilerplate keys from
+    step-base are filtered out here.
     """
     uri = _find_step_schema_uri(step_id, registry)
     if not uri:
