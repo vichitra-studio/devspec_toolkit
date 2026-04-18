@@ -203,12 +203,47 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             }
         }
         execution_results: list[dict[str, Any]] = []
+        # Resolve `satisfied_checklist_ids` → roadmap task_ids per-plan so that
+        # duplicate checklist IDs across milestones cannot cross-contaminate.
+        # The mapping is `checklist_item.id` → `checklist_item.spec_ref.id`,
+        # matching the convention W562/W563 already enforce (spec_ref.id on a
+        # checklist item is the roadmap task it verifies).
+        satisfied_task_ids: set[str] = set()
         for plan in milestone_plans:
             results = plan.get("execution", {}).get("execution_results", [])
             if isinstance(results, list):
                 execution_results.extend(r for r in results if isinstance(r, dict))
-        if execution_results:
-            data["code_execution"] = {"execution": {"execution_results": execution_results}}
+            local_checklist_to_task: dict[str, str] = {}
+            for item in plan.get("plan", {}).get("spec_alignment", {}).get("checklist", []):
+                if not isinstance(item, dict):
+                    continue
+                checklist_id = item.get("id")
+                spec_ref = item.get("spec_ref")
+                if (
+                    isinstance(checklist_id, str) and checklist_id
+                    and isinstance(spec_ref, dict)
+                ):
+                    spec_ref_id = spec_ref.get("id")
+                    if isinstance(spec_ref_id, str) and spec_ref_id:
+                        local_checklist_to_task[checklist_id] = spec_ref_id
+            satisfied = (
+                plan.get("execution", {})
+                .get("critical_evidence", {})
+                .get("satisfied_checklist_ids", [])
+            )
+            if isinstance(satisfied, list):
+                for sat_id in satisfied:
+                    if isinstance(sat_id, str):
+                        resolved = local_checklist_to_task.get(sat_id)
+                        if resolved:
+                            satisfied_task_ids.add(resolved)
+        if execution_results or satisfied_task_ids:
+            data["code_execution"] = {
+                "execution": {
+                    "execution_results": execution_results,
+                    "satisfied_task_ids": sorted(satisfied_task_ids),
+                }
+            }
 
     capability_ids: set[str] = set()
     if "capabilities" in data:
@@ -422,14 +457,15 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # files; post-Trinity-Anchor split there is no longer a separate 16b_code.json
     # artifact — the same milestone-plan file accumulates plan/execution/review).
     if "code_execution" in data and "roadmap" in data:
-        code_exec_data = data["code_execution"]
-        # Collect all task_ids referenced in 16b execution entries
-        executed_task_ids: set[str] = set()
-        for exec_entry in code_exec_data.get("execution", {}).get("execution_results", []):
-            if isinstance(exec_entry, dict):
-                task_ref = exec_entry.get("task_id")
-                if isinstance(task_ref, str) and task_ref:
-                    executed_task_ids.add(task_ref)
+        # Executed task coverage is sourced from `satisfied_task_ids`, resolved
+        # per-plan in `_load_milestone_plans_from_anchor` from each plan's
+        # `critical_evidence.satisfied_checklist_ids` → `checklist[*].spec_ref.id`.
+        # The 16_impl_context schema forbids a `task_id` field on execution_results
+        # items (additionalProperties: false), so the mapping through the
+        # checklist is the only schema-compliant closure path.
+        executed_task_ids: set[str] = set(
+            data["code_execution"].get("execution", {}).get("satisfied_task_ids", [])
+        )
         # Check each non-done task
         for ms in data["roadmap"].get("milestones", []):
             for task in ms.get("tasks", []):

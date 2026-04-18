@@ -701,5 +701,134 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             )
 
 
+class TestW576TaskExecutionCoverage(unittest.TestCase):
+    """W576 resolves executed task IDs via satisfied_checklist_ids → checklist.spec_ref.id."""
+
+    def _plan(self, milestone_id: str, checklist_id: str, task_id: str, satisfied: list[str]) -> dict:
+        return {
+            "id": milestone_id,
+            "plan": {
+                "spec_alignment": {
+                    "checklist": [{"id": checklist_id, "spec_ref": {"id": task_id}}]
+                }
+            },
+            "execution": {
+                "execution_results": [
+                    {
+                        "status": "passed",
+                        "outcome_description": "ok",
+                        "reasoning": "covered",
+                        "command": "pytest",
+                        "evidence": "5 passed in 0.10s",
+                    }
+                ],
+                "critical_evidence": {"satisfied_checklist_ids": satisfied},
+            },
+        }
+
+    def _write_base(self, d: str, plan: dict, tasks: list[dict] | None = None) -> None:
+        _write(d, "01_capabilities.json", CAPS)
+        _write(d, "04_fr_list.json", FRS_FULL)
+        if tasks is None:
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "pending"}]
+        _write(
+            d,
+            "14_roadmap.json",
+            {"milestones": [{"milestone_id": "ms-v1", "fr_refs": ["fr-login"], "tasks": tasks}]},
+        )
+        _write_anchor_with_plan(d, "ms-v1", plan)
+
+    def test_satisfied_checklist_resolves_task_suppresses_W576(self):
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", ["AUTH_LOGIN_OK"])
+            self._write_base(d, plan)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertFalse(
+                any("W576" in e for e in rendered),
+                f"W576 should be suppressed when satisfied_checklist_ids resolves task-1. Got: {rendered}",
+            )
+
+    def test_missing_satisfaction_emits_W576(self):
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", [])
+            self._write_base(d, plan)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertTrue(
+                any("W576" in e and "task-1" in e for e in rendered),
+                f"Expected W576 for task-1. Got: {rendered}",
+            )
+
+    def test_done_task_does_not_require_execution(self):
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", [])
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "done"}]
+            self._write_base(d, plan, tasks=tasks)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertFalse(
+                any("W576" in e for e in rendered),
+                f"W576 should not fire for status=done tasks. Got: {rendered}",
+            )
+
+    def test_unknown_satisfied_id_is_ignored(self):
+        """A satisfied_checklist_id that does not match any checklist item should not
+        accidentally resolve to a task — W576 should still fire for the uncovered task."""
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", ["UNKNOWN_ID"])
+            self._write_base(d, plan)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertTrue(
+                any("W576" in e and "task-1" in e for e in rendered),
+                f"Expected W576 when satisfied id is unknown. Got: {rendered}",
+            )
+
+    def test_cross_milestone_checklist_id_collision_resolves_per_plan(self):
+        """If two milestone plans share a checklist id but map it to different tasks,
+        satisfaction in plan A must only credit task A, not task B."""
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", CAPS)
+            _write(d, "04_fr_list.json", FRS_FULL)
+            _write(
+                d,
+                "14_roadmap.json",
+                {
+                    "milestones": [
+                        {
+                            "milestone_id": "ms-a",
+                            "fr_refs": ["fr-login"],
+                            "tasks": [
+                                {"task_id": "task-a", "fr_refs": ["fr-login"], "status": "pending"},
+                                {"task_id": "task-b", "fr_refs": ["fr-login"], "status": "pending"},
+                            ],
+                        }
+                    ]
+                },
+            )
+            # Build an anchor that registers two plan files with a colliding checklist id.
+            os.makedirs(os.path.join(d, "impl_context"), exist_ok=True)
+            anchor = {
+                "plan": {
+                    "milestone_index": [
+                        {"milestone_id": "ms-a", "context_path": "impl_context/ms_a_plan.json"},
+                        {"milestone_id": "ms-b", "context_path": "impl_context/ms_b_plan.json"},
+                    ]
+                }
+            }
+            _write(d, "16_impl_context.json", anchor)
+            # Both plans use checklist id "SHARED_ID" but map it to different tasks.
+            _write(d, "impl_context/ms_a_plan.json", self._plan("ms-a", "SHARED_ID", "task-a", ["SHARED_ID"]))
+            _write(d, "impl_context/ms_b_plan.json", self._plan("ms-b", "SHARED_ID", "task-b", []))
+            rendered = render_errors(check_traceability_closure(d))
+            # task-a satisfied in its own plan — no W576 for it.
+            self.assertFalse(
+                any("W576" in e and "task-a" in e for e in rendered),
+                f"task-a was satisfied in plan-a. Got: {rendered}",
+            )
+            # task-b was not satisfied in its own plan, so W576 must fire.
+            self.assertTrue(
+                any("W576" in e and "task-b" in e for e in rendered),
+                f"task-b was not satisfied — expected W576. Got: {rendered}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
