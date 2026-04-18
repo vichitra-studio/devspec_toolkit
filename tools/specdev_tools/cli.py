@@ -793,6 +793,7 @@ def main():
             require_canon_dir=True,
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
+            git_root=git_root,
         )
         if getattr(args, "json_output", False):
             _json_exit(errs, "hallucination-lint")
