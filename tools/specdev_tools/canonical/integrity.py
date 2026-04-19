@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import os
 import re
-from pathlib import Path
 from typing import Any
 from urllib.parse import urldefrag, urljoin
 
@@ -422,12 +421,32 @@ def _expected_ref_key(key: str, schema_props: dict[str, Any], allow_fallback: bo
             return f"{key}_ref"
         return None
     direct = f"{key}_ref"
-    if direct in schema_props:
+    if direct in schema_props and _is_canonical_ref_schema(schema_props[direct]):
         return direct
     mapped = _ALIASED_SOURCE_FIELDS.get(key)
-    if mapped and mapped in schema_props:
+    if mapped and mapped in schema_props and _is_canonical_ref_schema(schema_props[mapped]):
         return mapped
     return None
+
+
+def _is_canonical_ref_schema(node: Any) -> bool:
+    if not isinstance(node, dict):
+        return False
+    ref = node.get("$ref")
+    if isinstance(ref, str) and "canonicalRef" in ref:
+        return True
+    props = node.get("properties")
+    if isinstance(props, dict):
+        id_prop = props.get("id")
+        if isinstance(id_prop, dict):
+            pattern = id_prop.get("pattern")
+            if isinstance(pattern, str) and pattern.startswith("^cn:"):
+                return True
+    for combinator in ("allOf", "anyOf", "oneOf"):
+        for sub in node.get(combinator, []) or []:
+            if _is_canonical_ref_schema(sub):
+                return True
+    return False
 
 
 def _is_resolved_ref(value: Any) -> bool:

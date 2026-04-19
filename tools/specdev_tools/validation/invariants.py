@@ -27,8 +27,8 @@ try:  # pragma: no cover - import guard
     _CEL_ENV = celpy.Environment()
     # Bind exception classes to module-level names so _cel_eval never needs to
     # access attributes on the module reference (which Pyright types as optional).
-    _CelParseError = celpy.CELParseError
-    _CelEvalError = celpy.CELEvalError
+    _CelParseError = celpy.CELParseError  # pyright: ignore[reportPrivateImportUsage]
+    _CelEvalError = celpy.CELEvalError  # pyright: ignore[reportPrivateImportUsage]
 except Exception:  # pragma: no cover - library absent or broken at import time
     _CEL_AVAILABLE = False
     _CEL_ENV = None

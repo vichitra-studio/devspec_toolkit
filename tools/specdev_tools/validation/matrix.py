@@ -94,8 +94,9 @@ def collect_definitions_and_references(artifacts: dict) -> tuple[set[str], list[
                              references.append((source_file, item["id"]))
                 
                 # Check for direct references (field_ref: "target-id" or field_refs: ["id1", "id2"])
-                # Exclude evidence_ref - it's for evidence binding metadata, not spec traceability
-                if k.endswith("_ref") and k != "evidence_ref" and isinstance(v, str):
+                # Exclude URI-shaped values (e.g. evidence_ref: "https://..." or "ci://...") —
+                # those carry external-resource pointers, not spec IDs.
+                if k.endswith("_ref") and isinstance(v, str) and "://" not in v:
                     references.append((source_file, v))
                 elif k.endswith("_refs") and isinstance(v, list):
                     for ref_id in v:

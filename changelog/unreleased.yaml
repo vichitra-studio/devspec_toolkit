@@ -287,6 +287,12 @@ changes:
     migration:
       action: automatic
       note: "New warning. Existing canonically-located anchors are unaffected; misfiled anchors that previously emitted zero diagnostics now surface W609 with the move target."
+  - type: bugfix
+    path: "tools/specdev_tools/canonical/integrity.py"
+    description: "E210 unresolved_canonical_semantic false positive on string-typed _ref siblings (evidence/evidence_ref). _expected_ref_key previously classified any <field>_ref sibling as a canonicalRef based solely on key presence, ignoring the sibling schema type. Every populated execution.execution_results[*].evidence string in spec/impl_context/<milestone>_plan.json tripped E210 because evidence_ref is schema-typed as a plain URI string, not vc:core:collections#canonicalRef. New _is_canonical_ref_schema predicate gates the decision on direct $ref substring match, allOf/anyOf/oneOf composition, or inline canonicalRef object shape (properties.id.pattern starts with ^cn:). Acknowledged false-negative: chained $ref through $defs is not followed (zero such chains today). Covered by tests/unit/canonical/test_canonical_integrity.py::test_string_typed_ref_sibling_does_not_trigger_e210 and ::test_canonical_ref_typed_sibling_still_flags_e210_when_unresolved."
+    migration:
+      action: automatic
+      note: "Host repos that used git commit --no-verify to bypass this stop needing to. Host repos that added canonical_conflicts workaround entries see those become inert (still schema-valid; can be removed at author discretion)."
 
 deferred:
   - ref: "F-S3 / Phase 1 Task 1.2"

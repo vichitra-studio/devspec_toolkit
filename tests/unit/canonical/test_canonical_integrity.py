@@ -324,6 +324,145 @@ class CanonicalIntegrityTests(unittest.TestCase):
             )
             self.assertFalse(any("unresolved_canonical_semantic" in e.render() for e in non_strict))
 
+    def test_string_typed_ref_sibling_does_not_trigger_e210(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir()
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps({"vc:test": "schema/test.schema.json"}),
+                encoding="utf-8",
+            )
+            (root / "schema" / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "vc:test",
+                        "type": "object",
+                        "properties": {
+                            "evidence": {"type": "string", "minLength": 20},
+                            "evidence_ref": {"type": "string"},
+                            "canonical_refs_used": {"type": "array"},
+                            "canonical_proposals": {"type": "array"},
+                            "canonical_conflicts": {"type": "array"},
+                        },
+                        "required": [
+                            "evidence",
+                            "evidence_ref",
+                            "canonical_refs_used",
+                            "canonical_proposals",
+                            "canonical_conflicts",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "spec").mkdir()
+            (root / "spec" / "sample.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "vc:test",
+                        "evidence": "command output captured here >=20 chars",
+                        "evidence_ref": "https://example/log",
+                        "canonical_refs_used": [],
+                        "canonical_proposals": [],
+                        "canonical_conflicts": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
+            self.assertFalse(any("schema_not_found" in e.render() or "schema_uri_not_registered" in e.render() for e in errs))
+            self.assertFalse(any("unresolved_canonical_semantic" in e.render() for e in errs))
+            self.assertFalse(any("kind=evidence" in e.render() for e in errs))
+
+    def test_canonical_ref_typed_sibling_still_flags_e210_when_unresolved(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir()
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
+                encoding="utf-8",
+            )
+            (root / "tools").mkdir()
+            (root / "schema").mkdir()
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "vc:test": "schema/test.schema.json",
+                        "vc:core:atoms": "schema/atoms.schema.json",
+                        "vc:core:collections": "schema/collections.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            repo_root = Path(__file__).resolve().parents[3]
+            (root / "schema" / "atoms.schema.json").write_text(
+                (repo_root / "schema" / "core" / "atoms.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "collections.schema.json").write_text(
+                (repo_root / "schema" / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "test.schema.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$id": "vc:test",
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string"},
+                            "status_ref": {
+                                "allOf": [
+                                    {"$ref": "vc:core:collections#canonicalRef"},
+                                    {"properties": {"kind": {"const": "status"}}},
+                                ]
+                            },
+                            "canonical_refs_used": {"type": "array"},
+                            "canonical_proposals": {"type": "array"},
+                            "canonical_conflicts": {"type": "array"},
+                        },
+                        "required": [
+                            "status",
+                            "canonical_refs_used",
+                            "canonical_proposals",
+                            "canonical_conflicts",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "spec").mkdir()
+            (root / "spec" / "sample.json").write_text(
+                json.dumps(
+                    {
+                        "$schema": "vc:test",
+                        "status": "passed",
+                        "canonical_refs_used": [],
+                        "canonical_proposals": [],
+                        "canonical_conflicts": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(str(root), str(root / "spec"), require_manifest_schema_registration=False)
+            self.assertFalse(any("schema_not_found" in e.render() or "schema_uri_not_registered" in e.render() for e in errs))
+            self.assertTrue(
+                any(
+                    "unresolved_canonical_semantic" in e.render()
+                    and "field=status" in e.render()
+                    and "kind=status" in e.render()
+                    for e in errs
+                ),
+                f"Expected E210 unresolved_canonical_semantic for status/status_ref, got: {[e.render() for e in errs]}",
+            )
+
     def test_can_require_manifest_schema_registration(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

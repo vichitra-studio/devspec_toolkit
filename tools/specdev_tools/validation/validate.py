@@ -370,14 +370,14 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                         "Set SPECDEV_REPLAY_DIFF_ERROR_MODE=error to force.",
                         file=_sys.stderr,
                     )
-                git_root = _detect_git_root(root)
-                base_ref = _resolve_replay_base_ref(git_root)
+                detected_git_root = _detect_git_root(root)
+                base_ref = _resolve_replay_base_ref(detected_git_root)
                 failures.extend(
                     check_forward_replay(
                         repo_root,
                         base_ref=base_ref,
                         diff_error_mode=mode,
-                        git_root=str(git_root),
+                        git_root=str(detected_git_root),
                         spec_root=spec_root or str(root / "spec"),
                     )
                 )
