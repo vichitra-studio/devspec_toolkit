@@ -58,6 +58,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W611",
             # Milestone ID in milestone_index not found in 14_roadmap.json.
             "W612",
+            # Upstream-backlog: ambiguity's impact[] matches no classifier rule.
+            "W613",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

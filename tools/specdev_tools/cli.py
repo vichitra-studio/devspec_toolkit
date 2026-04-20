@@ -351,6 +351,21 @@ def main():
     eic.add_argument("--repo-root", default=".")
     eic.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    ub = sub.add_parser(
+        "upstream-backlog",
+        help="Aggregate emergent_ambiguities across impl_context plans by implicated upstream step (read-only)",
+    )
+    ub.add_argument("spec_dir")
+    ub.add_argument("--repo-root", default=".")
+    ub.add_argument("--spec-root", default=None,
+                    help="(reserved; no effect in MVP — accepted for submodule CLI symmetry)")
+    ub.add_argument("--severity", choices=["low", "medium", "high", "critical"], default="low",
+                    help="Minimum severity (default: low)")
+    ub.add_argument("--status", choices=["open", "resolved", "all"], default="open",
+                    help="Status filter (default: open = status != resolved)")
+    ub.add_argument("--json", action="store_true", dest="json_output",
+                    help="Emit JSON instead of plain text")
+
     cca = sub.add_parser("canon-accept", help="Promote canonical_proposals from a spec file to canon/manifest.json")
     cca.add_argument("--from", dest="spec_file", required=True, help="Path to spec file (e.g., spec/03_glossary.json)")
     cca.add_argument("--namespace", default="cn:project:", help="Target namespace prefix (default: cn:project:)")
@@ -1634,6 +1649,23 @@ def main():
             _json_exit(errs, "extraction-intent-check")
         else:
             _print_and_exit_if_errors(errs)
+
+    elif args.cmd == "upstream-backlog":
+        from .analysis.upstream_backlog import run as run_upstream_backlog
+        spec_dir_abs = os.path.abspath(args.spec_dir)
+        stdout_payload, stderr_lines, exit_code = run_upstream_backlog(
+            spec_dir=spec_dir_abs,
+            repo_root=args.repo_root,
+            spec_root=args.spec_root,
+            severity=args.severity,
+            status=args.status,
+            json_output=args.json_output,
+        )
+        for line in stderr_lines:
+            print(line, file=sys.stderr)
+        if stdout_payload:
+            print(stdout_payload)
+        sys.exit(exit_code)
 
     elif args.cmd == "canon-accept":
         from .canonical.accept import run_canon_accept

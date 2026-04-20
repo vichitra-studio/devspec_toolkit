@@ -188,6 +188,10 @@ ERROR_CODES = {
     # ownership, prefix, and scope drift detection are silently skipped for IDs
     # that don't exist in the roadmap.
     "W612": "ANCHOR_PHANTOM_MILESTONE",
+    # Upstream backlog: ambiguity's impact[] matches none of the 4 classifier
+    # rules (see analysis/upstream_backlog.py). Informational only — never
+    # promoted (deliberately excluded from PROMOTABLE_PAIRS).
+    "W613": "UPSTREAM_BACKLOG_UNCLASSIFIED",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
