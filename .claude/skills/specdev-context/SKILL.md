@@ -209,6 +209,23 @@ Write the complete JSON in one operation. The schema validator requires a comple
 Prefer `Edit` for simple replacements. Use `./tools/run_specdev.sh json` when the edit requires
 array manipulation or targeting an entry by ID within a nested array.
 
+## Upstream drift
+
+When a checklist assertion would diverge from the cited spec entry — or when the same canonical id resolves to different text in different source files — do not silently encode the code-side value. Log it as a `plan.ambiguities[]` entry (16a) or `execution.emergent_ambiguities[]` (16b+) and let the upstream-revision cycle reconcile it. Schema and field requirements live in `prompt_16a_impl_planner.md` and the step-16 schema.
+
+Before minting a new entry, check sibling plans in `spec/impl_context/` — reuse the id or cross-reference if the drift is already logged.
+
+Each entry's `impact[]` must include the upstream spec file path (e.g. `spec/04_fr_list.json:<id>`) so `upstream-backlog` can route it. For duplicate-id drift, include every definition site.
+
+After authoring, verify routing:
+
+```bash
+./tools/run_specdev.sh upstream-backlog <spec_dir> \
+  --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+Any entry from this plan landing in `Unclassified` means `impact[]` lacks a step-routable path.
+
 ## Error handling
 
 - **Command exits non-zero**: show stderr and stop.
