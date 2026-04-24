@@ -142,6 +142,28 @@ def make_milestone_plan(
     return path
 
 
+def make_object_test_command(
+    command: str,
+    *,
+    command_ref: Optional[dict[str, Any]] = None,
+    description: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build an object-form ``review_requirements.test_commands[]`` entry.
+
+    Schema (``schema/16_impl_context.schema.json``) permits each entry to be
+    either a plain string or an object with ``command`` (string) plus optional
+    ``command_ref`` (canonicalRef object, e.g. ``{"id": "cn:project:command:jq"}``)
+    and ``description`` fields. The validator only consumes ``command``;
+    ``command_ref`` resolution is out of scope for step_16.
+    """
+    entry: dict[str, Any] = {"command": command}
+    if command_ref is not None:
+        entry["command_ref"] = command_ref
+    if description is not None:
+        entry["description"] = description
+    return entry
+
+
 def make_checklist_item(
     item_id: str,
     spec_ref_id: str,

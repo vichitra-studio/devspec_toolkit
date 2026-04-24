@@ -25,6 +25,7 @@ from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
 from ..core.registry import SchemaRegistry
+from ..validation.linter_utils import is_resolved_canonical_ref as _is_resolved_ref
 
 
 def validate_canonical_integrity(
@@ -447,13 +448,6 @@ def _is_canonical_ref_schema(node: Any) -> bool:
             if _is_canonical_ref_schema(sub):
                 return True
     return False
-
-
-def _is_resolved_ref(value: Any) -> bool:
-    if not isinstance(value, dict):
-        return False
-    cid = value.get("id")
-    return isinstance(cid, str) and cid.startswith("cn:")
 
 
 def _kind_for_ref_key(ref_key: str) -> str | None:

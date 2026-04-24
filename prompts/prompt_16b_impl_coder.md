@@ -50,7 +50,7 @@ You must populate the `execution` JSON object according to these specific defini
         ```json
         "evidence": "tests/api/test_auth.py::test_login_success PASSED ... [100%]"
         ```
-*   *Rule*: You **MUST** run every command listed in `plan.review_requirements.test_commands`.
+*   *Rule*: You **MUST** run every command listed in `plan.review_requirements.test_commands`. For object-form entries, run the value of the `.command` field (not the dict literal).
 *   *Rule*: Do NOT say "not run" without a concrete blocker explanation.
 *   *Rule*: **Verbatim Output**: Copy exact stdout/stderr. Do NOT paraphrase.
 *   *Rule*: **Success Markers**: Output MUST contain `PASSED`, `OK`, `SUCCESS`, or exit code 0.
@@ -79,13 +79,16 @@ You must populate the `execution` JSON object according to these specific defini
     *   *Rule*: Only include an ID here if its `linked_test_expectation` command passed.
 *   `passed_test_commands`: List of the specific test commands that passed.
     *   *Expectation*: This allows the reviewer to trace each requirement to a passed test.
+    *   *Rule (object-form `test_commands`)*: when an entry in `plan.review_requirements.test_commands[]` uses object form (`{ command, command_ref?, description? }`), record the **`.command` string** here — never the full object. Do NOT flatten or rewrite object-form entries in the plan; only the comparison string belongs in `passed_test_commands`.
 
 ## 4. `execution.emergent_ambiguities` (Blockers)
-*   Log any blockers or spec issues you discovered.
-    *   `id`: `AMB-NEW-X`.
-    *   `description`: The issue.
-    *   `severity`: `blocking` or `non_blocking`.
-    *   `impact`: Which checklist IDs are affected?
+
+Field shape is in `schema/16_impl_context.schema.json` under `execution.emergent_ambiguities[]`. Decision rules below.
+
+*   Log any blocker or spec issue discovered during execution.
+*   **Severity scoping**: this enum is execution-phase. It is distinct from `plan.ambiguities` severity and from the anchor's `severityLevel`. Do not mix them.
+*   The id namespace is `amb-new-*` (kebab-case, lowercase — `crossCycleAmbiguityItem.id` resolves to `kebabId`). Reserve `amb-*` (without the `new-` infix) for planning-phase ids in `plan.ambiguities`.
+*   Capture which checklist ids are affected so the reviewer (16c) can scope remediation.
 
 ## 5. `execution.config_validation` (Ops Rigor)
 *   Applies when implementing `plan.delivery`, `plan.drift`, or `plan.security`.

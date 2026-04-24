@@ -1,6 +1,8 @@
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 from specdev_tools.validation.hallucination_lint import lint_hallucinations, _extract_path_from_string
@@ -388,6 +390,43 @@ class HallucinationLintTests(unittest.TestCase):
                 "missing test file in playwright command must fire E530",
             )
 
+    def test_linked_test_expectation_bash_c_wrapped_no_error(self):
+        """Drift #2 (linked_test_expectation side): `bash -c "<cmd>"` wrap must
+        unwrap before path extraction, so the inner test path is checked and no
+        spurious E530 fires when the file exists."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "tests").mkdir(parents=True)
+            (root / "tests" / "wrapped.test.js").write_text("// test", encoding="utf-8")
+            cmd = 'bash -c "npx playwright test tests/wrapped.test.js"'
+            (root / "spec" / "16a_plan.json").write_text(
+                json.dumps({"linked_test_expectation": cmd}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertFalse(
+                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
+                "bash -c wrap must not break linked_test_expectation path extraction",
+            )
+
+    def test_linked_test_expectation_bash_c_wrapped_missing_fires(self):
+        """`bash -c "..."` wrap unwraps, then existence check still fires E530
+        when the inner path is missing — wrapping is not an escape from the check."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            cmd = 'bash -c "npx playwright test tests/does_not_exist.test.js"'
+            (root / "spec" / "16a_plan.json").write_text(
+                json.dumps({"linked_test_expectation": cmd}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertTrue(
+                any("LINKED_TEST_FILE_NOT_FOUND" in e for e in render_errors(errs)),
+                "missing inner path under bash -c wrap must still fire E530",
+            )
+
     def test_linked_test_expectation_compound_command_no_error(self):
         """Compound shell commands (&&) must not fire E530 — there is no single
         authoritative test-file path to validate in a compound command."""
@@ -545,6 +584,46 @@ class ExtractPathFromStringTests(unittest.TestCase):
         )
         self.assertEqual(result, "tests/bootstrap.test.js")
 
+    def test_bash_c_double_quoted_wrapper_unwrapped(self):
+        """`bash -c "..."` wrap must not break path extraction. Drift #2 (linked_test_expectation side)."""
+        result = _extract_path_from_string(
+            'bash -c "npx playwright test tests/bootstrap.test.js"'
+        )
+        self.assertEqual(result, "tests/bootstrap.test.js")
+
+    def test_bash_c_single_quoted_wrapper_unwrapped(self):
+        result = _extract_path_from_string(
+            "bash -c 'npx playwright test tests/bootstrap.test.js'"
+        )
+        self.assertEqual(result, "tests/bootstrap.test.js")
+
+    def test_sh_c_wrapper_unwrapped(self):
+        result = _extract_path_from_string(
+            'sh -c "vitest run src/foo.test.js"'
+        )
+        self.assertEqual(result, "src/foo.test.js")
+
+    def test_bash_c_with_compound_inner_returns_empty(self):
+        """`bash -c "cd theme && npx ..."` unwraps to compound; returns '' (no single path)."""
+        result = _extract_path_from_string(
+            'bash -c "cd theme && npx playwright test foo.test.js"'
+        )
+        self.assertEqual(result, "")
+
+    def test_bash_c_with_bare_path_inner(self):
+        result = _extract_path_from_string('bash -c "tests/standalone.test.js"')
+        self.assertEqual(result, "tests/standalone.test.js")
+
+    def test_bash_c_malformed_quoting_falls_through(self):
+        """Mismatched/missing quotes after `bash -c ` still extract the inner unquoted text."""
+        result = _extract_path_from_string('bash -c "npx playwright test foo.test.js')
+        # Inner kept as-is (leading quote retained); first path-like token wins.
+        self.assertEqual(result, "foo.test.js")
+
+    def test_no_shell_wrapper_unchanged(self):
+        """Strings that do not start with `bash -c ` / `sh -c ` are unaffected."""
+        self.assertEqual(_extract_path_from_string("src/real.py"), "src/real.py")
+
 
 class SpecCheckGitRootForwardingTests(unittest.TestCase):
     """Integration test: run_spec_check must forward git_root to lint_hallucinations.
@@ -607,6 +686,370 @@ class SpecCheckGitRootForwardingTests(unittest.TestCase):
                 len(e530), 0,
                 "without git_root, host-repo file must trigger E530 (file not under toolkit root)",
             )
+
+
+class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
+    """Drift #2 — ref-bypass on test_commands[].command and project-tier allowlist.
+
+    Assertions filter on ``SpecError.code == "E530"`` (not substring matches on
+    rendered text) so the rendered message format can evolve without breaking tests.
+    """
+
+    # --- helpers ---------------------------------------------------------
+
+    def _write_step16(self, spec_dir: Path, command_entry: dict) -> None:
+        # Nest under the real schema shape (plan.review_requirements.test_commands)
+        # so the fixture mirrors a valid 16a artifact. hallucination-lint walks the
+        # tree generically, so structural depth does not affect verb-prefix checks —
+        # this nesting is for fixture fidelity, not lint behavior.
+        (spec_dir / "16_impl_context.json").write_text(
+            json.dumps({
+                "plan": {
+                    "review_requirements": {"test_commands": [command_entry]},
+                },
+            }),
+            encoding="utf-8",
+        )
+
+    def _write_ci_gates(self, spec_dir: Path, commands: list[str]) -> None:
+        (spec_dir / "12_ci_gates.json").write_text(
+            json.dumps({
+                "jobs": [{
+                    "job_id": "job-1",
+                    "steps": [
+                        {"id": f"s-{i}", "command": cmd}
+                        for i, cmd in enumerate(commands, start=1)
+                    ],
+                }]
+            }),
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _e530_for_prefix(errs, prefix: str) -> list:
+        """Return E530 errors whose message names *prefix* as the offending verb."""
+        # Message format: "INVENTED_ENUM_OR_ID {rel}:{p}={prefix} ..."
+        return [e for e in errs if e.code == "E530" and f"={prefix} " in e.message + " "]
+
+    # --- ref-bypass behavior --------------------------------------------
+
+    def test_resolved_command_ref_bypasses_e530(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(
+                root / "spec",
+                {"command": "jq -e '.foo'",
+                 "command_ref": {"id": "cn:project:command:jq"}},
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(
+                self._e530_for_prefix(errs, "jq"), [],
+                f"resolved command_ref must bypass E530; got: {[e.message for e in errs]}",
+            )
+
+    def test_well_formed_but_unresolvable_cn_id_also_bypasses_by_design(self):
+        """A `cn:` prefixed id that does NOT resolve to any canon entry still bypasses
+        verb-validation here. canonical-integrity (E110) is responsible for catching
+        the unresolvable id; hallucination-lint deliberately does not duplicate that
+        check. This test pins that documented design choice — change it only if the
+        contract between the two linters changes."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_step16(
+                root / "spec",
+                {"command": "jq -e '.foo'",
+                 "command_ref": {"id": "cn:project:command:totally-invented-no-match"}},
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(
+                self._e530_for_prefix(errs, "jq"), [],
+                "Per design, well-formed cn: id bypasses E530 even when unresolvable; "
+                "canonical-integrity owns ref-resolution (E110)."
+            )
+
+    def test_unresolved_command_ref_still_fires_e530(self):
+        """Variants where the bypass condition is NOT met must still trigger E530."""
+        for label, ref_value in (
+            ("string-not-dict",     "cn:project:command:jq"),
+            ("dict-missing-id",     {"label": "jq"}),
+            ("id-without-cn-prefix", {"id": "project:command:jq"}),
+            ("id-not-a-string",     {"id": 123}),
+            ("ref-is-list",         ["cn:project:command:jq"]),
+            ("ref-is-int",          42),
+            ("ref-is-none",         None),
+        ):
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as td:
+                    root = Path(td)
+                    (root / "spec").mkdir()
+                    self._write_step16(
+                        root / "spec",
+                        {"command": "jq -e '.foo'", "command_ref": ref_value},
+                    )
+                    errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+                    self.assertNotEqual(
+                        self._e530_for_prefix(errs, "jq"), [],
+                        f"{label}: ref must NOT bypass E530; got errors: {[e.message for e in errs]}",
+                    )
+
+    # --- project-tier allowlist -----------------------------------------
+
+    def test_project_tier_allowlist_extends_toolkit_allowlist(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            (project_canon / "command_prefixes.json").write_text(
+                json.dumps({"allowed_prefixes": ["yq"]}),
+                encoding="utf-8",
+            )
+            self._write_ci_gates(root / "spec", ["yq eval '.x' file.yaml", "absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(project_canon),
+            )
+            self.assertEqual(
+                self._e530_for_prefix(errs, "yq"), [],
+                f"yq must be allowed via project allowlist; got: {[e.message for e in errs]}",
+            )
+            self.assertNotEqual(
+                self._e530_for_prefix(errs, "absentverb"), [],
+                f"absentverb must still fire E530; got: {[e.message for e in errs]}",
+            )
+
+    def test_missing_project_allowlist_file_is_no_op(self):
+        """When no project allowlist file exists, only the toolkit defaults apply."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()  # exists, but no command_prefixes.json
+            self._write_ci_gates(root / "spec", ["npm test", "absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(project_canon),
+            )
+            self.assertEqual(
+                self._e530_for_prefix(errs, "npm"), [],
+                "npm is in toolkit defaults; missing project file must not affect that.",
+            )
+            self.assertNotEqual(
+                self._e530_for_prefix(errs, "absentverb"), [],
+                "absentverb is in neither tier; must still fire E530.",
+            )
+
+    def test_malformed_project_allowlist_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            cfg = project_canon / "command_prefixes.json"
+            cfg.write_text("{not json", encoding="utf-8")
+            self._write_ci_gates(root / "spec", ["npm test"])
+            stderr_buf = io.StringIO()
+            with redirect_stderr(stderr_buf):
+                errs = lint_hallucinations(
+                    str(root / "spec"),
+                    repo_root=str(root),
+                    project_canon_dir=str(project_canon),
+                )
+            self.assertEqual(
+                self._e530_for_prefix(errs, "npm"), [],
+                f"npm must remain allowed when project allowlist is malformed; got: {[e.message for e in errs]}",
+            )
+            stderr_text = stderr_buf.getvalue()
+            self.assertIn(str(cfg), stderr_text,
+                "loader must surface a stderr warning naming the malformed file")
+            self.assertIn("JSONDecodeError", stderr_text,
+                "loader must name the underlying error type for diagnosability")
+
+    def test_non_list_allowed_prefixes_warns_and_skips(self):
+        """`allowed_prefixes` set to a non-list value (e.g. dict) must be skipped
+        with a stderr warning rather than silently producing no effect."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            cfg = project_canon / "command_prefixes.json"
+            cfg.write_text(
+                json.dumps({"allowed_prefixes": {"yq": True}}),
+                encoding="utf-8",
+            )
+            self._write_ci_gates(root / "spec", ["npm test"])
+            stderr_buf = io.StringIO()
+            with redirect_stderr(stderr_buf):
+                errs = lint_hallucinations(
+                    str(root / "spec"),
+                    repo_root=str(root),
+                    project_canon_dir=str(project_canon),
+                )
+            self.assertEqual(self._e530_for_prefix(errs, "npm"), [])
+            stderr_text = stderr_buf.getvalue()
+            self.assertIn(str(cfg), stderr_text)
+            self.assertIn("allowed_prefixes", stderr_text)
+
+    def test_description_key_in_allowlist_is_not_treated_as_prefix(self):
+        """Top-level keys other than `allowed_prefixes` (e.g. `_description`) must be
+        ignored by the loader, not silently registered as a verb."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            (project_canon / "command_prefixes.json").write_text(
+                json.dumps({
+                    "_description": "absentverb",  # must NOT become an allowed prefix
+                    "allowed_prefixes": ["yq"],
+                }),
+                encoding="utf-8",
+            )
+            self._write_ci_gates(root / "spec", ["absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(project_canon),
+            )
+            self.assertNotEqual(
+                self._e530_for_prefix(errs, "absentverb"), [],
+                "_description key must not become an allowed prefix.",
+            )
+
+    def test_project_allowlist_dedups_with_toolkit_defaults(self):
+        """Listing a verb already present in toolkit defaults (e.g. `npm`) is a no-op,
+        not a double-register or error."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            (project_canon / "command_prefixes.json").write_text(
+                json.dumps({"allowed_prefixes": ["npm"]}),  # duplicate of toolkit default
+                encoding="utf-8",
+            )
+            self._write_ci_gates(root / "spec", ["npm test"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(project_canon),
+            )
+            self.assertEqual(
+                self._e530_for_prefix(errs, "npm"), [],
+                "duplicate registration must not produce E530.",
+            )
+
+    # --- bash -c documented behavior ------------------------------------
+
+    def test_bash_dash_c_remains_legal_regression(self):
+        """`bash -c "..."` is legal because `bash` is in the toolkit allowlist."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_ci_gates(root / "spec", ["bash -c \"jq -e '.'\""])
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(
+                [e for e in errs if e.code == "E530"], [],
+                f"bash -c must remain legal; got: {[e.message for e in errs]}",
+            )
+
+    def test_bash_dash_c_does_not_recurse_into_inner_verb(self):
+        """Pin the documented limitation: hallucination-lint inspects only the leading
+        verb of the command string. It does NOT parse `bash -c "<inner>"` to validate
+        the inner verb. This is why `bash -c` is described as "legal but discouraged"
+        — it silently bypasses verb-prefix validation. Change this test only if the
+        linter gains nested-command parsing."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_ci_gates(root / "spec", ["bash -c \"absentverb foo\""])
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(
+                self._e530_for_prefix(errs, "absentverb"), [],
+                "linter intentionally does not recurse into bash -c; inner verbs are unchecked.",
+            )
+
+    # --- ref-bypass scope is generic (any node, not just test_commands) ---
+
+    def test_command_ref_bypass_applies_to_ci_gates_step(self):
+        """`_scan_node` is generic: a sibling `command_ref` on any node containing
+        a `command` string bypasses E530, including Step 12 ci_gates steps. This
+        pins the documented scope so a future scope-narrowing change is caught."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "12_ci_gates.json").write_text(
+                json.dumps({
+                    "jobs": [{
+                        "job_id": "job-1",
+                        "steps": [{
+                            "id": "s-1",
+                            "command": "absentverb run",
+                            "command_ref": {"id": "cn:project:command:absentverb"},
+                        }],
+                    }]
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            self.assertEqual(
+                self._e530_for_prefix(errs, "absentverb"), [],
+                "ci_gates step with sibling command_ref must bypass E530 (same rule as test_commands).",
+            )
+
+    # --- project_canon_dir edge cases ---
+
+    def test_project_canon_dir_empty_string_is_no_op(self):
+        """Empty string `project_canon_dir` is treated as falsy — only toolkit defaults apply."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_ci_gates(root / "spec", ["npm test", "absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"), repo_root=str(root), project_canon_dir="",
+            )
+            self.assertEqual(self._e530_for_prefix(errs, "npm"), [])
+            self.assertNotEqual(self._e530_for_prefix(errs, "absentverb"), [])
+
+    def test_project_canon_dir_nonexistent_path_is_no_op(self):
+        """`project_canon_dir` pointing at a missing directory must not crash."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            self._write_ci_gates(root / "spec", ["npm test", "absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(root / "does-not-exist"),
+            )
+            self.assertEqual(self._e530_for_prefix(errs, "npm"), [])
+            self.assertNotEqual(self._e530_for_prefix(errs, "absentverb"), [])
+
+    def test_project_allowlist_missing_allowed_prefixes_key_is_no_op(self):
+        """A `command_prefixes.json` lacking the `allowed_prefixes` key falls back to
+        defaults silently — `data.get('allowed_prefixes', [])` returns `[]`."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            project_canon = root / "spec" / "canon"
+            project_canon.mkdir()
+            (project_canon / "command_prefixes.json").write_text(
+                json.dumps({"_description": "no allowed_prefixes key"}),
+                encoding="utf-8",
+            )
+            self._write_ci_gates(root / "spec", ["npm test", "absentverb run"])
+            errs = lint_hallucinations(
+                str(root / "spec"),
+                repo_root=str(root),
+                project_canon_dir=str(project_canon),
+            )
+            self.assertEqual(self._e530_for_prefix(errs, "npm"), [])
+            self.assertNotEqual(self._e530_for_prefix(errs, "absentverb"), [])
 
 
 if __name__ == "__main__":

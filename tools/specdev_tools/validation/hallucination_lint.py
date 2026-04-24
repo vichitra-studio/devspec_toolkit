@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from typing import Any
 
 from ..canonical.lint import lint_canon_dirs
@@ -12,6 +13,7 @@ from ..core.registry import derive_allowed_upstream
 from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
     collect_ids_and_refs,
+    is_resolved_canonical_ref,
     iter_json,
     load_canonical_stages,
     tokenize_free_text,
@@ -63,7 +65,7 @@ def lint_hallucinations(
     canon = CanonicalRegistry.load(root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
     if canon.load_errors:
         return list(dict.fromkeys(canon.load_errors))
-    known_command_prefixes = _load_command_prefixes(root)
+    known_command_prefixes = _load_command_prefixes(root, project_canon_dir=project_canon_dir)
     # Load canonical stages; fall back to hardcoded KNOWN_STAGES
     canon_stages = load_canonical_stages(canon_root)
     active_stages = canon_stages if canon_stages else KNOWN_STAGES
@@ -136,9 +138,21 @@ def _scan_node(
                         if isinstance(item, str) and not _is_valid_unit(item, canon):
                             errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}"))
             if key == "command" and isinstance(value, str):
-                prefix = value.strip().split(" ", 1)[0]
-                if prefix and prefix not in known_command_prefixes and not canon.resolve_alias("command", prefix):
-                    errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}={prefix}"))
+                # Skip prefix check when a sibling command_ref asserts a canon ref.
+                # We DO NOT re-validate that the ref resolves — verb validation is
+                # intentionally deferred. canonical-integrity (E210/E110) owns *ref*
+                # resolution and will fail loudly if the asserted id is unresolvable.
+                if not is_resolved_canonical_ref(node.get("command_ref")):
+                    prefix = value.strip().split(" ", 1)[0]
+                    if prefix and prefix not in known_command_prefixes and not canon.resolve_alias("command", prefix):
+                        errs.append(make_error(
+                            "E530",
+                            f"INVENTED_ENUM_OR_ID {rel}:{p}={prefix} "
+                            f"Command prefix '{prefix}' is not in the allowlist. "
+                            f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
+                            f"under <spec-root>/canon/kinds/command.json, "
+                            f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
+                        ))
             if key == "pr_rules" and isinstance(value, list):
                 allowed_pr_rules = {
                     "validate", "validate-all", "matrix", "fixtures-lint", "invariants-check",
@@ -163,26 +177,49 @@ def _is_valid_unit(value: str, canon: CanonicalRegistry) -> bool:
     return " ".join(value.strip().lower().split()) in KNOWN_UNITS
 
 
-def _load_command_prefixes(repo_root: str) -> set[str]:
+def _load_command_prefixes(
+    repo_root: str,
+    project_canon_dir: str | None = None,
+) -> set[str]:
     prefixes = set(DEFAULT_COMMAND_PREFIXES)
-    cfg_path = os.path.join(repo_root, "tools", "command_prefixes.json")
+    _merge_prefixes_from_file(
+        os.path.join(repo_root, "tools", "command_prefixes.json"),
+        prefixes,
+    )
+    if project_canon_dir:
+        _merge_prefixes_from_file(
+            os.path.join(project_canon_dir, "command_prefixes.json"),
+            prefixes,
+        )
+    return prefixes
+
+
+def _merge_prefixes_from_file(cfg_path: str, prefixes: set[str]) -> None:
     if not os.path.exists(cfg_path):
-        return prefixes
+        return
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, json.JSONDecodeError, ValueError, TypeError):
-        return prefixes
-
+    except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
+        print(
+            f"warning: hallucination-lint failed to load command-prefix allowlist "
+            f"at {cfg_path} ({type(exc).__name__}); using defaults only.",
+            file=sys.stderr,
+        )
+        return
     values = data.get("allowed_prefixes", [])
     if not isinstance(values, list):
-        return prefixes
+        print(
+            f"warning: hallucination-lint ignored {cfg_path}: "
+            f"'allowed_prefixes' must be a list of strings.",
+            file=sys.stderr,
+        )
+        return
     for item in values:
         if isinstance(item, str):
             token = item.strip().split(" ", 1)[0]
             if token:
                 prefixes.add(token)
-    return prefixes
 
 
 # D13: Free-text canonical term scanning
@@ -241,10 +278,30 @@ def _collect_values_under_key(obj: Any, target_key: str) -> list[str]:
     return results
 
 
+def _unwrap_shell_c(value: str) -> str:
+    """Strip a leading ``bash -c "..."`` / ``sh -c '...'`` wrapper.
+
+    Returns the inner command unquoted, or ``value`` unchanged if no recognised
+    wrapper is present or the surrounding quotes are malformed. Authors who wrap
+    a test invocation in ``bash -c`` to satisfy the canonical command-prefix
+    allowlist should not be penalised by path extraction; unwrap before parsing.
+    """
+    s = value.strip()
+    for prefix in ("bash -c ", "sh -c "):
+        if s.startswith(prefix):
+            inner = s[len(prefix):].strip()
+            if len(inner) >= 2 and inner[0] in ("\"", "'") and inner[-1] == inner[0]:
+                return inner[1:-1]
+            return inner
+    return value
+
+
 def _extract_path_from_string(value: str) -> str:
     """Extract the file path portion from a composite string.
 
-    Handles four cases:
+    Handles five cases:
+    - Wrapped invocation ``bash -c "..."`` / ``sh -c '...'``: unwrap the inner
+      command first so subsequent parsing sees the unquoted invocation.
     - Em-dash composite "path/to/file.ext \u2014 description": splits on the
       em-dash (with or without surrounding spaces) and returns the left side.
     - Compound shell command containing &&, ||, or " ; ": returns "" because
@@ -259,6 +316,8 @@ def _extract_path_from_string(value: str) -> str:
     Returns "" when no path can be extracted so callers receive a falsy
     value that _looks_like_path rejects, preventing a bogus os.path.exists call.
     """
+    # Unwrap shell -c wrappers before any other parsing.
+    value = _unwrap_shell_c(value)
     # Em-dash separator: path is everything before the em-dash (spaces optional).
     if "\u2014" in value:
         return value.split("\u2014")[0].strip()

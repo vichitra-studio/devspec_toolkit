@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The **AI Spec Driven Development Toolkit** is a schema-first, AI-assisted workflow that turns spec → implementation into a deterministic pipeline. It is typically vendored as a git submodule at `<product-repo>/devspec_toolkit/` beside the host repo's live `spec/` directory.
 
-Current version: **0.5.0** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
+Current version: **0.5.1** (see `tools/pyproject.toml`). Specs track the toolkit version they were written against in `spec/specdev_version`.
 
 ---
 
@@ -253,6 +253,7 @@ Agent protocol metadata lives in `docs/agents/manifest.json`.
 - **Step 15 failures**: `method` must be one of GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD; no duplicate `interface_ref`
 - **Glossary failures**: `terms` needs ≥1 item; definitions >20 chars; `domain` is kebab-case; no empty strings
 - **Step 09 failures**: `tech_stack` must be an object (not array); `milestones` need a `deliverables` array
+- **E530 INVENTED_ENUM_OR_ID on a `command` field**: hallucination-lint restricts the leading verb of any `command` string to its allowlist. Resolve via either (a) attach a sibling `command_ref` whose `id` is a `cn:`-prefixed string (typically `cn:project:command:<verb>` registered in `<spec-root>/canon/kinds/command.json`) — hallucination-lint bypasses the prefix check on shape alone; resolution of the ref is enforced separately by `canonical-integrity` (E110/E210), so register the entry to keep that check green; or (b) extend the project-level allowlist at `<spec-root>/canon/command_prefixes.json` (`{"allowed_prefixes": ["yq", "kubectl", ...]}`) which is merged with the toolkit default. `bash -c "<inner>"` wrapping is legal but discouraged.
 
 ---
 
@@ -276,7 +277,7 @@ These flags are **not accepted on every command** (e.g. `context`, `json`, `ai-h
   --git-root .
 ```
 
-- `--spec-root ./spec` — lets canonical-lint / canonical-integrity discover project-tier canon under `./spec/canon/` (in addition to toolkit-core canon under `./devspec_toolkit/canon/`).
+- `--spec-root ./spec` — lets canonical-lint / canonical-integrity discover project-tier canon under `./spec/canon/` (in addition to toolkit-core canon under `./devspec_toolkit/canon/`). Also enables hallucination-lint to merge the project-level command-prefix allowlist at `./spec/canon/command_prefixes.json` with the toolkit default at `tools/command_prefixes.json`.
 - `--git-root .` — points forward-replay and governance-check at the host repo's git history instead of the submodule's.
 
 If a command rejects these flags as "unrecognized arguments", it simply doesn't need them — drop the flags and re-run.

@@ -1,10 +1,19 @@
 import unittest
 import os
+import sys
 import json
 import tempfile
 from pathlib import Path
 
 from specdev_tools.validation.validate import validate_file
+
+# tests/integration/ has no __init__.py; add it to sys.path so factory modules
+# next to this file can be imported by name (matches test_step_16_anchor.py).
+_INTEGRATION_DIR = Path(__file__).resolve().parent
+if str(_INTEGRATION_DIR) not in sys.path:
+    sys.path.insert(0, str(_INTEGRATION_DIR))
+
+from _anchor_factories import make_object_test_command  # noqa: E402
 
 class TestStep16(unittest.TestCase):
     def setUp(self):
@@ -2206,6 +2215,227 @@ class TestStep16(unittest.TestCase):
             any("npm test" in e.message and "passed_test_commands" in e.message for e in e302_errors),
             f"Expected E302 for 'npm test' not in passed_test_commands. Got E302: {[e.message for e in e302_errors]}"
         )
+
+    # --- Object-form test_commands tests (E301 + E302) ---
+
+    def _run_step16_validate(self, data):
+        """Helper: write *data* to a temp 16_impl_context.json and run validate_step_16."""
+        from specdev_tools.validation.validators.step_16 import validate_step_16
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            return validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+    def _base_step16_artifact(
+        self,
+        *,
+        artifact_id="step-objform",
+        summary="Object-form test_commands.",
+        test_commands=None,
+        execution_results=None,
+        passed_test_commands=None,
+        review=None,
+    ):
+        """Minimal valid-shape Step 16 artifact for E301/E302 tests.
+
+        All fields not relevant to a test get sensible defaults; callers override
+        only what they need. Keeps each test focused on the behavior under check
+        instead of repeating ~50 lines of plan/execution scaffolding.
+        """
+        data = {
+            "$schema": "vc:16-impl-context",
+            "id": artifact_id,
+            "owner": "api",
+            "created_at": "2024-01-01T00:00:00Z",
+            "plan": {
+                "status": "active",
+                "summary": {
+                    "functional_summary": summary,
+                    "scope_in": ["core"], "scope_out": [], "target_file_patterns": [],
+                },
+                "spec_alignment": {
+                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
+                    "checklist": [],
+                },
+                "docs_impact": {"status": "not_required", "rationale": "No changes."},
+                "review_requirements": {"test_commands": test_commands or []},
+            },
+            "execution": {
+                "execution_results": execution_results or [],
+                "critical_evidence": {
+                    "passed_test_commands": passed_test_commands or [],
+                    "satisfied_checklist_ids": [],
+                },
+            },
+            "canonical_refs_used": [],
+        }
+        if review is not None:
+            data["review"] = review
+        return data
+
+    def test_e301_object_form_test_commands_pass_when_all_commands_executed(self):
+        """E301 must NOT fire when object-form test_commands all appear in execution_results."""
+        data = self._base_step16_artifact(
+            artifact_id="step-e301-objform-pass",
+            summary="Object-form test_commands all executed.",
+            test_commands=[
+                make_object_test_command("pytest tests/", description="unit tests"),
+                make_object_test_command("npm test"),
+            ],
+            execution_results=[
+                {"command": "pytest tests/", "status": "passed", "output": "ok"},
+                {"command": "npm test", "status": "passed", "output": "ok"},
+            ],
+            passed_test_commands=["pytest tests/", "npm test"],
+        )
+        errors = self._run_step16_validate(data)
+        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
+        self.assertEqual(e301, [], f"Expected no E301 MISSING_PROOF_CLOSURE; got: {[e.message for e in e301]}")
+
+    def test_e301_object_form_test_commands_fire_when_command_missing(self):
+        """E301 fires when an object-form test_commands entry lacks an execution_results match."""
+        data = self._base_step16_artifact(
+            artifact_id="step-e301-objform-fail",
+            summary="Object-form test_commands with one missing.",
+            test_commands=[
+                make_object_test_command("pytest tests/"),
+                make_object_test_command("npm test"),
+            ],
+            execution_results=[
+                {"command": "pytest tests/", "status": "passed", "output": "ok"},
+            ],
+            passed_test_commands=["pytest tests/"],
+        )
+        errors = self._run_step16_validate(data)
+        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
+        self.assertTrue(
+            any("npm test" in e.message for e in e301),
+            f"Expected E301 MISSING_PROOF_CLOSURE for 'npm test'; got: {[e.message for e in e301]}"
+        )
+
+    def test_e302_object_form_test_commands_against_passed_test_commands(self):
+        """E302 fires for object-form test_commands missing from passed_test_commands when verdict=verified."""
+        def build(passed_list):
+            return self._base_step16_artifact(
+                artifact_id="step-e302-objform",
+                summary="Object-form test_commands E302 path.",
+                test_commands=[
+                    make_object_test_command("pytest tests/"),
+                    make_object_test_command("npm test"),
+                ],
+                execution_results=[
+                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
+                    {"command": "npm test", "status": "passed", "output": "ok"},
+                ],
+                passed_test_commands=passed_list,
+                review={
+                    "verdict": "verified",
+                    "findings": [],
+                    "fixture_status": {"ci_status": "green"},
+                },
+            )
+
+        # Both commands present in passed_test_commands → no E302 from this check.
+        errors_ok = self._run_step16_validate(build(["pytest tests/", "npm test"]))
+        e302_missing = [
+            e for e in errors_ok
+            if e.code == "E302" and "passed_test_commands" in e.message
+        ]
+        self.assertEqual(
+            e302_missing, [],
+            f"Expected no E302 passed_test_commands errors when all object-form commands listed; got: {[e.message for e in e302_missing]}"
+        )
+
+        # Drop 'npm test' from passed_test_commands → E302 must fire for 'npm test'.
+        errors_bad = self._run_step16_validate(build(["pytest tests/"]))
+        e302_bad = [
+            e for e in errors_bad
+            if e.code == "E302" and "npm test" in e.message and "passed_test_commands" in e.message
+        ]
+        self.assertTrue(
+            e302_bad,
+            f"Expected E302 for 'npm test' missing from passed_test_commands; got E302 errors: {[e.message for e in errors_bad if e.code == 'E302']}"
+        )
+
+    def test_string_form_and_object_form_test_commands_produce_identical_e301(self):
+        """Regression parity: a string-form entry and an equivalent object-form entry
+        must produce the same E301 (MISSING_PROOF_CLOSURE) outcome for the same command."""
+        def build(test_commands):
+            return self._base_step16_artifact(
+                artifact_id="step-parity",
+                summary="String/object parity check.",
+                test_commands=test_commands,
+                # 'npm test' deliberately missing → must fire E301 in both forms
+                execution_results=[
+                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
+                ],
+                passed_test_commands=["pytest tests/"],
+            )
+
+        string_form_errors = self._run_step16_validate(build([
+            "pytest tests/", "npm test",
+        ]))
+        object_form_errors = self._run_step16_validate(build([
+            make_object_test_command("pytest tests/"),
+            make_object_test_command("npm test"),
+        ]))
+
+        def e301_for(errors, needle):
+            return [e for e in errors
+                    if e.code == "E301"
+                    and "MISSING_PROOF_CLOSURE" in e.message
+                    and needle in e.message]
+
+        def e301_messages(errors):
+            return sorted(e.message for e in errors if e.code == "E301")
+
+        self.assertTrue(
+            e301_for(string_form_errors, "npm test"),
+            f"string-form must fire E301 for 'npm test'; got: {[e.message for e in string_form_errors if e.code == 'E301']}",
+        )
+        self.assertTrue(
+            e301_for(object_form_errors, "npm test"),
+            f"object-form must fire E301 for 'npm test'; got: {[e.message for e in object_form_errors if e.code == 'E301']}",
+        )
+        # Strict parity: full E301 message set must match between string and object form.
+        # Catches regressions where object form silently produces extra/missing E301s
+        # for any command (not just 'npm test').
+        self.assertEqual(
+            e301_messages(string_form_errors),
+            e301_messages(object_form_errors),
+            "string-form and object-form must produce the identical E301 message set.",
+        )
+
+    def test_mixed_string_and_object_test_commands_both_enforced(self):
+        """Mixed list (one string entry, one object entry) — both must be enforced
+        consistently by E301. Pins that there is no silent-skip for either form
+        when the two are interleaved."""
+        # An unrelated command was executed; neither 'pytest tests/' nor 'npm test'
+        # is in passed_commands → E301 must fire for both forms.
+        data = self._base_step16_artifact(
+            artifact_id="step-mixed",
+            summary="Mixed string+object test_commands.",
+            test_commands=[
+                "pytest tests/",                          # string form
+                make_object_test_command("npm test"),     # object form
+            ],
+            execution_results=[
+                {"command": "echo placeholder", "status": "passed", "output": "ok"},
+            ],
+            passed_test_commands=["echo placeholder"],
+        )
+        errors = self._run_step16_validate(data)
+        e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
+        self.assertTrue(any("pytest tests/" in e.message for e in e301),
+                        f"E301 must fire for string-form 'pytest tests/'; got: {[e.message for e in e301]}")
+        self.assertTrue(any("npm test" in e.message for e in e301),
+                        f"E301 must fire for object-form 'npm test'; got: {[e.message for e in e301]}")
 
     # --- E307 reverse direction test ---
 

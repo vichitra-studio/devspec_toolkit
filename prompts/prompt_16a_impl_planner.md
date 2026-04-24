@@ -146,6 +146,7 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
     *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). Example: if the anchor's entry for this milestone declares `checklist_id_prefix: "AUTH"`, IDs look like `AUTH_LOGIN_01`, `AUTH_SESSION_02`. If the anchor has no entry for this milestone yet, STOP and add one before authoring the checklist.
     *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
         *   *Rule*: `commit_hash` is MANDATORY. Do not use placeholders.
+        *   *Rule*: `type` MUST be one of `fr | api | nfr | inv | fixture | doc | code | task` (see `$defs.specRef.type` in `schema/16_impl_context.schema.json`). For roadmap coverage checklist items (where `spec_ref.id` equals a `task-*` task_id from Step 14), `type` MUST be `"task"` — do NOT mislabel as `"fr"`. Use `"fr" | "api" | "nfr" | "inv" | "fixture"` only when `id` matches the corresponding kebab-case ID in the relevant spec artifact.
     *   `description`: **Verbose, Atomic, and Self-Explanatory**.
         *   *Rule*: Use "Subject-Action-Constraint" format.
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
@@ -166,17 +167,14 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
             *   `target` / `command`: File or Command to run.
 
 ## 3. `plan.ambiguities` (Risk Management)
-*   List ANY ambiguity that would affect implementation.
-    *   `id`: kebab-case identifier (e.g. `amb-storage-device`).
-    *   `description`: What is unclear?
-    *   `severity`: `blocking` or `non_blocking`. **This is the planning-phase severity enum — distinct from the anchor's ambiguities severity (`severityLevel` — low/medium/high/critical) and from emergent_ambiguities severity. Do not mix them.**
-    *   `mitigation`: How should the coder handle this? (e.g., "Assume X specifically").
-    *   `decision`: The decision made to resolve the ambiguity.
-    *   `resolved`: A string explanation OR a boolean flag indicating whether the ambiguity has been resolved.
-    *   `status`: Current resolution state. **Values come from the canonical `vc:core:atoms#ambiguityStatus` atom — currently `resolved`, `tracking`, `deferred`, `blocked`. Do not invent alternatives; consult the atom if this list drifts.** Pair with `status_ref` (a canonical reference of kind `status`) for registry-backed tracking.
-    *   *Rule*: If `blocking`, you must still plan the rest of the step but flag the blocker.
-    *   *Rule*: For `non_blocking`, you MUST provide a `mitigation` or `assumption`.
-    *   *Rule*: Use the `source` and `impact` fields to capture provenance and risk.
+
+Field shape (ids, required-status, enum members) is in `schema/16_impl_context.schema.json` under `plan.ambiguities[]`. Decision rules below — these are not enforceable by JSON Schema.
+
+*   List ANY ambiguity that would affect implementation. Provenance and impact must be captured (the schema names the fields).
+*   **Severity scoping**: this section's severity enum is the planning-phase one. It is distinct from the anchor's `ambiguities` severity (`severityLevel` — low/medium/high/critical) and from `emergent_ambiguities` severity. Do not mix them.
+*   **Status enum**: values come from the canonical `vc:core:atoms#ambiguityStatus` atom — read the atom for the current set; if it drifts, trust the atom over this prompt. Pair with the registry-backed status reference for tracking.
+*   *Rule*: a blocking ambiguity does not stop planning — flag it and plan the rest of the step.
+*   *Rule*: a non-blocking ambiguity requires a concrete mitigation describing how the coder works around it. A proposed assumption is optional context for the mitigation, not a substitute for it.
 
 ## 4. `plan.solution` (Architecture)
 *   `architecture_sketch`: Explain data flow, component interactions, and how this fits into the lifecycle.
@@ -194,8 +192,12 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
 *   **NOTE**: This section is removed. All implementation logic must reside in `checklist[].implementation`.
 
 ## 7. `plan.review_requirements` (Verification Plan)
-*   `test_commands`: Precision commands to run tests.
+*   `test_commands`: Precision commands to run tests. Each entry is either a **string** (the command) OR an **object** `{ command, command_ref?, description? }` — the schema accepts both forms (`oneOf [string, object]` in `schema/16_impl_context.schema.json`).
     *   *Rule*: must match `linked_test_expectation` commands.
+    *   *Rule (strict, no-exception)*: every distinct command or script invocation that appears in any `checklist[*].linked_test_expectation` — including shell probe scripts, curl calls, ghost/npm CLI invocations, and any other ad-hoc command strings, not just test-runner invocations (pytest/jest/playwright/etc.) — MUST appear in `test_commands`, either as a direct match OR via a broader file-level / suite-level invocation that demonstrably exercises it (e.g. a shell-level `bash theme/scripts/probe_all.sh` that runs the probe referenced in a checklist item). A `linked_test_expectation` whose command is neither directly present nor subsumed by a broader entry in `test_commands` is a declaration gap and MUST be added before emit. This closes the probe-command under-declaration hole observed in prior milestone plans.
+    *   *Rule (non-universal verbs)*: hallucination-lint (E530) restricts the leading verb to a known allowlist. For verbs **not** in the toolkit default `command_prefixes.json`, use one of the supported escape routes — **do NOT wrap the command in `bash -c "..."`** (legal but discouraged):
+        *   **PRIMARY** — register the verb as a canonical command entry in `<spec-root>/canon/kinds/command.json` (e.g. `cn:project:command:hugo`) and emit the entry in **object form** with a sibling `command_ref` pointing at it. Hallucination-lint bypasses the prefix check whenever a sibling `command_ref.id` is a `cn:`-prefixed string (shape-only); the corresponding canon entry must exist for `canonical-integrity` (E110/E210) to stay green.
+        *   **ESCAPE** — for one-off verbs that don't merit a canon entry, append the verb to `<spec-root>/canon/command_prefixes.json` (project-level allowlist, merged with the toolkit default).
     *   *Expectation*: Include DB migration commands if needed (`alembic upgrade head`).
     *   *Rule*: Use `guidelines` to capture `legacy_test_output` or specific success criteria.
 *   `nfr_measurement_methods`: Define how NFRs will be measured.

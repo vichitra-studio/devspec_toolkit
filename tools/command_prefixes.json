@@ -1,4 +1,5 @@
 {
+  "_description": "Universal command verbs only. Project-specific verbs should go via either (a) a `cn:project:command:*` canon entry in `<spec-root>/canon/kinds/command.json` referenced by a sibling `command_ref`, or (b) a project-level allowlist at `<spec-root>/canon/command_prefixes.json`. Do not add project-flavored verbs here.",
   "allowed_prefixes": [
     "python",
     "python3",

@@ -202,6 +202,35 @@ def check_no_duplicates(
 # load_canonical_stages — shared by step_07 validator and hallucination_lint
 # ---------------------------------------------------------------------------
 
+def extract_command_string(entry: Any) -> str:
+    """Return the command string for a test_commands[] entry.
+
+    test_commands[] items use oneOf [string, object{command, command_ref, ...}]
+    per schema/16_impl_context.schema.json. Returns "" when neither shape applies.
+    """
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        cmd = entry.get("command")
+        if isinstance(cmd, str):
+            return cmd
+    return ""
+
+
+def is_resolved_canonical_ref(value: Any) -> bool:
+    """Return True if *value* is the structural shape of a resolved canonical ref.
+
+    A resolved ref is a dict with a string ``id`` starting with ``cn:``. This
+    check is structural only — it does NOT verify the id resolves against the
+    canonical registry. Callers that need resolution must invoke
+    :meth:`CanonicalRegistry.resolve_alias` separately.
+    """
+    if not isinstance(value, dict):
+        return False
+    cid = value.get("id")
+    return isinstance(cid, str) and cid.startswith("cn:")
+
+
 def load_canonical_stages(canon_dir: str) -> set[str] | None:
     """Load canonical stage values from canon/kinds/stage.json.
 

@@ -4,21 +4,52 @@ Created by FIX-044 (Batch 5).
 """
 from __future__ import annotations
 
-import os
-import json
-
-import pytest
-
 from specdev_tools.core.errors import SpecError
 from specdev_tools.validation.linter_utils import (
     CONTENT_STOPWORDS,
     DERIVATION_STOPWORDS,
     check_no_duplicates,
     collect_ids_and_refs,
+    extract_command_string,
     is_reference_context,
     iter_json,
     tokenize_free_text,
 )
+
+
+class TestExtractCommandString:
+    """Tests for extract_command_string."""
+
+    def test_string_input(self):
+        assert extract_command_string("pytest -q") == "pytest -q"
+
+    def test_dict_with_string_command(self):
+        assert extract_command_string({"command": "jq -e '.'"}) == "jq -e '.'"
+
+    def test_dict_with_non_string_command(self):
+        assert extract_command_string({"command": 42}) == ""
+
+    def test_dict_without_command(self):
+        assert extract_command_string({"command_ref": {"id": "cn:project:command:jq"}}) == ""
+
+    def test_dict_with_command_and_command_ref(self):
+        # Object-form may carry both fields; helper returns the literal command string
+        # and lets ref-resolution stay the consumer's concern (linter / integrity check).
+        entry = {"command": "jq -e '.'", "command_ref": {"id": "cn:project:command:jq"}}
+        assert extract_command_string(entry) == "jq -e '.'"
+
+    def test_empty_string_input(self):
+        # Returned verbatim; callers .strip() before equality match in step_16
+        assert extract_command_string("") == ""
+
+    def test_whitespace_only_command_returned_verbatim(self):
+        assert extract_command_string("   ") == "   "
+        assert extract_command_string({"command": "   "}) == "   "
+
+    def test_non_string_non_dict_input(self):
+        assert extract_command_string(None) == ""
+        assert extract_command_string(123) == ""
+        assert extract_command_string(["pytest"]) == ""
 
 
 # ---------------------------------------------------------------------------

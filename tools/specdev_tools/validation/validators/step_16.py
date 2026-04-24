@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from ...core.errors import make_error, SpecError
+from ..linter_utils import extract_command_string
 
 # Checklist type and layer enums — currently hardcoded.  These values mirror the
 # enum constraints in schema/16_impl_context.schema.json (``checklist[].type``
@@ -124,7 +125,7 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
 
     Groups non-deferred checklist items by their spec_ref.id and checks that each
     group has both a 'behavior' and a 'validation' type item.
-    Non-behavioral spec_ref types ('doc', 'code') are excluded — these are work items,
+    Non-behavioral spec_ref types ('doc', 'code', 'task') are excluded — these are work items,
     not testable behaviors, and do not require behavior+validation pairing.
     """
     from collections import defaultdict
@@ -141,8 +142,8 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
         ref_id = spec_ref.get("id")
         if not ref_id:
             continue
-        # Skip non-behavioral spec_ref types (doc, code) — work items, not testable behaviors
-        if spec_ref.get("type") in {"doc", "code"}:
+        # Skip non-behavioral spec_ref types (doc, code, task) — work items, not testable behaviors
+        if spec_ref.get("type") in {"doc", "code", "task"}:
             continue
         item_type = item.get("type", "")
         if item_type:
@@ -385,9 +386,10 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
 
     if plan_status == "active" and test_commands and execution_results:
         for cmd in test_commands:
-            if isinstance(cmd, str) and cmd.strip() not in passed_commands:
+            cmd_str = extract_command_string(cmd)
+            if cmd_str and cmd_str.strip() not in passed_commands:
                 errors.append(
-                    make_error("E301", f"MISSING_PROOF_CLOSURE test command '{cmd}' required "
+                    make_error("E301", f"MISSING_PROOF_CLOSURE test command '{cmd_str}' required "
                     f"by review_requirements but not found in execution_results with status=passed")
                 )
 
@@ -408,10 +410,11 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
 
         # All test commands must be proven
         if test_commands:
-            unproven = [
-                cmd for cmd in test_commands
-                if isinstance(cmd, str) and cmd.strip() not in passed_commands
-            ]
+            unproven = []
+            for cmd in test_commands:
+                cmd_str = extract_command_string(cmd)
+                if cmd_str and cmd_str.strip() not in passed_commands:
+                    unproven.append(cmd_str)
             if unproven:
                 errors.append(
                     make_error("E302", f"UNPROVEN_VERIFIED_REVIEW review.verdict is 'verified' "
@@ -424,9 +427,10 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         if isinstance(declared_passed, list) and test_commands:
             declared_set = {c.strip() for c in declared_passed if isinstance(c, str)}
             for cmd in test_commands:
-                if isinstance(cmd, str) and cmd.strip() not in declared_set:
+                cmd_str = extract_command_string(cmd)
+                if cmd_str and cmd_str.strip() not in declared_set:
                     errors.append(
-                        make_error("E302", f"UNPROVEN_VERIFIED_REVIEW test command '{cmd}' "
+                        make_error("E302", f"UNPROVEN_VERIFIED_REVIEW test command '{cmd_str}' "
                         f"not listed in critical_evidence.passed_test_commands")
                     )
 

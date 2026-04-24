@@ -18,9 +18,10 @@
             "inv",
             "fixture",
             "doc",
-            "code"
+            "code",
+            "task"
           ],
-          "description": "The artifact type being referenced. Decision rule: use 'code' when pointing to a specific function, class, or code block; use 'doc' when pointing to a specification document, schema, or guide. Example: use 'code' when the reference is 'src/auth/jwt.py' (an implementation file); use 'doc' when the reference is 'vc:04-fr-list' (a spec schema). Anti-pattern: using 'doc' to reference a source code file."
+          "description": "The artifact type being referenced. Decision rule: use 'code' when pointing to a specific function, class, or code block; use 'doc' when pointing to a specification document, schema, or guide; use 'task' when the reference is a roadmap coverage item (a Step 14 task-* id) rather than a spec artifact. Example: use 'code' when the reference is 'src/auth/jwt.py' (an implementation file); use 'doc' when the reference is 'vc:04-fr-list' (a spec schema); use 'task' when the reference is 'task-install-ghost-local' from the roadmap. Anti-pattern: using 'doc' to reference a source code file, or using 'fr' to label a roadmap task-* id."
         },
         "id": {
           "$ref": "vc:core:atoms#kebabId",

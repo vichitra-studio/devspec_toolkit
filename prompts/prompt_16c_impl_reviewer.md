@@ -193,7 +193,7 @@ For each `checklist[]` item:
 2. ☐ Does `evidence.content` contain success markers?
 3. ☐ Is `spec_ref.commit_hash` valid in git?
 4. ☐ Are files in `implementation.files_touched` within `target_file_patterns`?
-5. ☐ Does `linked_test_expectation` appear in `execution.critical_evidence.passed_test_commands`?
+5. ☐ Does `linked_test_expectation` appear in `execution.critical_evidence.passed_test_commands`? When `test_commands[]` entries use object form (`{ command, command_ref?, description? }`), compare against the **`.command` field** of each entry — not the dict itself. `linked_test_expectation` is a free-form test identifier or command string (e.g. a pytest nodeid, a curl invocation, or a script path); it is **not** required to be a filesystem path. Caveat: hallucination-lint still extracts a path-shaped token from the value (after unwrapping a leading `bash -c "..."` / `sh -c '...'`) and existence-checks it. If the value contains a path-like token (a slash or a `.py|.ts|.js|.go|.java|.rb|.sh|.json` extension), that path **must** exist on disk or `LINKED_TEST_FILE_NOT_FOUND` (E530) fires.
 6. ☐ If code changes exist, do `plan.docs_impact` and updated docs match the execution?
 
 ## Red Flags (Immediate Rejection)
@@ -218,7 +218,7 @@ For each `checklist[]` item:
 Before emitting, verify:
 - Every checklist item in `spec/impl_context/{milestone_snake}_plan.json` has a per-item verdict in either (a) `execution.critical_evidence.satisfied_checklist_ids` (passed items) or (b) `review.findings` (failing items). `findings` is for issues only — clean items do **not** require an invented finding entry; they are recorded in `satisfied_checklist_ids` and `semantic_review.fr_coverage[*].checklist_ids`. No active checklist item should be left unaddressed.
 - All `fr_id` values in `plan.spec_alignment.checklist` appear in `semantic_review.fr_coverage` with a coverage status.
-- Every `linked_test_expectation` path referenced in the checklist resolves to an actual test file in the codebase.
+- Every `linked_test_expectation` referenced in the checklist resolves to runnable evidence — typically a test file/nodeid, but also acceptable as a script invocation, curl probe, or other free-form test identifier (it is not required to be a filesystem path). Caveat: any path-shaped token inside the value is still existence-checked by hallucination-lint (`bash -c "..."` / `sh -c '...'` wrappers are unwrapped first); a path-like token that does not exist on disk fires `LINKED_TEST_FILE_NOT_FOUND`.
 - No checklist item marked `complete` is accepted without reviewer verification of its test evidence.
 - If any linked test expectation is missing or the coverage claim is unverifiable: flag it as a finding rather than accepting the implementation as complete.
 - Every FR referenced in the active milestone's `fr_refs` has a corresponding entry in `semantic_review.fr_coverage`.

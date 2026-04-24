@@ -204,5 +204,23 @@ class PromptContractsTests(unittest.TestCase):
             )
 
 
+    def test_prompt_16a_does_not_reintroduce_assumption_field_name(self):
+        """Drift #1 regression guard.
+
+        prompt_16a previously instructed authors to populate `assumption` on
+        `plan.ambiguities[]`, but the schema field is `proposed_assumption` and
+        rejects the legacy name under `additionalProperties: false`. This test
+        pins that fix by failing if the prompt ever re-introduces the bare
+        backtick-quoted field name.
+        """
+        path = self.prompt_dir / "prompt_16a_impl_planner.md"
+        text = path.read_text(encoding="utf-8")
+        self.assertNotIn(
+            "`assumption`", text,
+            "prompt_16a must not name `assumption` as a field — schema requires "
+            "`proposed_assumption`. See WIP/done/toolkit_drift_report.md Drift #1.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
