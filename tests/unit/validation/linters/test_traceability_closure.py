@@ -389,6 +389,136 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Did not expect W564 for fr-login. Got: {rendered}"
             )
 
+    def test_w564_suppressed_by_out_of_scope_with_rationale(self):
+        """W564 is suppressed when FR is listed in apis.out_of_scope[] with a non-empty rationale."""
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
+
+        # FR in out_of_scope with rationale → no W564
+        apis_oos_with_rationale = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos_with_rationale)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W564" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W564 for fr-infra in out_of_scope with rationale. Got: {rendered}"
+            )
+
+        # FR in out_of_scope with empty rationale → W564 still fires
+        apis_oos_empty_rationale = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": ""}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos_empty_rationale)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W564" in e and "fr-infra" in e for e in rendered),
+                f"Expected W564 for fr-infra with empty rationale in out_of_scope. Got: {rendered}"
+            )
+
+        # FR in out_of_scope with rationale key absent → W564 still fires (missing key is not exempt)
+        apis_oos_missing_rationale_key = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra"}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos_missing_rationale_key)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W564" in e and "fr-infra" in e for e in rendered),
+                f"Expected W564 for fr-infra with absent rationale key in out_of_scope. Got: {rendered}"
+            )
+
+    def test_e535_fires_when_fr_in_both_out_of_scope_and_api_trace(self):
+        """E535 fires when an FR appears in both out_of_scope[] and an API trace[] — contradiction."""
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
+
+        # FR in out_of_scope[] AND referenced by an API trace → E535
+        apis_contradicted = {
+            "apis": [{"api_id": "api-infra", "trace": [{"type": "fr", "id": "fr-infra"}]}],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_contradicted)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("E535" in e and "fr-infra" in e for e in rendered),
+                f"Expected E535 for fr-infra contradicted across out_of_scope and trace. Got: {rendered}"
+            )
+            # W564 must NOT also fire — the trace reference covers it, contradiction is E535
+            self.assertFalse(
+                any("W564" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W564 when E535 already fires for fr-infra. Got: {rendered}"
+            )
+
+        # FR only in out_of_scope[] (no API trace) → no E535, no W564
+        apis_oos_only = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos_only)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("E535" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect E535 when FR is only in out_of_scope (no trace). Got: {rendered}"
+            )
+
+    def test_w561_w566_suppressed_by_step05_out_of_scope(self):
+        """W561/W566 are suppressed when FR is listed in Step 05 out_of_scope[] with rationale.
+
+        Step 05 out_of_scope[] exemption propagates to W561 (UNCOVERED_FR) and W566
+        (UNCOVERED_FR_MILESTONE) per DEVSPEC-2: infra/ops FRs with no HTTP API surface
+        may also legitimately lack milestone coverage. W565 (UNCOVERED_FR_FIXTURE) is NOT
+        suppressed — Step 08 has no analogous out_of_scope[] array (scope boundary).
+        """
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
+        roadmap_missing = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-1"}]}]}
+        apis_oos = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+
+        # W561 and W566 should not fire when FR is in Step 05 out_of_scope
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs, roadmap=roadmap_missing)
+            _write(d, "05_interface_contracts.json", apis_oos)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W561" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W561 for fr-infra in Step 05 out_of_scope. Got: {rendered}"
+            )
+            self.assertFalse(
+                any("W566" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W566 for fr-infra in Step 05 out_of_scope. Got: {rendered}"
+            )
+
+        # W565 (fixture coverage) is NOT suppressed — Step 08 has no out_of_scope[]
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos)
+            _write(d, "08_fixtures.json", {"fixtures": []})
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W565" in e and "fr-infra" in e for e in rendered),
+                f"Expected W565 for fr-infra — Step 08 has no out_of_scope (scope boundary). Got: {rendered}"
+            )
+
     def test_w565_fires_when_fr_has_no_fixture_coverage(self):
         """W565 fires when an FR has no fixture target pointing to it; clears when covered."""
         frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
@@ -519,6 +649,32 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Expected W567 mentioning 'fr-login not covered'. Got: {rendered}"
             )
 
+
+    def test_w568_not_suppressed_by_step05_out_of_scope(self):
+        """W568 (capability coverage) is NOT suppressed by Step 05 out_of_scope[].
+
+        out_of_scope[] exempts FRs from needing API/milestone coverage; it says nothing
+        about whether a capability has at least one FR tracing to it. W568 operates on
+        the capability→FR direction, which is orthogonal to the Step 05 exemption.
+        """
+        caps = {"capabilities": [{"capability_id": "cap-ops"}]}
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": []}]}
+        apis_oos = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "01_capabilities.json", caps)
+            _write(d, "04_fr_list.json", frs)
+            _write(d, "14_roadmap.json", ROADMAP_FULL)
+            _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
+            _write(d, "05_interface_contracts.json", apis_oos)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W568" in e and "cap-ops" in e for e in rendered),
+                f"Expected W568 for cap-ops — Step 05 out_of_scope does not suppress capability coverage. Got: {rendered}"
+            )
 
     def test_w561_and_w566_co_fire_for_same_fr_id(self):
         """W561 and W566 both fire for the same FR ID when no milestone covers it.

@@ -18,11 +18,19 @@
 
 **Removed in v0.4.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
 
+### E535 CONTRADICTORY_OUT_OF_SCOPE_FR
+
+**Trigger**: A functional requirement appears in both `apis.out_of_scope[]` in step 05 (declaring it has no HTTP API surface) and in an API's `trace[]` in the same step 05 file (declaring it is covered by an API endpoint). The two claims are mutually exclusive.
+
+**Resolution**: Remove the FR from `out_of_scope[]` if an API does cover it, or remove the trace reference from the API if the FR genuinely has no API surface.
+
+**Note**: `out_of_scope[]` entries suppress W564 (UNCOVERED_FR_API). Without this check, a contradicted `out_of_scope[]` entry would silently mask a real API trace from coverage reporting.
+
 ### E561 / W561 UNCOVERED_FR
 
 **Trigger**: A functional requirement defined in step 04 is not assigned to any milestone in step 14 (`fr_refs`).
 
-**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`, or document why the FR is intentionally unscheduled.
+**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`. If the FR has no implementation surface (e.g. an infra or ops constraint), add it to `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that exempts it from W561, W564, and W566.
 
 ### E562 / W562 ORPHAN_MILESTONE
 
@@ -40,7 +48,7 @@
 
 **Trigger**: A functional requirement defined in step 04 has no API trace reference — no API in step 05 has a trace link with type "fr" pointing to this FR.
 
-**Resolution**: Add a trace link of type "fr" in the appropriate API contract in `05_api_contracts.json`, or document why the FR has no API surface.
+**Resolution**: Add a trace link of type "fr" in the appropriate API contract in `05_interface_contracts.json`. If the FR genuinely has no HTTP API surface (infra, ops, external constraint), add it to `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that suppresses W564, W561, and W566 for that FR. See also E535 for the contradiction check.
 
 **Promotable**: W564 → E564.
 
@@ -56,7 +64,7 @@
 
 **Trigger**: A functional requirement defined in step 04 is not referenced in any step 14 milestone `fr_refs`.
 
-**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`, or document why the FR is intentionally unscheduled.
+**Resolution**: Add the FR ID to the appropriate milestone's `fr_refs` array in `14_roadmap.json`. If the FR has no implementation surface, use `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that exempts it from W566, W564, and W561.
 
 **Promotable**: W566 → E566.
 

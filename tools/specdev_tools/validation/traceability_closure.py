@@ -301,6 +301,21 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             if "fr_id" in fr:
                 fr_ids.add(fr["fr_id"])
 
+    # Compute FR IDs exempted by Step 05 out_of_scope[] from W564 (API coverage),
+    # W561, and W566 (milestone coverage). An FR listed in Step 05 out_of_scope[]
+    # with a non-empty rationale is acknowledged as having no HTTP API surface;
+    # the same exemption extends to milestone coverage because infra/ops FRs with
+    # no API surface may also legitimately lack milestone placement (DEVSPEC-2).
+    # W565 (fixture coverage) is NOT exempted — Step 08 has no out_of_scope[]
+    # array; that exemption requires a schema addition to 08_fixtures.schema.json.
+    step05_oos_fr_ids: set[str] = set()
+    if "apis" in data:
+        step05_oos_fr_ids = {
+            entry["fr_id"]
+            for entry in data["apis"].get("out_of_scope", [])
+            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
+        }
+
     milestone_fr_refs: set[str] = set()
     milestone_ids: set[str] = set()
     milestone_task_ids: dict[str, list[str]] = {}
@@ -336,7 +351,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 checklist_milestone_refs.add(ms_id)
 
     if "frs" in data and "roadmap" in data:
-        for fr_id in sorted(fr_ids - milestone_fr_refs):
+        for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W561", f"UNCOVERED_FR {fr_id}"))
 
     if "roadmap" in data and "impl_planner" in data:
@@ -353,19 +368,20 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # Pairwise completeness checks (W564–W568)
     # ---------------------------------------------------------------------------
 
-    # W564: FR→API coverage — each FR should be referenced by at least one API's trace.
-    # NOTE: W564 checks ALL FRs, not just those with externally-observable behavior. The FR
-    # schema (04_fr_list.json) has no field to classify observability (internal vs. external),
-    # so all FRs are treated as externally observable for this check. If such a field is added
-    # in the future (e.g. "observability": "external"|"internal"), this check should be updated
-    # to filter to only externally-observable FRs before computing the coverage gap.
+    # W564 / E535: FR→API coverage and out_of_scope[] contradiction check.
+    # step05_oos_fr_ids (computed above) carries the Step 05 out_of_scope[] exemption.
     if "frs" in data and "apis" in data:
         api_fr_refs: set[str] = set()
         for api in data["apis"].get("apis", []):
             for trace_ref in api.get("trace", []):
                 if isinstance(trace_ref, dict) and normalize_trace_type(trace_ref.get("type") or "") == _FR_TRACE_TYPE and "id" in trace_ref:
                     api_fr_refs.add(trace_ref["id"])
-        for fr_id in sorted(fr_ids - api_fr_refs):
+        # E535: FR declared in out_of_scope[] ("no API surface") but also referenced by
+        # an API's trace[] — the two claims contradict. out_of_scope[] suppresses W564,
+        # so without this check the trace reference would be silently masked.
+        for fr_id in sorted(step05_oos_fr_ids & api_fr_refs):
+            errors.append(make_error("E535", f"CONTRADICTORY_OUT_OF_SCOPE_FR {fr_id} appears in out_of_scope[] but is also referenced by an API trace"))
+        for fr_id in sorted(fr_ids - api_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W564", f"UNCOVERED_FR_API {fr_id}"))
 
     # W565: FR→fixture coverage — each FR should be referenced by at least one fixture's targets.
@@ -389,7 +405,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W561 is NOT in PROMOTABLE_PAIRS (see errors.py) to prevent double-promotion: without this
     # exclusion, SPECDEV_WARNINGS_AS_ERRORS=1 would emit both E561 and E566 for a single FR gap.
     if "frs" in data and "roadmap" in data:
-        for fr_id in sorted(fr_ids - milestone_fr_refs):
+        for fr_id in sorted(fr_ids - milestone_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W566", f"UNCOVERED_FR_MILESTONE {fr_id}"))
 
     # W567: Milestone decomposition completeness — milestones without any tasks.
