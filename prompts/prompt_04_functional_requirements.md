@@ -63,7 +63,7 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 **Granularity test**: If you cannot write a single failing test that specifically disproves this FR (and only this FR), it is too coarse.
 
 ## Heuristics For Completeness
-- MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope); MUST include `fixture_ref` for every FR with `priority: high` in the capabilities.
+- MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope).
 - Auto-trace: link FRs to capability and any API that delivers the behavior; include NFR trace where performance is key.
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
@@ -114,7 +114,7 @@ Before emitting, verify:
 - FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
 - Each FR includes preconditions and postconditions where relevant to bound the behavior.
 - Every FR has at least two acceptance criteria with a stable `criterion_id` and specific, measurable text.
-- MUST include a `fixture_ref` for every acceptance criterion whose behavior is automatable in Step 8; use `fixture-*-tbd` if the fixture does not yet exist.
+- Do **not** declare fixture coverage on acceptance criteria — fixture↔FR binding is authored in Step 08 via `fixture.targets[]`. Step 04 acceptance criteria carry only `criterion_id` and `text`.
 - `trace` links MUST map every FR to its originating capability from `spec/01_capabilities.json`; MUST also map to APIs, NFRs, or governance IDs when those IDs exist in the corresponding upstream spec files.
 - IDs are stable and descriptive (avoid renaming once referenced downstream).
 
@@ -124,7 +124,7 @@ Before emitting, verify:
 ## Best Practices
 - **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
 - **Boundaries**: Provide `preconditions` and `postconditions` so testers and implementers know the boundaries of each behavior.
-- **Criteria**: Ensure every acceptance criterion has a stable `criterion_id` and, when possible, a `fixture_ref` to drive automation.
+- **Criteria**: Ensure every acceptance criterion has a stable `criterion_id` and concrete, falsifiable `text`. Fixture coverage is authored later in Step 08.
 - **Trace**: Use `trace` arrays to link FRs back to capabilities, APIs, NFRs, or governance rules cover-to-cover.
 
 ## Common Pitfalls

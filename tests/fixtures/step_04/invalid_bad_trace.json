@@ -19,8 +19,7 @@
       "acceptance_criteria": [
         {
           "criterion_id": "ac-login-success",
-          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard",
-          "fixture_ref": "fixture-user-login-success"
+          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard"
         }
       ],
       "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},
@@ -46,8 +45,7 @@
       "acceptance_criteria": [
         {
           "criterion_id": "ac-logout-success",
-          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page",
-          "fixture_ref": "fixture-user-logout-success"
+          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page"
         }
       ],
       "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},

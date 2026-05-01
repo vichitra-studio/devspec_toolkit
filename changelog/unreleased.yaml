@@ -1,4 +1,10 @@
 changes:
+  - type: remove_field
+    path: "04_fr_list.functional_requirements[].acceptance_criteria[].fixture_ref"
+    description: "BREAKING (DEVSPEC-1): removed acceptance_criteria[].fixture_ref from schema/04_fr_list.schema.json. Prompt + schema description + spec-quality-lint were mutually inconsistent (the prompt mandated fixture-*-tbd placeholders that PLACEHOLDER_RE flagged as E510), and Step 08 had no backfill instruction. No tooling consumed the field — FR↔fixture binding lives entirely in fixture.targets[] (Step 08), which traceability_closure.W565 and matrix already use. Sweeps prompt_04 (lines 66/117/127), prompt_08 (lines 34/37/78), prompts/migration/template_frs.md, and docs/prompts/shared_expectations.md § 14. Steps 14 and 16 fixture_ref bindings are unaffected (different surfaces)."
+    migration:
+      action: automatic
+      note: "Remove any fixture_ref keys under spec/04_fr_list.json acceptance_criteria items. For projects that left the field absent (the dominant case under the prior contradictory guidance), no edit is required."
   - type: add_field
     path: "02_system_sketch.tech_stack"
     description: "tech_stack field added to Step 02 system sketch as the authoritative source for technology decisions"

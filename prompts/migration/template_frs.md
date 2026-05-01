@@ -38,7 +38,6 @@ The migrated artifact MUST include:
 - `functional_requirements[].priority`: MoSCoW enum — `must-have | should-have | could-have | wont-have`.
 - `functional_requirements[].preconditions`: Array of strings — state conditions before execution.
 - `functional_requirements[].postconditions`: Array of strings — state conditions after execution.
-- `functional_requirements[].acceptance_criteria[].fixture_ref`: kebab-case fixture ID from Step 08.
 - `functional_requirements[].action_ref`: Canonical reference (kind: `action`) for the primary verb.
 - `functional_requirements[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
 - `functional_requirements[].status_ref`: Canonical reference (kind: `stage`) for the lifecycle status.

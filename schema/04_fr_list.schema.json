@@ -50,7 +50,7 @@
                 "type": "array",
                 "minItems": 2,
                 "items": {
-                  "description": "A single acceptance criterion with an ID, descriptive text, and optional fixture reference.",
+                  "description": "A single acceptance criterion with an ID and testable text. Fixture coverage is authored in Step 08 via fixture.targets[] referencing the parent FR — Step 04 does not declare fixture references.",
                   "type": "object",
                   "additionalProperties": false,
                   "properties": {
@@ -62,10 +62,6 @@
                       "description": "Testable criterion text that can be objectively verified. Must be at least 15 characters (enforced by minLength). Should be specific enough to write an automated test. Avoid subjective terms like 'fast', 'good', 'user-friendly'. Include concrete thresholds, expected behaviors, and boundary conditions. Example: 'Given an expired JWT token, when the API is called, then it returns HTTP 401 with error code AUTH-001 within 200ms.'",
                       "type": "string",
                       "minLength": 15
-                    },
-                    "fixture_ref": {
-                      "description": "Optional reference to the Step 08 fixture that validates this acceptance criterion. Include when a fixture has already been written for this criterion in spec/08_fixtures.json. The value must match a fixture_id in that file exactly. Decision rule: add this after Step 08 is written, not during Step 04 authoring. Use the fixture_id from 08_fixtures.json — for example 'fix-auth-login-valid-credentials' for the happy-path login criterion, or 'fix-auth-login-invalid-creds' for the rejection criterion. Include once the fixture exists; use a '-tbd' suffix as a placeholder when defining the FR before fixtures are written (e.g., 'fix-auth-login-success-tbd'). Anti-pattern: referencing a capability or FR ID here — this field must point to a fix-* ID from 08_fixtures.json.",
-                      "$ref": "vc:core:atoms#kebabId"
                     }
                   },
                   "required": [

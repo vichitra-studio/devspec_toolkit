@@ -125,8 +125,9 @@ Before emitting output, build a private synthesis ledger (Context Ledger) contai
 
 ## 14. Fixture Traceability
 
-- If this step's schema includes `fixture_ref` fields, every automatable acceptance criterion should have a fixture reference.
-- Before omitting `fixture_ref`, check `spec/08_fixtures.json` for a matching fixture by target or category. Missing fixtures are coverage gaps, not permission to omit.
+- FR↔fixture binding is authored in Step 08 via `fixture.targets[]` referencing `fr_id`. Step 04 acceptance criteria carry no fixture reference; the inverse direction is the single source of truth.
+- Steps 14 (`task.acceptance_criteria[].fixture_ref`) and 16 (`impl_checklist[].fixture_ref`) bind roadmap acceptance criteria and impl-checklist items to specific Step 08 fixtures. When this step's schema includes `fixture_ref`, the value MUST equal a `fixture_id` from `spec/08_fixtures.json` exactly.
+- Before omitting a `fixture_ref` in Steps 14/16, check `spec/08_fixtures.json` for a matching fixture by target or category. Missing fixtures are coverage gaps, not permission to omit.
 
 ## 15. Cross-Step Relationships
 

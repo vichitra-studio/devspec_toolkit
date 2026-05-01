@@ -31,10 +31,10 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Map → Generate → Validate → Emit
 - **Map**: For each high-priority FR and its acceptance criteria, identify the fixture(s) needed. Track coverage in a private Context Ledger.
 - **Generate**: Create fixture data that is concrete, realistic, and deterministic. Each fixture should represent a specific scenario (happy path, boundary case, error case).
-- **Validate**: Verify every high-priority FR has ≥1 fixture; every acceptance criterion that is automatable has a `fixture_ref`; no fixture is missing a `target` ID.
+- **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `target` ID.
 - **Emit**: Write the artifact only when coverage is complete.
 
-**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture. Every automatable acceptance criterion must have a `fixture_ref` pointing to a fixture ID. List any high-priority FR without a fixture and explain why.
+**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why.
 
 ### Weak-vs-Strong Fixture Examples
 
@@ -75,8 +75,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
 - [ ] Every FR with error conditions has at least one fixture covering the failure path
-- [ ] Fixture IDs in this step match the `fixture_ref` values used in Step 04 FR acceptance criteria
-- [ ] Every fixture has a valid `target` ID referencing an existing FR or acceptance criterion
+- [ ] Every fixture has a valid `target` ID referencing an existing `fr_id`, `api_id`, `inv_id`, or `nfr_id` from the corresponding upstream spec file
 - [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist
