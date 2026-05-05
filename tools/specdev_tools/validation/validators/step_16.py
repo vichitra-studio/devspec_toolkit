@@ -378,16 +378,23 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
     execution_results = execution.get("execution_results", []) if isinstance(execution, dict) else []
 
     passed_commands: set[str] = set()
+    # acknowledged = passed OR blocked; a blocked entry is an explicit acknowledgment,
+    # not a missing proof — so it satisfies E301 but not E302 (verified verdict).
+    acknowledged_commands: set[str] = set()
     for result in execution_results:
-        if isinstance(result, dict) and result.get("status") == "passed":
+        if isinstance(result, dict):
+            status = result.get("status")
             cmd = result.get("command")
             if isinstance(cmd, str):
-                passed_commands.add(cmd.strip())
+                if status == "passed":
+                    passed_commands.add(cmd.strip())
+                if status in ("passed", "blocked"):
+                    acknowledged_commands.add(cmd.strip())
 
     if plan_status == "active" and test_commands and execution_results:
         for cmd in test_commands:
             cmd_str = extract_command_string(cmd)
-            if cmd_str and cmd_str.strip() not in passed_commands:
+            if cmd_str and cmd_str.strip() not in acknowledged_commands:
                 errors.append(
                     make_error("E301", f"MISSING_PROOF_CLOSURE test command '{cmd_str}' required "
                     f"by review_requirements but not found in execution_results with status=passed")

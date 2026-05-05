@@ -510,6 +510,9 @@ _E541_SKIP_KEYS = {
     # with bindable vocabulary, add an explicit E541 test to catch it.
     "actions",
     "coding_examples",
+    # emergent_ambiguities items use crossCycleAmbiguityItem (additionalProperties:false)
+    # which defines no *_ref field — a canonical binding is structurally impossible.
+    "emergent_ambiguities",
 }
 
 # File-scoped exemptions: ``edge_cases`` is an unbindable narrative subtree
