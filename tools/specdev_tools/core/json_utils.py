@@ -6,6 +6,7 @@ Capabilities:
 - CRUD: read, read-multi, patch, insert, delete (using jq)
 - Discovery: keys, structure (skeleton)
 - Schema: Schema-aware property discovery with $ref resolution and allOf merging
+- Pointer verification: resolve-pointers (pointer contract per llm_protocol.md §4/§7.3)
 
 All public functions raise JsonUtilsError on failure (not sys.exit), and return
 data instead of printing, making them safe to import as a library (e.g. from a
@@ -20,7 +21,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
 # Used to guard read-multi, whose {key: value} construct produces one output object per
@@ -626,6 +627,473 @@ def _summarise_prop(prop: dict) -> dict:
     return summary
 
 
+# --- Pointer Resolution (llm_protocol.md §4 / §7.3) ---
+
+# Forbidden path prefixes/patterns per §4.3.
+_FORBIDDEN_PREFIXES = (".specdev/",)
+_FORBIDDEN_EXTENSIONS = (".txt",)
+
+# Absolute path prefixes that indicate temp/scratch paths (§4.3).
+# Includes standard POSIX paths plus /private/tmp (macOS symlink resolution of /tmp).
+_FORBIDDEN_ABS_PREFIXES = (
+    "/tmp/",
+    "/var/tmp/",
+    "/private/tmp/",
+    "/var/folders/",  # macOS temp dir used by TMPDIR
+)
+
+
+def _is_forbidden_path(file_path: str) -> Optional[str]:
+    """Return a reason string if file_path is forbidden per §4.3, else None.
+
+    Forbidden shapes (§4.3):
+    - Paths under .specdev/
+    - *.txt dumps or temp paths
+    - Absolute paths under /tmp/, /var/tmp/, /private/tmp/, /var/folders/,
+      or TMPDIR (C1)
+    - Anything that resolves to a directory rather than a file
+      (checked at call time, not here — here we only check the path string)
+    """
+    # C1: Reject absolute paths under known temp directories before other checks.
+    if os.path.isabs(file_path):
+        norm = os.path.normpath(file_path)
+        for prefix in _FORBIDDEN_ABS_PREFIXES:
+            prefix_norm = os.path.normpath(prefix)
+            if norm == prefix_norm or norm.startswith(prefix_norm + os.sep):
+                return f"path is under forbidden temp prefix '{prefix}'"
+        tmpdir = os.environ.get("TMPDIR")
+        if tmpdir:
+            tmpdir_norm = os.path.normpath(tmpdir)
+            if norm == tmpdir_norm or norm.startswith(tmpdir_norm + os.sep):
+                return f"path is under forbidden temp prefix (TMPDIR='{tmpdir}')"
+
+    # Normalise away leading ./ for prefix matching
+    normalised = file_path.lstrip("./").replace("\\", "/")
+    for prefix in _FORBIDDEN_PREFIXES:
+        if normalised.startswith(prefix.lstrip("./")):
+            return f"path is under forbidden prefix '{prefix}'"
+    _, ext = os.path.splitext(file_path)
+    if ext.lower() in _FORBIDDEN_EXTENSIONS:
+        return f"path has forbidden extension '{ext}'"
+    return None
+
+
+def _is_valid_pointer_shape(pointer: Any) -> Tuple[bool, str]:
+    """Validate pointer shape per §4.1/§4.3.
+
+    Returns (valid, reason).  On success reason is "".
+
+    Valid shapes:
+      { "file": str, "id": str }
+      { "file": str, "jq_path": str }
+
+    Forbidden (§4.3):
+      - Bare strings
+      - file without id or jq_path
+      - Both id and jq_path absent
+    """
+    if not isinstance(pointer, dict):
+        return False, "invalid_shape: pointer must be a JSON object"
+
+    file_val = pointer.get("file")
+    if not file_val or not isinstance(file_val, str):
+        return False, "invalid_shape: 'file' field is missing or not a string"
+
+    has_id = isinstance(pointer.get("id"), str) and pointer.get("id")
+    has_jq = isinstance(pointer.get("jq_path"), str) and pointer.get("jq_path")
+
+    if not has_id and not has_jq:
+        return False, "invalid_shape: pointer must contain 'id' or 'jq_path'"
+
+    # Check forbidden path shapes
+    reason = _is_forbidden_path(file_val)
+    if reason:
+        return False, f"invalid_shape: {reason}"
+
+    return True, ""
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Compute Levenshtein edit distance between two strings."""
+    if len(a) < len(b):
+        return _levenshtein(b, a)
+    if len(b) == 0:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a):
+        curr = [i + 1]
+        for j, cb in enumerate(b):
+            cost = 0 if ca == cb else 1
+            curr.append(min(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost))
+        prev = curr
+    return prev[len(b)]
+
+
+def _kebab_tokens(s: str) -> List[str]:
+    """Split a kebab-case string into lowercase tokens."""
+    return [t for t in s.replace("_", "-").split("-") if t]
+
+
+def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
+    """Return top_n nearest ids by normalised token-level Levenshtein (§15).
+
+    Scoring: 1 - (edit_distance / max_len) so higher = more similar.
+    max_len is the max of the two token-joined strings' lengths (floor 1).
+    """
+    target_joined = " ".join(_kebab_tokens(target))
+    scored = []
+    for cand in candidates:
+        cand_joined = " ".join(_kebab_tokens(cand))
+        dist = _levenshtein(target_joined, cand_joined)
+        max_len = max(len(target_joined), len(cand_joined), 1)
+        score = round(1.0 - dist / max_len, 2)
+        scored.append((score, cand))
+    scored.sort(reverse=True, key=lambda x: x[0])
+    return [{"id": cand, "score": sc} for sc, cand in scored[:top_n]]
+
+
+# Interim stand-in for DEVSPEC-19's entry-key registry; swap out site is here.
+# Fields treated as entry-id candidates when scanning file arrays.
+# Order: bare "id" first (most common in canon kinds), then domain-specific ids
+# ordered by frequency of primary use across spec/ + devspec_toolkit/canon/.
+# cap_id and gate_id removed (zero occurrences); task_id retained (48 occurrences,
+# primary key for nested tasks[] in spec/14_roadmap.json).
+_ID_CANDIDATE_FIELDS = (
+    "id",             # canon kinds, trace arrays, charter
+    "fr_id",          # 04_fr_list, extras/trace_matrix
+    "term_id",        # 03_glossary
+    "inv_id",         # 06_invariants
+    "nfr_id",         # 07_nfrs
+    "api_id",         # 05_interface_contracts
+    "fixture_id",     # 08_fixtures
+    "milestone_id",   # 09_impl_plan, 14_roadmap
+    "capability_id",  # 01_capabilities
+    "threat_id",      # 11_redteam
+    "job_id",         # 12_ci_gates
+    "component_id",   # 02_system_sketch
+    "task_id",        # 14_roadmap nested tasks[]
+    "metric_id",      # 00_charter success_metrics
+    "seed_id",        # common/seed_manifest
+    "temp_id",        # canonical_proposals (staging; resolved by suffix fallback)
+    "segment_id",     # 00_charter user_segments
+)
+
+
+# Top-level array keys that must not contribute to the nearest-id corpus.
+# canonical_refs_used is a citation list, not a spec entry registry — its entries
+# are not authoritative IDs and would pollute typo-correction suggestions.
+_CORPUS_DENY_KEYS = frozenset(["canonical_refs_used"])
+
+# Lookup table for kind derivation from known plural array keys where a simple
+# "-s" strip produces the wrong singular (e.g. "capabilities" → "capabilitie"
+# rather than "capability"). Entries not in this table fall back to top_key[:-1].
+_KIND_LOOKUP: Dict[str, str] = {
+    "capabilities": "capability",
+    "aliases": "alias",
+    "entries": "entry",
+    "dependencies": "dependency",
+    "deliverables": "deliverable",
+    "categories": "category",
+    "stories": "story",
+    "factories": "factory",
+    "libraries": "library",
+    "policies": "policy",
+    "utilities": "utility",
+}
+
+
+def _derive_kind(top_key: str) -> str:
+    """Derive a singular kind label from a top-level plural array key (B2).
+
+    Uses a lookup table for known -ies/-ies plurals; falls back to stripping
+    exactly one trailing 's' (not rstrip which would strip all trailing s chars).
+    """
+    if top_key in _KIND_LOOKUP:
+        return _KIND_LOOKUP[top_key]
+    return top_key[:-1] if top_key.endswith("s") else top_key
+
+
+def _collect_ids_from_file(data: Any) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
+    """Walk a parsed JSON object and collect all entry ids.
+
+    Returns:
+      - ``all_ids``: flat list of every discovered id (for nearest-search).
+      - ``id_map``: {id_value -> (wrapper_key, jq_path, entry_object)}
+        where wrapper_key is the array key (e.g. "functional_requirements"),
+        jq_path is the resolved path (e.g. ".functional_requirements[2]"),
+        and entry_object is the raw dict.
+    """
+    all_ids: List[str] = []
+    id_map: Dict[str, Tuple[str, str, Any]] = {}
+
+    if not isinstance(data, dict):
+        return all_ids, id_map
+
+    for top_key, top_val in data.items():
+        if not isinstance(top_val, list):
+            continue
+        # C2: skip keys that must not contribute to the nearest-id corpus.
+        if top_key in _CORPUS_DENY_KEYS:
+            continue
+        for idx, item in enumerate(top_val):
+            if not isinstance(item, dict):
+                continue
+            # Try known id fields in priority order
+            found_id = None
+            for id_field in _ID_CANDIDATE_FIELDS:
+                if id_field in item and isinstance(item[id_field], str):
+                    found_id = item[id_field]
+                    break
+            # Fallback: any field whose name ends with "_id"
+            if found_id is None:
+                for k, v in item.items():
+                    if k.endswith("_id") and isinstance(v, str):
+                        found_id = v
+                        break
+            if found_id is not None:
+                jq_path = f".{top_key}[{idx}]"
+                all_ids.append(found_id)
+                # On id collision, keep first occurrence (deterministic)
+                if found_id not in id_map:
+                    # B2: derive kind using lookup table + single-s strip (not rstrip).
+                    kind = _derive_kind(top_key)
+                    id_map[found_id] = (kind, jq_path, item)
+
+    return all_ids, id_map
+
+
+def _resolve_single_pointer(
+    pointer: Dict[str, Any],
+    git_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolve one pointer to a result record per §7.3 report shape.
+
+    git_root is used to anchor relative ``file`` paths.  If None, cwd is used.
+    Always returns a dict; never raises.
+    """
+    base_dir = os.path.abspath(git_root) if git_root else os.getcwd()
+
+    valid, shape_reason = _is_valid_pointer_shape(pointer)
+    if not valid:
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": shape_reason,
+        }
+
+    file_val: str = pointer["file"]
+    id_val: Optional[str] = pointer.get("id")
+    jq_path_val: Optional[str] = pointer.get("jq_path")
+
+    # Resolve file path against git_root
+    if not os.path.isabs(file_val):
+        abs_file = os.path.join(base_dir, file_val)
+    else:
+        abs_file = file_val
+
+    # B1: Containment check — reject paths that escape git_root via traversal.
+    # Applied after forbidden-shape checks (stronger rejection takes priority).
+    abs_file = os.path.normpath(abs_file)
+    base_dir_norm = os.path.normpath(base_dir)
+    if abs_file != base_dir_norm and not abs_file.startswith(base_dir_norm + os.sep):
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": "invalid_shape: path_escapes_git_root",
+        }
+
+    # Check that the path is not a directory
+    if os.path.isdir(abs_file):
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": "invalid_shape: path resolves to a directory",
+        }
+
+    if not os.path.isfile(abs_file):
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": "missing_file",
+        }
+
+    # Load the file
+    try:
+        with open(abs_file, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError as exc:
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": f"file_parse_error: {exc}",
+        }
+    except OSError as exc:
+        return {
+            "pointer": pointer,
+            "exists": False,
+            "reason": f"file_read_error: {exc}",
+        }
+
+    # --- jq_path pointer ---
+    if jq_path_val:
+        # Execute the jq_path against the file; report miss if null/error
+        try:
+            raw = run_jq(["-c", jq_path_val], file_path=abs_file, timeout=10)
+        except JsonUtilsError as exc:
+            return {
+                "pointer": pointer,
+                "exists": False,
+                "reason": f"missing_path: {exc}",
+            }
+        if raw == "null" or not raw:
+            return {
+                "pointer": pointer,
+                "exists": False,
+                "reason": "missing_path",
+            }
+        # Derive kind from the jq path (e.g. ".functional_requirements[2]" -> "functional_requirement")
+        # B2: use _derive_kind (lookup + single-s strip) instead of rstrip.
+        kind: Optional[str] = None
+        m = re.match(r'^\.([\w]+)\[', jq_path_val)
+        if m:
+            raw_key = m.group(1)
+            kind = _derive_kind(raw_key)
+
+        # Build value_preview (first 3 keys of object, or truncated scalar)
+        try:
+            val_obj = json.loads(raw)
+            if isinstance(val_obj, dict):
+                preview_keys = list(val_obj.keys())[:3]
+                value_preview = {k: val_obj[k] for k in preview_keys}
+            else:
+                value_preview = val_obj
+        except (json.JSONDecodeError, ValueError):
+            value_preview = raw[:120]
+
+        result: Dict[str, Any] = {
+            "pointer": pointer,
+            "exists": True,
+            "jq_path": jq_path_val,
+            "value_preview": value_preview,
+        }
+        if kind:
+            result["kind"] = kind
+        return result
+
+    # --- id pointer ---
+    # C3: shape validation guarantees id_val is set; raise instead of bare assert
+    # so -O (optimised) builds don't silently skip the guard.
+    if id_val is None:
+        raise JsonUtilsError("internal: id_val is None; pointer shape check failed")
+    all_ids, id_map = _collect_ids_from_file(data)
+
+    if id_val in id_map:
+        kind_found, resolved_jq, entry = id_map[id_val]
+        # Build value_preview (first 3 keys)
+        preview_keys = list(entry.keys())[:3]
+        value_preview = {k: entry[k] for k in preview_keys}
+        return {
+            "pointer": pointer,
+            "exists": True,
+            "kind": kind_found,
+            "jq_path": resolved_jq,
+            "value_preview": value_preview,
+        }
+    else:
+        # Miss — compute nearest ids from the file's id corpus
+        nearest = _nearest_ids(id_val, all_ids, top_n=3)
+        result = {
+            "pointer": pointer,
+            "exists": False,
+            "reason": "missing_path",
+            "nearest": nearest,
+        }
+        return result
+
+
+def resolve_pointers(
+    pointer_list: List[Any],
+    git_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolve a list of pointers per llm_protocol.md §4/§7.3.
+
+    Args:
+        pointer_list: List of pointer objects (each {file, id} or {file, jq_path}).
+        git_root: Root directory for resolving relative file paths.
+
+    Returns:
+        Report dict: {"results": [...], "summary": {"hits": N, "misses": M}}
+
+    Always returns a valid dict; never raises.
+    """
+    results = []
+    hits = 0
+    misses = 0
+
+    for ptr in pointer_list:
+        record = _resolve_single_pointer(ptr, git_root=git_root)
+        results.append(record)
+        if record.get("exists"):
+            hits += 1
+        else:
+            misses += 1
+
+    return {
+        "results": results,
+        "summary": {"hits": hits, "misses": misses},
+    }
+
+
+def resolve_pointers_from_stdin(
+    out_path: Optional[str] = None,
+    git_root: Optional[str] = None,
+) -> None:
+    """CLI entry point for ``json resolve-pointers``.
+
+    Reads JSON pointer list from stdin. Writes report JSON to ``out_path``
+    (file) or stdout. Always exits 0 — the report is the artifact (§6.4/§7.3).
+    """
+    raw = sys.stdin.read()
+
+    # Parse input — emit a minimal error report on bad JSON rather than crashing
+    try:
+        data = json.loads(raw) if raw.strip() else []
+    except json.JSONDecodeError as exc:
+        report = {
+            "results": [],
+            "summary": {"hits": 0, "misses": 0},
+            "parse_error": str(exc),
+        }
+        _write_report(report, out_path)
+        return
+
+    # C4: §7.3 specifies bare list only; {"pointers": [...]} envelope is not part
+    # of the protocol (§6.1 uses "scoped_entries", not "pointers"). Reject envelope.
+    if not isinstance(data, list):
+        report = {
+            "results": [],
+            "summary": {"hits": 0, "misses": 0},
+            "parse_error": "invalid input: expected a JSON array of pointer objects, got " + type(data).__name__,
+        }
+        _write_report(report, out_path)
+        return
+    pointer_list = data
+
+    report = resolve_pointers(pointer_list, git_root=git_root)
+    _write_report(report, out_path)
+
+
+def _write_report(report: Dict[str, Any], out_path: Optional[str]) -> None:
+    """Write report JSON to out_path or stdout."""
+    output = json.dumps(report, indent=2)
+    if out_path:
+        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write(output + "\n")
+    else:
+        print(output)
+
+
 # --- CLI Setup ---
 
 def main():
@@ -679,6 +1147,26 @@ def main():
     p_schema.add_argument("path", help="Path looking for (e.g. .capabilities)")
     p_schema.add_argument("--repo-root", help="Toolkit root dir (for submodule deployments)")
 
+    # Resolve-pointers (llm_protocol.md §4/§7.3)
+    # Input: pointer list from stdin (no --in flag per §17.1 flag minimalism).
+    # Output: report to --out <path> or stdout.  Always exits 0.
+    p_rp = subparsers.add_parser(
+        "resolve-pointers",
+        help="Validate a JSON pointer list and return a resolution report (always exits 0)",
+    )
+    p_rp.add_argument(
+        "--out",
+        default=None,
+        metavar="PATH",
+        help="Write report JSON to PATH instead of stdout",
+    )
+    p_rp.add_argument(
+        "--git-root",
+        default=None,
+        metavar="DIR",
+        help="Root directory for resolving relative file paths (defaults to cwd)",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -699,6 +1187,10 @@ def main():
             result = json_structure(args.file, args.path)
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
+        elif args.command == "resolve-pointers":
+            # Always exits 0; report is the artifact
+            resolve_pointers_from_stdin(out_path=args.out, git_root=args.git_root)
+            return
 
         if result is not None:
             print(result)
