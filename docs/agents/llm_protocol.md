@@ -664,10 +664,13 @@ Response JSON schemas live at `devspec_toolkit/tools/specdev_tools/llm/schemas/*
 | `pointer_response.schema.json` | LLM pointer bundle emission (inner loop output) |
 | `edit_response.schema.json` | LLM edit proposal (outer loop output) |
 | `remediation_response.schema.json` | LLM remediation plan (remediate loop output) |
+| `bundle_response.schema.json` | Bundle CLI return envelope (success, partial, and failure variants) |
 
 Loop modules import templates and schemas at runtime. Smoke tests assert that each response from a real or mocked LLM validates against its schema before the loop acts on it.
 
 **Model assignments per template** — see §16.1. All five templates default to `haiku-4-5` except `widen_semantic.md` which uses `sonnet-4-6` (the one phase where reasoning quality matters). Subagent invocations override via the Agent tool's `model` parameter; local-LLM mode reads `SPECDEV_LLM_MODEL` from §8.
+
+**Status:** Templates and schemas are live. Prompt templates are at `devspec_toolkit/tools/specdev_tools/llm/prompts/` and response schemas at `devspec_toolkit/tools/specdev_tools/llm/schemas/`. Unit tests for both are at `devspec_toolkit/tests/unit/llm/`.
 
 ---
 

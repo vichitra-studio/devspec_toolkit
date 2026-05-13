@@ -1,0 +1,11 @@
+{
+  "pointers": [
+    { "file": "spec/04_fr_list.json", "id": "fr-example-001" }
+  ],
+  "unresolved": [
+    {
+      "pointer": { "file": "spec/04_fr_list.json", "id": "fr-example-typo" },
+      "reason": "no match; nearest: fr-example-001 (score 0.71)"
+    }
+  ]
+}

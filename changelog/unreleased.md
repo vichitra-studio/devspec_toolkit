@@ -6,6 +6,10 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### LLM Prompt Templates and Response Schemas (Wave A foundation)
+
+Added the complete set of prompt templates and JSON Schema response contracts for the `specdev llm *` loop machinery. Five prompt templates (`inner_plan.md`, `inner_repair.md`, `outer_edit.md`, `outer_remediate.md`, `widen_semantic.md`) live at `tools/specdev_tools/llm/prompts/`; each follows the 4-section front-matter contract (`# meta`, `# system`, `# user`, `# response_shape`) with a YAML meta block and a JSON example that validates against its referenced schema. Four response schemas (`pointer_response.schema.json`, `edit_response.schema.json`, `remediation_response.schema.json`, `bundle_response.schema.json`) live at `tools/specdev_tools/llm/schemas/`; all use JSON Schema draft 2020-12, enforce `additionalProperties: false` on pointer and scoped-entry shapes to block `content` field emission, and the bundle schema uses `oneOf` to handle both full success/partial and minimal failure envelopes. Eight static LLM-response fixtures live at `tools/specdev_tools/llm/test_fixtures/llm_responses/`, including an explicit `INVALID` fixture that asserts schema rejection of a pointer carrying a `content` field. Unit tests at `tests/unit/llm/` assert template structure, meta YAML keys, schema-file existence, response_format value, and that each template's embedded `response_shape` example validates against its schema.
+
 ### Trinity Anchor Schema Split (Phase 2 — anchor hardening)
 
 - **`vc:16-anchor` schema** (`schema/16_anchor.schema.json`): dedicated schema for the Step 16 Trinity Anchor artifact (`spec/16_impl_context.json`). Requires `artifact_role: "anchor"`, `plan.summary`, `plan.ambiguities`, `plan.drift`, and `plan.milestone_index`. Forbids `execution` and `review` via `unevaluatedProperties: false` — these sections belong only to milestone plans (16a/16b/16c).

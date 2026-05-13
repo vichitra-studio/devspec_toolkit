@@ -1,0 +1,31 @@
+{
+  "step": "04",
+  "task": "implement fr-example-001 end-to-end",
+  "bundle_version": "1",
+  "context": {
+    "skill_md": "...",
+    "shared_expectations": "...",
+    "prompt_NN": "...",
+    "claude_md_toolkit": "...",
+    "claude_md_host": "...",
+    "llm_protocol": "...",
+    "step_order": "...",
+    "trace_matrix": "...",
+    "step_docs": "...",
+    "canon_manifest_core": "...",
+    "canon_manifest_project": "..."
+  },
+  "upstream_structure": {
+    "spec/03_glossary.json": { "entry_count": 10, "top_level_keys": ["terms"] }
+  },
+  "step_structure_summary": {
+    "spec/04_fr_list.json": { "entry_count": 5, "ids": ["fr-example-001", "fr-example-002"] }
+  },
+  "scoped_entries": [
+    { "file": "spec/04_fr_list.json", "id": "fr-example-001", "jq_path": ".functional_requirements[0]" }
+  ],
+  "unresolved": [],
+  "iterations": { "inner": 1 },
+  "partial": false,
+  "ok": true
+}

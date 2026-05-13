@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devspec.toolkit/llm/bundle_response.schema.json",
+  "title": "Bundle CLI return envelope",
+  "description": "Shape returned by 'specdev llm bundle'. Two branches: success/partial (full field set) and minimal failure (ok:false + error). No content fields under scoped_entries.",
+  "oneOf": [
+    {
+      "title": "Success or partial bundle",
+      "description": "Orientation bundle assembled. ok:true means fully resolved; ok:false with unresolved means partial.",
+      "type": "object",
+      "required": [
+        "step",
+        "bundle_version",
+        "context",
+        "upstream_structure",
+        "step_structure_summary",
+        "scoped_entries",
+        "unresolved",
+        "iterations",
+        "partial",
+        "ok"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "The pipeline step number (e.g. '04')."
+        },
+        "task": {
+          "type": ["string", "null"],
+          "description": "Natural-language task description passed via --task, or null when omitted."
+        },
+        "bundle_version": {
+          "type": "string",
+          "const": "1",
+          "description": "Protocol version. Currently '1'."
+        },
+        "context": {
+          "type": "object",
+          "description": "Named string slots for always-included orientation artifacts (skill_md, shared_expectations, prompt_NN, etc.).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "upstream_structure": {
+          "type": "object",
+          "description": "Per-upstream-file structural summary: entry counts and top-level keys.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["entry_count", "top_level_keys"],
+            "additionalProperties": false,
+            "properties": {
+              "entry_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "top_level_keys": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "step_structure_summary": {
+          "type": "object",
+          "description": "Per-step-file structural summary: entry counts and id list.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["entry_count", "ids"],
+            "additionalProperties": false,
+            "properties": {
+              "entry_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "ids": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "scoped_entries": {
+          "type": "array",
+          "description": "Pointer-only scoped entries. No content field is permitted on any item.",
+          "items": {
+            "type": "object",
+            "required": ["file", "id", "jq_path"],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "description": "Path to the spec file, relative to git-root."
+              },
+              "id": {
+                "type": "string",
+                "description": "Entry id."
+              },
+              "jq_path": {
+                "type": "string",
+                "description": "jq-path to this entry within the file."
+              }
+            }
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "description": "Pointers that could not be resolved. Non-empty only on partial/failure.",
+          "items": {
+            "type": "object",
+            "required": ["pointer", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "pointer": {
+                "type": "object",
+                "description": "The unresolved pointer attempt.",
+                "additionalProperties": true
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "iterations": {
+          "type": "object",
+          "required": ["inner"],
+          "additionalProperties": false,
+          "properties": {
+            "inner": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of inner-loop iterations executed."
+            }
+          }
+        },
+        "partial": {
+          "type": "boolean",
+          "description": "True when some pointers resolved but some remain unresolved."
+        },
+        "ok": {
+          "type": "boolean",
+          "description": "True iff orientation bundle assembled without error AND (if --task provided) unresolved is empty."
+        }
+      }
+    },
+    {
+      "title": "Minimal failure envelope",
+      "description": "Emitted when the bundle cannot be assembled at all (unknown step, endpoint unreachable, schema not found).",
+      "type": "object",
+      "required": ["ok", "error", "bundle_version"],
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "error": {
+          "type": "string",
+          "description": "Short human-readable description of why assembly failed."
+        },
+        "bundle_version": {
+          "type": "string",
+          "const": "1"
+        }
+      }
+    }
+  ]
+}

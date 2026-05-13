@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devspec.toolkit/llm/remediation_response.schema.json",
+  "title": "LLM remediation plan (outer-remediate loop)",
+  "description": "Shape emitted by the LLM during the outer-remediate loop. Lists specdev CLI commands to resolve spec-check findings, plus a rationale.",
+  "type": "object",
+  "required": ["commands", "rationale"],
+  "additionalProperties": false,
+  "properties": {
+    "commands": {
+      "type": "array",
+      "description": "Ordered list of specdev CLI commands to execute.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["cmd", "expected_effect"],
+        "additionalProperties": false,
+        "properties": {
+          "cmd": {
+            "type": "string",
+            "description": "Full specdev CLI command string. Must begin with 'specdev '.",
+            "pattern": "^specdev "
+          },
+          "expected_effect": {
+            "type": "string",
+            "description": "Brief description of the intended outcome of running this command."
+          }
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "description": "Free-form explanation of the remediation approach and why these commands address the findings."
+    }
+  }
+}

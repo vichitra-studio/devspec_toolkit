@@ -1,0 +1,14 @@
+{
+  "pointers": [
+    {
+      "file": "spec/04_fr_list.json",
+      "id": "fr-example-001",
+      "content": {
+        "fr_id": "fr-example-001",
+        "name": "Example requirement",
+        "owner": "product"
+      }
+    }
+  ],
+  "unresolved": []
+}
