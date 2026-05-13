@@ -10,11 +10,11 @@ Tests cover:
 - --out / stdout wiring
 - File-parse error (corrupt JSON file)
 - B1: path traversal containment
-- B2: kind derivation (single-s strip + lookup table)
+- B2: kind derivation via registry lookup for known files
 - C1: temp path category enforcement
 - C2: canonical_refs_used filtered from nearest[] corpus
 - C4: {"pointers": [...]} envelope rejected
-- _ID_CANDIDATE_FIELDS: non-`id` primary keys resolve deterministically
+- Registry path: non-`id` primary keys resolve deterministically via entry_key_registry
 """
 from __future__ import annotations
 
@@ -32,6 +32,17 @@ from specdev_tools.core.json_utils import (
     resolve_pointers,
     resolve_pointers_from_stdin,
 )
+
+
+# ---------------------------------------------------------------------------
+# Fixture registry path (for T1 + T2 registered-filename tests)
+# ---------------------------------------------------------------------------
+
+_FIXTURE_DIR = os.path.normpath(os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "fixtures", "entry_key_registry",
+))
+"""Directory containing entry_key_registry.json for toolkit unit tests."""
 
 
 # ---------------------------------------------------------------------------
@@ -60,25 +71,26 @@ SAMPLE_SPEC = {
     ],
 }
 
-# Spec with a "capabilities" array to test B2 kind derivation.
+# Spec with a "capabilities" array to test registry kind derivation.
+# Uses capability_id to match the fixture registry for 01_capabilities.json.
 CAPABILITIES_SPEC = {
     "$schema": "vc:01-capabilities",
     "capabilities": [
         {
-            "id": "cap-search",
+            "capability_id": "cap-search",
             "name": "Search",
             "owner": "api",
         },
         {
-            "id": "cap-auth",
+            "capability_id": "cap-auth",
             "name": "Auth",
             "owner": "api",
         },
     ],
 }
 
-# Spec that uses inv_id as the primary entry key (not bare "id").
-# Used to verify _ID_CANDIDATE_FIELDS resolves non-"id" primary keys deterministically.
+# Spec that uses inv_id as the primary entry key.
+# Used to verify the registry resolves non-"id" primary keys deterministically.
 INVARIANTS_SPEC = {
     "$schema": "vc:06-invariants",
     "rules": [
@@ -125,10 +137,10 @@ class TmpSpecDir:
     Usage:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-x"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
     """
 
-    def __init__(self, data: Any, filename: str = "spec.json") -> None:
+    def __init__(self, data: Any, filename: str = "04_fr_list.json") -> None:
         self._data = data
         self._filename = filename
         self._tmpdir: tempfile.TemporaryDirectory | None = None
@@ -264,7 +276,7 @@ class TestResolvePointersHappy:
     def test_id_pointer_resolves(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-newsletter-subscribe"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True
             assert r["kind"] == "functional_requirement"
@@ -275,7 +287,7 @@ class TestResolvePointersHappy:
     def test_jq_path_pointer_resolves(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "jq_path": ".functional_requirements[1]"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True
             assert r["jq_path"] == ".functional_requirements[1]"
@@ -287,14 +299,14 @@ class TestResolvePointersHappy:
                 {"file": ctx.rel_name, "id": "fr-user-login"},
                 {"file": ctx.rel_name, "id": "fr-newsletter-subscribe"},
             ]
-            report = resolve_pointers(ptrs, git_root=ctx.dir)
+            report = resolve_pointers(ptrs, git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             assert report["summary"]["hits"] == 2
             assert report["summary"]["misses"] == 0
 
     def test_value_preview_has_at_most_3_keys(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-newsletter-subscribe"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             preview = report["results"][0]["value_preview"]
             assert isinstance(preview, dict)
             assert len(preview) <= 3
@@ -303,23 +315,23 @@ class TestResolvePointersHappy:
         """Pointer uses path relative to git_root."""
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-user-login"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             assert report["results"][0]["exists"] is True
 
-    # B2: capabilities array → kind "capability" (not "capabilitie")
+    # B2: capabilities array → kind "capability" via registry
     def test_capabilities_kind_derivation(self) -> None:
-        with TmpSpecDir(CAPABILITIES_SPEC) as ctx:
+        with TmpSpecDir(CAPABILITIES_SPEC, filename="01_capabilities.json") as ctx:
             ptr = {"file": ctx.rel_name, "id": "cap-search"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True
             assert r["kind"] == "capability", f"got kind={r['kind']!r}"
 
-    # B2: jq_path branch also uses correct kind derivation
+    # B2: jq_path branch also resolves kind via registry
     def test_capabilities_jq_path_kind_derivation(self) -> None:
-        with TmpSpecDir(CAPABILITIES_SPEC) as ctx:
+        with TmpSpecDir(CAPABILITIES_SPEC, filename="01_capabilities.json") as ctx:
             ptr = {"file": ctx.rel_name, "jq_path": ".capabilities[0]"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True
             assert r["kind"] == "capability", f"got kind={r['kind']!r}"
@@ -332,7 +344,7 @@ class TestResolvePointersHappy:
                 {"file": ctx.rel_name, "id": "fr-user-login"},          # hit
                 {"file": ctx.rel_name, "id": "fr-newsletter-confirm"},  # hit
             ]
-            report = resolve_pointers(ptrs, git_root=ctx.dir)
+            report = resolve_pointers(ptrs, git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             statuses = [r["exists"] for r in report["results"]]
             assert statuses == [False, True, True]
             # Pointer field round-trips in order
@@ -342,11 +354,10 @@ class TestResolvePointersHappy:
     # B1: path with normpath-collapsible traversal that stays inside git_root should resolve
     def test_traversal_that_stays_in_root_resolves(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
-            # "subdir/../spec.json" normalises to "spec.json" — inside git_root
-            ptr = {"file": "subdir/../spec.json", "id": "fr-user-login"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
-            # The file doesn't exist at that exact path but normpath resolves it inside root
-            # After normpath it's just spec.json inside ctx.dir — should be a hit
+            # "subdir/../04_fr_list.json" normalises to "04_fr_list.json" — inside git_root
+            ptr = {"file": f"subdir/../{ctx.rel_name}", "id": "fr-user-login"}
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
+            # After normpath it's just 04_fr_list.json inside ctx.dir — should be a hit
             assert report["results"][0]["exists"] is True
 
 
@@ -359,7 +370,7 @@ class TestResolvePointersMisses:
     def test_missing_file(self) -> None:
         ptr = {"file": "nonexistent_spec.json", "id": "fr-x"}
         with tempfile.TemporaryDirectory() as tmpdir:
-            report = resolve_pointers([ptr], git_root=tmpdir)
+            report = resolve_pointers([ptr], git_root=tmpdir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "missing_file" in r["reason"]
@@ -368,7 +379,7 @@ class TestResolvePointersMisses:
     def test_missing_id(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-nonexistent"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "nearest" in r
@@ -377,21 +388,21 @@ class TestResolvePointersMisses:
     def test_missing_jq_path(self) -> None:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "jq_path": ".functional_requirements[99]"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "missing_path" in r["reason"]
 
     def test_invalid_shape_in_results(self) -> None:
         ptr = "bare-string"
-        report = resolve_pointers([ptr])
+        report = resolve_pointers([ptr], spec_root=_FIXTURE_DIR)
         r = report["results"][0]
         assert r["exists"] is False
         assert "invalid_shape" in r["reason"]
 
     def test_forbidden_path_in_results(self) -> None:
         ptr = {"file": ".specdev/cache.json", "id": "x"}
-        report = resolve_pointers([ptr])
+        report = resolve_pointers([ptr], spec_root=_FIXTURE_DIR)
         r = report["results"][0]
         assert r["exists"] is False
         assert "invalid_shape" in r["reason"]
@@ -400,7 +411,7 @@ class TestResolvePointersMisses:
         """Typo 'fr-newslettr-subscribe' should surface real id as top nearest."""
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             ptr = {"file": ctx.rel_name, "id": "fr-newslettr-subscribe"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             top_nearest = r["nearest"][0]["id"]
@@ -412,7 +423,7 @@ class TestResolvePointersMisses:
             with open(corrupt_path, "w") as fh:
                 fh.write("{not valid json")
             ptr = {"file": "corrupt.json", "id": "fr-x"}
-            report = resolve_pointers([ptr], git_root=tmpdir)
+            report = resolve_pointers([ptr], git_root=tmpdir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "file_parse_error" in r["reason"]
@@ -421,7 +432,7 @@ class TestResolvePointersMisses:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Use a relative path that resolves to the tmpdir itself
             ptr = {"file": ".", "id": "fr-x"}
-            report = resolve_pointers([ptr], git_root=tmpdir)
+            report = resolve_pointers([ptr], git_root=tmpdir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "invalid_shape" in r["reason"]
@@ -430,7 +441,7 @@ class TestResolvePointersMisses:
     def test_path_traversal_escape_is_miss(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             ptr = {"file": "../etc/passwd", "id": "x"}
-            report = resolve_pointers([ptr], git_root=tmpdir)
+            report = resolve_pointers([ptr], git_root=tmpdir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "path_escapes_git_root" in r["reason"]
@@ -438,7 +449,7 @@ class TestResolvePointersMisses:
     # C1: absolute /tmp/ path → invalid_shape miss
     def test_tmp_path_is_invalid_shape_miss(self) -> None:
         ptr = {"file": "/tmp/foo.json", "id": "x"}
-        report = resolve_pointers([ptr])
+        report = resolve_pointers([ptr], spec_root=_FIXTURE_DIR)
         r = report["results"][0]
         assert r["exists"] is False
         assert "invalid_shape" in r["reason"]
@@ -446,7 +457,7 @@ class TestResolvePointersMisses:
     # C1: absolute /var/folders path → invalid_shape miss
     def test_var_folders_path_is_invalid_shape_miss(self) -> None:
         ptr = {"file": "/var/folders/ab/cdef/T/something.json", "id": "x"}
-        report = resolve_pointers([ptr])
+        report = resolve_pointers([ptr], spec_root=_FIXTURE_DIR)
         r = report["results"][0]
         assert r["exists"] is False
         assert "invalid_shape" in r["reason"]
@@ -456,7 +467,7 @@ class TestResolvePointersMisses:
         with TmpSpecDir(SPEC_WITH_CANONICAL_REFS) as ctx:
             # Look for a missing fr-* id — nearest should not surface canon-ref-* entries
             ptr = {"file": ctx.rel_name, "id": "fr-bogus-id"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             nearest_ids = [n["id"] for n in r.get("nearest", [])]
@@ -472,7 +483,7 @@ class TestResolvePointersMisses:
 
 class TestResolvePointersEmpty:
     def test_empty_list(self) -> None:
-        report = resolve_pointers([])
+        report = resolve_pointers([], spec_root=_FIXTURE_DIR)
         assert report["results"] == []
         assert report["summary"]["hits"] == 0
         assert report["summary"]["misses"] == 0
@@ -484,15 +495,15 @@ class TestResolvePointersEmpty:
 
 
 class TestResolvePointersFromStdin:
-    def _run_stdin(self, payload: str, out_path: str | None = None) -> Dict[str, Any]:
+    def _run_stdin(self, payload: str, out_path: str | None = None, git_root: str | None = None) -> Dict[str, Any]:
         with patch("sys.stdin", StringIO(payload)):
             captured = StringIO()
             if out_path is None:
                 with patch("sys.stdout", captured):
-                    resolve_pointers_from_stdin(out_path=None, git_root=None)
+                    resolve_pointers_from_stdin(out_path=None, git_root=git_root, spec_root=_FIXTURE_DIR)
                 return json.loads(captured.getvalue())
             else:
-                resolve_pointers_from_stdin(out_path=out_path, git_root=None)
+                resolve_pointers_from_stdin(out_path=out_path, git_root=git_root, spec_root=_FIXTURE_DIR)
                 with open(out_path, encoding="utf-8") as fh:
                     return json.load(fh)
 
@@ -511,7 +522,7 @@ class TestResolvePointersFromStdin:
             with patch("sys.stdin", StringIO(payload)):
                 captured = StringIO()
                 with patch("sys.stdout", captured):
-                    resolve_pointers_from_stdin(out_path=None, git_root=ctx.dir)
+                    resolve_pointers_from_stdin(out_path=None, git_root=ctx.dir, spec_root=_FIXTURE_DIR)
                 report = json.loads(captured.getvalue())
             assert report["summary"]["hits"] == 1
 
@@ -533,7 +544,7 @@ class TestResolvePointersFromStdin:
             with patch("sys.stdin", StringIO(payload)):
                 captured = StringIO()
                 with patch("sys.stdout", captured):
-                    resolve_pointers_from_stdin(out_path=None, git_root=ctx.dir)
+                    resolve_pointers_from_stdin(out_path=None, git_root=ctx.dir, spec_root=_FIXTURE_DIR)
                 report = json.loads(captured.getvalue())
             # Must be a parse/shape error — NOT a hit
             assert "parse_error" in report
@@ -546,7 +557,7 @@ class TestResolvePointersFromStdin:
             os.close(fd)
             try:
                 with patch("sys.stdin", StringIO(payload)):
-                    resolve_pointers_from_stdin(out_path=out_path, git_root=ctx.dir)
+                    resolve_pointers_from_stdin(out_path=out_path, git_root=ctx.dir, spec_root=_FIXTURE_DIR)
                 with open(out_path, encoding="utf-8") as fh:
                     report = json.load(fh)
                 assert report["summary"]["hits"] == 1
@@ -559,29 +570,29 @@ class TestResolvePointersFromStdin:
             captured = StringIO()
             with patch("sys.stdout", captured):
                 # Should not raise
-                resolve_pointers_from_stdin(out_path=None, git_root=None)
+                resolve_pointers_from_stdin(out_path=None, git_root=None, spec_root=_FIXTURE_DIR)
             report = json.loads(captured.getvalue())
             assert "parse_error" in report
 
 
 # ---------------------------------------------------------------------------
-# _ID_CANDIDATE_FIELDS — deterministic non-"id" primary key resolution
+# Registry-based deterministic non-"id" primary key resolution
 # ---------------------------------------------------------------------------
 
 
-class TestIdCandidateFields:
+class TestRegistryPrimaryKeyResolution:
     """Verify that entries using a non-bare-"id" primary key (e.g. inv_id)
-    are found via _ID_CANDIDATE_FIELDS lookup — not the *_id suffix fallback —
-    so the result is deterministic even when an entry has multiple *_id fields.
+    are found via the entry-key registry, so the result is deterministic
+    even when an entry has multiple *_id fields.
     """
 
     def test_inv_id_primary_key_resolves(self) -> None:
-        """inv_id is a real spec primary key (spec/06_invariants.json rules[]).
+        """inv_id is registered for 06_invariants.json rules[].
         The pointer must hit with kind='rule' and the correct jq_path.
         """
-        with TmpSpecDir(INVARIANTS_SPEC) as ctx:
+        with TmpSpecDir(INVARIANTS_SPEC, filename="06_invariants.json") as ctx:
             ptr = {"file": ctx.rel_name, "id": "inv-data-immutability"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True, f"expected hit; got: {r}"
             assert r["kind"] == "rule", f"expected kind='rule', got kind={r['kind']!r}"
@@ -589,22 +600,75 @@ class TestIdCandidateFields:
 
     def test_inv_id_second_entry_resolves(self) -> None:
         """Second entry in rules[] resolves to correct index deterministically."""
-        with TmpSpecDir(INVARIANTS_SPEC) as ctx:
+        with TmpSpecDir(INVARIANTS_SPEC, filename="06_invariants.json") as ctx:
             ptr = {"file": ctx.rel_name, "id": "inv-auth-required"}
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is True, f"expected hit; got: {r}"
             assert r["jq_path"] == ".rules[1]"
 
     def test_inv_id_miss_surfaces_nearest(self) -> None:
         """A typo on an inv_id produces a miss with nearest[] containing real inv_ids."""
-        with TmpSpecDir(INVARIANTS_SPEC) as ctx:
+        with TmpSpecDir(INVARIANTS_SPEC, filename="06_invariants.json") as ctx:
             ptr = {"file": ctx.rel_name, "id": "inv-data-immutabilty"}  # typo
-            report = resolve_pointers([ptr], git_root=ctx.dir)
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
             r = report["results"][0]
             assert r["exists"] is False
             assert "nearest" in r and len(r["nearest"]) > 0
             assert r["nearest"][0]["id"] == "inv-data-immutability"
+
+
+# ---------------------------------------------------------------------------
+# T1 + T2: _resolve_single_pointer through registered-filename path
+# ---------------------------------------------------------------------------
+
+# SAMPLE_SPEC (defined above) is the FR spec — used as the fixture for T1.
+
+SAMPLE_ROADMAP_SPEC = {
+    "$schema": "vc:14-roadmap",
+    "milestones": [
+        {
+            "milestone_id": "ms-1",
+            "name": "Phase 1",
+            "tasks": [
+                {"task_id": "task-setup-env", "description": "Set up environment"},
+                {"task_id": "task-build-theme", "description": "Build theme"},
+            ],
+            "deliverables": [],
+        }
+    ],
+    "dependencies": [],
+    "trace": [],
+}
+
+
+class TestResolveSinglePointerRegistryPath:
+    """T1 + T2: exercise _resolve_single_pointer through a registered filename,
+    exercising the registry-aware id-lookup path (not the fallback 'spec.json' path).
+    """
+
+    def test_T1_fr_list_registered_filename_hit(self) -> None:
+        """T1: resolve a known fr_id via the registered 04_fr_list.json path."""
+        with TmpSpecDir(SAMPLE_SPEC, filename="04_fr_list.json") as ctx:
+            ptr = {"file": "04_fr_list.json", "id": "fr-newsletter-subscribe"}
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
+            r = report["results"][0]
+            assert r["exists"] is True, f"expected hit; got: {r}"
+            assert r["kind"] == "functional_requirement"
+            assert r["jq_path"] == ".functional_requirements[0]"
+            assert report["summary"]["hits"] == 1
+
+    def test_T2_roadmap_nested_task_registered_filename_hit(self) -> None:
+        """T2: resolve a nested task_id via the registered 14_roadmap.json path."""
+        with TmpSpecDir(SAMPLE_ROADMAP_SPEC, filename="14_roadmap.json") as ctx:
+            ptr = {"file": "14_roadmap.json", "id": "task-build-theme"}
+            report = resolve_pointers([ptr], git_root=ctx.dir, spec_root=_FIXTURE_DIR)
+            r = report["results"][0]
+            assert r["exists"] is True, f"expected hit; got: {r}"
+            assert r["kind"] == "task"
+            # task-build-theme is at milestones[0].tasks[1]
+            assert r["jq_path"] == ".milestones[0].tasks[1]"
+            assert report["summary"]["hits"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -620,7 +684,9 @@ class TestCLIResolvePointers:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             payload = json.dumps([{"file": ctx.rel_name, "id": "fr-user-login"}])
             with patch("sys.stdin", StringIO(payload)):
-                with patch("sys.argv", ["json", "resolve-pointers", "--git-root", ctx.dir]):
+                with patch("sys.argv", ["json", "resolve-pointers",
+                                        "--git-root", ctx.dir,
+                                        "--spec-root", _FIXTURE_DIR]):
                     captured = StringIO()
                     with patch("sys.stdout", captured):
                         json_main()  # must not raise or sys.exit(1)
@@ -632,7 +698,9 @@ class TestCLIResolvePointers:
         with TmpSpecDir(SAMPLE_SPEC) as ctx:
             payload = json.dumps([{"file": ctx.rel_name, "id": "fr-bogus"}])
             with patch("sys.stdin", StringIO(payload)):
-                with patch("sys.argv", ["json", "resolve-pointers", "--git-root", ctx.dir]):
+                with patch("sys.argv", ["json", "resolve-pointers",
+                                        "--git-root", ctx.dir,
+                                        "--spec-root", _FIXTURE_DIR]):
                     captured = StringIO()
                     with patch("sys.stdout", captured):
                         json_main()
@@ -642,7 +710,8 @@ class TestCLIResolvePointers:
     def test_cli_exits_0_on_bad_json(self) -> None:
         from specdev_tools.core.json_utils import main as json_main
         with patch("sys.stdin", StringIO("{bad json")):
-            with patch("sys.argv", ["json", "resolve-pointers"]):
+            with patch("sys.argv", ["json", "resolve-pointers",
+                                    "--spec-root", _FIXTURE_DIR]):
                 captured = StringIO()
                 with patch("sys.stdout", captured):
                     json_main()

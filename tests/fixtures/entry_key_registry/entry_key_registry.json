@@ -1,0 +1,123 @@
+{
+    "_format_version": "1.0",
+    "_comment": "Minimal fixture registry for toolkit unit tests. Contains only enough entries to exercise all loader code paths. NOT a real project registry.",
+    "registry": {
+        "04_fr_list.json": {
+            "step": "04",
+            "arrays": [
+                {
+                    "array_path": ".functional_requirements",
+                    "id_field": "fr_id",
+                    "kind": "functional_requirement"
+                }
+            ]
+        },
+        "01_capabilities.json": {
+            "step": "01",
+            "arrays": [
+                {
+                    "array_path": ".capabilities",
+                    "id_field": "capability_id",
+                    "kind": "capability"
+                }
+            ]
+        },
+        "03_glossary.json": {
+            "step": "03",
+            "arrays": [
+                {
+                    "array_path": ".terms",
+                    "id_field": "term_id",
+                    "kind": "term"
+                }
+            ]
+        },
+        "06_invariants.json": {
+            "step": "06",
+            "arrays": [
+                {
+                    "array_path": ".rules",
+                    "id_field": "inv_id",
+                    "kind": "rule"
+                }
+            ]
+        },
+        "11_redteam.json": {
+            "step": "11",
+            "arrays": [
+                {
+                    "array_path": ".threats",
+                    "id_field": "threat_id",
+                    "kind": "threat"
+                },
+                {
+                    "array_path": ".edge_cases",
+                    "id_field": "id",
+                    "kind": "edge_case"
+                },
+                {
+                    "array_path": ".trace",
+                    "id_field": "id",
+                    "kind": "trace_entry"
+                }
+            ]
+        },
+        "14_roadmap.json": {
+            "step": "14",
+            "arrays": [
+                {
+                    "array_path": ".milestones",
+                    "id_field": "milestone_id",
+                    "kind": "milestone",
+                    "nested": [
+                        {
+                            "array_path": ".tasks",
+                            "id_field": "task_id",
+                            "kind": "task"
+                        },
+                        {
+                            "array_path": ".deliverables",
+                            "id_field": "id",
+                            "kind": "deliverable"
+                        }
+                    ]
+                }
+            ]
+        },
+        "13_extension_manifest.json": {
+            "step": "13",
+            "arrays": [
+                {
+                    "array_path": ".extensions",
+                    "id_field": "extension_id",
+                    "kind": "extension"
+                }
+            ]
+        },
+        "13a_completeness_assessment.json": {
+            "step": "13a",
+            "arrays": []
+        },
+        "16_impl_context.json": {
+            "step": "16",
+            "arrays": []
+        },
+        "corpus_excluded_test.json": {
+            "step": "99",
+            "arrays": [
+                {
+                    "array_path": ".excluded_items",
+                    "id_field": "id",
+                    "kind": "excluded_item",
+                    "corpus_excluded": true
+                }
+            ]
+        },
+        "canonical_refs_used": {
+            "_special": true
+        },
+        "canonical_proposals": {
+            "_special": true
+        }
+    }
+}

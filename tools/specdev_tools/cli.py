@@ -277,6 +277,12 @@ def main():
     sc.add_argument("--include-forward-replay", action="store_true", default=False, help="Include forward-replay check")
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
+    rc.add_argument("--spec-root", required=True, help="Project spec directory containing entry_key_registry.json")
+    rc.add_argument("--repo-root", default=".")
+    rc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
+    rc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
     dol.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
@@ -1805,6 +1811,17 @@ def main():
         from .core.json_utils import main as json_main
         sys.argv = [sys.argv[0]] + args.args
         json_main()
+
+    elif args.cmd == "registry-check":
+        repo_root = os.path.abspath(args.repo_root)
+        spec_root = os.path.abspath(args.spec_root)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        from .validation.registry_check import run_registry_check
+        errs = run_registry_check(spec_root=spec_root, repo_root=repo_root, git_root=git_root)
+        if getattr(args, "json_output", False):
+            _json_exit(errs, "registry-check")
+        else:
+            _print_and_exit_if_errors(errs)
 
     elif args.cmd == "spec-check":
         repo_root = os.path.abspath(args.repo_root)

@@ -194,7 +194,25 @@ def _run_checks(
             "reason": "step_order.json not found",
         }
 
-    # --- 11. Glossary drift ---
+    # --- 11. Registry check (R001-R003) ---
+    registry_file = os.path.join(spec_dir, "entry_key_registry.json") if spec_root is None else os.path.join(spec_root, "entry_key_registry.json")
+    if os.path.isfile(registry_file):
+        from .registry_check import run_registry_check
+
+        effective_spec_root = spec_root or spec_dir
+        reg_errs = run_registry_check(
+            spec_root=effective_spec_root,
+            repo_root=repo_root,
+            git_root=git_root,
+        )
+        checks["registry-check"] = {**_classify(reg_errs), "errors": reg_errs}
+    else:
+        checks["registry-check"] = {
+            "status": "SKIP",
+            "reason": "entry_key_registry.json not present",
+        }
+
+    # --- 13. Glossary drift ---
     glossary_file = os.path.join(spec_dir, "03_glossary.json")
     if os.path.isfile(glossary_file):
         from .glossary_drift_lint import lint_glossary_drift
@@ -210,7 +228,7 @@ def _run_checks(
             "reason": "03_glossary.json not present",
         }
 
-    # --- 12. Forward replay (opt-in) ---
+    # --- 14. Forward replay (opt-in) ---
     if include_forward_replay:
         from .forward_replay_check import check_forward_replay
         from .validate import _resolve_replay_base_ref, _detect_git_root

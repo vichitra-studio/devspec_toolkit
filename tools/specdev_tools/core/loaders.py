@@ -307,6 +307,13 @@ def iter_spec_artifacts(spec_dir: str) -> Iterator[str]:
             dirnames[:] = [d for d in dirnames if d != "migration_backups"]
         for fn in files:
             if fn.endswith(".json"):
+                # Skip entry_key_registry.json — it is project metadata for
+                # the entry-key registry (DEVSPEC-19), not a $schema-bearing
+                # spec artifact. It is validated by ``specdev registry-check``
+                # (also folded into ``spec-check``) rather than by per-file
+                # schema validation.
+                if rel == "." and fn == "entry_key_registry.json":
+                    continue
                 yield os.path.join(root, fn)
 
 

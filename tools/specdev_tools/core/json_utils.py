@@ -23,6 +23,9 @@ import sys
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 
+# Entry-key registry — deterministic id-field lookup per spec file.
+from specdev_tools.core import entry_key_registry as _ekreg
+
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
 # Used to guard read-multi, whose {key: value} construct produces one output object per
 # stream element — breaking the single-keyed-object output contract.
@@ -752,74 +755,37 @@ def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dic
     return [{"id": cand, "score": sc} for sc, cand in scored[:top_n]]
 
 
-# Interim stand-in for DEVSPEC-19's entry-key registry; swap out site is here.
-# Fields treated as entry-id candidates when scanning file arrays.
-# Order: bare "id" first (most common in canon kinds), then domain-specific ids
-# ordered by frequency of primary use across spec/ + devspec_toolkit/canon/.
-# cap_id and gate_id removed (zero occurrences); task_id retained (48 occurrences,
-# primary key for nested tasks[] in spec/14_roadmap.json).
-_ID_CANDIDATE_FIELDS = (
-    "id",             # canon kinds, trace arrays, charter
-    "fr_id",          # 04_fr_list, extras/trace_matrix
-    "term_id",        # 03_glossary
-    "inv_id",         # 06_invariants
-    "nfr_id",         # 07_nfrs
-    "api_id",         # 05_interface_contracts
-    "fixture_id",     # 08_fixtures
-    "milestone_id",   # 09_impl_plan, 14_roadmap
-    "capability_id",  # 01_capabilities
-    "threat_id",      # 11_redteam
-    "job_id",         # 12_ci_gates
-    "component_id",   # 02_system_sketch
-    "task_id",        # 14_roadmap nested tasks[]
-    "metric_id",      # 00_charter success_metrics
-    "seed_id",        # common/seed_manifest
-    "temp_id",        # canonical_proposals (staging; resolved by suffix fallback)
-    "segment_id",     # 00_charter user_segments
-)
+# ---------------------------------------------------------------------------
+# All entry-id lookups now go through entry_key_registry exclusively.
+# Callers must pass spec_root (required) so the registry can be loaded.
+# Files not registered in the registry return empty results — no broad scan.
+# ---------------------------------------------------------------------------
 
 
-# Top-level array keys that must not contribute to the nearest-id corpus.
-# canonical_refs_used is a citation list, not a spec entry registry — its entries
-# are not authoritative IDs and would pollute typo-correction suggestions.
-_CORPUS_DENY_KEYS = frozenset(["canonical_refs_used"])
-
-# Lookup table for kind derivation from known plural array keys where a simple
-# "-s" strip produces the wrong singular (e.g. "capabilities" → "capabilitie"
-# rather than "capability"). Entries not in this table fall back to top_key[:-1].
-_KIND_LOOKUP: Dict[str, str] = {
-    "capabilities": "capability",
-    "aliases": "alias",
-    "entries": "entry",
-    "dependencies": "dependency",
-    "deliverables": "deliverable",
-    "categories": "category",
-    "stories": "story",
-    "factories": "factory",
-    "libraries": "library",
-    "policies": "policy",
-    "utilities": "utility",
-}
-
-
-def _derive_kind(top_key: str) -> str:
-    """Derive a singular kind label from a top-level plural array key (B2).
-
-    Uses a lookup table for known -ies/-ies plurals; falls back to stripping
-    exactly one trailing 's' (not rstrip which would strip all trailing s chars).
-    """
-    if top_key in _KIND_LOOKUP:
-        return _KIND_LOOKUP[top_key]
-    return top_key[:-1] if top_key.endswith("s") else top_key
-
-
-def _collect_ids_from_file(data: Any) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
+def _collect_ids_from_file(
+    data: Any,
+    spec_file: str,
+    spec_root: str,
+) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
     """Walk a parsed JSON object and collect all entry ids.
+
+    For each spec file, the entry-key registry (``<spec_root>/entry_key_registry.json``)
+    is the sole source of truth for which arrays to scan and which id field to use.
+    Files not registered in the registry return empty results — no broad scan.
+    Nested arrays (e.g. ``milestones[].tasks``) are walked using the ``nested``
+    declarations in the registry.
+
+    Args:
+        data: parsed JSON object to index.
+        spec_file: basename or relative path of the spec file (required).
+        spec_root: filesystem path to the project's spec directory (required).
+            The registry is loaded from ``<spec_root>/entry_key_registry.json``.
+            ``FileNotFoundError`` is raised (and propagates) if the registry is absent.
 
     Returns:
       - ``all_ids``: flat list of every discovered id (for nearest-search).
-      - ``id_map``: {id_value -> (wrapper_key, jq_path, entry_object)}
-        where wrapper_key is the array key (e.g. "functional_requirements"),
+      - ``id_map``: {id_value -> (kind, jq_path, entry_object)}
+        where kind is the singular kind label (e.g. "functional_requirement"),
         jq_path is the resolved path (e.g. ".functional_requirements[2]"),
         and entry_object is the raw dict.
     """
@@ -829,46 +795,94 @@ def _collect_ids_from_file(data: Any) -> Tuple[List[str], Dict[str, Tuple[str, s
     if not isinstance(data, dict):
         return all_ids, id_map
 
+    # Registry is the only lookup path. FileNotFoundError propagates (misconfiguration).
+    reg_entries = _ekreg.list_entries(spec_file, spec_root)
+
+    # reg_entries is None  → unknown file — skip (no broad scan)
+    # reg_entries is []    → known file with no entry arrays (no-op)
+    # reg_entries is [...] → known file with registered arrays (may include nested)
+    if reg_entries is None:
+        return all_ids, id_map
+
+    # --- Registry path (known spec file) ---
+    # Split registry entries into top-level and nested.
+    # Nested entries have paths like ".milestones[].tasks".
+    top_level_lookup: Dict[str, Tuple[str, str]] = {}
+    # nested_lookup: parent_key → list of (sub_array_key, id_field, kind)
+    nested_lookup: Dict[str, List[Tuple[str, str, str]]] = {}
+
+    for entry in reg_entries:
+        path = entry.array_path  # e.g. ".milestones" or ".milestones[].tasks"
+        if "[]." in path:
+            # Nested: ".parent[].child" → parent="parent", child="child"
+            parent_part, _, child_part = path.partition("[].")
+            parent_key = parent_part.lstrip(".")
+            nested_lookup.setdefault(parent_key, []).append(
+                (child_part, entry.id_field, entry.kind)
+            )
+        else:
+            arr_key = path.lstrip(".")
+            top_level_lookup[arr_key] = (entry.id_field, entry.kind)
+
     for top_key, top_val in data.items():
         if not isinstance(top_val, list):
             continue
-        # C2: skip keys that must not contribute to the nearest-id corpus.
-        if top_key in _CORPUS_DENY_KEYS:
+        # Skip corpus-excluded keys.
+        if _ekreg.is_corpus_excluded(top_key, spec_root):
             continue
-        for idx, item in enumerate(top_val):
-            if not isinstance(item, dict):
-                continue
-            # Try known id fields in priority order
-            found_id = None
-            for id_field in _ID_CANDIDATE_FIELDS:
-                if id_field in item and isinstance(item[id_field], str):
-                    found_id = item[id_field]
-                    break
-            # Fallback: any field whose name ends with "_id"
-            if found_id is None:
-                for k, v in item.items():
-                    if k.endswith("_id") and isinstance(v, str):
-                        found_id = v
-                        break
-            if found_id is not None:
+        if top_key not in top_level_lookup and top_key not in nested_lookup:
+            # Array not registered for this file — skip deliberately.
+            continue
+
+        if top_key in top_level_lookup:
+            id_field, kind = top_level_lookup[top_key]
+            for idx, item in enumerate(top_val):
+                if not isinstance(item, dict):
+                    continue
+                # Use the registered id field exclusively (deterministic).
+                found_id = item.get(id_field)
+                if not isinstance(found_id, str) or not found_id:
+                    continue
                 jq_path = f".{top_key}[{idx}]"
                 all_ids.append(found_id)
-                # On id collision, keep first occurrence (deterministic)
+                # On id collision, keep first occurrence (deterministic).
                 if found_id not in id_map:
-                    # B2: derive kind using lookup table + single-s strip (not rstrip).
-                    kind = _derive_kind(top_key)
                     id_map[found_id] = (kind, jq_path, item)
+
+        # Walk nested sub-arrays for entries registered under this parent.
+        if top_key in nested_lookup:
+            for parent_idx, parent_item in enumerate(top_val):
+                if not isinstance(parent_item, dict):
+                    continue
+                for sub_key, id_field, kind in nested_lookup[top_key]:
+                    sub_val = parent_item.get(sub_key)
+                    if not isinstance(sub_val, list):
+                        continue
+                    for sub_idx, sub_item in enumerate(sub_val):
+                        if not isinstance(sub_item, dict):
+                            continue
+                        found_id = sub_item.get(id_field)
+                        if not isinstance(found_id, str) or not found_id:
+                            continue
+                        jq_path = f".{top_key}[{parent_idx}].{sub_key}[{sub_idx}]"
+                        all_ids.append(found_id)
+                        if found_id not in id_map:
+                            id_map[found_id] = (kind, jq_path, sub_item)
 
     return all_ids, id_map
 
 
 def _resolve_single_pointer(
     pointer: Dict[str, Any],
+    *,
+    spec_root: str,
     git_root: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Resolve one pointer to a result record per §7.3 report shape.
 
-    git_root is used to anchor relative ``file`` paths.  If None, cwd is used.
+    spec_root (keyword-only, required) is the host-repo spec directory; the
+    entry-key registry is loaded from ``<spec_root>/entry_key_registry.json``.
+    git_root (keyword-only) anchors relative ``file`` paths; defaults to cwd.
     Always returns a dict; never raises.
     """
     base_dir = os.path.abspath(git_root) if git_root else os.getcwd()
@@ -951,13 +965,26 @@ def _resolve_single_pointer(
                 "exists": False,
                 "reason": "missing_path",
             }
-        # Derive kind from the jq path (e.g. ".functional_requirements[2]" -> "functional_requirement")
-        # B2: use _derive_kind (lookup + single-s strip) instead of rstrip.
+        # Derive kind from the registry: look up the terminal array segment's
+        # registered kind.  For nested paths like ".milestones[0].tasks[2]"
+        # we extract ".tasks" to match a registered array_path.
+        # Falls back to omitting the kind field if no registry match exists.
         kind: Optional[str] = None
-        m = re.match(r'^\.([\w]+)\[', jq_path_val)
-        if m:
-            raw_key = m.group(1)
-            kind = _derive_kind(raw_key)
+        # Find all ".<word>[" segments; use the last one to get the array key.
+        seg_matches = re.findall(r'\.([\w]+)\[', jq_path_val)
+        if seg_matches and spec_root:
+            raw_key = seg_matches[-1]
+            try:
+                reg_entries = _ekreg.list_entries(file_val, spec_root)
+                if reg_entries:
+                    # Match by the last array segment name
+                    for reg_e in reg_entries:
+                        reg_arr_key = reg_e.array_path.split("[].")[-1].lstrip(".")
+                        if reg_arr_key == raw_key:
+                            kind = reg_e.kind
+                            break
+            except FileNotFoundError:
+                pass  # registry missing — kind remains None
 
         # Build value_preview (first 3 keys of object, or truncated scalar)
         try:
@@ -985,7 +1012,7 @@ def _resolve_single_pointer(
     # so -O (optimised) builds don't silently skip the guard.
     if id_val is None:
         raise JsonUtilsError("internal: id_val is None; pointer shape check failed")
-    all_ids, id_map = _collect_ids_from_file(data)
+    all_ids, id_map = _collect_ids_from_file(data, spec_file=file_val, spec_root=spec_root)
 
     if id_val in id_map:
         kind_found, resolved_jq, entry = id_map[id_val]
@@ -1013,25 +1040,34 @@ def _resolve_single_pointer(
 
 def resolve_pointers(
     pointer_list: List[Any],
+    *,
+    spec_root: str,
     git_root: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Resolve a list of pointers per llm_protocol.md §4/§7.3.
 
     Args:
         pointer_list: List of pointer objects (each {file, id} or {file, jq_path}).
-        git_root: Root directory for resolving relative file paths.
+        spec_root: Keyword-only, REQUIRED. Filesystem path to the project's spec
+            directory. The entry-key registry is loaded from
+            ``<spec_root>/entry_key_registry.json``. Omitting this raises
+            ``TypeError`` at call time rather than a later FileNotFoundError —
+            this contract supersedes the previous (broken) empty-string default.
+        git_root: Keyword-only. Root directory for resolving relative file paths.
+            Defaults to cwd.
 
     Returns:
         Report dict: {"results": [...], "summary": {"hits": N, "misses": M}}
 
-    Always returns a valid dict; never raises.
+    Always returns a valid dict once spec_root is supplied; never raises beyond
+    the argument-binding TypeError described above.
     """
     results = []
     hits = 0
     misses = 0
 
     for ptr in pointer_list:
-        record = _resolve_single_pointer(ptr, git_root=git_root)
+        record = _resolve_single_pointer(ptr, spec_root=spec_root, git_root=git_root)
         results.append(record)
         if record.get("exists"):
             hits += 1
@@ -1045,11 +1081,15 @@ def resolve_pointers(
 
 
 def resolve_pointers_from_stdin(
+    *,
+    spec_root: str,
     out_path: Optional[str] = None,
     git_root: Optional[str] = None,
 ) -> None:
     """CLI entry point for ``json resolve-pointers``.
 
+    All parameters are keyword-only. ``spec_root`` is REQUIRED and is the
+    host-repo spec directory used to load ``entry_key_registry.json``.
     Reads JSON pointer list from stdin. Writes report JSON to ``out_path``
     (file) or stdout. Always exits 0 — the report is the artifact (§6.4/§7.3).
     """
@@ -1079,7 +1119,7 @@ def resolve_pointers_from_stdin(
         return
     pointer_list = data
 
-    report = resolve_pointers(pointer_list, git_root=git_root)
+    report = resolve_pointers(pointer_list, spec_root=spec_root, git_root=git_root)
     _write_report(report, out_path)
 
 
@@ -1166,6 +1206,16 @@ def main():
         metavar="DIR",
         help="Root directory for resolving relative file paths (defaults to cwd)",
     )
+    p_rp.add_argument(
+        "--spec-root",
+        required=True,
+        metavar="DIR",
+        help=(
+            "Project spec directory containing entry_key_registry.json "
+            "(e.g. ./spec for submodule deployments). "
+            "Required for deterministic id-field lookup via the entry-key registry."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1188,8 +1238,9 @@ def main():
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
         elif args.command == "resolve-pointers":
-            # Always exits 0; report is the artifact
-            resolve_pointers_from_stdin(out_path=args.out, git_root=args.git_root)
+            # Always exits 0; report is the artifact. --spec-root is required by argparse.
+            spec_root_arg = os.path.abspath(args.spec_root)
+            resolve_pointers_from_stdin(spec_root=spec_root_arg, out_path=args.out, git_root=args.git_root)
             return
 
         if result is not None:

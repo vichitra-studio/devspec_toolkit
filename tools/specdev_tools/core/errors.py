@@ -193,6 +193,11 @@ ERROR_CODES = {
     # rules (see analysis/upstream_backlog.py). Informational only — never
     # promoted (deliberately excluded from PROMOTABLE_PAIRS).
     "W613": "UPSTREAM_BACKLOG_UNCLASSIFIED",
+    # Registry checks (R001–R003 / 620–622)
+    # Checks performed by `specdev registry-check` and folded into `spec-check`.
+    "E620": "REGISTRY_MISSING_STEP",     # R001: step in step_order.json not registered
+    "E621": "REGISTRY_PHANTOM_BASENAME", # R002: registered basename not in extraction_paths.json
+    "E622": "REGISTRY_DRIFT",            # R003: registered (array_path, id_field) doesn't match live file
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

@@ -72,7 +72,7 @@ The set of artifacts fed to the local LLM as system context for any step-scoped 
 | `devspec_toolkit/canon/manifest.json` | Core-tier canon registry |
 | `spec/canon/manifest.json` *(if present)* | Project-tier canon registry |
 | `specdev context structure <spec_dir> --step NN` output | Upstream dependency map: which prior-step files + keys feed this step (existing command) |
-| Project-step structure summary (entry-id list per spec file for the current step) | Derived at bundle time by reading each spec file with the **deterministic jq paths registered in story 04a's entry-key registry**. No semantic interpretation — the registry tells the assembler exactly which array to enumerate and which field on each entry is the id; the spec file content is read but never id-shape-inferred. |
+| Project-step structure summary (entry-id list per spec file for the current step) | Derived at bundle time by reading each spec file with the **deterministic jq paths registered in story 04a's entry-key registry**. No semantic interpretation — the registry tells the assembler exactly which array to enumerate and which field on each entry is the id; the spec file content is read but never id-shape-inferred. The registry data file is **project-side** at `<spec_root>/entry_key_registry.json` — it is not shipped inside the toolkit submodule. The bundle assembler resolves it via `--spec-root` (the host repo's spec directory). |
 
 Total size: typically < 30 KB. Cacheable across invocations within a session.
 
@@ -198,6 +198,19 @@ Every miss record carries a `reason` field. The exhaustive set of values the imp
 Note: `missing_path` is reused for two distinct miss cases — id-lookup failure (has `nearest[]`) and jq-path null/error (no `nearest[]`). Consumers can distinguish them by checking whether `nearest` is present in the miss record.
 
 The `nearest` array is computed by the CLI from normalized Levenshtein distance over kebab-tokens of ids in the file (§15), not by an LLM. It exists so the next re-prompt can give the LLM concrete alternatives.
+
+#### 4.2.1 Corpus exclusions
+
+The id lookup corpus is built from registered entry arrays in the entry-key registry. The following array keys are always excluded from the corpus regardless of which spec file contains them:
+
+- `canonical_refs_used` — cross-reference list; these are references to canon entries, not primary ids.
+- `canonical_proposals` — staging proposals awaiting promotion; not yet authoritative ids.
+
+Additional per-array exclusions may be declared via `corpus_excluded: true` in `entry_key_registry.json`. Excluded arrays never appear in `nearest[]` suggestions.
+
+**Location:** `entry_key_registry.json` lives at `<spec_root>/entry_key_registry.json` in the **host project's spec directory** — not inside the toolkit submodule. Each project provides its own registry. Pass `--spec-root <host-spec-path>` to `specdev json resolve-pointers` (required) so the registry is loaded from the correct location.
+
+**Registry health:** `specdev registry-check --spec-root <host-spec-path> --repo-root <toolkit-path>` validates the registry itself (three checks: R001 coverage against `step_order.json`, R002 phantom-basename guard against `extraction_paths.json`, R003 drift detection of registered `array_path`/`id_field` triples against live spec files). This command is folded into `spec-check` — when `entry_key_registry.json` is present, `spec-check` automatically includes the registry-check result in its per-check breakdown.
 
 ### 4.3 Forbidden pointer shapes
 
@@ -405,7 +418,7 @@ All three `specdev llm *` commands follow this policy:
 
 ### 7.1 Error envelope (emitted by lints with `--json`)
 
-The `--json` boolean flag already exists on: `spec-check`, `canonical-integrity`, `hallucination-lint`, `canonical-lint`, `canonical-autofix`, `glossary-drift-check`, `traceability-check`, `completeness-check`. The current top-level envelope is `{status, error_count, warning_count, errors[]}` and each error object has `{code, message, severity}` always present; `path` is present when set. The extensions below add new fields to each error object without removing existing ones — existing consumers continue to work unmodified.
+The `--json` boolean flag already exists on: `spec-check`, `canonical-integrity`, `hallucination-lint`, `canonical-lint`, `canonical-autofix`, `glossary-drift-check`, `traceability-check`, `completeness-check`, `registry-check`. The current top-level envelope is `{status, error_count, warning_count, errors[]}` and each error object has `{code, message, severity}` always present; `path` is present when set. The extensions below add new fields to each error object without removing existing ones — existing consumers continue to work unmodified.
 
 Extended per-error fields: `subcode` (optional string), `file` (string; equals `path` when not split out separately), `jq_path` (string; location within the file), `value` (the offending value), `remediation{}` (structured fix candidates — see example). These are additive; no existing field is renamed or removed.
 
