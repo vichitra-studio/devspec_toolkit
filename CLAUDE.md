@@ -49,6 +49,7 @@ For toolkit-internal development (cwd = toolkit root), the flags default sensibl
 2. **Use `/specdev-context <NN>` instead of `Read` on `spec/*.json`** — it loads schema-aware step context (`context structure` + `extract` + `canon`). For targeted reads, use `specdev json read|read-multi`; for targeted edits, use `specdev json patch|insert|delete`. Direct file ops miss cross-step dependencies and bypass schema awareness.
 3. **Read `prompts/shared_expectations.md`** before executing any `prompt_NN_*.md`.
 4. **Forward-only waterfall** — any upstream edit requires replaying every downstream step. Don't fix downstream failures by silently rewriting upstream artifacts.
+5. **`/specdev-context` is also the LLM-agent entry point** — agents use it to load step context before invoking `specdev json` read/patch/insert/delete or `specdev llm bundle` (Wave A, ships); `specdev llm edit`/`remediate` are pending Wave C. See `.claude/skills/specdev-context/SKILL.md` for composition recipes and the model-selection table.
 
 ---
 

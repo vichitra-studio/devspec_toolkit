@@ -1,0 +1,18 @@
+{
+  "$schema": "vc:seed-manifest",
+  "seed_manifest_id": "seed-manifest-llm-fixtures",
+  "version": "0.1.0",
+  "created_at": "2026-01-01T00:00:00Z",
+  "last_updated": "2026-01-01T00:00:00Z",
+  "global_seed_order": ["seed-llm-fixture-placeholder"],
+  "seeds": [
+    {
+      "seed_id": "seed-llm-fixture-placeholder",
+      "path": "docs/seed/seed_fixtures.md",
+      "description": "Placeholder seed — satisfies seed-lint for the e110_missing_canon fixture.",
+      "required": false,
+      "source_type": "doc"
+    }
+  ],
+  "step_requirements": {}
+}
