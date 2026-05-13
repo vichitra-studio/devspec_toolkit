@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://devspec.toolkit/llm/bundle_response.schema.json",
   "title": "Bundle CLI return envelope",
-  "description": "Shape returned by 'specdev llm bundle'. Two branches: success/partial (full field set) and minimal failure (ok:false + error). No content fields under scoped_entries.",
+  "description": "Shape returned by 'specdev llm bundle'. Two branches: success/partial (full field set) and minimal failure (ok:false + error). No content fields under scoped_entries. Large context slots (skill_md, llm_protocol, canon_manifest_core, canon_manifest_project) emit path-ref dicts {__type: 'path_ref', path: '...'} instead of full content; agent fetches on demand via 'specdev json read'.",
   "oneOf": [
     {
       "title": "Success or partial bundle",
@@ -10,6 +10,7 @@
       "type": "object",
       "required": [
         "step",
+        "task",
         "bundle_version",
         "context",
         "upstream_structure",
@@ -37,9 +38,9 @@
         },
         "context": {
           "type": "object",
-          "description": "Named string slots for always-included orientation artifacts (skill_md, shared_expectations, prompt_NN, etc.).",
+          "description": "Named string slots for always-included orientation artifacts. String slots hold file text (shared_expectations, prompt_NN, claude_md_toolkit, claude_md_host). step_order is an inline parsed dict. Large or reference-only slots emit path-ref dicts {__type: 'path_ref', path: '...'} instead of full content (skill_md, llm_protocol, canon_manifest_core, canon_manifest_project, trace_matrix, step_docs); agent fetches on demand via 'specdev json read'. Missing optional files use null.",
           "additionalProperties": {
-            "type": "string"
+            "type": ["string", "object", "null"]
           }
         },
         "upstream_structure": {
@@ -118,6 +119,11 @@
               },
               "reason": {
                 "type": "string"
+              },
+              "nearest": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Top-3 nearest id hints when no match found"
               }
             }
           }

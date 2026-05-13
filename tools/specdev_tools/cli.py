@@ -283,6 +283,17 @@ def main():
     rc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     rc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    llm_p = sub.add_parser("llm", help="LLM-assisted workflow commands")
+    llm_sub = llm_p.add_subparsers(dest="llm_cmd", help="LLM subcommand")
+
+    bundle_p = llm_sub.add_parser("bundle", help="Assemble orientation bundle for a step")
+    bundle_p.add_argument("--step", required=True, help="Step ID (e.g. 04)")
+    bundle_p.add_argument("--task", default=None, help="NL task hint for scoped_entries")
+    bundle_p.add_argument("--out", default=None, help="Write bundle JSON to this path instead of stdout")
+    bundle_p.add_argument("--repo-root", default=".", dest="repo_root")
+    bundle_p.add_argument("--spec-root", required=True, dest="spec_root")
+    bundle_p.add_argument("--git-root", default=None, dest="git_root")
+
     dol = sub.add_parser("dependency-order-lint")
     dol.add_argument("--repo-root", default=".")
     dol.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
@@ -1837,6 +1848,28 @@ def main():
             from .validation.spec_check import run_spec_check
             errs = run_spec_check(repo_root, spec_dir, args.include_forward_replay, git_root, spec_root, project_canon_dir=project_canon_dir)
             _print_and_exit_if_errors(errs)
+
+    elif args.cmd == "llm":
+        if not getattr(args, "llm_cmd", None):
+            llm_p.print_help()
+        elif args.llm_cmd == "bundle":
+            import json as _json
+            from .llm.bundle import run_bundle
+            result = run_bundle(
+                step=args.step,
+                spec_root=os.path.abspath(args.spec_root),
+                repo_root=os.path.abspath(args.repo_root),
+                git_root=os.path.abspath(args.git_root) if args.git_root else None,
+                task=args.task,
+            )
+            payload = _json.dumps(result, indent=2)
+            if args.out:
+                Path(args.out).write_text(payload, encoding="utf-8")
+            else:
+                sys.stdout.write(payload + "\n")
+            sys.exit(0 if result.get("ok") else 1)
+        else:
+            llm_p.print_help()
 
     else:
         p.print_help()
