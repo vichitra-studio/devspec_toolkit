@@ -682,3 +682,105 @@ class TestSpecCheckWiring:
 
             codes = [e.code for e in errs]
             assert "E620" in codes, f"Expected E620 in combined spec-check errors, got: {codes}"
+
+    def test_run_spec_check_json_skip_check_has_no_findings(self) -> None:
+        """DEVSPEC-10: SKIP checks in run_spec_check_json must NOT have a findings key."""
+        from specdev_tools.validation.spec_check import run_spec_check_json
+
+        import io
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = tmpdir
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(os.path.join(repo_root, "tools"))
+            _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            # No registry → registry-check will be SKIP
+
+            captured = io.StringIO()
+            sys.stderr = captured
+            try:
+                _, ctx = run_spec_check_json(repo_root=repo_root, spec_dir=spec_dir)
+            finally:
+                sys.stderr = sys.__stderr__
+
+            checks = ctx["checks"]
+            skip_checks = {name: info for name, info in checks.items() if info.get("status") == "SKIP"}
+            assert skip_checks, f"Expected at least one SKIP check, got: {list(checks.keys())}"
+            for name, info in skip_checks.items():
+                assert "findings" not in info, (
+                    f"SKIP check '{name}' must not have findings key, got: {info}"
+                )
+
+    def test_run_spec_check_json_non_skip_check_has_findings(self) -> None:
+        """DEVSPEC-10: non-SKIP checks in run_spec_check_json must have a findings key (even when empty)."""
+        from specdev_tools.validation.spec_check import run_spec_check_json
+
+        import io
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = tmpdir
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(os.path.join(repo_root, "tools"))
+            _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
+            # Write a clean registry so registry-check runs (not SKIP) and passes
+            _write(spec_dir, "entry_key_registry.json", _make_registry(
+                {},
+                steps_without_entry_arrays={}
+            ))
+
+            captured = io.StringIO()
+            sys.stderr = captured
+            try:
+                _, ctx = run_spec_check_json(repo_root=repo_root, spec_dir=spec_dir)
+            finally:
+                sys.stderr = sys.__stderr__
+
+            checks = ctx["checks"]
+            non_skip = {name: info for name, info in checks.items() if info.get("status") != "SKIP"}
+            assert non_skip, f"Expected at least one non-SKIP check, got: {list(checks.keys())}"
+            for name, info in non_skip.items():
+                assert "findings" in info, (
+                    f"Non-SKIP check '{name}' must have findings key, got: {info}"
+                )
+                assert isinstance(info["findings"], list), (
+                    f"findings must be a list for check '{name}', got: {type(info['findings'])}"
+                )
+
+    def test_run_spec_check_json_findings_contain_error_to_dict_shape(self) -> None:
+        """DEVSPEC-10: non-empty findings in run_spec_check_json have code/message/severity keys."""
+        from specdev_tools.validation.spec_check import run_spec_check_json
+
+        import io
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = tmpdir
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(os.path.join(repo_root, "tools"))
+            _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
+            # Registry exists but step 04 is not registered → E620
+            _write(spec_dir, "entry_key_registry.json", _make_registry({}))
+
+            captured = io.StringIO()
+            sys.stderr = captured
+            try:
+                _, ctx = run_spec_check_json(repo_root=repo_root, spec_dir=spec_dir)
+            finally:
+                sys.stderr = sys.__stderr__
+
+            checks = ctx["checks"]
+            # Find the registry-check which should have an E620 finding
+            rc = checks.get("registry-check", {})
+            assert rc.get("status") != "SKIP", f"registry-check should not be SKIP, got: {rc}"
+            assert "findings" in rc, f"registry-check must have findings, got: {rc}"
+            findings = rc["findings"]
+            assert len(findings) >= 1, f"Expected E620 finding, got: {findings}"
+            finding = findings[0]
+            assert "code" in finding, f"finding must have 'code' key, got: {finding}"
+            assert "message" in finding, f"finding must have 'message' key, got: {finding}"
+            assert "severity" in finding, f"finding must have 'severity' key, got: {finding}"
+            assert finding["severity"] == "error", f"E620 must have severity=error, got: {finding['severity']}"

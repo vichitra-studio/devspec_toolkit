@@ -441,5 +441,135 @@ class CanonicalLintTests(unittest.TestCase):
             self.assertTrue(any("missing_schema_registry" in e.render() for e in errs))
 
 
+class StructuredFieldsLintTests(unittest.TestCase):
+    """DEVSPEC-8: preflight E110 from lint_manifest carries jq_path and value."""
+
+    def test_e110_preflight_alias_unknown_target_carries_jq_path_and_value(self):
+        """lint_manifest E110 for an unknown alias target_id sets jq_path and value."""
+        errs = lint_manifest(
+            {
+                "registry_version": "1.0.0",
+                "entries": [],
+                "aliases": [
+                    {
+                        "kind": "term",
+                        "normalized": "jwt",
+                        "target_id": "cn:project:term:jwt",
+                        "status": "active",
+                    }
+                ],
+            }
+        )
+        e110 = [e for e in errs if e.code == "E110"]
+        self.assertTrue(e110, f"Expected E110, got: {[e.render() for e in errs]}")
+        err = e110[0]
+        self.assertEqual(err.subcode, "UNKNOWN_CANONICAL_ID")
+        # file is intentionally None — lint_manifest has no file context
+        self.assertIsNone(err.file)
+        self.assertIsNotNone(err.jq_path)
+        self.assertEqual(err.jq_path, ".aliases[0].target_id")
+        self.assertEqual(err.value, "cn:project:term:jwt")
+
+    def test_e110_preflight_alias_jq_path_uses_correct_index(self):
+        """jq_path index matches the position of the unknown alias in the list."""
+        errs = lint_manifest(
+            {
+                "registry_version": "1.0.0",
+                "entries": [
+                    {
+                        "id": "cn:core:term:known",
+                        "kind": "term",
+                        "preferred_label": "known",
+                        "definition": "d",
+                        "version": "1.0.0",
+                        "status": "active",
+                        "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                    }
+                ],
+                "aliases": [
+                    {
+                        "kind": "term",
+                        "normalized": "known",
+                        "target_id": "cn:core:term:known",
+                        "status": "active",
+                    },
+                    {
+                        "kind": "term",
+                        "normalized": "unknown",
+                        "target_id": "cn:project:term:unknown",
+                        "status": "active",
+                    },
+                ],
+            }
+        )
+        e110 = [e for e in errs if e.code == "E110"]
+        self.assertTrue(e110, f"Expected E110 for second alias, got: {[e.render() for e in errs]}")
+        err = e110[0]
+        # Second alias (index 1) is unknown
+        self.assertEqual(err.jq_path, ".aliases[1].target_id")
+        self.assertEqual(err.value, "cn:project:term:unknown")
+
+    def test_e210_detect_manifest_modular_drift_aliases_carries_structured_fields(self):
+        """_detect_manifest_modular_drift aliases-differ E210 has subcode, jq_path, and value."""
+        import tempfile
+
+        _ENTRY = {
+            "id": "cn:core:term:jwt",
+            "kind": "term",
+            "preferred_label": "jwt",
+            "version": "1.0.0",
+            "status": "active",
+            "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            canon = root / "canon"
+            (canon / "kinds").mkdir(parents=True)
+            # manifest.json has an extra explicit alias that kinds/term.json does not → aliases differ
+            (canon / "manifest.json").write_text(
+                json.dumps({
+                    "registry_version": "1.0.0",
+                    "entries": [_ENTRY],
+                    "aliases": [
+                        {
+                            "kind": "term",
+                            "normalized": "json web token",
+                            "target_id": "cn:core:term:jwt",
+                            "status": "active",
+                        }
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            # kinds/term.json has the same entry but no explicit aliases
+            (canon / "kinds" / "term.json").write_text(
+                json.dumps({
+                    "registry_version": "1.0.0",
+                    "kind": "term",
+                    "entries": [_ENTRY],
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
+            e210_aliases = [
+                e for e in errs
+                if e.code == "E210"
+                and e.subcode == "CROSS_ARTIFACT_DRIFT"
+                and "aliases" in (e.jq_path or "")
+                and "aliases differ" in e.message
+            ]
+            self.assertTrue(e210_aliases, f"Expected aliases-differ E210, got: {[e.render() for e in errs]}")
+            err = e210_aliases[0]
+            self.assertEqual(err.subcode, "CROSS_ARTIFACT_DRIFT")
+            # file = manifest.json path (authoritative source for cross-manifest drift)
+            self.assertIsNotNone(err.file, "aliases-differ E210 must have file set")
+            self.assertIn("manifest.json", err.file)
+            self.assertEqual(err.jq_path, ".aliases")
+            # value must now be set (not None) — previously this was the bug
+            self.assertIsNotNone(err.value, "aliases-differ E210 must have value set")
+            self.assertIn("manifest_count=", err.value)
+            self.assertIn("modular_count=", err.value)
+
+
 if __name__ == "__main__":
     unittest.main()

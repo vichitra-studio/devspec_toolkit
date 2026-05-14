@@ -11,6 +11,10 @@ class SpecError:
     code: str
     message: str
     path: Optional[str] = None
+    subcode: Optional[str] = None
+    file: Optional[str] = None
+    jq_path: Optional[str] = None
+    value: Optional[str] = None
 
     def render(self) -> str:
         if self.path:
@@ -247,10 +251,22 @@ PROMOTABLE_PAIRS = {
 }
 
 
-def make_error(code: str, message: str, path: Optional[str] = None) -> SpecError:
+def make_error(
+    code: str,
+    message: str,
+    path: Optional[str] = None,
+    *,
+    subcode: Optional[str] = None,
+    file: Optional[str] = None,
+    jq_path: Optional[str] = None,
+    value: Optional[str] = None,
+) -> SpecError:
     if code not in ERROR_CODES:
         raise ValueError(f"Unknown error code: {code}")
-    return SpecError(code=code, message=message, path=path)
+    return SpecError(
+        code=code, message=message, path=path,
+        subcode=subcode, file=file, jq_path=jq_path, value=value,
+    )
 
 
 def render_errors(errors: list[SpecError]) -> list[str]:

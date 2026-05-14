@@ -6,6 +6,42 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### Wave C — Structured Error Envelopes & Remediation Guides (DEVSPEC-8/9/10/11)
+
+#### DEVSPEC-8: Structured fields on canonical-integrity errors
+
+All errors from `canonical/integrity.py` and `canonical/lint.py` now carry four structured fields in addition to `code` and `message`:
+- `subcode` — named sub-classification (e.g. `UNKNOWN_CANONICAL_ID`, `CROSS_ARTIFACT_DRIFT`)
+- `file` — relative path of the spec or canon file involved
+- `jq_path` — leading-dot JSON path to the offending field (e.g. `.aliases[0].target_id`, `.canonical_refs_used`)
+- `value` — the string value that triggered the error
+
+Covered error codes: E110, E120, E210 (three variants: `canonical_refs_used_missing`, `canonical_refs_used_extra`, `unresolved_canonical_semantic`), E211. Documented exceptions: E211 carries `file=None` and `jq_path=None` (cross-file error, no single authoritative path); preflight E110 from `lint_manifest` carries `file=None` (function receives no file context). `_detect_manifest_modular_drift` E210 calls now pass `manifest_file` (relative path to `canon/manifest.json`) so all four fields are populated.
+
+#### DEVSPEC-9: Structured fields on hallucination-lint E530 errors
+
+All 10 `make_error("E530", ...)` call sites in `validation/hallucination_lint.py` now pass all four structured fields. Covered paths: trace-type, stage/environment (scalar + list), unit (scalar + list), command-prefix, pr_rules, cross-ref loop, `EXISTING_STRUCTURE_PATH_NOT_FOUND`, `LINKED_TEST_FILE_NOT_FOUND`, `UNRESOLVED_NFR_REF`. `_collect_values_under_key` replaced by `_collect_path_value_pairs` which returns `(jq_path, value)` tuples with precise leading-dot paths for nested fields (e.g. `.plan.tasks[0].linked_test_expectation`). `_check_path_values` and `_check_nfr_refs` use the new helper.
+
+#### DEVSPEC-10: Per-check `findings` in spec-check --json
+
+`run_spec_check_json` in `validation/spec_check.py` now includes `"findings": [error_to_dict(e) ...]` on every non-SKIP check entry in the JSON context dict. SKIP check entries remain `{"status": "SKIP", "reason": "..."}` with no `findings` key.
+
+#### DEVSPEC-11: Structured remediation blocks in error_to_dict
+
+`core/json_output.py` gains `_make_remediation(err)` which generates a structured remediation block for three subcodes:
+- `UNKNOWN_CANONICAL_ID` → `guide_code: "E110-UNKNOWN_CANONICAL_ID"`, `fix_kind: "REGISTER_CANON_ENTRY"`, one `canon_accept` candidate. Command uses `err.file` (not `<spec-file>`) when the file is known.
+- `INVENTED_ENUM_OR_ID` (only when `jq_path.endswith(".command")`) → `guide_code: "E530-INVENTED_ENUM_OR_ID"`, `fix_kind: "ALLOWLIST_OR_REF"`, two candidates: `extend_prefixes` and `attach_command_ref`.
+- `LINKED_TEST_FILE_NOT_FOUND` → `guide_code: "E530-LINKED_TEST_FILE_NOT_FOUND"`, `fix_kind: "CREATE_OR_FIX_TEST_PATH"`, one `correct_path` candidate. Command uses `err.file` when known.
+
+`error_to_dict` calls `_make_remediation` lazily and includes the result only when non-None. All five optional fields (`path`, `subcode`, `file`, `jq_path`, `value`) use `is not None` guards so empty strings are preserved in JSON output.
+
+**Test additions (1962 total, up from 1942):**
+- `tests/unit/core/test_json_output.py`: `TestErrorToDict` (7 tests), `TestMakeRemediation` (7 tests) covering all three subcode branches, file-in-command contracts, and fallback-placeholder behavior.
+- `tests/unit/canonical/test_canonical_integrity.py`: `StructuredFieldTests` (5 tests) — E110, E120, E210 (missing/extra), E211 structured fields with explicit `jq_path=None` pin for cross-file errors.
+- `tests/unit/canonical/test_canonical_lint.py`: `StructuredFieldsLintTests` (3 tests) — preflight E110 `jq_path` index correctness, `_detect_manifest_modular_drift` aliases-differ E210 `file`/`value` contract.
+- `tests/unit/validation/linters/test_hallucination_lint.py`: `StructuredFieldTests` (11 tests, up from 2) — all 9 previously untested E530 code paths; `CollectPathValuePairsTests` (5 tests) — jq_path precision for nested/list structures.
+- `tests/unit/validation/linters/test_registry_check.py`: `TestSpecCheckWiring` (3 new tests) — SKIP has no `findings`, non-SKIP always has `findings`, findings shape matches `error_to_dict` contract.
+
 ### LLM Test Fixture Catalog (DEVSPEC-21)
 
 Added 5 test fixtures for the LLM offload pipeline. Three spec-fixture directories under `tools/specdev_tools/llm/test_fixtures/specs/` that are readable by `specdev spec-check` and fire specific error codes: `e110_missing_canon/` (E110 UNKNOWN_CANONICAL_ID — `cn:project:*` ID without `--spec-root`), `e530_invented_verb/` (E530 INVENTED_ENUM_OR_ID — verb `frobulate` not in allowlist, no `command_ref` bypass), `e530_missing_test_file/` (E530 LINKED_TEST_FILE_NOT_FOUND — `linked_test_expectation` path that doesn't exist). Two LLM-response JSON fixtures under `llm_responses/`: `pointer_miss_typo.json` (typo in ID `fr-newslettr-subscribe`) and `pointer_miss_wrong_file.json` (correct ID in wrong file), both validating against `pointer_response.schema.json`. Unit test `tests/unit/llm/test_fixture_catalog.py` asserts each spec fixture fires the documented error code and exits non-zero.

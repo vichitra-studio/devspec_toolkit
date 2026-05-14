@@ -5,7 +5,7 @@ import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
-from specdev_tools.validation.hallucination_lint import lint_hallucinations, _extract_path_from_string
+from specdev_tools.validation.hallucination_lint import lint_hallucinations, _extract_path_from_string, _collect_path_value_pairs
 from specdev_tools.validation.spec_check import run_spec_check
 from specdev_tools.core.errors import render_errors
 
@@ -1050,6 +1050,220 @@ class CommandRefBypassAndProjectAllowlistTests(unittest.TestCase):
             )
             self.assertEqual(self._e530_for_prefix(errs, "npm"), [])
             self.assertNotEqual(self._e530_for_prefix(errs, "absentverb"), [])
+
+
+class StructuredFieldTests(unittest.TestCase):
+    """Verify structured fields (subcode, file, jq_path, value) on E530 errors."""
+
+    def test_existing_structure_path_not_found_has_structured_fields(self):
+        """EXISTING_STRUCTURE_PATH_NOT_FOUND E530 must carry all four structured fields."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "15_scaffold.json").write_text(
+                json.dumps({"existing_structures": ["theme/missing_dir/bootstrap.sh"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(spec), repo_root=str(root))
+            hits = [e for e in errs if e.code == "E530" and e.subcode == "EXISTING_STRUCTURE_PATH_NOT_FOUND"]
+            self.assertTrue(hits, "Expected E530 EXISTING_STRUCTURE_PATH_NOT_FOUND")
+            err = hits[0]
+            self.assertEqual(err.subcode, "EXISTING_STRUCTURE_PATH_NOT_FOUND")
+            self.assertIsNotNone(err.file, "file must be set")
+            self.assertIsNotNone(err.jq_path, "jq_path must be set")
+            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
+            self.assertEqual(err.value, "theme/missing_dir/bootstrap.sh")
+
+    def test_linked_test_file_not_found_has_structured_fields(self):
+        """LINKED_TEST_FILE_NOT_FOUND E530 must carry all four structured fields."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "09_impl_plan.json").write_text(
+                json.dumps({"linked_test_expectation": "tests/unit/completely_missing.py"}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(spec), repo_root=str(root))
+            hits = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
+            self.assertTrue(hits, "Expected E530 LINKED_TEST_FILE_NOT_FOUND")
+            err = hits[0]
+            self.assertIsNotNone(err.file)
+            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
+            self.assertEqual(err.value, "tests/unit/completely_missing.py")
+
+    def _lint(self, spec_data: dict, filename: str = "artifact.json") -> list:
+        """Helper: write spec_data to a temp dir and run lint_hallucinations."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / filename).write_text(json.dumps(spec_data), encoding="utf-8")
+            return lint_hallucinations(str(spec), repo_root=str(root))
+
+    def _assert_e530(self, errs, subcode: str, *, file_contains: str = "", jq_path_contains: str = "", value: str = "") -> None:
+        """Assert one E530 with the given subcode has all four structured fields set correctly."""
+        hits = [e for e in errs if e.code == "E530" and e.subcode == subcode]
+        self.assertTrue(hits, f"Expected E530 subcode={subcode} in {[e.render() for e in errs]}")
+        err = hits[0]
+        self.assertEqual(err.subcode, subcode)
+        self.assertIsNotNone(err.file, "E530 file must be set")
+        if file_contains:
+            self.assertIn(file_contains, err.file)
+        self.assertIsNotNone(err.jq_path, "E530 jq_path must be set")
+        self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
+        if jq_path_contains:
+            self.assertIn(jq_path_contains, err.jq_path)
+        self.assertIsNotNone(err.value, "E530 value must be set")
+        if value:
+            self.assertEqual(err.value, value)
+
+    def test_trace_type_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on trace .type field must carry all four structured fields."""
+        errs = self._lint({"trace": [{"type": "invented_trace_type", "id": "t-01"}]})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="type", value="invented_trace_type")
+
+    def test_stage_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .stage field must carry all four structured fields."""
+        errs = self._lint({"stage": "hyperspace"})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="stage", value="hyperspace")
+
+    def test_stages_list_item_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .stages[i] list item must carry all four structured fields."""
+        errs = self._lint({"stages": ["ci", "hyperspace_env"]})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="stages", value="hyperspace_env")
+        hits = [e for e in errs if e.code == "E530" and e.value == "hyperspace_env"]
+        self.assertEqual(hits[0].jq_path, ".stages[1]", "list-item jq_path must include index")
+
+    def test_unit_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .unit field must carry all four structured fields."""
+        errs = self._lint({"unit": "furlongs_per_fortnight"})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="unit", value="furlongs_per_fortnight")
+
+    def test_units_list_item_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .units[i] list item must carry all four structured fields."""
+        errs = self._lint({"units": ["ms", "furlongs_per_fortnight"]})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="units", value="furlongs_per_fortnight")
+        hits = [e for e in errs if e.code == "E530" and e.value == "furlongs_per_fortnight"]
+        self.assertEqual(hits[0].jq_path, ".units[1]", "list-item jq_path must include index")
+
+    def test_command_prefix_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .command field must carry all four structured fields."""
+        errs = self._lint({"jobs": [{"steps": [{"command": "frobnicatecli run tests"}]}]})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="command", value="frobnicatecli")
+
+    def test_pr_rules_invented_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID on .pr_rules[i] must carry all four structured fields."""
+        errs = self._lint({"pr_rules": ["validate", "hyperspacecheck"]})
+        self._assert_e530(errs, "INVENTED_ENUM_OR_ID", jq_path_contains="pr_rules", value="hyperspacecheck")
+
+    def test_cross_ref_invented_id_has_structured_fields(self):
+        """INVENTED_ENUM_OR_ID from the cross-ref loop must carry all four structured fields."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            # a.json defines id="fr-real-001"; b.json references "fr-ghost-999" which is never defined
+            (spec / "04_fr_list.json").write_text(
+                json.dumps({"frs": [{"fr_id": "fr-real-001", "description": "d"}]}),
+                encoding="utf-8",
+            )
+            (spec / "09_impl_plan.json").write_text(
+                json.dumps({"tasks": [{"fr_refs": ["fr-ghost-999"]}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(spec), repo_root=str(root))
+            ghost = [e for e in errs if e.code == "E530" and e.subcode == "INVENTED_ENUM_OR_ID"
+                     and e.value == "fr-ghost-999"]
+            self.assertTrue(ghost, f"Expected E530 for fr-ghost-999 in {[e.render() for e in errs]}")
+            err = ghost[0]
+            self.assertIsNotNone(err.file)
+            self.assertIsNotNone(err.jq_path)
+            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
+            self.assertEqual(err.value, "fr-ghost-999")
+
+    def test_unresolved_nfr_ref_has_structured_fields(self):
+        """UNRESOLVED_NFR_REF E530 must carry all four structured fields."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "07_nfrs.json").write_text(
+                json.dumps({"nfrs": [{"nfr_id": "nfr-perf-001"}]}),
+                encoding="utf-8",
+            )
+            (spec / "09_impl_plan.json").write_text(
+                json.dumps({"tasks": [{"nfr_refs": ["nfr-ghost-999"]}]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(spec), repo_root=str(root))
+            hits = [e for e in errs if e.code == "E530" and e.subcode == "UNRESOLVED_NFR_REF"]
+            self.assertTrue(hits, f"Expected E530 UNRESOLVED_NFR_REF in {[e.render() for e in errs]}")
+            err = hits[0]
+            self.assertEqual(err.subcode, "UNRESOLVED_NFR_REF")
+            self.assertIsNotNone(err.file)
+            self.assertIsNotNone(err.jq_path)
+            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
+            self.assertEqual(err.value, "nfr-ghost-999")
+
+
+class CollectPathValuePairsTests(unittest.TestCase):
+    """Unit tests for _collect_path_value_pairs — jq_path precision."""
+
+    def test_top_level_string_field(self):
+        obj = {"linked_test_expectation": "tests/foo.py"}
+        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
+        assert pairs == [(".linked_test_expectation", "tests/foo.py")]
+
+    def test_nested_field_produces_precise_path(self):
+        obj = {"plan": {"steps": [{"linked_test_expectation": "tests/bar.py"}]}}
+        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
+        assert pairs == [(".plan.steps[0].linked_test_expectation", "tests/bar.py")]
+
+    def test_multiple_occurrences_all_paths_distinct(self):
+        obj = {
+            "tasks": [
+                {"linked_test_expectation": "tests/a.py"},
+                {"linked_test_expectation": "tests/b.py"},
+            ]
+        }
+        pairs = _collect_path_value_pairs(obj, "linked_test_expectation")
+        assert (".tasks[0].linked_test_expectation", "tests/a.py") in pairs
+        assert (".tasks[1].linked_test_expectation", "tests/b.py") in pairs
+        assert len(pairs) == 2
+
+    def test_list_value_produces_indexed_paths(self):
+        obj = {"nfr_refs": ["nfr-perf-001", "nfr-sec-002"]}
+        pairs = _collect_path_value_pairs(obj, "nfr_refs")
+        assert pairs == [
+            (".nfr_refs[0]", "nfr-perf-001"),
+            (".nfr_refs[1]", "nfr-sec-002"),
+        ]
+
+    def test_linked_test_jq_path_appears_in_e530_error(self):
+        """E530 jq_path must reflect the actual nested location, not a static '.key'."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = root / "spec"
+            spec.mkdir()
+            (spec / "09_impl_plan.json").write_text(
+                json.dumps({
+                    "plan": {
+                        "tasks": [
+                            {"linked_test_expectation": "tests/unit/missing.py"}
+                        ]
+                    }
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(spec), repo_root=str(root))
+            e530 = [e for e in errs if e.code == "E530" and e.subcode == "LINKED_TEST_FILE_NOT_FOUND"]
+            assert e530, "Expected an E530 LINKED_TEST_FILE_NOT_FOUND error"
+            assert e530[0].jq_path == ".plan.tasks[0].linked_test_expectation", (
+                f"Expected precise nested jq_path, got: {e530[0].jq_path!r}"
+            )
 
 
 if __name__ == "__main__":

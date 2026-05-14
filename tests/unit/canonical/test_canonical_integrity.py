@@ -619,5 +619,212 @@ class Step10CanonicalRefsNegativeTests(unittest.TestCase):
         self.assertIn("cn:core:id_pattern:conventional-commit", e120[0].render())
 
 
+class StructuredFieldTests(unittest.TestCase):
+    """DEVSPEC-8: E110/E210/E211 errors carry subcode, file, jq_path, value."""
+
+    def _make_root(self, td: str) -> Path:
+        root = Path(td)
+        (root / "canon").mkdir()
+        (root / "spec").mkdir()
+        return root
+
+    def _write_manifest(self, root: Path, entries: list) -> None:
+        (root / "canon" / "manifest.json").write_text(
+            json.dumps({"registry_version": "1.0.0", "entries": entries, "aliases": []}),
+            encoding="utf-8",
+        )
+
+    def test_e110_carries_structured_fields(self):
+        """E110 from _validate_document_integrity has subcode/file/jq_path/value."""
+        with tempfile.TemporaryDirectory() as td:
+            root = self._make_root(td)
+            self._write_manifest(root, [])
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({
+                    "metric_ref": {"id": "cn:core:metric:unknown-metric", "kind": "metric"},
+                    "canonical_refs_used": [],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            e110 = [e for e in errs if e.code == "E110"]
+            self.assertTrue(e110, f"Expected E110, got: {[e.render() for e in errs]}")
+            err = e110[0]
+            self.assertEqual(err.subcode, "UNKNOWN_CANONICAL_ID")
+            self.assertIsNotNone(err.file)
+            self.assertIn("07_nfrs.json", err.file)
+            self.assertIsNotNone(err.jq_path)
+            self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got: {err.jq_path!r}")
+            self.assertIn("metric_ref", err.jq_path)
+            self.assertEqual(err.value, "cn:core:metric:unknown-metric")
+
+    def test_e120_carries_structured_fields(self):
+        """E120 from _validate_document_integrity has subcode/file/jq_path/value."""
+        with tempfile.TemporaryDirectory() as td:
+            root = self._make_root(td)
+            self._write_manifest(root, [
+                {
+                    "id": "cn:core:unit:ms",
+                    "kind": "unit",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                }
+            ])
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({
+                    "latency_ref": {"id": "cn:core:unit:ms", "kind": "metric"},
+                    "canonical_refs_used": [],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            e120 = [e for e in errs if e.code == "E120"]
+            self.assertTrue(e120, f"Expected E120, got: {[e.render() for e in errs]}")
+            err = e120[0]
+            self.assertEqual(err.subcode, "CANONICAL_KIND_MISMATCH")
+            self.assertIsNotNone(err.file)
+            self.assertIn("07_nfrs.json", err.file)
+            self.assertIsNotNone(err.jq_path)
+            self.assertTrue(err.jq_path.startswith("."))
+            self.assertEqual(err.value, "cn:core:unit:ms")
+
+    def test_e210_canonical_refs_used_missing_carries_structured_fields(self):
+        """E210 from refs-used mismatch (missing) has subcode/file/jq_path/value."""
+        with tempfile.TemporaryDirectory() as td:
+            root = self._make_root(td)
+            self._write_manifest(root, [
+                {
+                    "id": "cn:core:unit:ms",
+                    "kind": "unit",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                }
+            ])
+            # latency_ref uses cn:core:unit:ms but canonical_refs_used is empty
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({
+                    "latency_ref": {"id": "cn:core:unit:ms", "kind": "unit"},
+                    "canonical_refs_used": [],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            e210 = [e for e in errs if e.code == "E210" and e.subcode == "CROSS_ARTIFACT_DRIFT"]
+            self.assertTrue(e210, f"Expected E210 CROSS_ARTIFACT_DRIFT, got: {[e.render() for e in errs]}")
+            missing_err = next(
+                (e for e in e210 if "canonical_refs_used_missing" in e.message), None
+            )
+            self.assertIsNotNone(missing_err, "Expected canonical_refs_used_missing E210")
+            self.assertEqual(missing_err.subcode, "CROSS_ARTIFACT_DRIFT")
+            self.assertIn("07_nfrs.json", missing_err.file)
+            self.assertEqual(missing_err.jq_path, ".canonical_refs_used")
+            self.assertIn("cn:core:unit:ms", missing_err.value)
+
+    def test_e210_canonical_refs_used_extra_carries_structured_fields(self):
+        """E210 from refs-used mismatch (extra) has subcode/file/jq_path/value."""
+        with tempfile.TemporaryDirectory() as td:
+            root = self._make_root(td)
+            self._write_manifest(root, [
+                {
+                    "id": "cn:core:unit:ms",
+                    "kind": "unit",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                }
+            ])
+            # canonical_refs_used lists cn:core:unit:ms but no *_ref field uses it
+            (root / "spec" / "07_nfrs.json").write_text(
+                json.dumps({
+                    "description": "no refs used in body",
+                    "canonical_refs_used": [{"id": "cn:core:unit:ms", "kind": "unit"}],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            e210 = [e for e in errs if e.code == "E210" and e.subcode == "CROSS_ARTIFACT_DRIFT"]
+            self.assertTrue(e210, f"Expected E210 CROSS_ARTIFACT_DRIFT, got: {[e.render() for e in errs]}")
+            extra_err = next(
+                (e for e in e210 if "canonical_refs_used_extra" in e.message), None
+            )
+            self.assertIsNotNone(extra_err, "Expected canonical_refs_used_extra E210")
+            self.assertEqual(extra_err.subcode, "CROSS_ARTIFACT_DRIFT")
+            self.assertIn("07_nfrs.json", extra_err.file)
+            self.assertEqual(extra_err.jq_path, ".canonical_refs_used")
+            self.assertIn("cn:core:unit:ms", extra_err.value)
+
+    def test_e211_carries_subcode_and_value_but_no_file(self):
+        """E211 PARTIAL_DRIFT has subcode and value; file is intentionally omitted (cross-file)."""
+        with tempfile.TemporaryDirectory() as td:
+            root = self._make_root(td)
+            self._write_manifest(root, [
+                {
+                    "id": "cn:core:unit:ms",
+                    "kind": "unit",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                },
+                {
+                    "id": "cn:core:unit:seconds",
+                    "kind": "unit",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"},
+                },
+            ])
+            (root / "spec" / "a.json").write_text(
+                json.dumps({
+                    "latency": "p99",
+                    "latency_ref": {"id": "cn:core:unit:ms", "kind": "unit"},
+                    "canonical_refs_used": [{"id": "cn:core:unit:ms", "kind": "unit"}],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            (root / "spec" / "b.json").write_text(
+                json.dumps({
+                    "latency": "p99",
+                    "latency_ref": {"id": "cn:core:unit:seconds", "kind": "unit"},
+                    "canonical_refs_used": [{"id": "cn:core:unit:seconds", "kind": "unit"}],
+                    "canonical_proposals": [],
+                    "canonical_conflicts": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = validate_canonical_integrity(
+                str(root), str(root / "spec"), require_manifest_schema_registration=False
+            )
+            e211 = [e for e in errs if e.code == "E211"]
+            self.assertTrue(e211, f"Expected E211, got: {[e.render() for e in errs]}")
+            err = e211[0]
+            self.assertEqual(err.subcode, "PARTIAL_DRIFT")
+            self.assertIsNotNone(err.value)
+            self.assertIsInstance(err.value, str)
+            # file and jq_path are intentionally None — E211 spans multiple files
+            # and multiple fields; no single authoritative path exists.
+            self.assertIsNone(err.file, f"E211 file should be None (cross-file), got: {err.file!r}")
+            self.assertIsNone(err.jq_path, f"E211 jq_path should be None (cross-file), got: {err.jq_path!r}")
+
+
 if __name__ == "__main__":
     unittest.main()

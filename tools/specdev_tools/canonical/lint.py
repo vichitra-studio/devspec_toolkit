@@ -88,7 +88,7 @@ def lint_canon_dir(
     modular_manifest = _compose_modular_manifest(aliases_doc, aliases_path, kind_docs, errs) if modular_present else None
 
     if manifest is not None and modular_manifest is not None:
-        errs.extend(_detect_manifest_modular_drift(manifest, modular_manifest))
+        errs.extend(_detect_manifest_modular_drift(manifest, modular_manifest, manifest_file=str(manifest_path.relative_to(root))))
         merged = _merge_manifest_data(manifest, modular_manifest)
     elif manifest is not None:
         merged = manifest
@@ -184,7 +184,13 @@ def lint_manifest(manifest: dict[str, Any]) -> list[SpecError]:
             seen_aliases.add(key)
             entry_alias_targets.setdefault(key, set()).add(target)
         if target and target not in known_ids:
-            errs.append(make_error("E110", f"UNKNOWN_CANONICAL_ID alias target={target}"))
+            errs.append(make_error(
+                "E110",
+                f"UNKNOWN_CANONICAL_ID alias target={target}",
+                subcode="UNKNOWN_CANONICAL_ID",
+                jq_path=f".aliases[{i}].target_id",
+                value=target,
+            ))
         has_deprecated_since = alias.get("deprecated_since") or (
             isinstance(alias.get("lifecycle"), dict) and alias["lifecycle"].get("deprecated_since")
         )
@@ -333,7 +339,11 @@ def _merge_manifest_data(manifest: dict[str, Any], modular: dict[str, Any]) -> d
     return merged
 
 
-def _detect_manifest_modular_drift(manifest: dict[str, Any], modular: dict[str, Any]) -> list[SpecError]:
+def _detect_manifest_modular_drift(
+    manifest: dict[str, Any],
+    modular: dict[str, Any],
+    manifest_file: str | None = None,
+) -> list[SpecError]:
     errs: list[SpecError] = []
     manifest_entries = _entries_by_id(manifest.get("entries"))
     modular_entries = _entries_by_id(modular.get("entries"))
@@ -341,19 +351,40 @@ def _detect_manifest_modular_drift(manifest: dict[str, Any], modular: dict[str, 
         only_manifest = sorted(set(manifest_entries.keys()) - set(modular_entries.keys()))
         only_modular = sorted(set(modular_entries.keys()) - set(manifest_entries.keys()))
         errs.append(
-            make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch entries only_manifest={only_manifest} only_modular={only_modular}")
+            make_error(
+                "E210",
+                f"CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch entries only_manifest={only_manifest} only_modular={only_modular}",
+                subcode="CROSS_ARTIFACT_DRIFT",
+                file=manifest_file,
+                jq_path=".entries",
+                value=f"only_manifest={only_manifest} only_modular={only_modular}",
+            )
         )
     for entry_id in sorted(set(manifest_entries.keys()) & set(modular_entries.keys())):
         if _json_sig(manifest_entries[entry_id]) != _json_sig(modular_entries[entry_id]):
             errs.append(
-                make_error("E210", f"CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch entry={entry_id}")
+                make_error(
+                    "E210",
+                    f"CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch entry={entry_id}",
+                    subcode="CROSS_ARTIFACT_DRIFT",
+                    file=manifest_file,
+                    jq_path=".entries",
+                    value=entry_id,
+                )
             )
 
     manifest_aliases = _effective_alias_signatures(manifest)
     modular_aliases = _effective_alias_signatures(modular)
     if manifest_aliases != modular_aliases:
         errs.append(
-            make_error("E210", "CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch aliases differ")
+            make_error(
+                "E210",
+                "CROSS_ARTIFACT_DRIFT canonical_manifest_modular_mismatch aliases differ",
+                subcode="CROSS_ARTIFACT_DRIFT",
+                file=manifest_file,
+                jq_path=".aliases",
+                value=f"manifest_count={len(manifest_aliases)} modular_count={len(modular_aliases)}",
+            )
         )
     return errs
 

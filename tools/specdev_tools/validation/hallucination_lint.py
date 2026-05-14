@@ -101,7 +101,14 @@ def lint_hallucinations(
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
             continue
         if ref_id not in known_ids:
-            errors.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}={ref_id}"))
+            errors.append(make_error(
+                "E530",
+                f"INVENTED_ENUM_OR_ID {rel}:{p}={ref_id}",
+                subcode="INVENTED_ENUM_OR_ID",
+                file=rel,
+                jq_path=f".{p}" if not p.startswith(".") else p,
+                value=ref_id,
+            ))
     return errors
 
 
@@ -121,22 +128,58 @@ def _scan_node(
         if "type" in node and "id" in node and in_trace_container:
             t = node.get("type")
             if isinstance(t, str) and not is_valid_trace_type(t):
-                errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{path}.type={t}"))
+                _type_jq = f".{path}.type" if path else ".type"
+                errs.append(make_error(
+                    "E530",
+                    f"INVENTED_ENUM_OR_ID {rel}:{path}.type={t}",
+                    subcode="INVENTED_ENUM_OR_ID",
+                    file=rel,
+                    jq_path=_type_jq,
+                    value=t,
+                ))
         for key, value in node.items():
             p = f"{path}.{key}" if path else key
             if key in {"stage", "environment"} and isinstance(value, str) and value not in active_stages:
-                errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}={value}"))
+                errs.append(make_error(
+                    "E530",
+                    f"INVENTED_ENUM_OR_ID {rel}:{p}={value}",
+                    subcode="INVENTED_ENUM_OR_ID",
+                    file=rel,
+                    jq_path=f".{p}",
+                    value=value,
+                ))
             if key in {"stages", "environments"} and isinstance(value, list):
                 for idx, item in enumerate(value):
                     if isinstance(item, str) and item not in active_stages:
-                        errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}"))
+                        errs.append(make_error(
+                            "E530",
+                            f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}",
+                            subcode="INVENTED_ENUM_OR_ID",
+                            file=rel,
+                            jq_path=f".{p}[{idx}]",
+                            value=item,
+                        ))
             if key in {"unit", "units"}:
                 if isinstance(value, str) and not _is_valid_unit(value, canon):
-                    errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}={value}"))
+                    errs.append(make_error(
+                        "E530",
+                        f"INVENTED_ENUM_OR_ID {rel}:{p}={value}",
+                        subcode="INVENTED_ENUM_OR_ID",
+                        file=rel,
+                        jq_path=f".{p}",
+                        value=value,
+                    ))
                 if isinstance(value, list):
                     for idx, item in enumerate(value):
                         if isinstance(item, str) and not _is_valid_unit(item, canon):
-                            errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}"))
+                            errs.append(make_error(
+                                "E530",
+                                f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}",
+                                subcode="INVENTED_ENUM_OR_ID",
+                                file=rel,
+                                jq_path=f".{p}[{idx}]",
+                                value=item,
+                            ))
             if key == "command" and isinstance(value, str):
                 # Skip prefix check when a sibling command_ref asserts a canon ref.
                 # We DO NOT re-validate that the ref resolves — verb validation is
@@ -152,6 +195,10 @@ def _scan_node(
                             f"Resolve by either (a) attaching a sibling command_ref to a registered canon entry "
                             f"under <spec-root>/canon/kinds/command.json, "
                             f"or (b) appending the prefix to <spec-root>/canon/command_prefixes.json.",
+                            subcode="INVENTED_ENUM_OR_ID",
+                            file=rel,
+                            jq_path=f".{p}",
+                            value=prefix,
                         ))
             if key == "pr_rules" and isinstance(value, list):
                 allowed_pr_rules = {
@@ -161,7 +208,14 @@ def _scan_node(
                 }
                 for idx, item in enumerate(value):
                     if isinstance(item, str) and item not in allowed_pr_rules:
-                        errs.append(make_error("E530", f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}"))
+                        errs.append(make_error(
+                            "E530",
+                            f"INVENTED_ENUM_OR_ID {rel}:{p}[{idx}]={item}",
+                            subcode="INVENTED_ENUM_OR_ID",
+                            file=rel,
+                            jq_path=f".{p}[{idx}]",
+                            value=item,
+                        ))
             errs.extend(_scan_node(rel, value, canon, known_command_prefixes, p, stages=active_stages))
     elif isinstance(node, list):
         for idx, item in enumerate(node):
@@ -258,23 +312,31 @@ def _looks_like_path(s: str) -> bool:
     return "/" in s or any(s.endswith(ext) for ext in _PATH_EXTENSIONS)
 
 
-def _collect_values_under_key(obj: Any, target_key: str) -> list[str]:
-    results: list[str] = []
+def _collect_path_value_pairs(
+    obj: Any, target_key: str, prefix: str = ""
+) -> list[tuple[str, str]]:
+    """Recurse through ``obj`` and return ``(jq_path, value)`` pairs for every
+    occurrence of ``target_key``.  ``jq_path`` uses leading-dot notation so it
+    can be used directly in ``specdev json patch`` commands."""
+    results: list[tuple[str, str]] = []
     if isinstance(obj, dict):
         for k, v in obj.items():
-            if k == target_key and isinstance(v, str):
-                results.append(v)
-            elif k == target_key and isinstance(v, list):
-                for i in v:
-                    if isinstance(i, str):
-                        results.append(i)
-                    elif isinstance(i, dict) and "source_file" in i and isinstance(i["source_file"], str):
-                        results.append(i["source_file"])
+            current = f"{prefix}.{k}" if prefix else f".{k}"
+            if k == target_key:
+                if isinstance(v, str):
+                    results.append((current, v))
+                elif isinstance(v, list):
+                    for idx, item in enumerate(v):
+                        item_path = f"{current}[{idx}]"
+                        if isinstance(item, str):
+                            results.append((item_path, item))
+                        elif isinstance(item, dict) and "source_file" in item and isinstance(item["source_file"], str):
+                            results.append((f"{item_path}.source_file", item["source_file"]))
             else:
-                results.extend(_collect_values_under_key(v, target_key))
+                results.extend(_collect_path_value_pairs(v, target_key, current))
     elif isinstance(obj, list):
-        for item in obj:
-            results.extend(_collect_values_under_key(item, target_key))
+        for idx, item in enumerate(obj):
+            results.extend(_collect_path_value_pairs(item, target_key, f"{prefix}[{idx}]"))
     return results
 
 
@@ -345,10 +407,17 @@ def _check_path_values(
     rel: str, data: Any, path_root: str, key: str, error_tag: str
 ) -> list[SpecError]:
     errs: list[SpecError] = []
-    for value in _collect_values_under_key(data, key):
-        path = _extract_path_from_string(value)
+    for jq_path, raw_value in _collect_path_value_pairs(data, key):
+        path = _extract_path_from_string(raw_value)
         if _looks_like_path(path) and not os.path.exists(os.path.join(path_root, path)):
-            errs.append(make_error("E530", f"{error_tag} {rel}:{key} path={path}"))
+            errs.append(make_error(
+                "E530",
+                f"{error_tag} {rel}:{key} path={path}",
+                subcode=error_tag,
+                file=rel,
+                jq_path=jq_path,
+                value=path,
+            ))
     return errs
 
 
@@ -374,12 +443,17 @@ def _load_nfr_ids(spec_dir: str) -> set[str] | None:
 
 def _check_nfr_refs(rel: str, data: Any, nfr_ids: set[str]) -> list[SpecError]:
     errs: list[SpecError] = []
-    refs: list[str] = []
-    refs.extend(_collect_values_under_key(data, "nfr_refs"))
-    refs.extend(_collect_values_under_key(data, "nfr_ref"))
-    for ref in refs:
-        if ref not in nfr_ids:
-            errs.append(make_error("E530", f"UNRESOLVED_NFR_REF {rel} nfr_ref={ref}"))
+    for key in ("nfr_refs", "nfr_ref"):
+        for jq_path, ref in _collect_path_value_pairs(data, key):
+            if ref not in nfr_ids:
+                errs.append(make_error(
+                    "E530",
+                    f"UNRESOLVED_NFR_REF {rel} nfr_ref={ref}",
+                    subcode="UNRESOLVED_NFR_REF",
+                    file=rel,
+                    jq_path=jq_path,
+                    value=ref,
+                ))
     return errs
 
 

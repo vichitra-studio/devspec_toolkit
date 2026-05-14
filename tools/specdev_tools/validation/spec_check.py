@@ -15,6 +15,7 @@ from typing import Any
 
 from ..core.config import reset_config
 from ..core.errors import SpecError
+from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts
 
 
@@ -311,6 +312,7 @@ def run_spec_check_json(
                 "status": info["status"],
                 "error_count": info["error_count"],
                 "warning_count": info["warning_count"],
+                "findings": [error_to_dict(e) for e in info.get("errors", [])],
             }
     return _collect_errors(checks), {"checks": checks_summary}
 

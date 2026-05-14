@@ -22,7 +22,7 @@ from urllib.parse import urldefrag, urljoin
 
 from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
-from ..core.errors import SpecError, make_error
+from ..core.errors import ERROR_CODES, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
 from ..core.registry import SchemaRegistry
 from ..validation.linter_utils import is_resolved_canonical_ref as _is_resolved_ref
@@ -81,7 +81,12 @@ def validate_canonical_integrity(
         if len(cid_paths) > 1:
             detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                make_error("E211", f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}")
+                make_error(
+                    "E211",
+                    f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}",
+                    subcode="PARTIAL_DRIFT",
+                    value=value,
+                )
             )
     return errors
 
@@ -132,7 +137,12 @@ def validate_canonical_integrity_file(
         if len(cid_paths) > 1:
             detail = " | ".join(f"{cid}@[{','.join(paths)}]" for cid, paths in sorted(cid_paths.items()))
             errors.append(
-                make_error("E211", f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}")
+                make_error(
+                    "E211",
+                    f"PARTIAL_DRIFT kind={kind} value='{value}' {detail}",
+                    subcode="PARTIAL_DRIFT",
+                    value=value,
+                )
             )
     return errors
 
@@ -173,7 +183,20 @@ def _validate_document_integrity(
     for ref_path, ref in _collect_canonical_refs(data):
         ref_errors = registry.validate_ref(ref)
         for err in ref_errors:
-            errors.append(SpecError(code=err.code, message=f"{err.message} {rel}:{ref_path}"))
+            jq = f".{ref_path}" if ref_path != "$" else "."
+            # Direct SpecError() construction (not make_error) is intentional here:
+            # the code is already validated by registry.validate_ref() and we need
+            # to override message with file context. make_error's ERROR_CODES guard
+            # would reject any code not in the registry; if registry ever emits an
+            # unregistered code, this path propagates it visibly rather than raising.
+            errors.append(SpecError(
+                code=err.code,
+                message=f"{err.message} {rel}:{ref_path}",
+                subcode=ERROR_CODES.get(err.code),
+                file=rel,
+                jq_path=jq,
+                value=ref.get("id") if isinstance(ref, dict) else None,
+            ))
 
     declared_ids = _collect_declared_canonical_refs(data)
     observed_ids = _collect_used_canonical_ref_ids(data)
@@ -184,7 +207,11 @@ def _validate_document_integrity(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_missing {rel} ids={missing_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync"
+                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                subcode="CROSS_ARTIFACT_DRIFT",
+                file=rel,
+                jq_path=".canonical_refs_used",
+                value=", ".join(missing_ids),
             )
         )
     if extra_ids:
@@ -192,7 +219,11 @@ def _validate_document_integrity(
             make_error(
                 "E210",
                 f"CROSS_ARTIFACT_DRIFT canonical_refs_used_extra {rel} ids={extra_ids} "
-                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync"
+                f"— run './tools/run_specdev.sh canonical-autofix {rel} --write' to sync",
+                subcode="CROSS_ARTIFACT_DRIFT",
+                file=rel,
+                jq_path=".canonical_refs_used",
+                value=", ".join(extra_ids),
             )
         )
     if enforce_unresolved_semantics:
@@ -323,7 +354,14 @@ def _validate_unresolved_candidates(
         if (field_path, kind, label) in proposals:
             continue
         errors.append(
-            make_error("E210", f"CROSS_ARTIFACT_DRIFT unresolved_canonical_semantic {rel} field={field_path} kind={kind} value={value!r}")
+            make_error(
+                "E210",
+                f"CROSS_ARTIFACT_DRIFT unresolved_canonical_semantic {rel} field={field_path} kind={kind} value={value!r}",
+                subcode="CROSS_ARTIFACT_DRIFT",
+                file=rel,
+                jq_path=f".{field_path}" if field_path else ".",
+                value=value,
+            )
         )
     return errors
 
