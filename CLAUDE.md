@@ -125,9 +125,9 @@ specdev env-check --repo-root ./devspec_toolkit
 
 Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema patterns: `docs/developers/reference.md`. Common submodule-deployment traps:
 
-- **E110 UNKNOWN_CANONICAL_ID on a `cn:project:*` ID**: missing `--spec-root <host-spec>` — project canon isn't loaded.
-- **E530 INVENTED_ENUM_OR_ID on a `command` field**: hallucination-lint restricts the leading verb. Either (a) add a sibling `command_ref` with `id: cn:project:command:<verb>` registered in `<spec-root>/canon/kinds/command.json`, or (b) create/extend `<spec-root>/canon/command_prefixes.json` (`{"allowed_prefixes": ["yq", "kubectl", ...]}`) — merged with the toolkit default at `tools/command_prefixes.json`.
-- **E530 LINKED_TEST_FILE_NOT_FOUND**: hallucination-lint extracts a path-shaped token (slash, or `.py|.ts|.js|.go|.java|.rb|.sh|.json` extension) from the value and existence-checks it against `git_root` then `repo_root`. `bash -c "..."` / `sh -c '...'` wrappers are unwrapped first. Compound commands (`&&`/`||`/`;`) are skipped — no single authoritative path to validate.
+- **E110 UNKNOWN_CANONICAL_ID**: Run `specdev guide E110` for full playbook.
+- **E530 INVENTED_ENUM_OR_ID**: Run `specdev guide E530-INVENTED_ENUM_OR_ID` for full playbook.
+- **E530 LINKED_TEST_FILE_NOT_FOUND**: Run `specdev guide E530-LINKED_TEST_FILE_NOT_FOUND` for full playbook.
 - **Forward-replay silently disabled**: pass `--git-root .` so git ops target the host. Make diff failures fatal: `SPECDEV_REPLAY_DIFF_ERROR_MODE=error`.
 - **`Schema not found`**: confirm `--repo-root` points to the toolkit; check `tools/schema_registry.json`.
 

@@ -24,6 +24,9 @@ specdev = "specdev_tools.cli:main"
 [tool.setuptools.packages.find]
 include = ["specdev_tools*"]
 
+[tool.setuptools.package-data]
+specdev_tools = ["guides/*.yaml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

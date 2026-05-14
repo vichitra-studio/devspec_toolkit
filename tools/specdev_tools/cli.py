@@ -283,6 +283,11 @@ def main():
     rc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     rc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    gd = sub.add_parser("guide", help="Show remediation guide for an error code")
+    gd.add_argument("code", help="Error code to look up, e.g. E110 or E530-INVENTED_ENUM_OR_ID")
+    gd.add_argument("--repo-root", default=".", help="Toolkit root directory (unused for resolution, accepted for consistency)")
+    gd.add_argument("--json", action="store_true", help="Output result as JSON", dest="json_output")
+
     llm_p = sub.add_parser("llm", help="LLM-assisted workflow commands")
     llm_sub = llm_p.add_subparsers(dest="llm_cmd", help="LLM subcommand")
 
@@ -1822,6 +1827,26 @@ def main():
         from .core.json_utils import main as json_main
         sys.argv = [sys.argv[0]] + args.args
         json_main()
+
+    elif args.cmd == "guide":
+        from .core.guide import format_guide_text, load_guides, lookup_guide
+        code_arg = args.code
+        guides = load_guides()
+        entry = lookup_guide(code_arg, guides)
+        if getattr(args, "json_output", False):
+            if entry is not None:
+                print(json.dumps({"code": code_arg, "guide": entry}, indent=2))
+                sys.exit(0)
+            else:
+                print(json.dumps({"code": code_arg, "error": "no remediation guide"}, indent=2))
+                sys.exit(1)
+        else:
+            if entry is not None:
+                sys.stdout.write(format_guide_text(entry, code_arg=code_arg))
+                sys.exit(0)
+            else:
+                print(f"no remediation guide for {code_arg}", file=sys.stderr)
+                sys.exit(1)
 
     elif args.cmd == "registry-check":
         repo_root = os.path.abspath(args.repo_root)

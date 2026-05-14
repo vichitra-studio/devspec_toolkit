@@ -1,0 +1,31 @@
+code: E530
+subcode: INVENTED_ENUM_OR_ID
+title: "Invented enum or ID in command field"
+trigger: |
+  hallucination-lint found a leading verb in a `command` field that is not in
+  the toolkit default allowlist (tools/command_prefixes.json) and is not
+  covered by a sibling `command_ref` whose id is a registered cn:-prefixed
+  canonical command entry.
+resolution: |
+  Choose one of two fixes:
+
+  Option A — extend the project allowlist:
+    Create or edit spec/canon/command_prefixes.json:
+      {"allowed_prefixes": ["<verb>", ...]}
+    This file is merged with the toolkit default at runtime.
+
+  Option B — register as a canonical command and attach a command_ref:
+    1. Add the entry to spec/canon/kinds/command.json:
+         {"id": "cn:project:command:<verb>", "kind": "command",
+          "preferred_label": "<verb>", "owner": "engineering"}
+    2. Add a sibling command_ref in the artifact:
+         "command_ref": {"id": "cn:project:command:<verb>"}
+    hallucination-lint bypasses the prefix check when a command_ref is
+    present; canonical-integrity (E110/E210) then validates the ref.
+
+  Note: `bash -c "<inner>"` / `sh -c '<inner>'` wrappers are legal but
+  discouraged.  Compound commands containing &&, ||, or ; are skipped by
+  the path-validation check.
+see_also:
+  - E530-LINKED_TEST_FILE_NOT_FOUND
+  - E110

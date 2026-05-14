@@ -6,6 +6,19 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### Ticket 12 — `specdev guide <code>` subcommand
+
+New command `specdev guide <code> [--json]` surfaces human-readable remediation playbooks for error codes.
+
+- Accepts bare code (`E110`) or subcoded form (`E530-INVENTED_ENUM_OR_ID`); bare lookup falls back to the base-code catch-all when no exact subcoded entry exists.
+- `--json` emits `{"code": ..., "guide": {...}}` on success or `{"code": ..., "error": "no remediation guide"}` (exit 1) for unknown codes.
+- Human output header reflects the caller's invocation (e.g. `specdev guide E110` shows `=== E110: ... ===`).
+- Guide data in `tools/specdev_tools/guides/*.yaml`; bundled via `pyproject.toml` package-data.
+- Ships four guides: `E110` (UNKNOWN_CANONICAL_ID), `E530-INVENTED_ENUM_OR_ID`, `E530-LINKED_TEST_FILE_NOT_FOUND`, `E530` (catch-all).
+- `devspec_toolkit/CLAUDE.md` troubleshooting bullets for E110/E530 replaced with `specdev guide` pointers (prose now lives in the guide YAML).
+- `docs/developers/error-codes.md` updated with E110/E530 sections referencing `specdev guide`.
+- 34 new tests in `tests/unit/core/test_guide.py` covering loader, lookup, formatting, and CLI dispatch (including header-matches-input contract, base catch-all path, unknown-code exit code).
+
 ### Wave C — Structured Error Envelopes & Remediation Guides (DEVSPEC-8/9/10/11)
 
 #### DEVSPEC-8: Structured fields on canonical-integrity errors

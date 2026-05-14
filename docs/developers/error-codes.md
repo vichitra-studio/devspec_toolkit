@@ -2,6 +2,35 @@
 
 ## Validation Error Codes
 
+### E110 UNKNOWN_CANONICAL_ID
+
+**Trigger**: A `cn:`-prefixed ID used in a spec artifact is not registered in any loaded canon directory (toolkit core canon or project canon).  Commonly fires when `--spec-root` / `--git-root` are omitted and the project-level canon is not discovered, or when the ID is genuinely absent from all canon files.
+
+**Resolution**: Run `specdev guide E110` for the full playbook.  Quick summary:
+1. Re-run the check with the correct flags so the project canon is loaded:
+   ```
+   specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+   ```
+2. If the ID is new, declare it in `canonical_proposals` in the artifact, then promote with `specdev canon-accept`.
+
+**See also**: E120, E211.
+
+### E530 INVENTED_ENUM_OR_ID
+
+**Trigger**: A value in a spec artifact does not match any allowed enum member, canonical ID, or registered entry.  The most common variant is a leading verb in a `command` field that is not in the toolkit or project allowlist.
+
+**Resolution**: Run `specdev guide E530-INVENTED_ENUM_OR_ID` for the full playbook.  Quick summary: extend `spec/canon/command_prefixes.json` with the allowed verb, or register the verb as a canonical command entry and attach a sibling `command_ref`.
+
+**See also**: E530-LINKED_TEST_FILE_NOT_FOUND, E110.
+
+### E530 LINKED_TEST_FILE_NOT_FOUND
+
+**Trigger**: A `linked_test_expectation` field contains a path-shaped token (containing a slash or a recognised extension: `.py`, `.ts`, `.js`, `.go`, `.java`, `.rb`, `.sh`, `.json`) that does not exist on disk.  `bash -c "..."` / `sh -c '...'` wrappers are unwrapped before the check.  Compound commands (`&&`, `||`, `;`) are skipped.
+
+**Resolution**: Run `specdev guide E530-LINKED_TEST_FILE_NOT_FOUND` for the full playbook.  Quick summary: correct the path in the artifact with `specdev json patch`, or create the missing test file at the referenced path.
+
+**See also**: E530-INVENTED_ENUM_OR_ID.
+
 ### E125 ALIAS_SUNSET_EXPIRED
 
 **Trigger**: A canonical alias with a past `sunset_date` is used in a spec artifact.
