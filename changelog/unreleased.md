@@ -6,6 +6,27 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### Ticket 13 — Story 11: Inner verification loop (plan → resolve → repair)
+
+Module `tools/specdev_tools/llm/loop_inner.py` implementing the inner pointer-hallucination firewall per `docs/agents/llm_protocol.md` §5.1.
+
+- **`run_inner_loop()`** public API: takes `task`, `step_structure_summary`, `upstream_structure`, `prompt_nn`, an injected `LLMAdapter`, `spec_root`, `git_root`, and `max_iters`. Returns `{validated_pointers, unresolved, iterations, partial, ok}`.
+- **`LLMAdapter` Protocol** in `tools/specdev_tools/llm/adapter.py`: `@runtime_checkable` Protocol with a single `chat(system, user) -> str` method. Keeps `loop_inner.py` fully decoupled from any HTTP transport.
+- **Three termination conditions** from §5.1, all implemented and independently tested:
+  1. **Empty miss set** — returns validated bundle with `ok=True`.
+  2. **No-shrink for 2 consecutive iterations** — exits with `partial=True` when the last two consecutive iterations show no reduction in miss count.
+  3. **Same miss set twice in a row** — exits with `partial=True` when the fingerprint set of misses is identical across two back-to-back iterations (distinct from the count-based check).
+  4. **Max-iters reached** — falls through to partial return with `unresolved[]`.
+- **Forbidden pointer shapes** (`content` field): explicit guard before `resolve_pointers` (belt-and-suspenders; schema's `additionalProperties: false` also rejects).
+- **Template rendering**: reads `inner_plan.md` / `inner_repair.md` from `tools/specdev_tools/llm/prompts/`, extracts `# system` / `# user` sections, substitutes `{{ var }}` placeholders using `re.sub`. No jinja2 dependency.
+- **Schema validation**: `jsonschema.Draft202012Validator` against `pointer_response.schema.json`. Loaded lazily and cached at module level.
+- **LLM config vars** added to `SpecdevConfig.__slots__` and `__init__` in `tools/specdev_tools/core/config.py`:
+  - `llm_enabled` (`SPECDEV_LLM_ENABLED`)
+  - `llm_inner_max_iters` (`SPECDEV_LLM_INNER_MAX_ITERS`, default 3)
+  - `llm_dry_run` (`SPECDEV_LLM_DRY_RUN`)
+- **`specdev_tools/llm/__init__.py`** updated: exports `run_inner_loop` and `LLMAdapter` via `__all__`.
+- **20 unit tests** in `tests/unit/llm/test_loop_inner.py` covering all termination paths, discard conditions, LLM-emitted unresolved merging, partial-return content guarantees, reason-preservation from `resolve_pointers`, config integration via `SPECDEV_LLM_INNER_MAX_ITERS`, and `_format_nearest` input variants.
+
 ### Ticket 12 — `specdev guide <code>` subcommand
 
 New command `specdev guide <code> [--json]` surfaces human-readable remediation playbooks for error codes.

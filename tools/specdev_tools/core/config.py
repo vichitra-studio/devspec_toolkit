@@ -41,6 +41,12 @@ class SpecdevConfig:
         ``SPECDEV_REPLAY_DIFF_ERROR_MODE`` — ``"error"`` or ``"ignore"``.
     staleness_threshold : int
         ``SPECDEV_STALENESS_THRESHOLD`` — minimum new upstream tokens for W595 (default 3).
+    llm_enabled : bool
+        ``SPECDEV_LLM_ENABLED`` — enable the LLM-assisted workflow commands.
+    llm_inner_max_iters : int
+        ``SPECDEV_LLM_INNER_MAX_ITERS`` — maximum inner-loop iterations (default 3).
+    llm_dry_run : bool
+        ``SPECDEV_LLM_DRY_RUN`` — dry-run mode: skip LLM calls, return empty bundles.
     """
 
     __slots__ = (
@@ -50,6 +56,9 @@ class SpecdevConfig:
         "replay_base_ref",
         "replay_diff_error_mode",
         "staleness_threshold",
+        "llm_enabled",
+        "llm_inner_max_iters",
+        "llm_dry_run",
     )
 
     def __init__(self) -> None:
@@ -70,6 +79,15 @@ class SpecdevConfig:
             )
         except (ValueError, TypeError):
             self.staleness_threshold = 3
+
+        self.llm_enabled: bool = _parse_bool("SPECDEV_LLM_ENABLED")
+        try:
+            self.llm_inner_max_iters: int = int(
+                os.environ.get("SPECDEV_LLM_INNER_MAX_ITERS", "3")
+            )
+        except (ValueError, TypeError):
+            self.llm_inner_max_iters = 3
+        self.llm_dry_run: bool = _parse_bool("SPECDEV_LLM_DRY_RUN")
 
     def __repr__(self) -> str:
         attrs = ", ".join(f"{attr}={getattr(self, attr)!r}" for attr in self.__slots__)
