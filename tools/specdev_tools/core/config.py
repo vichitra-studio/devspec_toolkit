@@ -45,6 +45,8 @@ class SpecdevConfig:
         ``SPECDEV_LLM_ENABLED`` — enable the LLM-assisted workflow commands.
     llm_inner_max_iters : int
         ``SPECDEV_LLM_INNER_MAX_ITERS`` — maximum inner-loop iterations (default 3).
+    llm_outer_max_iters : int
+        ``SPECDEV_LLM_MAX_ITERS`` — maximum outer-loop iterations (default 3).
     llm_dry_run : bool
         ``SPECDEV_LLM_DRY_RUN`` — dry-run mode: skip LLM calls, return empty bundles.
     """
@@ -58,6 +60,7 @@ class SpecdevConfig:
         "staleness_threshold",
         "llm_enabled",
         "llm_inner_max_iters",
+        "llm_outer_max_iters",
         "llm_dry_run",
     )
 
@@ -87,6 +90,12 @@ class SpecdevConfig:
             )
         except (ValueError, TypeError):
             self.llm_inner_max_iters = 3
+        try:
+            self.llm_outer_max_iters: int = int(
+                os.environ.get("SPECDEV_LLM_MAX_ITERS", "3")
+            )
+        except (ValueError, TypeError):
+            self.llm_outer_max_iters = 3
         self.llm_dry_run: bool = _parse_bool("SPECDEV_LLM_DRY_RUN")
 
     def __repr__(self) -> str:

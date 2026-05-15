@@ -6,6 +6,38 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
+### Ticket 15 — Story 13: Outer remediation loop scaffold (snapshot/edit/check/rollback)
+
+Module `tools/specdev_tools/llm/loop_outer.py` implementing the apply-side closed loop per `docs/agents/llm_protocol.md`.
+
+- **`run_outer_loop()`** public API: takes `task`, `validated_pointers`, `step_structure_summary`, an injected `LLMAdapter`, `repo_root`, `spec_dir`, `git_root`, and `max_iters`. Returns `{applied, snapshot_id, spec_check_status, spec_check, files_changed, iterations, partial, ok, unresolved}`. `spec_check.forward_replay` always present — holds forward-replay-check findings from the final spec-check run (empty list when no spec-check was performed).
+- **Snapshot-first**: calls `context.snapshot.save_snapshot` for all affected step files before any mutation. Late-snapshot fires for LLM edits targeting files not covered by `validated_pointers`. On rollback, calls `restore_snapshot` to restore originals atomically.
+- **Edit application**: drives `json_patch` / `json_insert` / `json_delete` from `core/json_utils.py`. Apply errors trigger immediate rollback.
+- **spec-check integration**: runs `run_spec_check_json` after each edit application; feeds findings back to the `outer_edit.md` repair prompt on the next iteration.
+- **Forward-replay scope**: edits targeting any non-final step (per `tools/step_order.json` ordering) trigger `include_forward_replay=True` on the spec-check call.
+- **Three termination conditions**:
+  1. **Clean spec-check** — returns `applied=True, ok=True`.
+  2. **Stagnation** — error count doesn't shrink for 2 consecutive valid iterations → rollback, `ok=False`.
+  3. **Max-iters exhaustion** — rollback, `ok=False`.
+- **Discard policy**: invalid JSON / schema violations skip the iteration without touching stagnation state or triggering rollback.
+- **`max_iters=0` guard**: returns honest partial immediately, no snapshot or LLM calls.
+- **`restore_snapshot()`** added to `tools/specdev_tools/context/snapshot.py`: atomic copy-back mirroring `save_snapshot` style.
+- **`llm_outer_max_iters`** (`SPECDEV_LLM_MAX_ITERS`, default 3) added to `SpecdevConfig` in `tools/specdev_tools/core/config.py`.
+- **`specdev_tools/llm/__init__.py`** updated: exports `run_outer_loop` via `__all__`.
+- **`dry_run` parameter** added to `json_patch`, `json_insert`, `json_delete` in `core/json_utils.py`; CLI gains `--dry-run` flag on `json patch`, `json insert`, `json delete` subcommands.
+- **`validate_against_schema_field(value_str, step_field, repo_root)`** added to `core/json_utils.py`: validates a JSON value string against the schema for a named `<step>.<field>` path. Uses `_effective_schema` + `build_id_index` + `resolve_ref` machinery to fully dereference `$ref` and `allOf` compositions including `vc:` URN refs. Three-part form `<step>.<schema_suffix>.<field>` (step-16 multi-schema disambiguation) returns "not yet implemented" per §15. CLI gains `--against-schema-field STEP.FIELD` and `--repo-root` on `json patch` and `json insert`.
+- **`_find_schema_file` sort fix**: glob matches now returned in deterministic lexicographic order (was non-deterministic for steps with multiple schemas like step 16).
+- **`SPECDEV_LLM_DRY_RUN=1` honored**: `run_outer_loop` exits immediately with no LLM calls, no snapshots, and no filesystem mutations per §15.
+- **Snapshot ID** format is now `snap-<step>-<YYYYmmddTHHMMSSZ>-<4hex>` — sortable and unique per invocation per §15.
+- **One-step-per-invocation guard**: `run_outer_loop` rejects `validated_pointers` that span more than one step with a clear error per §5.2 constraint.
+- **Snapshot failure fast-exit**: if any upfront snapshot fails (step file absent), the loop returns an error immediately rather than proceeding without rollback safety.
+- **`_STEP_ORDER_CACHE` keyed by `repo_root`**: concurrent or sequential calls with different toolkit roots get independent caches (was a single global that leaked across calls).
+- **`SPECDEV_LLM_MAX_ITERS` default corrected to 3** (was 5) to match §5.2 bound.
+- **40 unit tests** in `tests/unit/llm/test_loop_outer.py` covering all termination paths, rollback file-restoration, forward-replay gating, discard conditions, stagnation, stall-count reset on shrink, `max_iters=0`, dry-run mode, one-step constraint enforcement, snapshot failure fast-exit, forward-replay error-count driving `has_errors`, config env-var reading, partial-return contract, `restore_snapshot` round-trip, late-snapshot coverage, apply-error rollback, `spec_check.forward_replay` key present on all return paths, and forward-replay findings surfaced.
+- **13 unit tests** in `tests/unit/core/test_json_utils_dry_run.py` covering `dry_run=True/False` on all three mutation functions, `validate_against_schema_field` against a synthetic schema (valid enum, invalid enum, bad format, unknown step, unknown field, invalid JSON, valid array, invalid array items), and three-part format "not yet implemented" guard.
+
+---
+
 ### Ticket 13 — Story 11: Inner verification loop (plan → resolve → repair)
 
 Module `tools/specdev_tools/llm/loop_inner.py` implementing the inner pointer-hallucination firewall per `docs/agents/llm_protocol.md` §5.1.
