@@ -1,5 +1,5 @@
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-manifest",
   "owner": "system",
   "created_at": "2026-01-15T00:00:00Z",
@@ -12,14 +12,17 @@
       "extension_id": "ext-01-database-schema",
       "title": "Database Schema",
       "area_of_concern": "Data",
-      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy — three dedicated schema sections are needed to cover the data domain.",
+      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy \u2014 three dedicated schema sections are needed to cover the data domain.",
       "required_schema_sections": [
         "tables",
         "relationships",
         "database_config"
       ],
       "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Each table must include a validation_rules section with at least one check constraint. Verify referential integrity across foreign key relationships.",
-      "governance_label_ref": {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      }
     },
     {
       "extension_id": "ext-02-session-management",
@@ -34,10 +37,16 @@
         "session_security"
       ],
       "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for session IDs. Include test coverage for token expiry edge cases. Verify session invalidation on password change events.",
-      "governance_label_ref": {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      }
     }
   ],
   "canonical_refs_used": [
-    {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    }
   ]
 }

@@ -2,7 +2,7 @@
 
 ## Schema URI
 
-`vc:13-extension-generator`
+`vc:13-extension-manifest`
 
 ## Required Changes
 
@@ -66,6 +66,6 @@ been generated.
 
 To generate this artifact from scratch (rather than migrate an existing one), use the canonical step prompt:
 
-- `prompts/prompt_13_extension_generator.md`
+- `prompts/prompt_13_extension_manifest.md`
 
 The generation prompt contains the complete Output Contract, Self-Audit Gate, and schema authority reference needed to produce a valid artifact.

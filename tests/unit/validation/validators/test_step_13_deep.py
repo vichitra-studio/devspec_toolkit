@@ -1,4 +1,4 @@
-"""Deep tests for step 13 extension generator: validator-layer + schema-layer.
+"""Deep tests for step 13 extension manifest: validator-layer + schema-layer.
 
 Validator-layer tests call validate_step_13() directly.
 Schema-layer tests load the shipped schema via the registry and run jsonschema.validate.
@@ -28,7 +28,7 @@ def schema_validator():
     """Build a Draft202012 validator against the shipped step 13 schema."""
     registry = SchemaRegistry(str(TOOLKIT_ROOT))
     ref_registry = registry.to_referencing_registry()
-    schema = registry.store["vc:13-extension-generator"]
+    schema = registry.store["vc:13-extension-manifest"]
     return Draft202012Validator(schema, registry=ref_registry)
 
 

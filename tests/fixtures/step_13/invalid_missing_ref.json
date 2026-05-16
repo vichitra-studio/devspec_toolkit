@@ -1,5 +1,5 @@
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-manifest",
   "owner": "system",
   "created_at": "2026-01-15T00:00:00Z",
@@ -19,7 +19,10 @@
         "database_config"
       ],
       "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Include a validation_rules section with check constraints.",
-      "governance_label_ref": {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"}
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      }
     },
     {
       "extension_id": "ext-02-nonexistent-extension",
@@ -30,11 +33,20 @@
         "session_config"
       ],
       "schema_design_guidelines": "Reuse vc:core:atoms for session fields. Include test coverage for token expiry edge cases.",
-      "governance_label_ref": {"id": "cn:core:governance_label:nonexistent", "kind": "governance_label"}
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:nonexistent",
+        "kind": "governance_label"
+      }
     }
   ],
   "canonical_refs_used": [
-    {"id": "cn:core:governance_label:mandatory", "kind": "governance_label"},
-    {"id": "cn:core:governance_label:nonexistent", "kind": "governance_label"}
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    },
+    {
+      "id": "cn:core:governance_label:nonexistent",
+      "kind": "governance_label"
+    }
   ]
 }

@@ -26,7 +26,7 @@ All extensions follow a strict naming pattern to ensure correct ordering and ing
 
 ## The Extension Manifest
 
-The manifest (`13_extension_manifest.json`) dictates which extensions exist. It validates against `schema/13_extension_generator.schema.json`.
+The manifest (`13_extension_manifest.json`) dictates which extensions exist. It validates against `schema/13_extension_manifest.schema.json`.
 
 The manifest requires an `extension_decision` field declaring whether extensions are needed. When `status` is `"none-required"`, the `extensions` array must be empty. When `status` is `"extensions-required"`, at least one extension entry is required.
 
@@ -34,7 +34,7 @@ The manifest requires an `extension_decision` field declaring whether extensions
 
 ```json
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-v1",
   "owner": "engineering",
   "created_at": "2025-01-15T00:00:00Z",

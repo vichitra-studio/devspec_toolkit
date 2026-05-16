@@ -20,7 +20,7 @@ Design constraints:
       * id_field == id → singularise array name snake→kebab
         (e.g. deliverables → deliverable, edge_cases → edge-case)
   - Basename overrides: schema name ≠ spec basename in two cases:
-      * step 13: schema is 13_extension_generator.schema.json
+      * step 13: schema is 13_extension_manifest.schema.json
                  spec basename is 13_extension_manifest.json
       * step 16: two schemas exist (16_impl_context + 16_anchor);
                  only 16_impl_context.schema.json is used;

@@ -61,7 +61,7 @@ from ..core.constants import STEP_TO_TEMPLATE
 class GeneratedPrompt:
     """Represents a generated migration prompt."""
     
-    filename: str                    # e.g., "01_add_step_13_extension_generator.md"
+    filename: str                    # e.g., "01_add_step_13_extension_manifest.md"
     template_name: str               # Which template was used
     step_id: Optional[str] = None    # Which step it's for
     field_path: Optional[str] = None # For field-level prompts

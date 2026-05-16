@@ -59,7 +59,7 @@ The following files have been identified for review.
 | `prompt_10_governance.md` | PASS |
 | `prompt_11_redteam.md` | PASS |
 | `prompt_12_ci_gates.md` | PASS |
-| `prompt_13_extension_generator.md` | PASS |
+| `prompt_13_extension_manifest.md` | PASS |
 | `prompt_13a_completeness_assessment.md` | PASS |
 | `prompt_14_roadmap.md` | PASS |
 | `prompt_15_scaffold.md` | PASS |
@@ -85,7 +85,7 @@ The following files have been identified for review.
 | `10_governance.schema.json` | PASS |
 | `11_redteam.schema.json` | PASS |
 | `12_ci_gates.schema.json` | PASS |
-| `13_extension_generator.schema.json` | PASS |
+| `13_extension_manifest.schema.json` | PASS |
 | `13a_completeness_assessment.schema.json` | PASS |
 | `14_roadmap.schema.json` | PASS |
 | `15_scaffold.schema.json` | PASS |

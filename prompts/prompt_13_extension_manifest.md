@@ -102,14 +102,14 @@ Typical values: `cn:core:governance_label:mandatory`, `cn:core:governance_label:
 1. The `extensions` array must be sorted by `extension_id` (ext-01, ext-02...).
 
 # Schema Reference
-- Schema URI: vc:13-extension-generator
-- Schema File: schema/13_extension_generator.schema.json
+- Schema URI: vc:13-extension-manifest
+- Schema File: schema/13_extension_manifest.schema.json
 - Schema Registry: tools/schema_registry.json
 
 # Output Contract
 ```json
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
@@ -143,7 +143,7 @@ Typical values: `cn:core:governance_label:mandatory`, `cn:core:governance_label:
 ### Example B — None Required
 ```json
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-v1",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",

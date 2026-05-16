@@ -351,7 +351,7 @@ def build_trace_matrix(
         schema = data.get("$schema", "")
         # Check if this artifact is an extension file
         art_basename = os.path.basename(art_key) if os.sep in art_key else art_key
-        if "extension_generator" in schema or art_basename.startswith("ext_"):
+        if "13-extension-manifest" in schema or art_basename.startswith("ext_"):
             if "extensions" in data:
                 extensions.extend(data.get("extensions", []))
 

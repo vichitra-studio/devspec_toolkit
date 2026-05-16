@@ -1,11 +1,11 @@
 {
-  "$schema": "vc:13-extension-generator",
+  "$schema": "vc:13-extension-manifest",
   "id": "extension-generator-v1",
   "owner": "system",
   "created_at": "2026-01-15T00:00:00Z",
   "extension_decision": {
     "status": "extensions-required",
-    "rationale": "Claims extensions are required but provides none — this should fail the allOf minItems constraint."
+    "rationale": "Claims extensions are required but provides none \u2014 this should fail the allOf minItems constraint."
   },
   "extensions": [],
   "canonical_refs_used": []

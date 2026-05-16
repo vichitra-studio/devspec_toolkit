@@ -90,7 +90,7 @@ Before starting, ensure your current specs are clean and valid.
 4.  **Step 12: CI Gates**: Do we need a new pipeline check?
     *   *Reference*: `prompts/prompt_12_ci_gates.md`.
 5.  **Step 13: Extensions**: Is this a Plugin/Extension?
-    *   *Reference*: `prompts/prompt_13_extension_generator.md`.
+    *   *Reference*: `prompts/prompt_13_extension_manifest.md`.
 
 ---
 

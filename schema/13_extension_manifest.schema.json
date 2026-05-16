@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "vc:13-extension-generator",
-  "title": "13_extension_generator",
+  "$id": "vc:13-extension-manifest",
+  "title": "13_extension_manifest",
   "type": "object",
   "properties": {
     "extension_decision": {

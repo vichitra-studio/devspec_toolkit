@@ -29,7 +29,7 @@ STEP_TO_TEMPLATE: dict[str, str] = {
     "10": "template_governance.md",
     "11": "template_redteam.md",
     "12": "template_ci_gates.md",
-    "13": "template_extension_generator.md",
+    "13": "template_extension_manifest.md",
     "13a": "template_completeness_assessment.md",
     "14": "template_roadmap.md",
     "15": "template_scaffold.md",

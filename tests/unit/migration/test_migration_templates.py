@@ -11,7 +11,7 @@ EXPECTED_TEMPLATES = [
     "template_ci_gates.md",
     "template_completeness_assessment.md",
     "template_delivery_baseline.md",
-    "template_extension_generator.md",
+    "template_extension_manifest.md",
     "template_fixtures.md",
     "template_frs.md",
     "template_glossary.md",
