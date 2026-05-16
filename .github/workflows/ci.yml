@@ -68,15 +68,40 @@ jobs:
         run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
       - name: Fixtures lint
         run: python -m specdev_tools.cli fixtures-lint spec --repo-root .
+      - name: Registry up-to-date check (W6-T5)
+        run: |
+          # Regenerate registry + extraction_paths to tmpfiles; fail if the
+          # committed artifacts diverge. Catches "schema changed but registry
+          # not regenerated" PRs at CI time.
+          TMPDIR=$(mktemp -d)
+          python -m specdev_tools.cli registry-generate \
+            --repo-root . \
+            --out "$TMPDIR/entry_key_registry.json" \
+            --extraction-paths-out "$TMPDIR/extraction_paths.json"
+          REGEN_CMD="specdev registry-generate --repo-root ./devspec_toolkit --out ./devspec_toolkit/tools/entry_key_registry.json"
+          if ! diff -q "$TMPDIR/entry_key_registry.json" tools/entry_key_registry.json; then
+            echo "::error::Registry out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/extraction_paths.json" tools/extraction_paths.json; then
+            echo "::error::extraction_paths out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/entry_key_registry.json" tests/fixtures/entry_key_registry_golden.json; then
+            echo "::error::Golden snapshot stale. Run '$REGEN_CMD' then cp tools/entry_key_registry.json tests/fixtures/entry_key_registry_golden.json"
+            exit 1
+          fi
       - name: Build trace matrix
         env:
           SPECDEV_MATRIX_STRICT: "1"
-        run: python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json --repo-root .
+        run: |
+          mkdir -p spec/extras
+          python -m specdev_tools.cli matrix spec --out spec/extras/trace_matrix.json --repo-root .
       - name: Upload matrix
         uses: actions/upload-artifact@v4
         with:
           name: trace-matrix
-          path: tools/trace_matrix.json
+          path: spec/extras/trace_matrix.json
           if-no-files-found: error
 
   test:
