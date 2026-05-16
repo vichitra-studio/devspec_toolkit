@@ -197,11 +197,14 @@ ERROR_CODES = {
     # rules (see analysis/upstream_backlog.py). Informational only — never
     # promoted (deliberately excluded from PROMOTABLE_PAIRS).
     "W613": "UPSTREAM_BACKLOG_UNCLASSIFIED",
-    # Registry checks (R001–R003 / 620–622)
+    # Registry checks (R001–R003 / 620–622) and R004 / W614
     # Checks performed by `specdev registry-check` and folded into `spec-check`.
-    "E620": "REGISTRY_MISSING_STEP",     # R001: step in step_order.json not registered
+    "E620": "REGISTRY_MISSING_STEP",     # R001: step in step_order.json not registered (moved to toolkit T-step-registry-coverage)
     "E621": "REGISTRY_PHANTOM_BASENAME", # R002: registered basename not in extraction_paths.json
     "E622": "REGISTRY_DRIFT",            # R003: registered (array_path, id_field) doesn't match live file
+    # R004: host-side novelty detection — array with id-pattern items not declared in registry.
+    # Severity is WARNING (not error) because the generator may not yet cover the new array.
+    "W614": "UNREGISTERED_ARRAY",        # R004: host spec has array with *_id items unknown to toolkit registry
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.

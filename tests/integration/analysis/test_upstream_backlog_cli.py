@@ -93,7 +93,7 @@ def test_malformed_plan_triggers_exit_two(broken_spec: Path):
 def test_severity_high_filters_out_lower(clean_spec: Path):
     r = _run_cli(clean_spec, "--severity", "high")
     assert r.returncode == 0
-    # Per spec §4 worked example, only amb-new-responsive-375 is high —
+    # Only amb-new-responsive-375 is high —
     # lands in Unclassified. Plan-level (all low) must be gone; Step 09
     # (low-severity wcag-pairing-ratchet) must also be gone.
     assert "Plan-level" not in r.stdout

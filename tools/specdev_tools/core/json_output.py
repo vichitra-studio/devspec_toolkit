@@ -20,7 +20,7 @@ def _make_remediation(err: SpecError) -> dict[str, Any] | None:
     """Generate a unified remediation block for actionable E110/E530 errors.
 
     Shape: {guide_code, parameters: {fix_kind, candidates[], references[]}, owner_story}
-    §17.4 outer envelope + §7.1 candidates inside parameters.
+    Outer envelope with guide_code/parameters/owner_story; candidates nested inside parameters.
     """
     if err.subcode == "UNKNOWN_CANONICAL_ID":
         cid = err.value or "<canonical-id>"

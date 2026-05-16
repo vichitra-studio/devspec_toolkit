@@ -2,6 +2,9 @@
 
 Public API for Phase A: structured context preparation and review for spec authoring.
 Reduces AI token usage from ~25,000+ to ~4,500 per pipeline step.
+
+Note: ``extract_context`` is a deprecation stub that exits 1 with a migration
+message. Use ``specdev json read <file> '<jq>'`` for surgical reads instead.
 """
 from .structure import get_step_structure
 from .scope_resolver import resolve_scope

@@ -121,7 +121,7 @@ def get_boilerplate_keys(registry: SchemaRegistry | None = None) -> frozenset[st
 
     Loads from vc:core:step-base via SchemaRegistry on first call and caches
     the result. Falls back to a hardcoded set if the registry is unavailable.
-    Per locked decision §4g — self-maintaining: new step-base fields auto-included.
+    Self-maintaining: new step-base fields defined in the schema are auto-included on each call.
     """
     global _boilerplate_keys_cache
     if _boilerplate_keys_cache is not None:

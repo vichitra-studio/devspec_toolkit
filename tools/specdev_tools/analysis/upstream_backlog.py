@@ -68,7 +68,7 @@ def classify(record: dict) -> tuple[str, int, Optional[str]]:
 def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[str]]]:
     """Yield ``(path, data_or_None, malformed_reason_or_None)`` for every
     ``impl_context/*.json`` plan under *spec_dir*. Nested directories below
-    ``impl_context/`` are not scanned (spec §2.1).
+    ``impl_context/`` are not scanned (only immediate children, no subdirectories).
     """
     for path in iter_spec_artifacts(spec_dir):
         if not _IMPL_CONTEXT_RE.search(path):
@@ -224,7 +224,7 @@ def _wrap_impact(impact: list, indent: int, width: int = 80) -> list[str]:
     """Join string entries of *impact* with ' | ', soft-wrap to *width* chars.
 
     Continuation lines align with the first entry column and start with
-    ``| `` to preserve the separator visually, matching spec §5a.
+    ``| `` to preserve the separator visually in the plain-text report.
     Non-string entries are filtered out for plain-text rendering (JSON
     output preserves them verbatim for auditability).
     """
@@ -256,7 +256,7 @@ def render_plain(
     milestones_scanned: int,
     unclassified_w613_count: int,
 ) -> str:
-    """Render the plain-text report per spec §5a."""
+    """Render the plain-text report of upstream ambiguity backlog items."""
     if status_filter == "resolved":
         unit = "resolved"
     elif status_filter == "all":

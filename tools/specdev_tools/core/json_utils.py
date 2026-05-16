@@ -6,7 +6,7 @@ Capabilities:
 - CRUD: read, read-multi, patch, insert, delete (using jq)
 - Discovery: keys, structure (skeleton)
 - Schema: Schema-aware property discovery with $ref resolution and allOf merging
-- Pointer verification: resolve-pointers (pointer contract per llm_protocol.md §4/§7.3)
+- Pointer verification: resolve-pointers (validates pointer shapes and resolves file+id or file+jq_path pairs)
 
 All public functions raise JsonUtilsError on failure (not sys.exit), and return
 data instead of printing, making them safe to import as a library (e.g. from a
@@ -763,13 +763,13 @@ def _summarise_prop(prop: dict) -> dict:
     return summary
 
 
-# --- Pointer Resolution (llm_protocol.md §4 / §7.3) ---
+# --- Pointer Resolution ---
 
-# Forbidden path prefixes/patterns per §4.3.
+# Forbidden path prefixes/patterns for pointer validation.
 _FORBIDDEN_PREFIXES = (".specdev/",)
 _FORBIDDEN_EXTENSIONS = (".txt",)
 
-# Absolute path prefixes that indicate temp/scratch paths (§4.3).
+# Absolute path prefixes that indicate temp/scratch paths (forbidden for pointers).
 # Includes standard POSIX paths plus /private/tmp (macOS symlink resolution of /tmp).
 _FORBIDDEN_ABS_PREFIXES = (
     "/tmp/",
@@ -780,9 +780,9 @@ _FORBIDDEN_ABS_PREFIXES = (
 
 
 def _is_forbidden_path(file_path: str) -> Optional[str]:
-    """Return a reason string if file_path is forbidden per §4.3, else None.
+    """Return a reason string if file_path is a forbidden pointer target, else None.
 
-    Forbidden shapes (§4.3):
+    Forbidden paths:
     - Paths under .specdev/
     - *.txt dumps or temp paths
     - Absolute paths under /tmp/, /var/tmp/, /private/tmp/, /var/folders/,
@@ -815,7 +815,7 @@ def _is_forbidden_path(file_path: str) -> Optional[str]:
 
 
 def _is_valid_pointer_shape(pointer: Any) -> Tuple[bool, str]:
-    """Validate pointer shape per §4.1/§4.3.
+    """Validate pointer shape: must be a JSON object with 'file' and either 'id' or 'jq_path'.
 
     Returns (valid, reason).  On success reason is "".
 
@@ -823,7 +823,7 @@ def _is_valid_pointer_shape(pointer: Any) -> Tuple[bool, str]:
       { "file": str, "id": str }
       { "file": str, "jq_path": str }
 
-    Forbidden (§4.3):
+    Forbidden:
       - Bare strings
       - file without id or jq_path
       - Both id and jq_path absent
@@ -871,7 +871,7 @@ def _kebab_tokens(s: str) -> List[str]:
 
 
 def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dict[str, Any]]:
-    """Return top_n nearest ids by normalised token-level Levenshtein (§15).
+    """Return top_n nearest ids by normalised token-level Levenshtein distance.
 
     Scoring: 1 - (edit_distance / max_len) so higher = more similar.
     max_len is the max of the two token-joined strings' lengths (floor 1).
@@ -898,11 +898,11 @@ def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dic
 def _collect_ids_from_file(
     data: Any,
     spec_file: str,
-    spec_root: str,
+    repo_root: str,
 ) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
     """Walk a parsed JSON object and collect all entry ids.
 
-    For each spec file, the entry-key registry (``<spec_root>/entry_key_registry.json``)
+    For each spec file, the entry-key registry (``<repo_root>/tools/entry_key_registry.json``)
     is the sole source of truth for which arrays to scan and which id field to use.
     Files not registered in the registry return empty results — no broad scan.
     Nested arrays (e.g. ``milestones[].tasks``) are walked using the ``nested``
@@ -911,8 +911,8 @@ def _collect_ids_from_file(
     Args:
         data: parsed JSON object to index.
         spec_file: basename or relative path of the spec file (required).
-        spec_root: filesystem path to the project's spec directory (required).
-            The registry is loaded from ``<spec_root>/entry_key_registry.json``.
+        repo_root: filesystem path to the toolkit root directory (required).
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
             ``FileNotFoundError`` is raised (and propagates) if the registry is absent.
 
     Returns:
@@ -929,7 +929,7 @@ def _collect_ids_from_file(
         return all_ids, id_map
 
     # Registry is the only lookup path. FileNotFoundError propagates (misconfiguration).
-    reg_entries = _ekreg.list_entries(spec_file, spec_root)
+    reg_entries = _ekreg.list_entries(spec_file, repo_root)
 
     # reg_entries is None  → unknown file — skip (no broad scan)
     # reg_entries is []    → known file with no entry arrays (no-op)
@@ -961,7 +961,7 @@ def _collect_ids_from_file(
         if not isinstance(top_val, list):
             continue
         # Skip corpus-excluded keys.
-        if _ekreg.is_corpus_excluded(top_key, spec_root):
+        if _ekreg.is_corpus_excluded(top_key, repo_root):
             continue
         if top_key not in top_level_lookup and top_key not in nested_lookup:
             # Array not registered for this file — skip deliberately.
@@ -1008,13 +1008,13 @@ def _collect_ids_from_file(
 def _resolve_single_pointer(
     pointer: Dict[str, Any],
     *,
-    spec_root: str,
+    repo_root: str,
     git_root: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Resolve one pointer to a result record per §7.3 report shape.
+    """Resolve one pointer to a result record per § specdev json resolve-pointers report shape.
 
-    spec_root (keyword-only, required) is the host-repo spec directory; the
-    entry-key registry is loaded from ``<spec_root>/entry_key_registry.json``.
+    repo_root (keyword-only, required) is the toolkit root directory containing
+    ``tools/entry_key_registry.json``.
     git_root (keyword-only) anchors relative ``file`` paths; defaults to cwd.
     Always returns a dict; never raises.
     """
@@ -1105,10 +1105,10 @@ def _resolve_single_pointer(
         kind: Optional[str] = None
         # Find all ".<word>[" segments; use the last one to get the array key.
         seg_matches = re.findall(r'\.([\w]+)\[', jq_path_val)
-        if seg_matches and spec_root:
+        if seg_matches and repo_root:
             raw_key = seg_matches[-1]
             try:
-                reg_entries = _ekreg.list_entries(file_val, spec_root)
+                reg_entries = _ekreg.list_entries(file_val, repo_root)
                 if reg_entries:
                     # Match by the last array segment name
                     for reg_e in reg_entries:
@@ -1145,7 +1145,7 @@ def _resolve_single_pointer(
     # so -O (optimised) builds don't silently skip the guard.
     if id_val is None:
         raise JsonUtilsError("internal: id_val is None; pointer shape check failed")
-    all_ids, id_map = _collect_ids_from_file(data, spec_file=file_val, spec_root=spec_root)
+    all_ids, id_map = _collect_ids_from_file(data, spec_file=file_val, repo_root=repo_root)
 
     if id_val in id_map:
         kind_found, resolved_jq, entry = id_map[id_val]
@@ -1174,25 +1174,24 @@ def _resolve_single_pointer(
 def resolve_pointers(
     pointer_list: List[Any],
     *,
-    spec_root: str,
+    repo_root: str,
     git_root: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Resolve a list of pointers per llm_protocol.md §4/§7.3.
+    """Resolve a list of pointers. Each pointer must be {file, id} or {file, jq_path}.
 
     Args:
         pointer_list: List of pointer objects (each {file, id} or {file, jq_path}).
-        spec_root: Keyword-only, REQUIRED. Filesystem path to the project's spec
+        repo_root: Keyword-only, REQUIRED. Filesystem path to the toolkit root
             directory. The entry-key registry is loaded from
-            ``<spec_root>/entry_key_registry.json``. Omitting this raises
-            ``TypeError`` at call time rather than a later FileNotFoundError —
-            this contract supersedes the previous (broken) empty-string default.
+            ``<repo_root>/tools/entry_key_registry.json``. Omitting this raises
+            ``TypeError`` at call time rather than a later FileNotFoundError.
         git_root: Keyword-only. Root directory for resolving relative file paths.
             Defaults to cwd.
 
     Returns:
         Report dict: {"results": [...], "summary": {"hits": N, "misses": M}}
 
-    Always returns a valid dict once spec_root is supplied; never raises beyond
+    Always returns a valid dict once repo_root is supplied; never raises beyond
     the argument-binding TypeError described above.
     """
     results = []
@@ -1200,7 +1199,7 @@ def resolve_pointers(
     misses = 0
 
     for ptr in pointer_list:
-        record = _resolve_single_pointer(ptr, spec_root=spec_root, git_root=git_root)
+        record = _resolve_single_pointer(ptr, repo_root=repo_root, git_root=git_root)
         results.append(record)
         if record.get("exists"):
             hits += 1
@@ -1215,16 +1214,16 @@ def resolve_pointers(
 
 def resolve_pointers_from_stdin(
     *,
-    spec_root: str,
+    repo_root: str,
     out_path: Optional[str] = None,
     git_root: Optional[str] = None,
 ) -> None:
     """CLI entry point for ``json resolve-pointers``.
 
-    All parameters are keyword-only. ``spec_root`` is REQUIRED and is the
-    host-repo spec directory used to load ``entry_key_registry.json``.
+    All parameters are keyword-only. ``repo_root`` is REQUIRED and is the
+    toolkit root directory containing ``tools/entry_key_registry.json``.
     Reads JSON pointer list from stdin. Writes report JSON to ``out_path``
-    (file) or stdout. Always exits 0 — the report is the artifact (§6.4/§7.3).
+    (file) or stdout. Always exits 0 — the report is the artifact (§ specdev json resolve-pointers).
     """
     raw = sys.stdin.read()
 
@@ -1240,8 +1239,8 @@ def resolve_pointers_from_stdin(
         _write_report(report, out_path)
         return
 
-    # C4: §7.3 specifies bare list only; {"pointers": [...]} envelope is not part
-    # of the protocol (§6.1 uses "scoped_entries", not "pointers"). Reject envelope.
+    # C4: resolve-pointers accepts a bare JSON array only; {"pointers": [...]} envelope is rejected
+    # (the error envelope uses "errors[]", not "pointers").
     if not isinstance(data, list):
         report = {
             "results": [],
@@ -1252,7 +1251,7 @@ def resolve_pointers_from_stdin(
         return
     pointer_list = data
 
-    report = resolve_pointers(pointer_list, spec_root=spec_root, git_root=git_root)
+    report = resolve_pointers(pointer_list, repo_root=repo_root, git_root=git_root)
     _write_report(report, out_path)
 
 
@@ -1336,8 +1335,8 @@ def main():
     p_schema.add_argument("path", help="Path looking for (e.g. .capabilities)")
     p_schema.add_argument("--repo-root", help="Toolkit root dir (for submodule deployments)")
 
-    # Resolve-pointers (llm_protocol.md §4/§7.3)
-    # Input: pointer list from stdin (no --in flag per §17.1 flag minimalism).
+    # Resolve-pointers: validate and resolve a JSON array of pointer objects.
+    # Input: pointer list from stdin (no --in flag; flag minimalism).
     # Output: report to --out <path> or stdout.  Always exits 0.
     p_rp = subparsers.add_parser(
         "resolve-pointers",
@@ -1350,20 +1349,31 @@ def main():
         help="Write report JSON to PATH instead of stdout",
     )
     p_rp.add_argument(
+        "--repo-root",
+        required=True,
+        metavar="DIR",
+        help=(
+            "Toolkit root directory containing tools/entry_key_registry.json "
+            "(e.g. ./devspec_toolkit for submodule deployments). "
+            "Required for deterministic id-field lookup via the entry-key registry."
+        ),
+    )
+    p_rp.add_argument(
+        "--spec-root",
+        required=False,
+        default=None,
+        metavar="DIR",
+        help=(
+            "Deprecated; accepted but ignored. "
+            "The registry is now toolkit-side (--repo-root). "
+            "This flag will be removed in a future release."
+        ),
+    )
+    p_rp.add_argument(
         "--git-root",
         default=None,
         metavar="DIR",
         help="Root directory for resolving relative file paths (defaults to cwd)",
-    )
-    p_rp.add_argument(
-        "--spec-root",
-        required=True,
-        metavar="DIR",
-        help=(
-            "Project spec directory containing entry_key_registry.json "
-            "(e.g. ./spec for submodule deployments). "
-            "Required for deterministic id-field lookup via the entry-key registry."
-        ),
     )
 
     args = parser.parse_args()
@@ -1405,9 +1415,15 @@ def main():
         elif args.command == "schema":
             result = json_schema_discovery(args.file, args.path, repo_root=args.repo_root)
         elif args.command == "resolve-pointers":
-            # Always exits 0; report is the artifact. --spec-root is required by argparse.
-            spec_root_arg = os.path.abspath(args.spec_root)
-            resolve_pointers_from_stdin(spec_root=spec_root_arg, out_path=args.out, git_root=args.git_root)
+            # Always exits 0; report is the artifact.
+            if getattr(args, "spec_root", None):
+                print(
+                    "--spec-root is no longer used by resolve-pointers (registry is toolkit-side). "
+                    "Flag will be removed in a future release.",
+                    file=sys.stderr,
+                )
+            repo_root_arg = os.path.abspath(args.repo_root)
+            resolve_pointers_from_stdin(repo_root=repo_root_arg, out_path=args.out, git_root=args.git_root)
             return
 
         if result is not None:
