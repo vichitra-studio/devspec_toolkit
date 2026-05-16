@@ -5,7 +5,8 @@ import os, json, warnings
 
 from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
-from ..core.trace_types import normalize_trace_type, is_valid_trace_type
+from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
+from ..core.entry_key_registry import list_entries, _ALWAYS_EXCLUDED
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -132,6 +133,7 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
     broken-reference scan, then dispatches to per-step cross-artifact checks
     defined in :mod:`cross_artifact_checks`.
     """
+    del repo_root  # accepted for API symmetry with build_trace_matrix
     artifacts = {}
     for p in iter_spec_artifacts(spec_dir):
         try:
@@ -166,42 +168,172 @@ def validate_trace_integrity(repo_root: str, spec_dir: str) -> list[SpecError]:
 
     return errors
 
-def build_trace_matrix(repo_root: str, spec_dir: str) -> dict:
+def _legacy_scan_data(
+    data: dict,
+    entity_index: dict,
+    seen_entities: set,
+    is_valid_type=is_valid_trace_type,
+    normalize_type=normalize_trace_type,
+) -> None:
+    """Legacy entity discovery: scan all top-level list values for ``*_id`` fields.
+
+    Used as a fallback when the toolkit-side entry_key_registry.json is not
+    present (e.g. unit-test temp dirs, bare host repos without the registry).
+    Mutates *entity_index* and *seen_entities* in place.
+    """
+    for value in data.values():
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            for field in item:
+                if not field.endswith("_id") or not isinstance(item[field], str):
+                    continue
+                prefix = field[:-3]  # strip "_id"
+                normalized = normalize_type(prefix)
+                if is_valid_type(normalized):
+                    entity_key = (normalized, item[field])
+                    if entity_key not in seen_entities:
+                        entity_index[normalized].append(item)
+                        seen_entities.add(entity_key)
+                    break  # one entity type per object
+
+
+def _extract_array_items(data: dict, array_path: str) -> list:
+    """Extract items from *data* at *array_path* (supports nested paths like `.foo[].bar`).
+
+    *array_path* uses dot-notation with an optional ``[]`` segment for nested arrays,
+    e.g. ``.milestones[].tasks``.  A leading dot is stripped.  ``[]`` signals
+    "iterate all list items and collect the sub-array from each".
+
+    Examples::
+
+        .functional_requirements           → data["functional_requirements"]
+        .milestones[].tasks                → [t for m in data["milestones"] for t in m.get("tasks", [])]
+
+    Returns an empty list if any key is missing or the value is not a list.
+    """
+    path = array_path.lstrip(".")
+    # Split on "[]." to separate the parent path from the nested key
+    if "[]." in path:
+        parent_key, _, nested_key = path.partition("[].")
+        parent_items = data.get(parent_key, [])
+        if not isinstance(parent_items, list):
+            return []
+        result = []
+        for parent_item in parent_items:
+            if isinstance(parent_item, dict):
+                sub = parent_item.get(nested_key, [])
+                if isinstance(sub, list):
+                    result.extend(sub)
+        return result
+    # Simple top-level array
+    items = data.get(path, [])
+    return items if isinstance(items, list) else []
+
+
+def build_trace_matrix(
+    repo_root: str,
+    spec_dir: str,
+    project_canon_dir: str | None = None,
+) -> dict:
+    """Build the trace matrix from *spec_dir* using the toolkit at *repo_root*.
+
+    Args:
+        repo_root: Path to the devspec_toolkit root (used for registry + canon).
+        spec_dir: Path to the host spec directory.
+        project_canon_dir: Optional path to the project-tier canon directory
+            (e.g. ``<host>/spec/canon``).  When provided, project-defined
+            trace_type entries are merged into the valid-type set via
+            ``get_trace_types()``, making them visible to the matrix builder.
+            When ``None`` only toolkit-core trace types are consulted (the
+            historical default, preserved for backward compatibility).
+    """
+    # Resolve project-tier trace types when a project canon dir is supplied.
+    # The module-level is_valid_trace_type() still works for call sites that
+    # don't have a project_canon_dir; this local pair is used within the matrix
+    # builder where project types must be visible.
+    _active_trace_types, _active_aliases = get_trace_types(project_canon_dir)
+
+    def _is_valid_type(value: str) -> bool:
+        normalized = (value or "").strip()
+        if not normalized:
+            return False
+        resolved = _active_aliases.get(normalized, normalized)
+        return resolved in _active_trace_types
+
+    def _normalize_type(value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            return normalized
+        return _active_aliases.get(normalized, normalized)
+
     # Classic step-00-to-09 link-building kept for visualization; extension artifacts
     # are indexed but not deeply linked.  FR→API direction: APIs carry the authoritative
     # FR trace (trace.type="fr"), not vice-versa — FRs trace to capabilities.
-    
-    # Collect step artifacts
-    artifacts = {}
+
+    # Determine whether the toolkit-side registry is available.  When repo_root
+    # points to a temp directory (e.g. unit tests) the registry file won't exist
+    # and we gracefully fall back to the legacy _id-suffix scan.
+    _registry_available: bool
+    try:
+        list_entries("__probe__", repo_root)  # triggers FileNotFoundError if absent
+        _registry_available = True
+    except FileNotFoundError:
+        _registry_available = False
+
+    # Collect step artifacts (keyed by artifact id / path, preserving filesystem order)
+    artifacts: dict[str, dict] = {}
+    # Also keep the path→data mapping for registry-driven entity discovery
+    path_to_data: dict[str, dict] = {}
     for p in iter_spec_artifacts(spec_dir):
         try:
             data = load_json(p)
             artifacts[data.get("id", p)] = data
+            path_to_data[p] = data
         except (OSError, json.JSONDecodeError):
             pass
 
-    # Dynamic entity indexing: discover entities by _id fields + canon trace type validation
-    entity_index = collections.defaultdict(list)  # normalized_trace_type -> [entity_objects]
-    seen_entities: set[tuple[str, str]] = set()   # (normalized_trace_type, id_value)
+    # Entity indexing: registry-driven when the toolkit registry is available,
+    # legacy _id-suffix scan when it is not (e.g. unit-test temp dirs).
+    entity_index = collections.defaultdict(list)  # kind -> [entity_objects]
+    seen_entities: set[tuple[str, str]] = set()   # (kind, id_value)
 
-    for data in artifacts.values():
-        for value in data.values():
-            if not isinstance(value, list):
+    if _registry_available:
+        # W4-T1: Registry-driven entity discovery.
+        # Iterate spec files in filesystem order (same order as legacy scan) so
+        # that entity_index insertion order — and therefore matrix row order —
+        # is stable and byte-equivalent to the pre-refactor output.
+        for p, data in path_to_data.items():
+            basename = os.path.basename(p)
+            reg_entries = list_entries(basename, repo_root)
+            if reg_entries is None:
+                # Unknown file — fall back to legacy _id-suffix scan for this file only
+                _legacy_scan_data(data, entity_index, seen_entities, _is_valid_type, _normalize_type)
                 continue
-            for item in value:
-                if not isinstance(item, dict):
+            # reg_entries is a list (possibly empty) of RegistryEntry(array_path, id_field, kind)
+            for reg_entry in reg_entries:
+                # Skip corpus-excluded arrays (e.g. canonical_refs_used)
+                array_key = reg_entry.array_path.lstrip(".").split("[")[0]
+                if array_key in _ALWAYS_EXCLUDED:
                     continue
-                for field in item:
-                    if not field.endswith("_id") or not isinstance(item[field], str):
+                items = _extract_array_items(data, reg_entry.array_path)
+                for item in items:
+                    if not isinstance(item, dict):
                         continue
-                    prefix = field[:-3]  # strip "_id"
-                    normalized = normalize_trace_type(prefix)
-                    if is_valid_trace_type(normalized):
-                        entity_key = (normalized, item[field])
-                        if entity_key not in seen_entities:
-                            entity_index[normalized].append(item)
-                            seen_entities.add(entity_key)
-                        break  # one entity type per object
+                    id_value = item.get(reg_entry.id_field)
+                    if not id_value or not isinstance(id_value, str):
+                        continue
+                    entity_key = (reg_entry.kind, id_value)
+                    if entity_key not in seen_entities:
+                        entity_index[reg_entry.kind].append(item)
+                        seen_entities.add(entity_key)
+    else:
+        # Legacy _id-suffix scan (fallback for unit tests and bare repo_roots
+        # that do not have the toolkit registry installed).
+        for data in artifacts.values():
+            _legacy_scan_data(data, entity_index, seen_entities, _is_valid_type, _normalize_type)
 
     # Bridge to existing variable names (Sections C/D/E unchanged).
     # "fr" and "api" use the named constants; the remaining keys ("fixture",

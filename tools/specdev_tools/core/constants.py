@@ -78,33 +78,18 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
 
 # ---------------------------------------------------------------------------
 # resolve_extras_path — shared logic for locating output files in the
-# spec/extras/ directory (host-repo) with fallback to toolkit tools/.
+# spec/extras/ directory (host-repo).
 # Used by context/extractor.py, context/scope_resolver.py, and
 # validation/validators/step_14.py.
 # ---------------------------------------------------------------------------
-def resolve_extras_path(spec_dir: str, repo_root: str, filename: str) -> str:
-    """Return the path for *filename* preferring ``<spec_dir>/extras/``.
+def resolve_extras_path(spec_dir: str, filename: str) -> str:
+    """Return the canonical path ``<spec_dir>/extras/<filename>``.
 
-    Resolution order (read-only — never creates directories):
-    1. ``<spec_dir>/extras/`` directory exists → return path there
-       (file may not exist yet — callers writing to this path will create it).
-    2. Submodule deployment (spec_dir outside repo_root) and the specific
-       file already exists at ``<spec_dir>/extras/<filename>`` → return it.
-    3. Fallback: ``<repo_root>/tools/<filename>``.
+    Single-path policy (no fallback):
+    - Always returns ``<spec_dir>/extras/<filename>``.
+    - The ``extras/`` directory is NOT created here.  Callers that write to
+      this path must run ``os.makedirs(os.path.dirname(path), exist_ok=True)``
+      before opening the file.  Read-only callers handle a missing file as a
+      ``FileNotFoundError`` (or equivalent) in their own error-handling logic.
     """
-    spec_abs = Path(spec_dir).resolve()
-    repo_abs = Path(repo_root).resolve()
-    extras_dir = spec_abs / "extras"
-    if extras_dir.is_dir():
-        return str(extras_dir / filename)
-    # If spec_dir is outside repo_root (submodule deployment), prefer
-    # extras/ — but only return it if the target file already exists there
-    # or a caller explicitly creates the directory.  Do NOT mkdir here:
-    # this function is called by read-only code paths that should not
-    # create directories as a side effect.
-    if not spec_abs.is_relative_to(repo_abs):
-        target = extras_dir / filename
-        if target.exists():
-            return str(target)
-    # Fallback: toolkit's own tools/ directory.
-    return str(repo_abs / "tools" / filename)
+    return str(Path(spec_dir).resolve() / "extras" / filename)

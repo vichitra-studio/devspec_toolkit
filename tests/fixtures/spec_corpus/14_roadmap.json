@@ -1,0 +1,24 @@
+{
+  "$schema": "vc:14-roadmap",
+  "id": "spec-corpus-14",
+  "milestones": [
+    {
+      "milestone_id": "MS-CORPUS-001",
+      "name": "Corpus sample milestone",
+      "target_date": "2026-06-01",
+      "user_story": "As a developer I want milestone coverage tested so the matrix fixture is complete.",
+      "source_milestones": [],
+      "fr_refs": ["FR-CORPUS-001"],
+      "capability_refs": [],
+      "tasks": [
+        {
+          "task_id": "T-CORPUS-001",
+          "title": "Implement corpus milestone",
+          "fr_refs": ["FR-CORPUS-001"]
+        }
+      ],
+      "deliverables": ["Corpus milestone deliverable"]
+    }
+  ],
+  "dependencies": []
+}

@@ -230,7 +230,8 @@ def resolve_scope(entry_id: str | None, spec_dir: str, repo_root: str) -> dict[s
     try:
         from ..validation.matrix import build_trace_matrix
         matrix_result = build_trace_matrix(repo_root_abs, spec_dir_abs)
-        matrix_out = resolve_extras_path(spec_dir_abs, repo_root_abs, "trace_matrix.json")
+        matrix_out = resolve_extras_path(spec_dir_abs, "trace_matrix.json")
+        os.makedirs(os.path.dirname(matrix_out), exist_ok=True)
         with open(matrix_out, "w", encoding="utf-8") as _fh:
             json.dump(matrix_result, _fh, indent=2)
     except Exception:

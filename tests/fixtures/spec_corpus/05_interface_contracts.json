@@ -1,0 +1,14 @@
+{
+  "$schema": "vc:05-interface-contracts",
+  "id": "spec-corpus-05",
+  "apis": [
+    {
+      "api_id": "API-CORPUS-001",
+      "title": "Corpus sample API",
+      "description": "A minimal API for spec_corpus fixture testing.",
+      "trace": [
+        {"type": "fr", "id": "FR-CORPUS-001"}
+      ]
+    }
+  ]
+}
