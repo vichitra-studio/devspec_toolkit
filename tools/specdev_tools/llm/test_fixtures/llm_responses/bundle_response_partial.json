@@ -19,8 +19,7 @@
   "unresolved": [
     {
       "pointer": { "file": "spec/04_fr_list.json", "id": "fr-bogus" },
-      "reason": "no match",
-      "nearest": ["fr-example-001"]
+      "reason": "no match; nearest: fr-example-001"
     }
   ],
   "iterations": { "inner": 3 },
