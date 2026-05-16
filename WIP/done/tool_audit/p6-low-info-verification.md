@@ -1,3 +1,5 @@
+> **ARCHIVE NOTE (2026-05-16):** Canonical trace_matrix path is now `spec/extras/trace_matrix.json`. The `tools/trace_matrix.json` references below reflect the state at the time of writing.
+
 # P6: LOW + INFO Findings Verification (AUDIT-045 through AUDIT-070)
 
 **Agent**: P6 Verification Agent D

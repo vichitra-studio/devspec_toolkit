@@ -1,3 +1,5 @@
+> **ARCHIVE NOTE (2026-05-16):** Canonical trace_matrix path is now `spec/extras/trace_matrix.json`. The `tools/trace_matrix.json` references below reflect the state at the time of writing.
+
 # P4: Fix Plan
 
 ## Summary

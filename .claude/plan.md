@@ -16,7 +16,7 @@ assumed findings — every item below is verified against actual file contents.
 |------|--------|-------|
 | 0.1 Generalize schema 16 | ✅ DONE | `patternProperties` for nfr_measurement_methods (L773) and timeout_constants (L797) |
 | 0.2 Align schema vs validator | ✅ DONE | if/then conditionals (L507-539) enforce nfr_refs/fixture_ref for non-deferred items |
-| 0.3 Repository cleanup | ✅ DONE | .gitignore has `*.egg-info/` and `tools/trace_matrix.json` |
+| 0.3 Repository cleanup | ✅ DONE | .gitignore has `*.egg-info/` and `tools/trace_matrix.json` _(note: canonical path is now `spec/extras/trace_matrix.json` — the gitignore entry above reflects the state at time of writing)_ |
 | 0.4 Migration template contracts | ✅ DONE | All templates use canonical URIs + B4 fields |
 | 0.5 Unify path references | ✅ DONE | path_conventions.md created, all 22 prompts use $PRODUCT_ROOT/$TOOLKIT_ROOT |
 

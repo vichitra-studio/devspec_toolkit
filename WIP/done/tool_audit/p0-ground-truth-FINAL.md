@@ -1,3 +1,5 @@
+> **ARCHIVE NOTE (2026-05-16):** Canonical trace_matrix path is now `spec/extras/trace_matrix.json`. The `tools/trace_matrix.json` references below reflect the state at the time of writing.
+
 # P0: Verified Ground Truth (Consolidated from Agent A + B)
 
 Consolidated at: 2026-03-17T19:30:00Z
