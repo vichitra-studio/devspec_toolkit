@@ -413,16 +413,6 @@ def main():
     ctx_canon.add_argument("--repo-root", default=".")
     ctx_canon.add_argument("--spec-root", default=None, help="Host project spec dir (e.g. ./spec) to include project-tier canon entries")
 
-    ctx_snap = ctx_sub.add_parser("snapshot", help="Save a workspace snapshot of a step artifact for later diffing")
-    ctx_snap.add_argument("spec_dir")
-    ctx_snap.add_argument("--step", required=True)
-    ctx_snap.add_argument("--repo-root", default=".")
-
-    ctx_diff = ctx_sub.add_parser("diff", help="Diff current step artifact against its last workspace snapshot")
-    ctx_diff.add_argument("spec_dir")
-    ctx_diff.add_argument("--step", required=True)
-    ctx_diff.add_argument("--repo-root", default=".")
-
     ctx_fresh = ctx_sub.add_parser("freshness")
     ctx_fresh.add_argument("spec_dir")
     ctx_fresh.add_argument("--repo-root", default=".")
@@ -1744,7 +1734,7 @@ def main():
     elif args.cmd == "context":
         from .context import (
             get_step_structure, resolve_scope, extract_context,
-            extract_canon, check_freshness, save_snapshot, diff_snapshot,
+            extract_canon, check_freshness,
         )
         repo_root = os.path.abspath(args.repo_root)
         context_cmd = getattr(args, "context_cmd", None)
@@ -1769,14 +1759,6 @@ def main():
         elif context_cmd == "canon":
             spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
             result = extract_canon(args.step, repo_root, spec_root=spec_root)
-            print(json.dumps(result, indent=2))
-        elif context_cmd == "snapshot":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = save_snapshot(args.step, spec_dir, repo_root)
-            print(json.dumps(result, indent=2))
-        elif context_cmd == "diff":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = diff_snapshot(args.step, spec_dir, repo_root)
             print(json.dumps(result, indent=2))
         elif context_cmd == "freshness":
             spec_dir = os.path.abspath(args.spec_dir)

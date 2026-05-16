@@ -4,6 +4,12 @@
 
 Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integrity enforcement, content derivation checks, dynamic W→E promotion, and Extraction Intent sections across all prompts.
 
+## Removed
+
+### `specdev context snapshot` and `specdev context diff`
+
+Removed the workspace-snapshot CLI subcommands and the underlying `tools/specdev_tools/context/snapshot.py` module. Workspace state is the rollback surface — `git diff`, `git checkout -- <file>`, `git stash` cover the same use case without a parallel state-tracking mechanism. The skill `/specdev-context` no longer recommends these commands. Hosts may safely remove stale `.specdev/snapshots/` directories — no code path will repopulate them.
+
 ## Added
 
 ### Ticket 12 — `specdev guide <code>` subcommand

@@ -10,7 +10,6 @@ from .canon_extractor import extract_canon
 from .freshness import check_freshness
 from .seed_indexer import build_seed_index
 from .reviewer import review_artifact
-from .snapshot import save_snapshot, diff_snapshot
 
 __all__ = [
     "get_step_structure",
@@ -20,6 +19,4 @@ __all__ = [
     "check_freshness",
     "build_seed_index",
     "review_artifact",
-    "save_snapshot",
-    "diff_snapshot",
 ]

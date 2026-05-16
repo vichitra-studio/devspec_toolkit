@@ -82,10 +82,6 @@ specdev json patch  spec/03_glossary.json '.terms[0].domain' '"infrastructure"'
 specdev json insert spec/03_glossary.json '.terms' '<term-object-json>'
 specdev json delete spec/03_glossary.json '.terms[3]'
 
-# Workspace snapshot/diff (stored in .specdev/snapshots/, not git)
-specdev context snapshot spec --step 03 --repo-root ./devspec_toolkit
-specdev context diff spec --step 03 --repo-root ./devspec_toolkit
-
 # Diagnostic — print active SPECDEV_* config
 specdev env-check --repo-root ./devspec_toolkit
 ```
