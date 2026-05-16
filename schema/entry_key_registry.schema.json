@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:entry-key-registry",
+  "title": "Entry Key Registry",
+  "description": "Schema for the generated entry_key_registry.json produced by 'specdev registry-generate'.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "_format_version",
+    "_note",
+    "registry",
+    "_sentinels",
+    "steps_without_entry_arrays",
+    "steps_with_deferred_registration"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "vc:entry-key-registry",
+      "description": "Schema URI identifying this document as an entry-key registry. Must be 'vc:entry-key-registry'."
+    },
+    "_format_version": {
+      "type": "string",
+      "description": "Semver string for the registry format.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "examples": ["1.0.0"]
+    },
+    "_note": {
+      "type": "string",
+      "description": "Human-readable note about the registry's origin. Consumers should not parse this string."
+    },
+    "registry": {
+      "type": "object",
+      "description": "Map of spec file basename (e.g. '04_fr_list.json') to entry-array metadata.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[0-9]{2}[a-z]?_[a-z_]+\\.json$": {
+          "$ref": "#/$defs/registryEntry"
+        }
+      }
+    },
+    "_sentinels": {
+      "type": "array",
+      "description": "Top-level array names (e.g. 'canonical_refs_used') that appear in multiple spec files and are always corpus-excluded. These are NOT listed per-file in the registry.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "steps_without_entry_arrays": {
+      "type": "array",
+      "description": "Steps that have no top-level entry-bearing arrays (neither schema-derived nor deferred).",
+      "items": {
+        "$ref": "#/$defs/stepRationale"
+      }
+    },
+    "steps_with_deferred_registration": {
+      "type": "array",
+      "description": "Steps whose entries live in non-canonical per-milestone files rather than spec/NN_*.json.",
+      "items": {
+        "$ref": "#/$defs/stepRationale"
+      }
+    }
+  },
+  "$defs": {
+    "registryEntry": {
+      "type": "object",
+      "required": ["step", "arrays"],
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "Step ID matching an entry in step_order.json::steps[], e.g. '04' or '16a'.",
+          "pattern": "^[0-9]{2}[a-z]?$"
+        },
+        "arrays": {
+          "type": "array",
+          "description": "Entry-bearing top-level arrays in the spec file.",
+          "items": {
+            "$ref": "#/$defs/arrayEntry"
+          }
+        }
+      }
+    },
+    "arrayEntry": {
+      "type": "object",
+      "required": ["array_path", "id_field", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "array_path": {
+          "type": "string",
+          "description": "jq-style path to the array, e.g. '.functional_requirements'.",
+          "pattern": "^\\.[a-zA-Z_][a-zA-Z0-9_]*(\\[\\]\\.[a-zA-Z_][a-zA-Z0-9_]*)*$"
+        },
+        "id_field": {
+          "type": "string",
+          "description": "Name of the property that carries the entry's unique ID, e.g. 'fr_id' or 'id'.",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "description": "Logical kind of the entry, kebab-case, e.g. 'fr' or 'deliverable'.",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "nested": {
+          "type": "array",
+          "description": "Nested entry-bearing arrays within each item of this array. IMPORTANT: the `array_path` for each nested entry is relative to each item of the parent array, NOT relative to the root spec document. To compute the full jq filter, concatenate: `<parent.array_path>[]<this.array_path>` (the leading `.` of the nested `array_path` is retained). For example, given `arrays[*].array_path = \".milestones\"` and `nested[*].array_path = \".deliverables\"`, the full jq path is `.milestones[].deliverables`.",
+          "items": {
+            "$ref": "#/$defs/arrayEntry"
+          }
+        },
+        "corpus_excluded": {
+          "type": "boolean",
+          "description": "When true, this array does not contribute to the nearest-id corpus. Only emitted when true."
+        }
+      }
+    },
+    "stepRationale": {
+      "type": "object",
+      "required": ["step", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "Step ID, e.g. '13a' or '16a'.",
+          "pattern": "^[0-9]{2}[a-z]?$"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Human-readable explanation for why this step has no or deferred entry arrays.",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 All tests use the minimal fixture registry at
 ``tests/fixtures/entry_key_registry/entry_key_registry.json``.  No real
-project data is used.  Every public API call passes ``spec_root`` explicitly
+project data is used.  Every public API call passes ``repo_root`` explicitly
 pointing at that fixture directory.
 
 Covers:
@@ -17,7 +17,7 @@ Covers:
 - all_registered_basenames / get_step_for_file: utilities work from fixture.
 - _collect_ids_from_file: registry path collects top-level and nested ids;
   unknown files return empty results (no broad scan — registry is the sole source).
-- FileNotFoundError raised when spec_root has no entry_key_registry.json.
+- FileNotFoundError raised when repo_root has no tools/entry_key_registry.json.
 
 Parametrized step_order.json coverage test
 -------------------------------------------
@@ -41,7 +41,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
@@ -63,15 +63,16 @@ _FIXTURE_DIR = os.path.normpath(os.path.join(
     os.path.dirname(__file__),
     "..", "..", "fixtures", "entry_key_registry",
 ))
-"""Path to the directory containing ``entry_key_registry.json`` for tests.
+"""Path to the fixture repo_root for tests.
 
-All public API calls in this module pass ``spec_root=_FIXTURE_DIR``.
+The fixture registry lives at ``<_FIXTURE_DIR>/tools/entry_key_registry.json``.
+All public API calls in this module pass ``repo_root=_FIXTURE_DIR``.
 """
 
 
 def _load_fixture_registry_raw() -> Dict[str, Any]:
     """Load the raw fixture registry JSON (for structural assertions)."""
-    path = os.path.join(_FIXTURE_DIR, "entry_key_registry.json")
+    path = os.path.join(_FIXTURE_DIR, "tools", "entry_key_registry.json")
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
 
@@ -110,7 +111,7 @@ class TestRegistryLoads:
                 )
 
     def test_missing_registry_raises_file_not_found(self) -> None:
-        """FileNotFoundError raised when spec_root has no entry_key_registry.json."""
+        """FileNotFoundError raised when repo_root has no tools/entry_key_registry.json."""
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(FileNotFoundError, match="entry_key_registry.json"):
                 list_entries("04_fr_list.json", tmpdir)
@@ -382,7 +383,7 @@ class TestCollectIdsWithRegistry:
     def test_known_file_uses_registry_id_field(self) -> None:
         """Known file 04_fr_list.json uses fr_id, not bare id fallback."""
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_FR_SPEC, spec_file="04_fr_list.json", spec_root=_FIXTURE_DIR
+            SAMPLE_FR_SPEC, spec_file="04_fr_list.json", repo_root=_FIXTURE_DIR
         )
         assert "fr-newsletter-subscribe" in all_ids
         assert "fr-newsletter-confirm" in all_ids
@@ -391,7 +392,7 @@ class TestCollectIdsWithRegistry:
 
     def test_known_file_kind_is_correct(self) -> None:
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_FR_SPEC, spec_file="04_fr_list.json", spec_root=_FIXTURE_DIR
+            SAMPLE_FR_SPEC, spec_file="04_fr_list.json", repo_root=_FIXTURE_DIR
         )
         kind, jq_path, _ = id_map["fr-newsletter-subscribe"]
         assert kind == "functional_requirement"
@@ -399,7 +400,7 @@ class TestCollectIdsWithRegistry:
 
     def test_known_file_capabilities_kind(self) -> None:
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_CAPABILITIES_SPEC, spec_file="01_capabilities.json", spec_root=_FIXTURE_DIR
+            SAMPLE_CAPABILITIES_SPEC, spec_file="01_capabilities.json", repo_root=_FIXTURE_DIR
         )
         assert "cap-search" in all_ids
         kind, _, _ = id_map["cap-search"]
@@ -407,7 +408,7 @@ class TestCollectIdsWithRegistry:
 
     def test_known_file_inv_id_resolves(self) -> None:
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_INVARIANTS_SPEC, spec_file="06_invariants.json", spec_root=_FIXTURE_DIR
+            SAMPLE_INVARIANTS_SPEC, spec_file="06_invariants.json", repo_root=_FIXTURE_DIR
         )
         assert "inv-data-immutability" in all_ids
         kind, jq_path, _ = id_map["inv-data-immutability"]
@@ -417,7 +418,7 @@ class TestCollectIdsWithRegistry:
     def test_unknown_file_returns_empty(self) -> None:
         """Files not in registry (e.g. spec.json) return empty results — no broad scan."""
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_FR_SPEC, spec_file="spec.json", spec_root=_FIXTURE_DIR
+            SAMPLE_FR_SPEC, spec_file="spec.json", repo_root=_FIXTURE_DIR
         )
         # Unknown file → no broad scan → empty results
         assert all_ids == []
@@ -426,7 +427,7 @@ class TestCollectIdsWithRegistry:
     def test_corpus_exclusion_without_spec_file(self) -> None:
         """Even with an unknown file, the call completes and returns empty."""
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_FR_SPEC, spec_file="unknown_file.json", spec_root=_FIXTURE_DIR
+            SAMPLE_FR_SPEC, spec_file="unknown_file.json", repo_root=_FIXTURE_DIR
         )
         assert all_ids == []
         assert id_map == {}
@@ -434,7 +435,7 @@ class TestCollectIdsWithRegistry:
     def test_multi_array_known_file_collects_all(self) -> None:
         """11_redteam.json: threats (threat_id) + edge_cases (id) + trace (id)."""
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_MULTI_ARRAY_SPEC, spec_file="11_redteam.json", spec_root=_FIXTURE_DIR
+            SAMPLE_MULTI_ARRAY_SPEC, spec_file="11_redteam.json", repo_root=_FIXTURE_DIR
         )
         assert "threat-xss" in all_ids
         assert "ec-rate-limit" in all_ids
@@ -450,7 +451,7 @@ class TestCollectIdsWithRegistry:
             ]
         }
         all_ids, id_map = _collect_ids_from_file(
-            spec, spec_file="04_fr_list.json", spec_root=_FIXTURE_DIR
+            spec, spec_file="04_fr_list.json", repo_root=_FIXTURE_DIR
         )
         # Both are in all_ids (corpus for nearest-search)
         assert all_ids.count("fr-dup") == 2
@@ -462,7 +463,7 @@ class TestCollectIdsWithRegistry:
     def test_relative_path_spec_file_works(self) -> None:
         """spec/04_fr_list.json → registry lookup by basename."""
         all_ids, id_map = _collect_ids_from_file(
-            SAMPLE_FR_SPEC, spec_file="spec/04_fr_list.json", spec_root=_FIXTURE_DIR
+            SAMPLE_FR_SPEC, spec_file="spec/04_fr_list.json", repo_root=_FIXTURE_DIR
         )
         assert "fr-newsletter-subscribe" in all_ids
 
@@ -486,7 +487,7 @@ class TestCollectIdsWithRegistry:
             "trace": [],
         }
         all_ids, id_map = _collect_ids_from_file(
-            spec, spec_file="14_roadmap.json", spec_root=_FIXTURE_DIR
+            spec, spec_file="14_roadmap.json", repo_root=_FIXTURE_DIR
         )
         # Milestone id present
         assert "ms-1" in all_ids
@@ -509,7 +510,7 @@ class TestCollectIdsWithRegistry:
         all_ids, id_map = _collect_ids_from_file(
             {"dimensions": {"completeness": {"score": 1.0}}},
             spec_file="13a_completeness_assessment.json",
-            spec_root=_FIXTURE_DIR,
+            repo_root=_FIXTURE_DIR,
         )
         assert all_ids == []
         assert id_map == {}
@@ -520,6 +521,6 @@ class TestCollectIdsWithRegistry:
             "canonical_refs_used": [{"id": "cn:project:cap-foo"}],
             "custom_array": [{"fr_id": "fr-example"}],
         }
-        all_ids, _ = _collect_ids_from_file(spec, spec_file="unknown.json", spec_root=_FIXTURE_DIR)
+        all_ids, _ = _collect_ids_from_file(spec, spec_file="unknown.json", repo_root=_FIXTURE_DIR)
         # Unknown file → empty results
         assert all_ids == []

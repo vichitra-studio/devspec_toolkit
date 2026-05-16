@@ -5,48 +5,48 @@ kind string for that array.  Used by json_utils to replace the interim
 ``_ID_CANDIDATE_FIELDS`` / ``_KIND_LOOKUP`` broad scan with a deterministic
 per-file lookup.
 
-Registry data location (project-side)
+Registry data location (toolkit-side)
 --------------------------------------
-The registry JSON file lives in the **host project**'s spec directory, NOT
-inside the toolkit submodule.  Each project that uses this toolkit must
-provide::
+The registry JSON file lives in the **toolkit** root under ``tools/``, NOT
+in the host project's spec directory.  The canonical path is::
 
-    <spec_root>/entry_key_registry.json
+    <repo_root>/tools/entry_key_registry.json
 
-where ``spec_root`` is the host repo's spec directory (typically ``./spec``).
-The toolkit ships no default registry — it is purely project-supplied.
+where ``repo_root`` is the toolkit directory (typically ``./devspec_toolkit``
+in submodule deployments).  The registry is generated from toolkit schemas
+via ``specdev registry-generate --repo-root <toolkit>``.
 
-All public API functions require a ``spec_root: str`` parameter (the filesystem
-path to the project's spec directory).  Calls without ``spec_root`` raise
+All public API functions require a ``repo_root: str`` parameter (the filesystem
+path to the toolkit root).  Calls without ``repo_root`` raise
 ``FileNotFoundError`` immediately rather than silently falling back to an empty
-registry — missing ``spec_root`` indicates misconfiguration and must be loud.
+registry — missing ``repo_root`` indicates misconfiguration and must be loud.
 
 Public API (what json_utils consumes)
 --------------------------------------
-list_entries(spec_file, spec_root)
+list_entries(spec_file, repo_root)
     Return the registered (array_path, id_field, kind) tuples for a file,
     including nested array entries with their full dot-notation path.
     Returns an empty list if the file has no entry arrays in the registry
     (e.g. 13a, 16).  Returns None for **unknown** files (callers fall back
     to legacy broad scan).
 
-find_entry(spec_file, id_value, spec_root)
+find_entry(spec_file, id_value, repo_root)
     Not used by the current json_utils hot path (which iterates all entries
     via list_entries + index-builds), but exposed for the bundle assembler
-    per the design doc §3.1.
+    Not used by the current hot path but exposed for callers that need direct entry lookup.
 
-is_corpus_excluded(array_key, spec_root)
+is_corpus_excluded(array_key, repo_root)
     True for array keys that must never contribute to nearest-id corpus
     (e.g. ``canonical_refs_used``, ``canonical_proposals``).
 
 Design constraints
 ------------------
 - Pure functions, no I/O at import time — data loaded lazily on first call.
-- Registry data lives project-side at ``<spec_root>/entry_key_registry.json``.
-  The toolkit ships no defaults.  Each project must supply its own registry.
-- ``spec_root`` is a required parameter on all public API calls.  No env-var
+- Registry data lives toolkit-side at ``<repo_root>/tools/entry_key_registry.json``.
+  Generated from schemas; projects must not hand-edit it.
+- ``repo_root`` is a required parameter on all public API calls.  No env-var
   fallback, no implicit state.  Misconfiguration is loud (FileNotFoundError).
-- Cache is keyed by ``os.path.realpath(spec_root)`` so that relative paths,
+- Cache is keyed by ``os.path.realpath(repo_root)`` so that relative paths,
   symlinks, and absolute paths to the same directory collapse to one entry.
 - No global feature list, no plugins, no extension points.
 - Fallback to ``None`` (not empty list) for unknown filenames so callers can
@@ -77,7 +77,7 @@ class RegistryEntry(NamedTuple):
 # Data loading (lazy, per-spec_root cache, thread-safe)
 # ---------------------------------------------------------------------------
 
-# Cache is keyed by realpath(spec_root) → (registry_dict, excluded_keys_frozenset)
+# Cache is keyed by realpath(repo_root) → (registry_dict, excluded_keys_frozenset)
 _REGISTRY_CACHE: Dict[str, Tuple[Dict[str, Any], FrozenSet[str]]] = {}
 _LOAD_LOCK = threading.Lock()
 
@@ -90,26 +90,36 @@ _ALWAYS_EXCLUDED = frozenset(["canonical_refs_used", "canonical_proposals"])
 _REGISTRY_FILENAME = "entry_key_registry.json"
 
 
-def _load(spec_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
-    """Load registry JSON from ``<spec_root>/entry_key_registry.json``, caching by realpath.
+def _load(repo_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
+    """Load registry JSON from ``<repo_root>/tools/entry_key_registry.json``, caching by realpath.
 
     Thread-safe via double-checked locking.  Returns ``(registry_dict,
     excluded_keys_frozenset)``.
 
+    Args:
+        repo_root: filesystem path to the toolkit root directory.  The registry
+            is resolved at ``<repo_root>/tools/entry_key_registry.json``.
+            Must be non-empty and non-None — omitting it is a misconfiguration.
+
     Raises:
-        FileNotFoundError: if ``<spec_root>/entry_key_registry.json`` does not exist.
+        FileNotFoundError: if ``<repo_root>/tools/entry_key_registry.json`` does not exist,
+            or if ``repo_root`` is None/empty.
             This is always a misconfiguration — do not catch silently.
     """
-    cache_key = os.path.realpath(spec_root)
+    if not repo_root:
+        raise FileNotFoundError(
+            "repo_root is required; toolkit registry at <repo_root>/tools/entry_key_registry.json"
+        )
+    cache_key = os.path.realpath(repo_root)
     if cache_key not in _REGISTRY_CACHE:
         with _LOAD_LOCK:
             if cache_key not in _REGISTRY_CACHE:
-                path = os.path.join(spec_root, _REGISTRY_FILENAME)
+                path = os.path.join(repo_root, "tools", _REGISTRY_FILENAME)
                 if not os.path.isfile(path):
                     raise FileNotFoundError(
                         f"Entry-key registry not found at {path!r}. "
-                        f"Each project must provide spec/entry_key_registry.json "
-                        f"(spec_root={spec_root!r})."
+                        f"Run 'specdev registry-generate --repo-root <toolkit>' to regenerate it "
+                        f"(repo_root={repo_root!r})."
                     )
                 with open(path, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
@@ -130,7 +140,7 @@ def _load(spec_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def list_entries(spec_file: str, spec_root: str) -> Optional[List[RegistryEntry]]:
+def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]]:
     """Return registered entry arrays for *spec_file* (basename-matched).
 
     Includes nested array entries with their full dot-notation path
@@ -147,17 +157,18 @@ def list_entries(spec_file: str, spec_root: str) -> Optional[List[RegistryEntry]
     Args:
         spec_file: basename or relative path of the spec file.
             ``"spec/04_fr_list.json"`` and ``"04_fr_list.json"`` both work.
-        spec_root: filesystem path to the project's spec directory.
-            The registry is loaded from ``<spec_root>/entry_key_registry.json``.
+        repo_root: filesystem path to the toolkit root directory.
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
 
     Raises:
-        FileNotFoundError: if entry_key_registry.json does not exist under spec_root.
+        FileNotFoundError: if entry_key_registry.json does not exist under
+            ``<repo_root>/tools/``.
     """
     if not spec_file:
         return None  # None/empty → unknown file
 
     basename = os.path.basename(spec_file)
-    registry, _ = _load(spec_root)
+    registry, _ = _load(repo_root)
 
     if basename not in registry:
         return None  # unknown file — caller uses fallback
@@ -191,7 +202,7 @@ def list_entries(spec_file: str, spec_root: str) -> Optional[List[RegistryEntry]
 def find_entry(
     spec_file: str,
     id_value: str,
-    spec_root: str,
+    repo_root: str,
 ) -> Optional[Tuple[str, str, str]]:
     """Find registry entry for *id_value* in *spec_file*.
 
@@ -214,12 +225,14 @@ def find_entry(
         id_value: the id string to look up (e.g. "fr-newsletter-subscribe").
             Used only for suffix-based heuristics; the registry matches by
             array registration, not by scanning actual id values.
-        spec_root: filesystem path to the project's spec directory.
+        repo_root: filesystem path to the toolkit root directory.
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
 
     Raises:
-        FileNotFoundError: if entry_key_registry.json does not exist under spec_root.
+        FileNotFoundError: if entry_key_registry.json does not exist under
+            ``<repo_root>/tools/``.
     """
-    entries = list_entries(spec_file, spec_root)
+    entries = list_entries(spec_file, repo_root)
     if not entries:
         return None
 
@@ -246,7 +259,7 @@ def find_entry(
     return None
 
 
-def is_corpus_excluded(array_key: str, spec_root: str) -> bool:
+def is_corpus_excluded(array_key: str, repo_root: str) -> bool:
     """Return True if *array_key* must not contribute to nearest-id corpus.
 
     Always-excluded keys are hard-coded in ``_ALWAYS_EXCLUDED`` (e.g.
@@ -257,38 +270,42 @@ def is_corpus_excluded(array_key: str, spec_root: str) -> bool:
 
     Args:
         array_key: the raw top-level key of the array (e.g. "canonical_refs_used").
-        spec_root: filesystem path to the project's spec directory.
+        repo_root: filesystem path to the toolkit root directory.
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
 
     Raises:
-        FileNotFoundError: if entry_key_registry.json does not exist under spec_root.
+        FileNotFoundError: if entry_key_registry.json does not exist under
+            ``<repo_root>/tools/``.
     """
-    _, excluded_keys = _load(spec_root)
+    _, excluded_keys = _load(repo_root)
     return array_key in excluded_keys
 
 
-def all_registered_basenames(spec_root: str) -> List[str]:
+def all_registered_basenames(repo_root: str) -> List[str]:
     """Return all non-sentinel basenames registered in the registry.
 
     Utility used by coverage tests to verify step_order.json coverage.
 
     Args:
-        spec_root: filesystem path to the project's spec directory.
+        repo_root: filesystem path to the toolkit root directory.
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
     """
-    registry, _ = _load(spec_root)
+    registry, _ = _load(repo_root)
     return [
         k for k, v in registry.items()
         if not v.get("_special", False)
     ]
 
 
-def get_step_for_file(basename: str, spec_root: str) -> Optional[str]:
+def get_step_for_file(basename: str, repo_root: str) -> Optional[str]:
     """Return the step string for a registered basename, or None.
 
     Args:
         basename: spec file basename (e.g. "04_fr_list.json").
-        spec_root: filesystem path to the project's spec directory.
+        repo_root: filesystem path to the toolkit root directory.
+            The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
     """
-    registry, _ = _load(spec_root)
+    registry, _ = _load(repo_root)
     entry = registry.get(basename)
     if entry and not entry.get("_special"):
         return entry.get("step")

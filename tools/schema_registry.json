@@ -26,6 +26,7 @@
   "vc:16-impl-context": "schema/16_impl_context.schema.json",
   "vc:16-anchor": "schema/16_anchor.schema.json",
   "vc:02a-delivery-baseline": "schema/02a_delivery_baseline.schema.json",
+  "vc:entry-key-registry": "schema/entry_key_registry.schema.json",
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
   "vc:step-order": "schema/step_order.schema.json"
