@@ -2,234 +2,204 @@
 name: specdev-context
 description: >
   Load context for a pipeline step. Required before any spec-related work: authoring,
-  reviewing, analysing, debugging, or answering questions about spec/*.json or pipeline steps.
-  NEVER read spec/*.json files directly with the Read tool — use this skill instead.
+  reviewing, analysing, debugging, or answering questions about spec files or pipeline steps.
+  Never read files under spec/ directly with the Read tool — use this skill's primitives.
   Trigger on: any mention of a step number, "what does step NN need", "look at step NN",
-  "work on step NN", "/specdev-context NN", or any task involving spec files or pipeline steps.
+  "work on step NN", "/specdev-context NN", or any task involving spec files, milestones,
+  cross-step concepts, or backlog follow-up.
 ---
 
 # /specdev-context — Step Context Loader
 
-**Never read `spec/*.json` files directly, and never read tool output dump files.** This skill
-is the single entry point for all spec reads. For any work involving a pipeline step —
-authoring, reviewing, fixing, debugging, or answering questions — load context here first.
-For targeted follow-up queries after context is loaded, use `json read` on the source artifact,
-not on saved terminal output. See **Prohibited patterns** below.
+Single entry point for all spec reads. Two flows: **Orientation** (load context for a step) and **Action** (apply surgical edits driven by a source of findings). Both compose existing CLI primitives. Subagents handle exploration; the main thread handles synthesis.
 
-For re-reads during a review-refine cycle, re-run with `--scope <entry-id>` to get a fresh
-scoped view of the modified entry. Do not inspect fields directly.
+## Path variables
 
-## Input
+| Variable | Meaning |
+|---|---|
+| `$TOOLKIT_ROOT` | Toolkit submodule root (typically `./devspec_toolkit`) |
+| `$SPEC_DIR` | Host spec directory (typically `./spec`) |
+| `$GIT_ROOT` | Host repo root (typically `.`) |
 
-```
-/specdev-context <NN> [--scope <entry-id>] [--full]
-```
+All paths resolve from `$GIT_ROOT`. If running from `$TOOLKIT_ROOT`, paths break — `cd` to `$GIT_ROOT` first.
 
-- `<NN>`: Step ID (e.g. `04`, `02a`, `16b`)
-- `--scope <entry-id>`: Restrict to IDs reachable from this entry via the trace graph.
-  Use during review-refine cycles to reload a specific entry after editing it.
-  The same `<entry-id>` value is used as `--entry` in Steps 2 and 3.
-- `--full`: Bypass scope filtering — include all spec objects for this step.
+Literal `tools/` references in this skill (`$TOOLKIT_ROOT/tools/`, `$GIT_ROOT/tools/`) are the conventional toolkit + host layouts.
 
-## Prerequisites
+## Hard bans
 
-Run from the host repo root. The toolkit must be at `./devspec_toolkit/`.
-Replace `<spec_dir>` with the actual spec directory path (typically `spec/` for a product repo,
-or `devspec_toolkit/spec/` when working on the toolkit itself).
+| Banned |
+|---|
+| `Read` on any file under `$SPEC_DIR/` |
+| `Read` on any file under `$TOOLKIT_ROOT/canon/kinds/` |
+| `Read` on tool-output dump files (`*.txt`, `.specdev/`, `/tmp/`) |
+| `cat` / `Bash` reads of spec or canon files |
+| `Edit` on any existing file under `$SPEC_DIR/` (use `specdev json patch/insert/delete`) |
+| `Write` on existing spec files (`Write` is allowed **only** for creating a brand-new step file that does not yet exist) |
+| Unfiltered `specdev json read <file>` — always pass a jq filter |
+| Hardcoded "FRs live in step 04 / APIs in step 05" mappings — use `entry_key_registry` |
 
-```
-./tools/run_specdev.sh <subcommand> --repo-root ./devspec_toolkit
-```
+| Explicitly allowed |
+|---|
+| `Read` on `$TOOLKIT_ROOT/prompts/prompt_NN_*.md` (step's authoring contract) |
+| `Read` on `$TOOLKIT_ROOT/prompts/shared_expectations.md` (operating rules — required before any prompt execution) |
 
-**Seed freshness (steps 00–02a only)**: If authoring or reviewing a step that reads seed
-documents (00–02a), verify seeds are current before loading context:
+## Surgical query rules
 
-```bash
-./tools/run_specdev.sh context freshness \
-  <spec_dir> --repo-root ./devspec_toolkit
-```
+- Always pass a jq filter to `specdev json read`. Unfiltered reads of whole spec files are banned.
+- Use `specdev json structure <file>` and `specdev json schema <file> <path>` to learn a file's shape before composing queries. Do not trust priors about field names.
+- Run `specdev <command> --help` when unsure about flags. Do not assume.
 
-A `"stale": true` result on any seed means upstream content has changed since the spec was
-last written. Stale seeds produce misleading context — re-index the affected seed before
-proceeding. Steps 05 and above have no seed dependency; skip this check.
+## The three static indices
 
-## Prohibited patterns
-
-The following are **hard bans** — never do these regardless of context:
-
-| Banned action | Why | Use instead |
+| Index | Path | Answers |
 |---|---|---|
-| `Read` on `spec/*.json` | Bypasses pipeline, no query filtering | `context extract` + `json read` |
-| `Read` on tool output dump files (`*.txt`, `.specdev/`, temp paths) | Reads stale, unfiltered blobs | `json read <source-file> '<jq-filter>'` on the actual artifact |
-| `cat` / `Bash` reads of spec or canon files | Same as above | `json read` |
-| `Read` on `devspec_toolkit/canon/kinds/*.json` | Canon is loaded via `context canon` | `context canon` output |
-| Re-running `context extract` to re-read already-loaded context | Wastes tokens | Use `json read` for targeted follow-up queries |
+| `step_order.json` | `$TOOLKIT_ROOT/tools/step_order.json` | "Which steps are downstream of step N? Which upstream files feed step N?" |
+| `trace_matrix.json` | `$GIT_ROOT/tools/trace_matrix.json` | "If I change entity E, which other entities are linked? (link kinds defined in `$TOOLKIT_ROOT/canon/kinds/trace_type.json`)" |
+| `entry_key_registry.json` | `$TOOLKIT_ROOT/tools/entry_key_registry.json` | "Which file/array/id_field holds entities of kind K? Which step is that file in?" |
 
-**If a command output is truncated** (saved to a file because it exceeded terminal limits):
-- Do **not** `Read` the saved dump file.
-- Instead run targeted `json read` queries directly on the upstream source artifact:
-  ```bash
-  # Example: extract output was large — query what you need directly
-  ./tools/run_specdev.sh json read spec/01_capabilities.json '.capabilities[] | {capability_id, scope, name}'
-  ./tools/run_specdev.sh json read spec/00_charter.json '.in_scope'
-  ```
-- Only call `context extract --full` again if the specific field you need is not accessible via `json read`.
+**Composition rule**: when walking from a kind to its owning file, from an entity to its dependents, or from a step to its downstream files — compose these three indices. Never hardcode the mappings they encode.
 
-## Execution
+`step_order` is mostly consumed indirectly via `specdev context structure` (Orientation Step 1). Read it directly only for `downstream_consumers` lookups in impact amplification.
 
-Run each command in sequence. Stop and report if any command exits non-zero.
+## Subagent delegation
 
-### Step 1 — Structure
+For tasks requiring many reads to compose an answer — cross-step concept reviews, milestone audits, backlog impact amplification — spawn a subagent. Give it the task; it runs the reads internally and returns a synthesis. The orchestrator's context stays focused on decisions.
+
+For single-step tasks (load context, patch one entry, verify), do the reads inline.
+
+## Orientation flow
+
+Invoked on a step, optionally with a scope hint (entry-id, milestone-id, fr-prefix, concept keyword). Skip Step 3 if no scope hint was provided.
+
+### Step 1 — Orient
 
 ```bash
-./tools/run_specdev.sh context structure \
-  <spec_dir> --step <NN> --repo-root ./devspec_toolkit
+specdev context structure $SPEC_DIR --step <NN> --repo-root $TOOLKIT_ROOT
 ```
 
-### Step 2 — Scope (only if --scope provided)
+Returns a structural skeleton: required upstream files, per-file array counts, canon kinds used.
+
+### Step 2 — Know shape
 
 ```bash
-./tools/run_specdev.sh context scope \
-  <spec_dir> --entry <entry-id> --repo-root ./devspec_toolkit
+specdev json structure $SPEC_DIR/<NN>_*.json
+specdev json schema $SPEC_DIR/<NN>_*.json '<jq-path>' --repo-root $TOOLKIT_ROOT
 ```
 
-If the output contains a `scope_warning`, surface it and run Step 3 with `--full` instead
-of `--entry`. Skip entirely when `--scope` is not provided.
+Discover the file's actual shape before querying. `json structure` returns a tree; `json schema` returns the schema definition for a path.
 
-### Step 3 — Extract
+### Step 3 — Scope resolution (only if a scope hint was provided)
 
-```bash
-./tools/run_specdev.sh context extract \
-  <spec_dir> --step <NN> [--entry <entry-id>] [--full] \
-  --repo-root ./devspec_toolkit
-```
+Compose primitives based on the hint:
+
+- **Entry id**: look up `kind` → `(file, array, id_field)` in `$TOOLKIT_ROOT/tools/entry_key_registry.json`, then `specdev json read $SPEC_DIR/<file> '.<array>[] | select(.<id_field> == "<entry-id>")'`.
+- **Milestone id**: `specdev json read $SPEC_DIR/14_roadmap.json '.milestones[] | select(.milestone_id == "<id>")'`; then the per-milestone plan at `$SPEC_DIR/impl_context/ms_*_plan.json`; then the trace matrix slice for the milestone's FRs.
+- **Concept keyword / FR prefix**: query `$GIT_ROOT/tools/trace_matrix.json` for entities matching the prefix; drill into specific entries via `json read`.
 
 ### Step 4 — Canon
 
 ```bash
-./tools/run_specdev.sh context canon \
-  --step <NN> --repo-root ./devspec_toolkit
+specdev context canon --step <NN> --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR
 ```
-
-For **submodule / product-repo** deployments where `spec/canon/` holds project-specific
-terms (e.g. after running `canon-accept`), add `--spec-root` so project-tier entries are
-merged alongside toolkit-core entries:
-
-```bash
-./tools/run_specdev.sh context canon \
-  --step <NN> --repo-root ./devspec_toolkit --spec-root ./spec
-```
-
-Full definitions are in `devspec_toolkit/canon/kinds/<kind>.json`. Do not read them
-unless a specific term lookup is requested.
 
 ### Step 5 — Prompt contract
 
-Read the file matching:
+Read `$TOOLKIT_ROOT/prompts/shared_expectations.md` (operating rules; required before any prompt execution) **and** `$TOOLKIT_ROOT/prompts/prompt_<NN>_*.md` (the step's authoring contract). Both are explicitly read-allowed (see Hard bans table).
 
-```
-devspec_toolkit/prompts/prompt_<NN>_*.md
-```
+## Action flow
 
-## Output
+Run when the task is to apply edits driven by a source of findings.
 
-After all steps complete, output only one of:
+### Step 1 — Acquire findings
 
-```
-Context loaded for step <NN>.                       # no --scope or --full
-Context loaded for step <NN> [scope: <entry-id>].   # --scope used
-Context loaded for step <NN> [scope: full].         # --full used
-```
+| Source | Command |
+|---|---|
+| Backlog | `specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT --json` |
+| Edit intent | Caller supplies findings |
+| Spec-check errors | `specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json` |
 
-All loaded data is in working context. Do not echo command outputs unless the user
-asks for something specific.
+Each finding has minimally `{id, severity, description, impact[]}`. The `impact[]` is a list of pointer-shaped `(file, id)` targets.
 
-## Reading the step's own output artifact
+### Step 2 — Validate pointers
 
-These commands are for **post-authoring verification only** — checking specific fields of
-the artifact a step just produced. They do NOT load upstream context.
-
-**For upstream context (what a step needs as inputs), always run the 5-step execution above —
-never substitute `json read` for `/specdev-context`.**
+`specdev json resolve-pointers` reads a JSON array of `{file, id}` (or `{file, jq_path}`) objects from stdin; returns hits/misses with `nearest[]` hints.
 
 ```bash
-# Read a single targeted field or expression — supports streaming filters
-./tools/run_specdev.sh json read <file> '<jq-filter>'
-
-# Examples:
-./tools/run_specdev.sh json read spec/03_glossary.json '.terms | length'
-./tools/run_specdev.sh json read spec/03_glossary.json '.terms[2]'
-./tools/run_specdev.sh json read spec/03_glossary.json '.terms[] | select(.domain == "analytics")'
-
-# Read multiple fields in one pass — returns a keyed JSON object
-# RESTRICTION: each filter must return a single value; streaming filters (.arr[]) are rejected here
-./tools/run_specdev.sh json read-multi <file> '<filter1>' '<filter2>' ...
-./tools/run_specdev.sh json read-multi spec/03_glossary.json '.id' '.version' '.terms | length'
-
-# Tree overview — structure only, no field content
-./tools/run_specdev.sh json structure <file>
+specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT --json \
+  | jq '[.records[]?.impact[]?
+         | if type == "string" and test(":") then split(":") | {file: .[0], id: .[1]}
+           elif type == "object" then {file, id}
+           else empty end]' \
+  | specdev json resolve-pointers --repo-root $TOOLKIT_ROOT --git-root $GIT_ROOT
 ```
 
-Use `json read` for streaming filters (`.arr[] | select(...)`). Use `json read-multi` when
-spot-checking several independent single-value fields after writing an artifact.
+The shape guard (`if type ==`) keeps the pipeline robust to either string (`"file:id"`) or object (`{file, id}`) impact entries. Surface unresolved pointers to the caller; do not silently drop.
 
-## Snapshot and diff
+### Step 3 — Amplify impact (optional)
 
-Save a checkpoint of a step artifact and diff it against the current state — without requiring
-a git commit. Useful during iterative authoring or review cycles.
+When a finding's `impact[]` may be incomplete (typical for newly-recorded `emergent_ambiguities`), walk the three indices to compute the full blast radius before patching:
+
+1. For each entity in the impact set, query `$GIT_ROOT/tools/trace_matrix.json` for all linked entities. The set of link kinds is defined in `$TOOLKIT_ROOT/canon/kinds/trace_type.json` — do not hardcode the kind list in your query.
+2. For each linked entity, look up its owning file via `$TOOLKIT_ROOT/tools/entry_key_registry.json` (kind → file/step).
+3. Union all `(file, id)` pairs into the amplified impact set.
+4. Optionally query `$TOOLKIT_ROOT/tools/step_order.json` `.downstream_consumers["<step>"]` for step-level blast radius.
+
+### Step 4 — Surgical edit
 
 ```bash
-# Save current state as a workspace snapshot
-./tools/run_specdev.sh context snapshot <spec_dir> --step <NN> --repo-root ./devspec_toolkit
-
-# Diff current artifact against the saved snapshot
-./tools/run_specdev.sh context diff <spec_dir> --step <NN> --repo-root ./devspec_toolkit
+specdev json patch <file> '<jq-path>' '<value>' \
+  --against-schema-field <step>.<field> --repo-root $TOOLKIT_ROOT
 ```
 
-Snapshots are stored in `.specdev/snapshots/` at the git root. Add `.specdev/` to `.gitignore`
-if you do not want snapshots committed.
+Use `insert` for array append, `delete` for removal. Always pass `--against-schema-field` for schema-validated writes. Preview with `--dry-run` for non-trivial edits.
 
-## Writing and editing artifacts
+### Step 5 — Verify
 
-Check whether `<spec_dir>/<NN>_*.json` exists before touching it.
+```bash
+specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json
+specdev forward-replay-check --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json
+```
 
-**File does not exist — full write**
+If both green: done. If errors surface, fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
 
-Write the complete JSON in one operation. The schema validator requires a complete document.
-
-**File exists — targeted edits only**
+## Writing primitives
 
 | Situation | Command |
-|-----------|---------|
-| Replace a value | `Edit` tool |
-| Append to an array or merge into an object | `./tools/run_specdev.sh json insert <file> <jq-path> <value>` |
-| Update by entry ID | `./tools/run_specdev.sh json patch <file> <jq-path> <value>` |
-| Delete a field or entry | `./tools/run_specdev.sh json delete <file> <jq-path>` |
+|---|---|
+| New step file (does not yet exist) | `Write` tool for initial creation only; then `spec-check` to validate |
+| Replace a scalar | `specdev json patch <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
+| Append to array / merge into object | `specdev json insert <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
+| Delete a field or entry | `specdev json delete <file> '<jq-path>'` |
+| Preview before write | All three accept `--dry-run` |
 
-Prefer `Edit` for simple replacements. Use `./tools/run_specdev.sh json` when the edit requires
-array manipulation or targeting an entry by ID within a nested array.
+## Cross-tier canon drift
 
-## Upstream drift
+When `spec-check` reports the same canonical id resolving differently in `$TOOLKIT_ROOT/canon/manifest.json` vs `$SPEC_DIR/canon/manifest.json`, query both, decide which is authoritative, and surface to caller for human resolution. Do not silently align one side.
 
-When a checklist assertion would diverge from the cited spec entry — or when the same canonical id resolves to different text in different source files — do not silently encode the code-side value. Log it as a `plan.ambiguities[]` entry (16a) or `execution.emergent_ambiguities[]` (16b+) and let the upstream-revision cycle reconcile it. Schema and field requirements live in `prompt_16a_impl_planner.md` and the step-16 schema.
+## Upstream drift recording
 
-Before minting a new entry, check sibling plans in `spec/impl_context/` — reuse the id or cross-reference if the drift is already logged.
+When a checklist assertion would diverge from the cited spec entry, log it as `plan.ambiguities[]` (16a) or `execution.emergent_ambiguities[]` (16b+). The `impact[]` of each new entry MUST be computed via the Action flow's amplification procedure (Step 3 above).
 
-Each entry's `impact[]` must include the upstream spec file path (e.g. `spec/04_fr_list.json:<id>`) so `upstream-backlog` can route it. For duplicate-id drift, include every definition site.
-
-After authoring, verify routing:
+Verify routing:
 
 ```bash
-./tools/run_specdev.sh upstream-backlog <spec_dir> \
-  --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT
 ```
 
-Any entry from this plan landing in `Unclassified` means `impact[]` lacks a step-routable path.
+Entries landing in `Unclassified` mean `impact[]` lacks a step-routable path.
+
+## Permission allow-list
+
+**Auto-invocable** (no human confirmation):
+`context structure`, `context canon`, `json read`, `json read-multi`, `json keys`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `forward-replay-check --json`, `upstream-backlog --json`, `matrix`, `guide`, `registry-check`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default.
+
+**Human required**:
+`canon-accept`, `align apply`, `git commit`, `git push`.
 
 ## Error handling
 
-- **Command exits non-zero**: show stderr and stop.
-- **Step not found / schema not found**: check `--repo-root ./devspec_toolkit`; confirm
-  the step ID exists in `devspec_toolkit/tools/step_order.json`.
-- **No spec file for an upstream step**: note missing steps and proceed with available context.
-- **`scope_warning` in scope output**: surface the warning, fall back to `--full` extraction.
+- **Command exits non-zero**: surface stderr to the caller and stop.
+- **`json resolve-pointers` reports misses**: surface the miss set with `nearest[]` hints. Do not silently drop.
+- **`spec-check` fails after a patch**: fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
+- **`forward-replay-check` reports invalidation**: feed affected entries into another Action flow iteration.
+- **Error code lookup**: `specdev guide <error-code>` for the canonical remediation playbook.
