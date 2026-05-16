@@ -510,7 +510,10 @@ def main():
         from .validation.matrix import build_trace_matrix
         repo_root = os.path.abspath(args.repo_root)
         spec_dir = os.path.abspath(args.spec_dir)
-        res = build_trace_matrix(repo_root, spec_dir)
+        git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+        project_canon_dir = _discover_project_canon_dir(git_root=git_root, spec_root=spec_root, spec_dir=spec_dir)
+        res = build_trace_matrix(repo_root, spec_dir, project_canon_dir=project_canon_dir)
         if getattr(args, "json_output", False):
             cfg = get_config()
             integrity_errors = res.get("integrity_errors")
@@ -531,9 +534,9 @@ def main():
             if has_integrity_err:
                 sys.exit(1)
         else:
-            out = json.dumps(res, indent=2)
+            out = json.dumps(res, indent=2, sort_keys=True) + "\n"
             if args.out == "-":
-                print(out)
+                print(out, end="")
             else:
                 out_path = os.path.abspath(args.out)
                 os.makedirs(os.path.dirname(out_path), exist_ok=True)

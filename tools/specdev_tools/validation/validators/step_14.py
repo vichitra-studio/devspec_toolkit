@@ -113,19 +113,18 @@ def validate_step_14(instance: dict[str, Any], toolkit_root: str, artifact_path:
             if not dep.get("note"):
                 errors.append(make_error("E520", f"External dependency '{dep_id}' missing note"))
     # AUDIT-033: Trace matrix staleness check (W604)
-    # If tools/trace_matrix.json is older than the roadmap artifact, warn that it should be regenerated.
-    errors.extend(_check_trace_matrix_staleness(toolkit_root, artifact_path))
+    # If spec/extras/trace_matrix.json is older than the roadmap artifact, warn that it should be regenerated.
+    errors.extend(_check_trace_matrix_staleness(artifact_path))
     return errors
 
 
-def _check_trace_matrix_staleness(toolkit_root: str, artifact_path: str | None) -> list[SpecError]:
+def _check_trace_matrix_staleness(artifact_path: str | None) -> list[SpecError]:
     """Check whether trace_matrix.json is stale relative to the roadmap artifact.
 
     Emits W604 TRACE_MATRIX_STALE if trace_matrix.json is older than 14_roadmap.json,
     or if trace_matrix.json is missing.
 
-    Looks in ``<spec_dir>/extras/`` first (host-repo location), then falls
-    back to ``<toolkit_root>/tools/`` for backwards compatibility.
+    Looks in ``<spec_dir>/extras/trace_matrix.json`` (canonical location).
 
     Guard conditions (skip silently):
     - artifact_path is None or not named "14_roadmap.json" — only meaningful for the real artifact
@@ -145,9 +144,9 @@ def _check_trace_matrix_staleness(toolkit_root: str, artifact_path: str | None) 
             return errors
         if not roadmap_path.exists():
             return errors
-        # Locate trace_matrix.json via shared resolution (extras/ → tools/ fallback)
+        # Locate trace_matrix.json via shared resolution (canonical: spec/extras/)
         spec_dir = str(roadmap_path.parent)
-        matrix_path = Path(resolve_extras_path(spec_dir, toolkit_root, "trace_matrix.json"))
+        matrix_path = Path(resolve_extras_path(spec_dir, "trace_matrix.json"))
         if not matrix_path.exists():
             errors.append(make_error(
                 "W604",

@@ -1,0 +1,1036 @@
+{
+  "matrix": [
+    {
+      "fr_id": "fr-post-publish",
+      "apis": [
+        "api-admin-post-publish",
+        "api-content-search",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-admin-post-publish-conflict-redteam",
+        "fix-admin-post-publish-contributor-forbidden-redteam",
+        "fix-admin-post-publish-id-not-found-redteam",
+        "fix-admin-post-publish-unauthorized-redteam",
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-content-search-exhaustion-threat-redteam",
+        "fix-content-search-invalid-api-key-redteam",
+        "fix-content-search-invalid-filter-redteam",
+        "fix-content-search-no-results-contract",
+        "fix-content-search-rate-limited-redteam",
+        "fix-content-search-success-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-load-publish-latency",
+        "fix-load-search-latency",
+        "fix-newsletter-no-resend-on-republish-e2e",
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-newsletter-suppressed-when-disabled-e2e",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-newsletter-send-phase2-contract",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-post-publish-empty-body-redteam",
+        "fix-post-publish-missing-title-redteam",
+        "fix-post-publish-success-contract",
+        "fix-post-schedule-success-contract",
+        "fix-progressive-enhancement-e2e",
+        "fix-throughput-publishing-velocity-e2e"
+      ],
+      "nfrs": [
+        "nfr-availability-ghost-cms",
+        "nfr-publish-latency",
+        "nfr-throughput-publishing-velocity"
+      ],
+      "threats": [
+        "threat-authn-admin-credential-stuffing",
+        "threat-authn-admin-session-hijack",
+        "threat-authz-admin-csrf",
+        "threat-authz-contributor-publish-escalation",
+        "threat-business-logic-public-page-scraping",
+        "threat-business-logic-search-exhaustion",
+        "threat-business-logic-stale-publish-overwrite",
+        "threat-business-logic-youtube-oembed-ssrf",
+        "threat-data-privacy-content-key-exfiltration",
+        "threat-data-privacy-error-stacktrace-leak",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-post-newsletter-send",
+      "apis": [
+        "api-admin-post-publish",
+        "api-zoho-smtp-transactional"
+      ],
+      "fixtures": [
+        "fix-admin-post-publish-conflict-redteam",
+        "fix-admin-post-publish-contributor-forbidden-redteam",
+        "fix-admin-post-publish-id-not-found-redteam",
+        "fix-admin-post-publish-unauthorized-redteam",
+        "fix-email-zoho-transactional-contract",
+        "fix-email-zoho-transactional-from-mismatch-redteam",
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-load-publish-latency",
+        "fix-newsletter-no-resend-on-republish-e2e",
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-newsletter-suppressed-when-disabled-e2e",
+        "fix-post-newsletter-send-phase2-contract",
+        "fix-post-publish-empty-body-redteam",
+        "fix-post-publish-missing-title-redteam",
+        "fix-post-publish-success-contract",
+        "fix-post-schedule-success-contract",
+        "fix-throughput-publishing-velocity-e2e"
+      ],
+      "nfrs": [
+        "nfr-email-colour-rendering",
+        "nfr-email-cross-client-baseline",
+        "nfr-email-font-stack",
+        "nfr-local-email-capture",
+        "nfr-newsletter-deliverability",
+        "nfr-usability-newsletter-open-rate"
+      ],
+      "threats": [
+        "threat-authn-admin-credential-stuffing",
+        "threat-authn-admin-session-hijack",
+        "threat-authz-admin-csrf",
+        "threat-authz-contributor-publish-escalation",
+        "threat-business-logic-stale-publish-overwrite",
+        "threat-business-logic-youtube-oembed-ssrf",
+        "threat-data-privacy-error-stacktrace-leak",
+        "threat-transport-smtp-transactional-starttls-stripping"
+      ]
+    },
+    {
+      "fr_id": "fr-post-publish-validation",
+      "apis": [
+        "api-admin-image-upload",
+        "api-admin-post-publish"
+      ],
+      "fixtures": [
+        "fix-admin-image-upload-contributor-forbidden-redteam",
+        "fix-admin-image-upload-invalid-type-redteam",
+        "fix-admin-image-upload-success-contract",
+        "fix-admin-image-upload-too-large-redteam",
+        "fix-admin-post-publish-conflict-redteam",
+        "fix-admin-post-publish-contributor-forbidden-redteam",
+        "fix-admin-post-publish-id-not-found-redteam",
+        "fix-admin-post-publish-unauthorized-redteam",
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-load-publish-latency",
+        "fix-newsletter-no-resend-on-republish-e2e",
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-newsletter-suppressed-when-disabled-e2e",
+        "fix-post-newsletter-send-phase2-contract",
+        "fix-post-publish-empty-body-redteam",
+        "fix-post-publish-missing-title-redteam",
+        "fix-post-publish-success-contract",
+        "fix-post-schedule-success-contract",
+        "fix-throughput-publishing-velocity-e2e"
+      ],
+      "nfrs": [],
+      "threats": [
+        "threat-authn-admin-credential-stuffing",
+        "threat-authn-admin-session-hijack",
+        "threat-authz-admin-csrf",
+        "threat-authz-contributor-publish-escalation",
+        "threat-business-logic-malicious-image-upload",
+        "threat-business-logic-stale-publish-overwrite",
+        "threat-business-logic-youtube-oembed-ssrf",
+        "threat-data-privacy-error-stacktrace-leak"
+      ]
+    },
+    {
+      "fr_id": "fr-homepage-render",
+      "apis": [
+        "api-homepage"
+      ],
+      "fixtures": [
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-homepage-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-latency-homepage-load"
+      ],
+      "threats": [
+        "threat-business-logic-public-page-scraping"
+      ]
+    },
+    {
+      "fr_id": "fr-post-schedule",
+      "apis": [
+        "api-admin-post-publish",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-admin-post-publish-conflict-redteam",
+        "fix-admin-post-publish-contributor-forbidden-redteam",
+        "fix-admin-post-publish-id-not-found-redteam",
+        "fix-admin-post-publish-unauthorized-redteam",
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-load-publish-latency",
+        "fix-newsletter-no-resend-on-republish-e2e",
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-newsletter-suppressed-when-disabled-e2e",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-newsletter-send-phase2-contract",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-post-publish-empty-body-redteam",
+        "fix-post-publish-missing-title-redteam",
+        "fix-post-publish-success-contract",
+        "fix-post-schedule-success-contract",
+        "fix-progressive-enhancement-e2e",
+        "fix-throughput-publishing-velocity-e2e"
+      ],
+      "nfrs": [
+        "nfr-availability-scheduled-publish"
+      ],
+      "threats": [
+        "threat-authn-admin-credential-stuffing",
+        "threat-authn-admin-session-hijack",
+        "threat-authz-admin-csrf",
+        "threat-authz-contributor-publish-escalation",
+        "threat-business-logic-public-page-scraping",
+        "threat-business-logic-stale-publish-overwrite",
+        "threat-business-logic-youtube-oembed-ssrf",
+        "threat-data-privacy-error-stacktrace-leak",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-newsletter-subscribe",
+      "apis": [
+        "api-newsletter-subscribe",
+        "api-zoho-smtp-transactional"
+      ],
+      "fixtures": [
+        "fix-email-zoho-transactional-contract",
+        "fix-email-zoho-transactional-from-mismatch-redteam",
+        "fix-ghost-portal-settings-probe",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-newsletter-signup-latency",
+        "fix-newsletter-enumeration-threat-redteam",
+        "fix-newsletter-subscribe-already-exists-contract",
+        "fix-newsletter-subscribe-invalid-email-redteam",
+        "fix-newsletter-subscribe-missing-domain-redteam",
+        "fix-newsletter-subscribe-rate-limited-redteam",
+        "fix-newsletter-subscribe-success-contract"
+      ],
+      "nfrs": [
+        "nfr-latency-newsletter-signup",
+        "nfr-security-rate-limiting"
+      ],
+      "threats": [
+        "threat-authn-magic-link-replay",
+        "threat-business-logic-newsletter-enumeration",
+        "threat-transport-smtp-transactional-starttls-stripping"
+      ]
+    },
+    {
+      "fr_id": "fr-newsletter-subscribe-validation",
+      "apis": [
+        "api-newsletter-subscribe"
+      ],
+      "fixtures": [
+        "fix-ghost-portal-settings-probe",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-newsletter-signup-latency",
+        "fix-newsletter-enumeration-threat-redteam",
+        "fix-newsletter-subscribe-already-exists-contract",
+        "fix-newsletter-subscribe-invalid-email-redteam",
+        "fix-newsletter-subscribe-missing-domain-redteam",
+        "fix-newsletter-subscribe-rate-limited-redteam",
+        "fix-newsletter-subscribe-success-contract"
+      ],
+      "nfrs": [],
+      "threats": [
+        "threat-authn-magic-link-replay",
+        "threat-business-logic-newsletter-enumeration"
+      ]
+    },
+    {
+      "fr_id": "fr-contact-page-render",
+      "apis": [
+        "api-contact-page"
+      ],
+      "fixtures": [
+        "fix-contact-page-not-found-redteam",
+        "fix-contact-page-render-success-contract",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-contact-page-latency"
+      ],
+      "nfrs": [
+        "nfr-latency-contact-page-load"
+      ],
+      "threats": [
+        "threat-business-logic-contact-form-abuse"
+      ]
+    },
+    {
+      "fr_id": "fr-brand-identity-apply",
+      "apis": [
+        "api-contact-page",
+        "api-gallery-page",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-contact-page-not-found-redteam",
+        "fix-contact-page-render-success-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-gallery-empty-state-redteam",
+        "fix-gallery-render-success-contract",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-contact-page-latency",
+        "fix-load-gallery-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-usability-wcag-aaa"
+      ],
+      "threats": [
+        "threat-business-logic-contact-form-abuse",
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-content-search",
+      "apis": [
+        "api-content-search",
+        "api-content-search-pages"
+      ],
+      "fixtures": [
+        "fix-content-search-exhaustion-threat-redteam",
+        "fix-content-search-invalid-api-key-redteam",
+        "fix-content-search-invalid-filter-redteam",
+        "fix-content-search-no-results-contract",
+        "fix-content-search-pages-success-contract",
+        "fix-content-search-rate-limited-redteam",
+        "fix-content-search-success-contract",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-search-latency"
+      ],
+      "nfrs": [
+        "nfr-latency-search-response",
+        "nfr-security-rate-limiting"
+      ],
+      "threats": [
+        "threat-business-logic-search-exhaustion",
+        "threat-data-privacy-content-key-exfiltration",
+        "threat-data-privacy-error-stacktrace-leak"
+      ]
+    },
+    {
+      "fr_id": "fr-post-feature-display",
+      "apis": [
+        "api-homepage"
+      ],
+      "fixtures": [
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-homepage-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [],
+      "threats": [
+        "threat-business-logic-public-page-scraping"
+      ]
+    },
+    {
+      "fr_id": "fr-content-export",
+      "apis": [
+        "api-content-export"
+      ],
+      "fixtures": [
+        "fix-content-export-author-forbidden-redteam",
+        "fix-content-export-success-contract",
+        "fix-content-export-unauthorized-redteam",
+        "fix-durability-content-backup-e2e",
+        "fix-internal-error-structured-response-admin-redteam"
+      ],
+      "nfrs": [
+        "nfr-durability-content-backup",
+        "nfr-security-access-control"
+      ],
+      "threats": [
+        "threat-data-privacy-export-pii-leak"
+      ]
+    },
+    {
+      "fr_id": "fr-content-restore",
+      "apis": [
+        "api-content-import"
+      ],
+      "fixtures": [
+        "fix-content-import-administrator-forbidden-redteam",
+        "fix-content-import-invalid-file-redteam",
+        "fix-content-import-success-contract",
+        "fix-content-import-version-mismatch-redteam",
+        "fix-durability-content-restore-e2e",
+        "fix-internal-error-structured-response-admin-redteam"
+      ],
+      "nfrs": [
+        "nfr-durability-content-restore",
+        "nfr-security-access-control"
+      ],
+      "threats": [
+        "threat-authz-admin-csrf",
+        "threat-business-logic-import-overwrite"
+      ]
+    },
+    {
+      "fr_id": "fr-theme-recovery",
+      "apis": [
+        "api-theme-activate",
+        "api-theme-upload"
+      ],
+      "fixtures": [
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-theme-activate-not-found-redteam",
+        "fix-theme-activate-success-contract",
+        "fix-theme-recovery-e2e",
+        "fix-theme-upload-invalid-zip-redteam",
+        "fix-theme-upload-success-contract"
+      ],
+      "nfrs": [
+        "nfr-portability-theme-recovery"
+      ],
+      "threats": [
+        "threat-authz-admin-csrf",
+        "threat-authz-theme-rce-upload",
+        "threat-authz-theme-supply-chain"
+      ]
+    },
+    {
+      "fr_id": "fr-media-caching",
+      "apis": [
+        "api-media-serve"
+      ],
+      "fixtures": [
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-media-serve-not-found-redteam",
+        "fix-media-serve-not-modified-contract",
+        "fix-media-serve-success-contract"
+      ],
+      "nfrs": [
+        "nfr-maintainability-image-cache-headers"
+      ],
+      "threats": [
+        "threat-business-logic-malicious-image-upload",
+        "threat-data-privacy-media-path-traversal"
+      ]
+    },
+    {
+      "fr_id": "fr-post-read",
+      "apis": [
+        "api-admin-image-upload",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-admin-image-upload-contributor-forbidden-redteam",
+        "fix-admin-image-upload-invalid-type-redteam",
+        "fix-admin-image-upload-success-contract",
+        "fix-admin-image-upload-too-large-redteam",
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-post-page-latency",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-latency-post-page-load"
+      ],
+      "threats": [
+        "threat-authz-admin-csrf",
+        "threat-business-logic-malicious-image-upload",
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-seo-metadata-render",
+      "apis": [
+        "api-contact-page",
+        "api-gallery-page",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-contact-page-not-found-redteam",
+        "fix-contact-page-render-success-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-gallery-empty-state-redteam",
+        "fix-gallery-render-success-contract",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-contact-page-latency",
+        "fix-load-gallery-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-maintainability-seo-metadata"
+      ],
+      "threats": [
+        "threat-business-logic-contact-form-abuse",
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-mobile-responsive",
+      "apis": [
+        "api-contact-page",
+        "api-gallery-page",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-contact-page-not-found-redteam",
+        "fix-contact-page-render-success-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-gallery-empty-state-redteam",
+        "fix-gallery-render-success-contract",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-contact-page-latency",
+        "fix-load-gallery-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-usability-mobile-responsive"
+      ],
+      "threats": [
+        "threat-business-logic-contact-form-abuse",
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-navigation",
+      "apis": [
+        "api-contact-page",
+        "api-gallery-page",
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-contact-page-not-found-redteam",
+        "fix-contact-page-render-success-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-gallery-empty-state-redteam",
+        "fix-gallery-render-success-contract",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-contact-page-latency",
+        "fix-load-gallery-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [],
+      "threats": [
+        "threat-business-logic-contact-form-abuse",
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-collaborative-authoring",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-gallery-display",
+      "apis": [
+        "api-gallery-page"
+      ],
+      "fixtures": [
+        "fix-gallery-empty-state-redteam",
+        "fix-gallery-render-success-contract",
+        "fix-load-gallery-latency"
+      ],
+      "nfrs": [
+        "nfr-latency-gallery-page-load"
+      ],
+      "threats": [
+        "threat-business-logic-public-page-scraping"
+      ]
+    },
+    {
+      "fr_id": "fr-comments-render",
+      "apis": [
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-post-page-latency",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-latency-comments-widget",
+        "nfr-usability-comments-moderation-latency"
+      ],
+      "threats": [
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-progressive-enhancement",
+      "apis": [
+        "api-homepage",
+        "api-post-page"
+      ],
+      "fixtures": [
+        "fix-comments-disabled-per-post-redteam",
+        "fix-comments-non-member-cta-contract",
+        "fix-featured-post-null-image-graceful-e2e",
+        "fix-homepage-render-success-contract",
+        "fix-homepage-template-not-found-fallback-contract",
+        "fix-ingress-route-https-e2e",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-comments-latency",
+        "fix-load-homepage-latency",
+        "fix-load-post-page-latency",
+        "fix-post-feature-display-on-homepage-e2e",
+        "fix-post-page-not-found-redteam",
+        "fix-post-page-read-success-contract",
+        "fix-progressive-enhancement-e2e"
+      ],
+      "nfrs": [
+        "nfr-maintainability-progressive-enhancement"
+      ],
+      "threats": [
+        "threat-business-logic-public-page-scraping",
+        "threat-data-privacy-stored-xss-comment",
+        "threat-data-privacy-stored-xss-post"
+      ]
+    },
+    {
+      "fr_id": "fr-newsletter-digest",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-newsletter-email-branding",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-newsletter-preview",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-theme-ci-deploy",
+      "apis": [
+        "api-theme-activate",
+        "api-theme-upload"
+      ],
+      "fixtures": [
+        "fix-internal-error-structured-response-admin-redteam",
+        "fix-theme-activate-not-found-redteam",
+        "fix-theme-activate-success-contract",
+        "fix-theme-recovery-e2e",
+        "fix-theme-upload-invalid-zip-redteam",
+        "fix-theme-upload-success-contract"
+      ],
+      "nfrs": [
+        "nfr-availability-deploy-success",
+        "nfr-security-stage-not-public-between-deploys"
+      ],
+      "threats": [
+        "threat-authz-admin-csrf",
+        "threat-authz-theme-rce-upload",
+        "threat-authz-theme-supply-chain"
+      ]
+    },
+    {
+      "fr_id": "fr-content-browse-filter",
+      "apis": [
+        "api-tag-archive-feed"
+      ],
+      "fixtures": [
+        "fix-content-browse-filter-api-fetch-contract",
+        "fix-internal-error-structured-response-public-redteam",
+        "fix-load-tag-filter-latency"
+      ],
+      "nfrs": [
+        "nfr-latency-tag-filter-interaction"
+      ],
+      "threats": [
+        "threat-business-logic-search-exhaustion"
+      ]
+    },
+    {
+      "fr_id": "fr-admin-2fa",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-security-ghost-admin-2fa"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-web-analytics",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-vm-snapshot-backup",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-durability-restore-drill",
+        "nfr-durability-vm-snapshot"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-email-alias",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-host-harden",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-operability-probe-cadence",
+        "nfr-security-host-harden"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-ingress-route",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-operability-probe-cadence",
+        "nfr-security-ingress-no-open-ports"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-provider-account-harden",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-security-provider-2fa"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-uptime-monitor",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [
+        "nfr-availability-uptime-sla"
+      ],
+      "threats": []
+    },
+    {
+      "fr_id": "fr-newsletter-send",
+      "apis": [
+        "api-ghost-admin-post-read",
+        "api-ghost-admin-post-tag",
+        "api-listmonk-campaign-create",
+        "api-listmonk-campaign-trigger",
+        "api-listmonk-subscriber-import",
+        "api-newsletter-webhook-receive",
+        "api-zoho-smtp-newsletter"
+      ],
+      "fixtures": [
+        "fix-email-zoho-newsletter-contract",
+        "fix-listmonk-deploy-smtp-test-contract",
+        "fix-newsletter-send-campaign-create-contract",
+        "fix-newsletter-send-campaign-trigger-contract",
+        "fix-newsletter-send-no-tag-skip-contract",
+        "fix-newsletter-send-webhook-validate-contract"
+      ],
+      "nfrs": [
+        "nfr-reliability-listmonk-service",
+        "nfr-reliability-smtp-relay",
+        "nfr-reliability-webhook-listener"
+      ],
+      "threats": [
+        "threat-authz-admin-api-key-post-read",
+        "threat-authz-admin-api-key-tag-manipulation",
+        "threat-authz-listmonk-unauthorized-campaign-create",
+        "threat-authz-smtp-newsletter-credential-abuse",
+        "threat-authz-webhook-hmac-bypass-forged-publish",
+        "threat-business-logic-campaign-trigger-stale-list",
+        "threat-business-logic-send-script-mid-pipeline-failure",
+        "threat-business-logic-webhook-secret-mismatch",
+        "threat-data-privacy-listmonk-subscriber-exfiltration"
+      ]
+    },
+    {
+      "fr_id": "fr-newsletter-listmonk-deploy",
+      "apis": [
+        "api-listmonk-campaign-trigger",
+        "api-zoho-smtp-newsletter"
+      ],
+      "fixtures": [
+        "fix-email-zoho-newsletter-contract",
+        "fix-listmonk-deploy-smtp-test-contract",
+        "fix-newsletter-send-campaign-trigger-contract"
+      ],
+      "nfrs": [
+        "nfr-reliability-listmonk-service"
+      ],
+      "threats": [
+        "threat-authz-smtp-newsletter-credential-abuse",
+        "threat-business-logic-campaign-trigger-stale-list",
+        "threat-business-logic-send-script-mid-pipeline-failure"
+      ]
+    },
+    {
+      "fr_id": "fr-email-zoho-topology",
+      "apis": [
+        "api-zoho-smtp-newsletter",
+        "api-zoho-smtp-transactional"
+      ],
+      "fixtures": [
+        "fix-email-zoho-newsletter-contract",
+        "fix-email-zoho-transactional-contract",
+        "fix-email-zoho-transactional-from-mismatch-redteam",
+        "fix-listmonk-deploy-smtp-test-contract"
+      ],
+      "nfrs": [
+        "nfr-reliability-smtp-relay"
+      ],
+      "threats": [
+        "threat-authz-smtp-newsletter-credential-abuse",
+        "threat-transport-smtp-transactional-starttls-stripping"
+      ]
+    },
+    {
+      "fr_id": "fr-newsletter-theme-filter",
+      "apis": [],
+      "fixtures": [],
+      "nfrs": [],
+      "threats": []
+    }
+  ],
+  "coverage": {
+    "fr_total": 40,
+    "fr_with_api": 27,
+    "fr_with_fixture": 27,
+    "fr_with_nfr": 29,
+    "fr_with_threat": 27,
+    "scaffolds_found": 0
+  },
+  "milestone_coverage": {
+    "fr-admin-2fa": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-brand-identity-apply": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-comments-render": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-contact-page-render": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-content-browse-filter": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-content-export": [
+      "ms-maintain-backup-recovery"
+    ],
+    "fr-content-restore": [
+      "ms-maintain-backup-recovery"
+    ],
+    "fr-content-search": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-email-alias": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-email-zoho-topology": [
+      "ms-phase2-newsletter-send"
+    ],
+    "fr-gallery-display": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-homepage-render": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-host-harden": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-ingress-route": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-media-caching": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-mobile-responsive": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-navigation": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-newsletter-listmonk-deploy": [
+      "ms-phase2-newsletter-send"
+    ],
+    "fr-newsletter-send": [
+      "ms-phase2-newsletter-send"
+    ],
+    "fr-newsletter-subscribe": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-newsletter-subscribe-validation": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-newsletter-theme-filter": [
+      "ms-phase2-newsletter-send"
+    ],
+    "fr-post-feature-display": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-post-newsletter-send": [
+      "ms-phase2-newsletter-send"
+    ],
+    "fr-post-publish": [
+      "ms-bootstrap-local-ghost"
+    ],
+    "fr-post-publish-validation": [
+      "ms-bootstrap-local-ghost"
+    ],
+    "fr-post-read": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-post-schedule": [
+      "ms-bootstrap-local-ghost"
+    ],
+    "fr-progressive-enhancement": [
+      "ms-membership-search-enhancements"
+    ],
+    "fr-provider-account-harden": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-seo-metadata-render": [
+      "ms-custom-pages-brand"
+    ],
+    "fr-theme-ci-deploy": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-theme-recovery": [
+      "ms-maintain-backup-recovery"
+    ],
+    "fr-uptime-monitor": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-vm-snapshot-backup": [
+      "ms-phase2-vps-deploy"
+    ],
+    "fr-web-analytics": [
+      "ms-phase2-vps-deploy"
+    ]
+  },
+  "integrity_errors": [
+    "W592 COVERAGE_THRESHOLD_WARN fr_coverage=67.5% below threshold=80%"
+  ]
+}
