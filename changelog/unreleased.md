@@ -226,6 +226,8 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
 
 ## Changed
 
+- **`13_extension_generator` → `13_extension_manifest` rename** (commit `d65ce71`): Aligned schema, prompt, and migration-template filenames with the canonical spec artifact name `spec/13_extension_manifest.json`. Files renamed: `schema/13_extension_generator.schema.json` → `schema/13_extension_manifest.schema.json`; `prompts/prompt_13_extension_generator.md` → `prompts/prompt_13_extension_manifest.md`; `prompts/migration/template_extension_generator.md` → `prompts/migration/template_extension_manifest.md`. Schema URI changed from `vc:13-extension-generator` to `vc:13-extension-manifest` in `$id`, `tools/schema_registry.json`, all step-13 fixtures, and inline prompt examples. `matrix.py` detection updated from `"extension_generator" in schema` to `"13-extension-manifest" in schema` (plus `art_basename.startswith("ext_")` for extension data files without `$schema`). Registry files regenerated.
+
 - **`downstream_consumers` completed** in step_order.json: 22+ entries added for steps 08, 11, 12, 15 to close DAG blind spots.
 - **E550 collision resolved**: `canon_schema_alignment.py` now uses E554 CANON_ENUM_DRIFT (was E550); `forward_replay_check.py` now uses E555 SEMANTIC_COVERAGE_REGRESSION for ID regressions (was E550). E550 is now exclusively FORWARD_REPLAY_MISSING.
 
