@@ -278,10 +278,36 @@ def main():
     sc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     rc = sub.add_parser("registry-check", help="Validate entry_key_registry.json: coverage, phantom basenames, and drift")
-    rc.add_argument("--spec-root", required=True, help="Project spec directory containing entry_key_registry.json")
+    rc.add_argument("--spec-root", required=True, help="Project spec directory (used for R003 drift check against live spec files)")
     rc.add_argument("--repo-root", default=".")
     rc.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
     rc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
+    rg = sub.add_parser(
+        "registry-generate",
+        help="Regenerate the entry-key registry and extraction-paths from toolkit schemas.",
+        description=(
+            "Regenerate the entry-key registry and extraction-paths from toolkit schemas.\n\n"
+            "Output is byte-deterministic across runs (sort_keys + indent=2 + trailing newline)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rg.add_argument(
+        "--repo-root",
+        required=True,
+        help="Toolkit root directory containing schema/ and tools/ (required).",
+    )
+    rg.add_argument(
+        "--out",
+        default=None,
+        help="Output path for entry_key_registry.json (default: <repo-root>/tools/entry_key_registry.json).",
+    )
+    rg.add_argument(
+        "--extraction-paths-out",
+        default=None,
+        dest="extraction_paths_out",
+        help="Output path for extraction_paths.json (default: <repo-root>/tools/extraction_paths.json).",
+    )
 
     gd = sub.add_parser("guide", help="Show remediation guide for an error code")
     gd.add_argument("code", help="Error code to look up, e.g. E110 or E530-INVENTED_ENUM_OR_ID")
@@ -401,12 +427,10 @@ def main():
     ctx_scope.add_argument("--entry", required=True)
     ctx_scope.add_argument("--repo-root", default=".")
 
-    ctx_extract = ctx_sub.add_parser("extract")
-    ctx_extract.add_argument("spec_dir")
-    ctx_extract.add_argument("--step", required=True)
-    ctx_extract.add_argument("--entry", default=None)
-    ctx_extract.add_argument("--full", action="store_true")
-    ctx_extract.add_argument("--repo-root", default=".")
+    # DEPRECATED: extract is removed; all args are optional so the handler always
+    # fires and emits the migration message regardless of what the user passed.
+    ctx_extract = ctx_sub.add_parser("extract", add_help=False)
+    ctx_extract.add_argument("args", nargs=argparse.REMAINDER)
 
     ctx_canon = ctx_sub.add_parser("canon")
     ctx_canon.add_argument("--step", required=True)
@@ -425,7 +449,24 @@ def main():
     ctx_review.add_argument("--repo-root", default=".")
 
     # --- json subcommand group ---
-    json_p = sub.add_parser("json", help="Targeted JSON read/write operations (read, patch, insert, delete)")
+    json_p = sub.add_parser(
+        "json",
+        help="Targeted JSON read/edit/validate operations on spec artifacts",
+        description=(
+            "Targeted JSON read/edit/validate operations on spec artifacts.\n\n"
+            "Available subcommands:\n"
+            "  read               Read a value at a jq path\n"
+            "  read-multi         Read multiple jq paths in one call\n"
+            "  patch              Replace a value at a jq path\n"
+            "  insert             Append to an array at a jq path\n"
+            "  delete             Remove a value at a jq path\n"
+            "  schema             Resolve the schema URI for a file\n"
+            "  structure          Print the structural outline of a file\n"
+            "  resolve-pointers   Verify a list of file:jq pointers\n\n"
+            "Run 'specdev json <subcommand> --help' for subcommand details."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     json_p.add_argument("args", nargs=argparse.REMAINDER, help="json subcommand and arguments")
 
     args = p.parse_args()
@@ -1736,64 +1777,62 @@ def main():
             get_step_structure, resolve_scope, extract_context,
             extract_canon, check_freshness,
         )
-        repo_root = os.path.abspath(args.repo_root)
         context_cmd = getattr(args, "context_cmd", None)
         if context_cmd is None:
             ctx_p.print_help()
-        elif context_cmd == "structure":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = get_step_structure(args.step, spec_dir, repo_root)
-            print(json.dumps(result, indent=2))
-        elif context_cmd == "scope":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = resolve_scope(args.entry, spec_dir, repo_root)
-            print(json.dumps(result, indent=2))
         elif context_cmd == "extract":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = extract_context(
-                args.step, spec_dir, repo_root,
-                entry_id=getattr(args, "entry", None),
-                full=getattr(args, "full", False),
-            )
-            print(json.dumps(result, indent=2))
-        elif context_cmd == "canon":
-            spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
-            result = extract_canon(args.step, repo_root, spec_root=spec_root)
-            print(json.dumps(result, indent=2))
-        elif context_cmd == "freshness":
-            spec_dir = os.path.abspath(args.spec_dir)
-            result = check_freshness(spec_dir, repo_root)
-            print(json.dumps(result, indent=2))
-            # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
-            stale_seeds = [
-                sid for sid, info in result.items()
-                if isinstance(info, dict) and info.get("stale")
-            ]
-            if stale_seeds:
-                cfg = get_config()
-                warn_or_error = "error" if cfg.warnings_as_errors else "warning"
-                for sid in stale_seeds:
-                    print(
-                        f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
-                        "re-index with /specdev-step (CONTENT_STALENESS)",
-                        file=sys.stderr,
-                    )
-                if cfg.warnings_as_errors:
-                    sys.exit(1)
-        elif context_cmd == "review":
-            from .context.reviewer import review_artifact
-            import dataclasses
-            artifact_path = os.path.abspath(args.artifact_path)
-            result = review_artifact(
-                artifact_path,
-                args.step,
-                os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
-                repo_root,
-                entry_id=getattr(args, "entry", None),
-            )
-            print(json.dumps(dataclasses.asdict(result), indent=2))
+            # DEPRECATED: extract_context is now a deprecation stub that
+            # prints a migration message and exits 1.
+            extract_context()
         else:
-            ctx_p.print_help()
+            # All non-deprecated subcommands need repo_root
+            repo_root = os.path.abspath(args.repo_root)
+            if context_cmd == "structure":
+                spec_dir = os.path.abspath(args.spec_dir)
+                result = get_step_structure(args.step, spec_dir, repo_root)
+                print(json.dumps(result, indent=2))
+            elif context_cmd == "scope":
+                spec_dir = os.path.abspath(args.spec_dir)
+                result = resolve_scope(args.entry, spec_dir, repo_root)
+                print(json.dumps(result, indent=2))
+            elif context_cmd == "canon":
+                spec_root = os.path.abspath(args.spec_root) if getattr(args, "spec_root", None) else None
+                result = extract_canon(args.step, repo_root, spec_root=spec_root)
+                print(json.dumps(result, indent=2))
+            elif context_cmd == "freshness":
+                spec_dir = os.path.abspath(args.spec_dir)
+                result = check_freshness(spec_dir, repo_root)
+                print(json.dumps(result, indent=2))
+                # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
+                stale_seeds = [
+                    sid for sid, info in result.items()
+                    if isinstance(info, dict) and info.get("stale")
+                ]
+                if stale_seeds:
+                    cfg = get_config()
+                    warn_or_error = "error" if cfg.warnings_as_errors else "warning"
+                    for sid in stale_seeds:
+                        print(
+                            f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
+                            "re-index with /specdev-step (CONTENT_STALENESS)",
+                            file=sys.stderr,
+                        )
+                    if cfg.warnings_as_errors:
+                        sys.exit(1)
+            elif context_cmd == "review":
+                from .context.reviewer import review_artifact
+                import dataclasses
+                artifact_path = os.path.abspath(args.artifact_path)
+                result = review_artifact(
+                    artifact_path,
+                    args.step,
+                    os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
+                    repo_root,
+                    entry_id=getattr(args, "entry", None),
+                )
+                print(json.dumps(dataclasses.asdict(result), indent=2))
+            else:
+                ctx_p.print_help()
 
     elif args.cmd == "json":
         from .core.json_utils import main as json_main
@@ -1830,6 +1869,25 @@ def main():
             _json_exit(errs, "registry-check")
         else:
             _print_and_exit_if_errors(errs)
+
+    elif args.cmd == "registry-generate":
+        repo_root = os.path.abspath(args.repo_root)
+        out_path = (
+            os.path.abspath(args.out)
+            if args.out
+            else os.path.join(repo_root, "tools", "entry_key_registry.json")
+        )
+        extraction_paths_out = (
+            os.path.abspath(args.extraction_paths_out)
+            if args.extraction_paths_out
+            else os.path.join(repo_root, "tools", "extraction_paths.json")
+        )
+        from .registry.generate import run as registry_generate_run
+        registry_generate_run(
+            repo_root=repo_root,
+            out_path=out_path,
+            extraction_paths_out=extraction_paths_out,
+        )
 
     elif args.cmd == "spec-check":
         repo_root = os.path.abspath(args.repo_root)
