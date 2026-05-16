@@ -60,8 +60,11 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W612",
             # Upstream-backlog: ambiguity's impact[] matches no classifier rule.
             "W613",
-            # Registry checks (R001-R003 / 620-622)
+            # Registry checks (R001-R003 / 620-622) and R004 / W614
+            # E620 retained for backward compat (R001 moved to toolkit unit tests).
             "E620", "E621", "E622",
+            # R004 host-side novelty detection (W6 refactor)
+            "W614",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

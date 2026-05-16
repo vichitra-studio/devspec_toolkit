@@ -1,12 +1,15 @@
 """Unit tests for specdev_tools.validation.registry_check.
 
 Tests cover:
-- Happy path: all-correct fixture passes all three checks.
-- R001 MISSING_STEP_REGISTRATION: step in step_order.json not registered and not opted-out.
+- Happy path: all-correct fixture passes all checks.
+- R001 MISSING_STEP_REGISTRATION: moved to toolkit unit test T-step-registry-coverage.
+  E620 is retained in ERROR_CODES for backward compatibility but no longer emitted
+  at host-runtime. See tests/unit/toolkit_invariants/test_step_registry_coverage.py.
 - R002 PHANTOM_BASENAME: registered basename not in extraction_paths.json.
 - R003 REGISTRY_DRIFT: id_field rename, array_path rename, missing array.
 - R003 nested: nested array missing, nested id_field mismatch.
-- spec-check wiring: registry-check SKIP when no registry file, PASS when present.
+- R004 UNREGISTERED_ARRAY: host spec has id-bearing array absent from toolkit registry.
+- spec-check wiring: registry-check SKIP when no registry file, PASS/WARN when present.
 - --json envelope shape: matches the standard format_errors_json shape.
 """
 from __future__ import annotations
@@ -78,7 +81,7 @@ class TestRegistryCheckHappyPath:
                     "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "functional_requirement"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             # spec file with matching structure
             spec_data = {
@@ -99,18 +102,30 @@ class TestRegistryCheckHappyPath:
             os.makedirs(spec_root)
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
-            # No entry_key_registry.json in spec_root
+            # No entry_key_registry.json in repo_root/tools/
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             assert errs == []
 
 
 # ---------------------------------------------------------------------------
-# R001 — Missing step registration
+# R001 — Missing step registration (MOVED to toolkit unit tests)
+# ---------------------------------------------------------------------------
+# R001 / E620 REGISTRY_MISSING_STEP was removed from host-runtime registry-check
+# after W6. The registry generator (W3) enforces step coverage as an internal
+# contract. The full R001 invariant is now tested in:
+#   tests/unit/toolkit_invariants/test_step_registry_coverage.py
+#
+# E620 is retained in ERROR_CODES for backward compatibility.
+# Tests below verify R001 is NOT emitted at host-runtime (since W6).
 # ---------------------------------------------------------------------------
 
 class TestR001MissingStepRegistration:
-    def test_unregistered_step_fires_E620(self) -> None:
-        """Step in step_order.json not in registry and not opted-out → E620."""
+    def test_r001_no_longer_fires_e620_at_host_runtime(self) -> None:
+        """R001 moved to toolkit unit tests — unregistered step does NOT fire E620 at host-runtime.
+
+        After W6, E620 is NOT emitted by run_registry_check(). The generator
+        enforces step coverage internally. See T-step-registry-coverage.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
@@ -121,25 +136,26 @@ class TestR001MissingStepRegistration:
             _write(repo_root, "tools/extraction_paths.json",
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
-            # Registry only covers step 04
+            # Registry only covers step 04 (step 05 is "unregistered")
             registry = _make_registry({
                 "04_fr_list.json": {
                     "step": "04",
                     "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             _write(spec_root, "04_fr_list.json", {"functional_requirements": [{"fr_id": "fr-x"}]})
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             codes = [e.code for e in errs]
-            assert "E620" in codes, f"Expected E620, got: {errs}"
-            # The error message mentions step 05
-            msgs = " ".join(e.message for e in errs)
-            assert "'05'" in msgs
+            # R001 moved to toolkit unit tests — E620 must NOT fire at host-runtime
+            assert "E620" not in codes, (
+                f"E620 unexpectedly fired at host-runtime (R001 was moved to toolkit "
+                f"unit tests after W6). Got errors: {errs}"
+            )
 
     def test_opted_out_step_does_not_fire(self) -> None:
-        """Step in steps_without_entry_arrays → no E620."""
+        """Step in steps_without_entry_arrays → no E620 (unchanged; R001 not emitted)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
@@ -154,14 +170,14 @@ class TestR001MissingStepRegistration:
                 {},
                 steps_without_entry_arrays={"16a": "No dedicated spec file."}
             )
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             codes = [e.code for e in errs]
             assert "E620" not in codes
 
     def test_step_with_basename_in_registry_does_not_fire(self) -> None:
-        """Step with a registered basename starting with '<step>_' → no E620."""
+        """Step with a registered basename → no E620 (unchanged; R001 not emitted)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
@@ -178,7 +194,7 @@ class TestR001MissingStepRegistration:
                     "arrays": [{"array_path": ".terms", "id_field": "term_id", "kind": "term"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             _write(spec_root, "03_glossary.json", {"terms": [{"term_id": "t-1"}]})
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
@@ -209,7 +225,7 @@ class TestR002PhantomBasename:
                     "arrays": [{"array_path": ".items", "id_field": "item_id", "kind": "item"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             codes = [e.code for e in errs]
@@ -233,7 +249,7 @@ class TestR002PhantomBasename:
                     "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             _write(spec_root, "04_fr_list.json", {"functional_requirements": [{"fr_id": "fr-x"}]})
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
@@ -255,7 +271,7 @@ class TestR002PhantomBasename:
                 "canonical_refs_used": {"_special": True},
                 "canonical_proposals": {"_special": True},
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             codes = [e.code for e in errs]
@@ -288,7 +304,7 @@ class TestR003Drift:
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
             # Registry says ".functional_requirements" but file has ".frs"
-            _write(spec_root, "entry_key_registry.json",
+            _write(repo_root, "tools/entry_key_registry.json",
                    self._minimal_registry_with(".functional_requirements", "fr_id"))
             _write(spec_root, "04_fr_list.json", {"frs": [{"fr_id": "fr-x"}]})
 
@@ -309,7 +325,7 @@ class TestR003Drift:
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
             # Registry says "fr_id" but file uses "requirement_id"
-            _write(spec_root, "entry_key_registry.json",
+            _write(repo_root, "tools/entry_key_registry.json",
                    self._minimal_registry_with(".functional_requirements", "fr_id"))
             _write(spec_root, "04_fr_list.json", {
                 "functional_requirements": [{"requirement_id": "req-1", "name": "Test"}]
@@ -333,7 +349,7 @@ class TestR003Drift:
             _write(repo_root, "tools/extraction_paths.json",
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
-            _write(spec_root, "entry_key_registry.json",
+            _write(repo_root, "tools/entry_key_registry.json",
                    self._minimal_registry_with(".functional_requirements", "fr_id"))
             # File has no 'functional_requirements' at all
             _write(spec_root, "04_fr_list.json", {"title": "FRs"})
@@ -354,7 +370,7 @@ class TestR003Drift:
             _write(repo_root, "tools/extraction_paths.json",
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
-            _write(spec_root, "entry_key_registry.json",
+            _write(repo_root, "tools/entry_key_registry.json",
                    self._minimal_registry_with(".functional_requirements", "fr_id"))
             _write(spec_root, "04_fr_list.json", {"functional_requirements": []})
 
@@ -374,7 +390,7 @@ class TestR003Drift:
             _write(repo_root, "tools/extraction_paths.json",
                    _make_extraction_paths(["04_fr_list.json"], step="04"))
 
-            _write(spec_root, "entry_key_registry.json",
+            _write(repo_root, "tools/entry_key_registry.json",
                    self._minimal_registry_with(".functional_requirements", "fr_id"))
             # No 04_fr_list.json in spec_root
 
@@ -405,7 +421,7 @@ class TestR003Drift:
                     }],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             # Parent entry exists but has no 'tasks' key
             _write(spec_root, "14_roadmap.json", {
                 "milestones": [{"milestone_id": "ms-1", "name": "M1"}]
@@ -438,7 +454,7 @@ class TestR003Drift:
                     }],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             # tasks array exists but uses "id" not "task_id"
             _write(spec_root, "14_roadmap.json", {
                 "milestones": [
@@ -491,7 +507,7 @@ class TestG2DriftMissingSpecFile:
                     "arrays": [{"array_path": ".items", "id_field": "item_id", "kind": "item"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             # Deliberately DO NOT create 99_phantom.json — drift must be skipped.
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
@@ -523,7 +539,7 @@ class TestG3DriftArrayPathNotAList:
                     "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
                 }
             })
-            _write(spec_root, "entry_key_registry.json", registry)
+            _write(repo_root, "tools/entry_key_registry.json", registry)
             # functional_requirements is an OBJECT, not a list.
             _write(spec_root, "04_fr_list.json", {"functional_requirements": {}})
 
@@ -537,13 +553,14 @@ class TestG3DriftArrayPathNotAList:
 
 
 class TestG4ResolvePointersRequiresSpecRoot:
-    def test_resolve_pointers_raises_TypeError_when_spec_root_omitted(self) -> None:
-        """G4: library API contract — ``resolve_pointers`` requires ``spec_root``.
+    def test_resolve_pointers_raises_TypeError_when_repo_root_omitted(self) -> None:
+        """G4: library API contract — ``resolve_pointers`` requires ``repo_root``.
 
         Pins the post-Task-1 fix: the previous ``spec_root=""`` default
         propagated empty strings into the loader, raising a confusing
-        ``FileNotFoundError`` at runtime. Now ``spec_root`` is a keyword-only
+        ``FileNotFoundError`` at runtime. Now ``repo_root`` is a keyword-only
         required parameter, so omitting it raises ``TypeError`` at call time.
+        (Renamed from spec_root → repo_root in W3-T4.)
         """
         from specdev_tools.core.json_utils import resolve_pointers
 
@@ -551,12 +568,12 @@ class TestG4ResolvePointersRequiresSpecRoot:
         try:
             resolve_pointers([ptr])  # type: ignore[call-arg]
         except TypeError as exc:
-            assert "spec_root" in str(exc), (
-                f"TypeError should mention 'spec_root', got: {exc!r}"
+            assert "repo_root" in str(exc), (
+                f"TypeError should mention 'repo_root', got: {exc!r}"
             )
         else:
             raise AssertionError(
-                "resolve_pointers([...]) without spec_root must raise TypeError"
+                "resolve_pointers([...]) without repo_root must raise TypeError"
             )
 
 
@@ -566,20 +583,34 @@ class TestG4ResolvePointersRequiresSpecRoot:
 
 class TestJsonEnvelopeShape:
     def test_json_output_matches_spec_error_format(self) -> None:
-        """Errors returned by run_registry_check are SpecError objects with code/message."""
+        """Errors returned by run_registry_check are SpecError objects with code/message.
+
+        Uses R002 / E621 (phantom basename) to trigger an error — R001 / E620
+        was moved to toolkit unit tests after W6 and no longer fires at host-runtime.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(spec_root)
             os.makedirs(os.path.join(repo_root, "tools"))
 
-            _write(repo_root, "tools/step_order.json", _make_step_order(["05"]))
+            _write(repo_root, "tools/step_order.json", _make_step_order([]))
+            # extraction_paths has no entries — basename will be phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
-            _write(spec_root, "entry_key_registry.json", _make_registry({}))
+            # Registry references a basename not in extraction_paths → E621
+            registry = _make_registry({
+                "05_interface_contracts.json": {
+                    "step": "05",
+                    "arrays": [{"array_path": ".apis", "id_field": "api_id", "kind": "api"}],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
-            # Should fire E620 for step "05"
-            assert any(e.code == "E620" for e in errs)
+            # Should fire E621 for phantom basename
+            assert any(e.code == "E621" for e in errs), (
+                f"Expected E621 (phantom basename), got: {[e.code for e in errs]}"
+            )
             # All errors have message strings
             for err in errs:
                 assert isinstance(err.message, str) and len(err.message) > 0
@@ -597,7 +628,7 @@ class TestJsonEnvelopeShape:
 
             _write(repo_root, "tools/step_order.json", _make_step_order(["05"]))
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
-            _write(spec_root, "entry_key_registry.json", _make_registry({}))
+            _write(repo_root, "tools/entry_key_registry.json", _make_registry({}))
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             spec_errs = ensure_spec_errors(errs)
@@ -645,8 +676,8 @@ class TestSpecCheckWiring:
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order([]))
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
-            # Write registry to spec_dir directly (no spec_root argument)
-            _write(spec_dir, "entry_key_registry.json", _make_registry(
+            # Write registry to toolkit-side tools/ directory
+            _write(repo_root, "tools/entry_key_registry.json", _make_registry(
                 {},
                 steps_without_entry_arrays={}
             ))
@@ -656,7 +687,12 @@ class TestSpecCheckWiring:
             assert rc.get("status") in ("PASS", "WARN"), f"Expected PASS/WARN, got: {rc}"
 
     def test_registry_check_fail_propagates_to_spec_check(self) -> None:
-        """When registry-check fires E620, spec-check's combined errors include it."""
+        """When registry-check fires E621 (phantom basename), spec-check includes it.
+
+        Previously this test asserted E620. After W6, R001 was moved to toolkit
+        unit tests and E620 no longer fires at host-runtime. This test now uses
+        E621 (phantom basename) to verify the propagation path is intact.
+        """
         from specdev_tools.validation.spec_check import run_spec_check
 
         import io
@@ -667,9 +703,16 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
-            # Registry exists but step 04 is not registered
-            _write(spec_dir, "entry_key_registry.json", _make_registry({}))
+            # Registry references a basename not in extraction_paths → E621
+            registry = _make_registry({
+                "04_fr_list.json": {
+                    "step": "04",
+                    "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             # Suppress stderr output from _print_summary
             captured = io.StringIO()
@@ -681,7 +724,9 @@ class TestSpecCheckWiring:
                 sys.stderr = orig_stderr
 
             codes = [e.code for e in errs]
-            assert "E620" in codes, f"Expected E620 in combined spec-check errors, got: {codes}"
+            assert "E621" in codes, (
+                f"Expected E621 (phantom basename) in combined spec-check errors, got: {codes}"
+            )
 
     def test_run_spec_check_json_skip_check_has_no_findings(self) -> None:
         """DEVSPEC-10: SKIP checks in run_spec_check_json must NOT have a findings key."""
@@ -750,7 +795,11 @@ class TestSpecCheckWiring:
                 )
 
     def test_run_spec_check_json_findings_contain_error_to_dict_shape(self) -> None:
-        """DEVSPEC-10: non-empty findings in run_spec_check_json have code/message/severity keys."""
+        """DEVSPEC-10: non-empty findings in run_spec_check_json have code/message/severity keys.
+
+        Uses R002 / E621 (phantom basename) to trigger a finding — R001 / E620
+        was moved to toolkit unit tests after W6 and no longer fires at host-runtime.
+        """
         from specdev_tools.validation.spec_check import run_spec_check_json
 
         import io
@@ -761,9 +810,16 @@ class TestSpecCheckWiring:
             repo_root = os.path.join(tmpdir, "toolkit")
             os.makedirs(os.path.join(repo_root, "tools"))
             _write(repo_root, "tools/step_order.json", _make_step_order(["04"]))
+            # extraction_paths has no entries → registered basename becomes phantom
             _write(repo_root, "tools/extraction_paths.json", {"_meta": {}})
-            # Registry exists but step 04 is not registered → E620
-            _write(spec_dir, "entry_key_registry.json", _make_registry({}))
+            # Registry references a basename not in extraction_paths → E621
+            registry = _make_registry({
+                "04_fr_list.json": {
+                    "step": "04",
+                    "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
 
             captured = io.StringIO()
             sys.stderr = captured
@@ -773,14 +829,191 @@ class TestSpecCheckWiring:
                 sys.stderr = sys.__stderr__
 
             checks = ctx["checks"]
-            # Find the registry-check which should have an E620 finding
+            # Find the registry-check which should have an E621 finding
             rc = checks.get("registry-check", {})
             assert rc.get("status") != "SKIP", f"registry-check should not be SKIP, got: {rc}"
             assert "findings" in rc, f"registry-check must have findings, got: {rc}"
             findings = rc["findings"]
-            assert len(findings) >= 1, f"Expected E620 finding, got: {findings}"
+            assert len(findings) >= 1, (
+                f"Expected E621 (phantom basename) finding, got: {findings}"
+            )
             finding = findings[0]
             assert "code" in finding, f"finding must have 'code' key, got: {finding}"
             assert "message" in finding, f"finding must have 'message' key, got: {finding}"
             assert "severity" in finding, f"finding must have 'severity' key, got: {finding}"
-            assert finding["severity"] == "error", f"E620 must have severity=error, got: {finding['severity']}"
+            assert finding["severity"] == "error", (
+                f"E621 must have severity=error, got: {finding['severity']}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# R004 — Unregistered arrays (W614)
+# ---------------------------------------------------------------------------
+
+
+def _make_registry_with_sentinels(entries: dict[str, Any], sentinels: list[str] | None = None) -> dict:
+    """Create a registry doc with _sentinels field."""
+    result = _make_registry(entries)
+    result["_sentinels"] = sentinels if sentinels is not None else ["canonical_refs_used", "canonical_proposals"]
+    return result
+
+
+class TestR004UnregisteredArrays:
+    """R004 / W614 UNREGISTERED_ARRAY: host spec has id-bearing array absent from registry."""
+
+    def test_unregistered_array_fires_W614(self) -> None:
+        """Array with *_id items not in registry emits W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            # Registry has no arrays for the spec file (empty arrays list)
+            registry = _make_registry_with_sentinels({
+                "04_fr_list.json": {
+                    "step": "04",
+                    "arrays": [],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # Spec file has an id-bearing array that isn't registered
+            _write(spec_root, "04_fr_list.json", {
+                "functional_requirements": [{"fr_id": "fr-x", "title": "Login"}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" in codes, f"Expected W614, got: {errs}"
+            w614 = [e for e in errs if e.code == "W614"][0]
+            assert "04_fr_list.json:.functional_requirements" in w614.message
+
+    def test_registered_array_does_not_fire_W614(self) -> None:
+        """Array whose (basename, array_path) is in registry → no W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            registry = _make_registry_with_sentinels({
+                "04_fr_list.json": {
+                    "step": "04",
+                    "arrays": [{"array_path": ".functional_requirements", "id_field": "fr_id", "kind": "fr"}],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            _write(spec_root, "04_fr_list.json", {
+                "functional_requirements": [{"fr_id": "fr-x", "title": "Login"}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" not in codes, f"Unexpected W614: {errs}"
+
+    def test_sentinel_arrays_excluded_from_W614(self) -> None:
+        """Sentinel arrays (canonical_refs_used, canonical_proposals) → no W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            registry = _make_registry_with_sentinels({})
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # Spec file has sentinel arrays with id-like fields
+            _write(spec_root, "04_fr_list.json", {
+                "canonical_refs_used": [{"id": "cap-x"}],
+                "canonical_proposals": [{"id": "term-y"}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" not in codes, f"Sentinel arrays should not trigger W614: {errs}"
+
+    def test_trace_array_excluded_from_W614(self) -> None:
+        """TraceRef array (.trace with bare 'id') → no W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            registry = _make_registry_with_sentinels({})
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # Spec file has a .trace array with bare 'id' field (traceRef pattern)
+            _write(spec_root, "02a_delivery_baseline.json", {
+                "trace": [{"id": "charter-v1", "type": "charter-goal", "note": "..."}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" not in codes, f"TraceRef .trace array should not trigger W614: {errs}"
+
+    def test_array_without_id_field_excluded_from_W614(self) -> None:
+        """Array whose first item has no *_id or 'id' field → no W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            registry = _make_registry_with_sentinels({})
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # Spec file has an array whose items have no id-like field
+            _write(spec_root, "00_charter.json", {
+                "tags": [{"name": "mvp", "color": "blue"}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" not in codes, f"Array without id field should not trigger W614: {errs}"
+
+    def test_W614_severity_is_warning_not_error(self) -> None:
+        """W614 is a warning (W-prefix), not an error (E-prefix)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            registry = _make_registry_with_sentinels({
+                "04_fr_list.json": {
+                    "step": "04",
+                    "arrays": [],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            _write(spec_root, "04_fr_list.json", {
+                "functional_requirements": [{"fr_id": "fr-x"}],
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            w614_errs = [e for e in errs if e.code == "W614"]
+            assert w614_errs, "Expected at least one W614"
+            for err in w614_errs:
+                # W-prefix codes are warnings
+                assert err.code.startswith("W"), (
+                    f"W614 should have W-prefix, got code: {err.code}"
+                )
+
+    def test_unknown_file_does_not_fire_W614(self) -> None:
+        """Spec file with no registry entry and no id-bearing arrays → no W614."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            # Registry with no entries
+            registry = _make_registry_with_sentinels({})
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # Spec file has no id-bearing arrays
+            _write(spec_root, "10_governance.json", {
+                "governance": {"process": "iterative"},
+                "owner": "product",
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            codes = [e.code for e in errs]
+            assert "W614" not in codes, f"Non-id-bearing arrays should not trigger W614: {errs}"

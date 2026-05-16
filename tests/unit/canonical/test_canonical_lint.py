@@ -563,10 +563,12 @@ class StructuredFieldsLintTests(unittest.TestCase):
             self.assertEqual(err.subcode, "CROSS_ARTIFACT_DRIFT")
             # file = manifest.json path (authoritative source for cross-manifest drift)
             self.assertIsNotNone(err.file, "aliases-differ E210 must have file set")
+            assert err.file is not None
             self.assertIn("manifest.json", err.file)
             self.assertEqual(err.jq_path, ".aliases")
             # value must now be set (not None) — previously this was the bug
             self.assertIsNotNone(err.value, "aliases-differ E210 must have value set")
+            assert err.value is not None
             self.assertIn("manifest_count=", err.value)
             self.assertIn("modular_count=", err.value)
 

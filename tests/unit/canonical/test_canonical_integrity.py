@@ -656,8 +656,10 @@ class StructuredFieldTests(unittest.TestCase):
             err = e110[0]
             self.assertEqual(err.subcode, "UNKNOWN_CANONICAL_ID")
             self.assertIsNotNone(err.file)
+            assert err.file is not None
             self.assertIn("07_nfrs.json", err.file)
             self.assertIsNotNone(err.jq_path)
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got: {err.jq_path!r}")
             self.assertIn("metric_ref", err.jq_path)
             self.assertEqual(err.value, "cn:core:metric:unknown-metric")
@@ -692,8 +694,10 @@ class StructuredFieldTests(unittest.TestCase):
             err = e120[0]
             self.assertEqual(err.subcode, "CANONICAL_KIND_MISMATCH")
             self.assertIsNotNone(err.file)
+            assert err.file is not None
             self.assertIn("07_nfrs.json", err.file)
             self.assertIsNotNone(err.jq_path)
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."))
             self.assertEqual(err.value, "cn:core:unit:ms")
 
@@ -729,9 +733,12 @@ class StructuredFieldTests(unittest.TestCase):
                 (e for e in e210 if "canonical_refs_used_missing" in e.message), None
             )
             self.assertIsNotNone(missing_err, "Expected canonical_refs_used_missing E210")
+            assert missing_err is not None
             self.assertEqual(missing_err.subcode, "CROSS_ARTIFACT_DRIFT")
+            assert missing_err.file is not None
             self.assertIn("07_nfrs.json", missing_err.file)
             self.assertEqual(missing_err.jq_path, ".canonical_refs_used")
+            assert missing_err.value is not None
             self.assertIn("cn:core:unit:ms", missing_err.value)
 
     def test_e210_canonical_refs_used_extra_carries_structured_fields(self):
@@ -766,9 +773,12 @@ class StructuredFieldTests(unittest.TestCase):
                 (e for e in e210 if "canonical_refs_used_extra" in e.message), None
             )
             self.assertIsNotNone(extra_err, "Expected canonical_refs_used_extra E210")
+            assert extra_err is not None
             self.assertEqual(extra_err.subcode, "CROSS_ARTIFACT_DRIFT")
+            assert extra_err.file is not None
             self.assertIn("07_nfrs.json", extra_err.file)
             self.assertEqual(extra_err.jq_path, ".canonical_refs_used")
+            assert extra_err.value is not None
             self.assertIn("cn:core:unit:ms", extra_err.value)
 
     def test_e211_carries_subcode_and_value_but_no_file(self):

@@ -1072,6 +1072,7 @@ class StructuredFieldTests(unittest.TestCase):
             self.assertEqual(err.subcode, "EXISTING_STRUCTURE_PATH_NOT_FOUND")
             self.assertIsNotNone(err.file, "file must be set")
             self.assertIsNotNone(err.jq_path, "jq_path must be set")
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "theme/missing_dir/bootstrap.sh")
 
@@ -1090,6 +1091,7 @@ class StructuredFieldTests(unittest.TestCase):
             self.assertTrue(hits, "Expected E530 LINKED_TEST_FILE_NOT_FOUND")
             err = hits[0]
             self.assertIsNotNone(err.file)
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "tests/unit/completely_missing.py")
 
@@ -1181,6 +1183,7 @@ class StructuredFieldTests(unittest.TestCase):
             err = ghost[0]
             self.assertIsNotNone(err.file)
             self.assertIsNotNone(err.jq_path)
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "fr-ghost-999")
 
@@ -1205,6 +1208,7 @@ class StructuredFieldTests(unittest.TestCase):
             self.assertEqual(err.subcode, "UNRESOLVED_NFR_REF")
             self.assertIsNotNone(err.file)
             self.assertIsNotNone(err.jq_path)
+            assert err.jq_path is not None
             self.assertTrue(err.jq_path.startswith("."), f"jq_path must start with '.', got {err.jq_path!r}")
             self.assertEqual(err.value, "nfr-ghost-999")
 
