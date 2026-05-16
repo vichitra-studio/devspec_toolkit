@@ -196,7 +196,8 @@ def _run_checks(
         }
 
     # --- 11. Registry check (R001-R003) ---
-    registry_file = os.path.join(spec_dir, "entry_key_registry.json") if spec_root is None else os.path.join(spec_root, "entry_key_registry.json")
+    # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json
+    registry_file = os.path.join(repo_root, "tools", "entry_key_registry.json")
     if os.path.isfile(registry_file):
         from .registry_check import run_registry_check
 
