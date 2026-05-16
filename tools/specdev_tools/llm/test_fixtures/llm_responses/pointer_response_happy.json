@@ -1,7 +1,0 @@
-{
-  "pointers": [
-    { "file": "spec/04_fr_list.json", "id": "fr-example-001" },
-    { "file": "spec/04_fr_list.json", "id": "fr-example-002" }
-  ],
-  "unresolved": []
-}
