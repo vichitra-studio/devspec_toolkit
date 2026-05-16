@@ -104,7 +104,7 @@ All 10 `make_error("E530", ...)` call sites in `validation/hallucination_lint.py
 - **H1 — `step_16b.py` status enum aligned with `executionStatus` atom**: validator accepted `{passed, failed, skipped, error}` while the schema enum allowed `{passed, failed, blocked, partial}`.  Legitimate `blocked`/`partial` statuses were being rejected, and schema-rejected `skipped`/`error` were slipping through.  Single-source-of-truth frozenset `_EXECUTION_STATUSES` mirrors the atom with an inline sync comment.
 - **H2 — misfiled-anchor routing coverage**: two new integration tests pin the routing matrix for (a) non-`16_`-prefixed anchor filenames dropped in `impl_context/` (content-based `artifact_role` demotion is the only rescue signal) and (b) misfiled anchor missing `artifact_role` (schema catches it before confusing 16a-phase diagnostics escape).
 - **H3 + M8 — `context_path` wired into anchor validator (`W607 ANCHOR_CONTEXT_PATH_MISSING`)**: new warning fires when a `milestone_index[].context_path` declaration points at a file that does not exist on disk.  Previously a typo silently dropped the milestone from E308/E309 drift detection; now the mismatch surfaces at author time.  Schema description for `context_path` updated to reflect the new consumer.  Two sibling fixtures added (`ms_auth_plan.json`, `ms_session_plan.json`) so the existing `valid_anchor_with_milestones.json` stays clean.
-- **H4 — ambiguity status enum cross-referenced to atom in prompts**: `prompt_16a_impl_planner.md` previously documented the literal `resolved`/`tracking`/`deferred`/`blocked` enum without a pointer to `vc:core:atoms#ambiguityStatus`; if the atom drifted, the prompt would desync silently.  Both `prompt_16a_impl_planner.md` and `prompt_16_impl_context.md` now name the atom explicitly and warn against inventing alternative values.  The schema-level shape duplication between anchor / planning / emergent ambiguities remains intentional (severity enums differ by design per RFC §17.4) and is not consolidated.
+- **H4 — ambiguity status enum cross-referenced to atom in prompts**: `prompt_16a_impl_planner.md` previously documented the literal `resolved`/`tracking`/`deferred`/`blocked` enum without a pointer to `vc:core:atoms#ambiguityStatus`; if the atom drifted, the prompt would desync silently.  Both `prompt_16a_impl_planner.md` and `prompt_16_impl_context.md` now name the atom explicitly and warn against inventing alternative values.  The schema-level shape duplication between anchor / planning / emergent ambiguities remains intentional (severity enums differ by design, as the RFC notes) and is not consolidated.
 - **F3 — `W608 ANCHOR_LEGACY_SCHEMA` migration signal**: fires when an artifact at the anchor path declares `$schema: vc:16-impl-context` (the pre-split milestone-plan schema). Without it, host repos that carry a legacy anchor from before the 0.6.0 split had no forcing function to migrate: schema validation still passed (the old schema remains registered for milestone plans inside `impl_context/`), and the anchor route's E308/E309/W587 silently no-op because the legacy shape has no `milestone_index`. W608 surfaces the mismatch at `spec-check` time with a message that cites `vc:16-anchor`, `spec/impl_context/`, and `prompts/prompt_16_impl_context.md` so the migration path is discoverable from the warning alone.
 - **F4 — W588/W607 responsibility split**: `traceability_closure._load_milestone_plans_from_anchor` no longer emits `W588 ANCHOR_MILESTONE_UNREADABLE` when a declared `context_path` is absent on disk — that signal is owned by `W607 ANCHOR_CONTEXT_PATH_MISSING` on the anchor validator. W588 now fires only on parse failures (file exists but is not valid JSON), avoiding double-reporting of the same root cause under two different codes in `spec-check` output.
 
@@ -281,6 +281,71 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
   (cross-milestone checklist ID collision or duplicate `checklist_id_prefix` in
   `milestone_index`), **W585** ANCHOR_DRIFT_SKIP, **W586** ANCHOR_VALIDATOR_WRONG_ARTIFACT,
   **W587** ANCHOR_DRIFT_CHECKS_STALE, **W588** ANCHOR_MILESTONE_UNREADABLE.
+
+## Wave 7 — Documentation Finalization
+
+### Verification notes
+
+- **W5-T3 verification**: the worked-example procedure in `prompts/prompt_16b_impl_coder.md` was executed against `amb-live-inv-contact-email-studio-drift` during plan execution; the expanded `impact[]` (9 entries) is preserved in the prompt itself as the canonical worked example. No separate run log is committed because the worked example IS the verification artifact.
+
+### Removed (CLI)
+
+- **`specdev llm bundle`**, **`specdev llm edit`**, **`specdev llm remediate`** — removed; the LLM-bundle orchestration namespace (`specdev llm *`) has been eliminated. Agents compose `specdev json read/patch/insert/delete` and `spec-check` directly via the subagent bridge. No migration path — callers must be rewritten.
+- **`specdev context extract`** — removed with a hard-fail migration message at runtime. The `/specdev-context` skill's Orientation and Action flows are the replacement. Callers invoking `context extract` will receive a non-zero exit with a message pointing to the `/specdev-context` skill (matching the stub's `See /specdev-context skill.` text).
+
+### Removed (host artifacts)
+
+- **`spec/entry_key_registry.json`** — deleted from host repos; replaced by the toolkit-generated `devspec_toolkit/tools/entry_key_registry.json`. Before removing, hosts should run a structural diff between their existing file and the new toolkit-side file. Any non-trivial divergence (different array_paths, id_fields, kinds, nested structures) means the toolkit registry needs to be regenerated and re-pinned (not that the host registry should be preserved). Hosts should also remove stale state: `rm -rf .specdev/snapshots/`.
+- **Host-side audit required**: any third-party scripts, CI workflows, or custom tooling in the host repo that reads `spec/entry_key_registry.json` directly will break silently. Hosts should grep their own repos (`grep -r "entry_key_registry" .`) and migrate to the toolkit-side path (`devspec_toolkit/tools/entry_key_registry.json`) before pulling this toolkit bump.
+
+### Added (CLI)
+
+- **`specdev registry-generate`** — programmatically generates `tools/entry_key_registry.json` + `tools/extraction_paths.json` from toolkit schemas. Required flag: `--repo-root`. Optional `--out` to write `entry_key_registry.json` to a non-default path. Deterministic byte-for-byte output; the CI gate enforces exact equality between the committed files and fresh `registry-generate` output.
+
+  Host invocation:
+  ```bash
+  specdev registry-generate --repo-root ./devspec_toolkit \
+    --out ./devspec_toolkit/tools/entry_key_registry.json
+  ```
+
+  Toolkit-internal invocation (from toolkit root):
+  ```bash
+  specdev registry-generate --repo-root .
+  ```
+
+### Added (registry-check rule)
+
+- **R004 / W614 `UNREGISTERED_ARRAY`** — host-side warning emitted by `registry-check` when a spec file contains an array not declared in the toolkit registry. Indicates the toolkit schema needs an update followed by registry regeneration. This is a warning (not an error) because host repos may have spec files that predate a schema definition; the W614 fires as a forcing function for the maintainer.
+
+### Added (toolkit CI tests)
+
+- **`T-schema-wellformed`** — asserts all toolkit JSON schemas parse without error and declare a valid `$schema` URI.
+- **`T-step-schema-coverage`** — asserts every step in `step_order.json` has a matching schema file in `schema/`.
+- **`T-step-registry-coverage`** — asserts every step in `step_order.json` has at least one entry in `entry_key_registry.json`. Replaces R001 (`REGISTRY_MISSING_STEP` / E620) in host-runtime; the check now runs as a toolkit invariant test rather than at host validation time.
+- **`T-registry-generation`** — asserts that running `specdev registry-generate` produces byte-exact output matching the committed `tools/entry_key_registry.json`. Fails the build if the registry is stale relative to schema changes.
+- **`T-matrix-registry-agreement`** — asserts that every kind referenced in `trace_matrix.json` appears in `entry_key_registry.json`.
+- **`T-extraction-paths-registry-agreement`** — asserts that `tools/extraction_paths.json` and `tools/entry_key_registry.json` agree on all registered array paths.
+
+### Added (toolkit CI gate)
+
+- **Registry-up-to-date check** — fails the build if `tools/entry_key_registry.json`, `tools/extraction_paths.json`, or `tests/fixtures/entry_key_registry_golden.json` diverge from `specdev registry-generate` output. The three generator-owned files MUST NOT be hand-edited; all changes must come from a schema edit followed by a regeneration.
+
+### Changed
+
+- **`entry_key_registry.json` is now programmatically generated, not human-curated.** The three generator-owned files (`tools/entry_key_registry.json`, `tools/extraction_paths.json`, `tests/fixtures/entry_key_registry_golden.json`) must not be hand-edited. The W6-T5 CI gate enforces byte-exact equality against `specdev registry-generate` output. Any change to these files must come from a schema edit followed by a regeneration run.
+- **`specdev json resolve-pointers` gains required `--repo-root`** — no cwd fallback. Host invocations must pass `--repo-root ./devspec_toolkit`. `--spec-root` is demoted from required to accepted-but-ignored on this command; it will be removed in a future release.
+- **Registry-check rule R001 removed from host-runtime** — `REGISTRY_MISSING_STEP` / E620 is no longer emitted at host validation time. The check has been moved to the toolkit's `T-step-registry-coverage` invariant test. R002 (E621) and R003 (E622) are unchanged.
+- **Agent protocol doc — 'The three static indices' section** — updated to reflect the toolkit-side registry location (`devspec_toolkit/tools/entry_key_registry.json`). The previous text incorrectly stated the registry was maintained in the host project's spec directory. The section now notes that `trace_matrix.json` is generated per-spec-run (written to `spec/extras/` when that directory exists, otherwise to `devspec_toolkit/tools/` as a fallback), and links to `docs/architecture/three_static_indices.md`.
+
+### Skill behavior
+
+- **`/specdev-context` skill rewritten** (commit 573ea69) with two flows: Orientation (load context for a step) and Action (apply surgical edits driven by a source of findings). Reading `prompts/shared_expectations.md` is explicitly part of Step 5 of the Orientation flow. The three static indices table in the skill now links to `docs/architecture/three_static_indices.md`.
+
+### Documentation
+
+- **`docs/architecture/three_static_indices.md`** — new architecture reference document. Covers what each index answers, where each lives (with notes on `trace_matrix.json`'s per-spec-run generation), update cadence, composition rules, cross-index navigation, and a worked impact-walking example referencing `prompts/prompt_16b_impl_coder.md`.
+
+---
 
 ## Pre-R8 / R8 Changes (carried forward)
 
