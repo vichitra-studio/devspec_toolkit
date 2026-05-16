@@ -289,7 +289,7 @@ Task IDs use `Tc` prefix.
 
 After drafting Decision Record + Part A + Part B, launch before writing to file.
 
-**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md § Phase 4`.
+**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md` (Phase 4).
 
 Extra check for this review:
 - CHECK 8 — Decision backed by evidence: the chosen option must cite the migration scope count from Phase 1 Subagent B findings. "Token waste" must be quantified (lines × steps × artifacts).
@@ -302,7 +302,7 @@ Extra check for this review:
 
 **Output file**: `docs/audit/findings/r5_findings.md`
 
-**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md § Phase 5`. Include the Decision Record before Part A.
+**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md` (Phase 5). Include the Decision Record before Part A.
 
 ---
 
@@ -310,7 +310,7 @@ Extra check for this review:
 
 Run in a separate session after all Part B tasks are executed.
 
-**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md § Phase 6`.
+**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md` (Phase 6).
 Key commands for this review:
 ```
 pytest tests/ -k "quality or migration" -v

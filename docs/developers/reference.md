@@ -78,7 +78,7 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 
 # Traceability & fixtures
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 
 # Seed enforcement

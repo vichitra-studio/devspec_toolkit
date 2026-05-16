@@ -284,7 +284,7 @@ You must investigate and report on **all thirteen areas** below. For each area, 
 ### Area 6: Holistic Prompt Hardening
 
 > **STATUS: PARTIALLY ADDRESSED — Pending items listed below**
-> Prompts 16a/16b/16c: milestone_ref binding rule, milestone context extraction, deliverable verification added (R4 A-R4-07/08/09). All 22 prompts: `specdev prompt-context <step>` reference added (R6 T09–T30). All 22 prompts: Self-Audit Gate score threshold "If score < 0.9, output clarifying questions only" added (R6 T09–T30). Step 14 seed consumption verified complete (R4 A-R4-10). Core 6a/6b/6c/6d/6e hardening remains pending across all prompts.
+> Prompts 16a/16b/16c: milestone_ref binding rule, milestone context loading, deliverable verification added (R4 A-R4-07/08/09). All 22 prompts: `specdev prompt-context <step>` reference added (R6 T09–T30). All 22 prompts: Self-Audit Gate score threshold "If score < 0.9, output clarifying questions only" added (R6 T09–T30). Step 14 seed consumption verified complete (R4 A-R4-10). Core 6a/6b/6c/6d/6e hardening remains pending across all prompts.
 
 **Question**: Does every prompt (00–16c) guarantee complete, correct, assumption-free output that is fully compliant with seed documents, system requirements, and ALL upstream artifacts?
 

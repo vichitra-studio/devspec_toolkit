@@ -191,7 +191,7 @@ The required sequence after any spec edit:
 ```
 1. validate          -- JSON Schema validation of the changed artifact
 2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
-3. matrix            -- regenerate trace_matrix.json (if traceability changed)
+3. matrix            -- regenerate spec/extras/trace_matrix.json (if traceability changed)
 4. fixtures-lint     -- verify fixture targets resolve (after matrix rebuild)
 ```
 

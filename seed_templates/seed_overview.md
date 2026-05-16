@@ -116,7 +116,7 @@ DEEP DIVE QUESTIONS:
 - Constraints: "Any hard limits? (Cost? Hardware? Legal? Team size?)"
 -->
 ### 3.1 In-Scope Goals (Must-Haves)
-- **Expectation**: The concrete outcomes this project will deliver. These are the results, not the behaviors (behaviors go in §4). Think "what will exist when we're done" not "what the system does."
+- **Expectation**: The concrete outcomes this project will deliver. These are the results, not the behaviors (behaviors belong in the Functional Requirements section). Think "what will exist when we're done" not "what the system does."
 - **Content**:
   <!-- Must list at least 3 specific goals -->
   - [Goal 1 — e.g., "Secure, personalized access for all team members" or "Automated daily sales report delivered by 9am"]

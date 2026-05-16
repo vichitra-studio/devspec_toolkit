@@ -204,7 +204,7 @@ Supply the executed artifact path. The reviewer validates execution against the 
 
 1.  **Regenerate Traceability Matrix**: Run the matrix command to rebuild cross-artifact trace links. Do not manually edit spec files for traceability.
     ```bash
-    ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+    mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
     ```
 2.  **Final Validation**:
     ```bash

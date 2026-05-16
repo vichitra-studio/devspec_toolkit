@@ -235,7 +235,7 @@ Note: validate.py appears twice (T02 and T04) — these are DIFFERENT logical ch
 
 After drafting Part A + Part B, launch before writing to file.
 
-**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md § Phase 4`.
+**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md` (Phase 4).
 - If NEEDS REVISION: revise and re-run. Max 3 iterations.
 - If VERIFIED after any iteration: proceed to Phase 5.
 
@@ -245,7 +245,7 @@ After drafting Part A + Part B, launch before writing to file.
 
 **Output file**: `docs/audit/findings/r2_findings.md`
 
-**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md § Phase 5`.
+**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md` (Phase 5).
 
 ---
 
@@ -253,7 +253,7 @@ After drafting Part A + Part B, launch before writing to file.
 
 Run in a separate session after all Part B tasks are executed.
 
-**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md § Phase 6`.
+**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md` (Phase 6).
 Key commands for this review:
 ```
 pytest tests/ -k "schema or validate or forward_replay" -v

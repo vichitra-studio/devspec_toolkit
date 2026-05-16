@@ -1487,7 +1487,7 @@ pytest tests/ -v
 ./tools/run_specdev.sh canon-schema-alignment --repo-root .
 
 # 7. Matrix generation (updated in G2)
-./tools/run_specdev.sh matrix spec --repo-root . --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root . --out spec/extras/trace_matrix.json
 
 # 8. Fixtures lint
 ./tools/run_specdev.sh fixtures-lint spec --repo-root .

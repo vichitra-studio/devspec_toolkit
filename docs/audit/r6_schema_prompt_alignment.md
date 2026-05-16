@@ -341,7 +341,7 @@ Note: with 22 schemas + 23 prompts, this review will have the most tasks. Prune 
 
 After drafting Part A + Part B, launch before writing to file.
 
-**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md § Phase 4`.
+**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md` (Phase 4).
 
 Extra check for this review:
 - CHECK 8 — No rework with R1-R5: verify no task modifies a file already changed in R1-R5.
@@ -355,7 +355,7 @@ Extra check for this review:
 
 **Output file**: `docs/audit/findings/r6_findings.md`
 
-**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md § Phase 5`.
+**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md` (Phase 5).
 
 ---
 
@@ -363,7 +363,7 @@ Extra check for this review:
 
 This is the **final integration gate** for the entire R1-R6 audit series.
 
-**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md § Phase 6`.
+**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md` (Phase 6).
 Key commands for this review:
 ```
 pytest tests/ --tb=short -q

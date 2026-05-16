@@ -194,7 +194,7 @@ Run full validation suite:
 1. pytest tests/ --tb=short -q
 2. ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 3. SPECDEV_WARNINGS_AS_ERRORS=1 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-4. ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+4. mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 Report: pass/fail counts and any new E561/E562/E563 emitted on the spec directory.
 ```
 
@@ -266,7 +266,7 @@ Required task sequence for this review (strict order — errors first):
 
 After drafting Part A + Part B, launch before writing to file.
 
-**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md § Phase 4`.
+**Subagent V1** (`general-purpose`, no isolation): Run all 7 checks from `docs/audit/review_protocol.md` (Phase 4).
 - If NEEDS REVISION: revise and re-run. Max 3 iterations.
 - If VERIFIED after any iteration: proceed to Phase 5.
 
@@ -276,7 +276,7 @@ After drafting Part A + Part B, launch before writing to file.
 
 **Output file**: `docs/audit/findings/r4_findings.md`
 
-**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md § Phase 5`.
+**Subagent W1** (`general-purpose`, no isolation): Write verified findings using the format in `docs/audit/review_protocol.md` (Phase 5).
 
 ---
 
@@ -284,14 +284,14 @@ After drafting Part A + Part B, launch before writing to file.
 
 Run in a separate session after all Part B tasks are executed.
 
-**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md § Phase 6`.
+**Subagent P1** (`Explore`, no isolation): Run all checks from `docs/audit/review_protocol.md` (Phase 6).
 Key commands for this review:
 ```
 pytest tests/ -k "traceability or seed" -v
 pytest tests/ --tb=short -q
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 SPECDEV_WARNINGS_AS_ERRORS=1 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ```
 
 </review_prompt>

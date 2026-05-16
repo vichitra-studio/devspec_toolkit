@@ -14,7 +14,7 @@ Run this checklist after meaningful spec changes to catch missing or ambiguous e
 2. Lint fixtures specifically when targeting new APIs or updating payloads.
 
 ### Manual Review Pass
-- Compare the generated `tools/trace_matrix.json` with your project's baseline expectations.
+- Compare the generated `spec/extras/trace_matrix.json` with your project's baseline expectations.
 - Look for `traceRef` placeholders such as `*-tbd` and replace them with concrete IDs.
 - Confirm every NFR in `07_nfrs.json` maps to monitoring assets in `16_impl_context.json` (Plan.Delivery).
 - Ensure threat IDs from `11_redteam.json` appear in `16_impl_context.json` (Plan.Security).

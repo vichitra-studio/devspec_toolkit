@@ -90,6 +90,209 @@ Field shape is in `schema/16_impl_context.schema.json` under `execution.emergent
 *   The id namespace is `amb-new-*` (kebab-case, lowercase — `crossCycleAmbiguityItem.id` resolves to `kebabId`). Reserve `amb-*` (without the `new-` infix) for planning-phase ids in `plan.ambiguities`.
 *   Capture which checklist ids are affected so the reviewer (16c) can scope remediation.
 
+### 4a. Impact-Walking Procedure (MANDATORY before emitting any ambiguity)
+
+Before emitting an `emergent_ambiguity`, you MUST execute the following five steps to compute a complete `impact[]`. Do not skip or abbreviate them.
+
+> **Do not hardcode "APIs live in step 05" or any other kind→step mapping.** Resolve all kind→file mappings at run-time via `devspec_toolkit/tools/entry_key_registry.json`. Do not hardcode the set of trace link kinds; read from `devspec_toolkit/canon/kinds/trace_type.json` (note: some kinds carry `aliases` — match on both `preferred_label` and `aliases[*]`).
+
+**Step 1 — Identify the directly-affected entity.**
+
+Note the `(file, id, kind)` triple for the entity whose emergent issue produced this ambiguity. This is your walk starting point.
+
+```bash
+# Example: read the entity's record to inspect its .trace[] links
+specdev json read spec/06_invariants.json \
+  '.rules[] | select(.inv_id == "<id>")'
+```
+
+**Step 2 — Query `trace_matrix.json` for linked entities.**
+
+The live host-repo trace matrix is at `spec/extras/trace_matrix.json`. Its schema is `.matrix[]` keyed by `fr_id`, with sibling arrays `apis`, `fixtures`, `nfrs`, `threats`. The file is regenerated automatically by context commands (per "Locked decision 4a") or manually via:
+```bash
+specdev matrix spec --out spec/extras/trace_matrix.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+- If the directly-affected entity is an FR: query `.matrix[] | select(.fr_id == "<id>")` and collect all sibling arrays.
+- If it is a non-FR kind (invariant, api, nfr, fixture, threat, etc.): first read the entity record's own `.trace[]` to find linked FR IDs; then for each linked FR, query the matrix for siblings.
+
+```bash
+# Read valid link kinds (preferred_label + aliases) — derive at runtime, never hardcode
+specdev json read devspec_toolkit/canon/kinds/trace_type.json '.entries[] | {kind: .preferred_label, aliases}'
+
+# Fan out from a linked FR in the matrix
+specdev json read spec/extras/trace_matrix.json '.matrix[] | select(.fr_id == "<fr_id>")'
+```
+
+Collect all `(kind, id)` pairs discovered. Do not hardcode which sibling arrays to expect; iterate over whatever arrays are present in the matrix entry.
+
+**Step 3 — Resolve each linked entity to its owning `(file, step)` via `entry_key_registry.json`.**
+
+```bash
+specdev json read devspec_toolkit/tools/entry_key_registry.json '.registry'
+```
+
+The registry maps filename keys to `{ step, arrays[{ array_path, id_field, kind }] }`. Match each discovered entity's kind to the registry `arrays[].kind` field to find its owning file and step number.
+
+**Step 4 — Cross-check step-level blast radius via `downstream_consumers`.**
+
+Query `devspec_toolkit/tools/step_order.json` for the downstream consumers of the directly-affected entity's step:
+
+```bash
+specdev json read devspec_toolkit/tools/step_order.json '.downstream_consumers["<step_number>"]'
+```
+
+Confirm that the entities discovered in steps 2–3 span the expected downstream steps. If a downstream consumer step has no entity surfaced yet, investigate whether the ambiguity could affect it and add representative entries to `impact[]` if so. This is a coverage cross-check, not an independent entity-discovery source.
+
+**Step 5 — Union and deduplicate into `impact[]`.**
+
+Collect all `(file, id)` pairs from steps 2–4. Always include the directly-affected entity from step 1. Deduplicate. Write the resulting list as the `impact[]` field on the ambiguity record.
+
+```bash
+# Verify every (file, id) pair resolves cleanly before emitting
+echo '[{"file":"<file>","id":"<id>"}, ...]' | \
+  specdev json resolve-pointers --repo-root ./devspec_toolkit --git-root .
+# Expect: summary.misses == 0
+```
+
+---
+
+### 4b. Worked Example: `amb-live-inv-contact-email-studio-drift`
+
+<!-- Worked example references amb-live-inv-contact-email-studio-drift for audit purposes; the underlying entry is NOT modified by W5. -->
+
+**Source entry** (from `spec/impl_context/ms_maintain_backup_plan.json`):
+
+```json
+{
+  "id": "amb-live-inv-contact-email-studio-drift",
+  "severity": "low",
+  "impact": [
+    "spec/06_invariants.json:inv-contact-page-content-present"
+  ],
+  "status": "tracking"
+}
+```
+
+Original `impact_count: 1` — a single invariant. The procedure produces a strictly larger set.
+
+---
+
+**Step 1 — Directly-affected entity.**
+
+| field | value |
+|-------|-------|
+| file  | `spec/06_invariants.json` |
+| id    | `inv-contact-page-content-present` |
+| kind  | `inv` |
+
+```bash
+specdev json read spec/06_invariants.json \
+  '.rules[] | select(.inv_id == "inv-contact-page-content-present")'
+```
+
+Result shows `.trace[0].type == "fr"` and `.trace[0].id == "fr-contact-page-render"`.
+
+---
+
+**Step 2 — Query `trace_matrix.json`.**
+
+First, derive valid link kinds at runtime (do not hardcode):
+
+```bash
+specdev json read devspec_toolkit/canon/kinds/trace_type.json \
+  '.entries[] | {kind: .preferred_label, aliases}'
+```
+
+The entity kind is `inv` (alias of `invariant`) — a non-FR kind. Read the entity's `.trace[]` to find the linked FR:
+
+Linked FR: `fr-contact-page-render`.
+
+Fan out in the trace matrix:
+
+```bash
+specdev json read spec/extras/trace_matrix.json \
+  '.matrix[] | select(.fr_id == "fr-contact-page-render")'
+```
+
+Discovered entities:
+
+| kind    | id |
+|---------|----|
+| fr      | `fr-contact-page-render` |
+| api     | `api-contact-page` |
+| fixture | `fix-contact-page-not-found-redteam` |
+| fixture | `fix-contact-page-render-success-contract` |
+| fixture | `fix-internal-error-structured-response-public-redteam` |
+| fixture | `fix-load-contact-page-latency` |
+| nfr     | `nfr-latency-contact-page-load` |
+| threat  | `threat-business-logic-contact-form-abuse` |
+
+---
+
+**Step 3 — Resolve to owning `(file, step)` via registry.**
+
+```bash
+specdev json read devspec_toolkit/tools/entry_key_registry.json '.registry'
+```
+
+Mapping used (derived from registry, not hardcoded):
+
+| kind    | owning file | step |
+|---------|-------------|------|
+| fr      | `spec/04_fr_list.json` | 04 |
+| api     | `spec/05_interface_contracts.json` | 05 |
+| fixture | `spec/08_fixtures.json` | 08 |
+| nfr     | `spec/07_nfrs.json` | 07 |
+| threat  | `spec/11_redteam.json` | 11 |
+
+---
+
+**Step 4 — Cross-check downstream consumers of step 06.**
+
+```bash
+specdev json read devspec_toolkit/tools/step_order.json \
+  '.downstream_consumers["06"]'
+# → ["08", "11", "16a"]
+```
+
+Steps 08 and 11 are represented in the entity set above (fixtures and threats). Step 16a is the impl-planning step — the ambiguity's `description` and `decision` fields already document the cross-cycle impact on implementation, so no additional `(file, id)` entry is needed from 16a for this case.
+
+---
+
+**Step 5 — Amplified `impact[]`.**
+
+```bash
+echo '[
+  {"file":"spec/06_invariants.json","id":"inv-contact-page-content-present"},
+  {"file":"spec/04_fr_list.json","id":"fr-contact-page-render"},
+  {"file":"spec/05_interface_contracts.json","id":"api-contact-page"},
+  {"file":"spec/08_fixtures.json","id":"fix-contact-page-not-found-redteam"},
+  {"file":"spec/08_fixtures.json","id":"fix-contact-page-render-success-contract"},
+  {"file":"spec/08_fixtures.json","id":"fix-internal-error-structured-response-public-redteam"},
+  {"file":"spec/08_fixtures.json","id":"fix-load-contact-page-latency"},
+  {"file":"spec/07_nfrs.json","id":"nfr-latency-contact-page-load"},
+  {"file":"spec/11_redteam.json","id":"threat-business-logic-contact-form-abuse"}
+]' | specdev json resolve-pointers --repo-root ./devspec_toolkit --git-root .
+# Expected: summary.hits == 9, summary.misses == 0
+```
+
+Amplified `impact[]` (9 entries vs. original 1):
+
+```json
+"impact": [
+  "spec/06_invariants.json:inv-contact-page-content-present",
+  "spec/04_fr_list.json:fr-contact-page-render",
+  "spec/05_interface_contracts.json:api-contact-page",
+  "spec/08_fixtures.json:fix-contact-page-not-found-redteam",
+  "spec/08_fixtures.json:fix-contact-page-render-success-contract",
+  "spec/08_fixtures.json:fix-internal-error-structured-response-public-redteam",
+  "spec/08_fixtures.json:fix-load-contact-page-latency",
+  "spec/07_nfrs.json:nfr-latency-contact-page-load",
+  "spec/11_redteam.json:threat-business-logic-contact-form-abuse"
+]
+```
+
 ## 5. `execution.config_validation` (Ops Rigor)
 *   Applies when implementing `plan.delivery`, `plan.drift`, or `plan.security`.
 *   *Rule*: **Dashboard Links**: Dashboard URLs must be valid/reachable or follow the known URI pattern.

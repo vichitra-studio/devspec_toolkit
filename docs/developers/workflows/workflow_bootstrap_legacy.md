@@ -178,7 +178,7 @@ After emitting, promote project-specific terms to the canon registry:
 ```bash
 ./tools/run_specdev.sh validate spec/04_fr_list.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -204,7 +204,7 @@ After emitting, promote project-specific terms to the canon registry:
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/05_interface_contracts.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 # Run after Step 08 is complete
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 ```

@@ -1,7 +1,7 @@
 # System Design: [Project Name]
 
 > **AI Coach Instructions**
-> You are a **System Architect Coach**. Your goal is to help the user define the system design for the product described in `seed_overview.md`. Adapt your coaching depth based on the user's technical proficiency (§0 Metadata).
+> You are a **System Architect Coach**. Your goal is to help the user define the system design for the product described in `seed_overview.md`. Adapt your coaching depth based on the user's technical proficiency level (recorded in the Metadata section of this file).
 >
 > **Protocol by Proficiency:**
 > - **Non-technical**: Ask about constraints and preferences in plain language. Recommend specific technologies based on requirements, explaining your reasoning. Mark recommendations as `[RECOMMENDED: reason]` so the user can accept or override. If a section depends on earlier answers the user couldn't provide, proactively suggest `[AUTO-DERIVE]`.
@@ -126,8 +126,8 @@ DEEP DIVE QUESTIONS:
 - "How does it connect to other components? (HTTP, database wire protocol, message queue, function call)"
 - "Are there any external systems this must talk to? (Payment processors, identity providers, analytics, email services?)"
 -->
-- **Expectation**: Detail on each major part from §2.3. Focus on role and connections. Include any third-party services the system depends on.
-- **If you marked §2.3 as AUTO-DERIVE**: Mark this section as `[AUTO-DERIVE: see §2.3]` and skip to §3.3 (External Systems). The pipeline will derive components from your requirements and constraints.
+- **Expectation**: Detail on each major component listed under System Components above. Focus on role and connections. Include any third-party services the system depends on.
+- **If you marked System Components as AUTO-DERIVE**: Mark this section as `[AUTO-DERIVE: see System Components]` and skip to the External Systems section. The pipeline will derive components from your requirements and constraints.
 
 ### 3.1 [Component Name]
 - **Role**: [What it does]
@@ -143,7 +143,7 @@ DEEP DIVE QUESTIONS:
   - [External system 1]: [What it provides, how it connects]
   - [External system 2]: [What it provides, how it connects]
 
-<!-- Add more components as needed. Every part from §2.3 should have an entry. -->
+<!-- Add more components as needed. Every component listed in the System Components section should have an entry. -->
 
 ---
 
@@ -199,7 +199,7 @@ DEEP DIVE QUESTIONS:
 - **CI/CD**: [e.g. "GitHub Actions", "Jenkins", "None yet — greenfield" or "[AUTO-DERIVE]"]
 - **Quality Gates**: [e.g. "Tests must pass, linting required" or "[AUTO-DERIVE: standard quality checks]"]
 - **Secrets / Credentials**: [e.g. "DATABASE_URL, STRIPE_API_KEY, JWT_SECRET" or "None" or "[UNKNOWN]"]
-- **Compliance Standards**: [e.g. "SOC2, GDPR" or "None" or "Same as overview §3.3"]
+- **Compliance Standards**: [e.g. "SOC2, GDPR" or "None" or "Same as overview constraints"]
 
 ---
 

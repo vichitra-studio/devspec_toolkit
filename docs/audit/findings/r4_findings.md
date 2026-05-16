@@ -13,7 +13,7 @@
 | A-R4-05 | HIGH | step_16 validators lack milestone_ref binding | Added W581/E582 milestone_ref validation |
 | A-R4-06 | HIGH | W→E promotion only handles W560→E560 | Generalized to handle all W/E pairs |
 | A-R4-07 | MED | prompt_16a missing milestone_ref rule | Added milestone_ref binding rule |
-| A-R4-08 | MED | prompt_16b missing milestone context | Added milestone extraction intent |
+| A-R4-08 | MED | prompt_16b missing milestone context | Added milestone context loading |
 | A-R4-09 | MED | prompt_16c missing deliverable verification | Added deliverable verification rule |
 | A-R4-10 | LOW | prompt_14 already complete | Verified, no changes needed |
 
