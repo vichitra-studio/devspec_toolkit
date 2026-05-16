@@ -45,9 +45,7 @@ from .schema_differ import (
 )
 from ..core.changelog_parser import (
     ChangelogEntry,
-    MigrationInfo,
     VersionChangelog,
-    get_changes_between,
     load_version,
 )
 from ..core.constants import STEP_TO_TEMPLATE

@@ -1,7 +1,4 @@
 """Tests for migration template files in prompts/migration/ directory."""
-import re
-from pathlib import Path
-
 import pytest
 
 
