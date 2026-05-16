@@ -357,117 +357,8 @@ def json_write_atomic(file_path: str, data_str: str) -> None:
         os.chmod(file_path, original_mode)
 
 
-def _find_schema_file(repo_root: str, step_id: str) -> Optional[str]:
-    """Return the schema file path for *step_id*, or None if not found.
-
-    When multiple schema files share the same numeric prefix (e.g. step 16 has
-    both ``16_anchor.schema.json`` and ``16_impl_context.schema.json``), returns
-    the lexicographically first match — deterministic, not arbitrary.
-    """
-    schema_dir = os.path.join(repo_root, "schema")
-    if not os.path.isdir(schema_dir):
-        return None
-    matches = sorted(glob_mod.glob(os.path.join(schema_dir, f"{step_id}_*.schema.json")))
-    return matches[0] if matches else None
-
-
-def validate_against_schema_field(value_str: str, step_field: str, repo_root: str) -> List[str]:
-    """Validate *value_str* (JSON) against the schema for ``<step>.<field>``.
-
-    Uses the full ref-aware schema machinery (``_effective_schema`` + ``build_id_index``)
-    so that step-base inherited fields and ``$ref``-using field schemas both resolve
-    correctly.
-
-    Parameters
-    ----------
-    value_str:
-        JSON-encoded value to validate.
-    step_field:
-        Dotted-path like ``"04.functional_requirements"``.
-    repo_root:
-        Toolkit root that contains ``schema/``.
-
-    Returns
-    -------
-    List of error message strings. Empty list means valid.
-    """
-    parts = step_field.split(".", 1)
-    if len(parts) != 2:
-        return [
-            f"Invalid --against-schema-field format '{step_field}': "
-            "expected '<step>.<field>' (e.g. '04.functional_requirements')"
-        ]
-    step_id, field_name = parts
-
-    # Three-part form <step>.<schema_suffix>.<field> is not yet implemented.
-    if "." in field_name:
-        return [
-            f"--against-schema-field: multi-schema step disambiguation is not yet implemented. "
-            f"Use the single-schema form '<step>.<field>' (e.g. '04.functional_requirements'). "
-            f"Step 16 disambiguation ('16.anchor.field' / '16.impl_context.field') is deferred."
-        ]
-
-    schema_file = _find_schema_file(repo_root, step_id)
-    if not schema_file:
-        return [f"Schema file not found for step '{step_id}' in {os.path.join(repo_root, 'schema/')}"]
-
-    try:
-        with open(schema_file, "r", encoding="utf-8") as fh:
-            schema = json.load(fh)
-    except (OSError, json.JSONDecodeError) as exc:
-        return [f"Could not load schema {schema_file}: {exc}"]
-
-    # Build a ref-aware resolver using the same id-index machinery as json_schema_discovery.
-    schema_dir = _find_schema_dir(repo_root)
-    id_index: Dict[str, str] = build_id_index(schema_dir) if schema_dir else {}
-    ref_cache: Dict[str, dict] = {}
-
-    def _resolve_node(node: dict) -> dict:
-        if not isinstance(node, dict) or "$ref" not in node:
-            return node
-        ref = node["$ref"]
-        if ref.startswith("#/$defs/"):
-            def_name = ref.split("/")[-1]
-            resolved = schema.get("$defs", {}).get(def_name)
-            return resolved if resolved else node
-        resolved = resolve_ref(ref, id_index, ref_cache)
-        return resolved if resolved else node
-
-    # Resolve $ref + merge allOf at the root level to get the merged properties map.
-    effective_root = _effective_schema(schema, _resolve_node)
-    properties = effective_root.get("properties", {})
-
-    if field_name not in properties:
-        return [f"Field '{field_name}' not found in schema properties for step '{step_id}' ({schema_file})"]
-
-    # Resolve the field sub-schema (it may itself use $ref or allOf).
-    field_schema = _effective_schema(properties[field_name], _resolve_node)
-
-    try:
-        value = json.loads(value_str)
-    except json.JSONDecodeError as exc:
-        return [f"Value is not valid JSON: {exc}"]
-
-    try:
-        import jsonschema as _jsonschema
-        errors = list(_jsonschema.Draft202012Validator(field_schema).iter_errors(value))
-        return [f"{e.json_path}: {e.message}" if e.json_path else e.message for e in errors]
-    except Exception as exc:
-        return [f"Schema validation error: {exc}"]
-
-
-def json_patch(
-    file_path: str,
-    path_selector: str,
-    value: str,
-    is_json: bool = True,
-    dry_run: bool = False,
-) -> str:
-    """Update a value at the path.
-
-    Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
-    """
+def json_patch(file_path: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """Update a value at the path. Returns confirmation message."""
     _check_file(file_path)
     _require_valid_filter(path_selector)
 
@@ -484,24 +375,12 @@ def json_patch(
         content = f.read()
 
     new_content = run_jq(args, input_data=content, timeout=10)
-    if dry_run:
-        return f"[dry-run] Would update {path_selector} in {file_path}:\n{new_content}"
     json_write_atomic(file_path, new_content)
     return f"Updated {path_selector} in {file_path}"
 
 
-def json_insert(
-    file_path: str,
-    path_selector: str,
-    value: str,
-    is_json: bool = True,
-    dry_run: bool = False,
-) -> str:
-    """Append to array or merge object.
-
-    Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
-    """
+def json_insert(file_path: str, path_selector: str, value: str, is_json: bool = True) -> str:
+    """Append to array or merge object. Returns confirmation message."""
     _check_file(file_path)
     _require_valid_filter(path_selector)
 
@@ -518,22 +397,12 @@ def json_insert(
         content = f.read()
 
     new_content = run_jq(args, input_data=content, timeout=10)
-    if dry_run:
-        return f"[dry-run] Would insert into {path_selector} in {file_path}:\n{new_content}"
     json_write_atomic(file_path, new_content)
     return f"Inserted into {path_selector} in {file_path}"
 
 
-def json_delete(
-    file_path: str,
-    path_selector: str,
-    dry_run: bool = False,
-) -> str:
-    """Delete item at path.
-
-    Returns a confirmation message, or a preview string when *dry_run* is True
-    (no file is written).
-    """
+def json_delete(file_path: str, path_selector: str) -> str:
+    """Delete item at path. Returns confirmation message."""
     _check_file(file_path)
     _require_valid_filter(path_selector)
 
@@ -545,8 +414,6 @@ def json_delete(
         content = f.read()
 
     new_content = run_jq(args, input_data=content, timeout=10)
-    if dry_run:
-        return f"[dry-run] Would delete {path_selector} in {file_path}:\n{new_content}"
     json_write_atomic(file_path, new_content)
     return f"Deleted {path_selector} in {file_path}"
 
@@ -1291,14 +1158,6 @@ def main():
     p_patch.add_argument("path", help="jq path to target (e.g. .version)")
     p_patch.add_argument("value", help="New value (JSON string or raw string)")
     p_patch.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_patch.add_argument("--dry-run", action="store_true", help="Preview result without writing")
-    p_patch.add_argument(
-        "--against-schema-field",
-        metavar="STEP.FIELD",
-        help="Validate value against schema for <step>.<field> (e.g. '04.functional_requirements'). "
-             "Requires --repo-root.",
-    )
-    p_patch.add_argument("--repo-root", default=".", help="Toolkit root for --against-schema-field resolution")
 
     # Insert
     p_insert = subparsers.add_parser("insert", help="Insert/Append value")
@@ -1306,19 +1165,11 @@ def main():
     p_insert.add_argument("path", help="jq path to target array/object")
     p_insert.add_argument("value", help="Value to insert")
     p_insert.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
-    p_insert.add_argument("--dry-run", action="store_true", help="Preview result without writing")
-    p_insert.add_argument(
-        "--against-schema-field",
-        metavar="STEP.FIELD",
-        help="Validate value against schema for <step>.<field>. Requires --repo-root.",
-    )
-    p_insert.add_argument("--repo-root", default=".", help="Toolkit root for --against-schema-field resolution")
 
     # Delete
     p_del = subparsers.add_parser("delete", help="Delete value")
     p_del.add_argument("file", help="JSON file path")
     p_del.add_argument("path", help="jq path to target")
-    p_del.add_argument("--dry-run", action="store_true", help="Preview result without writing")
 
     # Keys
     p_keys = subparsers.add_parser("keys", help="List keys")
@@ -1375,29 +1226,11 @@ def main():
         elif args.command == "read-multi":
             result = json_read_multi(args.file, args.filters)
         elif args.command == "patch":
-            schema_field = getattr(args, "against_schema_field", None)
-            if schema_field:
-                repo_root_abs = os.path.abspath(getattr(args, "repo_root", "."))
-                errs = validate_against_schema_field(args.value, schema_field, repo_root_abs)
-                if errs:
-                    for e in errs:
-                        print(f"schema-field error: {e}", file=sys.stderr)
-                    sys.exit(1)
-            result = json_patch(args.file, args.path, args.value, not args.raw,
-                                dry_run=getattr(args, "dry_run", False))
+            result = json_patch(args.file, args.path, args.value, not args.raw)
         elif args.command == "insert":
-            schema_field = getattr(args, "against_schema_field", None)
-            if schema_field:
-                repo_root_abs = os.path.abspath(getattr(args, "repo_root", "."))
-                errs = validate_against_schema_field(args.value, schema_field, repo_root_abs)
-                if errs:
-                    for e in errs:
-                        print(f"schema-field error: {e}", file=sys.stderr)
-                    sys.exit(1)
-            result = json_insert(args.file, args.path, args.value, not args.raw,
-                                 dry_run=getattr(args, "dry_run", False))
+            result = json_insert(args.file, args.path, args.value, not args.raw)
         elif args.command == "delete":
-            result = json_delete(args.file, args.path, dry_run=getattr(args, "dry_run", False))
+            result = json_delete(args.file, args.path)
         elif args.command == "keys":
             result = json_keys(args.file, args.path)
         elif args.command == "structure":

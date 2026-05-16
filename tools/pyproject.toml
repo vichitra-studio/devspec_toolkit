@@ -25,11 +25,7 @@ specdev = "specdev_tools.cli:main"
 include = ["specdev_tools*"]
 
 [tool.setuptools.package-data]
-specdev_tools = [
-    "guides/*.yaml",
-    "llm/prompts/*.md",
-    "llm/schemas/*.json",
-]
+specdev_tools = ["guides/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

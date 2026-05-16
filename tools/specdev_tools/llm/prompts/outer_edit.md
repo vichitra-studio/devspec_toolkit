@@ -38,10 +38,6 @@ Rules:
 
 {{ step_structure_summary }}
 
-## Spec-check findings from previous iteration
-
-{{ spec_check_findings }}
-
 ---
 
 Propose the minimal set of jq-path patch operations needed to accomplish the task. Include a rationale. Respond with valid JSON only.

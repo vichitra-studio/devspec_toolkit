@@ -6,59 +6,6 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 ## Added
 
-### Ticket 15 — Story 13: Outer remediation loop scaffold (snapshot/edit/check/rollback)
-
-Module `tools/specdev_tools/llm/loop_outer.py` implementing the apply-side closed loop per `docs/agents/llm_protocol.md`.
-
-- **`run_outer_loop()`** public API: takes `task`, `validated_pointers`, `step_structure_summary`, an injected `LLMAdapter`, `repo_root`, `spec_dir`, `git_root`, and `max_iters`. Returns `{applied, snapshot_id, spec_check_status, spec_check, files_changed, iterations, partial, ok, unresolved}`. `spec_check.forward_replay` always present — holds forward-replay-check findings from the final spec-check run (empty list when no spec-check was performed).
-- **Snapshot-first**: calls `context.snapshot.save_snapshot` for all affected step files before any mutation. Late-snapshot fires for LLM edits targeting files not covered by `validated_pointers`. On rollback, calls `restore_snapshot` to restore originals atomically.
-- **Edit application**: drives `json_patch` / `json_insert` / `json_delete` from `core/json_utils.py`. Apply errors trigger immediate rollback.
-- **spec-check integration**: runs `run_spec_check_json` after each edit application; feeds findings back to the `outer_edit.md` repair prompt on the next iteration.
-- **Forward-replay scope**: edits targeting any non-final step (per `tools/step_order.json` ordering) trigger `include_forward_replay=True` on the spec-check call.
-- **Three termination conditions**:
-  1. **Clean spec-check** — returns `applied=True, ok=True`.
-  2. **Stagnation** — error count doesn't shrink for 2 consecutive valid iterations → rollback, `ok=False`.
-  3. **Max-iters exhaustion** — rollback, `ok=False`.
-- **Discard policy**: invalid JSON / schema violations skip the iteration without touching stagnation state or triggering rollback.
-- **`max_iters=0` guard**: returns honest partial immediately, no snapshot or LLM calls.
-- **`restore_snapshot()`** added to `tools/specdev_tools/context/snapshot.py`: atomic copy-back mirroring `save_snapshot` style.
-- **`llm_outer_max_iters`** (`SPECDEV_LLM_MAX_ITERS`, default 3) added to `SpecdevConfig` in `tools/specdev_tools/core/config.py`.
-- **`specdev_tools/llm/__init__.py`** updated: exports `run_outer_loop` via `__all__`.
-- **`dry_run` parameter** added to `json_patch`, `json_insert`, `json_delete` in `core/json_utils.py`; CLI gains `--dry-run` flag on `json patch`, `json insert`, `json delete` subcommands.
-- **`validate_against_schema_field(value_str, step_field, repo_root)`** added to `core/json_utils.py`: validates a JSON value string against the schema for a named `<step>.<field>` path. Uses `_effective_schema` + `build_id_index` + `resolve_ref` machinery to fully dereference `$ref` and `allOf` compositions including `vc:` URN refs. Three-part form `<step>.<schema_suffix>.<field>` (step-16 multi-schema disambiguation) returns "not yet implemented" per §15. CLI gains `--against-schema-field STEP.FIELD` and `--repo-root` on `json patch` and `json insert`.
-- **`_find_schema_file` sort fix**: glob matches now returned in deterministic lexicographic order (was non-deterministic for steps with multiple schemas like step 16).
-- **`SPECDEV_LLM_DRY_RUN=1` honored**: `run_outer_loop` exits immediately with no LLM calls, no snapshots, and no filesystem mutations per §15.
-- **Snapshot ID** format is now `snap-<step>-<YYYYmmddTHHMMSSZ>-<4hex>` — sortable and unique per invocation per §15.
-- **One-step-per-invocation guard**: `run_outer_loop` rejects `validated_pointers` that span more than one step with a clear error per §5.2 constraint.
-- **Snapshot failure fast-exit**: if any upfront snapshot fails (step file absent), the loop returns an error immediately rather than proceeding without rollback safety.
-- **`_STEP_ORDER_CACHE` keyed by `repo_root`**: concurrent or sequential calls with different toolkit roots get independent caches (was a single global that leaked across calls).
-- **`SPECDEV_LLM_MAX_ITERS` default corrected to 3** (was 5) to match §5.2 bound.
-- **40 unit tests** in `tests/unit/llm/test_loop_outer.py` covering all termination paths, rollback file-restoration, forward-replay gating, discard conditions, stagnation, stall-count reset on shrink, `max_iters=0`, dry-run mode, one-step constraint enforcement, snapshot failure fast-exit, forward-replay error-count driving `has_errors`, config env-var reading, partial-return contract, `restore_snapshot` round-trip, late-snapshot coverage, apply-error rollback, `spec_check.forward_replay` key present on all return paths, and forward-replay findings surfaced.
-- **13 unit tests** in `tests/unit/core/test_json_utils_dry_run.py` covering `dry_run=True/False` on all three mutation functions, `validate_against_schema_field` against a synthetic schema (valid enum, invalid enum, bad format, unknown step, unknown field, invalid JSON, valid array, invalid array items), and three-part format "not yet implemented" guard.
-
----
-
-### Ticket 13 — Story 11: Inner verification loop (plan → resolve → repair)
-
-Module `tools/specdev_tools/llm/loop_inner.py` implementing the inner pointer-hallucination firewall per `docs/agents/llm_protocol.md` §5.1.
-
-- **`run_inner_loop()`** public API: takes `task`, `step_structure_summary`, `upstream_structure`, `prompt_nn`, an injected `LLMAdapter`, `spec_root`, `git_root`, and `max_iters`. Returns `{validated_pointers, unresolved, iterations, partial, ok}`.
-- **`LLMAdapter` Protocol** in `tools/specdev_tools/llm/adapter.py`: `@runtime_checkable` Protocol with a single `chat(system, user) -> str` method. Keeps `loop_inner.py` fully decoupled from any HTTP transport.
-- **Three termination conditions** from §5.1, all implemented and independently tested:
-  1. **Empty miss set** — returns validated bundle with `ok=True`.
-  2. **No-shrink for 2 consecutive iterations** — exits with `partial=True` when the last two consecutive iterations show no reduction in miss count.
-  3. **Same miss set twice in a row** — exits with `partial=True` when the fingerprint set of misses is identical across two back-to-back iterations (distinct from the count-based check).
-  4. **Max-iters reached** — falls through to partial return with `unresolved[]`.
-- **Forbidden pointer shapes** (`content` field): explicit guard before `resolve_pointers` (belt-and-suspenders; schema's `additionalProperties: false` also rejects).
-- **Template rendering**: reads `inner_plan.md` / `inner_repair.md` from `tools/specdev_tools/llm/prompts/`, extracts `# system` / `# user` sections, substitutes `{{ var }}` placeholders using `re.sub`. No jinja2 dependency.
-- **Schema validation**: `jsonschema.Draft202012Validator` against `pointer_response.schema.json`. Loaded lazily and cached at module level.
-- **LLM config vars** added to `SpecdevConfig.__slots__` and `__init__` in `tools/specdev_tools/core/config.py`:
-  - `llm_enabled` (`SPECDEV_LLM_ENABLED`)
-  - `llm_inner_max_iters` (`SPECDEV_LLM_INNER_MAX_ITERS`, default 3)
-  - `llm_dry_run` (`SPECDEV_LLM_DRY_RUN`)
-- **`specdev_tools/llm/__init__.py`** updated: exports `run_inner_loop` and `LLMAdapter` via `__all__`.
-- **20 unit tests** in `tests/unit/llm/test_loop_inner.py` covering all termination paths, discard conditions, LLM-emitted unresolved merging, partial-return content guarantees, reason-preservation from `resolve_pointers`, config integration via `SPECDEV_LLM_INNER_MAX_ITERS`, and `_format_nearest` input variants.
-
 ### Ticket 12 — `specdev guide <code>` subcommand
 
 New command `specdev guide <code> [--json]` surfaces human-readable remediation playbooks for error codes.
@@ -107,14 +54,6 @@ All 10 `make_error("E530", ...)` call sites in `validation/hallucination_lint.py
 - `tests/unit/canonical/test_canonical_lint.py`: `StructuredFieldsLintTests` (3 tests) — preflight E110 `jq_path` index correctness, `_detect_manifest_modular_drift` aliases-differ E210 `file`/`value` contract.
 - `tests/unit/validation/linters/test_hallucination_lint.py`: `StructuredFieldTests` (11 tests, up from 2) — all 9 previously untested E530 code paths; `CollectPathValuePairsTests` (5 tests) — jq_path precision for nested/list structures.
 - `tests/unit/validation/linters/test_registry_check.py`: `TestSpecCheckWiring` (3 new tests) — SKIP has no `findings`, non-SKIP always has `findings`, findings shape matches `error_to_dict` contract.
-
-### LLM Test Fixture Catalog (DEVSPEC-21)
-
-Added 5 test fixtures for the LLM offload pipeline. Three spec-fixture directories under `tools/specdev_tools/llm/test_fixtures/specs/` that are readable by `specdev spec-check` and fire specific error codes: `e110_missing_canon/` (E110 UNKNOWN_CANONICAL_ID — `cn:project:*` ID without `--spec-root`), `e530_invented_verb/` (E530 INVENTED_ENUM_OR_ID — verb `frobulate` not in allowlist, no `command_ref` bypass), `e530_missing_test_file/` (E530 LINKED_TEST_FILE_NOT_FOUND — `linked_test_expectation` path that doesn't exist). Two LLM-response JSON fixtures under `llm_responses/`: `pointer_miss_typo.json` (typo in ID `fr-newslettr-subscribe`) and `pointer_miss_wrong_file.json` (correct ID in wrong file), both validating against `pointer_response.schema.json`. Unit test `tests/unit/llm/test_fixture_catalog.py` asserts each spec fixture fires the documented error code and exits non-zero.
-
-### /specdev-context Skill Extended for LLM Agents (DEVSPEC-22)
-
-Extended `.claude/skills/specdev-context/SKILL.md` with four new sections: (1) Invocation modes — dispatch table distinguishing interactive human use from LLM-agent entry point, with canonical next-step commands; (2) Model-selection guidance — table mapping task type to `haiku-4-5` (inner/outer loop) or `sonnet-4-6` (widen/manual/remediation), matching §16.1; (3) Composition recipes — three end-to-end playbooks (Backlog→entries, Edit+replay, Investigate+fix) with `<!-- amended-in-wave-c -->` markers on Wave-C-dependent steps; (4) Manual replay playbook — 4-step drill-down recipe, 5 reasoning points, 3 worked examples, and a permission allow-list table. `CLAUDE.md` Core Rules item 5 added cross-referencing the skill as the LLM-agent entry point.
 
 ### LLM Prompt Templates and Response Schemas (Wave A foundation)
 

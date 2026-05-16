@@ -89,56 +89,6 @@ def save_snapshot(step_id: str, spec_dir: str, _repo_root: str) -> dict[str, Any
     }
 
 
-def restore_snapshot(step_id: str, spec_dir: str) -> dict[str, Any]:
-    """Restore a step artifact from its workspace snapshot.
-
-    Copies the snapshot file back over the current artifact, atomically.
-
-    Parameters
-    ----------
-    step_id:
-        Pipeline step identifier (e.g. ``"04"``).
-    spec_dir:
-        Absolute path to the spec directory.
-
-    Returns
-    -------
-    dict with keys: step, status ("restored" | "not_found"), artifact_path, snapshot_path
-    """
-    snap_path = _snapshot_path(step_id, spec_dir)
-    if not os.path.isfile(snap_path):
-        return {
-            "step": step_id,
-            "status": "not_found",
-            "artifact_path": "",
-            "snapshot_path": snap_path,
-        }
-
-    artifact_path = find_spec_file(step_id, spec_dir)
-    if not artifact_path:
-        return {
-            "step": step_id,
-            "status": "not_found",
-            "artifact_path": "",
-            "snapshot_path": snap_path,
-        }
-
-    # Atomic write: copy snapshot to temp then rename so reads never see partial file.
-    artifact_dir = os.path.dirname(artifact_path)
-    with tempfile.NamedTemporaryFile("w", dir=artifact_dir, delete=False, suffix=".tmp") as tf:
-        with open(snap_path, "r", encoding="utf-8") as src:
-            shutil.copyfileobj(src, tf)
-        tmp_name = tf.name
-    os.replace(tmp_name, artifact_path)
-
-    return {
-        "step": step_id,
-        "status": "restored",
-        "artifact_path": artifact_path,
-        "snapshot_path": snap_path,
-    }
-
-
 def diff_snapshot(step_id: str, spec_dir: str, _repo_root: str) -> dict[str, Any]:
     """Compare the current step artifact against its workspace snapshot.
 
