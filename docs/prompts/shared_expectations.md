@@ -90,6 +90,10 @@ Each prompt's Coverage Closure section contains step-specific rules. In addition
 
 ## 10. Tool Execution
 
+All spec reads and edits MUST go through the `/specdev-context` skill (`.claude/skills/specdev-context/SKILL.md`). Do not `Read` spec files directly. Before composing any new `specdev json read` filter, learn the shape via `specdev json structure` / `json keys` / `json schema` — guessing field names is the dominant failure pattern. If a `json read` call fails, do not retry with another guessed path; drop back to a shape probe.
+
+Flag scope: `--spec-root` and `--git-root` apply to validation/governance commands (`spec-check`, `validate`, `matrix`, `governance-check`). `canon-accept` accepts `--git-root` only (not `--spec-root`). Most `specdev json …` subcommands accept `--repo-root` only; the CLI silently strips `--spec-root`/`--git-root` if passed. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file paths.
+
 After generating or modifying a spec artifact, run the unified check command to validate schema conformance, canonical integrity, hallucination detection, traceability, and all applicable lints in one pass:
 ```bash
 specdev spec-check <spec_dir> --repo-root ./devspec_toolkit

@@ -114,7 +114,7 @@ Before emitting, verify:
 - **JIT Granularity**: Plan the immediate next 1-2 milestones in high detail (dates, deliverables). Later milestones MUST use tentative target dates and MUST include at minimum a `task_id`, `description` (>=2 words, imperative verb), and `status` for each task, but MAY omit `acceptance_criteria` and `depends_on`.
 - **Audit Trace**: Use the `milestones[].risks` field to note *why* a complex extension was deferred or split.
 - **Atomicity Test**: If a task description contains 'and' connecting two independent work items, split it into two tasks. If a task cannot be merged or demoed independently, split it further. Target: each task completable in 1-3 days by one developer.
-- **Trace Validation**: After emitting the roadmap artifact, run `specdev matrix spec/ --repo-root ./devspec_toolkit` to generate the cross-artifact traceability matrix. Verify that `fr_with_fixture > 0`, `fr_with_nfr > 0`, and `fr_with_threat > 0` in the coverage summary.
+- **Trace Validation**: After emitting the roadmap artifact, run `specdev matrix spec/ --repo-root ./devspec_toolkit` to generate the cross-artifact traceability matrix (written to `spec/extras/trace_matrix.json`). Then verify the coverage summary via `specdev json read spec/extras/trace_matrix.json '.coverage'` and confirm that `fr_with_fixture > 0`, `fr_with_nfr > 0`, and `fr_with_threat > 0`.
 
 ## Common Pitfalls
 - **Ignoring Extensions**: When `extension_decision.status == 'extensions-required'`, failing to schedule the work defined in extension files (e.g. `ext_01_database.json`). When `status == 'none-required'`, skipping extension milestones is correct behavior — do not flag it as a gap.

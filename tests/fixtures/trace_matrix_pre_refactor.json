@@ -1,7 +1,17 @@
 {
+  "coverage": {
+    "fr_total": 40,
+    "fr_with_api": 27,
+    "fr_with_fixture": 27,
+    "fr_with_nfr": 29,
+    "fr_with_threat": 27,
+    "scaffolds_found": 0
+  },
+  "integrity_errors": [
+    "W592 COVERAGE_THRESHOLD_WARN fr_coverage=67.5% below threshold=80%"
+  ],
   "matrix": [
     {
-      "fr_id": "fr-post-publish",
       "apis": [
         "api-admin-post-publish",
         "api-content-search",
@@ -32,11 +42,7 @@
         "fix-load-post-page-latency",
         "fix-load-publish-latency",
         "fix-load-search-latency",
-        "fix-newsletter-no-resend-on-republish-e2e",
-        "fix-newsletter-send-on-publish-e2e",
-        "fix-newsletter-suppressed-when-disabled-e2e",
         "fix-post-feature-display-on-homepage-e2e",
-        "fix-post-newsletter-send-phase2-contract",
         "fix-post-page-not-found-redteam",
         "fix-post-page-read-success-contract",
         "fix-post-publish-empty-body-redteam",
@@ -46,6 +52,7 @@
         "fix-progressive-enhancement-e2e",
         "fix-throughput-publishing-velocity-e2e"
       ],
+      "fr_id": "fr-post-publish",
       "nfrs": [
         "nfr-availability-ghost-cms",
         "nfr-publish-latency",
@@ -67,7 +74,6 @@
       ]
     },
     {
-      "fr_id": "fr-post-newsletter-send",
       "apis": [
         "api-admin-post-publish",
         "api-zoho-smtp-transactional"
@@ -81,16 +87,13 @@
         "fix-email-zoho-transactional-from-mismatch-redteam",
         "fix-internal-error-structured-response-admin-redteam",
         "fix-load-publish-latency",
-        "fix-newsletter-no-resend-on-republish-e2e",
-        "fix-newsletter-send-on-publish-e2e",
-        "fix-newsletter-suppressed-when-disabled-e2e",
-        "fix-post-newsletter-send-phase2-contract",
         "fix-post-publish-empty-body-redteam",
         "fix-post-publish-missing-title-redteam",
         "fix-post-publish-success-contract",
         "fix-post-schedule-success-contract",
         "fix-throughput-publishing-velocity-e2e"
       ],
+      "fr_id": "fr-post-newsletter-send",
       "nfrs": [
         "nfr-email-colour-rendering",
         "nfr-email-cross-client-baseline",
@@ -107,11 +110,10 @@
         "threat-business-logic-stale-publish-overwrite",
         "threat-business-logic-youtube-oembed-ssrf",
         "threat-data-privacy-error-stacktrace-leak",
-        "threat-transport-smtp-transactional-starttls-stripping"
+        "threat-transport-smtp-starttls-downgrade"
       ]
     },
     {
-      "fr_id": "fr-post-publish-validation",
       "apis": [
         "api-admin-image-upload",
         "api-admin-post-publish"
@@ -127,16 +129,13 @@
         "fix-admin-post-publish-unauthorized-redteam",
         "fix-internal-error-structured-response-admin-redteam",
         "fix-load-publish-latency",
-        "fix-newsletter-no-resend-on-republish-e2e",
-        "fix-newsletter-send-on-publish-e2e",
-        "fix-newsletter-suppressed-when-disabled-e2e",
-        "fix-post-newsletter-send-phase2-contract",
         "fix-post-publish-empty-body-redteam",
         "fix-post-publish-missing-title-redteam",
         "fix-post-publish-success-contract",
         "fix-post-schedule-success-contract",
         "fix-throughput-publishing-velocity-e2e"
       ],
+      "fr_id": "fr-post-publish-validation",
       "nfrs": [],
       "threats": [
         "threat-authn-admin-credential-stuffing",
@@ -150,7 +149,6 @@
       ]
     },
     {
-      "fr_id": "fr-homepage-render",
       "apis": [
         "api-homepage"
       ],
@@ -164,6 +162,7 @@
         "fix-post-feature-display-on-homepage-e2e",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-homepage-render",
       "nfrs": [
         "nfr-latency-homepage-load"
       ],
@@ -172,7 +171,6 @@
       ]
     },
     {
-      "fr_id": "fr-post-schedule",
       "apis": [
         "api-admin-post-publish",
         "api-homepage",
@@ -195,11 +193,7 @@
         "fix-load-homepage-latency",
         "fix-load-post-page-latency",
         "fix-load-publish-latency",
-        "fix-newsletter-no-resend-on-republish-e2e",
-        "fix-newsletter-send-on-publish-e2e",
-        "fix-newsletter-suppressed-when-disabled-e2e",
         "fix-post-feature-display-on-homepage-e2e",
-        "fix-post-newsletter-send-phase2-contract",
         "fix-post-page-not-found-redteam",
         "fix-post-page-read-success-contract",
         "fix-post-publish-empty-body-redteam",
@@ -209,6 +203,7 @@
         "fix-progressive-enhancement-e2e",
         "fix-throughput-publishing-velocity-e2e"
       ],
+      "fr_id": "fr-post-schedule",
       "nfrs": [
         "nfr-availability-scheduled-publish"
       ],
@@ -226,7 +221,6 @@
       ]
     },
     {
-      "fr_id": "fr-newsletter-subscribe",
       "apis": [
         "api-newsletter-subscribe",
         "api-zoho-smtp-transactional"
@@ -244,6 +238,7 @@
         "fix-newsletter-subscribe-rate-limited-redteam",
         "fix-newsletter-subscribe-success-contract"
       ],
+      "fr_id": "fr-newsletter-subscribe",
       "nfrs": [
         "nfr-latency-newsletter-signup",
         "nfr-security-rate-limiting"
@@ -251,11 +246,10 @@
       "threats": [
         "threat-authn-magic-link-replay",
         "threat-business-logic-newsletter-enumeration",
-        "threat-transport-smtp-transactional-starttls-stripping"
+        "threat-transport-smtp-starttls-downgrade"
       ]
     },
     {
-      "fr_id": "fr-newsletter-subscribe-validation",
       "apis": [
         "api-newsletter-subscribe"
       ],
@@ -270,6 +264,7 @@
         "fix-newsletter-subscribe-rate-limited-redteam",
         "fix-newsletter-subscribe-success-contract"
       ],
+      "fr_id": "fr-newsletter-subscribe-validation",
       "nfrs": [],
       "threats": [
         "threat-authn-magic-link-replay",
@@ -277,7 +272,6 @@
       ]
     },
     {
-      "fr_id": "fr-contact-page-render",
       "apis": [
         "api-contact-page"
       ],
@@ -287,6 +281,7 @@
         "fix-internal-error-structured-response-public-redteam",
         "fix-load-contact-page-latency"
       ],
+      "fr_id": "fr-contact-page-render",
       "nfrs": [
         "nfr-latency-contact-page-load"
       ],
@@ -295,7 +290,6 @@
       ]
     },
     {
-      "fr_id": "fr-brand-identity-apply",
       "apis": [
         "api-contact-page",
         "api-gallery-page",
@@ -324,6 +318,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-brand-identity-apply",
       "nfrs": [
         "nfr-usability-wcag-aaa"
       ],
@@ -335,7 +330,6 @@
       ]
     },
     {
-      "fr_id": "fr-content-search",
       "apis": [
         "api-content-search",
         "api-content-search-pages"
@@ -351,6 +345,7 @@
         "fix-internal-error-structured-response-public-redteam",
         "fix-load-search-latency"
       ],
+      "fr_id": "fr-content-search",
       "nfrs": [
         "nfr-latency-search-response",
         "nfr-security-rate-limiting"
@@ -362,7 +357,6 @@
       ]
     },
     {
-      "fr_id": "fr-post-feature-display",
       "apis": [
         "api-homepage"
       ],
@@ -376,13 +370,13 @@
         "fix-post-feature-display-on-homepage-e2e",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-post-feature-display",
       "nfrs": [],
       "threats": [
         "threat-business-logic-public-page-scraping"
       ]
     },
     {
-      "fr_id": "fr-content-export",
       "apis": [
         "api-content-export"
       ],
@@ -393,6 +387,7 @@
         "fix-durability-content-backup-e2e",
         "fix-internal-error-structured-response-admin-redteam"
       ],
+      "fr_id": "fr-content-export",
       "nfrs": [
         "nfr-durability-content-backup",
         "nfr-security-access-control"
@@ -402,7 +397,6 @@
       ]
     },
     {
-      "fr_id": "fr-content-restore",
       "apis": [
         "api-content-import"
       ],
@@ -414,6 +408,7 @@
         "fix-durability-content-restore-e2e",
         "fix-internal-error-structured-response-admin-redteam"
       ],
+      "fr_id": "fr-content-restore",
       "nfrs": [
         "nfr-durability-content-restore",
         "nfr-security-access-control"
@@ -424,7 +419,6 @@
       ]
     },
     {
-      "fr_id": "fr-theme-recovery",
       "apis": [
         "api-theme-activate",
         "api-theme-upload"
@@ -437,6 +431,7 @@
         "fix-theme-upload-invalid-zip-redteam",
         "fix-theme-upload-success-contract"
       ],
+      "fr_id": "fr-theme-recovery",
       "nfrs": [
         "nfr-portability-theme-recovery"
       ],
@@ -447,7 +442,6 @@
       ]
     },
     {
-      "fr_id": "fr-media-caching",
       "apis": [
         "api-media-serve"
       ],
@@ -457,6 +451,7 @@
         "fix-media-serve-not-modified-contract",
         "fix-media-serve-success-contract"
       ],
+      "fr_id": "fr-media-caching",
       "nfrs": [
         "nfr-maintainability-image-cache-headers"
       ],
@@ -466,7 +461,6 @@
       ]
     },
     {
-      "fr_id": "fr-post-read",
       "apis": [
         "api-admin-image-upload",
         "api-post-page"
@@ -486,6 +480,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-post-read",
       "nfrs": [
         "nfr-latency-post-page-load"
       ],
@@ -498,7 +493,6 @@
       ]
     },
     {
-      "fr_id": "fr-seo-metadata-render",
       "apis": [
         "api-contact-page",
         "api-gallery-page",
@@ -527,6 +521,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-seo-metadata-render",
       "nfrs": [
         "nfr-maintainability-seo-metadata"
       ],
@@ -538,7 +533,6 @@
       ]
     },
     {
-      "fr_id": "fr-mobile-responsive",
       "apis": [
         "api-contact-page",
         "api-gallery-page",
@@ -567,6 +561,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-mobile-responsive",
       "nfrs": [
         "nfr-usability-mobile-responsive"
       ],
@@ -578,7 +573,6 @@
       ]
     },
     {
-      "fr_id": "fr-navigation",
       "apis": [
         "api-contact-page",
         "api-gallery-page",
@@ -607,6 +601,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-navigation",
       "nfrs": [],
       "threats": [
         "threat-business-logic-contact-form-abuse",
@@ -616,14 +611,13 @@
       ]
     },
     {
-      "fr_id": "fr-collaborative-authoring",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-collaborative-authoring",
       "nfrs": [],
       "threats": []
     },
     {
-      "fr_id": "fr-gallery-display",
       "apis": [
         "api-gallery-page"
       ],
@@ -632,6 +626,7 @@
         "fix-gallery-render-success-contract",
         "fix-load-gallery-latency"
       ],
+      "fr_id": "fr-gallery-display",
       "nfrs": [
         "nfr-latency-gallery-page-load"
       ],
@@ -640,7 +635,6 @@
       ]
     },
     {
-      "fr_id": "fr-comments-render",
       "apis": [
         "api-post-page"
       ],
@@ -654,6 +648,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-comments-render",
       "nfrs": [
         "nfr-latency-comments-widget",
         "nfr-usability-comments-moderation-latency"
@@ -665,7 +660,6 @@
       ]
     },
     {
-      "fr_id": "fr-progressive-enhancement",
       "apis": [
         "api-homepage",
         "api-post-page"
@@ -686,6 +680,7 @@
         "fix-post-page-read-success-contract",
         "fix-progressive-enhancement-e2e"
       ],
+      "fr_id": "fr-progressive-enhancement",
       "nfrs": [
         "nfr-maintainability-progressive-enhancement"
       ],
@@ -696,28 +691,27 @@
       ]
     },
     {
+      "apis": [],
+      "fixtures": [],
       "fr_id": "fr-newsletter-digest",
-      "apis": [],
-      "fixtures": [],
       "nfrs": [],
       "threats": []
     },
     {
+      "apis": [],
+      "fixtures": [],
       "fr_id": "fr-newsletter-email-branding",
-      "apis": [],
-      "fixtures": [],
       "nfrs": [],
       "threats": []
     },
     {
+      "apis": [],
+      "fixtures": [],
       "fr_id": "fr-newsletter-preview",
-      "apis": [],
-      "fixtures": [],
       "nfrs": [],
       "threats": []
     },
     {
-      "fr_id": "fr-theme-ci-deploy",
       "apis": [
         "api-theme-activate",
         "api-theme-upload"
@@ -730,6 +724,7 @@
         "fix-theme-upload-invalid-zip-redteam",
         "fix-theme-upload-success-contract"
       ],
+      "fr_id": "fr-theme-ci-deploy",
       "nfrs": [
         "nfr-availability-deploy-success",
         "nfr-security-stage-not-public-between-deploys"
@@ -741,7 +736,6 @@
       ]
     },
     {
-      "fr_id": "fr-content-browse-filter",
       "apis": [
         "api-tag-archive-feed"
       ],
@@ -750,6 +744,7 @@
         "fix-internal-error-structured-response-public-redteam",
         "fix-load-tag-filter-latency"
       ],
+      "fr_id": "fr-content-browse-filter",
       "nfrs": [
         "nfr-latency-tag-filter-interaction"
       ],
@@ -758,25 +753,25 @@
       ]
     },
     {
-      "fr_id": "fr-admin-2fa",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-admin-2fa",
       "nfrs": [
         "nfr-security-ghost-admin-2fa"
       ],
       "threats": []
     },
     {
-      "fr_id": "fr-web-analytics",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-web-analytics",
       "nfrs": [],
       "threats": []
     },
     {
-      "fr_id": "fr-vm-snapshot-backup",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-vm-snapshot-backup",
       "nfrs": [
         "nfr-durability-restore-drill",
         "nfr-durability-vm-snapshot"
@@ -784,16 +779,16 @@
       "threats": []
     },
     {
-      "fr_id": "fr-email-alias",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-email-alias",
       "nfrs": [],
       "threats": []
     },
     {
-      "fr_id": "fr-host-harden",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-host-harden",
       "nfrs": [
         "nfr-operability-probe-cadence",
         "nfr-security-host-harden"
@@ -801,9 +796,9 @@
       "threats": []
     },
     {
-      "fr_id": "fr-ingress-route",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-ingress-route",
       "nfrs": [
         "nfr-operability-probe-cadence",
         "nfr-security-ingress-no-open-ports"
@@ -811,61 +806,72 @@
       "threats": []
     },
     {
-      "fr_id": "fr-provider-account-harden",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-provider-account-harden",
       "nfrs": [
         "nfr-security-provider-2fa"
       ],
       "threats": []
     },
     {
-      "fr_id": "fr-uptime-monitor",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-uptime-monitor",
       "nfrs": [
         "nfr-availability-uptime-sla"
       ],
       "threats": []
     },
     {
-      "fr_id": "fr-newsletter-send",
       "apis": [
         "api-ghost-admin-post-read",
         "api-ghost-admin-post-tag",
         "api-listmonk-campaign-create",
         "api-listmonk-campaign-trigger",
+        "api-listmonk-list-clear",
         "api-listmonk-subscriber-import",
         "api-newsletter-webhook-receive",
         "api-zoho-smtp-newsletter"
       ],
       "fixtures": [
         "fix-email-zoho-newsletter-contract",
+        "fix-internal-error-structured-response-public-redteam",
         "fix-listmonk-deploy-smtp-test-contract",
+        "fix-newsletter-no-resend-on-republish-e2e",
         "fix-newsletter-send-campaign-create-contract",
         "fix-newsletter-send-campaign-trigger-contract",
         "fix-newsletter-send-no-tag-skip-contract",
-        "fix-newsletter-send-webhook-validate-contract"
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-newsletter-send-webhook-validate-contract",
+        "fix-newsletter-suppressed-when-disabled-e2e",
+        "fix-post-newsletter-send-phase2-contract"
       ],
+      "fr_id": "fr-newsletter-send",
       "nfrs": [
+        "nfr-latency-newsletter-publish-to-dispatch",
+        "nfr-latency-webhook-ingest",
         "nfr-reliability-listmonk-service",
         "nfr-reliability-smtp-relay",
         "nfr-reliability-webhook-listener"
       ],
       "threats": [
+        "threat-authn-webhook-replay",
         "threat-authz-admin-api-key-post-read",
         "threat-authz-admin-api-key-tag-manipulation",
+        "threat-authz-listmonk-list-clear-without-auth",
         "threat-authz-listmonk-unauthorized-campaign-create",
         "threat-authz-smtp-newsletter-credential-abuse",
         "threat-authz-webhook-hmac-bypass-forged-publish",
         "threat-business-logic-campaign-trigger-stale-list",
         "threat-business-logic-send-script-mid-pipeline-failure",
         "threat-business-logic-webhook-secret-mismatch",
-        "threat-data-privacy-listmonk-subscriber-exfiltration"
+        "threat-data-privacy-listmonk-subscriber-exfiltration",
+        "threat-data-privacy-member-sync-blast-radius",
+        "threat-transport-smtp-starttls-downgrade"
       ]
     },
     {
-      "fr_id": "fr-newsletter-listmonk-deploy",
       "apis": [
         "api-listmonk-campaign-trigger",
         "api-zoho-smtp-newsletter"
@@ -873,19 +879,22 @@
       "fixtures": [
         "fix-email-zoho-newsletter-contract",
         "fix-listmonk-deploy-smtp-test-contract",
-        "fix-newsletter-send-campaign-trigger-contract"
+        "fix-newsletter-send-campaign-trigger-contract",
+        "fix-newsletter-send-on-publish-e2e",
+        "fix-post-newsletter-send-phase2-contract"
       ],
+      "fr_id": "fr-newsletter-listmonk-deploy",
       "nfrs": [
         "nfr-reliability-listmonk-service"
       ],
       "threats": [
         "threat-authz-smtp-newsletter-credential-abuse",
         "threat-business-logic-campaign-trigger-stale-list",
-        "threat-business-logic-send-script-mid-pipeline-failure"
+        "threat-business-logic-send-script-mid-pipeline-failure",
+        "threat-transport-smtp-starttls-downgrade"
       ]
     },
     {
-      "fr_id": "fr-email-zoho-topology",
       "apis": [
         "api-zoho-smtp-newsletter",
         "api-zoho-smtp-transactional"
@@ -896,30 +905,23 @@
         "fix-email-zoho-transactional-from-mismatch-redteam",
         "fix-listmonk-deploy-smtp-test-contract"
       ],
+      "fr_id": "fr-email-zoho-topology",
       "nfrs": [
         "nfr-reliability-smtp-relay"
       ],
       "threats": [
         "threat-authz-smtp-newsletter-credential-abuse",
-        "threat-transport-smtp-transactional-starttls-stripping"
+        "threat-transport-smtp-starttls-downgrade"
       ]
     },
     {
-      "fr_id": "fr-newsletter-theme-filter",
       "apis": [],
       "fixtures": [],
+      "fr_id": "fr-newsletter-theme-filter",
       "nfrs": [],
       "threats": []
     }
   ],
-  "coverage": {
-    "fr_total": 40,
-    "fr_with_api": 27,
-    "fr_with_fixture": 27,
-    "fr_with_nfr": 29,
-    "fr_with_threat": 27,
-    "scaffolds_found": 0
-  },
   "milestone_coverage": {
     "fr-admin-2fa": [
       "ms-phase2-vps-deploy"
@@ -1029,8 +1031,5 @@
     "fr-web-analytics": [
       "ms-phase2-vps-deploy"
     ]
-  },
-  "integrity_errors": [
-    "W592 COVERAGE_THRESHOLD_WARN fr_coverage=67.5% below threshold=80%"
-  ]
+  }
 }

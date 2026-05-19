@@ -34,6 +34,8 @@ All paths resolve from `$GIT_ROOT`. If running from `$TOOLKIT_ROOT`, paths break
 | `Edit` on any existing file under `$SPEC_DIR/` (use `specdev json patch/insert/delete`) |
 | `Write` on existing spec files (`Write` is allowed **only** for creating a brand-new step file that does not yet exist) |
 | Unfiltered `specdev json read <file>` — always pass a jq filter |
+| `specdev json read` with a filter that traverses into a path whose shape you have not directly inspected this session — run `json structure` or `json keys` against the parent path first. Guessing field names produces "Cannot iterate over null" errors |
+| `--spec-root` or `--git-root` on `specdev json` read/edit subcommands (`read`, `read-multi`, `keys`, `structure`, `schema`, `patch`, `insert`, `delete`) — the CLI silently strips them, but the canonical invocation omits them. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` (anchors relative file paths) |
 | Hardcoded "FRs live in step 04 / APIs in step 05" mappings — use `entry_key_registry` |
 | `specdev context extract` (removed — hard-fails) |
 
@@ -42,8 +44,11 @@ Explicitly allowed: `Read` on `$TOOLKIT_ROOT/prompts/prompt_NN_*.md` and `$TOOLK
 ## Surgical query rules
 
 - Always pass a jq filter to `specdev json read`. Unfiltered reads of whole spec files are banned.
-- Use `specdev json structure <file>` and `specdev json schema <file> <path>` to learn a file's shape before composing queries. Do not trust priors about field names.
+- **Shape-first**: before composing any new `json read` filter on a path you have not just inspected, run one of `specdev json structure <file>`, `specdev json keys <file> '<parent-path>'`, or `specdev json schema <file> <path>`. Each takes <1 second and prevents the dominant `json read` failure class. Do not trust priors about field names.
 - Run `specdev <command> --help` when unsure about flags. Do not assume.
+- **Flag scope**: `--spec-root` and `--git-root` apply to validation/governance commands (`spec-check`, `validate`, `matrix`, `governance-check`, etc.); `canon-accept` accepts `--git-root` only. Most `specdev json …` subcommands accept `--repo-root` only — the CLI silently strips the other two if passed. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file paths.
+
+**Retry trap**: when a `json read` fails, do not retry with another guessed path — the failure means your assumption about the parent shape is wrong. Drop back to a shape probe (`json structure` / `json keys` / `json schema`) and rebuild the filter from real field names.
 
 ## The three static indices
 
@@ -83,12 +88,15 @@ specdev context structure $SPEC_DIR --step <NN> --repo-root $TOOLKIT_ROOT
 
 Returns a structural skeleton: required upstream files, per-file array counts, canon kinds used.
 
-### Step 2 — Know shape
+### Step 2 — Know shape (mandatory before any new `json read` filter)
 
 ```bash
 specdev json structure $SPEC_DIR/<NN>_*.json
-specdev json schema $SPEC_DIR/<NN>_*.json '<jq-path>' --repo-root $TOOLKIT_ROOT
+specdev json keys      $SPEC_DIR/<NN>_*.json '<parent-jq-path>'
+specdev json schema    $SPEC_DIR/<NN>_*.json '<jq-path>' --repo-root $TOOLKIT_ROOT
 ```
+
+Pick whichever probe matches the question — `structure` for the whole skeleton, `keys` for "what fields exist at this path", `schema` for typed constraints. Skipping Step 2 is the root cause of the most common `json read` failure ("Cannot iterate over null") — see the **Retry trap** note under Surgical query rules.
 
 ### Step 3 — Scope resolution (only if a scope hint was provided)
 
@@ -199,7 +207,7 @@ Entries landing in `Unclassified` mean `impact[]` lacks a step-routable path.
 ## Permission allow-list
 
 **Auto-invocable** (no human confirmation):
-`context structure`, `context canon`, `json read`, `json read-multi`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `forward-replay-check --json`, `upstream-backlog --json`, `matrix`, `guide`, `registry-check`, `registry-generate`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default.
+`context structure`, `context canon`, `json read`, `json read-multi`, `json keys`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `forward-replay-check --json`, `upstream-backlog --json`, `matrix`, `guide`, `registry-check`, `registry-generate`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default.
 
 **Human required**:
 `canon-accept`, `align apply`, `git commit`, `git push`.

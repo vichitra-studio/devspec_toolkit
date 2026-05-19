@@ -110,8 +110,9 @@ specdev json read spec/06_invariants.json \
 
 The live host-repo trace matrix is at `spec/extras/trace_matrix.json`. Its schema is `.matrix[]` keyed by `fr_id`, with sibling arrays `apis`, `fixtures`, `nfrs`, `threats`. The file is regenerated automatically by context commands (per "Locked decision 4a") or manually via:
 ```bash
-specdev matrix spec --out spec/extras/trace_matrix.json --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+specdev matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
+The matrix is written to the canonical path `spec/extras/trace_matrix.json` (the default `--out` destination).
 
 - If the directly-affected entity is an FR: query `.matrix[] | select(.fr_id == "<id>")` and collect all sibling arrays.
 - If it is a non-FR kind (invariant, api, nfr, fixture, threat, etc.): first read the entity record's own `.trace[]` to find linked FR IDs; then for each linked FR, query the matrix for siblings.

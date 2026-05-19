@@ -1847,5 +1847,138 @@ class CliTests(unittest.TestCase):
             self.assertEqual(1, code, msg=f"Expected exit 1 for non-JSON path with SPECDEV_WARNINGS_AS_ERRORS=1. stdout: {stdout.getvalue()}")
 
 
+    # ------------------------------------------------------------------
+    # J.1 — `json` family tolerates --spec-root / --git-root by silently
+    # dropping them before dispatching to json_main. Agents over-apply
+    # CLAUDE.md's "always pass three flags" rule to the json family; this
+    # filter keeps the rule frictionless without changing json behavior.
+    # ------------------------------------------------------------------
+
+    def _run_json_capture_argv(self, argv: list[str]) -> list[str]:
+        """Run `specdev json …` and capture sys.argv as observed by json_main."""
+        captured: dict[str, list[str]] = {"argv": []}
+
+        def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with patch("specdev_tools.core.json_utils.main", fake_main):
+            self._run_cli(argv)
+        return captured["argv"]
+
+    def test_json_strips_spec_root_and_git_root_space_form(self):
+        observed = self._run_json_capture_argv(
+            ["json", "read", "spec/foo.json", ".x",
+             "--spec-root", "./spec", "--git-root", "."]
+        )
+        # First element is sys.argv[0]; rest is what json_main sees.
+        self.assertEqual(observed[1:], ["read", "spec/foo.json", ".x"])
+
+    def test_json_strips_spec_root_and_git_root_equals_form(self):
+        observed = self._run_json_capture_argv(
+            ["json", "read", "spec/foo.json", ".x",
+             "--spec-root=./spec", "--git-root=."]
+        )
+        self.assertEqual(observed[1:], ["read", "spec/foo.json", ".x"])
+
+    def test_json_strips_bare_trailing_flag(self):
+        # Trailing flag with no value — must also be dropped, not passed through.
+        observed = self._run_json_capture_argv(
+            ["json", "read", "spec/foo.json", ".x", "--spec-root"]
+        )
+        self.assertEqual(observed[1:], ["read", "spec/foo.json", ".x"])
+
+    def test_json_preserves_repo_root_and_other_flags(self):
+        observed = self._run_json_capture_argv(
+            ["json", "read", "spec/foo.json", ".x",
+             "--spec-root", "./spec",
+             "--repo-root", "./devspec_toolkit",
+             "--git-root", "."]
+        )
+        self.assertEqual(
+            observed[1:],
+            ["read", "spec/foo.json", ".x", "--repo-root", "./devspec_toolkit"],
+        )
+
+    def test_json_does_not_swallow_next_flag_when_value_missing(self):
+        # If the user (or tool) omits the value, the next token may itself be
+        # a flag. The stripper must not consume that flag as the missing value.
+        observed = self._run_json_capture_argv(
+            ["json", "read", "spec/foo.json", ".x",
+             "--spec-root", "--repo-root", "./devspec_toolkit"]
+        )
+        self.assertEqual(
+            observed[1:],
+            ["read", "spec/foo.json", ".x", "--repo-root", "./devspec_toolkit"],
+        )
+
+    def test_json_resolve_pointers_preserves_git_root_and_spec_root(self):
+        # resolve-pointers is the one json subcommand that legitimately
+        # consumes --git-root (and warns-then-ignores --spec-root). The
+        # stripper must not touch its arguments — both flags must reach
+        # json_main verbatim so the subcommand's own behaviour is preserved.
+        observed = self._run_json_capture_argv(
+            ["json", "resolve-pointers",
+             "--repo-root", "./devspec_toolkit",
+             "--spec-root", "./spec",
+             "--git-root", "."]
+        )
+        self.assertEqual(
+            observed[1:],
+            ["resolve-pointers",
+             "--repo-root", "./devspec_toolkit",
+             "--spec-root", "./spec",
+             "--git-root", "."],
+        )
+
+    # ------------------------------------------------------------------
+    # H.B — `matrix` writes to <spec_dir>/extras/trace_matrix.json when
+    # --out is omitted. Explicit --out and --out - still work.
+    # ------------------------------------------------------------------
+
+    def test_matrix_default_out_writes_to_canonical_extras_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            expected_path = spec_dir.resolve() / "extras" / "trace_matrix.json"
+
+            payload = {"matrix": [], "coverage": {"fr_total": 0}}
+            with patch(
+                "specdev_tools.validation.matrix.build_trace_matrix",
+                return_value=payload,
+            ):
+                code, out, err = self._run_cli(
+                    ["matrix", str(spec_dir), "--repo-root", str(repo_root)]
+                )
+
+            self.assertEqual(0, code, msg=err)
+            self.assertTrue(expected_path.exists())
+            self.assertIn(str(expected_path), out)
+            written = json.loads(expected_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["coverage"], written["coverage"])
+
+    def test_matrix_explicit_dash_still_streams_to_stdout(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+
+            payload = {"matrix": [], "coverage": {"fr_total": 7}}
+            with patch(
+                "specdev_tools.validation.matrix.build_trace_matrix",
+                return_value=payload,
+            ):
+                code, out, err = self._run_cli(
+                    ["matrix", str(spec_dir), "--out", "-", "--repo-root", str(repo_root)]
+                )
+
+            self.assertEqual(0, code, msg=err)
+            # stdout should contain serialized JSON, not a file path.
+            written = json.loads(out)
+            self.assertEqual(payload["coverage"], written["coverage"])
+            # And no extras dir created.
+            self.assertFalse((spec_dir / "extras").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

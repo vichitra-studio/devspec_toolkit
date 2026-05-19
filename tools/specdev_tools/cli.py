@@ -162,7 +162,10 @@ def main():
 
     m = sub.add_parser("matrix")
     m.add_argument("spec_dir")
-    m.add_argument("--out", default="-")
+    # Default: write to <spec_dir>/extras/trace_matrix.json (resolved at action
+    # time once spec_dir is known). Pass --out - explicitly for stdout, or
+    # --out <path> for a non-canonical location.
+    m.add_argument("--out", default=None)
     m.add_argument("--repo-root", default=".")
     m.add_argument("--spec-root", default=None, help="Spec directory (for submodule deployments)")
     m.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
@@ -538,11 +541,13 @@ def main():
             if args.out == "-":
                 print(out, end="")
             else:
-                out_path = os.path.abspath(args.out)
+                from .core.constants import resolve_extras_path
+                out_arg = args.out if args.out else resolve_extras_path(spec_dir, "trace_matrix.json")
+                out_path = os.path.abspath(out_arg)
                 os.makedirs(os.path.dirname(out_path), exist_ok=True)
                 with open(out_path, "w", encoding="utf-8") as f:
                     f.write(out)
-                print(args.out)
+                print(out_arg)
             cfg = get_config()
             matrix_strict = cfg.matrix_strict
             integrity_errors = res.get("integrity_errors")
@@ -1839,7 +1844,38 @@ def main():
 
     elif args.cmd == "json":
         from .core.json_utils import main as json_main
-        sys.argv = [sys.argv[0]] + args.args
+        # Strip --spec-root / --git-root if present — the json subcommand family
+        # accepts --repo-root only, but agents frequently over-apply the
+        # validation/governance flag-set (per CLAUDE.md guidance) and pass all
+        # three. Silently dropping these prevents a high-volume class of
+        # "unrecognized arguments" failures.
+        #
+        # Exception: `resolve-pointers` legitimately accepts --git-root (anchors
+        # relative file-path resolution) and warns-then-ignores --spec-root.
+        # Skip the strip entirely for that subcommand so both signals reach
+        # json_main unchanged.
+        subcmd = args.args[0] if args.args else None
+        if subcmd == "resolve-pointers":
+            filtered = list(args.args)
+        else:
+            filtered = []
+            i = 0
+            while i < len(args.args):
+                tok = args.args[i]
+                if tok in ("--spec-root", "--git-root"):
+                    # Drop the flag plus its value, but only when the next token
+                    # looks like a value (not another flag). This protects other
+                    # flags from being silently swallowed if a user wrote
+                    # `--spec-root --repo-root foo` (omitted value).
+                    nxt = args.args[i + 1] if i + 1 < len(args.args) else None
+                    i += 2 if (nxt is not None and not nxt.startswith("--")) else 1
+                    continue
+                if tok.startswith("--spec-root=") or tok.startswith("--git-root="):
+                    i += 1
+                    continue
+                filtered.append(tok)
+                i += 1
+        sys.argv = [sys.argv[0]] + filtered
         json_main()
 
     elif args.cmd == "guide":

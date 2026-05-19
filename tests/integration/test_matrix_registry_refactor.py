@@ -20,13 +20,29 @@ byte-for-byte equality against that golden.
 
 Intentional diff policy
 -----------------------
-The post-refactor output is **byte-for-byte identical** to the pre-refactor
-output.  If this test fails, it means an unintended difference was introduced.
-Any intentional change (e.g. adding a new entity kind to the registry) must be
-accompanied by:
+The golden snapshot must match the live ``build_trace_matrix()`` output for the
+**current host spec**.  If this test fails, determine whether the diff is a
+genuine refactor regression or downstream churn from host-spec evolution
+(entity renames, re-targeted fixtures, new entities added by a milestone).
+The function under test is unchanged in both cases — only the golden artifact
+needs refreshing for the latter.  Any regeneration must be accompanied by:
 
-    1. A doc comment here naming the diff and labelling it "INTENDED".
-    2. An update to ``tests/fixtures/trace_matrix_pre_refactor.json``.
+    1. A doc note in this section naming the diff and labelling it "INTENDED".
+    2. An update to ``tests/fixtures/trace_matrix_pre_refactor.json``
+       via ``specdev matrix spec --repo-root ./devspec_toolkit
+       --spec-root ./spec --git-root .
+       --out devspec_toolkit/tests/fixtures/trace_matrix_pre_refactor.json``.
+
+INTENDED regenerations
+^^^^^^^^^^^^^^^^^^^^^^
+- 2026-05-19 — newsletter milestone (16a) entity churn: renamed
+  ``threat-transport-smtp-transactional-starttls-stripping`` to
+  ``threat-transport-smtp-starttls-downgrade`` (broader scope covering both
+  transactional and newsletter paths); re-targeted newsletter fixtures
+  (``fix-newsletter-*-e2e``, ``fix-post-newsletter-send-phase2-contract``) from
+  generic publish FRs to newsletter-specific FRs; added new APIs/NFRs/threats
+  on ``fr-newsletter-send``. Same FR set, same row count, same integrity-error
+  count — only entity-set memberships shifted.
 
 W4-T2 verification note
 ------------------------
@@ -104,10 +120,13 @@ class TestMatrixRegistryRefactorGolden:
 
         result = build_trace_matrix(str(TOOLKIT_ROOT), str(HOST_SPEC_DIR))
 
-        # Normalise both through JSON round-trip so formatting differences don't
-        # cause false failures (the golden was written with indent=2 by specdev).
-        result_json = json.dumps(result, indent=2)
-        golden_json = json.dumps(golden, indent=2)
+        # Normalise both through JSON round-trip with sort_keys=True so the
+        # comparison is content-based, not dict-insertion-order-dependent.
+        # The CLI (`specdev matrix --out`) writes the golden with sort_keys=True;
+        # matching that here keeps the test stable across unrelated refactors
+        # that reorder fields inside build_trace_matrix().
+        result_json = json.dumps(result, indent=2, sort_keys=True)
+        golden_json = json.dumps(golden, indent=2, sort_keys=True)
 
         if result_json != golden_json:
             # Produce a useful diff summary (first 20 differing lines)
