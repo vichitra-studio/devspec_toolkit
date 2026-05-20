@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:infra:findings",
+  "title": "infra_findings",
+  "description": "Findings-record output document emitted by review agents (specdev-reviewer) and consumed by fix agents (specdev-impl). One document represents the merged findings of a single review round for a single scope. The dedup key for individual findings is the tuple (kind, location, signature). See Proposal K §4.1 (taxonomy), §5.4 (schema-only — no CLI), and §5.4.1 (path resolution).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["round", "scope", "generated_at", "findings"],
+  "properties": {
+    "round": {
+      "description": "Review round number within the loop. Starts at 1 and increments per review-fix iteration; bounded by max_rounds=5 (Proposal K §3).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "scope": {
+      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan'. Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename (spec/extras/findings_<scope>_<round>_<ts>.json per §5.4.1).",
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "description": "Unix-epoch seconds at merge time (from jq 'now'). Numeric for deterministic dedup.",
+      "type": "number",
+      "minimum": 0
+    },
+    "findings": {
+      "description": "Array of finding-records emitted by the reviewer(s). May be empty (zero findings is the CONVERGED predicate per §4.1).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "description": "One finding-record. Dedup key across reviewers within a round is the tuple (kind, location, signature). Severity follows the P0/P1/P2 priority language used elsewhere in the toolkit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "location", "signature", "message", "severity"],
+      "properties": {
+        "kind": {
+          "description": "Taxonomy bucket (Proposal K §4.1). 'gap' = required content missing; 'miss' = incomplete upstream coverage; 'bug' = factually wrong against schema/upstream/canon; 'regression' = downstream broken by upstream change; 'assumption' = un-grounded inference; 'ambiguity' = multiple valid readings or precedence conflict; 'hallucination' = invented ID/enum/command/path/canon-ref; 'drift' = artifact-vs-reality or artifact-vs-artifact divergence; 'coverage' = trace/fixture/NFR mapping incomplete; 'determinism' = non-reproducible decision, racy invariant, free-text where enum expected.",
+          "type": "string",
+          "enum": [
+            "gap",
+            "miss",
+            "bug",
+            "regression",
+            "assumption",
+            "ambiguity",
+            "hallucination",
+            "drift",
+            "coverage",
+            "determinism"
+          ]
+        },
+        "location": {
+          "description": "Where the finding sits. Free-form string holding a file path, a JSON pointer, or a combined 'file#pointer' form (e.g. 'spec/04_fr_list.json#/fr[3]/acceptance_criteria'). Kept as a string to accommodate non-pointer locations (e.g. cross-file drift descriptions).",
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "description": "Deterministic short hash of the finding's normalized message (Proposal K §5.4). Used together with kind+location for cross-reviewer dedup via the jq unique_by({kind, location, signature}) merge. Reviewer is responsible for generating the hash; the schema does not constrain the algorithm beyond requiring a stable string.",
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "description": "Human-readable description of the finding. Should be specific enough to drive a fix; should be normalized (stable wording for the same underlying issue) so that signature dedup works across reviewers.",
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "description": "Priority bucket. P0 = blocking (convergence cannot ignore); P1 = should-fix this round; P2 = nice-to-fix. Matches the P0/P1/P2 language used in Proposal K §4 / §7.6.",
+          "type": "string",
+          "enum": ["P0", "P1", "P2"]
+        },
+        "evidence": {
+          "description": "Optional citation(s) supporting the finding. Array of strings (e.g. quoted source lines, command output excerpts). Reviewer agents are encouraged to populate this so the fix agent can ground the edit.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "suggested_fix": {
+          "description": "Optional reviewer-proposed remediation (free text). The fix agent treats this as advisory, not authoritative.",
+          "type": "string"
+        },
+        "upstream_refs": {
+          "description": "Optional array of upstream references this finding ties back to — canonical IDs (e.g. 'cn:project:term-foo'), FR IDs (e.g. 'fr-user-login'), capability IDs, or other stable identifiers. Drives 'miss' / 'coverage' / 'assumption' findings into the upstream-backlog view.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

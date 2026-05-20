@@ -29,5 +29,6 @@
   "vc:entry-key-registry": "schema/entry_key_registry.schema.json",
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
-  "vc:step-order": "schema/step_order.schema.json"
+  "vc:step-order": "schema/step_order.schema.json",
+  "vc:infra:findings": "schema/infra/findings.schema.json"
 }
