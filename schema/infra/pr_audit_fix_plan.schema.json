@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:infra:pr-audit-fix-plan",
+  "title": "infra_pr_audit_fix_plan",
+  "description": "Atomic fix-plan output document produced by the devspec_pr_audit skill (Part B). One document represents the ordered task list for a single review round and scope. Tasks must appear in topological order (all deps declared before the task that references them). Each task modifies exactly one file; multi-file changes must be split.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["round", "scope", "generated_at", "tasks"],
+  "properties": {
+    "round": {
+      "description": "Review round ordinal, 1..max_rounds (5). Increments per review-fix iteration.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "scope": {
+      "description": "Short identifier of the review scope this plan addresses. Must match the scope of the corresponding findings document for document pairing to work.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9_-]+$"
+    },
+    "generated_at": {
+      "description": "Unix-epoch seconds (integer) when this document was emitted. Used for run correlation; not a uniqueness key.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "tasks": {
+      "description": "Ordered array of atomic fix tasks. Tasks must appear in topological order — a task's deps must reference only tasks that appear earlier in this array.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/task"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "task": {
+      "description": "One atomic fix task. Modifies exactly one file. Multi-file changes must be split into separate tasks. Tasks must appear in topological order with respect to their deps.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "priority", "file", "change_summary", "acceptance_command", "findings"],
+      "properties": {
+        "id": {
+          "description": "Task identifier (e.g., T1, T01, D1). The prefix letter is a naming convention only — use the kind field for the authoritative task category. Used as a dependency reference key. Note: the D prefix is unrelated to catalog_tag D-codes (D1-D14); a task with id 'D1' does NOT correspond to drift type D1.",
+          "type": "string",
+          "pattern": "^[TD][0-9]*[1-9][0-9]*$"
+        },
+        "kind": {
+          "description": "Task category. Used by the consolidator and human reviewers to classify tasks; the schema does not enforce sequencing or acceptance-command conventions per kind.",
+          "type": "string",
+          "enum": ["code", "doc", "test", "config"]
+        },
+        "priority": {
+          "description": "Task priority for scheduling. P0 = blocker, P1 = high, P2 = medium, P3 = low/docs/cleanup. Governance constraint (not enforced by schema): a P3 task must only address findings of severity P2; using P3 to defer a P0 or P1 finding is a violation that the consolidator's verifier should reject.",
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3"]
+        },
+        "deps": {
+          "description": "Other task IDs this task depends on. Must reference tasks declared earlier in the array (topological order). Forward references are forbidden — the consolidator must order tasks before writing this document. Omission is equivalent to an empty array; the schema does not coerce absent values.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[TD][0-9]*[1-9][0-9]*$"
+          },
+          "uniqueItems": true
+        },
+        "file": {
+          "description": "Single file modified by this task. Multi-file changes must be split into separate tasks. Path is relative to git root.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S.*$"
+        },
+        "change_summary": {
+          "description": "One-line description of the change. Concrete, not aspirational.",
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 200
+        },
+        "acceptance_command": {
+          "description": "Shell command (runnable verbatim) that returns non-zero if the change is incomplete or incorrect. e.g., pytest -k test_x, specdev spec-check ...",
+          "type": "string",
+          "minLength": 5
+        },
+        "findings": {
+          "description": "List of finding signatures (from findings.schema.json) this task addresses. At least one finding per task.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

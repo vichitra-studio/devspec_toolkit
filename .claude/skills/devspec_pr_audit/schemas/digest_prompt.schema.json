@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:prompt",
+  "title": "digest_prompt",
+  "description": "Digest projection of a prompt markdown file (prompts/prompt_NN_*.md). Captures structured facts extractable by Bash; prose nuance is handled inline by the Tier-2 reviewer against the raw file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a prompt digest.",
+      "type": "string",
+      "const": "digest_prompt"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root (e.g. prompts/prompt_01_capabilities.md).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^prompts/.*\\.md$"
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Prompt-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "section_headers"],
+      "properties": {
+        "step_id": {
+          "description": "Pipeline step identifier derived from the filename (e.g. 01 from prompt_01_capabilities.md). Two digits optionally followed by a single letter.",
+          "type": "string",
+          "pattern": "^[0-9]{2}[a-c]?$"
+        },
+        "schema_uri": {
+          "description": "The $schema URI declared inside the prompt (grep for '$schema' or 'vc:' URI pattern). Absent if not found. Tier-2 reviewers should treat missing field as equivalent to no schema URI declared.",
+          "type": "string"
+        },
+        "shared_expectations_required": {
+          "description": "True if the prompt contains a REQUIRED directive to read shared_expectations.md before proceeding.",
+          "type": "boolean"
+        },
+        "inputs": {
+          "description": "Upstream artifact file references explicitly mentioned as inputs (e.g. 00_charter.json). Derived from Extraction Intent section.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "outputs": {
+          "description": "Reserved for future use; currently always empty. Tier-2 reviewers derive output artifacts from step_id + schema registry.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "gates": {
+          "description": "Self-Audit Gate checklist items — lines beginning with a dash or checkbox inside the Self-Audit Gate section.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "emergent_ambiguities_exit": {
+          "description": "True if the prompt contains an explicit declaration about emergent_ambiguities or coverage_gaps escape valve.",
+          "type": "boolean"
+        },
+        "anchors": {
+          "description": "Named markdown anchors (<!-- anchor: name --> or heading IDs) found in the file. Useful for D6 cross-reference checks.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "section_headers": {
+          "description": "All H2-level (##) section header texts in document order. Provides structural outline for drift detection.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "negative_constraints_count": {
+          "description": "Count of lines in the Negative Constraints section (if present). Zero if section absent.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "downstream_consumer_count": {
+          "description": "Number of downstream steps declared in the prompt header line (e.g. 'feeds 7 downstream steps' → 7). -1 if not declared.",
+          "type": "integer",
+          "minimum": -1
+        }
+      }
+    }
+  }
+}

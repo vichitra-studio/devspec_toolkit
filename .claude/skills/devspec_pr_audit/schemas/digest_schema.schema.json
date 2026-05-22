@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:schema",
+  "title": "digest_schema",
+  "description": "Digest projection of a JSON Schema file (schema/**/*.schema.json). Captures structural contract facts for cross-slice drift analysis without transferring the full schema source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a schema digest.",
+      "type": "string",
+      "const": "digest_schema"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root (e.g. schema/core/atoms.schema.json).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/].*\\.schema\\.json$"
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time. Used as cache key component.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Schema-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_id", "required", "optional", "additional_properties_at_root", "refs", "has_definitions"],
+      "properties": {
+        "schema_id": {
+          "description": "Value of the $id field in the schema (e.g. vc:core:atoms).",
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_uri": {
+          "description": "Value of the $schema field declaring the metaschema URI.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "description": "Value of the top-level title field if present.",
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "description": "Array of property names listed in the root required[] array.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "optional": {
+          "description": "Root-level property names NOT in the required[] array.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "additional_properties_at_root": {
+          "description": "True if the root object sets additionalProperties to a non-false value (or omits it). False means additionalProperties: false is set at root.",
+          "type": "boolean"
+        },
+        "refs": {
+          "description": "All $ref URI strings found anywhere in the schema (recursive). Used to detect dangling references (D6).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "enums": {
+          "description": "Map of property-path (dot-notation) to enum value list for every enum constraint found in the schema.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "patterns": {
+          "description": "Map of property-path (dot-notation) to regex pattern string for every pattern constraint found in the schema.",
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "has_definitions": {
+          "description": "True if the schema defines a $defs (or definitions) block with at least one entry.",
+          "type": "boolean"
+        },
+        "def_names": {
+          "description": "Keys of the top-level $defs block (if present).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:cli",
+  "title": "digest_cli",
+  "description": "Digest projection of the CLI surface (tools/specdev_tools/cli.py or subcommand modules). Captures subcommand names, required/accepted flags, and known strip behaviour for documentation-parity and drift checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a CLI digest.",
+      "type": "string",
+      "const": "digest_cli"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root (e.g. tools/specdev_tools/cli.py).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^tools/.*\\.py$"
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "CLI-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands"],
+      "properties": {
+        "commands": {
+          "description": "Array of subcommand descriptors extracted from argparse add_parser() calls.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/command_descriptor"
+          }
+        },
+        "env_vars": {
+          "description": "Environment variable names referenced in the CLI source (SPECDEV_* pattern).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "command_descriptor": {
+      "description": "A single CLI subcommand and its flag contract.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "required_flags", "accepted_flags"],
+      "properties": {
+        "name": {
+          "description": "Subcommand name as passed to add_parser() (e.g. validate, spec-check, canon-accept).",
+          "type": "string",
+          "minLength": 1
+        },
+        "required_flags": {
+          "description": "Flag names (--flag) that are positional or declared required=True.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^--[a-z][-a-z0-9]*$" },
+          "uniqueItems": true
+        },
+        "accepted_flags": {
+          "description": "All flag names accepted by this subcommand including optional ones.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^--[a-z][-a-z0-9]*$" },
+          "uniqueItems": true
+        },
+        "strips_flags": {
+          "description": "Flags that this subcommand silently strips before processing (documented in source). Empty when none are documented. Do not fabricate — populate only when the strip is explicitly coded.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^--[a-z][-a-z0-9]*$" },
+          "uniqueItems": true
+        },
+        "positional_args": {
+          "description": "Names of positional (non-flag) arguments in declaration order.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

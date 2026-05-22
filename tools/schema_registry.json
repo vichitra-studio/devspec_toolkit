@@ -30,5 +30,6 @@
   "vc:seed-manifest": "schema/seed_manifest.schema.json",
   "vc:seed-requirements": "schema/seed_requirements.schema.json",
   "vc:step-order": "schema/step_order.schema.json",
-  "vc:infra:findings": "schema/infra/findings.schema.json"
+  "vc:infra:findings": "schema/infra/findings.schema.json",
+  "vc:infra:pr-audit-fix-plan": "schema/infra/pr_audit_fix_plan.schema.json"
 }

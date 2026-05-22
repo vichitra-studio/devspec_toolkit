@@ -1,0 +1,404 @@
+# slices.yaml — file-routing manifest for devspec_pr_audit
+#
+# Each slice declares:
+#   globs              — file patterns that route diff entries into this slice
+#   description        — one-line capability statement (NOT a bug list)
+#   type_weight        — per-glob impact weight (default + overrides)
+#   expansion_rules    — when a file in this slice changes, which other files
+#                        get pulled into scope. Each rule names a target glob
+#                        and optionally a capture (e.g., {step} from the source path)
+#   applies            — subset of catalog IDs that govern this slice
+#       drift_types    — list from D1-D14
+#       invariants     — list from I1-I13
+#   semantic_work      — does this slice have non-deterministic checks
+#                        (true → eligible for Tier-1/Tier-2 LLM analysis;
+#                         false → Tier-0 Bash only)
+#   model_tier         — haiku | sonnet (when semantic_work is true)
+#   complexity_per_file— weight unit used in impact bin-packing
+#                        (1 = trivial, 5 = heavy semantic load)
+#
+# Impact score (per changed file in slice):
+#   = type_weight × max(1, |expansion_set|) × |applies.drift_types ∪ applies.invariants|
+#
+# Agent allocation (Tier-2):
+#   greedy bin-pack by impact_score with budget ~200 units per sonnet agent
+#   (tunable after dry-run measurement).
+
+# Schema version: 1
+#
+# Top-level structure:
+#   exclusions: [glob, ...]   — files to drop from the diff before routing.
+#                                Patterns use `**` = zero-or-more path components.
+#   slices:     [slice, ...]  — routed slices (see schema below)
+#
+# D11 (changelog drift) ownership: D11 lives ONLY in the `migration_versioning`
+# slice. All other slices omit D11 from their applies lists to prevent duplicate
+# findings. The cross-boundary agent (Phase 3) and consolidator do not need to
+# dedup D11 across slices.
+
+exclusions:
+  # Per-run audit output (transient)
+  - "docs/audit/runs/**"
+  # Historical audit drafts kept in-tree for archival
+  - "docs/audit/findings/**"
+  # Transient working notes
+  - "WIP/**"
+  - "@WIP/**"
+  # Session / editor state
+  - ".claude/plan.md"
+  - ".claude/settings.local.json"
+  - ".claude/.archive/**"
+  - ".pytest_cache/**"
+  - ".DS_Store"
+  # Local virtualenvs (toolkit-vendored guidance: devspec_env / dev_env)
+  - "dev_env/**"
+  - "devspec_env/**"
+  # Repo hygiene at toolkit root (not part of any audited surface)
+  - ".gitignore"
+  - ".gitmessage"
+  - ".pre-commit-config.yaml"
+  - "pyrightconfig.json"
+  - "LICENSE"
+  - "tools/requirements.txt"
+  # Toolkit's own self-spec dir (audited by specdev itself, not this framework)
+  - "spec/**"
+  # Python type-marker files (no semantic content)
+  - "**/py.typed"
+
+slices:
+
+# ---------------------------------------------------------------
+# Schema slice — JSON Schemas (toolkit core + per-step)
+# ---------------------------------------------------------------
+- name: schemas
+  description: >
+    Schema artifacts that define structural contracts for every other layer.
+    Source of truth for field shapes, enums, required-ness, $refs.
+  globs:
+    - "schema/**/*.json"
+  type_weight:
+    default: 8
+    "schema/core/**": 12        # primitives cascade across all schemas
+  expansion_rules:
+    - target: "prompts/prompt_{step}_*.md"
+      capture: "schema/{step}_*.json"
+    - target: "tools/specdev_tools/validation/step_*.py"
+      capture: "schema/{step}_*.json"
+    - target: "tests/fixtures/step_{step}/**"
+      capture: "schema/{step}_*.json"
+    - target: "tools/schema_registry.json"
+    - target: "tools/entry_key_registry.json"
+    - target: "tools/extraction_paths.json"
+    - target: "CHANGELOG.md"
+    - target: "changelog/unreleased.md"
+    - target: "changelog/unreleased.yaml"
+  applies:
+    drift_types: [D1, D2, D5, D6, D7, D9, D14]
+    invariants:  [I1, I3, I4, I7, I9, I13]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 5
+
+# ---------------------------------------------------------------
+# Prompts slice — prompt contracts and shared expectations
+# ---------------------------------------------------------------
+- name: prompts
+  description: >
+    Prompt artifacts that drive AI execution per step. Carry sourcing
+    guidance, escape-valve declarations, schema-authority directives.
+  globs:
+    - "prompts/**/*.md"
+  type_weight:
+    default: 6
+    "prompts/shared_expectations.md": 12   # affects all prompts
+  expansion_rules:
+    - target: "schema/{step}_*.json"
+      capture: "prompts/prompt_{step}_*.md"
+    - target: "tools/specdev_tools/validation/step_*.py"
+      capture: "prompts/prompt_{step}_*.md"
+    - target: "tools/extraction_paths.json"
+    - target: "docs/prompts/**"
+    - target: "CHANGELOG.md"
+    - target: "changelog/unreleased.md"
+    - target: "changelog/unreleased.yaml"
+  applies:
+    drift_types: [D1, D2, D3, D5, D6, D7, D10, D14]
+    invariants:  [I1, I2, I3, I6, I9, I12, I13]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 5
+
+# ---------------------------------------------------------------
+# Canon slice — canonical registry (two-tier)
+# ---------------------------------------------------------------
+- name: canon
+  description: >
+    Canonical registry artifacts and namespace/alias machinery.
+    Owns the contract between IDs declared in canon and IDs referenced
+    throughout the pipeline.
+  globs:
+    - "canon/**/*.json"
+    - "canon/**/*.md"
+  type_weight:
+    default: 7
+    "canon/manifest.json": 11
+  expansion_rules:
+    - target: "tools/specdev_tools/canonical/**"
+    - target: "tools/specdev_tools/registry/**"
+    - target: "schema/core/canon.schema.json"
+    - target: "CHANGELOG.md"
+  applies:
+    drift_types: [D1, D6, D7, D8, D13]
+    invariants:  [I1, I4, I7, I9, I11]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 4
+
+# ---------------------------------------------------------------
+# Validators slice — Python check logic (validation, canonical, registry)
+# ---------------------------------------------------------------
+- name: validators
+  description: >
+    Check logic that enforces contracts. Includes per-step validators,
+    cross-artifact checks, canonical integrity, registry generation,
+    and lint modules.
+  globs:
+    - "tools/specdev_tools/validation/**/*.py"
+    - "tools/specdev_tools/validators/**/*.py"   # alt layout: per-step validators
+    - "tools/specdev_tools/canonical/**/*.py"
+    - "tools/specdev_tools/registry/**/*.py"
+    - "tools/specdev_tools/analysis/**/*.py"
+    - "tools/specdev_tools/generation/**/*.py"
+    - "tools/specdev_tools/core/**/*.py"          # shared core utilities (loaders, parsers, constants)
+    - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, matrix.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
+  type_weight:
+    default: 6
+    "tools/specdev_tools/core/errors.py": 12   # error registry affects everything
+  expansion_rules:
+    - target: "schema/{step}_*.json"
+      capture: "tools/specdev_tools/validation/step_*.py"
+    - target: "tests/**/test_{name}*.py"
+    - target: "docs/developers/error-codes.md"
+    - target: "docs/developers/reference.md"
+    - target: "CHANGELOG.md"
+  applies:
+    drift_types: [D2, D3, D4, D5, D6, D7, D10, D14]
+    invariants:  [I3, I4, I5, I7, I8, I11, I13]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 4
+
+# ---------------------------------------------------------------
+# CLI surface slice — commands, flags, env vars
+# ---------------------------------------------------------------
+- name: cli_surface
+  description: >
+    Public CLI surface: subcommands, flags, env-var contracts.
+    Documentation parity and host-deployment flag conventions live here.
+  globs:
+    - "tools/specdev_tools/cli.py"
+    - "tools/specdev_tools/guides/**/*.yaml"
+    - "tools/specdev_tools/context/**/*.py"
+  type_weight:
+    default: 5
+  expansion_rules:
+    - target: "docs/developers/reference.md"
+    - target: "docs/developers/**/*.md"
+    - target: "CHANGELOG.md"
+  applies:
+    drift_types: [D3, D14]
+    invariants:  [I9, I10, I12]
+  semantic_work: true                     # subjective: flag naming, help-text quality
+  model_tier: haiku
+  complexity_per_file: 2
+
+# ---------------------------------------------------------------
+# Tests + fixtures slice
+# ---------------------------------------------------------------
+- name: tests_fixtures
+  description: >
+    Test code and fixtures. Coverage of declared rules, error codes,
+    positive + negative + edge-case scenarios. Fixture-to-schema parity.
+  globs:
+    - "tests/**/*.py"
+    - "tests/**/*.json"
+    - "tests/fixtures/**"
+  type_weight:
+    default: 3
+    "tests/fixtures/**": 4
+  expansion_rules:
+    # {step} token convention: captures the leading NN prefix from filenames like
+    # NN_name.schema.json (e.g., "00" from "00_charter.schema.json").
+    # Actual schema files use format NN_name.schema.json — capture pattern updated accordingly.
+    - target: "schema/{step}_*.schema.json"
+      capture: "tests/fixtures/step_{step}/**"
+    - target: "tools/specdev_tools/validation/step_*.py"
+      capture: "tests/**/test_step_*.py"
+    - target: "tests/**/test_step_*.py"
+      capture: "tools/specdev_tools/validation/step_*.py"
+  applies:
+    drift_types: [D4, D5]
+    invariants:  [I3, I8, I10]
+  semantic_work: true                     # D4 requires semantic comparison of test assertions against current code contract
+  model_tier: haiku
+  complexity_per_file: 1
+
+# ---------------------------------------------------------------
+# Generated artifacts slice — generator-owned files
+# ---------------------------------------------------------------
+- name: generated_artifacts
+  description: >
+    Files declared as generator-owned. Must stay byte-exact with the
+    output of their generator. Hand-edits forbidden.
+  globs:
+    - "tools/entry_key_registry.json"
+    - "tools/extraction_paths.json"
+    - "tools/command_prefixes.json"
+    - "tools/step_docs.json"
+  type_weight:
+    default: 9                            # any drift here is high-signal
+  expansion_rules:
+    - target: "schema/**/*.json"          # generators read schemas
+    - target: "tools/specdev_tools/registry/**"
+  applies:
+    drift_types: [D1, D9]
+    invariants:  [I1, I11]
+  semantic_work: false                    # purely deterministic (re-run generator + diff)
+  model_tier: haiku
+  complexity_per_file: 1
+
+# ---------------------------------------------------------------
+# Migration + versioning slice
+# ---------------------------------------------------------------
+- name: migration_versioning
+  description: >
+    Migration prompts, align machinery, version files, and changelog.
+    Governs how breaking changes are introduced and applied.
+  globs:
+    - "tools/specdev_tools/migration/**/*.py"
+    - "prompts/migration/**/*.md"        # verified: prompts/migration/ exists
+    - "migration_prompts/**/*.md"        # back-compat: legacy location for migration templates
+    - "changelog/**/*.md"
+    - "changelog/**/*.yaml"
+    - "CHANGELOG.md"
+    - "tools/pyproject.toml"
+  type_weight:
+    default: 6
+    "tools/pyproject.toml": 10           # version source-of-truth
+  expansion_rules:
+    # docs/developers/migration*.md — removed; file does not exist
+    # docs/developers/versioning*.md — removed; file does not exist
+    - target: "schema/**/*.json"          # version bumps affect schemas
+  applies:
+    drift_types: [D11, D12, D13]
+    invariants:  [I7, I11]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 3
+
+# ---------------------------------------------------------------
+# Governance + CI slice
+# ---------------------------------------------------------------
+- name: governance_ci
+  description: >
+    Governance check, forward-replay, env-flag promotion, CI gates.
+    Owns the contract that policies declared elsewhere are actually enforceable.
+  globs:
+    - "tools/specdev_tools/validation/governance*.py"
+    - "tools/specdev_tools/validation/forward_replay*.py"
+    - "tools/specdev_tools/core/config.py"
+    - ".github/workflows/**/*.yml"
+  type_weight:
+    default: 7
+  expansion_rules:
+    - target: "tools/specdev_tools/core/errors.py"
+    # docs/developers/governance*.md — removed; file does not exist
+    - target: "docs/developers/error-codes.md"
+  applies:
+    drift_types: [D6, D7, D10]
+    invariants:  [I5, I7, I11]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 3
+
+# ---------------------------------------------------------------
+# Pipeline topology slice — DAG metadata wherever it lives
+# ---------------------------------------------------------------
+- name: pipeline_topology
+  description: >
+    Files that encode pipeline structure: step order, dependency declarations,
+    extraction intents, downstream consumer lists. Multiple files must agree.
+  globs:
+    - "tools/step_order.json"
+    - "tools/schema_registry.json"
+    - "tools/specdev_tools/validation/dag_lint.py"
+    - "tools/specdev_tools/validation/extraction_intent_check.py"
+    - "tools/specdev_tools/validation/_extraction_intent_parser.py"
+  type_weight:
+    default: 9                            # topology changes are high-signal
+  expansion_rules:
+    - target: "prompts/**/*.md"           # extraction-intent sections live here
+    - target: "schema/**/*.json"          # downstream_consumers fields live here
+  applies:
+    drift_types: [D2, D6, D8]
+    invariants:  [I2, I4, I12, I13]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 4
+
+# ---------------------------------------------------------------
+# Docs slice
+# ---------------------------------------------------------------
+- name: docs
+  description: >
+    Documentation tree. Audience separation, canonical-location uniqueness,
+    link integrity, deprecated-syntax hygiene.
+  globs:
+    - "docs/**/*.md"
+    - "docs/**/*.json"
+    - "README.md"
+    - "CLAUDE.md"
+    - "tools/README.md"
+  type_weight:
+    default: 2
+    "docs/developers/reference.md": 5
+    "docs/developers/error-codes.md": 5
+  expansion_rules:
+    - target: "tools/specdev_tools/cli.py"
+    - target: "tools/specdev_tools/core/errors.py"
+    - target: "CHANGELOG.md"
+  applies:
+    drift_types: [D1, D3, D14]
+    invariants:  [I1, I9, I12]
+  semantic_work: true                     # audience-utility judgments
+  model_tier: haiku
+  complexity_per_file: 1
+
+# ---------------------------------------------------------------
+# Host integration slice — submodule deployment surface
+# ---------------------------------------------------------------
+- name: host_integration
+  description: >
+    The toolkit's host-integration surface: init script, wrapper template,
+    and template files that init_project.py writes into host repos.
+    Audits toolkit-side artifacts only — not files generated into host repos.
+  globs:
+    - "scripts/init_project.py"
+    - "scripts/**/*.py"
+    - "scripts/templates/**"
+    - "scripts/templates/run_specdev.sh"  # template source; init_project writes this into host
+    - "templates/**"                       # toolkit-root templates shipped to host
+    - "seed_templates/**"                  # phase-0 seed templates for host bootstrap
+    - ".claude/skills/**"                  # toolkit-distributed skills (host-installed)
+  type_weight:
+    default: 5
+  expansion_rules:
+    - target: "docs/developers/getting_started.md"
+    # docs/developers/installation*.md — removed; file does not exist
+    - target: "CLAUDE.md"
+  applies:
+    drift_types: [D3, D10]
+    invariants:  [I9, I10]
+  semantic_work: false                    # mostly path/flag parity (Bash)
+  model_tier: haiku
+  complexity_per_file: 1

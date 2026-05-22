@@ -2,24 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "vc:infra:findings",
   "title": "infra_findings",
-  "description": "Findings-record output document emitted by review agents (specdev-reviewer) and consumed by fix agents (specdev-impl). One document represents the merged findings of a single review round for a single scope. The dedup key for individual findings is the tuple (kind, location, signature). See Proposal K §4.1 (taxonomy), §5.4 (schema-only — no CLI), and §5.4.1 (path resolution).",
+  "description": "Findings-record output document emitted by review agents (specdev-reviewer) and consumed by fix agents (specdev-impl). One document represents the merged findings of a single review round for a single scope. The dedup key for individual findings is the tuple (kind, location, signature). See Proposal K §4.1 (taxonomy), §5.4 (schema-only — no CLI), and §11.7 (path resolution).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["round", "scope", "generated_at", "findings"],
+  "required": [
+    "round",
+    "scope",
+    "generated_at",
+    "findings"
+  ],
   "properties": {
     "round": {
-      "description": "Review round number within the loop. Starts at 1 and increments per review-fix iteration; bounded by max_rounds=5 (Proposal K §3).",
+      "description": "1+ (no hard cap; spec-phase skills cap at 5 procedurally; K2 trinity uses soft-warn semantics -- see WIP/toolkit_proposals/K_agentification.md §11.3.1, §11.3.2). Increments per review-fix iteration.",
       "type": "integer",
       "minimum": 1
     },
     "scope": {
-      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan'. Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename (spec/extras/findings_<scope>_<round>_<ts>.json per §5.4.1).",
+      "description": "Short identifier of the review scope. Examples: 'step-04', 'steps-04-05-cross', 'ms-batch-1-plan'. Free-form string — the reviewer chooses; main-thread skill propagates it into the output filename under .specdev/findings/ using one of three patterns per §11.7: per-reviewer 'findings_<scope>_<round>_r<reviewer_id>.json', merged 'findings_<scope>_<round>.json', or HALT 'findings_<scope>_5_<unix_timestamp>.json'.",
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "pattern": "^[a-z0-9_-]+$"
     },
     "generated_at": {
-      "description": "Unix-epoch seconds at merge time (from jq 'now'). Numeric for deterministic dedup.",
-      "type": "number",
+      "description": "Unix-epoch seconds (integer) when this document was emitted. Used for run correlation; not a uniqueness key.",
+      "type": "integer",
       "minimum": 0
     },
     "findings": {
@@ -27,7 +33,8 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/finding"
-      }
+      },
+      "uniqueItems": true
     }
   },
   "$defs": {
@@ -35,10 +42,16 @@
       "description": "One finding-record. Dedup key across reviewers within a round is the tuple (kind, location, signature). Severity follows the P0/P1/P2 priority language used elsewhere in the toolkit.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "location", "signature", "message", "severity"],
+      "required": [
+        "kind",
+        "location",
+        "signature",
+        "message",
+        "severity"
+      ],
       "properties": {
         "kind": {
-          "description": "Taxonomy bucket (Proposal K §4.1). 'gap' = required content missing; 'miss' = incomplete upstream coverage; 'bug' = factually wrong against schema/upstream/canon; 'regression' = downstream broken by upstream change; 'assumption' = un-grounded inference; 'ambiguity' = multiple valid readings or precedence conflict; 'hallucination' = invented ID/enum/command/path/canon-ref; 'drift' = artifact-vs-reality or artifact-vs-artifact divergence; 'coverage' = trace/fixture/NFR mapping incomplete; 'determinism' = non-reproducible decision, racy invariant, free-text where enum expected.",
+          "description": "Taxonomy bucket (Proposal K §4.1). 'gap' = required content missing; 'miss' = incomplete upstream coverage; 'bug' = factually wrong against schema/upstream/canon; 'regression' = downstream broken by upstream change; 'assumption' = un-grounded inference; 'ambiguity' = multiple valid readings or precedence conflict; 'hallucination' = invented ID/enum/command/path/canon-ref; 'drift' = artifact-vs-reality or artifact-vs-artifact divergence; 'coverage' = trace/fixture/NFR mapping incomplete; 'determinism' = non-reproducible decision, racy invariant, free-text where enum expected; 'seed-grounding' = artifact ignores or contradicts Phase-0 seed content (seeds listed in spec/common/seed_manifest.json global_seed_order or step_requirements[NN]).",
           "type": "string",
           "enum": [
             "gap",
@@ -50,7 +63,8 @@
             "hallucination",
             "drift",
             "coverage",
-            "determinism"
+            "determinism",
+            "seed-grounding"
           ]
         },
         "location": {
@@ -71,25 +85,49 @@
         "severity": {
           "description": "Priority bucket. P0 = blocking (convergence cannot ignore); P1 = should-fix this round; P2 = nice-to-fix. Matches the P0/P1/P2 language used in Proposal K §4 / §7.6.",
           "type": "string",
-          "enum": ["P0", "P1", "P2"]
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ]
         },
         "evidence": {
           "description": "Optional citation(s) supporting the finding. Array of strings (e.g. quoted source lines, command output excerpts). Reviewer agents are encouraged to populate this so the fix agent can ground the edit.",
           "type": "array",
           "items": {
-            "type": "string"
-          }
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
         "suggested_fix": {
           "description": "Optional reviewer-proposed remediation (free text). The fix agent treats this as advisory, not authoritative.",
-          "type": "string"
+          "type": "string",
+          "minLength": 1
+        },
+        "catalog_tag": {
+          "description": "Audit catalog item (D1-D14 for drift, I1-I13 for invariant) that this finding violates. Optional in the schema; the devspec_pr_audit skill requires it to be populated for every audit finding. K §4.1 callers may omit it.",
+          "type": "string",
+          "pattern": "^(D([1-9]|1[0-4])|I([1-9]|1[0-3]))$"
+        },
+        "status": {
+          "description": "Finding lifecycle state. open = active, deferred = acknowledged but not in current Part B, verified = fixed and confirmed. The devspec_pr_audit skill is responsible for defaulting absent values to 'open' — validators do not fill this in.",
+          "type": "string",
+          "enum": [
+            "open",
+            "deferred",
+            "verified"
+          ]
         },
         "upstream_refs": {
           "description": "Optional array of upstream references this finding ties back to — canonical IDs (e.g. 'cn:project:term-foo'), FR IDs (e.g. 'fr-user-login'), capability IDs, or other stable identifiers. Drives 'miss' / 'coverage' / 'assumption' findings into the upstream-backlog view.",
           "type": "array",
           "items": {
-            "type": "string"
-          }
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
         }
       }
     }
