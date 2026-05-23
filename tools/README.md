@@ -11,10 +11,10 @@ If you are setting up manually or restoring an existing environment:
 2. Or use the helper script locally:
    ```bash
    ./devspec_toolkit/scripts/setup_devspec_env.sh
-   source dev_env/bin/activate
+   source devspec_env/bin/activate
    ```
 
-After initialization, the toolkit also generates `./tools/run_specdev.sh` in your host repo. This wrapper enforces virtualenv usage and is the canonical entrypoint for all CLI commands, even if you have not activated `dev_env` in your current shell.
+After initialization, the toolkit also generates `./tools/run_specdev.sh` in your host repo. This wrapper enforces virtualenv usage and is the canonical entrypoint for all CLI commands, even if you have not activated `devspec_env` in your current shell.
 
 
 ## Project Initialization
@@ -29,7 +29,7 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/project --stri
 - `--strict`: Enable strict governance mode (installs `commit-msg` hooks and enforces message format).
 - `--toolkit-url`: Custom URL for the submodule (defaults to `vichitracollective/devspec_toolkit`).
 
-This utility standardizes directory creation (`spec/`, `spec/common/`, `docs/seed/`), submodule addition, and environment setup (`dev_env` with pre-commit hooks).
+This utility standardizes directory creation (`spec/`, `spec/common/`, `docs/seed/`), submodule addition, and environment setup (`devspec_env` with pre-commit hooks).
 
 ---
 

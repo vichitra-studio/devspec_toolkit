@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_DIR="${ROOT}/dev_env"
+VENV_DIR="${ROOT}/devspec_env"
 
 PY_BIN=""
 if [[ -x "${VENV_DIR}/bin/python3" ]]; then
@@ -16,7 +16,7 @@ elif [[ -x "${VENV_DIR}/Scripts/python" ]]; then
 fi
 
 if [[ -z "${PY_BIN}" ]]; then
-  echo "Error: dev_env virtual environment not found. Run 'python3 devspec_toolkit/scripts/init_project.py --target .' first." >&2
+  echo "Error: devspec_env virtual environment not found. Run 'python3 devspec_toolkit/scripts/init_project.py --target .' first." >&2
   exit 1
 fi
 

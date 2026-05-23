@@ -20,7 +20,7 @@ The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
 2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `docs/seed/`, and `.github/workflows/`.
 3.  **Seed Templates**: Copies `seed_overview.md`, `seed_tech_stack.md`, and `spec/common/seed_manifest.json`.
-4.  **Environment**: Creates `dev_env` and installs dependencies + hooks.
+4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
 5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
 ## 1. Set Up Your Environment
@@ -28,7 +28,7 @@ The initialization utility has already created and configured your virtual envir
 
 Simply activate it to start working:
 ```bash
-source dev_env/bin/activate
+source devspec_env/bin/activate
 
 # Verify everything is working
 ./tools/run_specdev.sh --help
@@ -38,7 +38,7 @@ source dev_env/bin/activate
 > If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
 
 All validation and linting commands must run through `./tools/run_specdev.sh ...`; do not call internal modules directly. This is the only supported entrypoint and ensures the virtualenv guard and schema registry behavior are applied consistently.
-The wrapper invokes the `dev_env` Python directly, so it works even if you have not activated the environment in your current shell.
+The wrapper invokes the `devspec_env` Python directly, so it works even if you have not activated the environment in your current shell.
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
