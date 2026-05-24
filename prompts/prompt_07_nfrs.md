@@ -22,7 +22,7 @@ For each upstream artifact ingested, extract the following:
 - **06_invariants.json**: Invariant IDs and severity levels to cross-reference enforcement rules with NFR thresholds and to ensure invariants with severity error have corresponding measurable NFR targets for monitoring
 
 ## Operating Flow: Categorize → Quantify → Baseline → Trace → Emit
-- **Categorize**: Group NFR candidates by category (performance, availability, security, scalability, etc.). Use the canonical NFR categories from `canon/manifest.json`.
+- **Categorize**: Group NFR candidates by category using the canonical NFR categories from `canon/manifest.json` and `vc:core:atoms#nfrCategory`. Avoid informal terms — for example, 'performance' should be remapped to 'latency' or 'throughput'; 'scalability' should be remapped to 'throughput'.
 - **Quantify**: For each NFR, define a numeric target with explicit unit and measurement method. Replace all subjective language.
 - **Baseline**: Where seed documents or charter provide historical data or existing SLOs, record them as baselines. A target without a baseline is valid but weaker.
 - **Trace**: Link each NFR to the FR(s), API(s), or charter success_metrics it supports.
@@ -43,7 +43,7 @@ For each upstream artifact ingested, extract the following:
 | Automated monitoring | Alert fires within 60s when error rate exceeds 1% over 5-min window; measured in Datadog |
 
 ## Heuristics For Completeness
-- MUST include `stage` and `owner` for every NFR where `stage` is `prod` or `staging`; MUST include `measurement_method` that specifies a concrete query, tool, or dashboard URL.
+- MUST include `stage` and `owner` for every NFR (both are unconditionally required by the schema — see schema/07_nfrs.schema.json required[]); MUST include `measurement_method` that specifies a concrete query, tool, or dashboard URL.
 - Auto-trace: connect latency/throughput to public APIs; availability/durability to services and data stores; cost to components/pipelines.
 - Ambiguity scrub: quantify targets and specify time window/percentiles.
 
@@ -51,7 +51,7 @@ For each upstream artifact ingested, extract the following:
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/00_charter.json` is present and contains at least one success_metrics entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- `seed_templates/seed_tech_stack.md` is present and non-empty.
 
 ## Negative Constraints
 - NEVER invent new owner categories.
@@ -70,7 +70,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every NFR target has a numeric value with explicit unit (no subjective language)
 - [ ] Every NFR has a `measurement_method` that is operationally achievable
-- [ ] Every NFR target has a corresponding baseline (no target without a starting measurement)
+- [ ] Where a baseline measurement exists, it is recorded in the optional `baseline` field (baseline is not required — omit if not yet measured, per schema)
 - [ ] Every NFR target has a measurement_method specifying how and where the metric is captured
 - [ ] No NFR uses subjective language ("fast", "reliable", "secure") without a numeric target
 - [ ] Every performance-critical FR has a corresponding NFR covering its latency, throughput, or error budget
@@ -86,7 +86,7 @@ Before emitting, verify:
 - **Metrics**: Assign each NFR to a schema `category` and describe the `metric` in precise, customer-facing terms.
 - **Targets**: Provide numeric `target` values with `unit` and `measurement_method` so monitoring and CI use the same test.
 - **Observability**: Tie `measurement_method` to an actual query or dashboard to ensure observability.
-- **Staging**: Set `stage` to the earliest environment that must enforce the target (dev, ci, staging, prod) to guide rollout plans.
+- **Staging**: Set `stage` to the earliest environment that must enforce the target (see schema/07_nfrs.schema.json → `vc:core:collections#stageName` for authoritative values) to guide rollout plans.
 - **Trace**: Use `trace` to connect NFRs to FRs, invariants, or delivery tasks that uphold the requirement. For component-level NFRs, trace to relevant API, doc, or capability references.
 - **Measurement Verification**: Ensure `measurement_method` is a verifiable query or URL (e.g., "PromQL: ...", "Grafana dashboard: ...").
 
@@ -131,7 +131,7 @@ Before emitting, verify:
       "measurement_method": "P95 latency via APM dashboard, 5-min rolling window",
       "stage": "prod",
       "owner": "api",
-      "trace": [{ "type": "derives_from", "id": "fr-auth-login" }]
+      "trace": [{ "type": "charter-goal", "id": "goal-auth-latency", "note": "Derives from: metric-auth-p95-latency charter success metric directly motivating this NFR" }]
     }
   ],
   "canonical_refs_used": []

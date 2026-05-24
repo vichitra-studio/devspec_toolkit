@@ -53,7 +53,7 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 | Inventory can't go negative | `product.stock_count >= 0` at all times; stock decrements are atomic with order confirmation |
 
 ## Heuristics For Completeness
-- MUST use `jsonlogic` for data predicates and `cel` for field-level logic when the constraint is automatable; MUST set `severity=error` for invariants derived from FR acceptance criteria with error conditions or from security boundaries in `spec/02_system_sketch.json`.
+- Choose the appropriate `language` value (see schema/06_invariants.schema.json for the authoritative enum): prefer machine-evaluable languages for data predicates and field-level logic when the constraint is automatable; MUST set `severity=error` for invariants derived from FR acceptance criteria with error conditions or from security boundaries in `spec/02_system_sketch.json`.
 - Scope discipline: enumerate only affected components/APIs; avoid global rules unless necessary.
 - Ambiguity scrub: translate narrative policies into boolean/evaluable forms.
 
@@ -64,13 +64,13 @@ For each category, generate ≥1 invariant if the FR/API set implies it applies.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
 
 ## Negative Constraints
-- ❌ DO NOT use `text` language unless absolutely necessary.
+- ❌ Prefer machine-evaluable `language` values over prose-only options; see schema/06_invariants.schema.json for the authoritative language enum.
 - ❌ DO NOT invent component IDs; use only those from Step 2.
 - ❌ DO NOT skip tracing; every rule must have a reason (trace).
 
 ## Coverage Closure
 Before emitting, verify:
-- Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR explicitly listed in `out_of_scope` with rationale.
+- Every constraint in `spec/04_fr_list.json` acceptance criteria (negative cases, error conditions) is encoded as an `inv_id`, OR if a constraint cannot be expressed in the supported language formats, addressed with a gap question (Clarify mode) per line 77 below.
 - Every error response defined in `spec/05_interface_contracts.json` `errors` array has a corresponding invariant governing it.
 - All `trace` entries reference valid `fr_id` or `api_id` values from Steps 04 or 05.
 - No business rule, security boundary, or data integrity constraint is silently omitted.
@@ -88,14 +88,17 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - Every rule has a precise description, executable `language`, and concrete `expression` when automation is possible.
 - `scope` limits rules to specific components or APIs to avoid false positives.
-- `severity` set to `error` for hard guarantees and `warn` for observability; choose deliberately.
+- `severity` must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
+- `enforcement_point` must match one of the canonical values defined in schema/06_invariants.schema.json (see the `enforcement_point` enum in that file for the full authoritative list).
 - `trace` connects rules to FRs/NFRs/governance to explain rationale.
+- `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/manifest.json.
+- `status_ref`: populate to track lifecycle status of this invariant (active/draft/deprecated); use a canonicalRef object with kind 'status'.
 - Avoid purely textual rules unless automation is truly not feasible.
 
 ## Best Practices
-- **Language**: Choose the appropriate `language` (`jsonlogic`, `cel`, or `text`) and write evaluable `expression` strings for automated enforcement.
+- **Language**: Choose the appropriate `language` value (see schema/06_invariants.schema.json for authoritative enum) and write evaluable `expression` strings for automated enforcement.
 - **Scoping**: Describe each invariant in business language first, then map `scope.components` or `scope.apis` to constrain where it applies.
-- **Severity**: Tag severity as `error` for hard guarantees and `warn` for observability alerts to guide escalation paths.
+- **Severity**: Tag `severity` deliberately (see schema/06_invariants.schema.json for authoritative enum values) to guide escalation paths — harder values for hard guarantees, softer values for observability alerts.
 - **Trace**: Link invariants to FRs, NFRs, or governance rules using `trace` so auditors know why the rule exists.
 - **Sample maintenance**: Any PR that adds, modifies, or removes a runtime-evaluable (`cel`/`jsonlogic`) invariant MUST update `spec/samples/invariants_sample.json` in the same PR — see the "Invariant Evaluation Sample" section of `prompt_08_fixtures.md`. The Step 12 CI gate runs `invariants-check` against that sample.
 
@@ -136,9 +139,9 @@ Before emitting, verify:
       "enforcement_point": "api-gateway",
       "trace": [
         {
-          "type": "derives_from",
+          "type": "fr",
           "id": "fr-auth-login",
-          "note": "Enforces: 'The system shall authenticate a registered user and return a signed session token.'"
+          "note": "Derives from: 'The system shall authenticate a registered user and return a signed session token.'"
         }
       ],
       "policy_ref": { "id": "cn:core:policy:spec-first", "kind": "policy" }

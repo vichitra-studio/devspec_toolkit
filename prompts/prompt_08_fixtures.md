@@ -31,7 +31,7 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Map → Generate → Validate → Emit
 - **Map**: For each high-priority FR and its acceptance criteria, identify the fixture(s) needed. Track coverage in a private Context Ledger.
 - **Generate**: Create fixture data that is concrete, realistic, and deterministic. Each fixture should represent a specific scenario (happy path, boundary case, error case).
-- **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `target` ID.
+- **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `targets` entry.
 - **Emit**: Write the artifact only when coverage is complete.
 
 **Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why.
@@ -40,13 +40,13 @@ For each upstream artifact ingested, extract the following:
 
 | Weak | Strong |
 |------|--------|
-| Test login | `fixture-auth-login-success`: POST /auth/sessions with valid credentials → 200 + signed token |
-| Error case | `fixture-auth-login-bad-password`: POST /auth/sessions with wrong password → 401 `INVALID_CREDENTIALS` |
-| Data test | `fixture-user-profile-update-valid`: PUT /users/{id} with valid fields → 200 + updated profile |
-| Edge case | `fixture-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
+| Test login | `fix-auth-login-success`: POST /auth/sessions with valid credentials → 200 + signed token |
+| Error case | `fix-auth-login-bad-password`: POST /auth/sessions with wrong password → 401 `INVALID_CREDENTIALS` |
+| Data test | `fix-user-profile-update-valid`: PUT /users/{id} with valid fields → 200 + updated profile |
+| Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `targets` referencing every `fr_id`, `api_id`, `inv_id`, or `nfr_id` that the fixture exercises (as identified in `spec/04_fr_list.json`, `spec/05_interface_contracts.json`, `spec/06_invariants.json`, `spec/07_nfrs.json`); MUST add `smoke` tag for fixtures covering FRs listed as high-priority in capabilities; MUST add `load` tag for fixtures covering NFRs with `category: latency` or `category: throughput`.
+- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes are defined by `vc:core:collections#traceRef` (see schema/core/collections.schema.json for the full authoritative prefix list); MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -60,7 +60,7 @@ For each upstream artifact ingested, extract the following:
 - **NEVER** invent new IDs. Every trace ID must exist in the upstream specs.
 - **NEVER** use generic placeholder IDs (e.g., `api-login`) unless they match the actual spec.
 - **NEVER** include markdown commentary or key-value pairs outside the JSON block.
-- **NEVER** generate a fixture without at least one target (orphan fixtures are invalid).
+- **NEVER** generate a fixture without at least one entry in `targets` (orphan fixtures are invalid).
 
 ## Coverage Closure
 Before emitting, verify:
@@ -75,12 +75,12 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
 - [ ] Every FR with error conditions has at least one fixture covering the failure path
-- [ ] Every fixture has a valid `target` ID referencing an existing `fr_id`, `api_id`, `inv_id`, or `nfr_id` from the corresponding upstream spec file
+- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `vc:core:collections#traceRef` for the full authoritative prefix vocabulary)
 - [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist
 - Fixtures cover happy-path, edge, and failure scenarios for high-priority FRs and APIs.
-- Mix `mode` values across layers (unit, contract, e2e, redteam) to prove behavior.
+- Mix `mode` values across layers (see schema/08_fixtures.schema.json → `vc:core:atoms#testingMode` for the authoritative mode enum) to prove behavior.
 - Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
 - `targets` link fixtures to FRs/APIs/NFRs/invariants to enable coverage reporting.
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
@@ -148,7 +148,7 @@ See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 
   "created_at": "2025-01-01T00:00:00Z",
   "fixtures": [
     {
-      "fixture_id": "fixture-auth-login-success",
+      "fixture_id": "fix-auth-login-success",
       "mode": "contract",
       "input": {
         "email": "user@example.com",
@@ -157,7 +157,7 @@ See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 
       "expected": {
         "status": 200
       },
-      "targets": [{ "type": "validates", "id": "api-auth-login" }],
+      "targets": [{ "type": "api", "id": "api-auth-login", "note": "Validates: this fixture exercises the auth login API contract" }],
       "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag" }
     }
   ],

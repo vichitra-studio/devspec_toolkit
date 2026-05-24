@@ -143,26 +143,26 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
 - Using `spec_ref.id` values not present in the active milestone's `tasks[]`
 
 *   `checklist`: A list of **Atomic Requirements**.
-    *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). Example: if the anchor's entry for this milestone declares `checklist_id_prefix: "AUTH"`, IDs look like `AUTH_LOGIN_01`, `AUTH_SESSION_02`. If the anchor has no entry for this milestone yet, STOP and add one before authoring the checklist.
+    *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). The `checklist_id_prefix` pattern and constraints are enforced by `schema/16_anchor.schema.json`. If the anchor has no entry for this milestone yet, STOP and add one before authoring the checklist.
     *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
         *   *Rule*: `commit_hash` is MANDATORY. Do not use placeholders.
-        *   *Rule*: `type` MUST be one of `fr | api | nfr | inv | fixture | doc | code | task` (see `$defs.specRef.type` in `schema/16_impl_context.schema.json`). For roadmap coverage checklist items (where `spec_ref.id` equals a `task-*` task_id from Step 14), `type` MUST be `"task"` — do NOT mislabel as `"fr"`. Use `"fr" | "api" | "nfr" | "inv" | "fixture"` only when `id` matches the corresponding kebab-case ID in the relevant spec artifact.
+        *   *Rule*: `type` must be a value from `$defs.specRef.type` enum in `schema/16_impl_context.schema.json` (the schema is the authority). For roadmap coverage checklist items (where `spec_ref.id` equals a `task-*` task_id from Step 14), `type` MUST be `"task"` — do NOT mislabel as `"fr"`. Use `"fr" | "api" | "nfr" | "inv" | "fixture"` only when `id` matches the corresponding kebab-case ID in the relevant spec artifact.
     *   `description`: **Verbose, Atomic, and Self-Explanatory**.
         *   *Rule*: Use "Subject-Action-Constraint" format.
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
-    *   `type`: `behavior`, `constraint`, `validation`, `metadata`, `perf`, `logging`, `docs`, `security`.
-    *   `layer`: `db`, `model`, `service`, `api`, `integration`, `tests`, `docs`, `config`, `security`.
+    *   `type`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item type enum).
+    *   `layer`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item layer enum).
     *   `checklist_status`: `active` or `deferred`.
     *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
         *   *Expectation*: This serves as the "contract" for verification. Use specific test names, not just file paths.
     *   `nfr_refs`: Array of NFR IDs this checklist item relates to.
     *   `fixture_ref`: Reference to the test fixture for this checklist item.
     *   `implementation`: **Execution Slots** (Replaces `plan.tasks`).
-        *   `status`: `pending`, `in_progress`, `verified`, `deferred`.
+        *   `status`: allowed values defined in `schema/16_impl_context.schema.json` (implementation status enum).
         *   `files_touched`: Files explicitly modified.
         *   `actions`: Atomic implementation steps.
-            *   `type`: `file_create`, `file_edit`, `run_command`, `manual_verification`.
+            *   `type`: allowed values defined in `schema/16_impl_context.schema.json` (actions type enum).
             *   `description`: Verbose action description.
             *   `target` / `command`: File or Command to run.
 
@@ -170,8 +170,8 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
 
 Field shape (ids, required-status, enum members) is in `schema/16_impl_context.schema.json` under `plan.ambiguities[]`. Decision rules below — these are not enforceable by JSON Schema.
 
-*   List ANY ambiguity that would affect implementation. Provenance and impact must be captured (the schema names the fields).
-*   **Severity scoping**: this section's severity enum is the planning-phase one. It is distinct from the anchor's `ambiguities` severity (`severityLevel` — low/medium/high/critical) and from `emergent_ambiguities` severity. Do not mix them.
+*   List ANY ambiguity that would affect implementation. Populate `source` and `impact` when available — these are optional fields (the schema's `required` array for ambiguity items is `["id","description","severity"]`); capture them when they are known to improve fix-agent grounding.
+*   **Severity scoping**: this section's severity uses the planning-phase enum defined in `schema/16_impl_context.schema.json` under `plan.ambiguities[].severity`. It is distinct from the anchor's `ambiguities` severity (`severityLevel`) and from `emergent_ambiguities` severity. Do not mix them.
 *   **Status enum**: values come from the canonical `vc:core:atoms#ambiguityStatus` atom — read the atom for the current set; if it drifts, trust the atom over this prompt. Pair with the registry-backed status reference for tracking.
 *   *Rule*: a blocking ambiguity does not stop planning — flag it and plan the rest of the step.
 *   *Rule*: a non-blocking ambiguity requires a concrete mitigation describing how the coder works around it. A proposed assumption is optional context for the mitigation, not a substitute for it.
@@ -200,14 +200,8 @@ Field shape (ids, required-status, enum members) is in `schema/16_impl_context.s
         *   **ESCAPE** — for one-off verbs that don't merit a canon entry, append the verb to `<spec-root>/canon/command_prefixes.json` (project-level allowlist, merged with the toolkit default).
     *   *Expectation*: Include DB migration commands if needed (`alembic upgrade head`).
     *   *Rule*: Use `guidelines` to capture `legacy_test_output` or specific success criteria.
-*   `nfr_measurement_methods`: Define how NFRs will be measured.
-    *   `methodology`: The measurement approach (e.g., "load testing", "profiling").
-    *   `frequency`: How often measurements will be taken.
-    *   `thresholds`: Thresholds for acceptable values.
-*   `timeout_constants`: Define timeout configurations for tests.
-    *   `default_timeout`: Default timeout in seconds.
-    *   `max_timeout`: Maximum allowed timeout.
-    *   `per_operation`: Per-operation timeout configurations.
+*   `nfr_measurement_methods`: Define how NFRs will be measured. Shape: a map keyed by `nfr_id` (kebab-case). Each value is an object with allowed fields: `command` (measurement command), `expected` (expected output or threshold), `description` (how this NFR is measured), and optional `command_ref` (canonical reference). Do NOT use `methodology`, `frequency`, or `thresholds` — those fields are not in the schema.
+*   `timeout_constants`: Define timeout configurations. Shape: flat map of `SCREAMING_SNAKE_CASE` constant names → integer millisecond values (e.g., `{"JWT_VALIDATION_TIMEOUT_MS": 50, "AUTH_SERVICE_CONNECT_TIMEOUT_MS": 500}`). Do NOT use `default_timeout`, `max_timeout`, or `per_operation` — those fields are not in the schema.
 
 ## 8. `plan.security` (Red Team & Hardening)
 *   `new_fixtures`: List new security fixtures to cover threats.
@@ -230,7 +224,7 @@ Field shape (ids, required-status, enum members) is in `schema/16_impl_context.s
     *   *Pitfall*: Do not schedule checks using methods that don't exist in the tooling.
 
 ## 11. `plan.docs_impact` (Documentation Update)
-*   `status`: `required` or `not_required`.
+*   `status`: allowed values defined in `schema/16_impl_context.schema.json` (`plan.docs_impact.status` enum).
 *   `rationale`: Why docs updates are required or not required.
 *   `docs_touched`: List of docs to update when `status: required`.
     *   *Rule*: If code changes are planned, you MUST set `status: required` and list doc paths.

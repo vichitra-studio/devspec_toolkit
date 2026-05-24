@@ -63,12 +63,12 @@
               "config",
               "other"
             ],
-            "description": "Category of the seed source. 'doc': narrative documentation (PRDs, meeting notes, design docs) — prose documents that are human-readable only. 'spec': formal specification or schema — JSON, YAML, or CSV files that can be parsed programmatically. 'config': project configuration or environment settings. 'other': any source not fitting the above categories. Values: 'narrative' describes prose documents like design briefs, user research reports, or meeting notes (human-readable only); 'structured' describes JSON, YAML, or CSV files that can be parsed programmatically; 'both' describes a Markdown document with embedded YAML front matter or structured tables (e.g., a spec guide with a machine-parseable requirements table). When a document is both narrative and machine-parseable, prefer 'spec' if it has a defined schema, or 'doc' if it is primarily human-authored prose. Anti-pattern: classifying a plaintext changelog as 'spec' or 'structured' — it must have a parseable format (JSON/YAML/CSV) to qualify."
+            "description": "Category of the seed source. 'doc': narrative documentation (PRDs, meeting notes, design docs) — prose documents that are human-readable only. 'spec': formal specification or schema — JSON, YAML, or CSV files that can be parsed programmatically. 'config': project configuration or environment settings. 'other': any source not fitting the above categories. When a document is both narrative and machine-parseable, prefer 'spec' if it has a defined schema, or 'doc' if it is primarily human-authored prose. Anti-pattern: classifying a plaintext changelog as 'spec' — it must have a parseable format (JSON/YAML/CSV) to qualify."
           },
           "hash": {
             "type": "string",
-            "pattern": "^[0-9a-f]{64}$",
-            "description": "Optional SHA-256 content hash (64 hex chars) of the seed file at manifest-update time. Populated by `seed-index` tooling to let downstream validators detect whether a seed has changed since the manifest was last refreshed."
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Optional SHA-256 content hash of the seed file at manifest-update time, in 'sha256:<hex>' format as written by the seed-index tooling. Populated to let downstream validators detect whether a seed has changed since the manifest was last refreshed."
           },
           "version": {
             "type": "string",
@@ -89,7 +89,7 @@
     "step_requirements": {
       "type": "object",
       "patternProperties": {
-        "^(\\d{2}[a-z]?)$": {
+        "^(\\d{2}[a-c]?)$": {
           "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '04': ['seed-overview', 'seed-tech-stack'] (FR list step requires both seeds). For multi-part steps use the full step key: '16a': ['seed-overview', 'seed-tech-stack', 'seed-domain-model']. Anti-pattern: key format '4' instead of '04' — step keys must be zero-padded two-digit strings, or the full step identifier for multi-part steps (e.g., '16a', '16b').",
           "$ref": "vc:core:collections#kebabIdArray"
         }

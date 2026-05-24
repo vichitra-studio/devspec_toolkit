@@ -26,11 +26,11 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Scope → Sequence → Resource → Trace → Reconcile → Emit
 - **Scope**: Derive the set of deliverables from in-scope capabilities and FRs. Every in-scope capability must appear in ≥1 deliverable.
 - **Sequence**: Order milestones using `depends_on` references. Identify the critical path. A later milestone cannot depend on a future milestone (no cycles).
-- **Resource**: Inherit `tech_stack` from `spec/02_system_sketch.json` as the baseline. Refine only when implementation planning reveals needs not covered at architecture time (e.g., a testing tool discovered during spike scoping, a version pin change based on compatibility testing). Assign effort estimates and owners per milestone. Validate feasibility against charter constraints.
+- **Resource**: Inherit `tech_stack` from `spec/02_system_sketch.json` as the baseline. Refine only when implementation planning reveals needs not covered at architecture time (e.g., a testing tool discovered during spike scoping, a version pin change based on compatibility testing). Validate feasibility against charter constraints.
 - **Trace**: Link each milestone to the capability(ies) it delivers. Reference FR IDs where applicable.
 - **Reconcile**: Verify cross-step consistency before emitting:
   - Verify `tech_stack` entries are a superset of `spec/02_system_sketch.json` `tech_stack` — Step 09 may ADD refinements (version pins, spike-discovered tools) but MUST NOT REMOVE or contradict entries from Step 02. Any tech stack item in Step 02 that is absent from Step 09 is a gap requiring explicit justification.
-  - Verify milestones collectively cover all in-scope FRs from `spec/04_fr_list.json` — any uncovered FR must appear in `out_of_scope` with rationale.
+  - Verify milestones collectively cover all in-scope FRs from `spec/04_fr_list.json` — any uncovered FR must be explained in a gap question (enter Clarify mode).
   - Verify milestone delivery order does not contradict enforcement conditions in `spec/06_invariants.json` — a milestone must not ship a behavior before the invariant that governs it is in place.
   - If any inconsistency is found, add it as a gap question (enter Clarify mode) — do not silently resolve or defer.
 - **Emit**: Write the artifact only when all milestones are sequenced without cycles, all in-scope capabilities are covered, and Reconcile found no unresolved inconsistencies.
@@ -51,18 +51,18 @@ For each upstream artifact ingested, extract the following:
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/07_nfrs.json` is present and contains at least one nfr entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- `seed_templates/seed_tech_stack.md` is present and non-empty.
 
 ## Negative Constraints
 - **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/02_system_sketch.json` `tech_stack` or `spec/01_capabilities.json` without a clear "Spike" justification.
 - **NO Generic Versions**: Do not use "latest" or "stable". You must allow the specific version pinning (e.g., "^3.9", "^1.2.3").
 - **NO Orphan Milestones**: Do not create milestones that do not link to at least one FR or API in `deliverables`.
-- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It MUST be an object with `languages`, `frameworks`, `infrastructure`, and `tools` arrays.
-- **NO Missing Rationale**: Do not omit `rationale` for `tech_stack` items. Explain WHY a technology was chosen.
+- **NO Unstructured Tech Stack**: Do not provide `tech_stack` as a list of strings. It must be a structured object with the sections required by schema/09_impl_plan.schema.json.
+- **NO Missing Rationale**: Including `rationale` for `tech_stack` items is strongly recommended. Explain WHY a technology was chosen whenever possible.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `capability_id` from `spec/01_capabilities.json` appears in ≥1 milestone's scope or deliverables, OR explicitly listed in `out_of_scope` with rationale.
+- Every `capability_id` from `spec/01_capabilities.json` appears in ≥1 milestone's scope or deliverables, OR addressed with a gap question (Clarify mode) explaining why it is not covered.
 - All `component_id` values from `spec/02_system_sketch.json` are reflected in the `tech_stack` or architecture decisions.
 - Every charter constraint in `spec/00_charter.json` (`constraints`, `risks`) is addressed in milestones, risks, or migration plan.
 - All dependencies between milestones are explicit — no implicit ordering assumptions.

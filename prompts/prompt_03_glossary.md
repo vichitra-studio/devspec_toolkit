@@ -26,8 +26,8 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write artifact JSON once all terms are reconciled and canonical proposals are prepared.
 
 ## Heuristics For Completeness
-- MUST include `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics`; MUST include `domain` for every term to enable downstream grouping.
-- Coverage rule: every metric name in `spec/00_charter.json` `success_metrics[*].name` MUST have a corresponding `term_id` entry with `units` populated.
+- Populate `units` for every term whose `term_id` corresponds to a metric in `spec/00_charter.json` `success_metrics` to enable downstream alignment; populate `domain` for every term where a grouping domain can be clearly identified from the upstream artifacts.
+- Coverage rule: every metric name in `spec/00_charter.json` `success_metrics[*].name` should have a corresponding `term_id` entry with `units` populated.
 - Completeness formula: % of key nouns from charter/capability statements and upstream metrics covered in the glossary.
 - Ambiguity scrub: MUST NOT use circular definitions (a definition MUST NOT reference the term being defined); MUST NOT use marketing language; every definition MUST state what the term includes and excludes.
 
@@ -40,7 +40,7 @@ For each upstream artifact ingested, extract the following:
 ## Negative Constraints
 - Do not emit empty terms arrays.
 - Do not write circular definitions.
-- Do not use empty optional fields (domain, units).
+- Do not emit empty string values for optional fields (domain, units); omit the field entirely when it does not apply to a term.
 
 ## Coverage Closure
 Before emitting, verify:
@@ -58,7 +58,7 @@ Before emitting, verify:
 - [ ] Every term with a lifecycle has its valid stages explicitly enumerated
 - [ ] Every domain term used in charter, capabilities, and system sketch is defined here
 - [ ] No circular definitions (A defined using B, B defined using A without resolution)
-- [ ] Every term with a matching canonical entry has `canonical_ref` populated
+- [ ] Every term with a matching canonical entry has `term_ref` populated
 
 ## Step-Specific Completeness Checklist
 - Terms include all domain objects, key metrics, roles, and acronyms used across specs.
@@ -143,8 +143,9 @@ Field guidance:
       "definition": "A specific URL path exposed by the service that accepts HTTP requests and returns structured JSON responses.",
       "domain": "api",
       "term_ref": {
-        "id": "cn:core:term:api-endpoint",
-        "kind": "term"
+        "id": "cn:project:term:api-endpoint",
+        "kind": "term",
+        "label": "API Endpoint"
       }
     },
     {
@@ -160,13 +161,16 @@ Field guidance:
       }
     }
   ],
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:term:api-endpoint",
-      "kind": "term"
-    }
-  ],
+  "canonical_refs_used": [],
   "canonical_proposals": [
+    {
+      "temp_id": "api-endpoint",
+      "kind": "term",
+      "proposed_label": "API Endpoint",
+      "definition": "A specific URL path exposed by the service that accepts HTTP requests and returns structured JSON responses.",
+      "source_field": "terms[*].term",
+      "suggested_namespace": "project"
+    },
     {
       "temp_id": "response-time",
       "kind": "term",

@@ -34,8 +34,8 @@ You must populate the `review` JSON object according to these specific definitio
 ## 1. `review.fixture_status` (The Scoreboard)
 *   **The Final Gatekeeper**.
 *   `implemented_interfaces`: List only endpoints that are LIVE and passing.
-*   `test_results`: List status for critical fixtures (`pass`, `fail`, `skip`).
-*   `ci_status`: Overall health (`green` or `red`).
+*   `test_results`: List status for critical fixtures (allowed values per `schema/16_impl_context.schema.json` `review.fixture_status.test_results.items.status` enum).
+*   `ci_status`: Overall health (allowed values per `schema/16_impl_context.schema.json` `review.fixture_status.ci_status` enum).
 *   *Heuristic*: If `ci_status` is red, you CANNOT have a `verified` verdict.
 *   *Example*:
     ```json
@@ -51,7 +51,7 @@ You must populate the `review` JSON object according to these specific definitio
     *   `code_quality`: Is the code clean/safe?
     *   `tests_completeness`: Are all paths tested?
     *   `docs_completeness`: Are docs updated?
-    *   `metadata_usage`: Are `metadata` fields used to capture lost context (Source, Impact)?
+    *   `metadata_usage`: How well are canonical references and traceability metadata used? (Is `canonical_refs_used` populated? Are all `*_ref` fields present and carrying valid `cn:` IDs? Are `canonical_proposals` added for new terms? Do all trace links resolve?)
     *   **(New)**: `review.ratings` object MUST include `metadata_usage`.
 *   **Scale**:
     *   **5**: Exemplary. Verified. (Specs are exhaustive, no "hand-waving").
@@ -69,8 +69,8 @@ You must populate the `review` JSON object according to these specific definitio
 
 ## 3. `review.findings` (Gaps / Bugs / Scope Creep)
 *   List every issue as a structured object:
-    *   `type`: `bug`, `gap`, `scope_creep`, `tests`, `docs`, `style`, `design`.
-    *   `severity`: `blocking`, `major`, `minor`, `nit`.
+    *   `type`: allowed values defined in `schema/16_impl_context.schema.json` (`review.findings.items.type` enum).
+    *   `severity`: allowed values defined in `schema/16_impl_context.schema.json` (`review.findings.items.severity` enum).
     *   `spec_ref`: **MANDATORY**. Cite the spec/plan line violated.
         *   *Check*: Does the code match the Spec Version/Commit hash? If mismatch, flag as `gap`.
     *   `description`: Concrete description of the issue.
@@ -108,6 +108,8 @@ For each FR ID referenced in the checklist items:
 - Omitting `checklist_ids` from any `fr_coverage` entry
 
 ## 5. `review.verdict` (Closure Decision)
+
+Allowed verdict values are defined in `schema/16_impl_context.schema.json` (`review.verdict` enum). Decision guidance for each value:
 
 | Verdict | Condition | Rating |
 |---------|-----------|--------|

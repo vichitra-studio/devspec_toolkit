@@ -76,10 +76,10 @@
     },
     "trace": {
       "type": "array",
-      "description": "Traceability links connecting this scaffold to the FRs and APIs it implements. Every scaffold interface mapping must trace to the FR or API it implements. Use type='implements' pointing to fr-* or api-* IDs. Example: [{\"type\": \"implements\", \"id\": \"api-user-authenticate\", \"note\": \"Scaffold generates the handler file for this API endpoint\"}]. Scaffold entries without trace links cannot be validated against the spec step that defined the interface. Consult the items description for approved types and format.",
+      "description": "Traceability links connecting this scaffold to the FRs and APIs it implements. Every scaffold interface mapping must trace to the FR or API it implements. type = the canonical kind of the target: use type='fr' for fr-* IDs, type='api' for api-* IDs. The relationship verb (implements) goes in note. Example: [{\"type\": \"api\", \"id\": \"api-user-authenticate\", \"note\": \"implements: scaffold generates the handler file for this API endpoint\"}]. Scaffold entries without trace links cannot be validated against the spec step that defined the interface. Consult the items description for approved types and format.",
       "items": {
         "$ref": "vc:core:collections#traceRef",
-        "description": "A single traceability reference. At step 15, use type 'implements' pointing to fr-* IDs (Step 04 FRs the scaffold provides file structure for) or api-* IDs (Step 05 APIs the scaffold generates route handlers for). Example: {\"type\": \"implements\", \"id\": \"fr-user-login\", \"note\": \"Scaffold generates the authentication route handler and test fixture for this FR\"}. Anti-pattern: type 'derives_from' — the scaffold implements requirements, not derives from them."
+        "description": "A single traceability reference. At step 15, type = the canonical kind of the target: use type='fr' for fr-* IDs (Step 04 FRs the scaffold provides file structure for) or type='api' for api-* IDs (Step 05 APIs the scaffold generates route handlers for). The relationship verb (implements) goes in note. Example: {\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"implements: scaffold generates the authentication route handler and test fixture for this FR\"}. Anti-pattern: type='derives_from' or type='implements' — these are relationship verbs, not canonical kinds; type must be the kind of the target artifact."
       }
     },
     "links": {

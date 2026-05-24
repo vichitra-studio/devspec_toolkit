@@ -11,7 +11,7 @@
       "type": "object",
       "properties": {
         "tech_stack": {
-          "description": "Technology stack for the roadmap. Decision rule: include at minimum `languages` and `frameworks`; add `databases`, `queues`, `caches`, `infra`, and `tools` as needed. Example 1 (Python backend): {\"languages\": [\"python\"], \"frameworks\": [\"fastapi\"], \"databases\": [\"postgresql\"], \"caches\": [\"redis\"], \"infra\": [\"docker\", \"github-actions\"]}. Example 2 (TypeScript fullstack): {\"languages\": [\"typescript\"], \"frameworks\": [\"nextjs\", \"express\"], \"databases\": [\"postgresql\"], \"infra\": [\"vercel\", \"github-actions\"]}. Anti-pattern: leaving `tech_stack` empty or omitting `languages` and `frameworks` — these are always required because they define the primary development environment.",
+          "description": "Technology stack for the roadmap. Decision rule: include at minimum `languages` and `frameworks`; add `infrastructure` and `tools` as needed. Example 1 (Python backend): {\"languages\": [{\"name\": \"python\", \"version\": \"3.12\"}], \"frameworks\": [{\"name\": \"fastapi\", \"version\": \"0.111\"}], \"infrastructure\": [{\"name\": \"docker\", \"version\": \"25\"}, {\"name\": \"github-actions\", \"version\": \"latest\"}]}. Example 2 (TypeScript fullstack): {\"languages\": [{\"name\": \"typescript\", \"version\": \"5.x\"}], \"frameworks\": [{\"name\": \"nextjs\", \"version\": \"14\"}], \"infrastructure\": [{\"name\": \"vercel\", \"version\": \"latest\"}, {\"name\": \"github-actions\", \"version\": \"latest\"}]}. Anti-pattern: leaving `tech_stack` empty or omitting `languages` and `frameworks` — these are always required because they define the primary development environment.",
           "allOf": [
             {
               "$ref": "vc:core:collections#techStack",
@@ -218,7 +218,7 @@
               "deliverables": {
                 "type": "array",
                 "minItems": 1,
-                "description": "Trace references to spec artifacts this milestone will produce or modify as deliverables. Use type 'produces' for new artifacts and type 'modifies' for updated artifacts. Example: [{\"type\": \"produces\", \"id\": \"fr-user-login\", \"note\": \"New FR created in this milestone\"}, {\"type\": \"modifies\", \"id\": \"cap-user-authentication\", \"note\": \"Capability updated to reflect auth scope changes\"}]. Anti-pattern: bare strings — deliverables must be typed traceRef objects.",
+                "description": "Trace references to spec artifacts this milestone will produce or modify as deliverables. Use a canonical trace type from canon/kinds/trace_type.json (e.g., 'fr', 'capability', 'api', 'doc', 'component') — 'produces' and 'modifies' are NOT valid trace types and will fail canonical-lint. Set the `note` field to describe whether the artifact is being created or updated. Example: [{\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"New FR delivered by this milestone\"}, {\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Capability scope updated to reflect auth changes\"}]. Anti-pattern: bare strings or non-canonical type values — deliverables must be typed traceRef objects using registered trace types.",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
                   "description": "A trace reference to an artifact this milestone will produce."

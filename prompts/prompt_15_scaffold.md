@@ -23,12 +23,11 @@ After generating the JSON artifact, implement the scaffold manually or using you
 - **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
 #### Reference Sources (context only)
-- `spec/04_fr_list.json`: for stub method signatures
+- `spec/04_fr_list.json`: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
 - `spec/14_roadmap.json`: for phased scaffold generation (generate components in milestone order)
 - **00_charter.json**: Project identity and scope boundaries used to name the scaffold service and constrain module generation to in-scope domains only
 - **01_capabilities.json**: Capability definitions used to verify that scaffold modules cover all declared system capabilities and no capability lacks a corresponding code entry point
 - **03_glossary.json**: Domain terminology definitions used to ensure scaffold module names, route identifiers, and code structure follow the project's canonical vocabulary consistently
-- **04_fr_list.json**: Functional requirement IDs with acceptance criteria referencing HTTP endpoints used to verify that every endpoint-dependent FR has a corresponding scaffold route
 - **06_invariants.json**: System invariant rules used to inform validator configuration and ensure scaffold includes enforcement hooks for critical data integrity constraints
 - **07_nfrs.json**: Performance thresholds and security requirements used to configure scaffold middleware layers (rate limiting, authentication, logging) matching declared non-functional targets
 - **08_fixtures.json**: Test fixture definitions used to verify that scaffolded routes have corresponding test harness entry points and that fixture targets map to actual interface_map entries
@@ -60,7 +59,7 @@ After generating the JSON artifact, implement the scaffold manually or using you
 ## Negative Constraints
 - **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
 - **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
-- **DO NOT** mark build status as `green` if validators have not been executed.
+- **DO NOT** mark `build_status` as `green` without evidence that validators have been executed; the schema enforces structural coupling between `build_status` and `validators`.
 - **DO NOT** include logic or implementation code; this is a scaffold only.
 
 ## Coverage Closure
@@ -83,8 +82,8 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - `project_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
 - `interface_map` covers all in-scope APIs (Step 5) with path/method and `interface_ref` links.
-- `validators` MUST include at least one schema validation command (e.g., `specdev-tools validate-all spec --repo-root .`) and one type-check or lint command per language in `project_skeleton.language`.
-- `build_status` reflects build health; default to `pending` until CI succeeds.
+- `validators` must be populated when `build_status` is `green` (minimum item count per schema). Include commands that verify schema correctness, type safety, and lint compliance for the project languages.
+- `build_status` reflects build health; allowed values are defined in the schema.
 
 ## Best Practices
 - **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.

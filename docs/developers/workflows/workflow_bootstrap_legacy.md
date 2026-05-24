@@ -326,22 +326,22 @@ Add potential security threats for the project. `target_ids` must reference API 
 
 These steps bridge Phase I Discovery into Phase II Implementation. They must be completed before running the Trinity Loop (Steps 16a–16c).
 
-### Step 5.1: Extension Generator — `spec/13_extension_generator.json`
+### Step 5.1: Extension Manifest — `spec/13_extension_manifest.json`
 
-*Prompt: `prompts/prompt_13_extension_generator.md`*
+*Prompt: `prompts/prompt_13_extension_manifest.md`*
 
 **User Action:**
-> Open `prompts/prompt_13_extension_generator.md` in your AI assistant.
+> Open `prompts/prompt_13_extension_manifest.md` in your AI assistant.
 >
 > **Context to supply**:
 > - `spec/04_fr_list.json`, `spec/02_system_sketch.json`, `spec/01_capabilities.json`
 > - Any plugin or extension points identified during codebase excavation
 >
-> The AI identifies all extension points in the system and emits `spec/13_extension_generator.json`.
+> The AI identifies all extension points in the system and emits `spec/13_extension_manifest.json`.
 
 **Validation ritual:**
 ```bash
-./tools/run_specdev.sh validate spec/13_extension_generator.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate spec/13_extension_manifest.json --repo-root ./devspec_toolkit
 ```
 
 ### Step 5.2: Completeness Assessment — `spec/13a_completeness_assessment.json`

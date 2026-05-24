@@ -19,7 +19,7 @@ For each upstream artifact ingested, extract the following:
 - **spec/03_glossary.json, spec/07_nfrs.json** (if present): Align metrics/units and terminology with early drafts
 
 ## Operating Flow: Extract → Scope → Validate → Emit
-- **Extract**: Build a private Context Ledger from all upstream seed documents. Capture: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics (metric→unit→target→method). Do not output it. **seed_tech_stack.md extraction**: Extract hardware/legacy constraints for `out_of_scope`, technology constraints for `risks`, and dependency risks for `assumptions`. Do not leave seed_tech_stack.md data unreflected — every tech constraint must map to a charter field.
+- **Extract**: Build a private Context Ledger from all upstream seed documents. Capture: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics. Do not output it. **seed_tech_stack.md extraction**: Extract hardware/legacy constraints for `out_of_scope`, technology constraints for `risks`, and dependency risks for `assumptions`. Do not leave seed_tech_stack.md data unreflected — every tech constraint must map to a charter field.
 - **Scope**: Cross-check metrics against seed documents to align metric names and units; align segment terminology with seed document terminology.
 - **Validate**: Self-audit against the checklist; if scope, metrics, or stakeholders are unclear, ask Gap Questions instead of guessing; wait for answers. Rewrite for measurability: ensure problem statement and metrics have explicit units, targets, and measurement methods; propose `links` to anticipated FRs/NFRs where obvious.
 - **Emit**: Emit a single JSON artifact only after the above is satisfied.
@@ -37,38 +37,38 @@ For each upstream artifact ingested, extract the following:
 
 ## Negative Constraints
 - **DO NOT** use vague "business speak" (e.g. "optimize", "improve") without measurable metrics.
-- **DO NOT** omit the `owner` field; accountability is required.
+- **DO NOT** use a default or placeholder value for `owner`; set it to the accountable team.
 - **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
 - **DO NOT** list stakeholders without defining their specific `needs`.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every requirement stated in `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` is reflected in `goals`, `constraints`, `success_metrics`, or `user_segments`, OR explicitly listed in `out_of_scope` with rationale.
+- Every requirement stated in `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md` is reflected in `in_scope`, `out_of_scope`, `success_metrics`, `user_segments`, `assumptions`, or `risks`, OR explicitly listed in `out_of_scope` with rationale.
 - No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
 - All metric names and units in `success_metrics` align with terminology used in the seed documents.
 - If any seed statement is ambiguous or contradictory: add a gap question (Clarify mode) rather than making an assumption.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] `in_scope` and `out_of_scope` each contain ≥3 specific items (not vague categories)
+- [ ] `in_scope` and `out_of_scope` each contain specific items (not vague categories)
 - [ ] All `assumptions` and `risks` are traceable to seed_tech_stack.md or seed_overview.md entries
 - [ ] Every seed_tech_stack constraint is reflected in `assumptions`, `risks`, or `out_of_scope`
 - [ ] Every stakeholder's `needs` trace to at least one `success_metric` or scope item
-- [ ] Every `success_metric` has `unit`, `target`, and `measurement_method` (no vague targets)
+- [ ] Every `success_metric` has all required fields populated (no vague targets)
 
 ## Step-Specific Completeness Checklist
 - Problem statement specifies the primary pain, affected users, measurable business impact, and hard constraints (time, budget, compliance).
-- Scope is explicit: at least 3–5 in-scope items and 3–5 out-of-scope items; avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
+- Scope is explicit: avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
 - Stakeholders list covers decision-makers and operators; each stakeholder has a role and specific needs that drive requirements or success metrics.
 - User segments are distinct; each includes jobs-to-be-done, pains, and gains that map to capabilities and FRs.
-- Success metrics: each metric MUST include metric_id, name, unit, target, measurement_method, and — when `docs/seed/seed_overview.md` or product briefs contain historical values — baseline sourced from that data.
+- Success metrics: each metric MUST include all schema-required fields; when `docs/seed/seed_overview.md` or product briefs contain historical values, populate the optional `baseline` field with that data.
 - Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
 - Owner is set based on who will maintain the charter and is not just a default.
 
 ## Best Practices
 - **Problem Statement**: Write a statement of 1-3 sentences that names the affected users, their pain, the measurable business impact, and hard constraints — sourced from `docs/seed/seed_overview.md`. Avoid solutioneering.
-- **Success Metrics**: Pair each `success_metric` with a realistic baseline, target, unit, and measurement method.
-- **Scope**: Define in/out of scope explicitly to prevent creep; capture at least 3 items each.
+- **Success Metrics**: Ensure each `success_metric` is measurable and traceable to seed document data; populate all schema-required fields.
+- **Scope**: Define in/out of scope explicitly to prevent creep.
 - **Users**: Describe each `user_segment` with jobs-to-be-done, pains, and gains to map requirements to value.
 - **Risks**: Record critical `assumptions` and `risks` with enough context to inform governance.
 - **Stakeholders**: Identify real stakeholders (not just titles) to drive prioritization.
@@ -98,7 +98,7 @@ Before emitting, verify:
 ```json
 {
   "$schema": "vc:00-charter",
-  "id": "project-charter-catalog",
+  "id": "charter-v1",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
   "title": "Project Charter",

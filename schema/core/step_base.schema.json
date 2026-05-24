@@ -17,7 +17,7 @@
     },
     "owner": {
       "$ref": "vc:core:atoms#owner",
-      "description": "Owner of this spec artifact. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product' (product management), 'business' (business stakeholders), 'engineering' (general engineering). Choose the team that creates, maintains, and is accountable for this artifact. Authoritative list also maintained in canon/kinds/owner.json."
+      "description": "Owner of this spec artifact. Allowed values are enforced by vc:core:atoms#owner (the single authority). Choose the team that creates, maintains, and is accountable for this artifact."
     },
     "created_at": {
       "$ref": "vc:core:atoms#timestamp",

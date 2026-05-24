@@ -41,7 +41,7 @@
                 "description": "Classification tags for this component (e.g., critical-path, stateful, pii).",
                 "type": "array",
                 "items": {
-                  "description": "Standard tag vocabulary for components — use 1–3 tags per component from this list: 'stateful' (maintains durable state), 'stateless' (no persistent state), 'external-dependency' (required for all type='external' components), 'pii-store' (stores personally identifiable information), 'auth-boundary' (performs authentication or authorization), 'async' (communicates via events/queues), 'sync' (communicates via request/response), 'critical-path' (failure causes system-wide outage), 'read-heavy' (primarily serves read traffic), 'write-heavy' (primarily serves write traffic), 'cache' (stores ephemeral data), 'batch' (processes data in scheduled jobs). Anti-pattern: inventing tags not in this vocabulary — use the canonical list for consistent linting.",
+                  "description": "Standard tag vocabulary for components — use 1–3 tags per component from the enum below. Anti-pattern: inventing tags not in this vocabulary — use the canonical list for consistent linting.",
                   "type": "string",
                   "enum": [
                     "critical-path",
@@ -72,7 +72,7 @@
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this component to the upstream capability that drives its inclusion. At step 02 (system sketch), use type 'implements' pointing to a cap-* ID from spec/01_capabilities.json. Example: {\"type\": \"implements\", \"id\": \"cap-user-authentication\"}. Components without trace links are architectural drift — every component must trace to at least one capability that justified its design."
+                  "description": "A traceability reference linking this component to the upstream capability that drives its inclusion. At step 02 (system sketch), use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json (the kind of the target; describe the 'implements' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Implements this capability\"}. Components without trace links are architectural drift — every component must trace to at least one capability that justified its design."
                 },
                 "minItems": 1
               },
@@ -110,7 +110,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "protocol": {
-                "description": "Transport abstraction for this connection — never the implementation technology. Decision rules: 'http' — synchronous REST or HTTP call between services; 'grpc' — binary Protocol Buffers over HTTP/2; 'event' — any asynchronous message broker (Kafka, SQS, RabbitMQ); pair with a 'queue' component as the target; 'db' — database wire protocol (PostgreSQL wire, MongoDB wire); 'file' — file-based exchange via S3, SFTP, or shared volume. Examples: api-gateway → auth-service uses 'http'; order-service → order-events-queue uses 'event'; user-service → postgres-db uses 'db'. Anti-pattern: using 'kafka' or 'rabbitmq' as the protocol value — those are implementation details, not transport protocols; use 'event' instead.",
+                "description": "Transport abstraction for this connection — never the implementation technology. Decision rules: 'http' — synchronous REST or HTTP call between services; 'grpc' — binary Protocol Buffers over HTTP/2; 'rpc' — generic remote procedure call (use when gRPC is not the specific protocol); 'event' — any asynchronous message broker (Kafka, SQS, RabbitMQ); pair with a 'queue' component as the target; 'db' — database wire protocol (PostgreSQL wire, MongoDB wire); 'file' — file-based exchange via S3, SFTP, or shared volume. Examples: api-gateway → auth-service uses 'http'; order-service → order-events-queue uses 'event'; user-service → postgres-db uses 'db'. Anti-pattern: using 'kafka' or 'rabbitmq' as the protocol value — those are implementation details, not transport protocols; use 'event' instead.",
                 "$ref": "vc:core:atoms#connectionProtocol"
               },
               "trust_boundary": {
@@ -174,7 +174,7 @@
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this connection to the capability that requires it. At step 02, use type 'implements' pointing to a cap-* ID from spec/01_capabilities.json. Example: {\"type\": \"implements\", \"id\": \"cap-payment-processing\", \"note\": \"Payment service calls auth service to validate session before processing charge\"}. Connections that cannot be traced to a capability may indicate architectural over-design."
+                  "description": "A traceability reference linking this connection to the capability that requires it. At step 02, use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json (the kind of the target; describe the 'implements' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-payment-processing\", \"note\": \"Implements this capability; payment service calls auth service to validate session before processing charge\"}. Connections that cannot be traced to a capability may indicate architectural over-design."
                 },
                 "minItems": 1
               },

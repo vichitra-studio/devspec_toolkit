@@ -26,19 +26,21 @@ You are an aggregation reporter for **Step 13a · Completeness Assessment**. You
 
 ## Dimension Definitions
 
+The required dimension keys are enforced by schema `vc:13a-completeness-assessment` (dimensions.required). The table below documents their semantic meaning; the schema is the authoritative source for which keys are required.
+
 For each dimension, populate from the command output:
 
 | Dimension | Covered when... | uncovered_ids type | Required |
 |---|---|---|---|
-| `fr_api_coverage` | FR has ≥1 API endpoint bound to it | `fr-*` IDs with no API | Yes |
-| `fr_fixture_coverage` | FR has ≥1 fixture targeting it | `fr-*` IDs with no fixture | Yes |
-| `fr_milestone_coverage` | FR appears in ≥1 milestone deliverable | `fr-*` IDs absent from milestones | Yes |
-| `capability_fr_coverage` | Capability has ≥1 FR implementing it | `capability-*` IDs with no FR | Yes |
+| `fr_api_coverage` | FR has ≥1 API endpoint bound to it | `fr-*` IDs with no API | Yes (schema-enforced) |
+| `fr_fixture_coverage` | FR has ≥1 fixture targeting it | `fr-*` IDs with no fixture | Yes (schema-enforced) |
+| `fr_milestone_coverage` | FR appears in ≥1 milestone deliverable | `fr-*` IDs absent from milestones | Yes (schema-enforced) |
+| `capability_fr_coverage` | Capability has ≥1 FR implementing it | `capability-*` IDs with no FR | Yes (schema-enforced) |
 | `milestone_decomp_completeness` | Milestone's fr_refs all have task entries | milestone IDs with incomplete task decomposition | No (optional) |
 
 The optional `milestone_decomp_completeness` dimension captures W567 INCOMPLETE_MILESTONE_DECOMPOSITION signals: milestones in Step 09 whose `fr_refs` list is not fully decomposed into task entries. Populate this dimension only when the `completeness-check --json` output includes decomposition data; omit it if unavailable.
 
-**Ratio rule**: `ratio = covered_count / total_count` when `total_count > 0`; `ratio = 1.0` when `total_count = 0` (vacuous coverage). A ratio below 0.8 triggers a W592 warning during validation.
+**Ratio rule**: See schema `vc:13a-completeness-assessment` `$defs/coverageDimension/properties/ratio/description` for the authoritative computation rule (including vacuous-coverage handling). A ratio below 0.8 may trigger a W592 warning — see schema `dimensions/description` for the threshold.
 
 ### Extraction Intent
 For each upstream artifact ingested, extract the following:
@@ -82,34 +84,34 @@ For each upstream artifact ingested, extract the following:
 ## Coverage Closure
 Before emitting, verify:
 - Every `uncovered_id` in each dimension appears in the upstream spec file for that dimension (no hallucinated IDs).
-- All four dimensions (`fr_api_coverage`, `fr_fixture_coverage`, `fr_milestone_coverage`, `capability_fr_coverage`) are populated.
+- All required dimensions (per schema `vc:13a-completeness-assessment` dimensions.required) are populated.
 - `ratio` values are arithmetically consistent with `covered_count` and `total_count`.
-- Each dimension's `covered_count + len(uncovered_ids) == total_count`.
-- Each `ratio` equals `covered_count / total_count` (or 1.0 for empty universe).
+- Each dimension's `uncovered_ids` cardinality satisfies the constraint defined in schema `vc:13a-completeness-assessment` `$defs/coverageDimension/properties/uncovered_ids/description`.
+- Each `ratio` satisfies the computation rule in schema `vc:13a-completeness-assessment` `$defs/coverageDimension/properties/ratio/description`.
 - No `uncovered_id` was invented — each references a real upstream spec ID.
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every `uncovered_ids` entry references a real ID from the referenced upstream spec
-- [ ] All four pairwise transitions (capability→FR, FR→API, FR→fixture, FR→milestone) are assessed
+- [ ] All required pairwise transitions (capability→FR, FR→API, FR→fixture, FR→milestone) are assessed
 - [ ] Coverage ratios are derived from actual spec content counts — not estimated or guessed
-- [ ] All four dimensions have `covered_count + len(uncovered_ids) == total_count`
+- [ ] All dimensions satisfy the uncovered_ids cardinality rule defined in schema `vc:13a-completeness-assessment`
 
 ## Cross-Step Synthesis Notes
 - `dimensions.fr_api_coverage.uncovered_ids`: FR IDs that need API bindings — feed into Step 14 roadmap gaps.
 - `dimensions.fr_fixture_coverage.uncovered_ids`: FR IDs with no test coverage — feed into Step 16 trinity loop.
 - `dimensions.capability_fr_coverage.uncovered_ids`: capabilities with no FR — signal for Step 04 gap closure.
-- A `ratio < 0.8` on any dimension is a W592 warning, promotable to E592 via `SPECDEV_WARNINGS_AS_ERRORS=1`.
+- Low-ratio dimensions may trigger W592 — see schema `vc:13a-completeness-assessment` dimensions description for the threshold, and the error-code registry for promotion rules.
 
 ## Step-Specific Output Constraints
-1. All four required `dimensions` keys must be present (`fr_api_coverage`, `fr_fixture_coverage`, `fr_milestone_coverage`, `capability_fr_coverage`).
+1. All required `dimensions` keys must be present — enforced by schema `vc:13a-completeness-assessment` (dimensions.required). Consult the schema for the authoritative list.
 2. The optional `milestone_decomp_completeness` key may be included if decomposition data is available from `completeness-check`.
-3. Each dimension must have `covered_count`, `total_count`, `ratio`, and `uncovered_ids`.
-4. `ratio` must equal `covered_count / total_count` (or 1.0 when `total_count = 0`).
-5. `uncovered_ids` must contain exactly `total_count - covered_count` entries.
+3. Each dimension must include all fields required by schema `vc:13a-completeness-assessment` `$defs/coverageDimension/required` — consult the schema as the authoritative source.
+4. `ratio` must satisfy the computation rule defined in schema `vc:13a-completeness-assessment` `$defs/coverageDimension/properties/ratio/description`.
+5. `uncovered_ids` cardinality is defined in schema `vc:13a-completeness-assessment` `$defs/coverageDimension/properties/uncovered_ids/description` — consult the schema as the authoritative source.
 
 ## Step-Specific Completeness Checklist
-- ID format follows `assessment-<date>`.
+- ID must satisfy the kebab-case pattern enforced by schema `vc:13a-completeness-assessment` (via `vc:core:atoms#kebabId`). Convention: use `assessment-<date>` format (e.g., `assessment-20250101`) for readability, but any valid kebab-case ID is schema-conformant.
 - Owner is valid.
 - All four dimensions are populated from command output.
 - No uncovered_id is hallucinated.

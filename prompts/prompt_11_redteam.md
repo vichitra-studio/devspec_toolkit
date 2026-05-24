@@ -21,10 +21,10 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
-- **Constraint:** EVERY mitigation MUST link to an existing requirement ID (`nfr-*`, `inv-*`, `fr-*`) from upstream specs using the `traceRef` structure. If no existing ID applies, MUST define a new capability entry with `type: capability` and a concrete action in `note`.
+- **Constraint:** EVERY mitigation MUST link to an existing upstream artifact ID using the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive (valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items — e.g., `fr`, `api`, `nfr`, `inv`, `fixture`, `doc`, `capability`). If no existing ID applies, MUST define a new entry with `type: capability` and a concrete action in `note`.
 
 ## Taxonomy of Threats
-Use the `category` field to classify threats precisely:
+Use the `category` field to classify threats precisely. The authoritative enum is defined in `vc:core:atoms#threatCategory` — only the five values below are valid:
 1.  **`authn` (Authentication)**: "Who are you?" (e.g., Session fixation, Credential stuffing).
 2.  **`authz` (Authorization)**: "Can you do this?" (e.g., IDOR, Privilege Escalation, Admin bypass).
 3.  **`business_logic`**: Flaws in the workflow itself (e.g., Buying 0 items for $0, skipping payment step).
@@ -47,9 +47,9 @@ For each upstream artifact ingested, extract the following:
 - **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
 
 ## Operating Flow: Threat Model → Exploit → Mitigate → Emit
-1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. Use threat categories: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, DoS, Elevation of Privilege). For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.
+1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — valid categories are `authn`, `authz`, `business_logic`, `transport`, and `data_privacy` (see Taxonomy of Threats below for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to these five schema-defined categories.
 2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
-3.  **Mitigate**: Propose mitigations as structured objects (`{ "control": "...", "type": "preventive|detective|corrective" }`). Not plain strings. MUST link to existing `inv-*` or `nfr-*` IDs from `spec/06_invariants.json` or `spec/07_nfrs.json` using the `traceRef` structure when a matching control exists. If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
+3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
 4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
 
 ## Examples: Weak vs. Strong
@@ -83,7 +83,7 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`, OR is explicitly listed in `out_of_scope` with rationale (low-risk internal-only endpoints).
+- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`. For low-risk internal-only endpoints with no viable threat, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
 - Every security-relevant `inv_id` in `spec/06_invariants.json` has a corresponding threat entry that tests its enforcement.
 - All `target_ids[*].id` values resolve to existing `api_id`, `component_id`, or `fr_id` values in their referenced spec files.
@@ -97,20 +97,21 @@ Before emitting, verify:
 - [ ] Every high-priority FR has at least one threat scenario modeled
 - [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch
-- [ ] All `mitigations` are structured objects with `type` and `control` fields, not plain strings
+- [ ] All `mitigations` are structured objects with `type` and `id` fields (per schema `vc:11-redteam`), not plain strings
 - [ ] All `edge_cases` entries have a structured `id` field
 
 ## Step-Specific Output Constraints
 1.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
 2.  `target_ids`: MUST be populated for every threat.
-3.  `mitigations`: MUST use `traceRef` structure (type + id).
-4.  `category`: MUST be one of the allowed enum values.
+3.  `mitigations`: MUST use the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive. Valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items.
+4.  `category`: MUST be one of the allowed enum values (defined in `vc:core:atoms#threatCategory`).
+5.  `risk_category_ref`: REQUIRED for every threat. Must be a canonical ref object with `kind: "risk_category"` resolving to an entry in `canon/manifest.json`. Resolve the canonical ID from `canon/manifest.json` (kind: `risk_category`); if no matching entry exists, add one via `canonical_proposals` before authoring the artifact. Validated by canonical-integrity lint (E110).
 
 ## Step-Specific Completeness Checklist
 - [ ] **Surface Coverage**: Every `public` API and critical component has at least one mapped threat.
 - [ ] **Category Diversity**: Threats are not just `authz`; `transport`, `business_logic`, and `data_privacy` are represented.
 - [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified.
-- [ ] **Traceability Integrity**: Every threat has a valid `target_id` pointing to an existing Step 05 or Step 02 ID.
+- [ ] **Traceability Integrity**: Every threat has a valid `target_ids` array pointing to existing Step 05 or Step 02 IDs.
 - [ ] **Mitigation Actionability**: Mitigations link to specific Invariants/NFRs or define concrete new capabilities (no vague "Fix it" notes).
 
 ## Cross-Step Synthesis Notes
@@ -119,14 +120,15 @@ Before emitting, verify:
     - `threat_id`: `threat-<category>-<slug>` (e.g., `threat-authz-elevation`).
     - `description`: A detailed narrative of the attack scenario. Don't be vague; explain *how* the attack works in the context of the system (e.g. "Attacker injects SQL into the 'user_id' parameter to bypass auth").
     - `vector`: The specific technical method (e.g., "JWT Substitution", "SQL Injection", "Race Condition").
-    - `target_ids`: Array of objects `{ "type": "api"|"component", "id": "..." }`. **CRITICAL**: These must match actual upstream IDs.
-    - `category`: strictly validation against enum (`authn`, `authz`, `business_logic`, `transport`, `data_privacy`).
-    - `mitigations`: Array of references.
-        - If mitigating via an Invariant: `{ "type": "inv", "id": "inv-...", "note": "Enforced by middleware" }`.
-        - If mitigating via NFR: `{ "type": "nfr", "id": "nfr-..." }`.
-        - If new: `{ "type": "capability", "id": "cap-new-measure", "note": "Implement specific check" }`.
+    - `target_ids`: Array of traceRef objects `{ "type": "<trace-type>", "id": "<upstream-id>" }`. Valid types include `api`, `component`, `inv`, `fr`, and any other canonical trace type — consult schema `vc:11-redteam` target_ids items (`vc:core:collections#traceRef`). **CRITICAL**: These must match actual upstream IDs from Step 02/05/06.
+    - `category`: strictly validated against the schema enum `vc:core:atoms#threatCategory` — see Taxonomy of Threats above.
+    - `mitigations`: Array of structured objects. Full `type` enum is defined in schema `vc:11-redteam` (mitigations items.type.enum). Examples:
+        - Invariant: `{ "type": "inv", "id": "inv-...", "note": "Enforced by middleware" }`.
+        - NFR: `{ "type": "nfr", "id": "nfr-..." }`.
+        - FR: `{ "type": "fr", "id": "fr-..." }`.
+        - New capability: `{ "type": "capability", "id": "cap-new-measure", "note": "Implement specific check" }`.
     - `mitigation.note`: Optional context explaining *how* the linked item mitigates the threat (e.g., "Rate limit of 5rps prevents resource exhaustion").
-    - `severity`: `low`, `medium`, `high`, `critical`.
+    - `severity`: validated against `vc:core:atoms#severityLevel` (schema-enforced — do not restate values here).
 - **edge_cases**:
     - `id`: `ec-<slug>` (e.g., `ec-timeout-upstream`).
     - `description`: The specific operational scenario (e.g. "Upstream API returns 429 after 100 requests").
@@ -134,7 +136,7 @@ Before emitting, verify:
 
 ## Best Practices
 - **Think Like a Harrower**: Don't just list bugs; list *exploits*. How would you break the specific business logic defined in `04_fr_list.json`?
-- **Link Everything**: A threat without a `target_id` is a hallucination. A mitigation without a `traceRef` is a wish.
+- **Link Everything**: A threat without `target_ids` is a hallucination. A mitigation without a structured `{type, id}` trace link is a wish.
 - **Diversity**: Don't stop at SQL Injection. Look for Logic Flaws (e.g., skipping payment steps), Race Conditions, and Privacy Leaks.
 - **Specificity**: "API returns 500" is bad. "API leaks stack trace allowing causing info disclosure" is good.
 
@@ -156,6 +158,8 @@ Before emitting, verify:
 - Schema Registry: tools/schema_registry.json
 
 # Output Contract
+> **Note**: `risk_category_ref.id` values in the example below are illustrative slugs. Authoritative canonical IDs for `risk_category` entries **must be resolved from `canon/manifest.json`** (kind: `risk_category`). If no matching entry exists yet, add one via `canonical_proposals` and run `canon-accept` before authoring the artifact — do NOT copy unresolved IDs verbatim, as canonical-integrity lint (E110) will reject them.
+
 ```json
 {
   "$schema": "vc:11-redteam",

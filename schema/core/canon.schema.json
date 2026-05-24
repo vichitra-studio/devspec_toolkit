@@ -11,8 +11,7 @@
       "description": "JSON Schema URI identifying the schema this canonical registry conforms to."
     },
     "registry_version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "$ref": "#/$defs/semver",
       "description": "Semantic version of the canonical registry format."
     },
     "entries": {
@@ -55,7 +54,7 @@
       "$anchor": "owner",
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "Lowercase identifier for a team or role responsible for a canonical entry."
+      "description": "Lowercase identifier for a team or role responsible for a canonical registry entry. Deliberately broader than the 8-value spec-artifact owner enum in vc:core:atoms#owner — canon registry entries may be owned by platform teams (e.g., 'spec-platform') that are not in the spec-artifact owner set. Do not conflate with vc:core:atoms#owner, which is the authority for spec artifact ownership."
     },
     "entryStatus": {
       "$anchor": "entryStatus",
@@ -123,12 +122,12 @@
         "deprecated_since": {
           "type": "string",
           "format": "date",
-          "description": "ISO 8601 date when this alias was deprecated."
+          "description": "Date (YYYY-MM-DD) when this alias was deprecated. Uses date format (day precision) to match existing canon data; contrast with the entry lifecycle fields which use date-time."
         },
         "sunset_date": {
           "type": "string",
           "format": "date",
-          "description": "ISO 8601 date after which this alias will no longer resolve."
+          "description": "Date (YYYY-MM-DD) after which this alias will no longer resolve. Uses date format (day precision) to match existing canon data."
         },
         "replaced_by": {
           "$ref": "#/$defs/canonicalId",

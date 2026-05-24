@@ -23,7 +23,7 @@ def _run_extract(*extra_args):
         [sys.executable, "-m", "specdev_tools.cli", "context", "extract"] + list(extra_args),
         capture_output=True,
         text=True,
-        cwd=str(__import__("pathlib").Path(__file__).parents[4] / "tools"),
+        cwd=str(__import__("pathlib").Path(__file__).parents[3] / "tools"),
     )
 
 
@@ -59,7 +59,7 @@ class TestExtractDeprecationStub:
         import sys as _sys
         import pathlib
 
-        tools_dir = pathlib.Path(__file__).parents[4] / "tools"
+        tools_dir = pathlib.Path(__file__).parents[3] / "tools"
         if str(tools_dir) not in _sys.path:
             _sys.path.insert(0, str(tools_dir))
 

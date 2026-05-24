@@ -229,8 +229,8 @@ object. Violating any of the rules below causes `self_validate.py` to exit 1.
 
 **Required finding-level keys**: `kind`, `location`, `signature`, `message`, `severity`.
 
-**`kind` enum** (exactly these 10 values):
-`gap | miss | bug | regression | assumption | ambiguity | hallucination | drift | coverage | determinism`.
+**`kind` enum** — must match the `kind` enum in `schema/infra/findings.schema.json` (the authority; do not hardcode a count). Current values:
+`gap | miss | bug | regression | assumption | ambiguity | hallucination | drift | coverage | determinism | seed-grounding`.
 Any other value (e.g., `"invariant"`, `"schema_violation"`) is invalid.
 
 **`severity` enum**: `P0 | P1 | P2`.

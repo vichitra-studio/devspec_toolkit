@@ -43,7 +43,7 @@
                 ]
               },
               "owner": {
-                "description": "Team or domain responsible for implementing this capability. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product' (product management), 'business' (business stakeholders), 'engineering' (general engineering). Choose the team that will build and maintain this capability.",
+                "description": "Team or domain responsible for implementing this capability. See vc:core:atoms#owner for the canonical value set. Choose the team that will build and maintain this capability.",
                 "$ref": "vc:core:atoms#owner"
               },
               "inputs": {
@@ -99,7 +99,7 @@
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this capability to an upstream charter artifact. At step 01 (capabilities), use type 'derives_from' pointing to the charter artifact ID. Example: {\"type\": \"derives_from\", \"id\": \"charter-v1\", \"note\": \"Capability directly addresses the checkout flow in-scope item\"}. At minimum, include one trace per capability — capabilities without trace links are architectural drift that cannot be validated against charter scope."
+                  "description": "A traceability reference linking this capability to an upstream charter artifact. At step 01 (capabilities), use type 'charter-goal' pointing to the charter goal ID (e.g., a goal-* id from the charter goals array). Example: {\"type\": \"charter-goal\", \"id\": \"goal-checkout-flow\", \"note\": \"Derives from this charter goal; capability directly addresses the checkout flow in-scope item\"}. At minimum, include one trace per capability — capabilities without trace links are architectural drift that cannot be validated against charter scope."
                 }
               },
               "capability_ref": {

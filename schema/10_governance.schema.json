@@ -16,7 +16,7 @@
         },
         "pr_rules": {
           "type": "array",
-          "description": "Pull request rules governing how spec changes are submitted, reviewed, and merged. Decision matrix for which rules to include: always include 'validate-all' (mandatory for every PR touching spec files). Include conditionally: 'matrix' (when traceability links changed — new FR/API pairs), 'fixtures-lint' (when fixture targets changed), 'canonical-lint'/'canonical-integrity' (when canon entries were added or modified), 'security' (when auth, PII handling, or threat model changed), 'hallucination-lint' (when new spec content was added from AI generation), 'seed-lint' (when seed document references changed). Anti-pattern: including all 13 rules for every PR regardless of what changed — this makes CI slow and signals that the rules are not being considered.",
+          "description": "Pull request rules governing how spec changes are submitted, reviewed, and merged. Decision matrix for which rules to include: always include 'validate-all' (mandatory for every PR touching spec files). Include conditionally: 'matrix' (when traceability links changed — new FR/API pairs), 'fixtures-lint' (when fixture targets changed), 'seed-lint' (when seed document references changed), 'security' (when auth, PII handling, or threat model changed), 'audit' (for regulated environments requiring immutable evidence). Anti-pattern: including all rules for every PR regardless of what changed — this makes CI slow and signals that the rules are not being considered.",
           "items": {
             "type": "string",
             "enum": [
@@ -34,7 +34,7 @@
               "audit",
               "security"
             ],
-            "description": "A single CI/governance check required on pull requests. Selection guide: always include 'validate-all' (schema validation of all spec files) and 'governance-check' (commit message pattern enforcement). Add 'matrix' when FR, NFR, or API traceability links change. Add 'test' and 'build' for repos containing implementation code alongside the spec. Add 'canonical-lint' when canonical registry changes are expected. Add 'security' for production services handling PII or payment data. Add 'audit' for regulated environments requiring immutable evidence. Anti-pattern: including 'deploy' in a spec-only repo — deploy rules belong in the CI gates spec (Step 12)."
+            "description": "A single CI/governance check required on pull requests. Selection guide: always include 'validate-all' (schema validation of all spec files) and 'governance-check' (commit message pattern enforcement). Add 'matrix' when FR, NFR, or API traceability links change. Add 'test' and 'build' for repos containing implementation code alongside the spec. Add 'seed-lint' when seed document references changed. Add 'security' for production services handling PII or payment data. Add 'audit' for regulated environments requiring immutable evidence. Anti-pattern: including 'deploy' in a spec-only repo — deploy rules belong in the CI gates spec (Step 12)."
           },
           "uniqueItems": true
         },
@@ -126,10 +126,10 @@
         },
         "trace": {
           "type": "array",
-          "description": "Traceability links connecting this governance spec to upstream artifacts. Governance artifacts trace using three types: 'depends_on' (this governance rule only activates when the referenced FR or cap is in scope), 'verified_by' (the referenced artifact provides evidence that this governance requirement is met), 'derives_from' (the governance rule was derived from the referenced charter or policy). Example: [{\"type\": \"depends_on\", \"id\": \"fr-user-login\", \"note\": \"Authentication governance applies only when auth FRs are in scope\"}]. Every governance rule should trace to its origin; un-traced rules cannot be validated against charter scope.",
+          "description": "Traceability links connecting this governance spec to upstream artifacts. Governance artifacts trace to upstream artifacts using type = the canonical kind of the target: use type='fr' for fr-* IDs, type='capability' for cap-* IDs, type='charter-goal' for charter policy sources (goal-* form). The relationship verb (depends_on, verified_by, derives_from) goes in note. Example: [{\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"depends_on: authentication governance applies only when auth FRs are in scope\"}]. Every governance rule should trace to its origin; un-traced rules cannot be validated against charter scope.",
           "items": {
             "$ref": "vc:core:collections#traceRef",
-            "description": "A single traceability reference for this governance spec. Common types at step 10: 'depends_on' for invariants or policies this governance enforces; 'verified_by' for CI gate IDs that verify compliance; 'derives_from' for charter sections that mandate this governance approach. Example: {\"type\": \"verified_by\", \"id\": \"gate-governance-check\", \"note\": \"Governance rules enforced by this CI gate on every PR\"}. Anti-pattern: omitting the 'note' field on governance traces — unannoted governance links cannot be audited."
+            "description": "A single traceability reference for this governance spec. At step 10, type = the canonical kind of the target: use type='invariant' for inv-* IDs, type='fr' for fr-* IDs, type='charter-goal' for charter policy sources (goal-* form). The relationship verb (depends_on, verified_by, derives_from) goes in note. Example: {\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"depends_on: governance enforces this FR is spec-first reviewed\"}. Note: gate-* IDs (CI gate refs) have no canonical kind and cannot be used as trace targets — reference the governing spec artifact instead. Anti-pattern: omitting the 'note' field on governance traces — unannotated governance links cannot be audited."
           }
         },
         "links": {

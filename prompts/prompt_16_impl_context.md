@@ -64,7 +64,7 @@ Before emitting, verify:
 - All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.
 
 ## Negative Constraints
-1. **NEVER** emit `plan.spec_alignment`, `plan.review_requirements`, `plan.docs_impact`, `plan.solution`, `plan.context`, `plan.security`, `plan.delivery`, `plan.docs`, `plan.coverage_status`, or `plan.scope_validation` — these belong on 16a/16b/16c milestone contexts, not on the anchor.
+1. **NEVER** emit sub-fields on `plan` beyond what the anchor schema (`schema/16_anchor.schema.json`) allows — `additionalProperties: false` enforces this. Fields that belong on 16a/16b/16c milestone contexts must not appear on the anchor.
 2. **NEVER** emit an `execution` or `review` top-level section.
 3. **NEVER** emit a top-level `milestone_ref` — the anchor spans all milestones.
 4. **NEVER** author a per-FR checklist on the anchor — that detail lives in each 16a plan.

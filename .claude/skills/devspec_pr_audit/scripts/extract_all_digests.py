@@ -40,7 +40,7 @@ SCRIPTS_DIR = Path(__file__).parent
 # Slices (per routing.json) used to disambiguate doc / migration when the file
 # extension alone is insufficient (e.g. a .md inside migration_versioning that
 # is not a release-changelog must route to migration, not doc).
-_DOC_SLICES = {"docs", "host_integration"}
+_DOC_SLICES = {"docs", "host_integration", "agent_contracts"}
 _MIGRATION_SLICES = {"migration_versioning"}
 
 

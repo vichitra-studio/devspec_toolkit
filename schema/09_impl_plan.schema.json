@@ -64,10 +64,10 @@
           "deliverables": {
             "type": "array",
             "minItems": 1,
-            "description": "Trace references to artifacts this milestone will produce. Must be present (required by schema). Each item is a traceRef object with type, id, and optional note — not a free-text string. Example: {type: 'implements', id: 'fr-user-login', note: 'Working login endpoint with JWT tokens'}. Should contain at least one deliverable per milestone.",
+            "description": "Trace references to artifacts this milestone will produce. Must be present (required by schema). Each item is a traceRef object with type, id, and optional note — not a free-text string. type = the canonical kind of the target. Example: {type: 'fr', id: 'fr-user-login', note: 'implements: working login endpoint with JWT tokens'}. Should contain at least one deliverable per milestone.",
             "items": {
               "$ref": "vc:core:collections#traceRef",
-              "description": "A trace reference to an artifact this milestone will produce. Each item must be an object with 'type' and 'id' fields (not a free-text string). 'type' must be a valid trace type (e.g., 'implements', 'validates', 'depends_on'). 'id' must match a real artifact ID from another spec step (fr-*, api-*, nfr-*, inv-*). The optional 'note' field should describe what specifically is delivered. Examples: {type: 'implements', id: 'fr-user-login', note: 'Working login endpoint with JWT tokens and refresh flow'}, {type: 'validates', id: 'nfr-response-time', note: 'Load test suite confirming p99 < 200ms'}. Anti-pattern: free-text strings like 'Build login page' — these break traceability and cannot be linted."
+              "description": "A trace reference to an artifact this milestone will produce. Each item must be an object with 'type' and 'id' fields (not a free-text string). 'type' must be the canonical kind of the target artifact (e.g., 'fr', 'api', 'nfr', 'invariant'). 'id' must match a real artifact ID from another spec step (fr-*, api-*, nfr-*, inv-*). The optional 'note' field should describe the relationship (implements/validates) and what specifically is delivered. Examples: {type: 'fr', id: 'fr-user-login', note: 'implements: working login endpoint with JWT tokens and refresh flow'}, {type: 'nfr', id: 'nfr-response-time', note: 'validates: load test suite confirming p99 < 200ms'}. Anti-pattern: free-text strings like 'Build login page' — these break traceability and cannot be linted."
             }
           },
           "depends_on": {
@@ -118,10 +118,10 @@
     "trace": {
       "type": "array",
       "minItems": 1,
-      "description": "Traceability links connecting this implementation plan to upstream spec artifacts. Every milestone must trace to at least one upstream NFR, invariant, or capability that it implements or satisfies. Use type='derives_from' pointing to nfr-*, inv-*, or cap-* IDs. Example: [{\"type\": \"derives_from\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"Milestone delivers the auth service meeting this latency target\"}]. Multiple trace links are allowed when a milestone spans several NFRs. Consult the items description for approved types and ID formats. Anti-pattern: type 'implements' — this plan derives from requirements, it does not implement them directly.",
+      "description": "Traceability links connecting this implementation plan to upstream spec artifacts. Every milestone must trace to at least one upstream NFR, invariant, or capability that it implements or satisfies. type = the canonical kind of the target: use type='nfr' for nfr-* IDs, type='invariant' for inv-* IDs, type='capability' for cap-* IDs. Example: [{\"type\": \"nfr\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"derives_from: milestone delivers the auth service meeting this latency target\"}]. Multiple trace links are allowed when a milestone spans several NFRs. Consult the items description for approved types and ID formats. Anti-pattern: type='implements' or type='derives_from' — these are relationship verbs, not canonical kinds; type must be the kind of the target artifact.",
       "items": {
         "$ref": "vc:core:collections#traceRef",
-        "description": "A single traceability reference. At step 09, use type 'derives_from' pointing to nfr-* or inv-* IDs that constrain the implementation plan. Example: {\"type\": \"derives_from\", \"id\": \"inv-data-isolation\", \"note\": \"Multi-tenant isolation invariant constrains the database schema design in milestone ms-core-infra\"}. Anti-pattern: linking to cap-* IDs here — capability traceability belongs in Step 01, not Step 09."
+        "description": "A single traceability reference. At step 09, type = the canonical kind of the target: use type='nfr' for nfr-* IDs, type='invariant' for inv-* IDs. Example: {\"type\": \"invariant\", \"id\": \"inv-data-isolation\", \"note\": \"derives_from: multi-tenant isolation invariant constrains the database schema design in milestone ms-core-infra\"}. Anti-pattern: linking to cap-* IDs here — capability traceability belongs in Step 01, not Step 09."
       }
     }
   },

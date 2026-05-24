@@ -26,9 +26,9 @@ For each upstream artifact ingested, extract the following:
 - **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
-- MUST include secrets (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external`; MUST include compliance labels when `spec/00_charter.json` constraints or `docs/seed/seed_tech_stack.md` reference regulatory frameworks.
-- Parity rule: staging MUST include every `ci_gates` entry that prod includes, and MUST match prod's `region`, `runtime`, and `cluster` values (or explicitly document deviations with rationale).
-- Ambiguity scrub: MUST map every `ci_gates` entry to one of the known gate commands: `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`. Do NOT invent gate names not in this list.
+- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or `docs/seed/seed_tech_stack.md` reference regulatory frameworks.
+- Staging parity: staging should reflect prod's configuration as closely as possible; explicitly document any intentional deviations with rationale.
+- Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -47,7 +47,7 @@ Before emitting, verify:
 - Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
 - All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
 - No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
-- All environment names (`dev`, `ci`, `staging`, `prod`) align with canonical stage values.
+- All environment names align with the canonical stage values defined in the schema.
 - If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
 - Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
@@ -58,10 +58,10 @@ Before emitting, verify:
 - [ ] No environment name referenced in other spec files is missing from this baseline
 
 ## Step-Specific Completeness Checklist
-- All environments (`dev`, `ci`, `staging`, `prod`) present with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
+- All required environments present (see schema for the required set) with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
 - `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
 - `secrets` includes names of required secrets; values are not embedded.
-- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI) if relevant.
+- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI-DSS) if relevant; use the canonical short names defined in the schema.
 
 ## Best Practices
 - **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.

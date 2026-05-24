@@ -1,4 +1,4 @@
-# Step 13 · Extension Generator
+# Step 13 · Extension Manifest
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
@@ -11,7 +11,7 @@ Formalizes the creation of domain-specific specifications (extensions). Instead 
 You are a Principal Software Architect and Technical Program Manager. Your goal is to analyze the system requirements and define a set of **Extension Specifications** (Step 13) that are needed to fully describe the implementation details of specific domains. You do not generate code or full specs yet; you generate the **Manifest** of what additional specs are required.
 
 # Task
-- **Input Context**: Step 01 (Capabilities), Step 02 (System Sketch), Step 04 (Requirements), Step 05 (Interfaces), Step 07 (NFRs).
+- **Input Context**: All upstream spec artifacts Steps 00–12 (see Extraction Intent below for the full list of required inputs).
 - **Objective**: Identify distinct architectural components or domains that require their own dedicated specification file (Extension) to avoid monolithic complexity.
 - **Output Type**: A single JSON artifact (`13_extension_manifest.json`) conforming to the referenced step schema.
 - **Timing**: Executed after Core Specs (00-12) are stable but before the Roadmap (Step 14) is generated.
@@ -44,7 +44,7 @@ For each upstream artifact ingested, extract the following:
 - **Plan**: For each identified need, define the extension_id and structure. File names are derived from extension_id (hyphens → underscores + `.json`).
 
 ## Heuristics For Completeness
-- **Explicit > Implicit**: If a system has a Vector Database, do not leave it as an "implementation detail". Spec it out in `ext_01_vectordb.json`.
+- **Explicit > Implicit**: If a system has a Vector Database, do not leave it as an "implementation detail". Assign it `extension_id: ext-01-vectordb` — the output filename `ext_01_vectordb.json` is derived automatically (hyphens → underscores + `.json`).
 - **Don't Over-Splice**: Only create extensions for truly complex domains. A simple CRUD app might not need a dedicated Database Spec if the Interface Contracts (Step 05) are sufficient.
 - **Traceability**: Extensions MUST link back to Functional Requirements or NFRs that justify their existence.
 - **Justification**: Explaining *why* an extension is needed helps the Roadmap (Step 14) prioritize it correctly.
@@ -89,12 +89,12 @@ Before emitting, verify:
 1. The referenced canonical ID must exist in `canon/manifest.json` (verified by `canonical-integrity`, error E110).
 2. The same ID must appear in `spec/10_governance.json` `canonical_refs_used` with `kind: "governance_label"` (verified by `step_13.py`, error E590; missing file yields W590).
 
-Typical values: `cn:core:governance_label:mandatory`, `cn:core:governance_label:recommended`, `cn:core:governance_label:optional`, `cn:core:governance_label:security`.
+Authoritative values: resolve governance_label IDs from `canon/manifest.json` (kind: `governance_label`). Do not enumerate inline — the registry is the source of truth and validated by canonical-integrity lint (E110).
 
 ## Cross-Step Synthesis Notes
 - extensions[*].justification: MUST reference a specific `component_id` from `spec/02_system_sketch.json` or `nfr_id` from `spec/07_nfrs.json` that necessitates the extension.
 - extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in both `canon/manifest.json` and `spec/10_governance.json` (see Governance Label Resolution above). If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
-- extension_decision: **REQUIRED**. When `status` is `'none-required'`, `extensions` must be empty. When `status` is `'extensions-required'`, `extensions` must contain at least one entry.
+- extension_decision: **REQUIRED**. The cardinality constraints between `status` and `extensions` are machine-enforced by schema `vc:13-extension-manifest` allOf conditionals — consult the schema as the authoritative source.
 - **Optional per-extension fields** (omit when not applicable): `tag_ref` (kind: `"tag"` — for cross-cutting concern tags like `critical-path`), `policy_ref` (kind: `"policy"` — when the extension is governed by a specific policy), `id_pattern_ref` (kind: `"id_pattern"` — only when extension IDs follow a non-standard pattern).
 - Output filename is derived from `extension_id`: replace hyphens with underscores and append `.json` (e.g., `ext-01-database` → `ext_01_database.json`).
 

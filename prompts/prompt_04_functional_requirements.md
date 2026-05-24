@@ -88,13 +88,13 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 - **DO NOT** bundle multiple behaviors into one FR.
 - **DO NOT** leave acceptance criteria vague ('it works').
 - **DO NOT** trace to non-existent IDs.
-- **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
+- **DO NOT** use simple strings for trace field values — the schema enforces the object structure.
 - **DO NOT** use subjective language ("fast", "secure", "user-friendly").
 - **DO NOT** write FRs that are implementation steps rather than observable behaviors.
 
 ## Coverage Closure
 Before emitting, verify:
-- Every upstream requirement referenced in "Extraction Intent" is represented in this artifact's `trace`, `links`, or `fr_refs` array, OR explicitly listed in `out_of_scope` with rationale.
+- Every upstream requirement referenced in "Extraction Intent" is represented in at least one FR's `trace` array, OR explicitly documented as a gap with rationale.
 - No upstream capability, FR, or milestone ID is silently dropped.
 - All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
 - If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
@@ -105,7 +105,7 @@ Before emitting, verify:
 - [ ] No two FRs describe overlapping behaviors (each FR has a unique behavior boundary)
 - [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
 - [ ] Each FR's `acceptance_criteria` is written at the behavioral level — concrete enough that Step 14 tasks can derive execution-level criteria without contradiction
-- [ ] At least 2 functional requirements are present (schema minimum)
+- [ ] Functional requirements meet the schema minimum count
 
 **Extraction Mandate**:
 - Every capability ID from `01_capabilities.json` must map to ≥1 FR. List any capability left without an FR and explain why.
@@ -113,13 +113,13 @@ Before emitting, verify:
 ## Step-Specific Completeness Checklist
 - FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
 - Each FR includes preconditions and postconditions where relevant to bound the behavior.
-- Every FR has at least two acceptance criteria with a stable `criterion_id` and specific, measurable text.
+- Every FR has acceptance criteria that meet the schema minimum count; each criterion has a stable `criterion_id` and specific, measurable text.
 - Do **not** declare fixture coverage on acceptance criteria — fixture↔FR binding is authored in Step 08 via `fixture.targets[]`. Step 04 acceptance criteria carry only `criterion_id` and `text`.
 - `trace` links MUST map every FR to its originating capability from `spec/01_capabilities.json`; MUST also map to APIs, NFRs, or governance IDs when those IDs exist in the corresponding upstream spec files.
 - IDs are stable and descriptive (avoid renaming once referenced downstream).
 
 ## Cross-Step Synthesis Notes
-- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}`. Do not use simple strings or arrays of strings.
+- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}` for capability links; use `"fr"` when linking to another FR (e.g., when an FR splits or refines another). Valid `type` values must match a canonical trace type from `canon/kinds/trace_type.json` (e.g., `capability`, `fr`, `api`, `nfr`, `charter-goal`). Do not use simple strings or arrays of strings.
 
 ## Best Practices
 - **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
@@ -173,8 +173,9 @@ Before emitting, verify:
         }
       ],
       "capability_ref": {
-        "id": "cn:core:capability:example",
-        "kind": "capability"
+        "id": "cn:project:capability:user-authentication",
+        "kind": "capability",
+        "label": "User Authentication"
       }
     },
     {
@@ -197,8 +198,9 @@ Before emitting, verify:
         }
       ],
       "capability_ref": {
-        "id": "cn:core:capability:example",
-        "kind": "capability"
+        "id": "cn:project:capability:user-authentication",
+        "kind": "capability",
+        "label": "User Authentication"
       }
     }
   ],

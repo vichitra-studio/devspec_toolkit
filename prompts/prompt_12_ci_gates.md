@@ -17,10 +17,13 @@ Translate governance rules and fixture expectations into enforceable CI automati
 - `spec/04_fr_list.json`: high-priority FRs that must be gated
 
 ### Reference Sources (context only)
-- **11_redteam.json**: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
-- **07_nfrs.json**: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
-- **05_interface_contracts.json**: API contracts for schema validation gates — referenced to verify completeness of gate coverage
-- **09_impl_plan.json**: Milestone deliverables for completeness gate design — referenced to verify completeness of gate coverage
+- `spec/02a_delivery_baseline.json`: CI gate definitions and deployment environments — referenced for coverage closure (every ci_gate must map to a job_id) and environment_ref sourcing
+- `spec/06_invariants.json`: Invariant entries — determines whether an invariants-check job step is required
+- `spec/07_nfrs.json`: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
+- `spec/08_fixtures.json`: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
+- `spec/05_interface_contracts.json`: API contracts for schema validation gates — referenced to verify completeness of gate coverage
+- `spec/09_impl_plan.json`: Milestone deliverables for completeness gate design — referenced to verify completeness of gate coverage
+- `spec/11_redteam.json`: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
 - All other spec steps: referenced only to verify completeness of gate coverage
 
 ## Operating Flow: Survey → Gate → Threshold → Emit
@@ -43,11 +46,11 @@ Translate governance rules and fixture expectations into enforceable CI automati
 - Do not output YAML, Markdown prose, or any text outside the JSON schema.
 - Do not use placeholders like TBD or TODO.
 - Do not invent CI steps that do not map to actual tools in `specdev_tools` or standard shell commands.
-- Do not output unstructured strings for steps; use structured objects with `id`, `name`, and `command`.
+- Do not output unstructured strings for steps; use structured step objects as defined by schema `vc:12-ci-gates` (required fields enforced by the schema).
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `ci_gate` defined in `spec/02a_delivery_baseline.json` is implemented as a `job_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
+- Every `ci_gate` defined in `spec/02a_delivery_baseline.json` is implemented as a `job_id` in this artifact. For any gate that cannot be expressed as a CI job, add a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - All `pr_rules` commands from `spec/10_governance.json` have corresponding CI job steps.
 - Every environment stage (`dev`, `ci`, `staging`, `prod`) in the delivery baseline has coverage from ≥1 CI job.
 - All `requires` dependencies between jobs form a valid DAG — no circular dependencies.
@@ -65,7 +68,7 @@ Before emitting, verify:
 ## Hallucination Vectors
 - Do not invent new tools or commands that do not exist in the repository.
 - Do not reference non-existent job IDs in `requires` fields.
-- Do not use commands that do not start with allowed prefixes (e.g., `python -m`, `bash`, `npm`).
+- Use only commands that correspond to tools present in this repository's tooling (specdev CLI, shell scripts in `tools/`, or standard POSIX shell commands). Do not invent command prefixes or reference tools not confirmed in the repo.
 - Do not create circular dependencies in job requirements.
 
 ## Step-Specific Completeness Checklist
@@ -81,7 +84,7 @@ Before emitting, verify:
 - **Jobs**: Define each `job` with reproducible `steps` (CLI commands, scripts) and `requires` dependencies to express the pipeline graph.
 - **Naming**: Align job names with reality (e.g., `validate`, `fixtures`, `redteam`, `deploy`) to match tooling and dashboards.
 - **Coverage**: Set `coverage_thresholds` that reflect NFR commitments and update them when metric expectations change.
-- **Stability**: Keep job IDs in kebab-case and stable so generated CI configs and monitoring references remain valid.
+- **Stability**: Keep job IDs stable so generated CI configs and monitoring references remain valid. Kebab-case format is enforced by schema `vc:12-ci-gates` via `vc:core:atoms#kebabId`.
 
 ## Common Pitfalls
 - **Vague Steps**: Leaving steps as generic notes instead of exact commands, making automation impossible.
@@ -111,9 +114,6 @@ Before emitting, verify:
     {
       "job_id": "validate-specs",
       "name": "Validate All Spec Artifacts",
-      "requires": [
-        "inv-schema-valid"
-      ],
       "steps": [
         {
           "id": "step-validate-all",

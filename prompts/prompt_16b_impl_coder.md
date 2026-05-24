@@ -41,7 +41,7 @@ You must populate the `execution` JSON object according to these specific defini
 
 ## 2. `execution.execution_results` (The Log)
 *   You must add a result entry for **every** command you run.
-    *   `status`: `passed`, `failed`, `blocked`, or `partial`.
+    *   `status`: allowed values defined in `schema/16_impl_context.schema.json` (`$defs.executionStatus` enum).
     *   `outcome_description`: Brief summary of what ran (e.g. "Ran Auth Tests").
     *   `reasoning`: Why did it pass/fail? (e.g., "All 5 tests passed").
     *   `evidence`: **Verbatim** stdout/stderr snippet (max 20 lines) OR structured object.
@@ -86,7 +86,7 @@ You must populate the `execution` JSON object according to these specific defini
 Field shape is in `schema/16_impl_context.schema.json` under `execution.emergent_ambiguities[]`. Decision rules below.
 
 *   Log any blocker or spec issue discovered during execution.
-*   **Severity scoping**: this enum is execution-phase. It is distinct from `plan.ambiguities` severity and from the anchor's `severityLevel`. Do not mix them.
+*   **Severity scoping**: `emergent_ambiguities` uses `vc:core:atoms#severityLevel` (low/medium/high/critical) — the same atom as anchor ambiguities. This is distinct from `plan.ambiguities` severity, which uses a binary planning-phase enum. Do not mix them.
 *   The id namespace is `amb-new-*` (kebab-case, lowercase — `crossCycleAmbiguityItem.id` resolves to `kebabId`). Reserve `amb-*` (without the `new-` infix) for planning-phase ids in `plan.ambiguities`.
 *   Capture which checklist ids are affected so the reviewer (16c) can scope remediation.
 

@@ -1,43 +1,79 @@
 #!/bin/bash
+set -eo pipefail
 
-# Complete setup script for devspec toolkit virtual environment
-echo "Setting up complete devspec toolkit environment..."
+# Setup script for the devspec toolkit virtual environment.
+#
+# Uses `uv` to provision a managed CPython 3.13 interpreter and an isolated
+# virtualenv. Python 3.13 is REQUIRED on Apple Silicon: the toolkit depends on
+# cel-python, whose `google-re2` dependency has no arm64-macOS wheel and fails
+# to build from source — but cel-python drops google-re2 on Python 3.13/arm64
+# macOS (per its dependency markers) and falls back to the stdlib `re` engine.
+# The managed interpreter lives under uv's user-local cache (~/.local/share/uv),
+# never the system Python, so nothing is installed system-wide.
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "devspec_env" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv devspec_env
+echo "Setting up devspec toolkit environment (uv-managed)..."
+
+# --- locate the toolkit 'tools/' dir (host submodule layout OR toolkit-internal) ---
+if [ -d "./devspec_toolkit/tools" ]; then
+    TOOLS_DIR="./devspec_toolkit/tools"          # host repo: toolkit vendored at ./devspec_toolkit
+elif [ -d "./tools/specdev_tools" ]; then
+    TOOLS_DIR="./tools"                          # running from inside the toolkit itself
 else
-    echo "Virtual environment already exists"
+    echo "ERROR: cannot find the toolkit 'tools/' dir (looked for ./devspec_toolkit/tools and ./tools)." >&2
+    echo "Run this from your host repo root (toolkit vendored at ./devspec_toolkit) or from the toolkit root." >&2
+    exit 1
+fi
+echo "Using toolkit tools dir: ${TOOLS_DIR}"
+
+# --- require uv (user-local Python manager; no system Python needed) ---
+if ! command -v uv >/dev/null 2>&1; then
+    echo "ERROR: 'uv' is not installed. Install it (user-local; does not touch system Python):" >&2
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    echo "  (or: brew install uv)" >&2
+    exit 1
 fi
 
-# Activate the virtual environment
+# --- provision managed CPython 3.13 (idempotent; lands in uv's user cache) ---
+echo "Provisioning CPython 3.13 via uv..."
+uv python install 3.13
+
+# --- (re)create the virtualenv on the managed interpreter ---
+# If an env already exists but is NOT Python 3.13 (e.g. left over from an older
+# system-Python setup), rebuild it. Reusing a non-3.13 env would make the
+# `uv pip install` step pull the unbuildable google-re2 on arm64 macOS,
+# defeating the entire purpose of this script.
+NEED_VENV=1
+if [ -d "devspec_env" ]; then
+    EXISTING_PY=$(devspec_env/bin/python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "unknown")
+    if [ "$EXISTING_PY" = "3.13" ]; then
+        echo "Virtual environment 'devspec_env' already exists on Python 3.13 (reusing)."
+        NEED_VENV=0
+    else
+        echo "Existing 'devspec_env' is Python ${EXISTING_PY}, not 3.13 — rebuilding."
+        rm -rf devspec_env
+    fi
+fi
+if [ "$NEED_VENV" -eq 1 ]; then
+    echo "Creating virtual environment 'devspec_env' on Python 3.13..."
+    uv venv devspec_env --python 3.13
+fi
+
+# shellcheck disable=SC1091
 source devspec_env/bin/activate
 
-# Upgrade pip
-echo "Upgrading pip..."
-pip3 install --upgrade pip
-
-# Install dependencies
+# --- install dependencies + the toolkit (editable) into the venv ---
 echo "Installing toolkit dependencies..."
-pip3 install -r ./devspec_toolkit/tools/requirements.txt
+uv pip install -r "${TOOLS_DIR}/requirements.txt"
+echo "Installing devspec toolkit (editable)..."
+uv pip install -e "${TOOLS_DIR}"
 
-# Install the toolkit in development mode
-echo "Installing devspec toolkit..."
-pip3 install -e ./devspec_toolkit/tools
+# --- verify ---
+echo "Verifying installation..."
+python -c "import specdev_tools, celpy; print('specdev_tools + celpy available')"
+specdev --help >/dev/null && echo "specdev CLI OK"
 
-# Set up PYTHONPATH for toolkit modules
-export PYTHONPATH="${PWD}/devspec_toolkit/tools:$PYTHONPATH"
-
-# Verify installation
-echo "Verifying specdev_tools availability..."
-python3 -c "import specdev_tools; print('specdev_tools is available')"
-
-echo "Setup complete!"
-echo "To use the toolkit, activate the environment with:"
-echo "  source devspec_env/bin/activate"
-echo "Then run commands with:"
-echo "  PYTHONPATH=\"\${PWD}/devspec_toolkit/tools\" python3 -m specdev_tools.cli --help"
 echo ""
-echo "Example usage:"
-echo "  PYTHONPATH=\"\${PWD}/devspec_toolkit/tools\" python3 -m specdev_tools.cli validate spec/00_charter.json --repo-root ./devspec_toolkit"
+echo "Setup complete. Activate with:"
+echo "  source devspec_env/bin/activate"
+echo "Then run, e.g.:"
+echo "  specdev --help"

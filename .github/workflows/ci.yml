@@ -78,7 +78,7 @@ jobs:
             --repo-root . \
             --out "$TMPDIR/entry_key_registry.json" \
             --extraction-paths-out "$TMPDIR/extraction_paths.json"
-          REGEN_CMD="specdev registry-generate --repo-root ./devspec_toolkit --out ./devspec_toolkit/tools/entry_key_registry.json"
+          REGEN_CMD="specdev registry-generate --repo-root . --out ./tools/entry_key_registry.json"
           if ! diff -q "$TMPDIR/entry_key_registry.json" tools/entry_key_registry.json; then
             echo "::error::Registry out of date. Run '$REGEN_CMD' and commit the result."
             exit 1
@@ -142,7 +142,7 @@ jobs:
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
           devspec_env/bin/pip install -e tools/
       - name: Lint adversarial fixtures (same mechanism as fixtures)
-        run: python -m specdev_tools.cli fixtures-lint spec
+        run: python -m specdev_tools.cli fixtures-lint spec --repo-root .
 
   deploy-staging:
     name: Deploy Staging (placeholder)

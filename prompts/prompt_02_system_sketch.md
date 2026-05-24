@@ -31,11 +31,11 @@ For each upstream artifact ingested, extract the following:
 - Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, trust_boundary, auth, rate_limit, reliability, schema_ref). Do not output it.
 - **Cross-Check**: Verify each connection's `auth` and `reliability` against constraints listed in `spec/00_charter.json` and `docs/seed/seed_tech_stack.md`. Do not assume missing constraints.
 - Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
-- Rewrite responsibilities into 3-6 specific, testable bullets per component (each bullet MUST name a concrete action and data domain); complete connection details based on protocols and policy; ensure IDs are stable.
+- Rewrite responsibilities into specific, testable bullets per component (each bullet MUST name a concrete action and data domain); complete connection details based on protocols and policy; ensure IDs are stable.
 - Emit JSON once reconciled.
 
 ## Heuristics For Completeness
-- MUST set `trust_boundary` on every connection; MUST populate `auth` and `rate_limit` for connections where `trust_boundary` is `partner` or `public`.
+- MUST set `trust_boundary` on every connection; the schema enforces required fields for connections at `partner` or `public` trust boundaries.
 - Trust-boundary auth rules are authoritative; do not infer auth from protocol alone.
 - External integrations: connections touching `type: external` components MUST use `trust_boundary` of `partner` or `public`; MUST populate `auth` with a value from the schema enum.
 - Implicit mapping: responsibilities MUST cover all in-scope capabilities from `spec/01_capabilities.json`; if a capability has no responsible component, MUST propose a new component to own it.
@@ -106,7 +106,7 @@ Before emitting, verify:
 Define `type: external` as a component that represents third-party services or systems that are not owned or controlled by the organization. Examples include cloud APIs (AWS, GCP), payment processors (Stripe), identity providers (Auth0), or analytics services (Google Analytics). Internal partner services should be marked as `type: service` with appropriate `trust_boundary` and authentication. External components must include the `external-dependency` tag.
 
 ## Schema Ref and Rate Limit Formats
-Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`, `api:`, or `-tbd`. For `rate_limit` (required on `partner`/`public` connections), use the structured object with required fields `rps` (1-100000) and `scope` (ip, client, token, or global), with optional `burst` (1-200000) and `window_s` (1-3600). `burst` must be >= `rps` when present.
+Consult the schema for valid `schema_ref` formats and the `rate_limit` object shape, sub-field ranges, and scope values. Validator rules also apply an additional cross-field check — see the fixtures for examples of valid and invalid configurations.
 
 # Clarification Questions
 - What components exist (or must be created) to deliver the in-scope capabilities? Who owns each?
@@ -124,7 +124,7 @@ Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`,
 ```json
 {
   "$schema": "vc:02-system-sketch",
-  "id": "system-sketch-catalog",
+  "id": "system-sketch-v1",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
   "components": [
@@ -139,8 +139,9 @@ Specify acceptable formats for `schema_ref`: `file://`, `https://`, `glossary:`,
       "owner": "api",
       "trace": [
         {
-          "type": "doc",
-          "id": "capability-user-management"
+          "type": "capability",
+          "id": "cap-user-management",
+          "note": "Implements: this component delivers the user management capability"
         }
       ]
     }

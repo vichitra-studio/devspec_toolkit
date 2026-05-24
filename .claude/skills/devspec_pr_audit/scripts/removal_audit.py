@@ -126,15 +126,27 @@ def _finding(
 def _infer_catalog_tag(path: str) -> tuple[str, str]:
     """Return (catalog_tag, severity) for a deleted file path.
 
+    A file removal is an *upstream change that downstream dependents must
+    reflect* — catalogs.md D7 (Upstream ↔ downstream), whose generic pattern
+    explicitly covers a "removed value" not propagated to dependents. So every
+    removal is tagged D7, EXCEPT a generator-owned artifact, whose absence is a
+    generator-integrity defect (D9 — the generator would re-emit it; committed =
+    gone). The catalog has no dedicated "file removed" code; D7 is the correct
+    generic fit. (Earlier revisions mis-tagged removals as D14/D3/D2 — tags whose
+    semantics, per catalogs.md, are schema-authority delegation, code↔docs, and
+    producer↔consumer shape respectively, none of which describe a deletion.)
+
+    Severity reflects the criticality of the removed artifact, independent of tag.
+
     Rules (first match wins):
-      canon/**                               → D7, P0
+      canon/**                               → D7, P0  (registry everything references)
       tools/{schema_registry,step_order,
              entry_key_registry,extraction_paths,
-             command_prefixes,step_docs}.json → D9, P0
-      *.schema.json                          → D14, P1
-      prompts/**/*.md                        → D3, P1
-      tools/specdev_tools/**/*.py            → D2, P1
-      others                                 → D14, P2 (fallback)
+             command_prefixes,step_docs}.json → D9, P0  (generator-owned)
+      *.schema.json                          → D7, P1
+      prompts/**/*.md                        → D7, P1
+      tools/specdev_tools/**/*.py            → D7, P1
+      others                                 → D7, P2  (fallback)
     """
     if path.startswith("canon/"):
         return ("D7", "P0")
@@ -143,12 +155,12 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
         if name in GENERATED_ARTIFACT_NAMES:
             return ("D9", "P0")
     if path.endswith(".schema.json"):
-        return ("D14", "P1")
+        return ("D7", "P1")
     if (path.startswith("prompts/") or path.startswith("migration_prompts/")) and path.endswith(".md"):
-        return ("D3", "P1")
+        return ("D7", "P1")
     if path.startswith("tools/specdev_tools/") and path.endswith(".py"):
-        return ("D2", "P1")
-    return ("D14", "P2")
+        return ("D7", "P1")
+    return ("D7", "P2")
 
 
 def load_deleted_files(base_sha: str, head_sha: str) -> list[str]:

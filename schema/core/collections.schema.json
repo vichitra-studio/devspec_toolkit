@@ -69,7 +69,7 @@
         },
         "note": {
           "type": "string",
-          "description": "Optional free-text annotation explaining why this trace link exists and what aspect of the upstream artifact is being referenced. Required when the link is non-obvious (e.g., a capability that is only partially fulfilled, or a constraint that applies only under specific conditions). Example: 'Only the authentication sub-path of this capability is implemented here — token refresh is in a separate FR'. Anti-pattern: leaving note empty on a 'derives_from' link where the derivation rationale is not obvious from the IDs alone."
+          "description": "Optional free-text annotation explaining why this trace link exists and what aspect of the upstream artifact is being referenced. Required when the link is non-obvious (e.g., a capability that is only partially fulfilled, or a constraint that applies only under specific conditions). Example: 'Only the authentication sub-path of this capability is implemented here — token refresh is in a separate FR'. Anti-pattern: leaving note empty on a link expressing derivation where the derivation rationale is not obvious from the IDs alone."
         },
         "owner": {
           "description": "Responsible party for this trace reference. Deliberately unconstrained (not the 8-value owner enum) because external dependency owners may be arbitrary team or organization names.",
@@ -109,8 +109,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "type": "string",
-          "pattern": "^cn:[a-z0-9.]+:[a-z_][a-z0-9_]*:[a-z0-9-]+$",
+          "$ref": "vc:core:canon#canonicalId",
           "description": "Fully qualified canonical ID in the format cn:<namespace>:<kind>:<slug>. Example: 'cn:project:term:billing-amount'. The namespace is typically 'project' for project-specific entries; 'core' for shared primitives. The kind uses underscores not hyphens (e.g., 'risk_category' not 'risk-category'). The slug is kebab-case. Validated by canonical-lint at build time."
         },
         "kind": {
@@ -161,6 +160,7 @@
         },
         "kind": {
           "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$",
           "description": "Canonical kind category for the proposed entry. Must use underscores not hyphens — 'risk_category' not 'risk-category' (hyphenated kinds are rejected by canon-accept). Must match a kind defined under canon/kinds/*.json (or the project canon). See devspec_toolkit/canon/kinds/ for the full registered list. When in doubt between 'term' and 'entity': use 'entity' if the concept has lifecycle state or identity; use 'term' if it is purely vocabulary."
         },
         "proposed_label": {
@@ -213,7 +213,12 @@
           "description": "The original input value from the source document that matched multiple canon entries and could not be auto-resolved. Example: 'payment' (matched both cn:project:entity:payment and cn:project:term:payment-method). Populated by canonical-autofix tooling — do not author manually."
         },
         "candidate_ids": {
-          "$ref": "vc:core:collections#stringArray",
+          "type": "array",
+          "items": {
+            "$ref": "vc:core:canon#canonicalId",
+            "description": "A canonical ID matching cn:<namespace>:<kind>:<slug>."
+          },
+          "minItems": 1,
           "description": "List of canonical IDs that all matched the input value, preventing automatic resolution. Each ID follows the cn:<namespace>:<kind>:<slug> format. Example: ['cn:project:entity:payment', 'cn:project:term:payment-method']. To resolve: inspect the canon manifest for each candidate and pick the one that matches the semantic intent of the source field. Then add the correct ID to the source field and remove the conflict entry."
         },
         "reason": {

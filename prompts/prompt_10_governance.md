@@ -77,11 +77,14 @@ Before emitting, verify:
 - `spec_first_policy` is explicitly true or false; exceptions documented via PR rules if false.
 - `commit_message_rules` require spec IDs and provide a regex pattern compatible with CI.
 - `reviewers` list includes cross-functional approvers (engineering, QA, security, ops) as needed.
-- **Canonical Refs**: `commit_message_rules.id_pattern_ref` MUST be populated with a canon entry of kind `id_pattern` (e.g., `cn:core:id_pattern:conventional-commit`). `policy_ref` MUST be populated with a canon entry of kind `policy` (e.g., `cn:core:policy:spec-first`) — no other kind is accepted. `command_ref` SHOULD be populated with a canon entry of kind `command` (e.g., `cn:core:command:governance-check`) when the rule maps to a CLI command — no other kind is accepted. All referenced IDs must also appear in `canonical_refs_used`, and canonical-integrity (E120) will reject any kind mismatch against the canon registry.
+- **Canonical Refs**: `commit_message_rules.id_pattern_ref` SHOULD be populated with a canon entry of kind `id_pattern` when the commit pattern aligns with a canonical ID pattern (e.g., `cn:core:id_pattern:conventional-commit`); the kind is schema-pinned to `id_pattern` — no other kind is accepted, but the field itself is optional. `policy_ref` SHOULD be populated with a canon entry of kind `policy` when a governing policy applies (e.g., `cn:core:policy:spec-first`); the kind is schema-pinned to `policy` — no other kind is accepted, but the field itself is optional. `command_ref` SHOULD be populated with a canon entry of kind `command` (e.g., `cn:core:command:governance-check`) when the rule maps to a CLI command — no other kind is accepted. All referenced IDs must also appear in `canonical_refs_used`, and canonical-integrity (E120) will reject any kind mismatch against the canon registry.
 
 ## Cross-Step Synthesis Notes
-- pr_rules: Allowed values: `validate`, `validate-all`, `matrix`, `fixtures-lint`, `invariants-check`, `governance-check`, `test`, `build`, `lint`, `format`, `audit`, `security`.
+- pr_rules: Allowed values are enforced by the schema enum in `schema/10_governance.schema.json` (pr_rules items.enum). Consult the schema as the authoritative source rather than any inline list here — the enum is the contract.
 - commit_message_rules.error_message: explicitly list the valid `type` enums so users know what to type without reading regex (e.g., "Format: type(scope): msg [id]. Allowed types: feat, fix, chore.")
+
+## Emergent Ambiguities
+If any organizational constraint from the upstream specs cannot be mapped to a governance rule, a PR policy, or a commit convention: record a gap question and enter Clarify mode rather than silently dropping the constraint or inventing a rule. Do not proceed to Emit until all clarifications are resolved or explicitly deferred with rationale.
 
 ## Best Practices
 - **Versioning**: Document the `versioning` strategy (calendar, semver, spec revision) so downstream tooling can bump versions consistently.
@@ -109,6 +112,8 @@ Before emitting, verify:
 - Schema Registry: tools/schema_registry.json
 
 # Output Contract
+> **Note**: The ID strings for `id_pattern_ref`, `policy_ref`, and `command_ref` shown below (e.g., `cn:core:id_pattern:conventional-commit`) are illustrative examples. Authoritative canonical IDs must be resolved from `canon/manifest.json` — do not copy these IDs verbatim if the registry has changed. Validate with `canonical-integrity` lint after authoring.
+
 ```json
 {
   "$schema": "vc:10-governance",

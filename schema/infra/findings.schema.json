@@ -13,7 +13,7 @@
   ],
   "properties": {
     "round": {
-      "description": "1+ (no hard cap; spec-phase skills cap at 5 procedurally; K2 trinity uses soft-warn semantics -- see WIP/toolkit_proposals/K_agentification.md §11.3.1, §11.3.2). Increments per review-fix iteration.",
+      "description": "1+ (no hard cap; spec-phase skills cap at 5 procedurally; K2 trinity uses soft-warn semantics). Increments per review-fix iteration.",
       "type": "integer",
       "minimum": 1
     },

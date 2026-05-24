@@ -22,7 +22,7 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Map → Design → Validate → Trace → Emit
 - **Map**: For every FR with external-observable behavior, identify the API operation(s) needed. Track coverage in a private Context Ledger.
 - **Design**: Apply REST Design Heuristics to shape resource URLs, method semantics, request/response schemas, and error contracts.
-- **Validate**: Verify every FR with observable behavior has ≥1 API. Every endpoint has ≥1 error response. No duplicate `interface_ref`.
+- **Validate**: Verify every FR with observable behavior has ≥1 API. Every endpoint has ≥1 error response. Avoid duplicate `interface_ref` values — each distinct contract should have a unique `interface_ref` entry.
 - **Trace**: Link each API to its originating FR(s) and any NFR performance targets.
 - **Emit**: Write the artifact only when all FRs are covered and design heuristics pass.
 
@@ -31,9 +31,9 @@ For each upstream artifact ingested, extract the following:
 ### REST Design Heuristics
 - **Resource naming**: Use plural nouns for collections (`/users`, `/sessions`). Avoid verbs in URLs except for RPC-style actions (`/auth/refresh`).
 - **URL structure**: Nest resources to show ownership (`/users/{id}/sessions`). Keep nesting ≤2 levels deep.
-- **Method semantics**: GET=read, POST=create, PUT=replace, PATCH=partial update, DELETE=remove. Use POST for non-idempotent actions.
+- **Method semantics**: See the schema's `method` field (→ `vc:core:atoms#httpMethod`) for the authoritative decision rules per HTTP verb.
 - **Pagination**: All collection endpoints MUST support `limit`/`offset` or cursor-based pagination. Default and max page sizes must be defined.
-- **Error responses**: Every endpoint MUST define error responses for: 400 (invalid input), 401 (unauthenticated), 403 (unauthorized), 404 (not found), and 5xx (server error). Include `error_code` and `message` in all error bodies.
+- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies.
 - **Versioning**: Use URL path versioning (`/v1/`) unless the charter specifies otherwise. Version bump required on breaking changes.
 
 ### Implicit API Discovery
@@ -93,21 +93,20 @@ Before emitting, verify:
 - Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
 - Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
 - `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
-- `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` enum (`none`, `api-key`, `oauth2`, `jwt`, `mTLS`).
+- `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
 - `trace` links to FRs/capabilities that justify the API; add example_refs where helpful for fixtures.
 - No mixed concerns: separate entries for distinct behaviors or versioned variants.
 
 ## Cross-Step Synthesis Notes
-- **Trace Format**: When specifying trace references, use the exact JSON object format: `[{"type": "fr", "id": "fr-login", "note": "..."}]` - not string arrays like `["fr-login"]` or simple objects like `{"fr": "fr-login"}`.
+- **Trace Format**: When specifying trace references, use the exact JSON object format: `[{"type": "fr", "id": "fr-login", "note": "Implements: ..."}]` - not string arrays like `["fr-login"]` or simple objects like `{"fr": "fr-login"}`. At step 05, use type `fr` (the kind of the target) pointing to fr-* IDs; state the implements relationship in note.
 - **Semantic Drift Prevention**: When tracing an API to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Implements: 'The system shall authenticate a registered user and return a signed session token.'"`. This prevents trace drift when FR text is later revised.
 
 ## Best Practices
 - **Stability**: Keep `api_id` stable and map each entry to an owning component from the system sketch.
-- **Versioning**: Use semver-compatible `version` strings (`v1`, `v1.1`) and update in lockstep with schema changes.
+- **Versioning**: Use `version` strings conforming to the pattern enforced by schema/05_interface_contracts.schema.json, and update in lockstep with schema changes.
 - **Payloads**: Provide `input_schema_ref`, `output_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
 - **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
 - **Trace**: Populate `trace` references to FR IDs or capabilities proving why the interface exists.
-- **Protocols**: For non-HTTP protocols like gRPC, use POST method; for MQTT, map routes to topic paths.
 - **Non-HTTP Protocols**: For gRPC methods, use POST method; for MQTT, map routes to topic paths (e.g., `/topic/{id}`).
 
 ## Common Pitfalls
@@ -143,7 +142,7 @@ Before emitting, verify:
       "protocol": "http",
       "owner": "api",
       "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
-      "trace": [{"type": "implements", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
+      "trace": [{"type": "fr", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
       "errors": [
         {"code": "unauthenticated", "message": "No valid auth token provided"},
         {"code": "resource-not-found", "message": "The requested resource does not exist"}

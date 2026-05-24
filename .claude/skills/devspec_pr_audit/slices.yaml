@@ -129,6 +129,28 @@ slices:
   complexity_per_file: 5
 
 # ---------------------------------------------------------------
+# Agent-contracts slice — Claude agent definitions (.claude/agents)
+# ---------------------------------------------------------------
+- name: agent_contracts
+  description: >
+    Agent prompt-contracts under .claude/agents that drive the pr-audit and
+    specdev sub-agents. They restate schema-derived enums and protocol steps,
+    so they drift against schema/infra and protocol.md if left unaudited.
+  globs:
+    - ".claude/agents/**/*.md"
+  type_weight:
+    default: 5
+  expansion_rules:
+    - target: "schema/infra/findings.schema.json"
+    - target: "schema/infra/pr_audit_fix_plan.schema.json"
+  applies:
+    drift_types: [D1, D3, D6, D14]
+    invariants:  [I2, I13]
+  semantic_work: true
+  model_tier: sonnet
+  complexity_per_file: 4
+
+# ---------------------------------------------------------------
 # Canon slice — canonical registry (two-tier)
 # ---------------------------------------------------------------
 - name: canon

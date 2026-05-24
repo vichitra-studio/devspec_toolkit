@@ -144,7 +144,7 @@ Before emitting, verify:
 - `task_id` must be kebab-case and unique within the milestone.
 - `description` must be atomic and specific (at least two words).
 - Use imperative verb form in `description` (e.g., "Implement authentication module").
-- Use `acceptance_criteria` for non-trivial tasks; include `criterion_id` and a >=15 character `text` (optional `fixture_ref`).
+- Use `acceptance_criteria` for non-trivial tasks; include `criterion_id` and a `text` meeting the schema's minimum length (optional `fixture_ref`).
 
 ### tasks[].depends_on
 - List `task_id` values this task depends on (within the same milestone only).
@@ -152,12 +152,12 @@ Before emitting, verify:
 - Omit or use `[]` when the task has no intra-milestone dependencies.
 
 ### tasks[].assumptions
-- List assumptions that must hold for this task to succeed (≥10 characters each).
+- List assumptions that must hold for this task to succeed (minimum length per schema).
 - Include at least one item when the task has external dependencies or uncertain preconditions.
 - Example: "Database migration scripts are applied before service restarts."
 
 ### tasks[].exit_conditions
-- List conditions that definitively mark this task complete (≥10 characters each).
+- List conditions that definitively mark this task complete (minimum length per schema).
 - Be specific and verifiable (e.g., "All unit tests pass with 100% coverage for this module").
 - Do not duplicate `acceptance_criteria`; exit conditions describe the done state, not the test.
 
@@ -190,9 +190,7 @@ Before emitting, verify:
 - If not `"none"`, use at least three words and keep it under 40 words.
 
 ### dependencies
-- Use objects with `type` and `id`; `owner` and `note` are required for external dependencies.
-- For internal dependencies: `{ "type": "milestone", "id": "<milestone_id>" }` (`id` must be kebab-case).
-- For external dependencies: `{ "type": "external", "id": "<dependency>", "owner": "<team-or-system>", "note": "<rationale>" }` (`id` must be kebab-case).
+- Use `vc:core:collections#dependencyItem` objects. The schema enforces allowed `type` values and any conditional required fields (e.g., `owner` and `note` for external dependencies).
 
 ### Invariant-Fixture Cross-Check
 - For each invariant from Step 06 with severity `error`, verify that Step 08 contains >=1 fixture with a target referencing that invariant ID. If missing, note it as a coverage gap in milestone risks rather than silently omitting the invariant from the trace.
@@ -250,12 +248,15 @@ The `$schema` field is required in the output and is stripped before validation 
         }
       ],
       "deliverables": [
-        { "type": "doc", "id": "charter" }
+        { "type": "component", "id": "comp-fastapi-scaffold", "note": "FastAPI project scaffold produced by this milestone" }
       ],
       "target_date": "2025-02-01",
       "fr_refs": [],
       "capability_refs": []
     }
+  ],
+  "trace": [
+    { "type": "charter-goal", "id": "goal-core-foundation", "note": "Whole-charter goal grounding this roadmap" }
   ],
   "canonical_refs_used": []
 }
