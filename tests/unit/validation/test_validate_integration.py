@@ -260,7 +260,14 @@ class ValidateIntegrationTests(unittest.TestCase):
                 json.dumps({"registry_version": "1.0.0", "entries": [], "aliases": []}),
                 encoding="utf-8",
             )
-            with patch("specdev_tools.validation.validate.validate_file", return_value=[]), \
+            # Clear SPECDEV_REPLAY_DIFF_ERROR_MODE so the default not-git-repo
+            # fallback logic is exercised regardless of CI environment settings.
+            # Also clear CI so the fallback resolves to "ignore" (not a git repo,
+            # not in CI => ignore).
+            env_overrides = {k: v for k, v in os.environ.items()
+                             if k not in ("SPECDEV_REPLAY_DIFF_ERROR_MODE", "CI")}
+            with patch.dict(os.environ, env_overrides, clear=True), \
+                 patch("specdev_tools.validation.validate.validate_file", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_spec_quality", return_value=[]), \
                  patch("specdev_tools.validation.validate.lint_hallucinations", return_value=[]), \
                  patch("specdev_tools.validation.validate.validate_canonical_integrity", return_value=[]), \
@@ -366,7 +373,7 @@ class ValidateIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
 
-            def has_ref(_root, ref):
+            def has_ref(_, ref):
                 return ref == "main"
 
             with patch("specdev_tools.validation.validate._git_current_branch", return_value="feature/x"), \
