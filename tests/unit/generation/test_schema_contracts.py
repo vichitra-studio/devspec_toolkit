@@ -214,9 +214,16 @@ class SchemaContractsTests(unittest.TestCase):
         self.assertTrue(errors, msg="Nested free-form environment payload unexpectedly passed")
 
     def test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution(self):
-        sample = self.repo_root / "spec" / "05_interface_contracts.json"
-        with patch("specdev_tools.validation.validate.Draft202012Validator.iter_errors", side_effect=RuntimeError("boom")):
-            errs = validate_file(str(self.repo_root), str(sample))
+        # Write a minimal valid-JSON sample with a registered $schema URI into
+        # a temp file so this test has no dependency on any file in spec/.
+        with tempfile.TemporaryDirectory() as td:
+            sample = Path(td) / "05_interface_contracts.json"
+            sample.write_text(
+                json.dumps({"$schema": "vc:05-interface-contracts", "id": "test"}),
+                encoding="utf-8",
+            )
+            with patch("specdev_tools.validation.validate.Draft202012Validator.iter_errors", side_effect=RuntimeError("boom")):
+                errs = validate_file(str(self.repo_root), str(sample))
         self.assertTrue(errs)
         self.assertTrue(any(e.code == "E521" and "schema_validation_runtime_error" in e.message for e in errs))
         self.assertFalse(any("schema_reference_resolution_failed" in e.message for e in errs))

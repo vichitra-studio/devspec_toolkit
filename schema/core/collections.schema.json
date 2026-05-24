@@ -35,7 +35,7 @@
         },
         "href": {
           "type": "string",
-          "description": "URL or path to the linked resource. Decision rule: use absolute HTTPS URLs for all external resources; use forward-slash relative paths (no leading ./) for in-repo files. Examples: 'https://www.figma.com/file/abc123/checkout-wireframes' (external design link), 'https://stripe.com/docs/api/payment_intents' (external API docs), 'spec/seed_overview.md' (in-repo seed document), 'docs/architecture/auth-flow.png' (in-repo diagram). Anti-patterns: file:// URLs (not portable across machines), Windows backslash paths like 'docs\\auth\\flow.png' (breaks on non-Windows), localhost URLs like 'http://localhost:3000/api' (not resolvable outside the author's machine), paths starting with ./ (use 'spec/foo.md' not './spec/foo.md')."
+          "description": "URL or path to the linked resource. Decision rule: use absolute HTTPS URLs for all external resources; use forward-slash relative paths (no leading ./) for in-repo files. Examples: 'https://www.figma.com/file/abc123/checkout-wireframes' (external design link), 'https://stripe.com/docs/api/payment_intents' (external API docs), 'docs/seed/seed_overview.md' (in-repo seed document), 'docs/architecture/auth-flow.png' (in-repo diagram). Anti-patterns: file:// URLs (not portable across machines), Windows backslash paths like 'docs\\auth\\flow.png' (breaks on non-Windows), localhost URLs like 'http://localhost:3000/api' (not resolvable outside the author's machine), paths starting with ./ (use 'spec/foo.md' not './spec/foo.md')."
         },
         "spec_ref": {
           "$ref": "vc:core:atoms#kebabId",

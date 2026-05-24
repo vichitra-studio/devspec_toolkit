@@ -44,7 +44,7 @@
           "path": {
             "type": "string",
             "minLength": 1,
-            "description": "File path to the seed document relative to the repository root. Example: 'seed/seed_overview.md'."
+            "description": "File path to the seed document relative to the repository root. Example: 'docs/seed/seed_overview.md'."
           },
           "description": {
             "type": "string",

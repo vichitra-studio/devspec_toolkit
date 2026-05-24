@@ -1,0 +1,48 @@
+{
+  "$schema": "vc:seed-manifest",
+  "seed_manifest_id": "seed-manifest-core",
+  "version": "0.1.0",
+  "created_at": "2026-02-07T00:00:00Z",
+  "last_updated": "2026-02-07T00:00:00Z",
+  "global_seed_order": [
+    "seed-overview",
+    "seed-tech-stack"
+  ],
+  "seeds": [
+    {
+      "seed_id": "seed-overview",
+      "path": "docs/seed/seed_overview.md",
+      "description": "Project scope, personas, and business context.",
+      "required": true,
+      "source_type": "doc"
+    },
+    {
+      "seed_id": "seed-tech-stack",
+      "path": "docs/seed/seed_tech_stack.md",
+      "description": "Architecture decisions, constraints, and technology baseline.",
+      "required": true,
+      "source_type": "doc"
+    }
+  ],
+  "doc_paths": [
+    "docs/**/*.md",
+    "README.md",
+    "CHANGELOG.md",
+    "*.md"
+  ],
+  "step_requirements": {
+    "00": [
+      "seed-overview",
+      "seed-tech-stack"
+    ],
+    "01": [
+      "seed-overview"
+    ],
+    "02": [
+      "seed-tech-stack"
+    ],
+    "02a": [
+      "seed-tech-stack"
+    ]
+  }
+}

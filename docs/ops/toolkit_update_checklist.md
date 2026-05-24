@@ -11,7 +11,6 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 5. [ ] Add/update test fixtures in `tests/fixtures/step_NN/`
 6. [ ] Run `pytest tests/ -v` — all tests pass
 7. [ ] Add changelog entry: `changelog/unreleased.yaml` (machine) + `changelog/unreleased.md` (human)
-8. [ ] Run `specdev validate-all spec --repo-root .` — all specs validate
 
 ## Prompt Change Workflow
 
@@ -26,9 +25,8 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 1. [ ] Update `canon/manifest.json` or the relevant `canon/kinds/*/` file
 2. [ ] Run `specdev canonical-lint canon --repo-root .` — no errors
 3. [ ] Run `specdev canonical-integrity spec --repo-root .` — all refs valid
-4. [ ] Run `specdev hallucination-lint spec --repo-root .` — no phantom refs
-5. [ ] If aliases changed: update `canon/aliases.json`
-6. [ ] Run full test suite: `pytest tests/ -v`
+4. [ ] If aliases changed: update `canon/aliases.json`
+5. [ ] Run full test suite: `pytest tests/ -v`
 
 ## Migration Template Change Workflow
 
@@ -47,5 +45,4 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 6. [ ] Update version in `docs/developers/getting_started.md`
 7. [ ] Add new version to `CHANGELOG.md` version index table
 8. [ ] Run full test suite: `pytest tests/ -v`
-9. [ ] Run `specdev validate-all spec --repo-root .`
-10. [ ] Commit and tag: `git tag vX.Y.Z`
+9. [ ] Commit and tag: `git tag vX.Y.Z`

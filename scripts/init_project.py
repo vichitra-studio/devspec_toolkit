@@ -398,7 +398,7 @@ def main():
 
     seed_manifest_target = os.path.join(spec_common_dir, "seed_manifest.json")
     if not os.path.exists(seed_manifest_target):
-        manifest_src = os.path.join(actual_toolkit_root, "spec", "common", "seed_manifest.json")
+        manifest_src = os.path.join(actual_toolkit_root, "seed_templates", "seed_manifest.json")
         if os.path.exists(manifest_src):
             print("Copying seed_manifest.json to spec/common/...")
             shutil.copy2(manifest_src, seed_manifest_target)
@@ -483,6 +483,12 @@ def main():
             s = os.path.join(seed_templates_dir, item)
             d = os.path.join(docs_seed_dir, item)
             if os.path.isfile(s):
+                # Only copy Markdown templates to docs/seed/.  seed_manifest.json
+                # lives in seed_templates/ but belongs in spec/common/ (handled
+                # above in step 3a) — copying it here would place it in the wrong
+                # host location.
+                if not item.endswith(".md"):
+                    continue
                 if not os.path.exists(d):
                     print(f"Copying {item} to docs/seed/...")
                     shutil.copy2(s, d)

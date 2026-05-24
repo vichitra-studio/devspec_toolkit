@@ -80,7 +80,7 @@ All authoritative CLI examples, guardrails, and troubleshooting checklists live 
 - [docs/README.md](docs/README.md) — documentation map.
 - [tools/README.md](tools/README.md) — CLI packaging details.
 
-- [.github/workflows/ci.yml](.github/workflows/ci.yml) — sample workflow generated via `gen-ci`.
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) — the toolkit's own CI pipeline.
 
 ---
 

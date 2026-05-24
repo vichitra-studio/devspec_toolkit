@@ -2650,8 +2650,11 @@ class TestStep16(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "16_impl_context.json"
             p.write_text(json.dumps(data), encoding="utf-8")
-            (Path(td) / "common").mkdir()
-            (Path(td) / "common" / "seed_manifest.json").write_text(
+            # _find_seed_manifest walks up from dirname(spec_path) looking for
+            # spec/common/seed_manifest.json at each level.  Place it at the
+            # path the validator expects so docs_impact validation actually runs.
+            (Path(td) / "spec" / "common").mkdir(parents=True)
+            (Path(td) / "spec" / "common" / "seed_manifest.json").write_text(
                 json.dumps({"doc_paths": ["docs/**/*.md", "CHANGELOG.md"]}), encoding="utf-8"
             )
             from specdev_tools.validation.validators.step_16 import validate_step_16

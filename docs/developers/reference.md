@@ -58,7 +58,7 @@ See [path_conventions.md](path_conventions.md) for canonical path variables (`$P
 ## Scope Lock (`spec_dir`)
 - Enforce scope lock for every repo: set and persist `spec_dir` explicitly instead of inferring from cwd.
 - **Consumer repos** (projects that vendor the toolkit as a submodule): the locked `spec_dir` is `<product-repo>/spec/` — this is where your live spec artifacts live.
-- **Toolkit repo itself**: the locked path is `devspec_toolkit/spec` (not a top-level `spec/`). This contains the toolkit's own baseline specs.
+- **Toolkit repo itself**: the toolkit does not maintain spec waterfall artifacts and does not run spec validation against itself. Seed templates for host bootstrap live in `seed_templates/`.
 - Automation and CI must pass the same `spec_dir` to every command to avoid path-assumption drift.
 
 ## Command Cheatsheet
@@ -196,7 +196,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - Workflow is forward-only.
 - There is no refinement mode.
 - Any accepted upstream change requires full replay of all downstream steps before merge.
-- In strict mode, CI runs quality, hallucination, dependency-order, and replay checks as blocking gates.
+- In strict mode, host-repo CI should run quality, hallucination, dependency-order, and replay checks as blocking gates.
 
 ## Two-Phase AI Runner Mode
 - Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
