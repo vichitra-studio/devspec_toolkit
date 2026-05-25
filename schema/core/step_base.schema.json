@@ -49,7 +49,7 @@
     },
     "seed_refs_ingested": {
       "$ref": "vc:core:collections#seedRefArray",
-      "description": "Optional record of seed documents consumed during generation of this artifact. Each entry captures {seed_id, hash?, version?} so drift detection can identify when the artifact was derived from a seed version that has since changed. Applies mainly to steps 00–02a which read seed documents directly. Anti-pattern: adding entries for seeds the prompt did not actually read — use only for seeds whose content materially shaped this artifact."
+      "description": "Optional record of seed documents consumed during generation of this artifact. Each entry captures {seed_id, hash?, version?} so drift detection can identify when the artifact was derived from a seed version that has since changed. Applies to any step whose prompt reads seed documents directly, as determined by the manifest. Anti-pattern: adding entries for seeds the prompt did not actually read — use only for seeds whose content materially shaped this artifact."
     }
   },
   "required": [

@@ -51,7 +51,7 @@ For each upstream artifact ingested, extract the following:
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/00_charter.json` is present and contains at least one success_metrics entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- All seeds listed for step "07" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["07"] is non-empty).
 
 ## Negative Constraints
 - NEVER invent new owner categories.

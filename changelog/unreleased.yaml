@@ -10,7 +10,7 @@ changes:
     description: "tech_stack field added to Step 02 system sketch as the authoritative source for technology decisions"
     migration:
       action: ai_assisted
-      note: "Use template_infer_missing.md prompt to populate tech_stack from seed_tech_stack.md"
+      note: "Use template_infer_missing.md prompt to populate tech_stack from the seeds declared in spec/common/seed_manifest.json"
   - type: add_constraint
     path: "02_system_sketch.tech_stack"
     description: "tech_stack promoted to required — all 4 categories (languages, frameworks, infrastructure, tools) required"
@@ -65,10 +65,10 @@ changes:
       note: "Populate in future regenerations for steps 00–02a. Absence is allowed — existing artifacts remain valid."
   - type: add_field
     path: "step_order.step_metadata"
-    description: "Per-step declarative metadata (required_spec_inputs, required_seed_inputs). Consistency-linted against downstream_consumers by dependency-order-lint."
+    description: "Per-step declarative metadata (required_spec_inputs). Consistency-linted against downstream_consumers by dependency-order-lint. Note: required_seed_inputs (also shipped in v0.3.0) has been removed in this cycle — see remove_field entries for DEVSPEC-43."
     migration:
       action: automatic
-      note: "Populated for all 22 steps. Bidirectional consistency enforced by _lint_step_metadata_consistency — mismatches emit E543 STEP_METADATA_INCONSISTENT."
+      note: "Populated for all 22 steps. Spec-side consistency enforced by _lint_step_metadata_consistency — mismatches emit E543 STEP_METADATA_INCONSISTENT."
   - type: add_field
     path: "seed_manifest.seeds[*]"
     description: "Optional hash (SHA-256) and version fields on each seed entry for content-integrity tracking by seed-index tooling."
@@ -165,12 +165,20 @@ changes:
     migration:
       action: automatic
       note: "Test-only reorganization. Does not affect live specs."
-  - type: add_validator
-    path: "tools/specdev_tools/validation/dependency_order_lint.py"
-    description: "_lint_step_metadata_seed_consistency — symmetric check that step_metadata.required_seed_inputs matches seed_manifest.step_requirements exactly (unordered set equality). Silently skips when either file or block is absent. Emits E543 STEP_METADATA_INCONSISTENT with a message distinguishing required_seed_inputs from required_spec_inputs."
+  # DEVSPEC-43: _lint_step_metadata_seed_consistency was added in v0.3.0 and removed in this cycle.
+  # The remove_field entries below record both the field removal and the validator removal.
+  - type: remove_field
+    path: "step_order.step_metadata.required_seed_inputs"
+    description: "DEVSPEC-43: required_seed_inputs removed from step_metadata in step_order.json and its schema. Seed routing is now governed exclusively by spec/common/seed_manifest.json step_requirements — maintaining a parallel mirror in step_order.json was redundant and a drift surface. Shipped as added in v0.3.0; removed in this cycle."
     migration:
       action: automatic
-      note: "Existing projects where step_metadata.required_seed_inputs drifted from seed_manifest will now see E543 errors. Reconcile the two sources."
+      note: "Remove any required_seed_inputs keys under step_metadata in step_order.json (toolkit-internal only). Host repos do not reference step_order.json directly — no host-side migration required."
+  - type: remove_validator
+    path: "tools/specdev_tools/validation/dependency_order_lint.py"
+    description: "DEVSPEC-43: _lint_step_metadata_seed_consistency removed. The validator enforced required_seed_inputs <-> seed_manifest.step_requirements consistency; both the field and the lint are gone. E543 STEP_METADATA_INCONSISTENT is retained for the spec-side required_spec_inputs check. Shipped as added in v0.3.0; removed in this cycle."
+    migration:
+      action: automatic
+      note: "No host-facing migration. E543 errors related to required_seed_inputs will no longer fire."
   - type: update_validator
     path: "tools/specdev_tools/validation/validate.py"
     description: "_step16_cache.clear() called at the start of validate_dir. Prevents cross-run accumulation of content-hash cache entries in long-lived processes; the cache remains beneficial as a chain-up dedup within one invocation."
@@ -299,6 +307,62 @@ changes:
     migration:
       action: automatic
       note: "Host repos that used git commit --no-verify to bypass this stop needing to. Host repos that added canonical_conflicts workaround entries see those become inert (still schema-valid; can be removed at author discretion)."
+
+  # ── DEVSPEC-43: Generalised Seed Routing ─────────────────────────────────────
+  - type: update_validator
+    path: "tools/specdev_tools/validation/seed_lint.py"
+    description: "DEVSPEC-43: seed_manifest.json is now the single authoritative source for seed routing for all pipeline steps (00-16c). step_requirements entries for any real pipeline step now actively route seeds to that step's authoring and review. Seed-lint runs whenever a host seed_manifest.json exists (no longer gated on early-step artifacts). W551 directory scans, reviewer/structure/step_16 seed resolution are all manifest-driven — no hardcoded docs/seed/ path or toolkit-side manifest reads."
+    migration:
+      action: manual
+      note: "DEVSPEC-43 migration required. Audit spec/common/seed_manifest.json step_requirements before upgrading: any key for a real pipeline step that was previously inert will now actively route seeds. In particular, a bare 'step_requirements[\"16\"]' entry (previously ignored) now routes its seeds to all trinity sub-phases (16a/16b/16c) — W140 seed-grounding will be enforced across the entire code phase. Remove or correct stale entries to avoid unintended seed ingestion."
+  - type: update_validator
+    path: "tools/specdev_tools/validation/seed_lint.py"
+    description: "DEVSPEC-43: W553 repurposed from SEED_STEP_OUT_OF_RANGE to SEED_STEP_UNKNOWN. Previously fired for any step_requirements key outside the 00-02a range. Now fires only when a step_requirements key is not a recognized pipeline step in step_order.json (e.g. typo '9', non-existent '02b', or out-of-range '17'). Real steps including '16'/'16a'/'16b'/'16c' no longer trigger W553."
+    migration:
+      action: automatic
+      note: "Hosts with phantom/typo step_requirements keys that were previously tolerated will now see W553 SEED_STEP_UNKNOWN warnings. Fix the typos or remove the keys."
+  - type: add_validator
+    path: "tools/specdev_tools/validation/seed_lint.py"
+    description: "DEVSPEC-43: W554 HARDCODED_SEED_REFERENCE (warning-only) — new validator that flags literal seed_*.md filenames re-introduced into prompt files. The manifest is the authoritative source for seed names; hardcoding filenames in prompts duplicates that authority and drifts silently when seed names change. Exposed via the hardcoded-seed-check CLI subcommand and run inside the spec-check gate."
+    migration:
+      action: automatic
+      note: "Warning only. Prompts with literal seed_*.md filenames will surface W554 in spec-check output. Remove the hardcoded filenames and reference seeds via the manifest."
+  - type: add_command
+    path: "tools/specdev_tools/cli.py"
+    description: "DEVSPEC-43: hardcoded-seed-check subcommand — scans all prompt files for literal seed_*.md patterns and reports W554 HARDCODED_SEED_REFERENCE warnings. Supports --json output. Run as standalone regression guard or automatically via spec-check."
+    migration:
+      action: automatic
+      note: "New subcommand, no migration required."
+  - type: fix
+    path: "tools/specdev_tools/context/freshness.py"
+    description: "DEVSPEC-43: check_freshness() now resolves seeds[].path against the host repository root (git_root when provided, otherwise dirname(spec_dir_abs)) via resolve_seed_paths(), honouring the seed_manifest schema contract. The old spec_dir-first heuristic is removed. check_freshness() gains a git_root keyword argument; the context freshness CLI subparser gains --git-root."
+    migration:
+      action: automatic
+      note: "Behavioural change for nested spec layouts (spec_dir not a direct child of host root): pass --git-root to 'specdev context freshness' to ensure seed paths resolve correctly. Standard flat layouts (spec/ at repo root) are unaffected."
+  - type: fix
+    path: "tools/specdev_tools/context/seed_indexer.py"
+    description: "DEVSPEC-43: build_seed_index() now resolves seeds[].path against the host repository root (git_root when provided, otherwise dirname(spec_dir_abs)) via resolve_seed_paths(). The old _resolve_seed_path() helper with its spec_dir-first probe is removed."
+    migration:
+      action: automatic
+      note: "Behavioural change for nested spec layouts: pass --git-root to 'specdev seed-index' to ensure seed paths resolve correctly. Standard flat layouts are unaffected (--git-root was already supported and threaded; now it is used as the primary resolution base rather than a fallback)."
+  - type: fix
+    path: "tools/specdev_tools/context/reviewer.py"
+    description: "DEVSPEC-43: seed distillation in context/reviewer.py now resolves seeds[].path against the host repository root (git_root when provided, otherwise dirname(spec_dir_abs)), matching the resolution semantics applied to freshness.py and seed_indexer.py. The old spec_dir-first probe is removed."
+    migration:
+      action: automatic
+      note: "Behavioural change for nested spec layouts: pass --git-root to 'specdev context review' (new flag) to ensure seed paths resolve correctly. Standard flat layouts are unaffected."
+  - type: add_flag
+    path: "tools/specdev_tools/cli.py"
+    description: "DEVSPEC-43: 'specdev context review' subcommand gains a --git-root argument, mirroring 'context freshness'. Threads git_root into the reviewer seed resolution path so hosts with nested spec layouts can resolve seeds[].path against the correct repository root."
+    migration:
+      action: automatic
+      note: "Optional new flag — existing invocations without --git-root continue to work unchanged. Standard flat layouts are unaffected."
+  - type: fix
+    path: "scripts/init_project.py"
+    description: "DEVSPEC-43: project scaffolding bootstrap now derives seed directories from the template manifest's seeds[].path instead of hardcoding docs/seed/. Each .md template is copied to the relative path declared in its manifest entry. The fallback for templates without a manifest entry uses sorted(seed_parent_dirs)[0] (lexicographically first, deterministic) instead of the previous non-deterministic next(iter(set)) call."
+    migration:
+      action: automatic
+      note: "No host-side migration required. Affects only the initial project bootstrap (specdev init / init_project.py). Host repos already bootstrapped retain their existing seed layout."
 
 deferred:
   - ref: "F-S3 / Phase 1 Task 1.2"

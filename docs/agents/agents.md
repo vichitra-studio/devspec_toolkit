@@ -21,10 +21,10 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
    - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
-   - In prompts, use the sections: `Operating Flow`, `Self‑Audit Gate`, and `Coverage Closure`. Seed-phase prompts (Steps 00–04) additionally include a `Context To Ingest` section.
+   - In prompts, use the sections: `Operating Flow`, `Self‑Audit Gate`, and `Coverage Closure`. Some prompts also include a `Context To Ingest` section; when present, follow it.
 2. **Prepare Context**
    - Read `spec/common/seed_manifest.json` first and ingest required seeds in order.
-   - For seed-phase prompts (Steps 00–04), ingest the paths listed in `Context To Ingest`. For Steps 05–16c, context is resolved via `Coverage Closure` in the `Self‑Audit Gate`.
+   - For every step, ingest the seeds listed in `step_requirements[NN]` (resolved to paths via `seeds[]`, in `global_seed_order` order — read order only, not inclusion) before any other context. For trinity sub-steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the umbrella key). A step with empty or absent `step_requirements[NN]` ingests no seeds; there is no fallback to `global_seed_order`.
    - Build a private ledger per step (e.g., FR ledger, API ledger) as described in `Operating Flow` (do not output it).
 3. **Phase A — Clarify**
    - Apply the `Self‑Audit Gate`. If the private completeness score is < 0.9 or any gating item is missing:
@@ -84,7 +84,7 @@ During Phase A (Clarify), output only a bulleted list of questions grouped by to
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.
 - Honor `interaction_mode` and `phase_triggers` from the manifest; switch phases only when conditions are met.
-- For seed-phase prompts (Steps 00–04), read only the paths listed in “Context To Ingest”; for Steps 05–16c, use the coverage requirements in “Self‑Audit Gate” / “Coverage Closure”. Avoid external sources.
+- For every step, ingest the seeds listed in `step_requirements[NN]` (resolved to paths via `seeds[]`, in `global_seed_order` order — read order only, not inclusion) before any other context. For trinity sub-steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the umbrella key). A step with empty or absent `step_requirements[NN]` ingests no seeds; there is no fallback to `global_seed_order`. Avoid external sources.
 - Build private ledgers in memory only; never persist them or include them in outputs.
 - In Phase A, emit only grouped, concise questions; never include JSON, code fences, or speculative answers.
 - Stop generation when the self‑audit gate is not met; wait for human input rather than guessing.

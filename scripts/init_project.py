@@ -324,6 +324,91 @@ def _install_one_symlink(dst_abs, rel_target, force, label):
         return "skipped_error"
 
 
+def copy_seeds_from_manifest(
+    target_dir: str,
+    seed_templates_dir: str,
+    seed_manifest_path: str,
+) -> set:
+    """Copy .md seed templates into the locations declared in the manifest.
+
+    Reads ``seeds[].path`` from *seed_manifest_path*, builds a stem→declared-path
+    map, derives unique seed parent directories, creates them if necessary, then
+    copies each ``.md`` template from *seed_templates_dir* to its manifest-declared
+    destination (relative to *target_dir*).
+
+    Templates with no manifest entry fall back to the lexicographically first seed
+    parent directory (deterministic across multiple declared parent dirs).  When the
+    manifest is absent or unparseable the fallback directory is ``docs/seed/``.
+
+    Existing destination files are never overwritten.
+
+    Args:
+        target_dir: Absolute path to the host repo root (copy destinations are
+            relative to this directory).
+        seed_templates_dir: Directory containing the ``.md`` template files.
+        seed_manifest_path: Path to the (already-copied) ``seed_manifest.json``.
+
+    Returns:
+        The set of absolute destination paths where files were copied (excludes
+        destinations that were skipped because they already existed).
+    """
+    import json as _json
+
+    stem_to_declared_path: dict = {}
+    if os.path.isfile(seed_manifest_path):
+        try:
+            with open(seed_manifest_path, "r", encoding="utf-8") as _mf:
+                _manifest_data = _json.load(_mf)
+            for _seed_entry in _manifest_data.get("seeds", []):
+                _rel = _seed_entry.get("path", "")
+                if _rel:
+                    _stem = os.path.splitext(os.path.basename(_rel))[0]
+                    stem_to_declared_path[_stem] = _rel
+        except (OSError, _json.JSONDecodeError):
+            pass  # fall back to docs/seed/ default below
+
+    if stem_to_declared_path:
+        seed_parent_dirs = {
+            os.path.join(target_dir, os.path.dirname(p))
+            for p in stem_to_declared_path.values()
+        }
+    else:
+        seed_parent_dirs = {os.path.join(target_dir, "docs", "seed")}
+
+    for _seed_dir in seed_parent_dirs:
+        if not os.path.exists(_seed_dir):
+            print(f"Creating {os.path.relpath(_seed_dir, target_dir)}/ directory...")
+            os.makedirs(_seed_dir)
+
+    # Deterministic fallback — sorted() ensures a stable choice when the manifest
+    # declares multiple distinct parent directories.
+    fallback_seed_dir = sorted(seed_parent_dirs)[0]
+
+    copied: set = set()
+    for item in os.listdir(seed_templates_dir):
+        s = os.path.join(seed_templates_dir, item)
+        if os.path.isfile(s):
+            # Only copy Markdown templates — seed_manifest.json belongs in
+            # spec/common/ (handled above in step 3a), not in a seed dir.
+            if not item.endswith(".md"):
+                continue
+            stem = os.path.splitext(item)[0]
+            if stem in stem_to_declared_path:
+                # Copy to the path declared in the manifest (authoritative)
+                d = os.path.join(target_dir, stem_to_declared_path[stem])
+            else:
+                # Template file has no manifest entry — fall back to the
+                # first declared seed parent dir (or docs/seed/ default)
+                d = os.path.join(fallback_seed_dir, item)
+            if not os.path.exists(d):
+                print(f"Copying {item} to {os.path.relpath(d, target_dir)}...")
+                shutil.copy2(s, d)
+                copied.add(d)
+            else:
+                print(f"Skipping {item} (already exists)")
+    return copied
+
+
 def main():
     parser = argparse.ArgumentParser(description="Initialize DevSpec Toolkit in a project")
     parser.add_argument("--target", default=".", help="Target project directory")
@@ -439,11 +524,11 @@ def main():
     else:
         print("spec/impl_context/ directory already exists.")
 
-    # 4. Init docs/seed directory and copy templates
-    docs_seed_dir = os.path.join(target_dir, "docs", "seed")
-    if not os.path.exists(docs_seed_dir):
-        print("Creating docs/seed/ directory...")
-        os.makedirs(docs_seed_dir)
+    # 4. Init seed directories and copy templates, deriving locations from the
+    #    template manifest's seeds[].path rather than hardcoding docs/seed/.
+    #    This honours the North Star: seed_manifest.json is authoritative for
+    #    seed routing AND location.  seed_manifest.json was already copied in
+    #    step 3a so it is available here.
 
     # 4a. Emit wrapper scripts for venv-enforced CLI usage
     tools_dir = os.path.join(target_dir, "tools")
@@ -479,23 +564,9 @@ def main():
     seed_templates_dir = _find_seed_templates(toolkit_path, script_dir)
     if seed_templates_dir:
         print(f"Found seed templates at {seed_templates_dir}")
-        for item in os.listdir(seed_templates_dir):
-            s = os.path.join(seed_templates_dir, item)
-            d = os.path.join(docs_seed_dir, item)
-            if os.path.isfile(s):
-                # Only copy Markdown templates to docs/seed/.  seed_manifest.json
-                # lives in seed_templates/ but belongs in spec/common/ (handled
-                # above in step 3a) — copying it here would place it in the wrong
-                # host location.
-                if not item.endswith(".md"):
-                    continue
-                if not os.path.exists(d):
-                    print(f"Copying {item} to docs/seed/...")
-                    shutil.copy2(s, d)
-                else:
-                    print(f"Skipping {item} (already exists)")
+        copy_seeds_from_manifest(target_dir, seed_templates_dir, seed_manifest_target)
     else:
-        print("Warning: Seed templates not found. Could not copy seed templates to docs/seed/.")
+        print("Warning: Seed templates not found. Could not copy seed templates.")
 
     rel_toolkit_root = os.path.relpath(actual_toolkit_root, target_dir).replace("\\", "/")
 
@@ -661,7 +732,7 @@ This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/de
 
     print("\nInitialization complete!")
     print("Next steps:")
-    print("1. Fill out docs/seed/seed_overview.md and seed_tech_stack.md")
+    print("1. Fill out the seed files declared in spec/common/seed_manifest.json")
     print(f"2. Activate your environment: source {venv_name}/bin/activate")
     print("3. Start your first spec or run `./tools/run_specdev.sh --help`")
 

@@ -13,14 +13,14 @@ Build a lightweight architecture map that shows the components required to deliv
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_tech_stack.md** (required): Technology decisions (languages, frameworks, infrastructure, tools), architecture patterns, deployment topology, and technology constraints for both component design and tech_stack population
+- **Seeds**: per spec/common/seed_manifest.json step_requirements["02"]
 - **00_charter.json**: Scope boundaries, system context, integration points, and deployment constraints for component identification
 - **01_capabilities.json**: Capability IDs and owners to map to components; scope boundaries to determine component set; use only upstream artifacts — do not ingest downstream interface, glossary, or NFR specs in this step
 
 ## Operating Flow: Decompose → Resolve Tech → Connect → Verify → Emit
 
 - **Decompose**: Break down the system into components (services, stores, clients, gateways) from charter scope and capabilities.
-- **Resolve Tech**: Extract technology decisions from `docs/seed/seed_tech_stack.md` into the `tech_stack` field. For each category (languages, frameworks, infrastructure, tools): resolve `[AUTO-DERIVE]` markers using system type, component types, and charter constraints. Validate consistency — a component of `type: db` should have a matching entry in `tech_stack.infrastructure`. Challenge version specificity: "Python 3" should become "Python 3.12" with rationale.
+- **Resolve Tech**: Extract technology decisions from the seeds ingested for this step into the `tech_stack` field. For each category (languages, frameworks, infrastructure, tools): resolve `[AUTO-DERIVE]` markers using system type, component types, and charter constraints. Validate consistency — a component of `type: db` should have a matching entry in `tech_stack.infrastructure`. Challenge version specificity: "Python 3" should become "Python 3.12" with rationale.
 - **Connect**: Map data flows, integration points, and trust boundaries between components.
 - **Verify**: Check that every in-scope capability maps to ≥1 component; no capability is architecturally orphaned.
 - **Emit**: Write artifact when all components are connected and trust boundaries are explicit.
@@ -29,7 +29,7 @@ For each upstream artifact ingested, extract the following:
 - Step 01 (Capabilities) is required input.
 - Do not depend on downstream specs; when interface/security/perf details are unknown, use `-tbd` or ask Gap Questions.
 - Build a private Context Ledger of components (id, type, responsibilities, owner, tags) derived from capabilities and current systems; enumerate all connections (from→to, protocol, trust_boundary, auth, rate_limit, reliability, schema_ref). Do not output it.
-- **Cross-Check**: Verify each connection's `auth` and `reliability` against constraints listed in `spec/00_charter.json` and `docs/seed/seed_tech_stack.md`. Do not assume missing constraints.
+- **Cross-Check**: Verify each connection's `auth` and `reliability` against constraints listed in `spec/00_charter.json` and the ingested seeds. Do not assume missing constraints.
 - Self-audit; if a capability lacks a responsible component or a connection is underspecified, ask Gap Questions.
 - Rewrite responsibilities into specific, testable bullets per component (each bullet MUST name a concrete action and data domain); complete connection details based on protocols and policy; ensure IDs are stable.
 - Emit JSON once reconciled.
@@ -39,14 +39,14 @@ For each upstream artifact ingested, extract the following:
 - Trust-boundary auth rules are authoritative; do not infer auth from protocol alone.
 - External integrations: connections touching `type: external` components MUST use `trust_boundary` of `partner` or `public`; MUST populate `auth` with a value from the schema enum.
 - Implicit mapping: responsibilities MUST cover all in-scope capabilities from `spec/01_capabilities.json`; if a capability has no responsible component, MUST propose a new component to own it.
-- Ambiguity scrub: MUST NOT use generic phrases like “owns data” or “manages resources”; MUST specify the data domain (read from `spec/01_capabilities.json` inputs/outputs) and quantitative SLAs (read from `docs/seed/seed_tech_stack.md` constraints).
-- MUST populate `tech_stack` with at least one entry in each of `languages`, `frameworks`, `infrastructure`, and `tools`. MUST resolve any `[AUTO-DERIVE]` markers from `docs/seed/seed_tech_stack.md` into concrete technology choices with version and rationale. MUST cross-check that `type: db` components have corresponding `tech_stack.infrastructure` entries.
+- Ambiguity scrub: MUST NOT use generic phrases like “owns data” or “manages resources”; MUST specify the data domain (read from `spec/01_capabilities.json` inputs/outputs) and quantitative SLAs (read from ingested seeds).
+- MUST populate `tech_stack` with at least one entry in each of `languages`, `frameworks`, `infrastructure`, and `tools`. MUST resolve any `[AUTO-DERIVE]` markers from the ingested seeds into concrete technology choices with version and rationale. MUST cross-check that `type: db` components have corresponding `tech_stack.infrastructure` entries.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/00_charter.json` is present and contains at least one in_scope entry.
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- All seeds listed for step "02" in `spec/common/seed_manifest.json` are present and non-empty.
 
 ## Negative Constraints
 DO NOT:
@@ -64,7 +64,7 @@ Before emitting, verify:
 - Every `capability_id` from `spec/01_capabilities.json` is reflected in ≥1 component's `trace` or `links`, OR explicitly listed in `out_of_scope` with rationale.
 - No capability is left without an architectural home — every capability must be owned by a `component_id`.
 - All `owner` values on components resolve to owner enums defined in canonical registry or `spec/01_capabilities.json`.
-- All tech choices align with constraints in `docs/seed/seed_tech_stack.md`; no stack choice contradicts a seed constraint.
+- All tech choices align with constraints in the ingested seeds; no stack choice contradicts a seed constraint.
 - If any capability cannot be assigned to a component: add a gap question (Clarify mode) rather than omitting it.
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -75,7 +75,7 @@ Before emitting, verify:
 - [ ] All trust zone boundaries are explicit — no component straddles multiple trust zones silently
 - [ ] Every external system dependency is represented as a distinct component with interface type defined
 - [ ] `tech_stack` has at least one entry per category (languages, frameworks, infrastructure, tools)
-- [ ] Every `[AUTO-DERIVE]` marker from seed_tech_stack.md has been resolved to a concrete choice
+- [ ] Every `[AUTO-DERIVE]` marker from the ingested seeds has been resolved to a concrete choice
 - [ ] Database/cache/queue component types have matching infrastructure entries in tech_stack
 
 ## Step-Specific Completeness Checklist
@@ -85,7 +85,7 @@ Before emitting, verify:
 - Protocols/auth match real integration constraints (e.g., gRPC with mTLS, events with exactly-once semantics where needed).
 - Include reliability semantics on event/async paths; specify rate limits where known.
 - Tag external dependencies and their owners; `type: external` must include the `external-dependency` tag.
-- `tech_stack` covers all technology decisions from `docs/seed/seed_tech_stack.md`; each entry has `name`, `version`, and `rationale` (rationale required for all non-obvious choices).
+- `tech_stack` covers all technology decisions from the ingested seeds; each entry has `name`, `version`, and `rationale` (rationale required for all non-obvious choices).
 - Infrastructure entries in `tech_stack` are consistent with component types (db, cache, queue) declared in `components`.
 
 ## Best Practices

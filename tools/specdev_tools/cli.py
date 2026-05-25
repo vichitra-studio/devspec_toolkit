@@ -392,6 +392,10 @@ def main():
     eic.add_argument("--repo-root", default=".")
     eic.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    hsc = sub.add_parser("hardcoded-seed-check", help="Detect literal seed-doc filenames in prompts (W554 regression guard)")
+    hsc.add_argument("--repo-root", default=".")
+    hsc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
+
     ub = sub.add_parser(
         "upstream-backlog",
         help="Aggregate emergent_ambiguities across impl_context plans by implicated upstream step (read-only)",
@@ -443,6 +447,7 @@ def main():
     ctx_fresh = ctx_sub.add_parser("freshness")
     ctx_fresh.add_argument("spec_dir")
     ctx_fresh.add_argument("--repo-root", default=".")
+    ctx_fresh.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
 
     ctx_review = ctx_sub.add_parser("review")
     ctx_review.add_argument("artifact_path")
@@ -450,6 +455,7 @@ def main():
     ctx_review.add_argument("--entry", default=None)
     ctx_review.add_argument("--spec-dir", default=None)
     ctx_review.add_argument("--repo-root", default=".")
+    ctx_review.add_argument("--git-root", default=None, help="Host repo git root (for submodule deployments)")
 
     # --- json subcommand group ---
     json_p = sub.add_parser(
@@ -1701,6 +1707,15 @@ def main():
         else:
             _print_and_exit_if_errors(errs)
 
+    elif args.cmd == "hardcoded-seed-check":
+        from .validation.seed_lint import check_hardcoded_seed_reference
+        repo_root = os.path.abspath(args.repo_root)
+        errs = check_hardcoded_seed_reference(repo_root)
+        if getattr(args, "json_output", False):
+            _json_exit(errs, "hardcoded-seed-check")
+        else:
+            _print_and_exit_if_errors(errs)
+
     elif args.cmd == "upstream-backlog":
         from .analysis.upstream_backlog import run as run_upstream_backlog
         spec_dir_abs = os.path.abspath(args.spec_dir)
@@ -1809,7 +1824,8 @@ def main():
                 print(json.dumps(result, indent=2))
             elif context_cmd == "freshness":
                 spec_dir = os.path.abspath(args.spec_dir)
-                result = check_freshness(spec_dir, repo_root)
+                git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+                result = check_freshness(spec_dir, repo_root, git_root=git_root)
                 print(json.dumps(result, indent=2))
                 # Emit W595 (CONTENT_STALENESS) for any stale seed — §A6
                 stale_seeds = [
@@ -1831,12 +1847,14 @@ def main():
                 from .context.reviewer import review_artifact
                 import dataclasses
                 artifact_path = os.path.abspath(args.artifact_path)
+                git_root = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
                 result = review_artifact(
                     artifact_path,
                     args.step,
                     os.path.abspath(args.spec_dir) if getattr(args, "spec_dir", None) else os.path.dirname(artifact_path),
                     repo_root,
                     entry_id=getattr(args, "entry", None),
+                    git_root=git_root,
                 )
                 print(json.dumps(dataclasses.asdict(result), indent=2))
             else:

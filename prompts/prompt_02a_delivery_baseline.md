@@ -16,24 +16,24 @@ For each upstream artifact ingested, extract the following:
 - **00_charter.json**: Deployment targets, compliance requirements, and operational constraints for environment scoping
 - **01_capabilities.json**: Capability owners and operational modes to determine environment tier requirements and CI pipeline stages
 - **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
-- **docs/seed/seed_tech_stack.md**: Runtime versions, cloud providers, and infrastructure constraints for environment definitions
+- **Seeds**: per spec/common/seed_manifest.json step_requirements["02a"]
 - **Current CI configs** (if present): Existing pipeline configuration and `$TOOLKIT_ROOT/tests/run.sh` usage for gate alignment
 
 ## Operating Flow: Enumerate → Baseline → Validate → Emit
-- **Enumerate**: List all deployment stages and environments from seed_tech_stack.md.
+- **Enumerate**: List all deployment stages and environments from the seeds ingested for this step.
 - **Baseline**: Capture infrastructure constraints, SLA targets, and deployment dependencies per environment.
 - **Validate**: Verify every stage has a complete definition; no environment name is undefined.
 - **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
-- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or `docs/seed/seed_tech_stack.md` reference regulatory frameworks.
+- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
 - Staging parity: staging should reflect prod's configuration as closely as possible; explicitly document any intentional deviations with rationale.
 - Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/02_system_sketch.json` is present and contains at least one component entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- All seeds listed for step "02a" in `spec/common/seed_manifest.json` are present and non-empty.
 - `spec/00_charter.json` is present and contains at least one in_scope entry.
 
 ## Negative Constraints
@@ -53,7 +53,7 @@ Before emitting, verify:
 - [ ] Every upstream ID referenced in extraction intent has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
 - [ ] All required fields populated from actual upstream data (not hallucinated)
-- [ ] Every deployment stage from seed_tech_stack.md is represented
+- [ ] Every deployment stage identified in the ingested seeds is represented
 - [ ] All environment-specific constraints and SLA targets are explicitly defined
 - [ ] No environment name referenced in other spec files is missing from this baseline
 

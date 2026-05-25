@@ -149,22 +149,23 @@ def _run_checks(
     }
 
     # --- 8. Seed lint ---
-    seed_applicable = any(
-        os.path.isfile(os.path.join(spec_dir, f))
-        for f in ("00_charter.json", "01_capabilities.json", "02_system_sketch.json", "02a_ux_sketch.json")
+    # project_root must be computed before the gate so the manifest-existence
+    # check can use it.  It is also passed to lint_seeds when the gate is True.
+    project_root = os.path.dirname(spec_dir) if git_root is None else git_root
+    seed_applicable = os.path.exists(
+        os.path.join(project_root, "spec", "common", "seed_manifest.json")
     )
     if seed_applicable:
         from .seed_lint import lint_seeds
 
         # For submodule deployments, seed docs are in the host repo (git_root),
         # not in the toolkit root. Pass project_root so seeds resolve correctly.
-        project_root = os.path.dirname(spec_dir) if git_root is None else git_root
         seed_errs = lint_seeds(repo_root, spec_dir, project_root=project_root)
         checks["seed-lint"] = {**_classify(seed_errs), "errors": seed_errs}
     else:
         checks["seed-lint"] = {
             "status": "SKIP",
-            "reason": "no steps 00-02a present",
+            "reason": "seed_manifest.json not present",
         }
 
     # --- 9. Fixtures lint ---
@@ -212,6 +213,20 @@ def _run_checks(
         checks["registry-check"] = {
             "status": "SKIP",
             "reason": "entry_key_registry.json not present",
+        }
+
+    # --- 12. Hardcoded seed reference check (W554) ---
+    # Always runs when a prompts/ directory exists under repo_root.
+    prompts_dir = os.path.join(repo_root, "prompts")
+    if os.path.isdir(prompts_dir):
+        from .seed_lint import check_hardcoded_seed_reference
+
+        hsr_errs = check_hardcoded_seed_reference(repo_root)
+        checks["hardcoded-seed-check"] = {**_classify(hsr_errs), "errors": hsr_errs}
+    else:
+        checks["hardcoded-seed-check"] = {
+            "status": "SKIP",
+            "reason": "prompts/ directory not present",
         }
 
     # --- 13. Glossary drift ---

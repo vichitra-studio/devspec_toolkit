@@ -13,13 +13,13 @@ class TestSeedPropagationTrim(unittest.TestCase):
     """Verify seed manifest and helper validation."""
 
     def test_collect_required_seeds_empty_for_unlisted_step(self):
-        """_collect_required_seeds returns empty set for steps not in step_requirements."""
+        """_collect_required_seeds returns empty list for steps not in step_requirements."""
         manifest = {
             "global_seed_order": ["seed-overview", "seed-tech-stack"],
             "step_requirements": {"00": ["seed-overview"]},
         }
         result = _collect_required_seeds(manifest, "07")
-        self.assertEqual(result, set(), f"Step 07 should have no required seeds. Got: {result}")
+        self.assertEqual(result, [], f"Step 07 should have no required seeds. Got: {result}")
 
     def test_collect_required_seeds_returns_only_declared_seeds(self):
         """_collect_required_seeds returns only seeds declared in step_requirements, not all global seeds."""
@@ -33,13 +33,13 @@ class TestSeedPropagationTrim(unittest.TestCase):
         self.assertNotIn("seed-tech-stack", result)
 
     def test_step_16_no_sub_steps_in_requirements(self):
-        """Step 16 with no 16a/16b/16c in step_requirements should require no seeds."""
+        """Step 16 with no 16/16a/16b/16c in step_requirements should require no seeds."""
         manifest = {
             "global_seed_order": ["seed-overview", "seed-tech-stack"],
             "step_requirements": {"00": ["seed-overview"]},
         }
         result = _collect_required_seeds(manifest, "16")
-        self.assertEqual(result, set(), f"Step 16 should have no required seeds. Got: {result}")
+        self.assertEqual(result, [], f"Step 16 should have no required seeds. Got: {result}")
 
 
 if __name__ == "__main__":

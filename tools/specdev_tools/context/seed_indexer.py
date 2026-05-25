@@ -3,6 +3,11 @@
 Hashes seed documents listed in seed_manifest.json and writes
 seed_requirements.json so that the freshness checker can detect
 when seeds have changed since a spec was last written.
+
+Seed paths are resolved relative to the host repository root (``git_root``
+when provided, otherwise the parent of ``spec_dir``).  This honours
+``seed_manifest.json``'s contract that ``seeds[].path`` is relative to the
+repository root, not relative to the spec directory.
 """
 from __future__ import annotations
 
@@ -12,6 +17,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+from ..core.seed_routing import resolve_seed_paths
+
 
 def _sha256_file(path: str) -> str:
     """Compute the SHA-256 hex digest of a file and return ``sha256:<hex>``."""
@@ -20,30 +27,6 @@ def _sha256_file(path: str) -> str:
         for chunk in iter(lambda: fh.read(65536), b""):
             h.update(chunk)
     return f"sha256:{h.hexdigest()}"
-
-
-def _resolve_seed_path(
-    rel_path: str,
-    spec_dir_abs: str,
-    git_root: str | None,
-) -> str | None:
-    """Resolve a seed path using the same two-pass logic as freshness.py.
-
-    1. Try relative to spec_dir.
-    2. Fallback: relative to git_root (or parent of spec_dir if git_root is None).
-
-    Returns the absolute path if the file exists, or None.
-    """
-    abs_path = os.path.join(spec_dir_abs, rel_path)
-    if os.path.isfile(abs_path):
-        return abs_path
-
-    fallback_base = git_root if git_root else os.path.dirname(spec_dir_abs)
-    abs_path = os.path.join(fallback_base, rel_path)
-    if os.path.isfile(abs_path):
-        return abs_path
-
-    return None
 
 
 def build_seed_index(
@@ -60,9 +43,12 @@ def build_seed_index(
     repo_root:
         Path to the devspec_toolkit repo root (for API consistency).
     git_root:
-        Host repo root for submodule deployments. When provided, used as
-        the fallback base for resolving seed paths. When None, falls back
-        to the parent of *spec_dir*.
+        Host repository root.  When provided, ``seeds[].path`` entries from
+        the manifest are resolved relative to this directory — honouring the
+        schema contract that paths are "relative to the repository root".
+        When ``None``, falls back to ``os.path.dirname(spec_dir_abs)``, which
+        is correct for the standard flat layout (host root contains ``spec/``
+        as a direct child).
 
     Returns
     -------
@@ -71,6 +57,7 @@ def build_seed_index(
     """
     _ = repo_root  # accepted for API consistency
     spec_dir_abs = os.path.abspath(spec_dir)
+    host_root = git_root if git_root else os.path.dirname(spec_dir_abs)
     warnings: list[str] = []
 
     # 1. Load seed_manifest.json
@@ -88,28 +75,38 @@ def build_seed_index(
     if not seeds_list:
         return {}, [f"W595 EMPTY_MANIFEST no seeds listed in {manifest_path}"]
 
-    # 2. Hash each seed
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    seeds_index: dict[str, Any] = {}
-
+    # 2. Collect seed IDs that have a path declared (warn on missing paths).
+    all_seed_ids: list[str] = []
+    no_path_ids: set[str] = set()
     for seed_entry in seeds_list:
         if not isinstance(seed_entry, dict):
             continue
         seed_id = seed_entry.get("seed_id")
         if not seed_id:
             continue
-
-        rel_path = seed_entry.get("path") or seed_entry.get("file")
+        rel_path = seed_entry.get("path")
         if not rel_path:
             warnings.append(
                 f"W595 MISSING_PATH seed '{seed_id}' has no path in manifest"
             )
+            no_path_ids.add(seed_id)
             continue
+        all_seed_ids.append(seed_id)
 
-        abs_path = _resolve_seed_path(rel_path, spec_dir_abs, git_root)
-        if abs_path is None:
+    # 3. Resolve paths via host_root (authoritative per seed_manifest schema).
+    #    resolve_seed_paths joins each seeds[].path against host_root and does
+    #    NOT existence-filter — we check os.path.isfile ourselves below.
+    resolved_paths = resolve_seed_paths(manifest, all_seed_ids, host_root)
+
+    # 4. Hash each seed
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    seeds_index: dict[str, Any] = {}
+
+    for seed_id in all_seed_ids:
+        abs_path = resolved_paths.get(seed_id)
+        if abs_path is None or not os.path.isfile(abs_path):
             warnings.append(
-                f"W595 SEED_NOT_FOUND seed '{seed_id}' file not found: {rel_path}"
+                f"W595 SEED_NOT_FOUND seed '{seed_id}' file not found"
             )
             continue
 
@@ -118,7 +115,7 @@ def build_seed_index(
             "indexed_at": now,
         }
 
-    # 3. Write seed_requirements.json
+    # 5. Write seed_requirements.json
     output = {
         "$schema": "vc:seed-requirements",
         "seeds": seeds_index,

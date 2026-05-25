@@ -28,11 +28,11 @@ Before starting, ensure your current specs are clean and valid.
 
 1.  **Step 00: Seed Docs & Charter**:
     *   **Check**: Does this feature change the project overview (Success Metrics/Users)?
-    *   **Action**: Update `docs/seed/seed_overview.md` first, then update `spec/00_charter.json`.
+    *   **Action**: Update the overview seed declared in `spec/common/seed_manifest.json` first, then update `spec/00_charter.json`.
     *   *Reference*: `prompts/prompt_00_project_charter.md`.
 2.  **Step 01: Capabilities & Stack**:
     *   **Check**: Does this introduce a new Tech Stack element (e.g., Redis)?
-    *   **Action**: Update `docs/seed/seed_tech_stack.md` first, then update `spec/01_capabilities.json`.
+    *   **Action**: Update the tech-stack seed declared in `spec/common/seed_manifest.json` first, then update `spec/01_capabilities.json`.
     *   *Reference*: `prompts/prompt_01_capabilities.md`.
 3.  **Step 02: System Sketch**: Does this add a new Component? Update the diagram.
     *   *Reference*: `prompts/prompt_02_system_sketch.md`.
@@ -46,7 +46,7 @@ Before starting, ensure your current specs are clean and valid.
 **User Action:**
 > **PROMPT:**
 > I am adding feature [Name].
-> 1. Check `docs/seed/seed_overview.md` and `docs/seed/seed_tech_stack.md`. Do they need updates?
+> 1. Check the seeds declared in `spec/common/seed_manifest.json` for steps 00 and 01. Do they need updates?
 > 2. Iterate through Specs 00, 01, 02, 03, and 04.
 > Ask me if updates are needed for each.
 > Use each step's canonical prompt (`prompts/prompt_NN_name.md`) and emit updated JSON directly to `spec/NN_name.json`.

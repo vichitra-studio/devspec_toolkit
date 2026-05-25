@@ -51,7 +51,7 @@
       ],
       "properties": {
         "kind": {
-          "description": "Taxonomy bucket (Proposal K §4.1). 'gap' = required content missing; 'miss' = incomplete upstream coverage; 'bug' = factually wrong against schema/upstream/canon; 'regression' = downstream broken by upstream change; 'assumption' = un-grounded inference; 'ambiguity' = multiple valid readings or precedence conflict; 'hallucination' = invented ID/enum/command/path/canon-ref; 'drift' = artifact-vs-reality or artifact-vs-artifact divergence; 'coverage' = trace/fixture/NFR mapping incomplete; 'determinism' = non-reproducible decision, racy invariant, free-text where enum expected; 'seed-grounding' = artifact ignores or contradicts Phase-0 seed content (seeds listed in spec/common/seed_manifest.json global_seed_order or step_requirements[NN]).",
+          "description": "Taxonomy bucket (Proposal K §4.1). 'gap' = required content missing; 'miss' = incomplete upstream coverage; 'bug' = factually wrong against schema/upstream/canon; 'regression' = downstream broken by upstream change; 'assumption' = un-grounded inference; 'ambiguity' = multiple valid readings or precedence conflict; 'hallucination' = invented ID/enum/command/path/canon-ref; 'drift' = artifact-vs-reality or artifact-vs-artifact divergence; 'coverage' = trace/fixture/NFR mapping incomplete; 'determinism' = non-reproducible decision, racy invariant, free-text where enum expected; 'seed-grounding' = artifact ignores or contradicts seed content the step is required to ingest (per spec/common/seed_manifest.json step_requirements[NN]; global_seed_order governs read order only).",
           "type": "string",
           "enum": [
             "gap",

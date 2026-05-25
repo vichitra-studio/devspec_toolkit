@@ -18,7 +18,7 @@ from .step_16a import validate_step_16a
 _EXECUTION_STATUSES = frozenset({"passed", "failed", "blocked", "partial"})
 
 
-def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
+def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
     """Deep validation for Step 16b (Execute phase).
 
     A 16b artifact is a 16a plan augmented with an ``execution`` section.
@@ -26,7 +26,7 @@ def validate_step_16b(data: dict[str, Any], toolkit_root: str, spec_path: Option
     execution-result checks below.  Chains up through ``validate_step_16a``,
     which itself chains through ``validate_step_16`` (base).
     """
-    errors = validate_step_16a(data, toolkit_root, spec_path)
+    errors = validate_step_16a(data, toolkit_root, spec_path, spec_root)
 
     execution = data.get("execution", {})
     if not isinstance(execution, dict):

@@ -42,7 +42,7 @@ Read is allowed for:
 - `devspec_toolkit/prompts/prompt_NN_*.md` (step authoring contracts)
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline)
 - `devspec_toolkit/.claude/skills/` (skill files)
-- `docs/seed/*.md` (Phase-0 seed docs referenced from `spec/common/seed_manifest.json`)
+- `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`)
 
 Do NOT Read any file under `spec/` directly. Use `specdev json read` with a filter.
 Unfiltered `specdev json read <file>` (no filter) is banned — always pass a jq filter.
@@ -124,7 +124,7 @@ Emit findings across all applicable kinds. Trigger conditions:
 | `drift` | Artifact-vs-reality or artifact-vs-sibling-artifact divergence |
 | `coverage` | Trace, fixture, or NFR mapping is incomplete |
 | `determinism` | Non-reproducible decision, racy invariant, or free-text where an enum is expected |
-| `seed-grounding` | Artifact ignores or contradicts Phase-0 seed content (seeds listed in `spec/common/seed_manifest.json` `global_seed_order` or `step_requirements[NN]`) |
+| `seed-grounding` | Artifact ignores or contradicts seed content the step is required to ingest (per `spec/common/seed_manifest.json` `step_requirements[NN]`; `global_seed_order` governs read order only) |
 
 Severity defaults:
 - P0 (blocks convergence): `gap`, `bug`, `regression`, `hallucination`, `seed-grounding`
@@ -220,13 +220,14 @@ If validation fails, fix the output before returning. Do not return an invalid f
 ## Operating procedure
 
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline).
-1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs: read all entries in
-    `global_seed_order` and `step_requirements[NN]` for the in-scope step(s):
+1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs to ingest: read
+    `step_requirements[NN]` for the in-scope step(s) — this is the authoritative inclusion set;
+    `global_seed_order` governs read order only (a step with empty or absent `step_requirements[NN]`
+    has no seeds — there is no fallback to `global_seed_order`):
     ```bash
-    specdev json read spec/common/seed_manifest.json '.global_seed_order'
     specdev json read spec/common/seed_manifest.json '.step_requirements."<NN>"'
     ```
-    Both commands return arrays of seed IDs (e.g. `"seed-tech-stack"`, `"decision-clarifications"`),
+    This returns an array of seed IDs (e.g. `"seed-tech-stack"`, `"decision-clarifications"`),
     NOT file paths. For each seed ID, resolve it to a file path via:
     ```bash
     specdev json read spec/common/seed_manifest.json \
@@ -236,8 +237,8 @@ If validation fails, fix the output before returning. Do not return an invalid f
     ```bash
     specdev json read spec/common/seed_manifest.json '.seeds[] | {seed_id, path}'
     ```
-    Then `Read` each resolved path. Seed docs frame the Phase-0 architecture every
-    artifact must respect.
+    Then `Read` each resolved path. Seed docs frame the architecture every artifact
+    must respect.
 2. Run shape probes (`json structure`, `json keys`) on in-scope artifacts.
 3. Read in-scope artifacts via targeted `specdev json read` with jq filters.
    Never Read `spec/*.json` directly.

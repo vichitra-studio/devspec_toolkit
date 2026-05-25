@@ -36,10 +36,6 @@ Detailed breakdowns of the spec lifecycle phases:
 - **[Governance Architecture](architecture/governance_architecture.md)**: Design of the governance and validation system.
 - **[ADR: Template Engine](ops/adr_template_engine.md)**: Decision record for the migration prompt template renderer.
 - **[Toolkit Update Checklist](ops/toolkit_update_checklist.md)**: Steps for releasing a new toolkit version.
-- **[Plans](plans/)**: Optimisation backlog and governance roadmap.
-  - **[Optimisation Backlog](plans/optimisation_backlog.md)**: Tracked performance and UX improvements.
-  - **[Future Extensions](plans/future_extensions.md)**: Planned capability additions.
-  - **[Phase 0 Governance Plan](plans/phase_0_governance_plan.md)**: Governance rollout strategy.
 
 ---
 

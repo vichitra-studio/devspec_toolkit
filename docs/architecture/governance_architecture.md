@@ -122,35 +122,13 @@ Defined in `tools/step_order.json`.
 
 Defined in `spec/common/seed_manifest.json`.
 
-**Core rule:** Seeds feed Steps 00-04 only. Steps 05+ derive exclusively from structured spec artifacts.
-
-**`step_requirements` map:**
-
-| Step | Required seeds |
-|---|---|
-| `00` | `seed-overview`, `seed-tech-stack` |
-| `01` | `seed-overview` |
-| `02` | `seed-tech-stack` |
-| `02a` | `seed-tech-stack` |
-| `03` | `seed-overview` |
-| `04` | `seed-overview` |
-
-Steps not listed (05-16c) have no seed requirements. The `seed-lint` command validates that only steps within the seed boundary (00-04) reference seed documents.
-
-**Seed inventory:**
-
-| seed_id | path | required |
-|---|---|---|
-| `seed-overview` | `docs/seed/seed_overview.md` | yes |
-| `seed-tech-stack` | `docs/seed/seed_tech_stack.md` | yes |
-
-Both are `source_type: "doc"` and belong to the `foundation` nesting level.
+**Routing is manifest-driven:** `spec/common/seed_manifest.json` is the single authoritative source for which seeds apply to which steps and where they live. The `step_requirements` map in the manifest defines per-step seed requirements; the `seeds[]` array defines each seed's `path` and metadata. Any step — across the full 00–16c waterfall — may declare seed requirements via `step_requirements[NN]`. Steps not listed (or with an empty array) require no seeds; `global_seed_order` governs only the read order of step-required seeds. The `seed-lint` command validates that all referenced seed IDs are declared in the manifest and that each step's usage is consistent with its manifest entry.
 
 ---
 
 ## Prompt Architecture (Post-Sanitization)
 
-Prompts for Steps 05-16c no longer contain "Context To Ingest" sections. This was a deliberate sanitization to enforce a clean separation:
+Prompts no longer contain "Context To Ingest" sections. This was a deliberate sanitization to enforce a clean separation:
 
 - **Prompts** define output contracts (JSON schema URI, required fields, validation rules) and operating flows (Clarify/Emit protocol, self-audit gates).
 - **Orchestration layer** is responsible for assembling and delivering context (upstream artifacts, seed docs, canon entries) to the AI runner.

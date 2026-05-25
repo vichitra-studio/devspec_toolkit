@@ -51,7 +51,7 @@ are rejected by the validator. If `build_status` is `green`, at least one
 validator must be listed; downgrade to `pending` during migration if validators
 have not yet been confirmed. The `project_skeleton.language` and `framework`
 values drive code generation in Step 16b, so ensure they accurately reflect the
-target tech stack from `seed_tech_stack.md`.
+target tech stack from the seeds listed for step "15" in `spec/common/seed_manifest.json`.
 
 
 ## Full Generation Reference

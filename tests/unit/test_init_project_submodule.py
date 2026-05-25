@@ -1,13 +1,12 @@
-"""Tests for init_project.py pre-commit config generation."""
+"""Tests for init_project.py pre-commit config generation and seed bootstrap."""
+import json
 import os
 import sys
-
-import pytest
 
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
-from init_project import _build_pre_commit_config
+from init_project import _build_pre_commit_config, copy_seeds_from_manifest
 
 
 class TestBuildPreCommitConfig:
@@ -39,3 +38,104 @@ class TestBuildPreCommitConfig:
         content = _build_pre_commit_config("my_toolkit")
         assert "./devspec_toolkit" not in content
         assert "./my_toolkit" in content
+
+
+class TestManifestDerivedSeedBootstrap:
+    """Verify that seed templates land at the paths declared in seeds[].path,
+    not at a hardcoded docs/seed/ location."""
+
+    def _make_seed_manifest(self, target_dir, seed_paths):
+        """Write a minimal seed_manifest.json with the given seed path entries."""
+        seeds = []
+        for rel_path in seed_paths:
+            stem = os.path.splitext(os.path.basename(rel_path))[0]
+            seed_id = stem.replace("_", "-")
+            seeds.append({"seed_id": seed_id, "path": rel_path})
+        manifest = {
+            "$schema": "vc:seed-manifest",
+            "seed_manifest_id": "test-manifest",
+            "version": "0.1.0",
+            "seeds": seeds,
+        }
+        common_dir = os.path.join(target_dir, "spec", "common")
+        os.makedirs(common_dir, exist_ok=True)
+        manifest_path = os.path.join(common_dir, "seed_manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2)
+        return manifest_path
+
+    def _make_seed_templates(self, templates_dir, filenames):
+        """Create stub .md template files."""
+        os.makedirs(templates_dir, exist_ok=True)
+        for name in filenames:
+            with open(os.path.join(templates_dir, name), "w") as f:
+                f.write(f"# {name}\n")
+
+    def test_seeds_land_at_manifest_declared_paths(self, tmp_path):
+        """Files must be copied to the exact relative paths in seeds[].path."""
+        declared_paths = [
+            "docs/seed/seed_overview.md",
+            "docs/seed/seed_tech_stack.md",
+        ]
+        manifest_path = self._make_seed_manifest(str(tmp_path), declared_paths)
+
+        templates_dir = str(tmp_path / "seed_templates")
+        self._make_seed_templates(templates_dir, ["seed_overview.md", "seed_tech_stack.md"])
+
+        copy_seeds_from_manifest(str(tmp_path), templates_dir, manifest_path)
+
+        # Read back the manifest and assert each declared path exists on disk
+        with open(manifest_path) as f:
+            manifest_data = json.load(f)
+        for entry in manifest_data["seeds"]:
+            expected = tmp_path / entry["path"]
+            assert expected.exists(), (
+                f"Expected seed file at {entry['path']} (declared in manifest) "
+                f"but it was not created."
+            )
+
+    def test_seeds_land_at_non_default_path_when_manifest_declares_it(self, tmp_path):
+        """When the manifest declares a non-docs/seed path the file must land
+        there — proving the logic is manifest-driven, not hardcoded."""
+        declared_paths = ["content/seeds/seed_overview.md"]
+        manifest_path = self._make_seed_manifest(str(tmp_path), declared_paths)
+
+        templates_dir = str(tmp_path / "seed_templates")
+        self._make_seed_templates(templates_dir, ["seed_overview.md"])
+
+        copy_seeds_from_manifest(str(tmp_path), templates_dir, manifest_path)
+
+        expected = tmp_path / "content" / "seeds" / "seed_overview.md"
+        assert expected.exists(), (
+            "Expected seed file at content/seeds/seed_overview.md "
+            "(non-default path declared in manifest) but it was not created."
+        )
+        # The hardcoded default must NOT have been used
+        assert not (tmp_path / "docs" / "seed" / "seed_overview.md").exists(), (
+            "File was placed at the hardcoded docs/seed/ path instead of "
+            "the manifest-declared path."
+        )
+
+    def test_fallback_is_deterministic_across_multiple_parent_dirs(self, tmp_path):
+        """When a template .md has no manifest entry and multiple seed parent
+        dirs exist, the fallback must always be the lexicographically first dir."""
+        declared_paths = [
+            "alpha/seeds/seed_a.md",
+            "zeta/seeds/seed_z.md",
+        ]
+        manifest_path = self._make_seed_manifest(str(tmp_path), declared_paths)
+
+        templates_dir = str(tmp_path / "seed_templates")
+        # seed_extra.md has no manifest entry — will use the fallback dir
+        self._make_seed_templates(
+            templates_dir, ["seed_a.md", "seed_z.md", "seed_extra.md"]
+        )
+
+        copy_seeds_from_manifest(str(tmp_path), templates_dir, manifest_path)
+
+        # Fallback should be sorted(parent_dirs)[0] → alpha/seeds (< zeta/seeds)
+        expected_fallback = tmp_path / "alpha" / "seeds" / "seed_extra.md"
+        assert expected_fallback.exists(), (
+            "Unmatched template should fall back to the lexicographically first "
+            "seed parent dir (alpha/seeds), not a non-deterministic choice."
+        )
