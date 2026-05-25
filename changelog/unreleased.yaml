@@ -363,6 +363,12 @@ changes:
     migration:
       action: automatic
       note: "No host-side migration required. Affects only the initial project bootstrap (specdev init / init_project.py). Host repos already bootstrapped retain their existing seed layout."
+  - type: changed
+    path: "scripts/init_project.py, scripts/templates/ensure_venv.py, CLAUDE.md, docs/developers/getting_started.md"
+    description: "init_project.py --venv-name default changed from dev_env to devspec_env. The emitted CI template (python -m venv, pip install steps), .gitignore writer, and pre-commit warning string all updated to match. ensure_venv.py error message and CLAUDE.md setup/toolkit-dev sections unified on devspec_env as the canonical virtual environment name."
+    migration:
+      action: manual
+      note: "Hosts that bootstrapped with the old default and rely on a dev_env/ directory should rename it: mv dev_env devspec_env && source devspec_env/bin/activate. Projects already using devspec_env are unaffected."
 
 deferred:
   - ref: "F-S3 / Phase 1 Task 1.2"

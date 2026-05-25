@@ -63,12 +63,12 @@ jobs:
           python-version: "3.x"
           cache: "pip"
       - name: Create virtualenv
-        run: python -m venv dev_env  # Matches default --venv-name
+        run: python -m venv devspec_env  # Matches default --venv-name
       - name: Install tooling
         run: |
-          dev_env/bin/pip install --upgrade pip
-          dev_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
-          dev_env/bin/pip install -e devspec_toolkit/tools/
+          devspec_env/bin/pip install --upgrade pip
+          devspec_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
+          devspec_env/bin/pip install -e devspec_toolkit/tools/
       - name: Validate all specs
         run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
       - name: Governance check (PR Title)
@@ -414,7 +414,7 @@ def main():
     parser.add_argument("--target", default=".", help="Target project directory")
     parser.add_argument("--toolkit-url", default="https://github.com/vichitra-studio/devspec_toolkit.git", help="URL of the devspec_toolkit repo")
     parser.add_argument("--toolkit-root", help="Explicit path to devspec_toolkit source directory")
-    parser.add_argument("--venv-name", default="dev_env", help="Name for the virtual environment (default: dev_env)")
+    parser.add_argument("--venv-name", default="devspec_env", help="Name for the virtual environment (default: devspec_env)")
     parser.add_argument("--strict", action="store_true", help="Enable strict governance (commit-msg hooks)")
     parser.add_argument(
         "--force-claude",
@@ -663,7 +663,7 @@ def main():
                     with open(config_path, "a") as f:
                         f.write(governance_hook)
     else:
-        print("Warning: pre-commit binary not found in dev_env. Skipping hook install.")
+        print("Warning: pre-commit binary not found in devspec_env. Skipping hook install.")
 
     # 7b. Generate CI Workflow
     workflows_dir = os.path.join(target_dir, ".github", "workflows")
@@ -693,11 +693,11 @@ def main():
         with open(gitignore_path, "r") as f:
             content = f.read()
         if ignore_entry not in content:
-            print("Adding dev_env/ to .gitignore...")
+            print("Adding devspec_env/ to .gitignore...")
             with open(gitignore_path, "a") as f:
                 f.write(f"\n{ignore_entry}\n")
     else:
-        print("Creating .gitignore with dev_env/...")
+        print("Creating .gitignore with devspec_env/...")
         with open(gitignore_path, "w") as f:
             f.write(f"{ignore_entry}\n")
 

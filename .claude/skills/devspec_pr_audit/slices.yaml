@@ -50,8 +50,7 @@ exclusions:
   - ".claude/.archive/**"
   - ".pytest_cache/**"
   - ".DS_Store"
-  # Local virtualenvs (toolkit-vendored guidance: devspec_env / dev_env)
-  - "dev_env/**"
+  # Local virtualenv (canonical name: devspec_env)
   - "devspec_env/**"
   # Repo hygiene at toolkit root (not part of any audited surface)
   - ".gitignore"

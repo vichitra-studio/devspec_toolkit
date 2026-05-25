@@ -11,7 +11,7 @@ Current version: see `tools/pyproject.toml`.
 ## Setup
 
 ```bash
-source dev_env/bin/activate    # CLI refuses without it
+source devspec_env/bin/activate    # CLI refuses without it
 specdev --help                  # list subcommands
 specdev <command> --help       # usage for one command
 ```
@@ -174,4 +174,4 @@ pytest tests/unit/             # unit tests only
 pytest tests/integration/ -v   # step-level integration tests
 ```
 
-Run from toolkit root with `dev_env` active.
+Run from toolkit root with `devspec_env` active.

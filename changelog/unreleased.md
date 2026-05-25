@@ -383,6 +383,7 @@ Before this release, `spec/common/seed_manifest.json` `step_requirements` entrie
 - **`specdev json resolve-pointers` gains required `--repo-root`** — no cwd fallback. Host invocations must pass `--repo-root ./devspec_toolkit`. `--spec-root` is demoted from required to accepted-but-ignored on this command; it will be removed in a future release.
 - **Registry-check rule R001 removed from host-runtime** — `REGISTRY_MISSING_STEP` / E620 is no longer emitted at host validation time. The check has been moved to the toolkit's `T-step-registry-coverage` invariant test. R002 (E621) and R003 (E622) are unchanged.
 - **Agent protocol doc — 'The three static indices' section** — updated to reflect the toolkit-side registry location (`devspec_toolkit/tools/entry_key_registry.json`). The previous text incorrectly stated the registry was maintained in the host project's spec directory. The section now notes that `trace_matrix.json` is generated per-spec-run (written to `spec/extras/` when that directory exists, otherwise to `devspec_toolkit/tools/` as a fallback), and links to `docs/architecture/three_static_indices.md`.
+- **`init_project.py` `--venv-name` default changed from `dev_env` to `devspec_env`** — the emitted CI template (`python -m venv ...` and `pip install` steps), `.gitignore` writer, and pre-commit warning string are all updated to match. `scripts/templates/ensure_venv.py` error message, `CLAUDE.md` setup instructions, and toolkit docs unified on `devspec_env` as the canonical virtual environment name.
 
 ### Skill behavior
 

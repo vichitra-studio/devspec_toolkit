@@ -18,7 +18,7 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --s
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
 3.  **Seed Templates**: Copies the seed files declared in `spec/common/seed_manifest.json` (`seeds[].path`) and the manifest itself.
 4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
 5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
@@ -50,7 +50,7 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-When you initialize a project, a `spec/specdev_version` file is created. This file is critical—it tells the toolkit which version your specs were written for.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created and maintained by the migration flow (`specdev align`), not at project initialization—a freshly initialized project will not have one until its first alignment (until then the toolkit reports the version as *not detected*).
 
 **Check if you are up to date:**
 ```bash
