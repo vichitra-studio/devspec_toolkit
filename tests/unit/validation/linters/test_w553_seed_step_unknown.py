@@ -274,5 +274,64 @@ class TestW553SeedStepUnknown(unittest.TestCase):
             )
 
 
+class TestE520UnknownSeedIdLintIntegration(unittest.TestCase):
+    """TEST 2: lint_seeds emits E520 when step_requirements references a
+    seed_id that is NOT declared in manifest["seeds"].
+
+    Coverage gap: test_seed_routing.py::TestResolveSeedPaths::test_omits_unknown_seed_id
+    only verifies that resolve_seed_paths SILENTLY OMITS unknown IDs at the helper layer.
+    It does NOT test that lint_seeds raises E520 at the integration boundary — those are
+    separate paths.
+
+    Discrimination logic:
+    - manifest["seeds"] declares only "seed-known" (with a real on-disk file).
+    - step_requirements["04"] references "seed-ghost", which is NOT in manifest["seeds"].
+    - lint_seeds must fire E520 referencing "seed-ghost".
+    - If the `if sid not in seed_id_set` guard in seed_lint.py were removed or
+      bypassed, no E520 would fire and this assertion would fail.
+    """
+
+    def test_unknown_seed_id_in_step_requirements_fires_e520(self):
+        """step_requirements["04"] references "seed-ghost" which is not in
+        manifest["seeds"] → lint_seeds must emit E520 naming "seed-ghost".
+
+        Using a KNOWN pipeline step (04) isolates E520 from W553; a phantom
+        step would produce W553 noise that could mask the E520 signal we need.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = _build_project(
+                tmpdir,
+                seeds=[_seed_tuple("seed-known", "seed_known.md",
+                                   text="authentication login endpoint validation security")],
+                global_seed_order=["seed-known"],
+                step_requirements={
+                    "04": ["seed-ghost"],   # "seed-ghost" NOT in manifest["seeds"]
+                },
+            )
+            errors = lint_seeds(repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir)
+            rendered = render_errors(errors)
+
+            # E520 must fire and name the unknown seed_id.
+            e520 = [e for e in rendered if "E520" in e and "seed-ghost" in e]
+            self.assertTrue(
+                len(e520) >= 1,
+                msg=(
+                    "E520 must fire for step_requirements['04'] referencing undeclared "
+                    f"seed_id 'seed-ghost'. Got rendered errors: {rendered}"
+                ),
+            )
+
+            # W553 must NOT fire — "04" is a known pipeline step.
+            w553 = [e for e in rendered if "W553" in e]
+            self.assertEqual(
+                w553,
+                [],
+                msg=(
+                    "W553 must not fire for known step '04'. "
+                    f"Got: {w553}"
+                ),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

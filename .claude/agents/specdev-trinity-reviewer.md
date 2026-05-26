@@ -367,7 +367,7 @@ If validation fails, fix the output before returning. Do not return an invalid f
     16a/16b/16c). `global_seed_order` governs read order only — it is NOT an inclusion set.
     This grounds the reviewer against exactly what the execute-mode impl agent was required
     to ingest — the effective seed set is `step_requirements["16b"] ∪ step_requirements["16"]`
-    (the trinity umbrella), ingested in `global_seed_order` order. Read them:
+    (the trinity umbrella), ingested in `global_seed_order` order (required seeds absent from `global_seed_order` are appended last). Read them:
     ```bash
     specdev json read spec/common/seed_manifest.json '.seeds[] | {seed_id, path}'
     specdev json read spec/common/seed_manifest.json \

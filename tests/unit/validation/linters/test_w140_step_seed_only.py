@@ -19,6 +19,9 @@ import unittest
 from specdev_tools.validation.seed_lint import lint_seeds
 from specdev_tools.core.errors import render_errors
 
+# Absolute path to toolkit root (for step_order.json and schema_registry.json lookup).
+_TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir))
+
 
 def _build_project(
     tmpdir: str,
@@ -210,6 +213,87 @@ class TestW140StepSeedOnly(unittest.TestCase):
                 msg=(
                     "W140 must not fire for seed-00 against step-09 artifact "
                     f"(seed-00 is not step-required for 09). Got: {w140_seed00}"
+                ),
+            )
+
+
+class TestEmptyStepRequirementsNoFallback(unittest.TestCase):
+    """TEST 3: explicit step_requirements[NN] = [] must suppress all seed-grounding
+    checks for that step — no fallback to global_seed_order.
+
+    Coverage gap: existing tests only confirm that a seed in global_seed_order but
+    absent from step_requirements[step] is not flagged.  None of them check the
+    short-circuit path triggered by `if not required_seeds: continue` in
+    _check_seed_content_overlap, i.e. when the step key IS present but maps to [].
+
+    Discrimination logic:
+    - global_seed_order has "seed-global" with genuinely unrelated text
+      ("weather forecast precipitation tornado") — low-overlap if evaluated.
+    - step_requirements["09"] = [] (explicit empty list) for the spec artifact
+      "09_impl_plan.json" whose content contains none of the global seed text.
+    - A correct implementation (empty-step skip fires) → no W140 for step 09.
+    - A broken implementation that falls back to global_seed_order → would check
+      "seed-global" against the artifact → low overlap → emits W140 → test FAILS.
+
+    The global seeds are declared in manifest["seeds"] (on disk) to avoid E520
+    noise from the global_seed_order unknown-seed check.
+    """
+
+    def test_explicit_empty_step_requirements_suppresses_seed_check(self):
+        """step_requirements["09"] = [] with a real spec artifact present must
+        produce NO W140, confirming the empty-step short-circuit fires and no
+        fallback to global_seed_order occurs.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = _build_project(
+                tmpdir,
+                seeds=[
+                    {
+                        "seed_id": "seed-global",
+                        "relpath": "seed_global.md",
+                        # Genuinely unrelated text; if fallback occurred it would trigger W140.
+                        "text": "weather forecast precipitation tornado isobar barometric pressure",
+                    },
+                ],
+                global_seed_order=["seed-global"],
+                step_requirements={
+                    # Explicit empty list for step 09 — the key IS present, value is [].
+                    "09": [],
+                },
+                spec_artifacts={
+                    "09_impl_plan.json": {
+                        "id": "impl-plan",
+                        "milestones": [{"milestone_id": "ms-alpha", "title": "Phase one"}],
+                    },
+                },
+            )
+            errors = lint_seeds(repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir)
+            rendered = render_errors(errors)
+
+            # No W140 must fire for step 09.  A broken fallback to global_seed_order
+            # would emit W140 for "seed-global" against "09_impl_plan.json" (low overlap).
+            w140 = [e for e in rendered if "W140" in e]
+            self.assertEqual(
+                w140,
+                [],
+                msg=(
+                    "W140 must not fire for step 09 when step_requirements['09'] = []. "
+                    "An empty requirement list must short-circuit all seed-grounding "
+                    "checks — there must be NO fallback to global_seed_order. "
+                    f"Got W140 lines: {w140} (full errors: {rendered})"
+                ),
+            )
+
+            # No seed-path E520 must fire: seed-global IS declared in manifest["seeds"]
+            # and its on-disk file exists.  (Schema-validation E520s from the test manifest
+            # lacking $schema are unrelated and filtered out here.)
+            e520_seed = [e for e in rendered if "E520" in e and "seed-global" in e]
+            self.assertEqual(
+                e520_seed,
+                [],
+                msg=(
+                    "No seed-path E520 expected — seed-global is declared and exists on disk. "
+                    f"Got: {e520_seed}"
                 ),
             )
 

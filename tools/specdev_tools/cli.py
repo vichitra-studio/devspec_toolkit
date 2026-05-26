@@ -394,6 +394,7 @@ def main():
 
     hsc = sub.add_parser("hardcoded-seed-check", help="Detect literal seed-doc filenames in prompts (W554 regression guard)")
     hsc.add_argument("--repo-root", default=".")
+    hsc.add_argument("--git-root", default=None, help="Host-repo root; when set and different from --repo-root, also scans <git-root>/prompts/ (submodule deployments)")
     hsc.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
     ub = sub.add_parser(
@@ -1710,7 +1711,8 @@ def main():
     elif args.cmd == "hardcoded-seed-check":
         from .validation.seed_lint import check_hardcoded_seed_reference
         repo_root = os.path.abspath(args.repo_root)
-        errs = check_hardcoded_seed_reference(repo_root)
+        git_root_arg = os.path.abspath(args.git_root) if getattr(args, "git_root", None) else None
+        errs = check_hardcoded_seed_reference(repo_root, git_root=git_root_arg)
         if getattr(args, "json_output", False):
             _json_exit(errs, "hardcoded-seed-check")
         else:

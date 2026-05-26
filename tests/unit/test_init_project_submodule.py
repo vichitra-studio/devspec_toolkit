@@ -6,7 +6,7 @@ import sys
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
-from init_project import _build_pre_commit_config, copy_seeds_from_manifest
+from init_project import _build_pre_commit_config, _render_ci_workflow, copy_seeds_from_manifest
 
 
 class TestBuildPreCommitConfig:
@@ -139,3 +139,25 @@ class TestManifestDerivedSeedBootstrap:
             "Unmatched template should fall back to the lexicographically first "
             "seed parent dir (alpha/seeds), not a non-deterministic choice."
         )
+
+
+class TestCiWorkflowRender:
+    def test_default_venv_name_in_ci(self):
+        content = _render_ci_workflow(".", "devspec_env")
+        assert "python -m venv devspec_env" in content
+        assert "devspec_env/bin/pip" in content
+
+    def test_custom_venv_name_propagates(self):
+        content = _render_ci_workflow(".", "customenv")
+        assert "python -m venv customenv" in content
+        assert "customenv/bin/pip install" in content
+        assert "devspec_env/bin/pip" not in content
+
+    def test_toolkit_path_substitution(self):
+        content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")
+        assert "vendor/devspec_toolkit/tools" in content
+        # Every "devspec_toolkit/tools" occurrence must carry the vendor/ prefix —
+        # i.e. the path substitution left no unsubstituted bare token behind.
+        # (Discriminating: if replace-1 were dropped, bare tokens would remain and
+        # the counts would diverge.)
+        assert content.count("devspec_toolkit/tools") == content.count("vendor/devspec_toolkit/tools")

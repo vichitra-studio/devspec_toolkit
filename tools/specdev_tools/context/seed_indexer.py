@@ -77,7 +77,6 @@ def build_seed_index(
 
     # 2. Collect seed IDs that have a path declared (warn on missing paths).
     all_seed_ids: list[str] = []
-    no_path_ids: set[str] = set()
     for seed_entry in seeds_list:
         if not isinstance(seed_entry, dict):
             continue
@@ -89,7 +88,6 @@ def build_seed_index(
             warnings.append(
                 f"W595 MISSING_PATH seed '{seed_id}' has no path in manifest"
             )
-            no_path_ids.add(seed_id)
             continue
         all_seed_ids.append(seed_id)
 

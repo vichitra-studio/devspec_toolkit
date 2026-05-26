@@ -86,6 +86,15 @@ jobs:
           if-no-files-found: ignore
 """
 
+def _render_ci_workflow(rel_toolkit_root: str, venv_name: str) -> str:
+    """Render the CI workflow content with toolkit-path and venv-name substitutions."""
+    content = CI_WORKFLOW_TEMPLATE
+    content = content.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
+    content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+    content = content.replace("devspec_env", venv_name)
+    return content
+
+
 def run_cmd(cmd, cwd=None, check=True):
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=cwd, check=check)
@@ -663,7 +672,7 @@ def main():
                     with open(config_path, "a") as f:
                         f.write(governance_hook)
     else:
-        print("Warning: pre-commit binary not found in devspec_env. Skipping hook install.")
+        print(f"Warning: pre-commit binary not found in {venv_name}. Skipping hook install.")
 
     # 7b. Generate CI Workflow
     workflows_dir = os.path.join(target_dir, ".github", "workflows")
@@ -673,8 +682,7 @@ def main():
     ci_file = os.path.join(workflows_dir, "spec_validation.yml")
     if not os.path.exists(ci_file):
         print("Creating CI workflow .github/workflows/spec_validation.yml...")
-        ci_content = CI_WORKFLOW_TEMPLATE.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
-        ci_content = ci_content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+        ci_content = _render_ci_workflow(rel_toolkit_root, venv_name)
         # Add submodule-aware flags to CI commands
         if is_submodule:
             ci_content = ci_content.replace(
@@ -686,22 +694,22 @@ def main():
     else:
         print("CI workflow already exists.")
 
-    # 7. Gitignore
+    # 8. Gitignore
     gitignore_path = os.path.join(target_dir, ".gitignore")
     ignore_entry = f"{venv_name}/"
     if os.path.exists(gitignore_path):
         with open(gitignore_path, "r") as f:
             content = f.read()
         if ignore_entry not in content:
-            print("Adding devspec_env/ to .gitignore...")
+            print(f"Adding {venv_name}/ to .gitignore...")
             with open(gitignore_path, "a") as f:
                 f.write(f"\n{ignore_entry}\n")
     else:
-        print("Creating .gitignore with devspec_env/...")
+        print(f"Creating .gitignore with {venv_name}/...")
         with open(gitignore_path, "w") as f:
             f.write(f"{ignore_entry}\n")
 
-    # 8. Update README
+    # 9. Update README
     readme_path = os.path.join(target_dir, "README.md")
     setup_docs = f"""
 ## Development Setup

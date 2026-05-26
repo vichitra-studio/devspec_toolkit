@@ -221,7 +221,7 @@ def _run_checks(
     if os.path.isdir(prompts_dir):
         from .seed_lint import check_hardcoded_seed_reference
 
-        hsr_errs = check_hardcoded_seed_reference(repo_root)
+        hsr_errs = check_hardcoded_seed_reference(repo_root, git_root=git_root)
         checks["hardcoded-seed-check"] = {**_classify(hsr_errs), "errors": hsr_errs}
     else:
         checks["hardcoded-seed-check"] = {

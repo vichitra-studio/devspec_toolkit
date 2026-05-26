@@ -174,6 +174,98 @@ class TestW554HardcodedSeedReference(unittest.TestCase):
         """W554 must be absent from PROMOTABLE_PAIRS (no E-twin; promotion is inappropriate)."""
         self.assertNotIn("W554", PROMOTABLE_PAIRS, "W554 must be non-promotable (no E-twin)")
 
+    # ------------------------------------------------------------------
+    # 8. git_root=None → backward-compatible: only repo_root is scanned
+    # ------------------------------------------------------------------
+
+    def test_git_root_none_scans_only_repo_root(self):
+        """When git_root is None, only repo_root/prompts/ is scanned (backward compat)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_dir = os.path.join(tmpdir, "prompts")
+            _write_prompt(
+                prompts_dir,
+                "prompt_00_charter.md",
+                "Read seed_overview.md before starting.\n",
+            )
+            # Passing git_root=None must behave exactly like the old single-arg call
+            errs_new = check_hardcoded_seed_reference(tmpdir, git_root=None)
+            errs_old = check_hardcoded_seed_reference(tmpdir)
+            self.assertEqual(
+                len(errs_new),
+                len(errs_old),
+                "git_root=None should produce same result as omitting git_root",
+            )
+            self.assertTrue(self._has_w554(errs_new), "W554 must still fire when git_root=None")
+
+    # ------------------------------------------------------------------
+    # 9. git_root != repo_root → host prompts/ is also scanned
+    # ------------------------------------------------------------------
+
+    def test_host_prompts_scanned_when_git_root_differs(self):
+        """When git_root differs from repo_root, host prompts/ is also scanned for W554."""
+        with tempfile.TemporaryDirectory() as toolkit_dir:
+            with tempfile.TemporaryDirectory() as host_dir:
+                # toolkit prompts/ — clean (no seed references)
+                toolkit_prompts = os.path.join(toolkit_dir, "prompts")
+                _write_prompt(
+                    toolkit_prompts,
+                    "prompt_toolkit.md",
+                    "## Toolkit prompt\nNo seed references here.\n",
+                )
+                # host prompts/ — contains a hardcoded seed filename
+                host_prompts = os.path.join(host_dir, "prompts")
+                _write_prompt(
+                    host_prompts,
+                    "foo.md",
+                    "Host prompt: read seed_overview.md for context.\n",
+                )
+
+                errs = check_hardcoded_seed_reference(toolkit_dir, git_root=host_dir)
+
+                self.assertTrue(
+                    self._has_w554(errs),
+                    f"Expected W554 from host prompts, got: {render_errors(errs)}",
+                )
+                # Confirm the error message identifies this as a host-prompt hit
+                rendered = render_errors(errs)
+                self.assertTrue(
+                    any("[host]" in msg for msg in rendered),
+                    f"Expected '[host]' label in W554 message, got: {rendered}",
+                )
+
+    # ------------------------------------------------------------------
+    # 10. git_root == repo_root → no double-scan (toolkit-internal case)
+    # ------------------------------------------------------------------
+
+    def test_no_double_scan_when_git_root_equals_repo_root(self):
+        """When git_root equals repo_root, each finding is reported exactly once."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            prompts_dir = os.path.join(tmpdir, "prompts")
+            _write_prompt(
+                prompts_dir,
+                "prompt_00_charter.md",
+                "Read seed_overview.md before starting.\n",
+            )
+            errs_single = check_hardcoded_seed_reference(tmpdir)
+            errs_same = check_hardcoded_seed_reference(tmpdir, git_root=tmpdir)
+            self.assertEqual(
+                len(errs_single),
+                len(errs_same),
+                "git_root==repo_root must not double-count findings",
+            )
+
+    # ------------------------------------------------------------------
+    # 11. git_root provided but has no prompts/ → no crash, no extra errors
+    # ------------------------------------------------------------------
+
+    def test_host_without_prompts_dir_no_crash(self):
+        """When git_root/prompts/ does not exist, no error is raised and no W554 added."""
+        with tempfile.TemporaryDirectory() as toolkit_dir:
+            with tempfile.TemporaryDirectory() as host_dir:
+                # toolkit has no prompts/ either — both clean
+                errs = check_hardcoded_seed_reference(toolkit_dir, git_root=host_dir)
+                self.assertEqual(errs, [], f"Expected empty list, got: {errs}")
+
 
 if __name__ == "__main__":
     unittest.main()

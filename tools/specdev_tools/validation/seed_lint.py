@@ -19,26 +19,21 @@ from .validate import validate_file
 _HARDCODED_SEED_RE = _re.compile(r"\bseed_\w+\.md\b")
 
 
-def check_hardcoded_seed_reference(repo_root: str) -> List[SpecError]:
-    r"""Scan prompt files for literal seed-doc filenames (W554 HARDCODED_SEED_REFERENCE).
-
-    Globs ``prompts/**/*.md`` recursively from *repo_root* and flags any line
-    containing a pattern like ``seed_overview.md``, ``seed_tech_stack.md``, etc.
-    The pattern ``seed_\w+\.md`` deliberately excludes ``seed_manifest.json``
-    (wrong suffix) and the manifest-anchored ``**Seeds**:`` bullets that only
-    reference ``seed_manifest.json``.
+def _scan_prompts_dir(
+    prompts_dir: Path,
+    display_root: Path,
+    label: str,
+    errors: List[SpecError],
+) -> None:
+    """Scan *prompts_dir* for W554 hits and append findings to *errors*.
 
     Args:
-        repo_root: Path to the toolkit (or host-repo) root containing ``prompts/``.
-
-    Returns:
-        List of W554 SpecError objects, one per matching line.
+        prompts_dir: Absolute path to the ``prompts/`` directory to scan.
+        display_root: Root used to compute relative paths in error messages.
+        label: Short prefix (e.g. ``"toolkit"`` or ``"host"``) shown in
+            error messages so callers can tell which prompts tree was hit.
+        errors: Mutable list to append :class:`SpecError` objects into.
     """
-    errors: List[SpecError] = []
-    prompts_dir = Path(os.path.abspath(repo_root)) / "prompts"
-    if not prompts_dir.is_dir():
-        return errors
-
     for prompt_path in sorted(prompts_dir.rglob("*.md")):
         try:
             text = prompt_path.read_text(encoding="utf-8")
@@ -47,12 +42,54 @@ def check_hardcoded_seed_reference(repo_root: str) -> List[SpecError]:
         for lineno, line in enumerate(text.splitlines(), start=1):
             m = _HARDCODED_SEED_RE.search(line)
             if m:
-                rel = str(prompt_path.relative_to(Path(os.path.abspath(repo_root))))
+                rel = str(prompt_path.relative_to(display_root))
                 errors.append(make_error(
                     "W554",
-                    f"HARDCODED_SEED_REFERENCE {rel}:{lineno}: literal seed filename"
-                    f" '{m.group()}' — route seeds via seed_manifest.json instead",
+                    f"HARDCODED_SEED_REFERENCE [{label}] {rel}:{lineno}: literal seed"
+                    f" filename '{m.group()}' — route seeds via seed_manifest.json instead",
                 ))
+
+
+def check_hardcoded_seed_reference(
+    repo_root: str,
+    git_root: str | None = None,
+) -> List[SpecError]:
+    r"""Scan prompt files for literal seed-doc filenames (W554 HARDCODED_SEED_REFERENCE).
+
+    Globs ``prompts/**/*.md`` recursively from *repo_root* and, when *git_root*
+    differs from *repo_root*, also scans ``<git_root>/prompts/`` (host-repo
+    prompts).  This covers submodule deployments where ``repo_root`` is the
+    toolkit and ``git_root`` is the host repo.
+
+    The pattern ``seed_\w+\.md`` deliberately excludes ``seed_manifest.json``
+    (wrong suffix) and the manifest-anchored ``**Seeds**:`` bullets that only
+    reference ``seed_manifest.json``.
+
+    Args:
+        repo_root: Path to the toolkit (or host-repo) root containing ``prompts/``.
+        git_root: Optional path to the host-repo root.  When provided and
+            different from *repo_root*, ``<git_root>/prompts/`` is also
+            scanned.  Defaults to ``None`` (toolkit-only scan, backward-
+            compatible behaviour).
+
+    Returns:
+        List of W554 SpecError objects, one per matching line.
+    """
+    errors: List[SpecError] = []
+    abs_repo_root = Path(os.path.abspath(repo_root))
+    prompts_dir = abs_repo_root / "prompts"
+    if prompts_dir.is_dir():
+        _scan_prompts_dir(prompts_dir, abs_repo_root, "toolkit", errors)
+
+    # In submodule deployments git_root points to the host repo (different from
+    # the toolkit root).  Scan host prompts/ only when it is a distinct tree.
+    if git_root is not None:
+        abs_git_root = Path(os.path.abspath(git_root))
+        if abs_git_root != abs_repo_root:
+            host_prompts_dir = abs_git_root / "prompts"
+            if host_prompts_dir.is_dir():
+                _scan_prompts_dir(host_prompts_dir, abs_git_root, "host", errors)
+
     return errors
 
 

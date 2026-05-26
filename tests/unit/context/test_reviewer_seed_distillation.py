@@ -217,6 +217,116 @@ class TestSeedDistillationLateStep:
 # DEVSPEC-43 Cycle-2: git_root authority fix — nested layout discriminator
 # ---------------------------------------------------------------------------
 
+class TestTrinityUmbrellaInheritanceConsumer:
+    """TEST 1: _check_seed_distillation resolves step 16a seeds as UNION of
+    step_requirements["16a"] ∪ step_requirements["16"].
+
+    Coverage gap: existing tests only cover plain steps (09, 14) and never a
+    trinity sub-step.  This class adds a consumer-layer test that directly
+    discriminates the umbrella-inheritance path through _check_seed_distillation.
+
+    Discrimination logic:
+    - seed-16a-only is assigned to step_requirements["16a"] and has
+      ALL_CAPS acronyms ALPHAONE, ALPHATWO (guaranteed to be extracted).
+    - seed-umbrella is assigned to step_requirements["16"] (umbrella) and has
+      disjoint ALL_CAPS acronyms OMEGAONE, OMEGATWO.
+    - The artifact contains NEITHER set of acronyms.
+    - A correct implementation must produce TWO distillation ReviewPairs — one
+      per seed file (they are distinct seeds with non-zero missing terms).
+    - A broken implementation that ignores the umbrella key would produce only
+      ONE pair (16a seed only) — failing the assertion.
+    """
+
+    def _build_trinity_manifest(self, tmp_path):
+        """Create spec/common/seed_manifest.json with two seeds assigned to
+        step_requirements["16a"] and step_requirements["16"] respectively.
+        Returns spec_dir str."""
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
+        common_dir.mkdir(parents=True)
+        seed_dir = tmp_path / "docs" / "seed"
+        seed_dir.mkdir(parents=True)
+
+        # seed-16a-only: in step_requirements["16a"] — disjoint acronyms
+        seed_16a_path = seed_dir / "seed_16a_only.md"
+        seed_16a_path.write_text(
+            "ALPHAONE ALPHATWO build phase artifacts check",
+            encoding="utf-8",
+        )
+        # seed-umbrella: in step_requirements["16"] — disjoint acronyms
+        seed_umbrella_path = seed_dir / "seed_umbrella.md"
+        seed_umbrella_path.write_text(
+            "OMEGAONE OMEGATWO shared trinity baseline context",
+            encoding="utf-8",
+        )
+
+        manifest = {
+            "global_seed_order": ["seed-umbrella", "seed-16a-only"],
+            "seeds": [
+                {"seed_id": "seed-16a-only", "path": "docs/seed/seed_16a_only.md"},
+                {"seed_id": "seed-umbrella",  "path": "docs/seed/seed_umbrella.md"},
+            ],
+            "step_requirements": {
+                "16a": ["seed-16a-only"],   # sub-phase seed
+                "16":  ["seed-umbrella"],   # umbrella seed
+            },
+        }
+        (common_dir / "seed_manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        return str(spec_dir)
+
+    def test_16a_union_yields_two_distillation_pairs(self, tmp_path):
+        """Both seed-16a-only (via "16a" key) and seed-umbrella (via "16" key)
+        must produce distillation pairs for a step-16a artifact that contains
+        none of their acronyms.
+
+        A consumer that only consulted step_requirements["16a"] and ignored the
+        umbrella would produce exactly ONE pair (for seed-16a-only) and FAIL
+        this assertion.  The correct union logic produces TWO pairs.
+        """
+        spec_dir = self._build_trinity_manifest(tmp_path)
+
+        # Artifact deliberately contains none of ALPHAONE/ALPHATWO/OMEGAONE/OMEGATWO.
+        artifact = {
+            "id": "ms-alpha-plan",
+            "description": "generic implementation checklist unrelated to seed acronyms",
+        }
+        artifact_path = os.path.join(spec_dir, "16a_ms_alpha_plan.json")
+        git_root = str(tmp_path)
+
+        pairs = _check_seed_distillation(
+            artifact, artifact_path, "16a", spec_dir, git_root=git_root
+        )
+        distillation_pairs = [p for p in pairs if p.check_type == "seed_distillation"]
+
+        assert len(distillation_pairs) == 2, (
+            "Expected exactly 2 distillation pairs for step 16a: one from the "
+            "sub-phase seed (seed-16a-only via '16a' key) and one from the umbrella "
+            "seed (seed-umbrella via '16' key).  A consumer that ignores the umbrella "
+            f"would produce only 1 pair.  Got: {distillation_pairs}"
+        )
+
+        # Confirm both seeds are represented in the pairs — not just one of them.
+        source_filenames = {p.source.id for p in distillation_pairs}
+        assert "seed_16a_only.md" in source_filenames, (
+            f"seed_16a_only.md (step_requirements['16a']) must appear. Got: {source_filenames}"
+        )
+        assert "seed_umbrella.md" in source_filenames, (
+            f"seed_umbrella.md (step_requirements['16'] umbrella) must appear. "
+            f"Got: {source_filenames}"
+        )
+
+        # Confirm acronyms from BOTH seeds are flagged as missing.
+        all_concerns = " ".join(p.concern for p in distillation_pairs)
+        assert "ALPHAONE" in all_concerns or "ALPHATWO" in all_concerns, (
+            f"Concerns must reference 16a-seed acronyms. Got: {all_concerns}"
+        )
+        assert "OMEGAONE" in all_concerns or "OMEGATWO" in all_concerns, (
+            f"Concerns must reference umbrella-seed acronyms. Got: {all_concerns}"
+        )
+
+
 class TestGitRootNestedLayout:
     """_check_seed_distillation resolves seed paths via git_root, not dirname(spec_dir).
 
