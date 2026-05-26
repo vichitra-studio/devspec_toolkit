@@ -51,7 +51,7 @@ For each upstream artifact ingested, extract the following:
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
 - `spec/07_nfrs.json` is present and contains at least one nfr entry.
-- `docs/seed/seed_tech_stack.md` is present and non-empty.
+- All seeds listed for step "09" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["09"] is non-empty).
 
 ## Negative Constraints
 - **NO Hallucinations**: Do not list technologies in `tech_stack` that are not present in `spec/02_system_sketch.json` `tech_stack` or `spec/01_capabilities.json` without a clear "Spike" justification.

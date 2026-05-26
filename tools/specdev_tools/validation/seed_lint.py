@@ -3,11 +3,94 @@ from __future__ import annotations
 import json
 import os
 import re as _re
-from typing import Dict, List, Set
+from pathlib import Path
+from typing import Dict, List
 
 from ..core.errors import SpecError, ensure_spec_errors, make_error
 from ..core.loaders import iter_spec_artifacts
+from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
 from .validate import validate_file
+
+
+# W554 HARDCODED_SEED_REFERENCE — matches literal seed-doc filenames like
+# seed_overview.md, seed_tech_stack.md, etc. that end in .md.
+# The pattern seed_\w+\.md cannot match seed_manifest.json because that
+# filename ends in .json (not .md), so the \.md suffix acts as the exclusion.
+_HARDCODED_SEED_RE = _re.compile(r"\bseed_\w+\.md\b")
+
+
+def _scan_prompts_dir(
+    prompts_dir: Path,
+    display_root: Path,
+    label: str,
+    errors: List[SpecError],
+) -> None:
+    """Scan *prompts_dir* for W554 hits and append findings to *errors*.
+
+    Args:
+        prompts_dir: Absolute path to the ``prompts/`` directory to scan.
+        display_root: Root used to compute relative paths in error messages.
+        label: Short prefix (e.g. ``"toolkit"`` or ``"host"``) shown in
+            error messages so callers can tell which prompts tree was hit.
+        errors: Mutable list to append :class:`SpecError` objects into.
+    """
+    for prompt_path in sorted(prompts_dir.rglob("*.md")):
+        try:
+            text = prompt_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            m = _HARDCODED_SEED_RE.search(line)
+            if m:
+                rel = str(prompt_path.relative_to(display_root))
+                errors.append(make_error(
+                    "W554",
+                    f"HARDCODED_SEED_REFERENCE [{label}] {rel}:{lineno}: literal seed"
+                    f" filename '{m.group()}' — route seeds via seed_manifest.json instead",
+                ))
+
+
+def check_hardcoded_seed_reference(
+    repo_root: str,
+    git_root: str | None = None,
+) -> List[SpecError]:
+    r"""Scan prompt files for literal seed-doc filenames (W554 HARDCODED_SEED_REFERENCE).
+
+    Globs ``prompts/**/*.md`` recursively from *repo_root* and, when *git_root*
+    differs from *repo_root*, also scans ``<git_root>/prompts/`` (host-repo
+    prompts).  This covers submodule deployments where ``repo_root`` is the
+    toolkit and ``git_root`` is the host repo.
+
+    The pattern ``seed_\w+\.md`` deliberately excludes ``seed_manifest.json``
+    (wrong suffix) and the manifest-anchored ``**Seeds**:`` bullets that only
+    reference ``seed_manifest.json``.
+
+    Args:
+        repo_root: Path to the toolkit (or host-repo) root containing ``prompts/``.
+        git_root: Optional path to the host-repo root.  When provided and
+            different from *repo_root*, ``<git_root>/prompts/`` is also
+            scanned.  Defaults to ``None`` (toolkit-only scan, backward-
+            compatible behaviour).
+
+    Returns:
+        List of W554 SpecError objects, one per matching line.
+    """
+    errors: List[SpecError] = []
+    abs_repo_root = Path(os.path.abspath(repo_root))
+    prompts_dir = abs_repo_root / "prompts"
+    if prompts_dir.is_dir():
+        _scan_prompts_dir(prompts_dir, abs_repo_root, "toolkit", errors)
+
+    # In submodule deployments git_root points to the host repo (different from
+    # the toolkit root).  Scan host prompts/ only when it is a distinct tree.
+    if git_root is not None:
+        abs_git_root = Path(os.path.abspath(git_root))
+        if abs_git_root != abs_repo_root:
+            host_prompts_dir = abs_git_root / "prompts"
+            if host_prompts_dir.is_dir():
+                _scan_prompts_dir(host_prompts_dir, abs_git_root, "host", errors)
+
+    return errors
 
 
 def project_root_from_spec_dir(spec_dir: str) -> str:
@@ -46,26 +129,17 @@ def _step_from_path(path: str) -> str:
     return "unknown"
 
 
-def _collect_required_seeds(manifest: Dict, step_id: str) -> Set[str]:
-    step_requirements = manifest.get("step_requirements", {})
-    if step_id == "16":
-        sub_keys = ("16a", "16b", "16c")
-        if not any(k in step_requirements for k in sub_keys):
-            return set()
-        required = set()
-        for key in sub_keys:
-            required.update(step_requirements.get(key, []))
-    else:
-        if step_id not in step_requirements:
-            return set()
-        required = set(step_requirements.get(step_id, []))
-    # Use global_seed_order for ordering only, not membership expansion.
-    global_order = manifest.get("global_seed_order", [])
-    ordered = [s for s in global_order if s in required]
-    remaining = [s for s in required if s not in set(global_order)]
-    return set(ordered + remaining)
+def _collect_required_seeds(manifest: Dict, step_id: str) -> List[str]:
+    """Return the ordered list of seed IDs required by *step_id*.
 
-
+    Delegates to ``seed_routing.resolve_seeds_for_step``.  Returns only
+    *step_seed_ids* (second element of the tuple) — the seeds required by this
+    specific step, ordered by global_seed_order with extras appended.  The
+    global_seed_ids (first element) are intentionally discarded to avoid
+    widening W140 false-positives across all step–artifact pairs.
+    """
+    _, step_seed_ids = resolve_seeds_for_step(step_id, manifest)
+    return step_seed_ids
 
 
 _STOP_WORDS = frozenset({
@@ -84,12 +158,19 @@ def _tokenize(text: str) -> set:
 def _check_seed_content_overlap(
     spec_dir: str, manifest: Dict, project_root: str, errors: List[SpecError]
 ) -> None:
-    seed_paths: Dict[str, str] = {}
-    for seed in manifest.get("seeds", []):
-        if isinstance(seed, dict) and seed.get("seed_id") and seed.get("path"):
-            resolved = os.path.normpath(os.path.join(project_root, seed["path"]))
-            if os.path.isfile(resolved):
-                seed_paths[seed["seed_id"]] = resolved
+    # Resolve all seed IDs declared in the manifest to absolute paths.
+    # resolve_seed_paths does NOT existence-filter; we keep only paths that
+    # exist on disk, matching the prior behaviour.
+    all_seed_ids = [
+        s.get("seed_id") for s in manifest.get("seeds", [])
+        if isinstance(s, dict) and s.get("seed_id")
+    ]
+    raw_paths = resolve_seed_paths(manifest, all_seed_ids, project_root)
+    seed_paths: Dict[str, str] = {
+        sid: os.path.normpath(p)
+        for sid, p in raw_paths.items()
+        if os.path.isfile(os.path.normpath(p))
+    }
 
     for file_path in iter_spec_artifacts(spec_dir):
         try:
@@ -192,9 +273,17 @@ def lint_seeds(
         if isinstance(seed, dict) and seed.get("path"):
             declared_paths.add(os.path.normpath(os.path.join(project_root, seed["path"])))
 
-    seed_directory = manifest.get("seed_directory", "docs/seed")
-    seed_dir_abs = os.path.join(project_root, seed_directory)
-    if os.path.isdir(seed_dir_abs):
+    # Derive scan directories from the parent directories of declared seed paths.
+    # This avoids the hardcoded "docs/seed" fallback that misfires when the
+    # host places seeds elsewhere.  Each unique parent is scanned once.
+    scan_dirs: set = set()
+    for seed in manifest.get("seeds", []):
+        if isinstance(seed, dict) and seed.get("path"):
+            seed_abs = os.path.normpath(os.path.join(project_root, seed["path"]))
+            scan_dirs.add(os.path.dirname(seed_abs))
+    for seed_dir_abs in scan_dirs:
+        if not os.path.isdir(seed_dir_abs):
+            continue
         for fn in os.listdir(seed_dir_abs):
             if not fn.endswith(".md"):
                 continue
@@ -209,16 +298,23 @@ def lint_seeds(
         if sid not in seed_id_set:
             errors.append(make_error("E520", f"global_seed_order references unknown seed_id: {sid}"))
 
-    _SEED_ELIGIBLE_STEPS = frozenset(["00", "01", "02", "02a"])
+    # Load valid pipeline step IDs from step_order.json (toolkit-side).
+    # Inline load to avoid import-time I/O; cached in a local variable.
+    _step_order_path = os.path.join(repo_root, "tools", "step_order.json")
+    try:
+        with open(_step_order_path, "r", encoding="utf-8") as _f:
+            _valid_steps: frozenset = frozenset(json.load(_f).get("steps", []))
+    except Exception:
+        _valid_steps = frozenset()
+
     for step_id, reqs in manifest.get("step_requirements", {}).items():
         for sid in reqs:
             if sid not in seed_id_set:
                 errors.append(make_error("E520", f"step_requirements[{step_id}] references unknown seed_id: {sid}"))
-        if step_id not in _SEED_ELIGIBLE_STEPS:
+        if _valid_steps and step_id not in _valid_steps:
             errors.append(make_error(
                 "W553",
-                f"SEED_STEP_OUT_OF_RANGE step_requirements[{step_id}] is ignored — "
-                f"seed injection only applies to steps 00–02a",
+                f"SEED_STEP_UNKNOWN step_requirements[{step_id}] is not a known pipeline step",
             ))
 
     _check_seed_content_overlap(spec_dir, manifest, project_root, errors)

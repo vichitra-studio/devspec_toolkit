@@ -81,7 +81,7 @@ If any of these apply to in-scope capabilities, they MUST generate FRs unless ex
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/01_capabilities.json` is present and contains at least one capability entry.
 - `spec/03_glossary.json` is present and contains at least one term entry.
-- `docs/seed/seed_overview.md` is present and non-empty.
+- All seeds listed for step "04" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["04"] is non-empty).
 
 ## Negative Constraints
 - **DO NOT** use implementation details (function names, DB tables) in statements.

@@ -385,7 +385,7 @@ class TestAcceptanceGapGating:
         )
         # All other semantic checks also produce no pairs for this data:
         # faithfulness skips (FR statement too short), quantifier_weakening finds
-        # no upstream metrics, seed_distillation skips (step 06 not in _SEED_STEPS),
+        # no upstream metrics, seed_distillation skips (step 06 has no seeds in manifest),
         # scope_completeness returns [] when schema registry is absent.
         assert result.verdict == "PASS"
 

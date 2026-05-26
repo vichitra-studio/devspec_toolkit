@@ -5,7 +5,7 @@ import sys
 def main() -> int:
     if sys.prefix == sys.base_prefix:
         sys.stderr.write(
-            "Error: Running without a virtual environment. Activate dev_env or run via ./tools/run_specdev.sh.\n"
+            "Error: Running without a virtual environment. Activate devspec_env or run via ./tools/run_specdev.sh.\n"
         )
         return 1
     return 0

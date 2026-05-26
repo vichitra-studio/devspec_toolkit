@@ -46,7 +46,7 @@ Read is allowed for:
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline — read first)
 - `devspec_toolkit/.claude/skills/` (skill files)
 - `.specdev/findings/findings_*.json` (merged findings files from reviewer; K_agentification.md §11.7)
-- `docs/seed/*.md` (Phase-0 seed docs referenced from `spec/common/seed_manifest.json`)
+- `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`)
 
 Do NOT Read any `spec/NN_*.json` file directly.
 Use `specdev json read` with a filter for any spec content read.
@@ -82,14 +82,14 @@ prompt. This agent reads it and branches.
 
 **Procedure:**
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` first (required baseline — §10 Tool Execution, §13 Namespace Resolution).
-1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs: read all entries in
-    `global_seed_order` (universally applicable seeds) AND all entries in
-    `step_requirements[NN]` for the current step NN (per-step seed requirements):
+1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs to ingest: read all entries in
+    `step_requirements[NN]` for the current step NN (this is the authoritative inclusion set;
+    `global_seed_order` governs read order only — a step with empty or absent `step_requirements[NN]`
+    ingests no seeds, there is no fallback to `global_seed_order`):
     ```bash
-    specdev json read spec/common/seed_manifest.json '.global_seed_order'
     specdev json read spec/common/seed_manifest.json '.step_requirements."<NN>"'
     ```
-    Both commands return arrays of seed IDs (e.g. `"seed-tech-stack"`, `"decision-clarifications"`),
+    This returns an array of seed IDs (e.g. `"seed-tech-stack"`, `"decision-clarifications"`),
     NOT file paths. For each seed ID, resolve it to a file path via:
     ```bash
     specdev json read spec/common/seed_manifest.json \
@@ -99,7 +99,7 @@ prompt. This agent reads it and branches.
     ```bash
     specdev json read spec/common/seed_manifest.json '.seeds[] | {seed_id, path}'
     ```
-    Then `Read` each resolved path in full. Seed docs are the Phase-0 ground truth;
+    Then `Read` each resolved path in full. Seed docs are ground truth;
     ignoring them produces ungrounded artifacts.
 2. Read `devspec_toolkit/prompts/prompt_NN_*.md` — the step's authoring contract.
 3. Probe upstream artifact shapes: `specdev json structure`, `json keys` on required inputs.

@@ -7,7 +7,7 @@ module consumed by both validators.
 Exports:
     INTENT_ENTRY_RE — regex matching extraction intent bullet entries
     ARTIFACT_STEP_RE — regex extracting step numbers from artifact filenames
-    SEED_ENTRY_RE — regex matching seed document references
+    SEED_ENTRY_RE — regex matching the manifest-anchored seed bullet
     ParsedIntent — dataclass holding parsed extraction intent data
     parse_extraction_intent — function to parse a prompt file's intent section
 """
@@ -22,14 +22,14 @@ from pathlib import Path
 # Matches extraction intent bullet entries like:
 #   - **00_charter.json**: Project scope boundaries ...
 #   - **spec/00_charter.json**: Project scope boundaries ... (spec-prefixed form)
-#   - **docs/seed/seed_overview.md**: Scope boundaries ...
 #   - **03_glossary.json** (optional): Domain terms ...
 #   - **spec/16_impl_context.json**: Trinity Anchor scope ...
-# The optional prefix group tolerates `docs/seed/` and `spec/` — the two
-# in-prompt conventions used across the toolkit. A bare filename is also
-# accepted.
+# The optional prefix group tolerates `spec/` — the in-prompt convention for
+# spec artifacts. A bare filename is also accepted.
+# NOTE: seed_\w+\.md literals are no longer accepted here — seed entries are
+# now expressed using the manifest-anchored bullet form captured by SEED_ENTRY_RE.
 INTENT_ENTRY_RE = re.compile(
-    r"^\s*-\s+\*\*(?:docs/seed/|spec/)?(\d{2}[a-z]?_[a-z0-9_]+\.\w+|seed_\w+\.md)\*\*"
+    r"^\s*-\s+\*\*(?:spec/)?(\d{2}[a-z]?_[a-z0-9_]+\.\w+)\*\*"
     r"(?:\s*\([^)]*\))?\s*:\s*(.+)",
     re.IGNORECASE,
 )
@@ -50,11 +50,13 @@ IMPL_CONTEXT_ENTRY_RE = re.compile(
 # Extracts the step number from an artifact filename like "04_fr_list.json" -> "04"
 ARTIFACT_STEP_RE = re.compile(r"^(\d{2}[a-z]?)_")
 
-# Matches seed document references (not step dependencies):
-#   - **docs/seed/seed_overview.md**: ...
-#   - **seed_tech_stack.md**: ...
+# Matches the manifest-anchored seed bullet (not step dependencies):
+#   - **Seeds**: per spec/common/seed_manifest.json step_requirements["NN"]
+# This form is the canonical way to declare seed ingestion in an Extraction
+# Intent section after DEVSPEC-43. Literal seed_*.md filenames are no longer
+# accepted — the manifest is the single authoritative source for seed routing.
 SEED_ENTRY_RE = re.compile(
-    r"^\s*-\s+\*\*(?:docs/(?:seed/)?)?seed_\w+\.md\*\*",
+    r"^\s*-\s+\*\*Seeds\*\*\s*:\s*per\s+spec/common/seed_manifest\.json\s+step_requirements\[",
     re.IGNORECASE,
 )
 
@@ -135,11 +137,6 @@ def parse_extraction_intent(prompt_path: Path) -> ParsedIntent | None:
             continue
         artifact_name = match.group(1)
         description = match.group(2).strip()
-
-        # Check if this is a seed doc (matched by INTENT_ENTRY_RE but not SEED_ENTRY_RE)
-        if artifact_name.startswith("seed_"):
-            has_seed_entries = True
-            continue
 
         # Extract step number from artifact filename (e.g., "04_fr_list.json" -> "04")
         step_match = ARTIFACT_STEP_RE.match(artifact_name)

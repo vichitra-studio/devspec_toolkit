@@ -83,14 +83,20 @@ invocation prompt. This agent reads it and branches.
 
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` first (required baseline —
    §10 Tool Execution, §13 Namespace Resolution).
-1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs: read all entries in
-    `global_seed_order` (universally applicable seeds — `step_requirements` lookup is not
-    applicable in trinity execute mode; only `global_seed_order` applies to code-phase work):
+1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs to ingest: the seeds listed
+    under `step_requirements["16b"]` (seeds specific to the code/execute sub-phase) and
+    `step_requirements["16"]` (the umbrella key, which applies to all trinity sub-phases
+    16a/16b/16c). `global_seed_order` governs read order only — it is NOT an inclusion set.
+    The execute phase IS step 16b, so both keys are well-defined. Read them:
     ```bash
-    specdev json read spec/common/seed_manifest.json '.global_seed_order'
+    specdev json read spec/common/seed_manifest.json \
+      '((.step_requirements["16b"] // []) + (.step_requirements["16"] // [])) | unique'
     ```
-    This returns an array of seed IDs (e.g. `"seed-tech-stack"`, `"decision-clarifications"`),
-    NOT file paths. For each seed ID, resolve it to a file path via:
+    Deduplicate the combined list — the effective seed set for execute mode is
+    `step_requirements["16b"] ∪ step_requirements["16"]` (the trinity umbrella), ingested in
+    `global_seed_order` order (required seeds absent from `global_seed_order` are appended last).
+    Each entry is a seed ID (e.g. `"seed-tech-stack"`, `"decision-clarifications"`), NOT a file path.
+    For each seed ID, resolve it to a file path via:
     ```bash
     specdev json read spec/common/seed_manifest.json \
       '.seeds[] | select(.seed_id == "<seed_id>") | .path'
@@ -99,8 +105,8 @@ invocation prompt. This agent reads it and branches.
     ```bash
     specdev json read spec/common/seed_manifest.json '.seeds[] | {seed_id, path}'
     ```
-    Then `Read` each resolved path in full. Code-phase work that ignores seeds drifts from
-    the Phase-0 architecture.
+    Then `Read` each resolved path in full. Code-phase work that ignores seeds produces
+    ungrounded code.
 2. Read the plan artifact path supplied by the dispatcher. Probe shape first:
    ```bash
    specdev json structure spec/impl_context/ms_<batch_id>_plan.json

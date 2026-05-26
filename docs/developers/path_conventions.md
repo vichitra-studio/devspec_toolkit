@@ -42,7 +42,7 @@ This document defines the canonical path variables used across the DevSpec Toolk
 | `$PRODUCT_ROOT` | Root of the consumer (host) repository | `/path/to/my-product/` |
 | `$TOOLKIT_ROOT` | Root of the vendored devspec_toolkit | `$PRODUCT_ROOT/devspec_toolkit/` |
 | `$SPEC_DIR` | Directory containing live spec artifacts | `$PRODUCT_ROOT/spec/` (consumer) or `$TOOLKIT_ROOT/spec` (toolkit itself) |
-| `$SEED_DIR` | Directory containing seed documents | `$PRODUCT_ROOT/docs/seed/` |
+| `$SEED_DIR` | Default directory for seed documents (authoritative locations are in `spec/common/seed_manifest.json` `seeds[].path`) | `$PRODUCT_ROOT/docs/seed/` (default layout) |
 | `$CANON_DIR` | Canonical registry directory | `$TOOLKIT_ROOT/canon/` |
 | `$SCHEMA_DIR` | JSON Schema definitions | `$TOOLKIT_ROOT/schema/` |
 | `$PROMPTS_DIR` | Deterministic prompt contracts | `$TOOLKIT_ROOT/prompts/` |

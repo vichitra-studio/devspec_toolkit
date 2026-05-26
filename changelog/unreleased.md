@@ -10,6 +10,24 @@ Completes the 4-Layer Determinism Closure: cross-step ID validation, DAG integri
 
 Removed the workspace-snapshot CLI subcommands and the underlying `tools/specdev_tools/context/snapshot.py` module. Workspace state is the rollback surface — `git diff`, `git checkout -- <file>`, `git stash` cover the same use case without a parallel state-tracking mechanism. The skill `/specdev-context` no longer recommends these commands. Hosts may safely remove stale `.specdev/snapshots/` directories — no code path will repopulate them.
 
+### DEVSPEC-43 — `required_seed_inputs` field and seed-mirror lint removed
+
+- **`required_seed_inputs` removed from `step_order.json` and its schema**: the per-step `step_metadata.required_seed_inputs` field has been removed. Seed routing is now governed exclusively by `spec/common/seed_manifest.json` `step_requirements` — maintaining a parallel mirror in `step_order.json` was redundant and created a drift surface. (Shipped as "added" in v0.3.0; removed in this cycle.)
+- **`_lint_step_metadata_seed_consistency` removed** (`validation/dependency_order_lint.py`): the validator that enforced `step_metadata.required_seed_inputs` ↔ `seed_manifest.step_requirements` consistency is removed alongside the field it guarded. E543 `STEP_METADATA_INCONSISTENT` is retained for the spec-side `required_spec_inputs` check. (Shipped as "added" in v0.3.0; removed in this cycle.)
+
+## Fixed
+
+### DEVSPEC-43 — `freshness.py`, `seed_indexer.py`, and `reviewer.py` now resolve seed paths against the host repository root
+
+`context/freshness.py`, `context/seed_indexer.py`, and `context/reviewer.py` previously resolved `seeds[].path` entries using a spec_dir-first heuristic that violated the `seed_manifest.json` schema contract ("paths relative to the repository root"). This caused silent failures for any host layout where the spec directory is not a direct child of the repository root (e.g. `src/project/spec/`).
+
+**Changes:**
+
+- **`context/freshness.py`**: `check_freshness()` gains a `git_root: str | None = None` parameter. Seed paths are now resolved via `resolve_seed_paths(manifest, seed_ids, host_root)` where `host_root = git_root or dirname(spec_dir_abs)`. The old spec_dir-first probe with fallback is removed. Behaviour is unchanged for the standard flat layout (where `dirname(spec_dir) == host_root`); nested/explicit-git_root layouts are now correct.
+- **`context/seed_indexer.py`**: `_resolve_seed_path()` (spec_dir-first two-pass heuristic) is removed. `build_seed_index()` now computes `host_root = git_root or dirname(spec_dir_abs)` and calls `resolve_seed_paths()` for all seeds, then checks `os.path.isfile` on each returned path. Same fallback semantics, no spec_dir-first probe.
+- **`context/reviewer.py`**: seed distillation now resolves `seeds[].path` against the host repository root (`git_root` when provided, otherwise `dirname(spec_dir_abs)`), matching the resolution semantics of `freshness.py` and `seed_indexer.py`. The old spec_dir-first probe is removed.
+- **`cli.py`**: the `context freshness` and `context review` subparsers each gain a `--git-root` argument; dispatch threads it to the corresponding function's `git_root` parameter.
+
 ## Added
 
 ### Ticket 12 — `specdev guide <code>` subcommand
@@ -80,10 +98,14 @@ All 10 `make_error("E530", ...)` call sites in `validation/hallucination_lint.py
 - **`specRefIngested` / `specRefIngestedArray`** (`schema/core/collections.schema.json`): new reusable type recording `{step_id, artifact_id, hash?}` so downstream artifacts can declare which upstream artifacts they were derived from.
 - **`spec_refs_ingested` and `seed_refs_ingested`** (`schema/core/step_base.schema.json`): optional properties inherited by all 20 step schemas composed via `allOf` — no per-step changes required.
 - **`seed_manifest` optional `hash` and `version` fields** on each seed entry — populated by `seed-index` tooling for integrity tracking.
-- **`step_metadata` block in `tools/step_order.json`** (schema-validated): for all 22 steps, declares `required_spec_inputs` (inverse of `downstream_consumers`) and `required_seed_inputs` (mirror of seed manifest step_requirements). Prevents drift between forward/reverse DAG views.
+- **`step_metadata` block in `tools/step_order.json`** (schema-validated): for all 22 steps, declares `required_spec_inputs` (inverse of `downstream_consumers`). Prevents drift between forward/reverse DAG views.
 - **`_lint_step_metadata_consistency`** (`validation/dependency_order_lint.py`): new consistency validator that rejects any `step_metadata.required_spec_inputs` that is not the exact inverse of `downstream_consumers`. Emits **E543 STEP_METADATA_INCONSISTENT** (dedicated code — previously shared E540 with `SELF_OR_FORWARD_DEPENDENCY`, which broke selective error-code promotion).
-- **`_lint_step_metadata_seed_consistency`** (`validation/dependency_order_lint.py`): symmetric check on the seed side — `step_metadata.required_seed_inputs` must match `seed_manifest.step_requirements` exactly. Silently skips when either file or block is absent. Also emits E543 STEP_METADATA_INCONSISTENT with a message distinguishing `required_seed_inputs` from `required_spec_inputs`.
-- **8 new unit tests** for the consistency linters (4 spec-edge + 4 seed-edge: absent/consistent/missing/extra cases).
+- **8 new unit tests** for the spec-side consistency linter (absent/consistent/missing/extra cases).
+
+### DEVSPEC-43 — Generalised Seed Routing + W554 Validator
+
+- **W554 `HARDCODED_SEED_REFERENCE`** (warning-only): new validator that flags literal `seed_*.md` filenames re-introduced into prompt files. The manifest (`spec/common/seed_manifest.json`) is the authoritative source for seed names; hardcoding filenames in prompts duplicates that authority and drifts silently when seed names change. Exposed via the `hardcoded-seed-check` CLI subcommand and run automatically inside the `spec-check` gate.
+- **`hardcoded-seed-check` CLI subcommand**: new command that scans all prompt files for literal `seed_*.md` patterns and reports W554 warnings. Supports `--json` output. Run as a standalone regression guard or via `spec-check`.
 
 ### Trinity Anchor Follow-on (Phase 2 polish)
 
@@ -235,6 +257,11 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
 - **`downstream_consumers` completed** in step_order.json: 22+ entries added for steps 08, 11, 12, 15 to close DAG blind spots.
 - **E550 collision resolved**: `canon_schema_alignment.py` now uses E554 CANON_ENUM_DRIFT (was E550); `forward_replay_check.py` now uses E555 SEMANTIC_COVERAGE_REGRESSION for ID regressions (was E550). E550 is now exclusively FORWARD_REPLAY_MISSING.
 
+- **DEVSPEC-43 — Manifest authoritative for seed routing across all steps (00–16c)**: `spec/common/seed_manifest.json` `step_requirements` is now the single source of truth for seed routing and location for ANY pipeline step. Previously `step_requirements` entries for steps outside 00–02a were inert or warned against; they now actively route seeds to the named step's authoring and review. Seed-lint runs whenever a host `seed_manifest.json` exists (no longer gated on early-step artifacts). W551 directory scans, reviewer seed resolution, and step-16 seed resolution are all manifest-driven (no hardcoded `docs/seed/` path or toolkit-side manifest reads).
+- **DEVSPEC-43 — W553 repurposed: `SEED_STEP_OUT_OF_RANGE` → `SEED_STEP_UNKNOWN`**: W553 previously fired for any `step_requirements` key outside the 00–02a range. It now fires only when a `step_requirements` key is not a recognized pipeline step in `step_order.json` (e.g. typos like `"9"`, `"02b"`, or `"17"`). Real steps — including `"16"`, `"16a"`, `"16b"`, `"16c"` — no longer trigger W553.
+- **DEVSPEC-43 — Bare `"16"` umbrella in `step_requirements` now active**: a `step_requirements["16"]` entry previously had no effect (only `"16a"`, `"16b"`, `"16c"` sub-keys were read). It now routes its seeds to ALL trinity sub-phases (16a, 16b, 16c).
+- **DEVSPEC-43 — `scripts/init_project.py` bootstrap derives seed directories from the template manifest's `seeds[].path`**: the project scaffolding step that copies seed template files previously placed them in a hardcoded `docs/seed/` directory. It now reads the template `seed_manifest.json` (copied to `spec/common/` in step 3a) and copies each `.md` template to the relative path declared in its `seeds[].path` entry. The fallback for templates without a manifest entry uses the lexicographically first declared seed parent directory (deterministic) instead of a non-deterministic set iteration.
+
 ## Fixed
 
 - **`canonical-integrity` E210 false positive on string-typed `_ref` siblings** (`canonical/integrity.py`): `_expected_ref_key` previously treated any `<field>_ref` sibling as a canonicalRef based solely on key presence, regardless of how the sibling was schema-typed. This caused E210 `unresolved_canonical_semantic` to fire against every populated `execution.execution_results[*].evidence` string in `spec/impl_context/<milestone>_plan.json`, because the paired `evidence_ref` is schema-typed as a plain URI `string` (not `vc:core:collections#canonicalRef`). New `_is_canonical_ref_schema` predicate gates the decision on three shape rules: direct `$ref` substring match against `canonicalRef`, composition via `allOf`/`anyOf`/`oneOf`, or inline canonicalRef object shape (`properties.id.pattern` starts with `^cn:`). Genuine canonicalRef pairs (`status`/`status_ref`, `command`/`command_ref`, `unit`/`unit_ref`, etc.) continue to emit E210 when unresolved. **Acknowledged false-negative**: chained `$ref` through `$defs` to a canonicalRef leaf is not followed (zero such chains exist today; if a future schema adds one, the predicate silently drops E210 for that pair — schema validator and canonical-lint registry checks still fire via independent paths). Covered by two new unit tests in `tests/unit/canonical/test_canonical_integrity.py`: `test_string_typed_ref_sibling_does_not_trigger_e210` (negative regression) and `test_canonical_ref_typed_sibling_still_flags_e210_when_unresolved` (positive must-not-regress).
@@ -287,6 +314,20 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
   (cross-milestone checklist ID collision or duplicate `checklist_id_prefix` in
   `milestone_index`), **W585** ANCHOR_DRIFT_SKIP, **W586** ANCHOR_VALIDATOR_WRONG_ARTIFACT,
   **W587** ANCHOR_DRIFT_CHECKS_STALE, **W588** ANCHOR_MILESTONE_UNREADABLE.
+
+### DEVSPEC-43 — Migration note: generalised seed routing
+
+**Tightened semantics: previously-inert `step_requirements` keys now actively route seeds.**
+
+Before this release, `spec/common/seed_manifest.json` `step_requirements` entries for steps outside 00–02a were silently ignored or produced W553 warnings. As of DEVSPEC-43, the manifest is the single authoritative source for seed routing for **all** pipeline steps (00–16c). Any `step_requirements` key for a real pipeline step will now cause those seeds to be required and grounded (W140 seed-content-overlap enforced) at that step's authoring and review.
+
+**Action required before upgrading**: audit `spec/common/seed_manifest.json` `step_requirements` and remove or correct any stale entries that should not route seeds to later steps. A `step_requirements` key that was previously inert (and therefore safe to leave in place) may now pull seeds into authoring steps where they are not intended.
+
+**Bare `"16"` umbrella — high impact case**: if your manifest contains a bare `step_requirements["16"]` entry, that entry was previously ignored (only `"16a"`, `"16b"`, `"16c"` sub-keys were read). As of DEVSPEC-43, a bare `"16"` key routes its seeds to ALL three trinity sub-phases (16a plan, 16b code-write, 16c code-review). A host with a stale bare `"16"` entry will suddenly see those seeds required — and W140 seed-grounding enforced — across the entire code phase. Remove the bare `"16"` key if the intent was step-specific routing; replace it with explicit `"16a"`, `"16b"`, and/or `"16c"` keys as appropriate.
+
+**W553 reclassification**: hosts may now see `SEED_STEP_UNKNOWN` (W553) warnings for `step_requirements` keys that are not recognized pipeline steps (e.g. typo `"9"` instead of `"09"`, non-existent `"02b"`, or out-of-range `"17"`). These were previously tolerated; they now surface as W553. Correct the typo or remove the key.
+
+**`required_seed_inputs` removed from `step_order.json`**: hosts or CI scripts that read `step_order.json`'s `step_metadata.required_seed_inputs` field will find it absent. Switch to reading `spec/common/seed_manifest.json` `step_requirements` directly — that file is now the sole authoritative source.
 
 ## Wave 7 — Documentation Finalization
 
@@ -342,6 +383,7 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
 - **`specdev json resolve-pointers` gains required `--repo-root`** — no cwd fallback. Host invocations must pass `--repo-root ./devspec_toolkit`. `--spec-root` is demoted from required to accepted-but-ignored on this command; it will be removed in a future release.
 - **Registry-check rule R001 removed from host-runtime** — `REGISTRY_MISSING_STEP` / E620 is no longer emitted at host validation time. The check has been moved to the toolkit's `T-step-registry-coverage` invariant test. R002 (E621) and R003 (E622) are unchanged.
 - **Agent protocol doc — 'The three static indices' section** — updated to reflect the toolkit-side registry location (`devspec_toolkit/tools/entry_key_registry.json`). The previous text incorrectly stated the registry was maintained in the host project's spec directory. The section now notes that `trace_matrix.json` is generated per-spec-run (written to `spec/extras/` when that directory exists, otherwise to `devspec_toolkit/tools/` as a fallback), and links to `docs/architecture/three_static_indices.md`.
+- **`init_project.py` `--venv-name` default changed from `dev_env` to `devspec_env`** — the emitted CI template (`python -m venv ...` and `pip install` steps), `.gitignore` writer, and pre-commit warning string are all updated to match. `scripts/templates/ensure_venv.py` error message, `CLAUDE.md` setup instructions, and toolkit docs unified on `devspec_env` as the canonical virtual environment name.
 
 ### Skill behavior
 
@@ -357,6 +399,6 @@ A second deep-review pass against the unpushed Trinity Anchor commits found two 
 
 - E561/E562/E563 differentiated traceability codes.
 - W140 seed content overlap check.
-- W581/E582 milestone_ref binding; seed-tech-stack required for step 14.
+- W581/E582 milestone_ref binding; seed documents for any step declared via `seed_manifest.json` `step_requirements` are required at authoring time.
 - **R8 Schema Tightening**: `milestone_ref` added to Step 16 checklist item properties; `trace` promoted to required in Steps 01 and 07; `milestones` promoted to required in Step 09 with `deliverables`+`status` required on milestone items; `acceptance_criteria` removed from Step 14 task required; Step 14 assumptions minLength 15→10; Step 13a category enum added + `specification_source` promoted to required. (`coverage_gaps` field and `generationQuality.assumptions` required promotion were subsequently removed as dead fields.)
 - **Post-R8 cleanup**: 189 cross-schema `$ref` URIs normalized from JSON Pointer (`#/$defs/`) to anchor (`#`) syntax; W580 SUBSTEP_DRIFT validator updated to forward-only drift detection.

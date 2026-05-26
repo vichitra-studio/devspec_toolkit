@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.seed_routing import resolve_seeds_for_step
 from .canon_extractor import extract_canon
 from ._utils import (
     load_json as _u_load_json,
@@ -22,11 +23,6 @@ from ._utils import (
     compute_required_inputs as _u_compute_required_inputs,
     get_boilerplate_keys as _u_get_boilerplate_keys,
 )
-
-# Steps that MAY have seed requirements. The actual requirements are read
-# from seed_manifest.json step_requirements. Steps 03+ work from prior
-# spec artifacts and never require raw seed docs.
-_POSSIBLE_SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a"])
 
 
 def _load_json(path: str) -> dict:
@@ -104,13 +100,15 @@ def _output_schema_keys(step_id: str, registry: SchemaRegistry) -> list[str]:
 
 
 def _seeds_required(step_id: str, spec_dir: str) -> list[str]:
-    """Return seed IDs required by *step_id* from seed_manifest.json.
+    """Return seed IDs required by *step_id* from the host seed_manifest.json.
 
-    Only meaningful for steps 00-04; returns empty list for all others.
+    Manifest-driven for any pipeline step (00–16c).  Returns an empty list
+    when the manifest does not exist or does not list requirements for
+    *step_id*.  Ordering follows ``global_seed_order`` (seeds present in that
+    list appear first; any additional step-required seeds are appended).
+    For the "16"-family steps, umbrella semantics apply (see
+    ``seed_routing.resolve_seeds_for_step`` for full routing rules).
     """
-    if step_id not in _POSSIBLE_SEED_STEPS:
-        return []
-
     spec_dir_abs = os.path.abspath(spec_dir)
     manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
     if not os.path.exists(manifest_path):
@@ -121,8 +119,8 @@ def _seeds_required(step_id: str, spec_dir: str) -> list[str]:
     except (OSError, json.JSONDecodeError):
         return []
 
-    step_requirements: dict[str, list[str]] = manifest.get("step_requirements", {})
-    return list(step_requirements.get(step_id, []))
+    _, step_seed_ids = resolve_seeds_for_step(step_id, manifest)
+    return step_seed_ids
 
 
 def get_step_structure(step_id: str, spec_dir: str, repo_root: str) -> dict[str, Any]:
@@ -196,7 +194,7 @@ def get_step_structure(step_id: str, spec_dir: str, repo_root: str) -> dict[str,
         output_keys = []
 
     # ------------------------------------------------------------------
-    # 4. Seeds required (early steps only).
+    # 4. Seeds required for this step (manifest-driven).
     # ------------------------------------------------------------------
     seeds = _seeds_required(step_id, spec_dir_abs)
 

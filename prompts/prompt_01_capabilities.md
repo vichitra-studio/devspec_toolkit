@@ -13,12 +13,12 @@ Translate the charter into a catalog of system capabilities with explicit verbs,
 ## Extraction Intent
 
 For each upstream artifact ingested, extract the following:
-- **docs/seed/seed_overview.md** (required): Scope boundaries, user persona definitions, high-level feature expectations, and product vision for capability derivation
+- **Seeds**: per spec/common/seed_manifest.json step_requirements["01"]
 - **00_charter.json**: Project goals, success metrics, in/out-of-scope items, and stakeholder needs to anchor capability boundaries; use canonical nouns/verbs from charter language; do not depend on downstream glossary/FR artifacts
 
 ## Operating Flow: Discover → Cross-Cut → Trace → Emit
 - **Discover**: Build a private Context Ledger of candidate capabilities as verb–object pairs derived from charter goals, user JTBD, and glossary nouns; include proposed scope (in/out/future), natural owner, inputs/outputs, and key error states. Do not output it.
-- **Cross-Cut**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in `docs/seed/seed_overview.md`. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question. Apply the Cross-Cutting Capability Checklist below.
+- **Cross-Cut**: Verify each capability exists in `spec/00_charter.json` `in_scope` or `goals`, and does not contradict `out_of_scope` or constraints in the ingested seeds. If a capability cannot be traced to a charter goal or seed requirement, ask a Gap Question. Apply the Cross-Cutting Capability Checklist below.
 - **Trace**: Rewrite to single, testable behaviors with explicit boundaries and error states; propose `trace` hooks to FRs (if any exist) or omit the trace entry until FR IDs are known. For each in-scope user segment's `jobs_to_be_done` from `00_charter.json`, verify at least one capability traces to that job. Any uncovered JTBD must either generate a new capability or be explicitly listed as out-of-scope.
 - **Emit**: Emit JSON after alignment.
 
@@ -34,19 +34,19 @@ Before finalizing, verify these system-level capabilities are considered:
 - Multi-tenancy or environment isolation (if applicable)
 
 ## Heuristics For Completeness
-- MUST include pre/postconditions for capabilities when `spec/00_charter.json` constraints or `docs/seed/seed_overview.md` define prerequisites or side effects; MUST include owner for any capability that spans multiple components as identified in upstream artifacts.
+- MUST include pre/postconditions for capabilities when `spec/00_charter.json` constraints or ingested seeds define prerequisites or side effects; MUST include owner for any capability that spans multiple components as identified in upstream artifacts.
 - Auto-trace seeds: if an FR list has been generated downstream and contains FR IDs, add a `trace` to matching FRs; otherwise, omit the trace entry until FR IDs are known.
-- Naming: MUST use `cap-{noun}-{verb-or-noun}` format (e.g., `cap-user-authentication`) when a matching term exists in `spec/00_charter.json` or `docs/seed/seed_overview.md`; MUST NOT use UI-screen or database-table names as capability identifiers.
+- Naming: MUST use `cap-{noun}-{verb-or-noun}` format (e.g., `cap-user-authentication`) when a matching term exists in `spec/00_charter.json` or the ingested seeds; MUST NOT use UI-screen or database-table names as capability identifiers.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
 - `spec/00_charter.json` is present and contains at least one in_scope entry.
 - `spec/00_charter.json` is present and contains at least one user_segments entry.
-- `docs/seed/seed_overview.md` is present and non-empty.
+- All seeds listed for step "01" in `spec/common/seed_manifest.json` are present and non-empty.
 
 ## Negative Constraints
 - **DO NOT** overlap capability scopes; each capability must have a clear boundary.
-- **DO NOT** use generic verbs ("manage", "handle"); MUST use specific action verbs derived from `spec/00_charter.json` goals and `docs/seed/seed_overview.md` user jobs.
+- **DO NOT** use generic verbs ("manage", "handle"); MUST use specific action verbs derived from `spec/00_charter.json` goals and the ingested seeds.
 - **DO NOT** leave `trace` fields empty; omit `trace` entries whose target IDs are not yet known rather than using invalid placeholder values.
 - **DO NOT** invent capabilities that are not supported by the Charter goals.
 

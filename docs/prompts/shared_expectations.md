@@ -61,10 +61,10 @@ Before generating output, you MUST load and search `canon/manifest.json` for exi
 
 ## 7. Seed Order Protocol
 
-> **Applies to**: Seed-phase steps (00–04) and any step that ingests seed documents.
+> **Applies to**: Any step whose `step_requirements["NN"]` is non-empty in the host `spec/common/seed_manifest.json`.
 
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["NN"]`.
-- Ingest required seeds in order before any other context.
+- Read `spec/common/seed_manifest.json` first. The manifest is authoritative for both routing (which seeds apply to which step, via `step_requirements["NN"]`) and location (the resolved file path, via `seeds[].path`). Do not assume `docs/seed/` or any specific filename.
+- Ingest all seeds listed under `step_requirements["NN"]` for this step (resolved via `seeds[].path`, in `global_seed_order` order) before any other context. For steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the trinity umbrella). `global_seed_order` governs read order only; a step with empty or absent `step_requirements[NN]` ingests no seeds — there is no fallback to `global_seed_order`.
 - If a required seed is missing or stale, stop and request it before proceeding.
 
 ## 8. Self-Audit Gate Protocol

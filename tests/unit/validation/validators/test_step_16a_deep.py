@@ -8,8 +8,12 @@ required.  These tests inline ``review`` into the same data dict.
 """
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
+from specdev_tools.validation.validators.step_16 import _find_seed_manifest
 from specdev_tools.validation.validators.step_16a import validate_step_16a
 
 
@@ -119,6 +123,164 @@ class TestStep16aFeedbackLoop(unittest.TestCase):
         codes_with_path = {e.code for e in errors_with_path}
         self.assertIn("W584", codes_no_path)
         self.assertIn("W584", codes_with_path)
+
+
+class TestFindSeedManifest(unittest.TestCase):
+    """Unit tests for _find_seed_manifest host-discovery.
+
+    Exercises the deterministic resolution strategy: spec_root-preferred when
+    supplied, spec_path-relative fallback when not.  The unbounded upward walk
+    has been removed (DEVSPEC-43); ancestor-escape is no longer possible.
+    """
+
+    def _write_manifest(self, base: Path) -> Path:
+        """Write a minimal seed_manifest.json at base/spec/common/ and return its path."""
+        manifest_dir = base / "spec" / "common"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / "seed_manifest.json"
+        manifest_path.write_text(json.dumps({"doc_paths": ["docs/**/*.md"]}), encoding="utf-8")
+        return manifest_path
+
+    def test_anchor_artifact_finds_sibling_manifest(self):
+        """Anchor at spec/16_impl_context.json resolves spec/common/seed_manifest.json."""
+        with tempfile.TemporaryDirectory() as td:
+            host = Path(td)
+            expected = self._write_manifest(host)
+            spec_path = str(host / "spec" / "16_impl_context.json")
+            result = _find_seed_manifest(spec_path)
+            self.assertEqual(result, str(expected))
+
+    def test_milestone_plan_finds_host_manifest(self):
+        """16a/16b/16c plan at spec/impl_context/ms_foo_plan.json resolves via parent.parent."""
+        with tempfile.TemporaryDirectory() as td:
+            host = Path(td)
+            expected = self._write_manifest(host)
+            impl_dir = host / "spec" / "impl_context"
+            impl_dir.mkdir(parents=True)
+            spec_path = str(impl_dir / "ms_auth_plan.json")
+            result = _find_seed_manifest(spec_path)
+            self.assertEqual(result, str(expected))
+
+    def test_nested_host_path_finds_correct_manifest(self):
+        """Works when spec is nested several levels deep (e.g. tmp/src/project/spec)."""
+        with tempfile.TemporaryDirectory() as td:
+            host = Path(td) / "src" / "project"
+            expected = self._write_manifest(host)
+            spec_path = str(host / "spec" / "16_impl_context.json")
+            result = _find_seed_manifest(spec_path)
+            self.assertEqual(result, str(expected))
+
+    def test_no_manifest_returns_none(self):
+        """Returns None when no seed_manifest.json exists at the deterministic location."""
+        with tempfile.TemporaryDirectory() as td:
+            spec_dir = Path(td) / "spec"
+            spec_dir.mkdir()
+            spec_path = str(spec_dir / "16_impl_context.json")
+            result = _find_seed_manifest(spec_path)
+            self.assertIsNone(result)
+
+    def test_none_spec_path_returns_none(self):
+        """Returns None gracefully when spec_path is None."""
+        result = _find_seed_manifest(None)
+        self.assertIsNone(result)
+
+    def test_monorepo_ancestor_manifest_not_found_without_local_manifest(self):
+        """DEVSPEC-43 fix: ancestor manifest is NOT returned when host has no local manifest.
+
+        Previously the unbounded upward walk would escape the host boundary and return
+        an ancestor workspace manifest.  With deterministic spec_path-relative resolution,
+        a host that lacks a local spec/common/seed_manifest.json correctly gets None
+        (→ W570) rather than silently inheriting an ancestor's manifest.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            # Workspace root has a manifest — should NOT be picked up
+            workspace = Path(td)
+            self._write_manifest(workspace)
+
+            # Host project lives under packages/project — no local manifest
+            host_spec = workspace / "packages" / "project" / "spec"
+            host_spec.mkdir(parents=True)
+            spec_path = str(host_spec / "16_impl_context.json")
+
+            result = _find_seed_manifest(spec_path)
+            # Ancestor-escape is prevented: no local manifest → None (not the workspace manifest)
+            self.assertIsNone(result)
+
+    # ── spec_root-preferred resolution (DEVSPEC-43) ───────────────────────────
+
+    def test_spec_root_with_manifest_returns_it(self):
+        """When spec_root is supplied and contains common/seed_manifest.json, return it."""
+        with tempfile.TemporaryDirectory() as td:
+            spec_root = Path(td) / "spec"
+            expected = self._write_manifest(Path(td))
+            result = _find_seed_manifest(spec_path=None, spec_root=str(spec_root))
+            self.assertEqual(result, str(expected))
+
+    def test_spec_root_without_manifest_returns_none(self):
+        """When spec_root is supplied but has no manifest, return None (no fallback to walk)."""
+        with tempfile.TemporaryDirectory() as td:
+            # Create a spec_root dir — but NO manifest inside it
+            spec_root = Path(td) / "spec"
+            spec_root.mkdir(parents=True)
+            # Put a manifest somewhere in the parent tree — must NOT be found
+            ancestor = Path(td).parent
+            (ancestor / "spec" / "common").mkdir(parents=True, exist_ok=True)
+            (ancestor / "spec" / "common" / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": []}), encoding="utf-8"
+            )
+            result = _find_seed_manifest(spec_path=None, spec_root=str(spec_root))
+            self.assertIsNone(result)
+
+    def test_declared_spec_root_suppresses_spec_path_fallback(self):
+        """A declared spec_root with no manifest wins over a resolvable spec_path manifest.
+
+        Discriminating assertion: if the code fell back to spec_path-relative resolution
+        when spec_root has no manifest, _find_seed_manifest would return the spec_path
+        manifest instead of None — so assertIsNone would fail, catching the regression.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            host = Path(td)
+
+            # Set up a valid spec_path whose directory DOES contain common/seed_manifest.json
+            spec_dir = host / "spec"
+            spec_common = spec_dir / "common"
+            spec_common.mkdir(parents=True)
+            resolvable_manifest = spec_common / "seed_manifest.json"
+            resolvable_manifest.write_text(
+                json.dumps({"doc_paths": ["docs/**/*.md"]}), encoding="utf-8"
+            )
+            spec_path = str(spec_dir / "16_impl_context.json")
+
+            # Sanity-check: spec_path alone WOULD resolve a manifest (proves it's a real target)
+            self.assertIsNotNone(_find_seed_manifest(spec_path=spec_path, spec_root=None))
+
+            # Set up a DIFFERENT spec_root that has NO manifest
+            empty_spec_root = host / "alt_spec"
+            empty_spec_root.mkdir(parents=True)
+
+            # With spec_root declared (but empty), result must be None — NOT the spec_path manifest
+            result = _find_seed_manifest(
+                spec_path=spec_path, spec_root=str(empty_spec_root)
+            )
+            self.assertIsNone(
+                result,
+                "spec_root was declared but has no manifest; must return None without "
+                "falling back to the spec_path-resolvable manifest",
+            )
+
+    def test_spec_root_takes_precedence_over_spec_path(self):
+        """When spec_root is supplied, it is used regardless of what spec_path resolves to."""
+        with tempfile.TemporaryDirectory() as td:
+            host = Path(td)
+            # spec_path-relative location has a manifest (should be ignored)
+            self._write_manifest(host)
+            # spec_root points to a different dir that also has a manifest
+            alt_root = host / "alt_spec"
+            alt_manifest = self._write_manifest(alt_root)
+
+            spec_path = str(host / "spec" / "16_impl_context.json")
+            result = _find_seed_manifest(spec_path=spec_path, spec_root=str(alt_root / "spec"))
+            self.assertEqual(result, str(alt_manifest))
 
 
 if __name__ == "__main__":

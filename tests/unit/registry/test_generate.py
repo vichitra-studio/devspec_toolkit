@@ -87,7 +87,7 @@ class TestGoldenSnapshotMatch:
         assert generated == golden, (
             "Generated registry does not match the golden snapshot.  "
             "If the schema legitimately changed, regenerate with:\n"
-            "  source dev_env/bin/activate && "
+            "  source devspec_env/bin/activate && "
             "specdev registry-generate --repo-root ./devspec_toolkit\n"
             "  cp devspec_toolkit/tools/entry_key_registry.json "
             "devspec_toolkit/tests/fixtures/entry_key_registry_golden.json"

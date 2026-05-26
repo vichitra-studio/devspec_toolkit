@@ -1,5 +1,7 @@
 # Workflow: Bootstrapping Legacy Projects (The Hybrid Approach)
 
+> **NOTE:** Seed location and routing are authoritative in `spec/common/seed_manifest.json`; paths shown below are the default layout.
+
 This guide describes the rigorous operating procedure for onboarding an existing **Legacy (Brownfield) Codebase** into the DevSpec Toolkit.
 
 ## Prerequisites

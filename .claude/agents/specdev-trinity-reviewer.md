@@ -52,7 +52,7 @@ Writing the findings file under `.specdev/findings/` is required by the output c
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline)
 - Project CLAUDE.md and memory files (for E5 architectural cross-check)
 - `.specdev/findings/findings_<group_id>_*.json` (own past output + impl gate-clean signals, for E2/E5 cross-checks)
-- `docs/seed/*.md` (Phase-0 seed docs referenced from `spec/common/seed_manifest.json`)
+- `**/*.md` (seed and reference docs declared in `spec/common/seed_manifest.json`)
 
 Do NOT Read any file under `spec/` directly. Use `specdev json read` with a filter.
 Unfiltered `specdev json read <file>` (no filter) is banned — always pass a jq filter.
@@ -127,7 +127,7 @@ Emit findings across all applicable kinds. Trigger conditions:
 | `drift` | Artifact-vs-reality or artifact-vs-sibling-artifact divergence |
 | `coverage` | Trace, fixture, or NFR mapping is incomplete |
 | `determinism` | Non-reproducible decision, racy invariant, or free-text where an enum is expected |
-| `seed-grounding` | Artifact ignores or contradicts Phase-0 seed content (seeds listed in `spec/common/seed_manifest.json` `global_seed_order` or `step_requirements[NN]`) |
+| `seed-grounding` | Artifact ignores or contradicts seed content the step is required to ingest (per `spec/common/seed_manifest.json` `step_requirements[NN]`; `global_seed_order` governs read order only) |
 
 Severity defaults:
 - P0 (blocks convergence): `gap`, `bug`, `regression`, `hallucination`, `seed-grounding`
@@ -161,7 +161,7 @@ invocation, regardless of scope_kind:
 | **citation drift** — cited primary source no longer matches the reality of the file or URL it points to | `drift` |
 | **architectural violations** — code edit violates a "do NOT" or "never" pattern found in project CLAUDE.md or memory files (E5) | `bug` or `determinism` (per case) |
 | **timestamp validity** — any timestamp that is `T00:00:00Z`, round-hour, or outside session window (E4) | `bug` |
-| **seed-grounding** — code-phase artifact ignores or contradicts Phase-0 seed content read in step 1b (seeds from `spec/common/seed_manifest.json`) | `seed-grounding` |
+| **seed-grounding** — code-phase artifact ignores or contradicts seed content read in step 1b (seeds from `spec/common/seed_manifest.json`) | `seed-grounding` |
 | **ambiguity** — code-phase artifact has multiple valid readings or precedence conflict | `ambiguity` |
 
 Each bucket must be explicitly checked; silently skipping any bucket is a protocol violation.
@@ -360,20 +360,21 @@ If validation fails, fix the output before returning. Do not return an invalid f
 
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline — §10 Tool
    Execution, §13 Namespace Resolution).
-1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs: read all entries in
-    `global_seed_order` and (if reviewing code aligned to a specific step) `step_requirements[NN]`:
+1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs to ingest: for
+    `code_phase_group` and `code_phase_milestone` scopes, the seeds listed under
+    `step_requirements["16b"]` (seeds specific to the code/execute sub-phase) and
+    `step_requirements["16"]` (the umbrella key, which applies to all trinity sub-phases
+    16a/16b/16c). `global_seed_order` governs read order only — it is NOT an inclusion set.
+    This grounds the reviewer against exactly what the execute-mode impl agent was required
+    to ingest — the effective seed set is `step_requirements["16b"] ∪ step_requirements["16"]`
+    (the trinity umbrella), ingested in `global_seed_order` order (required seeds absent from `global_seed_order` are appended last). Read them:
     ```bash
-    specdev json read spec/common/seed_manifest.json '.global_seed_order'
     specdev json read spec/common/seed_manifest.json '.seeds[] | {seed_id, path}'
-    specdev json read spec/common/seed_manifest.json '.step_requirements."<NN>"'
+    specdev json read spec/common/seed_manifest.json \
+      '((.step_requirements["16b"] // []) + (.step_requirements["16"] // [])) | unique'
     ```
-    Note: the third command (`step_requirements` lookup) applies only when reviewing a
-    step-scoped artifact where `<NN>` is a known pipeline step number. For
-    milestone-scoped code-phase review (`code_phase_group` and `code_phase_milestone`),
-    groups are not keyed by step number — `global_seed_order` alone is the universal
-    scope; skip the `step_requirements` read in that case.
     For each seed ID, resolve it to a file path and `Read` each resolved path. Seed docs frame
-    the Phase-0 architecture that all code-phase artifacts must respect. Required before applying
+    the architecture that all code-phase artifacts must respect. Required before applying
     seed-grounding checks in E2.
 2. Read dispatch input: parse `scope_kind`, `scope`, `round`, `reviewer_id`, `plan_path`,
    and (if `code_phase_group`) `group_id`.

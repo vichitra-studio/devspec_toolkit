@@ -11,9 +11,9 @@ from ...core.errors import make_error, SpecError
 from .step_16 import validate_step_16
 
 
-def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
+def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
     """Deep validation for Step 16a (Plan phase)."""
-    errors = validate_step_16(data, toolkit_root, spec_path)
+    errors = validate_step_16(data, toolkit_root, spec_path, spec_root)
 
     plan = data.get("plan", {})
     if not isinstance(plan, dict):

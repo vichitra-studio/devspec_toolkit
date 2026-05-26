@@ -126,7 +126,7 @@ class TestInitProjectVenvName:
         source = self._INIT_SCRIPT.read_text()
         assert "--venv-name" in source, "init_project.py should accept --venv-name"
 
-    def test_default_is_dev_env(self):
+    def test_default_is_devspec_env(self):
         source = self._INIT_SCRIPT.read_text()
-        # The default value should be dev_env
-        assert 'default="dev_env"' in source
+        # The default value should be devspec_env
+        assert 'default="devspec_env"' in source

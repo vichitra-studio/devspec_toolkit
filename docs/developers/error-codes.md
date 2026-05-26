@@ -121,7 +121,7 @@
 
 ### E150 / W150 SEED_MANIFEST_NOT_PROVIDED
 
-**Trigger**: A step listed in `seed_manifest.json`'s `step_requirements` has no corresponding seed documents available, or a step outside the seed boundary (05+) incorrectly references seeds.
+**Trigger**: A step listed in `seed_manifest.json`'s `step_requirements` has no corresponding seed documents available.
 
 **Resolution**: Ensure the step's required seeds (as declared in `spec/common/seed_manifest.json` → `step_requirements`) are present and accessible.
 
@@ -129,9 +129,31 @@
 
 ### W140 SEED_CONTENT_OVERLAP_LOW
 
-**Trigger**: A spec artifact for a seed-consuming step (00–04) shares fewer than 3 content tokens with the seed documents required by `seed_manifest.json`.
+**Trigger**: A spec artifact for a seed-consuming step shares fewer than 3 content tokens with the seed documents required by `seed_manifest.json` for that step. Applies to any pipeline step (00–16c) for which `step_requirements` declares seeds.
 
 **Resolution**: Either incorporate content from the required seed documents into the artifact or review whether the step truly depends on those seeds.
+
+### W551 UNDECLARED_SEED
+
+**Trigger**: An on-disk seed file (under a directory declared in the manifest's `seeds[].path` entries) is not declared in the `seeds[]` array of `spec/common/seed_manifest.json`.
+
+**Resolution**: Either add the file to the `seeds[]` array in `seed_manifest.json` with an appropriate `seed_id` and `path`, or remove the undeclared file from the seed directory.
+
+### W553 SEED_STEP_UNKNOWN
+
+**Trigger**: A key in `seed_manifest.json` `step_requirements` is not a recognized pipeline step in `step_order.json` (e.g. a typo such as `"9"` instead of `"09"`, a non-existent step `"02b"`, or an out-of-range value `"17"`). Real pipeline steps including `"16"`, `"16a"`, `"16b"`, and `"16c"` do not trigger this warning.
+
+**Resolution**: Fix the typo in the `step_requirements` key to match a real step ID, or remove the phantom entry.
+
+**Note**: W553 was previously named `SEED_STEP_OUT_OF_RANGE` (fired for any step outside 00–02a). It was repurposed in DEVSPEC-43 to fire only on genuinely unknown steps, enabling seed routing to all pipeline steps.
+
+### W554 HARDCODED_SEED_REFERENCE
+
+**Trigger**: A prompt file contains a literal `seed_*.md` filename (matched by the pattern `seed_\w+\.md`). `spec/common/seed_manifest.json` is the authoritative source for seed names; hardcoding seed filenames in prompts duplicates that authority and drifts silently when seed names change.
+
+**Resolution**: Remove the literal seed filename from the prompt. Reference seed documents through the manifest's `step_requirements` routing, not by name in prompt prose. Run `specdev hardcoded-seed-check` to identify all occurrences.
+
+**Warning-only and non-promotable**: W554 has no E-counterpart (E554 is `CANON_ENUM_DRIFT`) and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
 
 ### E581 / W581 MILESTONE_REF_MISSING
 

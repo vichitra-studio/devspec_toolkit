@@ -63,12 +63,12 @@ jobs:
           python-version: "3.x"
           cache: "pip"
       - name: Create virtualenv
-        run: python -m venv dev_env  # Matches default --venv-name
+        run: python -m venv devspec_env  # Matches default --venv-name
       - name: Install tooling
         run: |
-          dev_env/bin/pip install --upgrade pip
-          dev_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
-          dev_env/bin/pip install -e devspec_toolkit/tools/
+          devspec_env/bin/pip install --upgrade pip
+          devspec_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
+          devspec_env/bin/pip install -e devspec_toolkit/tools/
       - name: Validate all specs
         run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
       - name: Governance check (PR Title)
@@ -85,6 +85,15 @@ jobs:
           path: trace_matrix.json
           if-no-files-found: ignore
 """
+
+def _render_ci_workflow(rel_toolkit_root: str, venv_name: str) -> str:
+    """Render the CI workflow content with toolkit-path and venv-name substitutions."""
+    content = CI_WORKFLOW_TEMPLATE
+    content = content.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
+    content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+    content = content.replace("devspec_env", venv_name)
+    return content
+
 
 def run_cmd(cmd, cwd=None, check=True):
     print(f"Running: {' '.join(cmd)}")
@@ -324,12 +333,97 @@ def _install_one_symlink(dst_abs, rel_target, force, label):
         return "skipped_error"
 
 
+def copy_seeds_from_manifest(
+    target_dir: str,
+    seed_templates_dir: str,
+    seed_manifest_path: str,
+) -> set:
+    """Copy .md seed templates into the locations declared in the manifest.
+
+    Reads ``seeds[].path`` from *seed_manifest_path*, builds a stem→declared-path
+    map, derives unique seed parent directories, creates them if necessary, then
+    copies each ``.md`` template from *seed_templates_dir* to its manifest-declared
+    destination (relative to *target_dir*).
+
+    Templates with no manifest entry fall back to the lexicographically first seed
+    parent directory (deterministic across multiple declared parent dirs).  When the
+    manifest is absent or unparseable the fallback directory is ``docs/seed/``.
+
+    Existing destination files are never overwritten.
+
+    Args:
+        target_dir: Absolute path to the host repo root (copy destinations are
+            relative to this directory).
+        seed_templates_dir: Directory containing the ``.md`` template files.
+        seed_manifest_path: Path to the (already-copied) ``seed_manifest.json``.
+
+    Returns:
+        The set of absolute destination paths where files were copied (excludes
+        destinations that were skipped because they already existed).
+    """
+    import json as _json
+
+    stem_to_declared_path: dict = {}
+    if os.path.isfile(seed_manifest_path):
+        try:
+            with open(seed_manifest_path, "r", encoding="utf-8") as _mf:
+                _manifest_data = _json.load(_mf)
+            for _seed_entry in _manifest_data.get("seeds", []):
+                _rel = _seed_entry.get("path", "")
+                if _rel:
+                    _stem = os.path.splitext(os.path.basename(_rel))[0]
+                    stem_to_declared_path[_stem] = _rel
+        except (OSError, _json.JSONDecodeError):
+            pass  # fall back to docs/seed/ default below
+
+    if stem_to_declared_path:
+        seed_parent_dirs = {
+            os.path.join(target_dir, os.path.dirname(p))
+            for p in stem_to_declared_path.values()
+        }
+    else:
+        seed_parent_dirs = {os.path.join(target_dir, "docs", "seed")}
+
+    for _seed_dir in seed_parent_dirs:
+        if not os.path.exists(_seed_dir):
+            print(f"Creating {os.path.relpath(_seed_dir, target_dir)}/ directory...")
+            os.makedirs(_seed_dir)
+
+    # Deterministic fallback — sorted() ensures a stable choice when the manifest
+    # declares multiple distinct parent directories.
+    fallback_seed_dir = sorted(seed_parent_dirs)[0]
+
+    copied: set = set()
+    for item in os.listdir(seed_templates_dir):
+        s = os.path.join(seed_templates_dir, item)
+        if os.path.isfile(s):
+            # Only copy Markdown templates — seed_manifest.json belongs in
+            # spec/common/ (handled above in step 3a), not in a seed dir.
+            if not item.endswith(".md"):
+                continue
+            stem = os.path.splitext(item)[0]
+            if stem in stem_to_declared_path:
+                # Copy to the path declared in the manifest (authoritative)
+                d = os.path.join(target_dir, stem_to_declared_path[stem])
+            else:
+                # Template file has no manifest entry — fall back to the
+                # first declared seed parent dir (or docs/seed/ default)
+                d = os.path.join(fallback_seed_dir, item)
+            if not os.path.exists(d):
+                print(f"Copying {item} to {os.path.relpath(d, target_dir)}...")
+                shutil.copy2(s, d)
+                copied.add(d)
+            else:
+                print(f"Skipping {item} (already exists)")
+    return copied
+
+
 def main():
     parser = argparse.ArgumentParser(description="Initialize DevSpec Toolkit in a project")
     parser.add_argument("--target", default=".", help="Target project directory")
     parser.add_argument("--toolkit-url", default="https://github.com/vichitra-studio/devspec_toolkit.git", help="URL of the devspec_toolkit repo")
     parser.add_argument("--toolkit-root", help="Explicit path to devspec_toolkit source directory")
-    parser.add_argument("--venv-name", default="dev_env", help="Name for the virtual environment (default: dev_env)")
+    parser.add_argument("--venv-name", default="devspec_env", help="Name for the virtual environment (default: devspec_env)")
     parser.add_argument("--strict", action="store_true", help="Enable strict governance (commit-msg hooks)")
     parser.add_argument(
         "--force-claude",
@@ -439,11 +533,11 @@ def main():
     else:
         print("spec/impl_context/ directory already exists.")
 
-    # 4. Init docs/seed directory and copy templates
-    docs_seed_dir = os.path.join(target_dir, "docs", "seed")
-    if not os.path.exists(docs_seed_dir):
-        print("Creating docs/seed/ directory...")
-        os.makedirs(docs_seed_dir)
+    # 4. Init seed directories and copy templates, deriving locations from the
+    #    template manifest's seeds[].path rather than hardcoding docs/seed/.
+    #    This honours the North Star: seed_manifest.json is authoritative for
+    #    seed routing AND location.  seed_manifest.json was already copied in
+    #    step 3a so it is available here.
 
     # 4a. Emit wrapper scripts for venv-enforced CLI usage
     tools_dir = os.path.join(target_dir, "tools")
@@ -479,23 +573,9 @@ def main():
     seed_templates_dir = _find_seed_templates(toolkit_path, script_dir)
     if seed_templates_dir:
         print(f"Found seed templates at {seed_templates_dir}")
-        for item in os.listdir(seed_templates_dir):
-            s = os.path.join(seed_templates_dir, item)
-            d = os.path.join(docs_seed_dir, item)
-            if os.path.isfile(s):
-                # Only copy Markdown templates to docs/seed/.  seed_manifest.json
-                # lives in seed_templates/ but belongs in spec/common/ (handled
-                # above in step 3a) — copying it here would place it in the wrong
-                # host location.
-                if not item.endswith(".md"):
-                    continue
-                if not os.path.exists(d):
-                    print(f"Copying {item} to docs/seed/...")
-                    shutil.copy2(s, d)
-                else:
-                    print(f"Skipping {item} (already exists)")
+        copy_seeds_from_manifest(target_dir, seed_templates_dir, seed_manifest_target)
     else:
-        print("Warning: Seed templates not found. Could not copy seed templates to docs/seed/.")
+        print("Warning: Seed templates not found. Could not copy seed templates.")
 
     rel_toolkit_root = os.path.relpath(actual_toolkit_root, target_dir).replace("\\", "/")
 
@@ -592,7 +672,7 @@ def main():
                     with open(config_path, "a") as f:
                         f.write(governance_hook)
     else:
-        print("Warning: pre-commit binary not found in dev_env. Skipping hook install.")
+        print(f"Warning: pre-commit binary not found in {venv_name}. Skipping hook install.")
 
     # 7b. Generate CI Workflow
     workflows_dir = os.path.join(target_dir, ".github", "workflows")
@@ -602,8 +682,7 @@ def main():
     ci_file = os.path.join(workflows_dir, "spec_validation.yml")
     if not os.path.exists(ci_file):
         print("Creating CI workflow .github/workflows/spec_validation.yml...")
-        ci_content = CI_WORKFLOW_TEMPLATE.replace("devspec_toolkit/tools", f"{rel_toolkit_root}/tools" if rel_toolkit_root != "." else "tools")
-        ci_content = ci_content.replace("./devspec_toolkit", f"./{rel_toolkit_root}" if rel_toolkit_root != "." else ".")
+        ci_content = _render_ci_workflow(rel_toolkit_root, venv_name)
         # Add submodule-aware flags to CI commands
         if is_submodule:
             ci_content = ci_content.replace(
@@ -615,22 +694,22 @@ def main():
     else:
         print("CI workflow already exists.")
 
-    # 7. Gitignore
+    # 8. Gitignore
     gitignore_path = os.path.join(target_dir, ".gitignore")
     ignore_entry = f"{venv_name}/"
     if os.path.exists(gitignore_path):
         with open(gitignore_path, "r") as f:
             content = f.read()
         if ignore_entry not in content:
-            print("Adding dev_env/ to .gitignore...")
+            print(f"Adding {venv_name}/ to .gitignore...")
             with open(gitignore_path, "a") as f:
                 f.write(f"\n{ignore_entry}\n")
     else:
-        print("Creating .gitignore with dev_env/...")
+        print(f"Creating .gitignore with {venv_name}/...")
         with open(gitignore_path, "w") as f:
             f.write(f"{ignore_entry}\n")
 
-    # 8. Update README
+    # 9. Update README
     readme_path = os.path.join(target_dir, "README.md")
     setup_docs = f"""
 ## Development Setup
@@ -661,7 +740,7 @@ This project uses the [DevSpec Toolkit](https://github.com/vichitracollective/de
 
     print("\nInitialization complete!")
     print("Next steps:")
-    print("1. Fill out docs/seed/seed_overview.md and seed_tech_stack.md")
+    print("1. Fill out the seed files declared in spec/common/seed_manifest.json")
     print(f"2. Activate your environment: source {venv_name}/bin/activate")
     print("3. Start your first spec or run `./tools/run_specdev.sh --help`")
 

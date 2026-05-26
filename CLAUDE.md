@@ -11,7 +11,7 @@ Current version: see `tools/pyproject.toml`.
 ## Setup
 
 ```bash
-source dev_env/bin/activate    # CLI refuses without it
+source devspec_env/bin/activate    # CLI refuses without it
 specdev --help                  # list subcommands
 specdev <command> --help       # usage for one command
 ```
@@ -48,7 +48,7 @@ For toolkit-internal development (cwd = toolkit root), the flags default sensibl
 
 1. **Use `spec-check`, not `validate`** — `spec-check` resolves project canon; bare `validate`/`validate-all` only see toolkit core canon and emit false E110s.
 2. **Spec context loads through the /specdev-context skill** (`devspec_toolkit/.claude/skills/specdev-context/SKILL.md`). The skill exposes two flows — Orientation (load context for a step) and Action (apply surgical edits driven by a source of findings). Never read `spec/*.json` files directly. For targeted reads, use `specdev json read|read-multi`; for targeted edits, use `specdev json patch|insert|delete`. Direct file ops miss cross-step dependencies and bypass schema awareness.
-3. **Read `prompts/shared_expectations.md`** before executing any `prompt_NN_*.md`.
+3. **Read `docs/prompts/shared_expectations.md`** before executing any `prompt_NN_*.md`.
 4. **Forward-only waterfall** — any upstream edit requires replaying every downstream step. Don't fix downstream failures by silently rewriting upstream artifacts.
 
 ---
@@ -174,4 +174,4 @@ pytest tests/unit/             # unit tests only
 pytest tests/integration/ -v   # step-level integration tests
 ```
 
-Run from toolkit root with `dev_env` active.
+Run from toolkit root with `devspec_env` active.

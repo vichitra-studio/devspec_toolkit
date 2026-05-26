@@ -18,8 +18,8 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --s
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `docs/seed/`, and `.github/workflows/`.
-3.  **Seed Templates**: Copies `seed_overview.md`, `seed_tech_stack.md`, and `spec/common/seed_manifest.json`.
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
+3.  **Seed Templates**: Copies the seed files declared in `spec/common/seed_manifest.json` (`seeds[].path`) and the manifest itself.
 4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
 5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
@@ -50,7 +50,7 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-When you initialize a project, a `spec/specdev_version` file is created. This file is critical—it tells the toolkit which version your specs were written for.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created and maintained by the migration flow (`specdev align`), not at project initialization—a freshly initialized project will not have one until its first alignment (until then the toolkit reports the version as *not detected*).
 
 **Check if you are up to date:**
 ```bash
@@ -87,12 +87,9 @@ Before writing formal specs, you must define the "Seed" of your project using th
 0. **Seed Manifest** (`spec/common/seed_manifest.json`):
    - **Purpose**: defines the mandatory seed order and step-specific requirements.
    - **Expectation**: treat it as the authoritative source for seed ingestion order and per-step seed requirements.
-1. **Seed Overview** (`docs/seed/seed_overview.md`):
-   - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
-   - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
-2. **Seed Tech Stack** (`docs/seed/seed_tech_stack.md`):
-   - **Purpose**: acts as your "Senior Architect" to define the *How* and *Where* (Architecture, Constraints, Dependencies).
-   - **Expectation**: high technical rigor. Pinned versions (e.g. `Python 3.12`), justified choices, and explicit constraints.
+1. **Seed documents** (paths declared in `spec/common/seed_manifest.json` `seeds[].path`):
+   - The manifest lists every seed file, its path relative to the repo root, and its description. Consult it as the authoritative source of seed locations and purpose.
+   - Typical seeds include a product overview (Vision, Personas, MVP Scope) and a tech-stack document (Architecture, Constraints, Dependencies). Your project may declare additional seeds for any step.
 
 **Why?** These documents eliminate ambiguity before you start the AI workflow. Step 00-12 will hallucinate if these foundations are missing.
 
@@ -100,7 +97,7 @@ Before writing formal specs, you must define the "Seed" of your project using th
 1. Locate the matching prompt in [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
-   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” for seed-phase prompts 00–04; “Coverage Closure” for Steps 05–16c), and outputs only a short bulleted list of targeted questions if critical info is missing.
+   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” where applicable, or “Coverage Closure” for steps that use it), and outputs only a short bulleted list of targeted questions if critical info is missing.
    - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
 4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).

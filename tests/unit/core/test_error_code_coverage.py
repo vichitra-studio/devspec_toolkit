@@ -28,7 +28,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E571", "E572", "E573",
             "E575", "E576",
             "E580", "E581", "E582", "E585",
-            "W550", "W551", "W552", "W553", "W560", "W561", "W562", "W563",
+            "W550", "W551", "W552", "W553", "W554", "W560", "W561", "W562", "W563",
             "W564", "W565", "W566", "W567", "W568", "W569",
             "W570", "W571", "W572", "W573", "W574",
             "W575", "W576",
@@ -77,7 +77,7 @@ class ErrorCodeCoverageTests(unittest.TestCase):
 
     def test_all_emitted_codes_registered(self):
         """Every error/warning code used as a string literal in source files exists in ERROR_CODES."""
-        tools_dir = Path(__file__).resolve().parent.parent / "tools" / "specdev_tools"
+        tools_dir = Path(__file__).resolve().parent.parent.parent.parent / "tools" / "specdev_tools"
         pattern = re.compile(r'"([EW]\d{3})"')
         found_codes = set()
         for py_file in tools_dir.rglob("*.py"):

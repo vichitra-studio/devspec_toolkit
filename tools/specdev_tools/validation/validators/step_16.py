@@ -40,21 +40,58 @@ _BUILTIN_DOC_BASENAMES: frozenset[str] = frozenset({
 # the triple execution overhead without changing the public API (AUDIT-029).
 _step16_cache: Dict[str, list[SpecError]] = {}
 
-def _find_seed_manifest(spec_path: Optional[str], toolkit_root: str) -> Optional[str]:
-    if spec_path:
-        cur = os.path.abspath(os.path.dirname(spec_path))
-        while True:
-            cand = os.path.join(cur, "spec", "common", "seed_manifest.json")
-            if os.path.exists(cand):
-                return cand
-            parent = os.path.dirname(cur)
-            if parent == cur:
-                break
-            cur = parent
+def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = None) -> Optional[str]:
+    """Locate the host's spec/common/seed_manifest.json without upward-walk ancestor escape.
 
-    fallback = os.path.join(toolkit_root, "spec", "common", "seed_manifest.json")
-    if os.path.exists(fallback):
-        return fallback
+    Resolution strategy (authoritative order):
+
+    1. **spec_root declared**: return ``<spec_root>/common/seed_manifest.json`` if it
+       exists, else ``None``.  When the caller supplies an explicit spec root, that is
+       the authoritative location — no fallback to a spec_path walk if the declared
+       root has no manifest.  Returning ``None`` causes the caller to emit W570, which
+       is the correct signal: the declared root is missing its manifest.
+
+    2. **spec_root absent, spec_path provided**: deterministic spec_path-relative
+       resolution mirroring ``_load_roadmap``.  Compute the spec dir from spec_path:
+       - If ``basename(dirname(spec_path)) == "impl_context"`` (milestone plan inside
+         ``spec/impl_context/``): spec_dir = ``dirname(dirname(spec_path))``.
+       - Otherwise (anchor at ``spec/16_impl_context.json``): spec_dir =
+         ``dirname(spec_path)``.
+       Return ``<spec_dir>/common/seed_manifest.json`` if it exists, else ``None``.
+
+    3. **Both absent**: return ``None``.
+
+    The unbounded upward walk used previously has been removed.  That walk violated
+    the DEVSPEC-43 north star by escaping the host boundary: in a monorepo where the
+    host has no local manifest but an ancestor directory does, the walk returned the
+    ancestor's manifest instead of ``None``.  With the deterministic fallback, a host
+    that lacks a local manifest correctly gets ``None`` → W570 rather than silently
+    inheriting an ancestor's manifest.
+
+    Behavior for standard submodule layouts (spec_root = host spec dir):
+        - spec_root supplied → resolves ``<host>/spec/common/seed_manifest.json``
+          directly.  Same manifest the walk found; behaviour unchanged for
+          correctly structured hosts. ✓
+        - Anchor (``spec/16_impl_context.json``, no spec_root): spec_dir =
+          ``dirname(spec_path)`` = ``<host>/spec/`` →
+          ``<host>/spec/common/seed_manifest.json``. ✓
+        - Milestone plan (``spec/impl_context/ms_foo_plan.json``, no spec_root):
+          spec_dir = ``dirname(dirname(spec_path))`` = ``<host>/spec/`` →
+          ``<host>/spec/common/seed_manifest.json``. ✓
+    """
+    if spec_root is not None:
+        cand = os.path.join(os.path.abspath(spec_root), "common", "seed_manifest.json")
+        return cand if os.path.exists(cand) else None
+
+    if spec_path:
+        dirname = os.path.dirname(os.path.abspath(spec_path))
+        if os.path.basename(dirname) == "impl_context":
+            spec_dir = os.path.dirname(dirname)
+        else:
+            spec_dir = dirname
+        cand = os.path.join(spec_dir, "common", "seed_manifest.json")
+        return cand if os.path.exists(cand) else None
+
     return None
 
 
@@ -162,7 +199,7 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
             )
 
 
-def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None) -> list[SpecError]:
+def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
     """
     Deep validation for Step 16 (Implementation Context).
 
@@ -173,8 +210,8 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
     Returns:
         List of SpecError objects. Empty list if valid.
     """
-    # Cache lookup: hash data + spec_path to detect identical invocations from 16a/16b/16c
-    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "")
+    # Cache lookup: hash data + spec_path + spec_root to detect identical invocations from 16a/16b/16c
+    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "") + "\0" + (spec_root or "")
     cache_key = hashlib.md5(cache_input.encode()).hexdigest()
     if cache_key in _step16_cache:
         return list(_step16_cache[cache_key])  # Return a copy
@@ -313,7 +350,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         if not matched:
             errors.append(make_error("E520", f"File '{f}' is touched by implementation but not covered by target_file_patterns."))
 
-    manifest_path = _find_seed_manifest(spec_path, toolkit_root)
+    manifest_path = _find_seed_manifest(spec_path, spec_root)
     doc_patterns: List[str] = []
     doc_patterns_valid = False
     if manifest_path:

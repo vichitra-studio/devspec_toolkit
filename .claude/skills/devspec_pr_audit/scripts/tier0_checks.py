@@ -464,13 +464,9 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
     """
     findings: list[dict[str, Any]] = []
 
-    # Try to locate specdev on PATH (try activating devspec_env first)
+    # Try to locate specdev on PATH (activate devspec_env if present)
     activate = REPO_ROOT / "devspec_env" / "bin" / "activate"
-    if activate.exists():
-        env_setup = f"source {activate} && "
-    else:
-        activate2 = REPO_ROOT / "dev_env" / "bin" / "activate"
-        env_setup = f"source {activate2} && " if activate2.exists() else ""
+    env_setup = f"source {activate} && " if activate.exists() else ""
 
     check_cmd = f"{env_setup}command -v specdev"
     check_result = subprocess.run(

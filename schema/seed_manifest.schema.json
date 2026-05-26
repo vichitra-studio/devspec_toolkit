@@ -28,7 +28,7 @@
     },
     "global_seed_order": {
       "$ref": "vc:core:collections#kebabIdArray",
-      "description": "Ordered list of seed IDs that AI prompts should read before generating any spec artifact. The order determines the precedence of context: earlier seeds provide foundational context, later seeds provide specifics. All prompts read seeds in this order via the 'Seed Order & Mandatory Sources' section. Should include at minimum the IDs for seed_overview.md and seed_tech_stack.md."
+      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. Should include at minimum the IDs for the host's declared seed files."
     },
     "seeds": {
       "type": "array",
@@ -39,7 +39,7 @@
         "properties": {
           "seed_id": {
             "$ref": "vc:core:atoms#kebabId",
-            "description": "Unique kebab-case identifier for this seed document. Should match a corresponding entry in global_seed_order and/or step_requirements (validated by seed-lint). Example: 'seed-overview', 'seed-tech-stack'. Convention: use the filename stem in kebab-case."
+            "description": "Unique kebab-case identifier for this seed document. Should be referenced by step_requirements (which routes the seed to steps) and may also appear in global_seed_order (which governs read order only); seed-lint validates these references. Example: 'seed-overview', 'seed-tech-stack'. Convention: use the filename stem in kebab-case."
           },
           "path": {
             "type": "string",
@@ -84,7 +84,7 @@
         ],
         "description": "Definition of a single seed document: its location, type, and role in the pipeline."
       },
-      "description": "Registry of all seed files available for this project. Each entry describes a seed file's purpose and scope. Seeds are source-of-truth documents (PRDs, technical specs, meeting notes) that ground AI outputs in project reality. Must contain at least one entry; seed_ids here should align with global_seed_order and step_requirements values (validated by seed-lint)."
+      "description": "Registry of all seed files available for this project. Each entry describes a seed file's purpose and scope. Seeds are source-of-truth documents (PRDs, technical specs, meeting notes) that ground AI outputs in project reality. Must contain at least one entry; each seed_id here should be referenced by step_requirements (routing) and may also appear in global_seed_order (read order only), validated by seed-lint."
     },
     "step_requirements": {
       "type": "object",
@@ -95,7 +95,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to prioritize reading. Key: step ID matching the pattern NN or NNx (e.g., '04', '05', '16a'). Value: array of seed IDs from the seeds registry. Ensures each step gets the most relevant context without requiring all seeds. Steps not listed here fall back to reading global_seed_order."
+      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to ingest. Key: step ID matching the pattern NN or NNx (e.g., '04', '05', '16a'). Value: array of seed IDs from the seeds registry. This is the authoritative inclusion set — only seeds listed here are ingested at a step. Steps with no entry (or an empty array) require no seeds — there is no fallback to global_seed_order, which governs read order only."
     },
     "doc_paths": {
       "description": "Array of glob patterns identifying documentation files in the repository that the step_16 docs_impact validator monitors. Use forward-slash glob syntax relative to the repository root. Examples: ['docs/**/*.md', 'README.md', 'api-reference/**/*.yaml', 'guides/*.md']. Anti-pattern: absolute paths or OS-specific separators ('docs\\*.md') — use forward-slash glob syntax only. Anti-pattern: listing individual files when a glob covers them ('README.md', 'SETUP.md' → use '*.md' at the root level instead).",

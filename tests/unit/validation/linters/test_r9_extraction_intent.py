@@ -257,8 +257,8 @@ class TestExtractionIntentCheck(unittest.TestCase):
     # ------------------------------------------------------------------
     # Edge cases
     # ------------------------------------------------------------------
-    def test_seed_doc_refs_not_counted_as_step_entries(self):
-        """Seed doc references (docs/seed/...) are skipped; they don't satisfy dep coverage."""
+    def test_manifest_anchored_seed_bullet_suppresses_e591(self):
+        """Manifest-anchored seed bullet (DEVSPEC-43 form) suppresses E591 — section is populated."""
         with tempfile.TemporaryDirectory() as tmp:
             self._make_repo(
                 tmp,
@@ -267,14 +267,13 @@ class TestExtractionIntentCheck(unittest.TestCase):
                     "prompt_01_capabilities.md": (
                         "# Step 01 Capabilities\n\n"
                         "### Extraction Intent\n\n"
-                        "- **docs/seed/seed_overview.md**: Scope boundaries "
-                        "from the seed overview document used for initial framing\n"
+                        '- **Seeds**: per spec/common/seed_manifest.json step_requirements["01"]\n'
                     ),
                 },
             )
             errors = check_extraction_intent(tmp)
-            # Seed ref IS a valid entry — section is populated (just not
-            # with spec deps), so E591 should NOT fire.
+            # Manifest-anchored seed bullet IS a valid entry — section is populated
+            # (just not with spec step deps), so E591 should NOT fire.
             e591 = [e for e in render_errors(errors) if e.startswith("E591")]
             self.assertEqual(len(e591), 0)
 

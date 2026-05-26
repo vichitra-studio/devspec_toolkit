@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
 from ._utils import merge_allof as _u_merge_allof
@@ -28,11 +29,6 @@ _STOPWORDS: frozenset[str] = frozenset([
     "the", "and", "that", "this", "with", "from", "have", "will",
     "must", "shall", "should", "when", "then", "able", "been",
 ])
-
-# ---------------------------------------------------------------------------
-# Early-step IDs for seed_distillation check.
-# ---------------------------------------------------------------------------
-_SEED_STEPS: frozenset[str] = frozenset(["00", "01", "02", "02a", "03", "04"])
 
 # ---------------------------------------------------------------------------
 # Steps that produce checklist-style artifacts whose items have 'description'
@@ -576,30 +572,49 @@ def _check_seed_distillation(
     artifact_path: str,
     step_id: str,
     spec_dir: str,
-    repo_root: str,
+    git_root: str | None = None,
 ) -> list[ReviewPair]:
-    """Check 4: were seed requirements faithfully captured? (Only steps 00–04.)"""
-    if step_id not in _SEED_STEPS:
+    """Check 4: were seed requirements faithfully captured?
+
+    Manifest-driven for any step whose ``step_requirements`` lists seeds in the
+    host ``seed_manifest.json``.  If the manifest is absent, unreadable, or
+    lists no seeds for this step, the check returns cleanly with no pairs.
+
+    Args:
+        git_root: Host repo root (authoritative for seed path resolution).
+                  When None, falls back to os.path.dirname(spec_dir_abs),
+                  which is correct for the standard flat layout.
+    """
+    # Derive host root: git_root is authoritative for seed path resolution;
+    # fall back to dirname(spec_dir_abs) for the standard flat layout.
+    # abspath guards against double-"spec" from trailing-slash or relative spec_dir.
+    spec_dir_abs = os.path.abspath(spec_dir)
+    project_root = git_root if git_root else os.path.dirname(spec_dir_abs)
+
+    # The manifest always lives inside spec_dir (spec_dir/common/seed_manifest.json).
+    # project_root is used only to resolve the seeds[].path entries within it.
+    manifest_path = os.path.join(spec_dir_abs, "common", "seed_manifest.json")
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as _f:
+            manifest: dict = json.load(_f)
+    except Exception:
+        return []
+
+    # Resolve which seed IDs this step requires.  Use step_seed_ids ONLY.
+    _, step_seed_ids = resolve_seeds_for_step(step_id, manifest)
+    if not step_seed_ids:
+        return []
+
+    # Map seed IDs to absolute paths (no existence filter — we handle that below).
+    seed_paths: dict[str, str] = resolve_seed_paths(manifest, step_seed_ids, project_root)
+
+    if not seed_paths:
         return []
 
     pairs: list[ReviewPair] = []
-
-    # Locate seed docs: seed_overview.md and seed_tech_stack.md
-    seed_files: list[str] = []
-    seen_seed_paths: set[str] = set()
-    for candidate_dir in [spec_dir, os.path.dirname(spec_dir), repo_root]:
-        for seed_name in ["seed_overview.md", "seed_tech_stack.md"]:
-            seed_path = os.path.join(candidate_dir, seed_name)
-            if os.path.isfile(seed_path) and seed_path not in seen_seed_paths:
-                seen_seed_paths.add(seed_path)
-                seed_files.append(seed_path)
-
-    if not seed_files:
-        return []
-
     artifact_combined = " ".join(_extract_all_strings(artifact))
 
-    for seed_path in seed_files:
+    for seed_path in seed_paths.values():
         try:
             with open(seed_path, "r", encoding="utf-8") as f:
                 seed_text = f.read()
@@ -743,6 +758,7 @@ def review_artifact(
     spec_dir: str,
     repo_root: str,
     entry_id: str | None = None,
+    git_root: str | None = None,
 ) -> ReviewResult:
     """Run a two-pass structural + semantic review on a freshly-emitted spec artifact.
 
@@ -752,6 +768,9 @@ def review_artifact(
         spec_dir:      Directory containing spec/*.json files.
         repo_root:     Root of the devspec_toolkit (for schema_registry, step_order).
         entry_id:      Optional entity ID to scope the review (currently informational).
+        git_root:      Host repo root (authoritative for seed path resolution).
+                       When None, falls back to os.path.dirname(spec_dir), which is
+                       correct for the standard flat layout.
 
     Returns:
         ReviewResult with structural analysis, semantic pairs, verdict, and token cost.
@@ -799,7 +818,7 @@ def review_artifact(
         _check_quantifier_weakening(artifact, artifact_path, upstream_specs)
     )
     semantic_pairs.extend(
-        _check_seed_distillation(artifact, artifact_path, step_id, spec_dir, repo_root)
+        _check_seed_distillation(artifact, artifact_path, step_id, spec_dir, git_root=git_root)
     )
     semantic_pairs.extend(
         _check_scope_completeness(artifact, artifact_path, step_id, repo_root)

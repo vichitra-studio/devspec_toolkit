@@ -116,10 +116,10 @@
     },
     "step_metadata": {
       "type": "object",
-      "description": "Per-step declarative metadata: upstream spec inputs and seed inputs. Optional — when present, the consistency linter validates each declared field against the inverse of downstream_consumers (required_spec_inputs) or seed_manifest.step_requirements (required_seed_inputs). Both inner fields are independently optional so a step may opt in to one side without the other; the linter treats omitted fields as empty lists and still catches missing edges via the cross-source comparison.",
+      "description": "Per-step declarative metadata: upstream spec inputs. Optional — when present, the consistency linter validates required_spec_inputs against the inverse of downstream_consumers. The field is independently optional; the linter treats omission as an empty list and still catches missing edges via the cross-source comparison.",
       "additionalProperties": {
         "type": "object",
-        "description": "Metadata block for a single step. Both inner fields are optional to allow incremental per-step migration; the linter validates whatever is declared and treats absence as an empty list. Keys at this level must reference steps declared in the top-level `steps` array — phantom step keys are caught by `_lint_step_metadata_consistency` (E543).",
+        "description": "Metadata block for a single step. The field is optional to allow incremental per-step migration; the linter validates whatever is declared and treats absence as an empty list. Keys at this level must reference steps declared in the top-level `steps` array — phantom step keys are caught by `_lint_step_metadata_consistency` (E543).",
         "additionalProperties": false,
         "properties": {
           "required_spec_inputs": {
@@ -128,16 +128,6 @@
             "items": {
               "$ref": "vc:core:atoms#stepId",
               "description": "A step ID that produces upstream input for this step."
-            },
-            "uniqueItems": true
-          },
-          "required_seed_inputs": {
-            "type": "array",
-            "description": "Seed document IDs required by this step. Must match a subset of seed_manifest.seeds[*].seed_id and should mirror seed_manifest.step_requirements[<this step>] when present. Optional — when omitted, the linter treats this side as empty and surfaces any missing seed edge via E543.",
-            "items": {
-              "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$",
-              "description": "A kebab-case seed_id from seed_manifest.json."
             },
             "uniqueItems": true
           }

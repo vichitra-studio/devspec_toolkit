@@ -451,19 +451,17 @@ class TestIntentEntryRegex(unittest.TestCase):
         self.assertEqual(m.group(1), "08_fixtures.json")
         self.assertIn("Extract fixture definitions", m.group(2))
 
-    def test_seed_doc_ref_matches(self):
-        """Seed document reference with docs/seed/ prefix matches."""
-        line = "- **docs/seed/seed_overview.md**: Extract high-level product vision and target audience for capability alignment"
+    def test_seed_doc_ref_does_not_match_intent_entry_re(self):
+        """Manifest-anchored seed bullet does NOT match INTENT_ENTRY_RE (captured by SEED_ENTRY_RE instead)."""
+        line = "- **Seeds**: per spec/common/seed_manifest.json step_requirements[\"00\"]"
         m = _INTENT_ENTRY_RE.match(line)
-        assert m is not None
-        self.assertEqual(m.group(1), "seed_overview.md")
+        self.assertIsNone(m)
 
-    def test_seed_doc_without_prefix_matches(self):
-        """Bare seed_*.md reference matches."""
+    def test_legacy_seed_filename_no_longer_matches(self):
+        """Bare seed_*.md literals no longer match INTENT_ENTRY_RE after DEVSPEC-43."""
         line = "- **seed_tech_stack.md**: Extract technology choices and platform constraints for architecture decisions"
         m = _INTENT_ENTRY_RE.match(line)
-        assert m is not None
-        self.assertEqual(m.group(1), "seed_tech_stack.md")
+        self.assertIsNone(m)
 
     def test_step_with_letter_suffix_matches(self):
         """Step numbers with letter suffixes like 02a, 13a, 16b match."""

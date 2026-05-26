@@ -196,13 +196,28 @@ class TestContextCanon:
 # ---------------------------------------------------------------------------
 
 class TestContextFreshness:
-    """Smoke tests for `specdev context freshness`."""
+    """Smoke tests for `specdev context freshness`.
+
+    Fixture layout (standard flat layout):
+        tmp_path/           ← host root; dirname(spec_dir) == host root
+          spec/             ← spec_dir passed to commands
+            common/
+              seed_manifest.json
+          docs/seed/        ← seeds[].path = "docs/seed/..." (relative to host root)
+            seed_overview.md
+
+    The git_root-implicit path (git_root=None → dirname(spec_dir)) is tested by
+    all tests that omit --git-root.  The explicit nested-layout tests at the
+    bottom of this class pass --git-root explicitly and prove correctness when
+    host_root != dirname(spec_dir).
+    """
 
     def test_no_index_when_no_seed_requirements(self, tmp_path):
         """freshness returns {'status': 'no_index'} when no seed_requirements.json exists."""
-        (tmp_path / "common").mkdir()
+        spec_dir = tmp_path / "spec"
+        (spec_dir / "common").mkdir(parents=True)
         proc = _run(
-            "context", "freshness", str(tmp_path),
+            "context", "freshness", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
@@ -215,9 +230,14 @@ class TestContextFreshness:
 
         Setup: write a seed file, build seed_requirements.json via seed-index,
         then call freshness and assert on the populated result.
+
+        Uses the standard flat layout: spec_dir = tmp_path/spec, seeds at
+        tmp_path/docs/seed/ (seeds[].path relative to tmp_path == host root).
+        No --git-root flag → dirname(spec_dir) == tmp_path is used as host root.
         """
-        # 1. Build the spec dir structure
-        common_dir = tmp_path / "common"
+        # 1. Build the host + spec dir structure
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
         seed_file_dir = tmp_path / "docs" / "seed"
         common_dir.mkdir(parents=True)
         seed_file_dir.mkdir(parents=True)
@@ -248,7 +268,7 @@ class TestContextFreshness:
 
         # 2. Run seed-index to produce seed_requirements.json
         idx_proc = _run(
-            "seed-index", str(tmp_path),
+            "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
@@ -258,7 +278,7 @@ class TestContextFreshness:
 
         # 3. Run freshness and verify the seed reports not stale
         proc = _run(
-            "context", "freshness", str(tmp_path),
+            "context", "freshness", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
@@ -278,8 +298,12 @@ class TestContextFreshness:
         )
 
     def test_stale_seed_detected(self, tmp_path):
-        """Modifying a seed file after indexing must cause stale=True."""
-        common_dir = tmp_path / "common"
+        """Modifying a seed file after indexing must cause stale=True.
+
+        Uses the standard flat layout (no --git-root).
+        """
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
         seed_file_dir = tmp_path / "docs" / "seed"
         common_dir.mkdir(parents=True)
         seed_file_dir.mkdir(parents=True)
@@ -310,7 +334,7 @@ class TestContextFreshness:
 
         # Index the seed
         idx_proc = _run(
-            "seed-index", str(tmp_path),
+            "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
@@ -321,13 +345,87 @@ class TestContextFreshness:
 
         # Check freshness — expect stale=True
         proc = _run(
-            "context", "freshness", str(tmp_path),
+            "context", "freshness", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
         assert "seed-overview" in data
         assert data["seed-overview"]["stale"] is True, (
             "Seed content changed after indexing; must report stale=True"
+        )
+
+    def test_nested_layout_freshness_resolves_via_git_root(self, tmp_path):
+        """Nested layout: spec_dir is NOT a direct child of the host root.
+
+        host_root = tmp_path
+        spec_dir  = tmp_path/src/project/spec   (deeply nested)
+        seeds     = tmp_path/docs/seed/seed_overview.md
+        seeds[].path = "docs/seed/seed_overview.md"  (relative to host root)
+
+        Without --git-root the dirname heuristic gives tmp_path/src/project —
+        wrong.  With --git-root tmp_path the path resolves correctly.
+        This test proves the nested-layout bug is fixed.
+        """
+        host_root = tmp_path
+        spec_dir = tmp_path / "src" / "project" / "spec"
+        common_dir = spec_dir / "common"
+        seed_file_dir = host_root / "docs" / "seed"
+        common_dir.mkdir(parents=True)
+        seed_file_dir.mkdir(parents=True)
+        seed_file = seed_file_dir / "seed_overview.md"
+        seed_file.write_text("Nested layout seed content.\n", encoding="utf-8")
+
+        manifest = {
+            "$schema": "vc:seed-manifest",
+            "seed_manifest_id": "seed-manifest-nested",
+            "version": "0.1.0",
+            "created_at": "2026-01-01T00:00:00Z",
+            "last_updated": "2026-01-01T00:00:00Z",
+            "global_seed_order": ["seed-overview"],
+            "seeds": [
+                {
+                    "seed_id": "seed-overview",
+                    "path": "docs/seed/seed_overview.md",
+                    "description": "Nested layout seed",
+                    "required": True,
+                    "source_type": "doc",
+                }
+            ],
+            "step_requirements": {"00": ["seed-overview"]},
+        }
+        (common_dir / "seed_manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+
+        # seed-index must also use --git-root to resolve correctly
+        idx_proc = _run(
+            "seed-index", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+            "--git-root", str(host_root),
+            "--json",
+        )
+        assert idx_proc.returncode == 0, (
+            f"seed-index with --git-root failed: {idx_proc.stderr}"
+        )
+
+        # freshness with --git-root must find the seed and report it not stale
+        proc = _run(
+            "context", "freshness", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+            "--git-root", str(host_root),
+        )
+        data = _parse_json(proc)
+        assert "seed-overview" in data, (
+            f"'seed-overview' missing from freshness output for nested layout: {data}"
+        )
+        assert data["seed-overview"]["stale"] is False, (
+            "Seed was just indexed and not modified; must not be stale (nested layout)"
+        )
+        assert data["seed-overview"]["current_hash"] != "", (
+            "current_hash must be non-empty — seed found+hashed via --git-root"
+        )
+        assert data["seed-overview"]["current_hash"] == data["seed-overview"]["indexed_hash"], (
+            "hashes must match for unmodified seed (nested layout)"
         )
 
 
@@ -416,11 +514,26 @@ class TestContextScope:
 # ---------------------------------------------------------------------------
 
 class TestSeedIndex:
-    """Smoke tests for `specdev seed-index`."""
+    """Smoke tests for `specdev seed-index`.
+
+    Fixture layout (standard flat layout):
+        tmp_path/           ← host root; dirname(spec_dir) == host root
+          spec/             ← spec_dir passed to commands
+            common/
+              seed_manifest.json
+          docs/seed/        ← seeds[].path = "docs/seed/..." (relative to host root)
+            seed_overview.md
+
+    The git_root-implicit path (git_root=None → dirname(spec_dir)) is tested by
+    all tests that omit --git-root.  The explicit nested-layout test at the
+    bottom of this class passes --git-root explicitly and proves correctness when
+    host_root != dirname(spec_dir).
+    """
 
     def test_pass_status_on_valid_manifest(self, tmp_path):
         """seed-index must exit 0 and report PASS for a well-formed manifest."""
-        common_dir = tmp_path / "common"
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
         seed_dir = tmp_path / "docs" / "seed"
         common_dir.mkdir(parents=True)
         seed_dir.mkdir(parents=True)
@@ -450,7 +563,7 @@ class TestSeedIndex:
         )
 
         proc = _run(
-            "seed-index", str(tmp_path),
+            "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
@@ -459,7 +572,8 @@ class TestSeedIndex:
 
     def test_writes_seed_requirements_json(self, tmp_path):
         """seed-index must write seed_requirements.json into common/."""
-        common_dir = tmp_path / "common"
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
         seed_dir = tmp_path / "docs" / "seed"
         common_dir.mkdir(parents=True)
         seed_dir.mkdir(parents=True)
@@ -487,14 +601,15 @@ class TestSeedIndex:
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
 
-        _run("seed-index", str(tmp_path), "--repo-root", str(REPO_ROOT), "--json")
+        _run("seed-index", str(spec_dir), "--repo-root", str(REPO_ROOT), "--json")
 
         out_file = common_dir / "seed_requirements.json"
         assert out_file.exists(), "seed_requirements.json was not written into common/"
 
     def test_seed_hash_is_sha256_digest(self, tmp_path):
         """The source_hash for each indexed seed must start with 'sha256:'."""
-        common_dir = tmp_path / "common"
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
         seed_dir = tmp_path / "docs" / "seed"
         common_dir.mkdir(parents=True)
         seed_dir.mkdir(parents=True)
@@ -523,7 +638,7 @@ class TestSeedIndex:
         )
 
         proc = _run(
-            "seed-index", str(tmp_path),
+            "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
@@ -541,9 +656,10 @@ class TestSeedIndex:
 
     def test_fail_status_when_manifest_missing(self, tmp_path):
         """seed-index must report FAIL (exit 1) when seed_manifest.json is absent."""
-        # tmp_path has no common/ dir at all
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir(parents=True)
         proc = _run(
-            "seed-index", str(tmp_path),
+            "seed-index", str(spec_dir),
             "--repo-root", str(REPO_ROOT),
             "--json",
         )
@@ -556,3 +672,65 @@ class TestSeedIndex:
             f"Expected FAIL when manifest is missing, got {data['status']!r}"
         )
         assert data["error_count"] >= 1
+
+    def test_nested_layout_seed_index_resolves_via_git_root(self, tmp_path):
+        """Nested layout: spec_dir is NOT a direct child of the host root.
+
+        host_root = tmp_path
+        spec_dir  = tmp_path/src/project/spec   (deeply nested)
+        seeds     = tmp_path/docs/seed/seed_overview.md
+        seeds[].path = "docs/seed/seed_overview.md"  (relative to host root)
+
+        Without --git-root the dirname heuristic gives tmp_path/src/project —
+        wrong.  With --git-root tmp_path the path resolves correctly.
+        This test proves the nested-layout bug is fixed.
+        """
+        host_root = tmp_path
+        spec_dir = tmp_path / "src" / "project" / "spec"
+        common_dir = spec_dir / "common"
+        seed_file_dir = host_root / "docs" / "seed"
+        common_dir.mkdir(parents=True)
+        seed_file_dir.mkdir(parents=True)
+        (seed_file_dir / "seed_overview.md").write_text(
+            "Nested layout seed content.\n", encoding="utf-8"
+        )
+
+        manifest = {
+            "$schema": "vc:seed-manifest",
+            "seed_manifest_id": "seed-manifest-nested-idx",
+            "version": "0.1.0",
+            "created_at": "2026-01-01T00:00:00Z",
+            "last_updated": "2026-01-01T00:00:00Z",
+            "global_seed_order": ["seed-overview"],
+            "seeds": [
+                {
+                    "seed_id": "seed-overview",
+                    "path": "docs/seed/seed_overview.md",
+                    "description": "Nested layout seed",
+                    "required": True,
+                    "source_type": "doc",
+                }
+            ],
+            "step_requirements": {"00": ["seed-overview"]},
+        }
+        (common_dir / "seed_manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+
+        proc = _run(
+            "seed-index", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+            "--git-root", str(host_root),
+            "--json",
+        )
+        data = _parse_json(proc)
+        assert data["status"] == "PASS", (
+            f"seed-index with --git-root should succeed for nested layout, got {data}"
+        )
+        seeds = data["result"]["seeds"]
+        assert "seed-overview" in seeds, (
+            f"seed-overview must be indexed in nested layout: {seeds}"
+        )
+        assert seeds["seed-overview"]["source_hash"].startswith("sha256:"), (
+            "source_hash must be a sha256 digest for the nested-layout seed"
+        )

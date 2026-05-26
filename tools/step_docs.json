@@ -76,8 +76,7 @@
       "docs/developers/workflows/discovery.md",
       "docs/developers/workflows/workflow_feature_extension.md",
       "docs/architecture/governance_architecture.md",
-      "docs/ops/toolkit_update_checklist.md",
-      "docs/plans/phase_0_governance_plan.md"
+      "docs/ops/toolkit_update_checklist.md"
     ],
     "11": [
       "docs/developers/workflows/discovery.md",
