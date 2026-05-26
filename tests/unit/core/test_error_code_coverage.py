@@ -43,6 +43,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W605",
             # Glossary parity (6xx)
             "E606", "E607", "W606",
+            # Toolkit version gate (6xx)
+            "E608",
             # Anchor context_path integrity (follows the W585-W589 anchor
             # group; W590-W606 are already allocated to unrelated semantics).
             "W607",

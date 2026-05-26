@@ -5,11 +5,10 @@ See: docs/developers/workflows/migration_system_spec.md
 """
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -56,7 +55,6 @@ class StepInfo:
 class VersionChangelog:
     """Represents a full version changelog."""
     version: str
-    release_date: str
     breaking: bool
     description: Optional[str] = None
     changes: List[ChangelogEntry] = field(default_factory=list)
@@ -134,7 +132,7 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
         raise ValueError(f"Empty changelog file: {yaml_path}")
     
     # Validate required fields
-    for field in ["version", "release_date", "breaking"]:
+    for field in ["version", "breaking"]:
         if field not in data:
             raise ValueError(f"Missing required field '{field}' in {yaml_path}")
     
@@ -175,7 +173,6 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
     
     return VersionChangelog(
         version=data["version"],
-        release_date=data["release_date"],
         breaking=data["breaking"],
         description=data.get("description"),
         changes=changes,
@@ -292,6 +289,70 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
         errors.append(make_error("E520", f"Cannot load format: {e}"))
         return errors
 
+    # ------------------------------------------------------------------
+    # Raw-dict structural checks (run before load_version so type/key
+    # problems are visible even when the parsed dataclass would succeed).
+    # ------------------------------------------------------------------
+    yaml_path = changelog_dir / f"v{version}.yaml"
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as _f:
+            raw = yaml.safe_load(_f)
+        if not isinstance(raw, dict):
+            errors.append(make_error("E520", f"Cannot load changelog: empty or non-mapping YAML in {yaml_path}"))
+            return errors
+    except FileNotFoundError as e:
+        errors.append(make_error("E520", f"Cannot load changelog: {e}"))
+        return errors
+    except yaml.YAMLError as e:
+        errors.append(make_error("E520", f"Cannot load changelog: YAML parse error in {yaml_path}: {e}"))
+        return errors
+    except OSError as e:
+        errors.append(make_error("E520", f"Cannot load changelog: {e}"))
+        return errors
+
+    # Check 1: `breaking` must be a Python bool.
+    if "breaking" in raw and not isinstance(raw["breaking"], bool):
+        actual_type = type(raw["breaking"]).__name__
+        errors.append(
+            make_error(
+                "E520",
+                f"Field 'breaking' must be a boolean, got {actual_type}.",
+            )
+        )
+
+    # Check 2: No unknown top-level keys.
+    allowed_keys = set(fmt.required_fields) | set(fmt.optional_fields)
+    for key in raw:
+        if key not in allowed_keys:
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Unknown top-level key '{key}' in {yaml_path.name}. "
+                    f"Allowed keys: {sorted(allowed_keys)}.",
+                )
+            )
+
+    # Check 3: `version` field must be valid semver and match filename argument.
+    if "version" in raw:
+        file_version = raw["version"]
+        if not isinstance(file_version, str) or not _is_valid_semver(file_version):
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field 'version' is not a valid semantic version, got {file_version!r}.",
+                )
+            )
+        elif file_version != version:
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field 'version' value {file_version!r} does not match filename version {version!r}.",
+                )
+            )
+
+    # ------------------------------------------------------------------
+    # Parsed-object checks (change types + migration actions).
+    # ------------------------------------------------------------------
     try:
         changelog = load_version(changelog_dir, version)
     except (FileNotFoundError, ValueError) as e:

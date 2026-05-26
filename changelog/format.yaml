@@ -5,7 +5,6 @@ format_version: "1.0"
 
 required_fields:
   - version        # Semantic version string (e.g., "0.2.0")
-  - release_date   # ISO 8601 date (e.g., "2026-01-14")
   - breaking       # boolean - true if any breaking changes
 
 optional_fields:

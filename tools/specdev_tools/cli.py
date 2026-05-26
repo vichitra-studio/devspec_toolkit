@@ -140,6 +140,16 @@ def check_venv():
         sys.exit(1)
 
 def main():
+    # --version must bypass venv check so it works in any environment.
+    # We short-circuit here before check_venv() and before argparse, because
+    # required=True on add_subparsers would otherwise reject bare --version.
+    if "--version" in sys.argv[1:]:
+        _toolkit_root = Path(__file__).resolve().parent.parent.parent
+        from .core.changelog_parser import get_toolkit_version as _gtv
+        _ver = _gtv(_toolkit_root) or "unknown"
+        print(f"specdev {_ver}")
+        sys.exit(0)
+
     check_venv()
     # Reset config singleton so each CLI invocation reads current env vars
     reset_config()
@@ -1205,7 +1215,6 @@ def main():
                         "action": "version",
                         "errors": [],
                         "version": changelog.version,
-                        "release_date": changelog.release_date,
                         "breaking": changelog.breaking,
                         "description": changelog.description.strip() if changelog.description else None,
                         "steps": [s.id for s in changelog.steps] if changelog.steps else [],
@@ -1227,7 +1236,6 @@ def main():
                 try:
                     changelog = load_version(changelog_dir, args.version)
                     print(f"Version: {changelog.version}")
-                    print(f"Release Date: {changelog.release_date}")
                     print(f"Breaking: {'Yes' if changelog.breaking else 'No'}")
                     if changelog.description:
                         print(f"Description: {changelog.description.strip()}")

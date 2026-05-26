@@ -10,7 +10,7 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 4. [ ] Update step validator if logic changed (`tools/specdev_tools/validation/validators/step_NN.py`)
 5. [ ] Add/update test fixtures in `tests/fixtures/step_NN/`
 6. [ ] Run `pytest tests/ -v` — all tests pass
-7. [ ] Add changelog entry: `changelog/unreleased.yaml` (machine) + `changelog/unreleased.md` (human)
+7. [ ] Add changelog entry: create `changelog/vX.Y.Z.yaml` (machine) + `changelog/vX.Y.Z.md` (human) directly (no unreleased staging)
 
 ## Prompt Change Workflow
 
@@ -38,11 +38,12 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 ## Release Checklist
 
 1. [ ] All items from applicable workflow checklists above are complete
-2. [ ] Rename `changelog/unreleased.md` → `changelog/vX.Y.Z.md`
-3. [ ] Rename `changelog/unreleased.yaml` → `changelog/vX.Y.Z.yaml`
-4. [ ] Update version in `tools/pyproject.toml`
-5. [ ] Update version in `CLAUDE.md`
-6. [ ] Update version in `docs/developers/getting_started.md`
-7. [ ] Add new version to `CHANGELOG.md` version index table
+2. [ ] Create `changelog/vX.Y.Z.md` (human-readable release notes)
+3. [ ] Create `changelog/vX.Y.Z.yaml` (machine-readable changelog entry)
+4. [ ] Add new version to `CHANGELOG.md` version index table
+5. [ ] Bump `version` in `tools/pyproject.toml` to `X.Y.Z`
+6. [ ] Verify `CLAUDE.md` still points to `tools/pyproject.toml` for version (no hardcoded version to update)
+7. [ ] Run `specdev changelog --validate X.Y.Z --repo-root .` — no errors
 8. [ ] Run full test suite: `pytest tests/ -v`
-9. [ ] Commit and tag: `git tag vX.Y.Z`
+9. [ ] Commit: `git commit -m "chore(release): vX.Y.Z"`
+10. [ ] Tag and release: `git tag vX.Y.Z` then create a GitHub Release with release notes = the changelog entry for that version (`changelog/vX.Y.Z.md`)

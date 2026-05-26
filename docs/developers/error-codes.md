@@ -45,7 +45,7 @@
 
 ### E511 PLACEHOLDER_SCAN_MISMATCH
 
-**Removed in v0.4.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
+**Removed prior to 1.0.0**. E511 (`PLACEHOLDER_SCAN_MISMATCH`) was redundant with E510 independent placeholder scan. The associated sub-field has been removed.
 
 ### E535 CONTRADICTORY_OUT_OF_SCOPE_FR
 
@@ -358,6 +358,14 @@
 **Resolution**: Update the substep reference to match the current step definition.
 
 **Promotable**: W580 → E580.
+
+### E608 TOOLKIT_VERSION_MISMATCH
+
+**Trigger**: Fires in any of three cases: (1) `spec/specdev_version` is absent or is present but malformed / missing the `toolkit_version` key; (2) the active toolkit version cannot be read from `tools/pyproject.toml` (file missing or unparseable); (3) the `toolkit_version` recorded in `spec/specdev_version` differs from the active toolkit version.
+
+**Resolution**: Run `specdev align` to migrate spec artifacts to the current toolkit version before making further edits. If the file is stale or incorrect, update `spec/specdev_version` manually after verifying your toolkit version with `specdev --version`.
+
+**Promotable**: No (error only).
 
 ## Exception Classes
 

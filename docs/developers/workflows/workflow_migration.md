@@ -3,7 +3,7 @@
 The DevSpec Toolkit evolves rapidly. When you update the toolkit submodule (e.g., `git submodule update --remote`), schemas may become stricter, steps might be renumbered, or paradigms might shift.
 
 > [!TIP]
-> **New in v0.2.0**: The `specdev align` CLI now automates most of this process.
+> The `specdev align` CLI automates most of this process.
 
 This guide explains how to use the automated alignment system. For the legacy manual approach, see [Manual Fallback](#manual-fallback-legacy).
 

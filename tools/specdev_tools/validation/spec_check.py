@@ -32,6 +32,61 @@ def _classify(errors: list[SpecError]) -> dict[str, Any]:
     return {"status": status, "error_count": e_count, "warning_count": w_count}
 
 
+def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
+    """Return [] if versions match, or [E608] on any error condition.
+
+    Error cases:
+    - ``spec/specdev_version`` does not exist (project must always have a recorded version).
+    - Toolkit version is unreadable (missing pyproject.toml).
+    - Version mismatch between recorded and active toolkit.
+    """
+    import os as _os
+    from pathlib import Path as _Path
+    from ..generation.schema_differ import get_user_version
+    from ..core.changelog_parser import get_toolkit_version
+    from ..core.errors import make_error
+
+    host_version = get_user_version(_Path(_os.path.abspath(spec_dir)))
+    if host_version is None:
+        _sv_file = _Path(_os.path.abspath(spec_dir)) / "specdev_version"
+        if _sv_file.exists():
+            return [
+                make_error(
+                    "E608",
+                    "spec/specdev_version exists but is malformed or missing the `toolkit_version` key. "
+                    "Re-stamp it (run `specdev align`) or fix the file.",
+                )
+            ]
+        return [
+            make_error(
+                "E608",
+                "No toolkit version recorded in spec/specdev_version. Run `specdev align` to stamp the project's toolkit version.",
+            )
+        ]
+
+    toolkit_version = get_toolkit_version(_Path(_os.path.abspath(repo_root)))
+    if toolkit_version is None:
+        return [
+            make_error(
+                "E608",
+                f"Could not determine the active toolkit version from {_os.path.abspath(repo_root)}/tools/pyproject.toml.",
+            )
+        ]
+
+    if host_version == toolkit_version:
+        return []
+
+    return [
+        make_error(
+            "E608",
+            (
+                f"Spec was built against toolkit v{host_version}, but the active "
+                f"toolkit is v{toolkit_version}. Run `specdev align` to migrate before editing specs."
+            ),
+        )
+    ]
+
+
 def _run_checks(
     repo_root: str,
     spec_dir: str,
@@ -66,6 +121,10 @@ def _run_checks(
                 )
             )
     checks["schema-validation"] = {**_classify(schema_errs), "errors": schema_errs}
+
+    # --- 1b. Toolkit version gate ---
+    tv_result = _check_toolkit_version(repo_root, spec_dir)
+    checks["toolkit-version"] = {**_classify(tv_result), "errors": tv_result}
 
     # --- 2. Spec quality lint ---
     from .spec_quality_lint import lint_spec_quality

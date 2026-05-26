@@ -246,20 +246,31 @@ $ specdev align prompts
 
 ### Toolkit Version
 
-Version is defined in the Python package metadata for consistency with Python tooling:
+Version is defined in `tools/pyproject.toml` and read at runtime via `get_toolkit_version()`:
 
 **File**: `tools/pyproject.toml`
 ```toml
 [project]
 name = "specdev_tools"
-version = "0.1.0"
+version = "<current version>"
 ```
 
 **Reading the version**:
 ```bash
+# Shell — read directly from the source of truth:
 grep 'version' devspec_toolkit/tools/pyproject.toml
-# Or programmatically after install:
-python -c "from importlib.metadata import version; print(version('specdev-tools'))"
+# Or via the CLI:
+specdev --version --repo-root ./devspec_toolkit
+```
+
+**Reading programmatically** (toolkit-internal code):
+```python
+from pathlib import Path
+from specdev_tools.core.changelog_parser import get_toolkit_version
+
+version = get_toolkit_version(Path("devspec_toolkit"))
+# Returns the version string from tools/pyproject.toml, or None if unreadable.
+# NOTE: always read from pyproject.toml directly — package metadata goes stale in editable installs.
 ```
 
 ### Project Version Tracking
@@ -342,9 +353,8 @@ Each version has both human-readable and machine-readable changelogs:
 ### Machine-Readable Changelog (changelog/vX.Y.Z.yaml)
 
 ```yaml
-# changelog/v0.2.0.yaml
-version: "0.2.0"
-release_date: "2026-02-01"
+# changelog/vX.Y.Z.yaml  (example — replace X.Y.Z with the actual version)
+version: "X.Y.Z"
 breaking: true
 
 changes:
@@ -883,8 +893,8 @@ change_types:
 |------|---------|--------|
 | `CHANGELOG.md` | Human-readable changelog | Keep a Changelog format |
 | `changelog/format.yaml` | Changelog format schema | Change types, migration actions |
-| `changelog/v0.1.0.yaml` | Machine-readable baseline | Initial release entry |
-| `changelog/v0.1.0.md` | Human-readable v0.1.0 notes | Detailed step breakdown |
+| `changelog/vX.Y.Z.yaml` | Machine-readable release entry | Per-version changelog entry |
+| `changelog/vX.Y.Z.md` | Human-readable release notes | Detailed step breakdown |
 | `docs/developers/workflows/workflow_align.md` | User-facing alignment workflow | Full usage guide |
 
 ### Workflows to Update
@@ -991,10 +1001,8 @@ devspec_toolkit/
 ├── CHANGELOG.md                     # Human-readable summary
 ├── changelog/                       # Per-version changelogs
 │   ├── format.yaml                  # Schema for changelog YAML files
-│   ├── v0.1.0.md                    # Human-readable v0.1.0
-│   ├── v0.1.0.yaml                  # Machine-readable v0.1.0
-│   ├── v0.2.0.md                    # Human-readable v0.2.0
-│   └── v0.2.0.yaml                  # Machine-readable v0.2.0
+│   ├── vX.Y.Z.md                    # Human-readable release notes (one per version)
+│   └── vX.Y.Z.yaml                  # Machine-readable release entry (one per version)
 ├── tools/
 │   └── pyproject.toml               # version = "X.Y.Z"
 ├── migration_prompts/               # Template library
@@ -1045,7 +1053,7 @@ user_project/
 
 | Phase | Deliverables | Dependencies | Effort |
 |-------|--------------|--------------|--------|
-| **1: Versioning** ✅ | CHANGELOG.md, changelog/format.yaml, changelog/v0.1.0.* | None | Done |
+| **1: Versioning** ✅ | CHANGELOG.md, changelog/format.yaml, changelog/vX.Y.Z.* | None | Done |
 | **2: Changelog Parser** ✅ | changelog_parser.py, YAML schema | Phase 1 | Done |
 | **3: Schema Differ** ✅ | schema_differ.py, diff structures | Phase 2 | Done |
 | **4: CLI Framework** ✅ | align.py (status, diff, plan) | Phase 3 | Done |
@@ -1084,9 +1092,9 @@ user_project/
 
 ## References
 
-- [Existing Migration Workflow](./workflow_migration.md)
-- [Bootstrap Legacy Workflow](./workflow_bootstrap_legacy.md)
-- [Feature Extension Workflow](./workflow_feature_extension.md)
+- [Existing Migration Workflow](../workflows/workflow_migration.md)
+- [Bootstrap Legacy Workflow](../workflows/workflow_bootstrap_legacy.md)
+- [Feature Extension Workflow](../workflows/workflow_feature_extension.md)
 - [16_impl_context Schema](../../../schema/16_impl_context.schema.json)
 
 ---

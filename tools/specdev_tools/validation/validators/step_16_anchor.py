@@ -112,8 +112,7 @@ def validate_step_16_anchor(
                 "(2) rewrite this file against vc:16-anchor with plan.summary, "
                 "plan.ambiguities, plan.drift, plan.milestone_index; "
                 "(3) set artifact_role='anchor'. "
-                "See prompts/prompt_16_impl_context.md and "
-                "changelog/unreleased.md (breaking_schema_swap entry).",
+                "See prompts/prompt_16_impl_context.md for the target schema.",
             )
         )
 

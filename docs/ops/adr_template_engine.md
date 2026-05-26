@@ -14,7 +14,7 @@ The current implementation includes a Handlebars-style renderer (`render_templat
 
 The question was whether to replace this with a Python-native template engine (Jinja2, string.Template, f-strings) or keep the current approach.
 
-## Current Implementation Status (as of v0.5.0)
+## Current Implementation Status
 
 **The renderer is implemented but templates are currently static.** The `render_template()` function fully supports `{{VAR}}` substitution and `{{#each}}` iteration, and the `PromptContext` dataclass populates variables such as `SOURCE_VERSION`, `TARGET_VERSION`, `STEP_ID`, `REQUIRED_FIELDS`, `CONTEXT_SOURCES`, and field-level variables (`FIELD_PATH`, `OLD_TYPE`, `NEW_TYPE`, etc.).
 

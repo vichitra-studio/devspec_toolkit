@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 def _build_pre_commit_config(rel_toolkit_root: str) -> str:
     """Read the host pre-commit template and substitute the toolkit root path."""
@@ -532,6 +533,61 @@ def main():
             f.write("")
     else:
         print("spec/impl_context/ directory already exists.")
+
+    # 3d. Write spec/specdev_version (idempotent — only if not already present)
+    specdev_version_path = os.path.join(spec_dir, "specdev_version")
+    if not os.path.exists(specdev_version_path):
+        print("Creating spec/specdev_version...")
+        # Read toolkit version directly from pyproject.toml (package may not be installed yet)
+        _toolkit_root = Path(__file__).resolve().parent.parent
+        _pyproject = _toolkit_root / "tools" / "pyproject.toml"
+        _toolkit_ver = None
+        try:
+            import tomllib as _tomllib  # type: ignore[import-not-found]  # Python 3.11+
+        except ModuleNotFoundError:
+            _tomllib = None  # type: ignore[assignment]
+        if _pyproject.exists():
+            if _tomllib is not None:
+                with open(_pyproject, "rb") as _f:
+                    _toml_data = _tomllib.load(_f)
+                _toolkit_ver = _toml_data.get("project", {}).get("version")
+            else:
+                import re as _re
+                with open(_pyproject, "r", encoding="utf-8") as _f:
+                    _lines = _f.readlines()
+                _in_project = False
+                for _line in _lines:
+                    _stripped = _line.strip()
+                    if _stripped == "[project]":
+                        _in_project = True
+                        continue
+                    if _stripped.startswith("[") and _stripped != "[project]":
+                        _in_project = False
+                        continue
+                    if _in_project and _stripped.startswith("version"):
+                        _m = _re.search(r'version\s*=\s*["\']([^"\']+)["\']', _stripped)
+                        if _m:
+                            _toolkit_ver = _m.group(1)
+                            break
+        if _toolkit_ver is None:
+            print(
+                f"ERROR: could not determine toolkit version from {_pyproject}; "
+                "cannot stamp spec/specdev_version. Aborting init.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        _ver_str = _toolkit_ver
+        import datetime as _datetime
+        _created_at = _datetime.datetime.now(_datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(specdev_version_path, "w", encoding="utf-8") as _svf:
+            _svf.write(
+                f'toolkit_version: "{_ver_str}"\n'
+                f'created_at: "{_created_at}"\n'
+                f'last_migration: null\n'
+                f'migration_history: []\n'
+            )
+    else:
+        print("spec/specdev_version already exists.")
 
     # 4. Init seed directories and copy templates, deriving locations from the
     #    template manifest's seeds[].path rather than hardcoding docs/seed/.

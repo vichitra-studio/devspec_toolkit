@@ -3,8 +3,6 @@
 import importlib as _importlib
 import warnings as _warnings
 
-__version__ = "0.4.0"
-
 __all__: list[str] = []
 
 # Backward-compatibility lazy-import registry (AUDIT-061 design decision).

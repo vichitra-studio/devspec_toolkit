@@ -50,7 +50,7 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created and maintained by the migration flow (`specdev align`), not at project initialization—a freshly initialized project will not have one until its first alignment (until then the toolkit reports the version as *not detected*).
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev align` on each migration. Every project must have this file; `spec-check` reports E608 if it is absent.
 
 **Check if you are up to date:**
 ```bash
@@ -62,7 +62,7 @@ specdev align status
 
 ```yaml
 # Example spec/specdev_version
-toolkit_version: "0.5.1"
+toolkit_version: "<current toolkit version>"
 created_at: "2026-01-14T00:00:00Z"
 last_migration: null
 ```

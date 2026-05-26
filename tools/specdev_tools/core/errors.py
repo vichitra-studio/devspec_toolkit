@@ -156,6 +156,8 @@ ERROR_CODES = {
     # Glossary parity (6xx)
     "E606": "GLOSSARY_PROPOSAL_DRIFT",
     "E607": "GLOSSARY_CANON_DRIFT",
+    # Toolkit version gate (6xx)
+    "E608": "TOOLKIT_VERSION_MISMATCH",
     "W606": "GLOSSARY_CANON_ORPHAN",
     # Anchor context_path integrity (follows the W585-W589 anchor group;
     # W590-W606 are already allocated to unrelated semantics).

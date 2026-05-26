@@ -1,23 +1,24 @@
-version: "0.1.0"
-release_date: "2026-01-14"
+version: "1.0.0"
 breaking: false
 
 description: |
-  Initial release establishing the baseline for migration tracking.
-  All existing steps (00-16) are considered part of this initial version.
+  Foundational release of the DevSpec AI Toolkit. This is the baseline
+  version from which all future migrations are measured. No prior version
+  exists to compare against, so there are no migration changes.
 
 changes: []
-  # Empty - this is the baseline version from which all future 
-  # migrations are measured. No prior version exists to compare against.
 
 steps:
-  # Canonical list of steps in v0.1.0
+  # Step schema inventory at v1.0.0 — one entry per schema file (migration baseline).
+  # Trinity sub-steps 16a/16b/16c share 16_impl_context.schema.json (no separate schema per sub-step).
   - id: "00_charter"
     schema: "00_charter.schema.json"
   - id: "01_capabilities"
     schema: "01_capabilities.schema.json"
   - id: "02_system_sketch"
     schema: "02_system_sketch.schema.json"
+  - id: "02a_delivery_baseline"
+    schema: "02a_delivery_baseline.schema.json"
   - id: "03_glossary"
     schema: "03_glossary.schema.json"
   - id: "04_fr_list"
@@ -38,11 +39,15 @@ steps:
     schema: "11_redteam.schema.json"
   - id: "12_ci_gates"
     schema: "12_ci_gates.schema.json"
-  - id: "13_extension_generator"
-    schema: "13_extension_generator.schema.json"
+  - id: "13_extension_manifest"
+    schema: "13_extension_manifest.schema.json"
+  - id: "13a_completeness_assessment"
+    schema: "13a_completeness_assessment.schema.json"
   - id: "14_roadmap"
     schema: "14_roadmap.schema.json"
   - id: "15_scaffold"
     schema: "15_scaffold.schema.json"
+  - id: "16_anchor"
+    schema: "16_anchor.schema.json"
   - id: "16_impl_context"
     schema: "16_impl_context.schema.json"

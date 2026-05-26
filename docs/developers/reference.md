@@ -115,8 +115,8 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Changelog utilities (migration system)
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --version 0.3.0 --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --validate 0.3.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --version <version> --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --validate <version> --repo-root ./devspec_toolkit
 ```
 
 ### DAG & Extraction Intent Commands
