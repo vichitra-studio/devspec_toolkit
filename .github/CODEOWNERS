@@ -1,6 +1,3 @@
-# This file controls who creates pull request reviews automatically.
+# All files are owned by the repo maintainer.
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-
-# Global owner(s) for the entire repository
-# TODO: Replace @<your-github-username> with your actual GitHub username
 *       @vichitra-studio
