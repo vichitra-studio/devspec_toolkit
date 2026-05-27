@@ -24,7 +24,7 @@ jobs:
       SPECDEV_WARNINGS_AS_ERRORS: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Needed for commit history if checking multiple commits
       - name: Setup Python
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
