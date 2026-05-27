@@ -1,5 +1,5 @@
 {
-  "$schema": "https://specdev.local/schema/canon/kind/1",
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "trace_type",
   "entries": [
@@ -58,24 +58,6 @@
       }
     },
     {
-      "id": "cn:core:trace_type:inv",
-      "kind": "trace_type",
-      "preferred_label": "inv",
-      "definition": "Trace reference type for inv artifacts.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "tracing"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
       "id": "cn:core:trace_type:invariant",
       "kind": "trace_type",
       "preferred_label": "invariant",
@@ -85,7 +67,7 @@
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": ["inv"],
       "tags": [
         "tracing"
       ],
@@ -163,6 +145,60 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:threat",
+      "kind": "trace_type",
+      "preferred_label": "threat",
+      "definition": "A red-team threat entity from Step 11 (11_redteam.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:charter-goal",
+      "kind": "trace_type",
+      "preferred_label": "charter-goal",
+      "definition": "Reference to a charter goal from Step 00 (00_charter.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:glossary",
+      "kind": "trace_type",
+      "preferred_label": "glossary",
+      "definition": "Reference to a glossary term from Step 03 (03_glossary.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
       }
     }
   ]

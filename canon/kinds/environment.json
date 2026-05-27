@@ -1,6 +1,9 @@
 {
+  "$schema": "vc:canon:kind",
+  "$comment": "Current values are identical to stage.json. Environment values represent runtime deployment targets and are expected to diverge as environment-specific targets (e.g., sandbox, canary) are added.",
   "registry_version": "1.0.0",
   "kind": "environment",
+  "description": "Authoritative registry of runtime environment names. An environment represents WHERE the system runs (a target deployment environment). Schema field environmentName in schema/core/collections.schema.json references this file as its canonical source.",
   "entries": [
     {
       "id": "cn:core:environment:ci",

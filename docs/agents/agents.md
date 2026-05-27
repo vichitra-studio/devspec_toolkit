@@ -21,10 +21,10 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 1. **Read Inputs**
    - Load the relevant human guide: `spec/NN_name.guide.md`.
    - Load the deterministic prompt: [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
-   - In prompts, use the new sections: `Context To Ingest`, `Operating Flow`, `Heuristics For Completeness`, and `Self‑Audit Gate`.
+   - In prompts, use the sections: `Operating Flow`, `Self‑Audit Gate`, and `Coverage Closure`. Some prompts also include a `Context To Ingest` section; when present, follow it.
 2. **Prepare Context**
    - Read `spec/common/seed_manifest.json` first and ingest required seeds in order.
-   - Ingest the paths listed in `Context To Ingest` for the step.
+   - For every step, ingest the seeds listed in `step_requirements[NN]` (resolved to paths via `seeds[]`, in `global_seed_order` order — read order only, not inclusion) before any other context. For trinity sub-steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the umbrella key). A step with empty or absent `step_requirements[NN]` ingests no seeds; there is no fallback to `global_seed_order`.
    - Build a private ledger per step (e.g., FR ledger, API ledger) as described in `Operating Flow` (do not output it).
 3. **Phase A — Clarify**
    - Apply the `Self‑Audit Gate`. If the private completeness score is < 0.9 or any gating item is missing:
@@ -34,7 +34,7 @@ This toolkit uses a two‑phase interaction to maximize completeness without har
 4. **Phase B — Emit**
    - Once answers resolve gating items, run the same prompt to generate the artifact.
    - Write the JSON artifact directly to disk and validate against the referenced step schema; do not return fenced JSON as primary output.
-   - Populate `seed_refs` with the seeds actually used.
+   - Ensure the artifact conforms to the seed requirements declared in `spec/common/seed_manifest.json`.
 5. **Persist Artifact**
    - Replace the contents of `spec/NN_name.json` with the generated block.
    - Preserve the `$schema` field already present in the file.
@@ -84,7 +84,7 @@ During Phase A (Clarify), output only a bulleted list of questions grouped by to
 ## 8. Runner Tips
 - Treat prompts as the contract; do not modify them at runtime.
 - Honor `interaction_mode` and `phase_triggers` from the manifest; switch phases only when conditions are met.
-- Read only the paths listed in the prompt’s “Context To Ingest” for that step; avoid external sources.
+- For every step, ingest the seeds listed in `step_requirements[NN]` (resolved to paths via `seeds[]`, in `global_seed_order` order — read order only, not inclusion) before any other context. For trinity sub-steps 16a/16b/16c, also include seeds from `step_requirements["16"]` (the umbrella key). A step with empty or absent `step_requirements[NN]` ingests no seeds; there is no fallback to `global_seed_order`. Avoid external sources.
 - Build private ledgers in memory only; never persist them or include them in outputs.
 - In Phase A, emit only grouped, concise questions; never include JSON, code fences, or speculative answers.
 - Stop generation when the self‑audit gate is not met; wait for human input rather than guessing.

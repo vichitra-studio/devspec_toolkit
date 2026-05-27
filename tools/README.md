@@ -1,4 +1,4 @@
-# AI Spec Driven Development CLI (v3 Full)
+# AI Spec Driven Development CLI
 
 Deterministic, schema-first utilities for the AI Spec Driven Development Toolkit.
 
@@ -11,10 +11,10 @@ If you are setting up manually or restoring an existing environment:
 2. Or use the helper script locally:
    ```bash
    ./devspec_toolkit/scripts/setup_devspec_env.sh
-   source dev_env/bin/activate
+   source devspec_env/bin/activate
    ```
 
-After initialization, the toolkit also generates `./tools/run_specdev.sh` in your host repo. This wrapper enforces virtualenv usage and is the canonical entrypoint for all CLI commands, even if you have not activated `dev_env` in your current shell.
+After initialization, the toolkit also generates `./tools/run_specdev.sh` in your host repo. This wrapper enforces virtualenv usage and is the canonical entrypoint for all CLI commands, even if you have not activated `devspec_env` in your current shell.
 
 
 ## Project Initialization
@@ -29,7 +29,7 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/project --stri
 - `--strict`: Enable strict governance mode (installs `commit-msg` hooks and enforces message format).
 - `--toolkit-url`: Custom URL for the submodule (defaults to `vichitracollective/devspec_toolkit`).
 
-This utility standardizes directory creation (`spec/`, `spec/common/`, `docs/seed/`), submodule addition, and environment setup (`dev_env` with pre-commit hooks).
+This utility standardizes directory creation (`spec/`, `spec/common/`, `docs/seed/`), submodule addition, and environment setup (`devspec_env` with pre-commit hooks).
 
 ---
 
@@ -60,7 +60,7 @@ If you vend the toolkit elsewhere, substitute that path in the commands above an
 
 ## CLI Overview
 
-The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `seed-lint`, `docs-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and `forward-replay-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
+The CLI exposes subcommands such as `validate`, `validate-all`, `matrix`, `fixtures-lint`, `seed-lint`, `invariants-check`, `governance-check`, `spec-quality-lint`, `hallucination-lint`, `canonical-lint`, `canonical-integrity`, `dependency-order-lint`, and `forward-replay-check`. The canonical usage examples and options are maintained in [`docs/developers/reference.md`](../docs/developers/reference.md#core-validation-commands); this README intentionally avoids duplicating that content.
 
 From any location, run:
 ```bash
@@ -80,7 +80,7 @@ After running `prompts/prompt_13a_completeness_assessment.md`, validate the resu
 
 ## Schema Resolution
 
-- Artifacts embed `$schema` URIs (for example `https://specdev.local/schema/04_fr_list.schema.json`).
+- Artifacts embed `$schema` URIs (for example `vc:04-fr-list`).
 - The CLI maps each URI using `tools/schema_registry.json` relative to the toolkit root.
 - After moving or versioning schema files, update the registry to keep validation deterministic.
 

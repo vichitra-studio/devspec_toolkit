@@ -1,12 +1,81 @@
 {
-  "$schema": "../../schema/00_charter.schema.json",
-  "vision": "Test",
-  "seed_refs": [
+  "$schema": "vc:00-charter",
+  "id": "charter-minimal",
+  "title": "Minimal Charter Test",
+  "owner": "product",
+  "created_at": "2026-02-27T00:00:00Z",
+  "problem_statement": "This is a test charter for schema validation.",
+  "in_scope": [
+    "Feature A",
+    "Feature B",
+    "Feature C"
+  ],
+  "out_of_scope": [
+    "Item 1",
+    "Item 2",
+    "Item 3"
+  ],
+  "assumptions": [
+    "Assumption 1"
+  ],
+  "risks": [
+    "Risk 1"
+  ],
+  "stakeholders": [
     {
-      "seed_id": "seed-overview"
+      "role": "Security team",
+      "needs": [
+        "Compliance"
+      ]
+    }
+  ],
+  "user_segments": [
+    {
+      "segment_id": "seg-admin",
+      "description": "administrators",
+      "jobs_to_be_done": [
+        "Manage system"
+      ],
+      "pains": [
+        "Slow interface"
+      ],
+      "gains": [
+        "Faster operations"
+      ]
+    }
+  ],
+  "success_metrics": [
+    {
+      "metric_id": "metric-1",
+      "name": "First Metric",
+      "target": 100,
+      "unit": "ms",
+      "measurement_method": "direct measurement",
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      }
     },
     {
-      "seed_id": "seed-tech-stack"
+      "metric_id": "metric-2",
+      "name": "Second Metric",
+      "target": 99,
+      "unit": "percent",
+      "measurement_method": "system tracking",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit"
     }
   ]
 }

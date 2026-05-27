@@ -18,9 +18,9 @@ python3 devspec_toolkit/scripts/init_project.py --target /path/to/my/project --s
 
 The script performs the following actions:
 1.  **Git Initialization**: Runs `git init` and adds `devspec_toolkit` submodule.
-2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `docs/seed/`, and `.github/workflows/`.
-3.  **Seed Templates**: Copies `seed_overview.md`, `seed_tech_stack.md`, and `spec/common/seed_manifest.json`.
-4.  **Environment**: Creates `dev_env` and installs dependencies + hooks.
+2.  **Directory Structure**: Creates `spec/`, `spec/common/`, `spec/canon/`, `spec/impl_context/`, `.github/workflows/`, and seed-doc directories (default layout: `docs/seed/`; actual paths are declared in `spec/common/seed_manifest.json` `seeds[].path`).
+3.  **Seed Templates**: Copies the seed files declared in `spec/common/seed_manifest.json` (`seeds[].path`) and the manifest itself.
+4.  **Environment**: Creates `devspec_env` and installs dependencies + hooks.
 5.  **Strict Mode** (Optional): Passing `--strict` enforces governance rules on commit messages.
 
 ## 1. Set Up Your Environment
@@ -28,7 +28,7 @@ The initialization utility has already created and configured your virtual envir
 
 Simply activate it to start working:
 ```bash
-source dev_env/bin/activate
+source devspec_env/bin/activate
 
 # Verify everything is working
 ./tools/run_specdev.sh --help
@@ -38,7 +38,7 @@ source dev_env/bin/activate
 > If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
 
 All validation and linting commands must run through `./tools/run_specdev.sh ...`; do not call internal modules directly. This is the only supported entrypoint and ensures the virtualenv guard and schema registry behavior are applied consistently.
-The wrapper invokes the `dev_env` Python directly, so it works even if you have not activated the environment in your current shell.
+The wrapper invokes the `devspec_env` Python directly, so it works even if you have not activated the environment in your current shell.
 
 When you run CLI commands against artifacts in your host repo, include `--repo-root ./devspec_toolkit` so the schema registry in the toolkit resolves correctly.
 
@@ -50,7 +50,7 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-When you initialize a project, a `spec/specdev_version` file is created. This file is critical—it tells the toolkit which version your specs were written for.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev align` on each migration. Every project must have this file; `spec-check` reports E608 if it is absent.
 
 **Check if you are up to date:**
 ```bash
@@ -62,7 +62,7 @@ specdev align status
 
 ```yaml
 # Example spec/specdev_version
-toolkit_version: "0.1.0"
+toolkit_version: "<current toolkit version>"
 created_at: "2026-01-14T00:00:00Z"
 last_migration: null
 ```
@@ -86,13 +86,10 @@ Before writing formal specs, you must define the "Seed" of your project using th
 
 0. **Seed Manifest** (`spec/common/seed_manifest.json`):
    - **Purpose**: defines the mandatory seed order and step-specific requirements.
-   - **Expectation**: treat it as the authoritative source for seed ingestion order and `seed_refs` population.
-1. **Seed Overview** (`docs/seed/seed_overview.md`):
-   - **Purpose**: acts as your "Product Coach" to define the *What*, *Who*, and *Why* (Vision, Personas, MVP Scope).
-   - **Expectation**: plain English, accessible language. Completeness is mandatory (no TBDs). Defines the functional North Star.
-2. **Seed Tech Stack** (`docs/seed/seed_tech_stack.md`):
-   - **Purpose**: acts as your "Senior Architect" to define the *How* and *Where* (Architecture, Constraints, Dependencies).
-   - **Expectation**: high technical rigor. Pinned versions (e.g. `Python 3.12`), justified choices, and explicit constraints.
+   - **Expectation**: treat it as the authoritative source for seed ingestion order and per-step seed requirements.
+1. **Seed documents** (paths declared in `spec/common/seed_manifest.json` `seeds[].path`):
+   - The manifest lists every seed file, its path relative to the repo root, and its description. Consult it as the authoritative source of seed locations and purpose.
+   - Typical seeds include a product overview (Vision, Personas, MVP Scope) and a tech-stack document (Architecture, Constraints, Dependencies). Your project may declare additional seeds for any step.
 
 **Why?** These documents eliminate ambiguity before you start the AI workflow. Step 00-12 will hallucinate if these foundations are missing.
 
@@ -100,7 +97,7 @@ Before writing formal specs, you must define the "Seed" of your project using th
 1. Locate the matching prompt in [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/).
 2. Read the prompt to internalise the Definition of Ready and dependencies.
 3. Run the matching prompt from [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) using the two‑phase flow:
-   - Phase A — Clarify: the assistant reads the prompt’s “Context To Ingest” and “Operating Flow”, applies the “Self‑Audit Gate”, and outputs only a short bulleted list of targeted questions if critical info is missing.
+   - Phase A — Clarify: the assistant reads the prompt’s “Operating Flow”, applies the “Self‑Audit Gate” (and “Context To Ingest” where applicable, or “Coverage Closure” for steps that use it), and outputs only a short bulleted list of targeted questions if critical info is missing.
    - Phase B — Emit: after answering questions, rerun and write the artifact JSON directly to disk (`spec/NN_name.json`).
 4. Confirm the artifact JSON is written directly to `spec/NN_name.json` in your host repo.
 5. Validate the artifact using the [core validation commands](reference.md#core-validation-commands).
@@ -131,11 +128,6 @@ Automation protocol and runner tips live in [../agents/manifest.json](../agents/
 
 ## 7. Validation Rituals
 Run the [core validation commands](reference.md#core-validation-commands) whenever you change specs. They enforce schema compliance, traceability coverage, and fixture health, keeping the workflow repeatable and predictable.
-
-## 7a. Documentation Policy
-Documentation coverage is controlled by `spec/common/seed_manifest.json`. Use `docs-lint` to validate coverage and keep docs updated when code changes occur. The planner decides when new directories require README coverage and records that in `docs_policy.readme_depth_by_scope`.
-
-
 
 ## 8. Where To Go Next
 - Need a conceptual model? See [workflows/discovery.md](workflows/discovery.md) and [workflows/spec_to_impl.md](workflows/spec_to_impl.md).

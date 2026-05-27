@@ -1,26 +1,38 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/canon/kind/1",
+  "$id": "vc:canon:kind",
   "title": "Canonical Kind Registry",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "JSON Schema URI identifying the schema this kind registry file conforms to."
+    },
+    "$comment": {
+      "type": "string",
+      "description": "Optional human-readable annotation for maintainers. Not used by validators."
     },
     "registry_version": {
-      "$ref": "https://specdev.local/schema/core/canon/1#/$defs/semver"
+      "$ref": "vc:core:canon#/$defs/semver",
+      "description": "Semantic version of the canonical registry format for this kind file."
     },
     "kind": {
       "type": "string",
-      "pattern": "^[a-z_][a-z0-9_]*$"
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "description": "Lowercase identifier for the canonical kind category defined in this file (e.g., unit, owner, stage)."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this kind registry file and its role in the canon system."
     },
     "entries": {
       "type": "array",
       "items": {
-        "$ref": "https://specdev.local/schema/core/canon/1#/$defs/entry"
-      }
+        "$ref": "vc:core:canon#/$defs/entry"
+      },
+      "description": "Array of canonical entries belonging to this kind, each validated against the core canon entry schema."
     }
   },
   "required": [

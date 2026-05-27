@@ -1,65 +1,104 @@
 {
-  "$schema": "https://specdev.local/schema/core/canon/1",
+  "$schema": "vc:core:canon",
   "registry_version": "1.0.0",
   "entries": [
     {
-      "id": "cn:core:unit:percent",
-      "kind": "unit",
-      "preferred_label": "percent",
-      "definition": "Percentage value expressed on a 0-100 scale unless explicitly documented otherwise.",
+      "id": "cn:core:command:governance-check",
+      "kind": "command",
+      "preferred_label": "governance-check",
+      "definition": "Validate commit messages, PR rules, and spec-first policy enforcement for a spec repository.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-04-08T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:command:pytest",
+      "kind": "command",
+      "preferred_label": "pytest",
+      "definition": "Execute Python test suites via pytest.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "percent",
-        "%"
+        "python-test-command"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:unit:ms",
-      "kind": "unit",
-      "preferred_label": "milliseconds",
-      "definition": "Duration measured in milliseconds.",
+      "id": "cn:core:completeness_dimension:ambiguity",
+      "kind": "completeness_dimension",
+      "preferred_label": "ambiguity",
+      "definition": "Completeness dimension covering unresolved ambiguity and interpretation risk.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [
-        "ms",
-        "milliseconds"
-      ],
+      "aliases": [],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:stage:dev",
-      "kind": "stage",
-      "preferred_label": "dev",
-      "definition": "Development stage for local or shared dev workflows.",
+      "id": "cn:core:completeness_dimension:completeness",
+      "kind": "completeness_dimension",
+      "preferred_label": "completeness",
+      "definition": "Completeness dimension covering missing required specification content.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [
-        "development"
-      ],
+      "aliases": [],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:stage:ci",
-      "kind": "stage",
+      "id": "cn:core:completeness_dimension:quality",
+      "kind": "completeness_dimension",
+      "preferred_label": "quality",
+      "definition": "Completeness dimension covering specification quality and rigor gaps.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:completeness_dimension:traceability",
+      "kind": "completeness_dimension",
+      "preferred_label": "traceability",
+      "definition": "Completeness dimension covering cross-artifact trace linkage coverage.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:environment:ci",
+      "kind": "environment",
       "preferred_label": "ci",
-      "definition": "Continuous integration stage for automated verification.",
+      "definition": "Automated integration environment used by CI pipelines.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -67,41 +106,6 @@
       ],
       "aliases": [
         "continuous integration"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:stage:staging",
-      "kind": "stage",
-      "preferred_label": "staging",
-      "definition": "Pre-production stage for release validation.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "pre-prod",
-        "preproduction"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:stage:prod",
-      "kind": "stage",
-      "preferred_label": "prod",
-      "definition": "Production stage serving real user traffic.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "production"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
@@ -125,17 +129,17 @@
       }
     },
     {
-      "id": "cn:core:environment:ci",
+      "id": "cn:core:environment:prod",
       "kind": "environment",
-      "preferred_label": "ci",
-      "definition": "Automated integration environment used by CI pipelines.",
+      "preferred_label": "prod",
+      "definition": "Primary production environment for live traffic.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "continuous integration"
+        "production"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
@@ -160,269 +164,91 @@
       }
     },
     {
-      "id": "cn:core:environment:prod",
-      "kind": "environment",
-      "preferred_label": "prod",
-      "definition": "Primary production environment for live traffic.",
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label",
+      "preferred_label": "mandatory",
+      "definition": "Governance label for extensions or controls that must be implemented before the artifact is shippable. Blocks release if absent. Equivalent to 'Must Have' in MoSCoW.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "production"
+        "must-have",
+        "required",
+        "p0",
+        "critical"
       ],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-04-10T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:status:active",
-      "kind": "status",
-      "preferred_label": "active",
-      "definition": "Work item is currently in-progress and not deferred.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:deferred",
-      "kind": "status",
-      "preferred_label": "deferred",
-      "definition": "Work item is intentionally postponed with a stated rationale.",
+      "id": "cn:core:governance_label:optional",
+      "kind": "governance_label",
+      "preferred_label": "optional",
+      "definition": "Governance label for extensions or controls that are nice-to-have and may be deferred without blocking release. Equivalent to 'Could Have' in MoSCoW.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "postponed"
+        "nice-to-have",
+        "could-have",
+        "p2"
       ],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-04-10T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:status:pending",
-      "kind": "status",
-      "preferred_label": "pending",
-      "definition": "Work item is planned but not started.",
+      "id": "cn:core:governance_label:recommended",
+      "kind": "governance_label",
+      "preferred_label": "recommended",
+      "definition": "Governance label for extensions or controls that should be implemented unless explicitly deprioritised. Equivalent to 'Should Have' in MoSCoW.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "not-started"
+        "should-have",
+        "p1"
       ],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-04-10T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:status:blocked",
-      "kind": "status",
-      "preferred_label": "blocked",
-      "definition": "Work item cannot proceed due to an external dependency or issue.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:verified",
-      "kind": "status",
-      "preferred_label": "verified",
-      "definition": "Work item has been verified against its checklist and evidence.",
+      "id": "cn:core:governance_label:security",
+      "kind": "governance_label",
+      "preferred_label": "security",
+      "definition": "Governance label for extensions and controls that directly affect security posture.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "approved"
+        "sec"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:status:green",
-      "kind": "status",
-      "preferred_label": "green",
-      "definition": "Quality gate or CI status indicating success.",
+      "id": "cn:core:id_pattern:conventional-commit",
+      "kind": "id_pattern",
+      "preferred_label": "conventional-commit",
+      "definition": "Commit message pattern enforcing type(scope): summary semantics for governance checks.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "pass",
-        "passed"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:red",
-      "kind": "status",
-      "preferred_label": "red",
-      "definition": "Quality gate or CI status indicating failure.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "fail",
-        "failed"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:capability:authentication",
-      "kind": "capability",
-      "preferred_label": "authentication",
-      "definition": "Ability to verify identity and establish authenticated sessions.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "auth",
-        "authn"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:risk_category:authn",
-      "kind": "risk_category",
-      "preferred_label": "authn",
-      "definition": "Risk related to user authentication mechanisms.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "authentication"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:risk_category:authz",
-      "kind": "risk_category",
-      "preferred_label": "authz",
-      "definition": "Risk related to authorization and access control.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "authorization"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:risk_category:data-privacy",
-      "kind": "risk_category",
-      "preferred_label": "data_privacy",
-      "definition": "Risk related to misuse or exposure of sensitive data.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "privacy"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:action:authenticate",
-      "kind": "action",
-      "preferred_label": "authenticate",
-      "definition": "Verify presented credentials and establish identity for subsequent operations.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "authn"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:command:pytest",
-      "kind": "command",
-      "preferred_label": "pytest",
-      "definition": "Execute Python test suites via pytest.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "python-test-command"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:entity:user",
-      "kind": "entity",
-      "preferred_label": "user",
-      "definition": "Primary actor record representing an authenticated or identifiable person.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "account-holder"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:event:login-succeeded",
-      "kind": "event",
-      "preferred_label": "login_succeeded",
-      "definition": "Event emitted when authentication succeeds and a session is issued.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "auth-success"
+        "commit-pattern"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
@@ -531,148 +357,10 @@
       }
     },
     {
-      "id": "cn:core:policy:spec-first",
-      "kind": "policy",
-      "preferred_label": "spec_first",
-      "definition": "Policy requiring spec updates to land before or with implementation changes.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "spec-driven-development"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:role:reviewer",
-      "kind": "role",
-      "preferred_label": "reviewer",
-      "definition": "Actor responsible for validating implementation quality and spec alignment.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "code-reviewer"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:tag:critical-path",
-      "kind": "tag",
-      "preferred_label": "critical-path",
-      "definition": "Tag indicating direct impact on primary delivery path.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "priority-critical"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:id_pattern:conventional-commit",
-      "kind": "id_pattern",
-      "preferred_label": "conventional-commit",
-      "definition": "Commit message pattern enforcing type(scope): summary semantics for governance checks.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "commit-pattern"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:governance_label:security",
-      "kind": "governance_label",
-      "preferred_label": "security",
-      "definition": "Governance label for extensions and controls that directly affect security posture.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "sec"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:tech_stack:python",
-      "kind": "tech_stack",
-      "preferred_label": "python",
-      "definition": "Python language/runtime component in the implementation technology stack.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "py"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:dependency:auth-service",
-      "kind": "dependency",
-      "preferred_label": "auth-service",
-      "definition": "External authentication service dependency used by roadmap and implementation planning artifacts.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "auth-service"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:acronym:jwt",
-      "kind": "acronym",
-      "preferred_label": "JWT",
-      "definition": "Acronym for JSON Web Token.",
-      "version": "1.0.0",
-      "status": "deprecated",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "jwt"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z",
-        "deprecated_since": "2026-02-23T00:00:00Z",
-        "replaced_by": "cn:core:term:jwt"
-      }
-    },
-    {
-      "id": "cn:core:completeness_dimension:traceability",
-      "kind": "completeness_dimension",
-      "preferred_label": "traceability",
-      "definition": "Completeness dimension covering cross-artifact trace linkage coverage.",
+      "id": "cn:core:metric:p95-response-time",
+      "kind": "metric",
+      "preferred_label": "p95-response-time",
+      "definition": "95th-percentile response time over a defined interval.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -680,110 +368,7 @@
       ],
       "aliases": [],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:completeness_dimension:completeness",
-      "kind": "completeness_dimension",
-      "preferred_label": "completeness",
-      "definition": "Completeness dimension covering missing required specification content.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:completeness_dimension:quality",
-      "kind": "completeness_dimension",
-      "preferred_label": "quality",
-      "definition": "Completeness dimension covering specification quality and rigor gaps.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:completeness_dimension:ambiguity",
-      "kind": "completeness_dimension",
-      "preferred_label": "ambiguity",
-      "definition": "Completeness dimension covering unresolved ambiguity and interpretation risk.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:term:jwt",
-      "kind": "term",
-      "preferred_label": "JWT",
-      "definition": "JSON Web Token used to transport authenticated claims between parties.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "json-web-token"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:latency",
-      "kind": "nfr_category",
-      "preferred_label": "latency",
-      "definition": "Time taken to respond to a request or complete an operation.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "response-time"
-      ],
-      "tags": [
-        "performance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:throughput",
-      "kind": "nfr_category",
-      "preferred_label": "throughput",
-      "definition": "Number of requests or operations handled per unit time.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "rps",
-        "requests-per-second"
-      ],
-      "tags": [
-        "performance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
+        "introduced_at": "2026-05-24T00:00:00Z"
       }
     },
     {
@@ -798,26 +383,6 @@
       ],
       "aliases": [
         "uptime"
-      ],
-      "tags": [
-        "reliability"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:durability",
-      "kind": "nfr_category",
-      "preferred_label": "durability",
-      "definition": "Guarantee that stored data persists without loss.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "data-persistence"
       ],
       "tags": [
         "reliability"
@@ -845,94 +410,20 @@
       }
     },
     {
-      "id": "cn:core:nfr_category:security",
+      "id": "cn:core:nfr_category:durability",
       "kind": "nfr_category",
-      "preferred_label": "security",
-      "definition": "Protection against unauthorized access, data breaches, and threats.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "compliance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:privacy",
-      "kind": "nfr_category",
-      "preferred_label": "privacy",
-      "definition": "Protection of user data and compliance with privacy regulations.",
+      "preferred_label": "durability",
+      "definition": "Guarantee that stored data persists without loss.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
       "aliases": [
-        "data-privacy"
+        "data-persistence"
       ],
       "tags": [
-        "compliance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:maintainability",
-      "kind": "nfr_category",
-      "preferred_label": "maintainability",
-      "definition": "Ease of modifying, extending, and debugging the system.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "engineering"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:usability",
-      "kind": "nfr_category",
-      "preferred_label": "usability",
-      "definition": "Ease of use and quality of user experience.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "ux"
-      ],
-      "tags": [
-        "product"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:nfr_category:portability",
-      "kind": "nfr_category",
-      "preferred_label": "portability",
-      "definition": "Ability to run the system across different environments or platforms.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "engineering"
+        "reliability"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
@@ -959,28 +450,30 @@
       }
     },
     {
-      "id": "cn:core:trace_type:fr",
-      "kind": "trace_type",
-      "preferred_label": "fr",
-      "definition": "Trace reference type for fr artifacts.",
+      "id": "cn:core:nfr_category:latency",
+      "kind": "nfr_category",
+      "preferred_label": "latency",
+      "definition": "Time taken to respond to a request or complete an operation.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": [
+        "response-time"
+      ],
       "tags": [
-        "tracing"
+        "performance"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:api",
-      "kind": "trace_type",
-      "preferred_label": "api",
-      "definition": "Trace reference type for api artifacts.",
+      "id": "cn:core:nfr_category:maintainability",
+      "kind": "nfr_category",
+      "preferred_label": "maintainability",
+      "definition": "Ease of modifying, extending, and debugging the system.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -988,17 +481,17 @@
       ],
       "aliases": [],
       "tags": [
-        "tracing"
+        "engineering"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:nfr",
-      "kind": "trace_type",
-      "preferred_label": "nfr",
-      "definition": "Trace reference type for nfr artifacts.",
+      "id": "cn:core:nfr_category:portability",
+      "kind": "nfr_category",
+      "preferred_label": "portability",
+      "definition": "Ability to run the system across different environments or platforms.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -1006,35 +499,37 @@
       ],
       "aliases": [],
       "tags": [
-        "tracing"
+        "engineering"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:inv",
-      "kind": "trace_type",
-      "preferred_label": "inv",
-      "definition": "Trace reference type for inv artifacts.",
+      "id": "cn:core:nfr_category:privacy",
+      "kind": "nfr_category",
+      "preferred_label": "privacy",
+      "definition": "Protection of user data and compliance with privacy regulations.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": [
+        "data-privacy"
+      ],
       "tags": [
-        "tracing"
+        "compliance"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:invariant",
-      "kind": "trace_type",
-      "preferred_label": "invariant",
-      "definition": "Trace reference type for invariant artifacts.",
+      "id": "cn:core:nfr_category:security",
+      "kind": "nfr_category",
+      "preferred_label": "security",
+      "definition": "Protection against unauthorized access, data breaches, and threats.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -1042,79 +537,48 @@
       ],
       "aliases": [],
       "tags": [
-        "tracing"
+        "compliance"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:fixture",
-      "kind": "trace_type",
-      "preferred_label": "fixture",
-      "definition": "Trace reference type for fixture artifacts.",
+      "id": "cn:core:nfr_category:throughput",
+      "kind": "nfr_category",
+      "preferred_label": "throughput",
+      "definition": "Number of requests or operations handled per unit time.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": [
+        "rps",
+        "requests-per-second"
+      ],
       "tags": [
-        "tracing"
+        "performance"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
     },
     {
-      "id": "cn:core:trace_type:doc",
-      "kind": "trace_type",
-      "preferred_label": "doc",
-      "definition": "Trace reference type for doc artifacts.",
+      "id": "cn:core:nfr_category:usability",
+      "kind": "nfr_category",
+      "preferred_label": "usability",
+      "definition": "Ease of use and quality of user experience.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [],
+      "aliases": [
+        "ux"
+      ],
       "tags": [
-        "tracing"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:trace_type:capability",
-      "kind": "trace_type",
-      "preferred_label": "capability",
-      "definition": "Trace reference type for capability artifacts.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "tracing"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:trace_type:component",
-      "kind": "trace_type",
-      "preferred_label": "component",
-      "definition": "Trace reference type for component artifacts.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "tracing"
+        "product"
       ],
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
@@ -1125,96 +589,6 @@
       "kind": "owner",
       "preferred_label": "api",
       "definition": "Artifact ownership domain: api.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "governance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:owner:ui",
-      "kind": "owner",
-      "preferred_label": "ui",
-      "definition": "Artifact ownership domain: ui.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "governance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:owner:system",
-      "kind": "owner",
-      "preferred_label": "system",
-      "definition": "Artifact ownership domain: system.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "governance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:owner:ops",
-      "kind": "owner",
-      "preferred_label": "ops",
-      "definition": "Artifact ownership domain: ops.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "governance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:owner:data",
-      "kind": "owner",
-      "preferred_label": "data",
-      "definition": "Artifact ownership domain: data.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [],
-      "tags": [
-        "governance"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-23T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:owner:product",
-      "kind": "owner",
-      "preferred_label": "product",
-      "definition": "Artifact ownership domain: product.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
@@ -1247,6 +621,24 @@
       }
     },
     {
+      "id": "cn:core:owner:data",
+      "kind": "owner",
+      "preferred_label": "data",
+      "definition": "Artifact ownership domain: data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
       "id": "cn:core:owner:engineering",
       "kind": "owner",
       "preferred_label": "engineering",
@@ -1263,7 +655,908 @@
       "lifecycle": {
         "introduced_at": "2026-02-23T00:00:00Z"
       }
+    },
+    {
+      "id": "cn:core:owner:ops",
+      "kind": "owner",
+      "preferred_label": "ops",
+      "definition": "Artifact ownership domain: ops.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:product",
+      "kind": "owner",
+      "preferred_label": "product",
+      "definition": "Artifact ownership domain: product.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:system",
+      "kind": "owner",
+      "preferred_label": "system",
+      "definition": "Artifact ownership domain: system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:owner:ui",
+      "kind": "owner",
+      "preferred_label": "ui",
+      "definition": "Artifact ownership domain: ui.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "governance"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:policy:spec-first",
+      "kind": "policy",
+      "preferred_label": "spec_first",
+      "definition": "Policy requiring spec updates to land before or with implementation changes.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "spec-driven-development"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:authz",
+      "kind": "risk_category",
+      "preferred_label": "authz",
+      "definition": "Risks concerning access-control and authorization decisions.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:business-logic",
+      "kind": "risk_category",
+      "preferred_label": "business-logic",
+      "definition": "Risks from incorrect or abusable business rules (e.g., invalid state transitions, value bounds).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-integrity",
+      "kind": "risk_category",
+      "preferred_label": "data-integrity",
+      "definition": "Risks to the correctness, consistency, and durability of stored or transmitted data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-privacy",
+      "kind": "risk_category",
+      "preferred_label": "data-privacy",
+      "definition": "Risks concerning exposure or mishandling of personal or sensitive data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:delivery-risk",
+      "kind": "risk_category",
+      "preferred_label": "delivery-risk",
+      "definition": "Risks to on-time, on-scope delivery of the implementation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:security",
+      "kind": "risk_category",
+      "preferred_label": "security",
+      "definition": "Risks concerning authentication, authorization, confidentiality, and integrity of the system.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:role:reviewer",
+      "kind": "role",
+      "preferred_label": "reviewer",
+      "definition": "Actor responsible for validating implementation quality and spec alignment.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "code-reviewer"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:ci",
+      "kind": "stage",
+      "preferred_label": "ci",
+      "definition": "Continuous integration stage for automated verification.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "continuous integration"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:dev",
+      "kind": "stage",
+      "preferred_label": "dev",
+      "definition": "Development stage for local or shared dev workflows.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "development"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:prod",
+      "kind": "stage",
+      "preferred_label": "prod",
+      "definition": "Production stage serving real user traffic.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "production"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:stage:staging",
+      "kind": "stage",
+      "preferred_label": "staging",
+      "definition": "Pre-production stage for release validation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "pre-prod",
+        "preproduction"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:active",
+      "kind": "status",
+      "preferred_label": "active",
+      "definition": "Work item is currently in-progress and not deferred.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:blocked",
+      "kind": "status",
+      "preferred_label": "blocked",
+      "definition": "Work item cannot proceed due to an external dependency or issue.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:deferred",
+      "kind": "status",
+      "preferred_label": "deferred",
+      "definition": "Work item is intentionally postponed with a stated rationale.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "postponed"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:green",
+      "kind": "status",
+      "preferred_label": "green",
+      "definition": "Quality gate or CI status indicating success.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "pass",
+        "passed"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:pending",
+      "kind": "status",
+      "preferred_label": "pending",
+      "definition": "Work item is planned but not started.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "not-started"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:red",
+      "kind": "status",
+      "preferred_label": "red",
+      "definition": "Quality gate or CI status indicating failure.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "fail",
+        "failed"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:status:verified",
+      "kind": "status",
+      "preferred_label": "verified",
+      "definition": "Work item has been verified against its checklist and evidence.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "approved"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag",
+      "preferred_label": "critical-path",
+      "definition": "Tag indicating direct impact on primary delivery path.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "priority-critical"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tag:load",
+      "kind": "tag",
+      "preferred_label": "load",
+      "definition": "Tag marking load / performance-benchmark coverage.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tag:smoke",
+      "kind": "tag",
+      "preferred_label": "smoke",
+      "definition": "Tag marking smoke-test coverage for high-priority paths.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tech_stack:python",
+      "kind": "tech_stack",
+      "preferred_label": "python",
+      "definition": "Python language/runtime component in the implementation technology stack.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "py"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:api",
+      "kind": "trace_type",
+      "preferred_label": "api",
+      "definition": "Trace reference type for api artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:capability",
+      "kind": "trace_type",
+      "preferred_label": "capability",
+      "definition": "Trace reference type for capability artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:charter-goal",
+      "kind": "trace_type",
+      "preferred_label": "charter-goal",
+      "definition": "Reference to a charter goal from Step 00 (00_charter.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:component",
+      "kind": "trace_type",
+      "preferred_label": "component",
+      "definition": "Trace reference type for component artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:doc",
+      "kind": "trace_type",
+      "preferred_label": "doc",
+      "definition": "Trace reference type for doc artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:fixture",
+      "kind": "trace_type",
+      "preferred_label": "fixture",
+      "definition": "Trace reference type for fixture artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:fr",
+      "kind": "trace_type",
+      "preferred_label": "fr",
+      "definition": "Trace reference type for fr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:glossary",
+      "kind": "trace_type",
+      "preferred_label": "glossary",
+      "definition": "Reference to a glossary term from Step 03 (03_glossary.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:invariant",
+      "kind": "trace_type",
+      "preferred_label": "invariant",
+      "definition": "Trace reference type for invariant artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "inv"
+      ],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:nfr",
+      "kind": "trace_type",
+      "preferred_label": "nfr",
+      "definition": "Trace reference type for nfr artifacts.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-23T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:trace_type:threat",
+      "kind": "trace_type",
+      "preferred_label": "threat",
+      "definition": "A red-team threat entity from Step 11 (11_redteam.json).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "tags": [
+        "tracing"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-03-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:unit:count",
+      "kind": "unit",
+      "preferred_label": "count",
+      "definition": "Discrete integer count of items. Dimensionless \u2014 context (e.g., posts, subscribers, requests) gives semantic meaning.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "count",
+        "items",
+        "number"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-02T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit",
+      "preferred_label": "milliseconds",
+      "definition": "Duration measured in milliseconds.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "ms",
+        "milliseconds"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit",
+      "preferred_label": "percent",
+      "definition": "Percentage value expressed on a 0-100 scale unless explicitly documented otherwise.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "percent",
+        "%"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-02-21T00:00:00Z"
+      }
     }
   ],
-  "aliases": []
+  "aliases": [
+    {
+      "kind": "command",
+      "normalized": "python test command",
+      "target_id": "cn:core:command:pytest",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "continuous integration",
+      "target_id": "cn:core:environment:ci",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "development",
+      "target_id": "cn:core:environment:dev",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "pre prod",
+      "target_id": "cn:core:environment:staging",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "preproduction",
+      "target_id": "cn:core:environment:staging",
+      "status": "active"
+    },
+    {
+      "kind": "environment",
+      "normalized": "production",
+      "target_id": "cn:core:environment:prod",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "sec",
+      "target_id": "cn:core:governance_label:security",
+      "status": "active"
+    },
+    {
+      "kind": "id_pattern",
+      "normalized": "commit pattern",
+      "target_id": "cn:core:id_pattern:conventional-commit",
+      "status": "active"
+    },
+    {
+      "kind": "interface",
+      "normalized": "rest json",
+      "target_id": "cn:core:interface:http-json",
+      "status": "active"
+    },
+    {
+      "kind": "metric",
+      "normalized": "failure rate",
+      "target_id": "cn:core:metric:error-rate",
+      "status": "active"
+    },
+    {
+      "kind": "policy",
+      "normalized": "spec driven development",
+      "target_id": "cn:core:policy:spec-first",
+      "status": "active"
+    },
+    {
+      "kind": "role",
+      "normalized": "code reviewer",
+      "target_id": "cn:core:role:reviewer",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "continuous integration",
+      "target_id": "cn:core:stage:ci",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "development",
+      "target_id": "cn:core:stage:dev",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "pre prod",
+      "target_id": "cn:core:stage:staging",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "preproduction",
+      "target_id": "cn:core:stage:staging",
+      "status": "active"
+    },
+    {
+      "kind": "stage",
+      "normalized": "production",
+      "target_id": "cn:core:stage:prod",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "approved",
+      "target_id": "cn:core:status:verified",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "fail",
+      "target_id": "cn:core:status:red",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "failed",
+      "target_id": "cn:core:status:red",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "not started",
+      "target_id": "cn:core:status:pending",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "pass",
+      "target_id": "cn:core:status:green",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "passed",
+      "target_id": "cn:core:status:green",
+      "status": "active"
+    },
+    {
+      "kind": "status",
+      "normalized": "postponed",
+      "target_id": "cn:core:status:deferred",
+      "status": "active"
+    },
+    {
+      "kind": "tag",
+      "normalized": "priority critical",
+      "target_id": "cn:core:tag:critical-path",
+      "status": "active"
+    },
+    {
+      "kind": "tech_stack",
+      "normalized": "py",
+      "target_id": "cn:core:tech_stack:python",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "%",
+      "target_id": "cn:core:unit:percent",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "millis",
+      "target_id": "cn:core:unit:ms",
+      "status": "deprecated",
+      "lifecycle": {
+        "deprecated_since": "2026-01-15",
+        "replaced_by": "cn:core:unit:ms"
+      }
+    },
+    {
+      "kind": "unit",
+      "normalized": "millisec",
+      "target_id": "cn:core:unit:ms",
+      "status": "deprecated",
+      "lifecycle": {
+        "deprecated_since": "2025-06-01",
+        "sunset_date": "2025-12-31",
+        "replaced_by": "cn:core:unit:ms"
+      }
+    },
+    {
+      "kind": "unit",
+      "normalized": "milliseconds",
+      "target_id": "cn:core:unit:ms",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "ms",
+      "target_id": "cn:core:unit:ms",
+      "status": "active"
+    },
+    {
+      "kind": "unit",
+      "normalized": "percent",
+      "target_id": "cn:core:unit:percent",
+      "status": "active"
+    }
+  ]
 }

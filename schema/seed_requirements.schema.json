@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:seed-requirements",
+  "title": "seed_requirements",
+  "description": "Index of seed document hashes used by the freshness checker to detect when seeds have changed since a spec was last written.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URI identifying this as a seed requirements index."
+    },
+    "seeds": {
+      "type": "object",
+      "description": "Map of seed_id to hash record. Keyed by seed_id (not a list).",
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "description": "SHA-256 hash of the seed file at index time."
+            },
+            "indexed_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp when this seed was indexed."
+            }
+          },
+          "required": ["source_hash"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["seeds"]
+}

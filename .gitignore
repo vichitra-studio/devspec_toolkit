@@ -40,3 +40,10 @@ devspec_env/
 
 # Generated artifacts
 tools/trace_matrix.json
+**/migration_backups/
+
+# WIP — temp folder for in-flight task plans, never committed
+/WIP/
+
+# devspec_pr_audit — per-run reports (transient, not tracked)
+docs/audit/runs/

@@ -1,23 +1,28 @@
 {
-  "$schema": "https://specdev.local/schema/03_glossary.schema.json",
+  "$schema": "vc:03-glossary",
   "id": "glossary-minimal",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "terms": [
     {
-      "term_id": "term-billing-amount",
-      "term": "amount",
-      "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
-      "domain": "billing",
-      "units": "USD"
+      "term_id": "term-millisecond",
+      "term": "millisecond",
+      "definition": "A unit of time equal to one thousandth of a second, commonly used to measure latency and response time in software systems.",
+      "domain": "performance",
+      "units": "ms",
+      "term_ref": {
+        "id": "cn:project:term:millisecond",
+        "kind": "term"
+      },
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      }
     }
-  ]
+  ],
+  "canonical_refs_used": [
+    {"id": "cn:core:unit:ms", "kind": "unit"},
+    {"id": "cn:project:term:millisecond", "kind": "term"}
+  ],
+  "canonical_proposals": []
 }

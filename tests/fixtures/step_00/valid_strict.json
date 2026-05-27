@@ -1,16 +1,9 @@
 {
+  "$schema": "vc:00-charter",
   "id": "project-alpha",
   "title": "Project Alpha Charter",
   "owner": "product",
   "created_at": "2023-10-27T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
   "in_scope": [
     "User Authentication",
@@ -59,7 +52,32 @@
       "name": "API Latency",
       "target": 200,
       "unit": "ms",
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
       "measurement_method": "P95 via Datadog"
+    },
+    {
+      "metric_id": "uptime",
+      "name": "System Uptime",
+      "target": 99.99,
+      "unit": "percent",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "measurement_method": "Monthly monitoring"
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    },
+    {
+      "id": "cn:core:unit:percent",
+      "kind": "unit"
     }
   ]
 }

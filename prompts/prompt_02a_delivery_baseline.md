@@ -1,76 +1,40 @@
 # Step 02a · Delivery Baseline
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+Run `specdev prompt-context 02a` to see downstream consumers. This prompt's output feeds 1 downstream step.
+
+## Role
+You are a **senior delivery baseline analyst and deployment environment specialist**. Your job is to emit a single JSON artifact for **Step 02a · Delivery Baseline** that captures environment definitions, deployment stages, and baseline infrastructure constraints. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Capture the minimum delivery infrastructure (environments, CI expectations, and compliance guardrails) needed to take the system sketch from spec to running code safely. This baseline makes deployment assumptions explicit early so fixture execution, governance, and implementation planning share the same operational picture.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 02a · Delivery Baseline** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Deployment targets, compliance requirements, and operational constraints for environment scoping
+- **01_capabilities.json**: Capability owners and operational modes to determine environment tier requirements and CI pipeline stages
+- **02_system_sketch.json**: Component IDs and external dependencies that affect environment setup; connection protocols requiring specific infrastructure; do not depend on downstream NFR/governance specs — use charter constraints and required seeds for baseline coverage
+- **Seeds**: per spec/common/seed_manifest.json step_requirements["02a"]
+- **Current CI configs** (if present): Existing pipeline configuration and `$TOOLKIT_ROOT/tests/run.sh` usage for gate alignment
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 02a · Delivery Baseline**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
-
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["02a"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- System Sketch `spec/02_system_sketch.json` for components and external dependencies that affect env setup.
-- Do not depend on downstream NFR/governance specs; use charter constraints and required seeds for baseline coverage.
-- Current CI configs (if present) and `devspec_toolkit/tests/run.sh` usage from the reference docs.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger: env matrix (dev/ci/staging/prod traits like region/runners/base images), CI gates (validator steps), secrets (names), compliance tags. Do not output it.
-- Cross-check gates against required command list and seed constraints; add missing core checks.
-- Self-audit; if any environment or critical gate is unclear, ask Gap Questions.
-- Rewrite gate names to match CLI commands; ensure secrets are names only and compliance labels reflect actual obligations.
-- Emit JSON once consistent.
+## Operating Flow: Enumerate → Baseline → Validate → Emit
+- **Enumerate**: List all deployment stages and environments from the seeds ingested for this step.
+- **Baseline**: Capture infrastructure constraints, SLA targets, and deployment dependencies per environment.
+- **Validate**: Verify every stage has a complete definition; no environment name is undefined.
+- **Emit**: Write the artifact when all stages are defined and constraints are sourced from seed documents.
 
 ## Heuristics For Completeness
-- Optional→expected: include secrets required by external systems in the sketch; include compliance labels when NFRs or governance imply policies.
-- Parity hint: staging **MUST** mirror prod critical gates and environment traits to ensure valid testing.
-- Ambiguity scrub: map gates to `schema-validate`, `validate-all`, `fixtures-lint`, `matrix`, `invariants-check`, `governance-check`, `gen-ci`.
+- Include `secrets` (names only) for every external system listed in `spec/02_system_sketch.json` connections where `type: external` when secrets are required by those systems; MUST include compliance labels when `spec/00_charter.json` constraints or the ingested seeds reference regulatory frameworks.
+- Staging parity: staging should reflect prod's configuration as closely as possible; explicitly document any intentional deviations with rationale.
+- Ambiguity scrub: MUST use kebab-case gate names derived from the actual CI pipeline steps in this project (e.g., `schema-validate`, `fixtures-lint`, `governance-check`); do not invent gate names that do not correspond to real pipeline steps.
 
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
-- Gating items:
-  - All four environments listed; each has enough detail to differentiate.
-  - CI gates include core validations; governance and coverage accounted for where relevant.
-  - Secrets are names only; no values.
-  - Compliance labels reflect real obligations (or explicitly none).
-
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-6. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-7. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-- Do not output 'TBD' or placeholders.
-- Do not invent compliance standards not present in upstream context.
-- Do not include secret values.
-- Do not include manual review steps in ci_gates.
-- Non-empty environments.
-
-## Step-Specific Completeness Checklist
-- All environments (`dev`, `ci`, `staging`, `prod`) present with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
-- `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
-- `secrets` includes names of required secrets; values are not embedded.
-- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI) if relevant.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
+- All seeds listed for step "02a" in `spec/common/seed_manifest.json` are present and non-empty.
+- `spec/00_charter.json` is present and contains at least one in_scope entry.
 
 ## Negative Constraints
 - **DO NOT** include actual secret values (use names only); specific values belong in secure stores.
@@ -78,12 +42,26 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **DO NOT** invent compliance standards that are not relevant to the organizational context.
 - **DO NOT** include manual review steps in `ci_gates` (these belong in governance).
 
-## Field-by-Field Guidance
-- environments.dev/ci/staging/prod: include minimal structure describing infra/tooling expectations (e.g., cloud, region, cluster, runners).
-- ci_gates: ordered list of gate names as strings.
-- secrets: namespaced identifiers (e.g., `PAYMENTS_API_KEY`), not values.
-- compliance: list of applicable labels/policies (e.g., `gdpr-data-exportable`).
-- trace: array of upstream/downstream links (e.g., `traceRef` objects).
+## Coverage Closure
+Before emitting, verify:
+- Every `component_id` from `spec/02_system_sketch.json` that requires deployment has a corresponding environment config in `environments`.
+- All external dependencies listed in `spec/02_system_sketch.json` connections appear in `dependencies` or `secrets` sections.
+- No component's infrastructure needs are silently omitted — external services, databases, and queues must all be represented.
+- All environment names align with the canonical stage values defined in the schema.
+- If any system sketch component has unclear deployment needs: add a gap question (Clarify mode) rather than assuming defaults.
+- Compliance labels in `environments[].compliance_labels` reflect real obligations documented in upstream specs or are explicitly marked as none.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every deployment stage identified in the ingested seeds is represented
+- [ ] All environment-specific constraints and SLA targets are explicitly defined
+- [ ] No environment name referenced in other spec files is missing from this baseline
+
+## Step-Specific Completeness Checklist
+- All required environments present (see schema for the required set) with relevant keys (e.g., regions, runtime versions, feature flags, data sources).
+- `ci_gates` enumerates the gates we actually enforce (schema-validate, fixtures-lint, matrix, invariants-check, coverage, governance-check).
+- `secrets` includes names of required secrets; values are not embedded.
+- `compliance` lists applicable frameworks/policies (e.g., SOC2, GDPR, PCI-DSS) if relevant; use the canonical short names defined in the schema.
 
 ## Best Practices
 - **Environments**: Document each environment (`dev`, `ci`, `staging`, `prod`) with the critical configuration knobs, dependencies, and access paths.
@@ -99,11 +77,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Staging Drift**: Missing staging environment parity causing late-stage surprises.
 - **Optional Compliance**: Treating compliance requirements as optional notes instead of binding constraints.
 
-## Quick Reference
-- Environments: objects for `dev`, `ci`, `staging`, `prod`.
-- CI Gates: strings naming the checks to run.
-- Trace: upstream/downstream connections.
-
 # Clarification Questions
 - What deployment environments are required now and in the near term? Any differences in config or data sources?
 - Which CI gates must block merges? Any minimum coverage thresholds or invariants that must run?
@@ -111,59 +84,51 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What compliance or audit requirements apply to environments and pipelines?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/02a_delivery_baseline.schema.json
+- Schema URI: vc:02a-delivery-baseline
 - Schema File: schema/02a_delivery_baseline.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:02a-delivery-baseline",
   "id": "delivery-baseline-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:01:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
   "environments": {
-    "dev": {"runtime": "python3.11"},
-    "ci": {"runner": "ubuntu-latest"},
-    "staging": {"region": "us-east-1"},
-    "prod": {"region": "us-east-1"}
-  },
-  "ci_gates": ["schema-validate"],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
+    "dev": {
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 1,
+      "log_level": "debug"
     },
-    "self_check_results": []
+    "ci": {
+      "runner": "ubuntu-latest",
+      "region": "us-east-1",
+      "replica_count": 1
+    },
+    "staging": {
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 2,
+      "log_level": "warn"
+    },
+    "prod": {
+      "runtime": "python3.11",
+      "region": "us-east-1",
+      "replica_count": 3,
+      "log_level": "warn"
+    }
   },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "ci_gates": [
+    "schema-validate",
+    "fixtures-lint",
+    "invariants-check",
+    "governance-check"
+  ],
+  "secrets": ["DATABASE_URL", "JWT_SECRET"],
+  "compliance": ["SOC2"],
+  "canonical_refs_used": []
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

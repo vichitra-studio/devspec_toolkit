@@ -1,172 +1,173 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "$id": "vc:12-ci-gates",
   "title": "12_ci_gates",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "jobs": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "job_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "requires": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-          },
-          "steps": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "command": {
-                  "type": "string"
-                },
-                "command_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "command"
-              ]
-            }
-          },
-          "environment_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "role_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "security": {
+    {
+      "type": "object",
+      "properties": {
+        "trace": {
+          "type": "array",
+          "description": "Traceability links connecting CI gate jobs to the spec artifacts they enforce. Decision rule: every CI gate must trace to at least one NFR or invariant it enforces, using type='enforces'. Example: [{\"type\": \"enforces\", \"id\": \"nfr-api-auth-p95-latency\", \"note\": \"This gate rejects PRs that degrade latency beyond the NFR target\"}]. A second example: [{\"type\": \"enforces\", \"id\": \"inv-test-coverage-threshold\", \"note\": \"Coverage gate enforces the 80% line coverage invariant\"}]. Gates without trace links are floating checks that cannot be mapped to their specification rationale. Consult the items description for approved types and format. Anti-pattern: prose strings instead of traceRef objects — always use the {type, id, note} structure.",
+          "items": {
+            "$ref": "vc:core:collections#traceRef",
+            "description": "A traceability link from this CI gates spec to another artifact. Use to connect enforcement jobs back to the NFRs, invariants, or FRs they protect. Examples: link a security-scan job back to 'nfr-security-vuln-scan', link a coverage gate to 'nfr-test-coverage'. Provides end-to-end traceability from quality requirement to pipeline enforcement."
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "minItems": 1,
+          "description": "CI/CD pipeline jobs that enforce this gate. Must contain at least one job (enforced by minItems). Each job represents one independent, parallelisable workstream in CI (typically ≤10 minutes). Decision rule: split jobs when two workstreams have no shared dependencies and can run in parallel (e.g., 'unit-tests' and 'lint' are independent — split them); combine steps into one job when they must share a running service or file system state. Examples: jobs: [{job_id: 'unit-tests', steps: [...]}, {job_id: 'lint', steps: [...]}, {job_id: 'security-scan', steps: [...]}]. Collectively, the jobs here should cover all quality gates required for safe deployment: unit tests, integration tests, security scans, linting, etc. Anti-pattern: a single monolithic 'build-and-test' job with 30+ sequential steps — this cannot be parallelised and creates a single bottleneck.",
+          "items": {
             "type": "object",
             "additionalProperties": false,
-            "description": "CI security primitives for this job.",
             "properties": {
-              "runner_labels": {
+              "job_id": {
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Unique kebab-case identifier for this CI job. Recommended format: gate-{phase}-{check}. Example: 'gate-build-unit-tests', 'gate-deploy-security-scan'. Should be unique across all jobs in this spec (enforced by linters, not the schema)."
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable display name for this CI gate job, shown in CI dashboards and PR status checks. Decision rule: use Title Case, mirroring the words in job_id. Examples: job_id='unit-tests' → name='Unit Tests'; job_id='security-scan' → name='Security Scan'; job_id='e2e-smoke' → name='E2E Smoke Tests'. Anti-pattern: name='Tests' when job_id='unit-tests' (inconsistent, hides the scope); name='Run unit tests and check coverage' (too verbose for a CI dashboard label)."
+              },
+              "requires": {
+                "$ref": "vc:core:collections#kebabIdArray",
+                "description": "Other gates or jobs that must complete before this job runs. When present, must contain at least one entry (enforced by minItems from kebabIdArray). Omit the field entirely for jobs with no prerequisites. Use to model the dependency DAG of your CI pipeline. Example: 'unit-tests must pass before integration-tests run'. Each entry should reference a valid job_id defined in this spec (enforced by linters, not the schema)."
+              },
+              "steps": {
                 "type": "array",
+                "minItems": 1,
+                "description": "Ordered list of steps within this CI job. Steps execute sequentially; a failing step halts the job.",
                 "items": {
-                  "type": "string"
-                },
-                "description": "Runner isolation labels (e.g. 'self-hosted', 'ubuntu-latest')."
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "$ref": "vc:core:atoms#kebabId",
+                      "description": "Unique kebab-case identifier for this pipeline step within the parent job. Use the pattern '{verb}-{noun}' describing what the step does. Examples: 'run-unit-tests', 'install-dependencies', 'build-docker-image', 'run-security-scan', 'upload-coverage-report'. Should be unique within the parent job. Referenced by step dependency declarations and failure reporting."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Human-readable display name for this pipeline step. Use Title Case, verb + noun phrase. Examples: 'Install Dependencies', 'Run Unit Tests', 'Build Docker Image', 'Run Security Scan', 'Upload Coverage Report'. Shown in CI pipeline dashboards next to pass/fail status."
+                    },
+                    "command": {
+                      "type": "string",
+                      "description": "The shell command or CI step definition to execute. Should be reproducible \u2014 an engineer should be able to run this locally. Include: the tool, the arguments, and any required environment variables. Example: 'pytest tests/ --cov=src --cov-fail-under=80'."
+                    },
+                    "command_ref": {
+                      "description": "Canonical reference linking this step's command to a shared tool definition. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:pytest\", \"kind\": \"command\"}. Include only when this command appears in ≥2 different jobs. The canonical ID must exist in canon/manifest.json.",
+                      "allOf": [
+                        { "$ref": "vc:core:collections#canonicalRef" },
+                        { "properties": { "kind": { "const": "command" } } }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "command"
+                  ],
+                  "description": "A single atomic step within this CI job. Steps execute sequentially; if any step fails, the job fails immediately. Each step should have a unique id within the job, a human-readable name for dashboard display, and a specific reproducible command. Minimize steps that have side effects outside the job runner."
+                }
               },
-              "token_permissions": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string",
-                  "enum": [
-                    "read",
-                    "write",
-                    "none"
-                  ]
-                },
-                "description": "Token permission scopes (e.g. {'contents': 'read', 'packages': 'write'})."
+              "environment_ref": {
+                "description": "Canonical registry reference identifying the deployment environment for this job. The canonicalRef 'id' must follow the format 'cn:<namespace>:<kind>:<slug>' (e.g., id: 'cn:core:environment:ci', kind: 'environment'). Common environment IDs: 'cn:core:environment:dev', 'cn:core:environment:ci', 'cn:core:environment:staging', 'cn:core:environment:prod'. Determines which environment this job targets and which secrets or configuration it inherits.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "environment" } } }
+                ]
               },
-              "environment_protection": {
+              "role_ref": {
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "role" } } }
+                ],
+                "description": "Canonical reference to the role that owns or approves this CI job. Kind is structurally pinned to role. Decision rule: include role_ref when this CI gate requires human approval from a specific role. Example: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"reviewer\"} for a gate requiring security team sign-off. Omit for fully automated gates (unit tests, linting) that require no human review. Anti-pattern: adding role_ref to automated test jobs — only required_reviewers in environment_protection gates should have role refs. Use real example ID: cn:core:role:reviewer"
+              },
+              "security": {
                 "type": "object",
                 "additionalProperties": false,
+                "description": "CI security primitives for this job. Use to lock down runner access, token permissions, and deployment protection. All production jobs should explicitly configure these fields.",
                 "properties": {
-                  "required_reviewers": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "Number of required approvers before deployment."
+                  "runner_labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A single runner label for this CI job. Decision rules: use 'ubuntu-latest' or 'macos-latest' for standard code builds and tests that do not need internal network access; use 'self-hosted' (plus additional labels) for jobs requiring internal network access, secrets not held in CI provider vault, privileged hardware (GPUs), or compliance requirements for air-gapped execution. Examples: 'ubuntu-latest', 'self-hosted', 'self-hosted,linux,x64'. Anti-pattern: using 'self-hosted' for all jobs — reserve it for jobs with genuine isolation requirements to avoid runner fleet bottlenecks."
+                    },
+                    "description": "Runner isolation labels that control which runner pool executes this job. Use 'self-hosted' for jobs that require internal network access or privileged hardware. Use 'ubuntu-latest' for standard public CI."
                   },
-                  "wait_timer_minutes": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "Delay in minutes before deployment proceeds."
+                  "token_permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write",
+                        "none"
+                      ],
+                      "description": "Permission level for this token scope: read, write, or none."
+                    },
+                    "description": "Token permission scopes for this job. Decision rule: start with no permissions and add only what each specific job step requires; never grant 'write' to scopes that are only read. Example of correct (least-privilege): {\"contents\": \"read\", \"packages\": \"write\"} for a job that reads code and publishes a package. Example of incorrect (over-permissioned): {\"all\": \"write\"} or leaving permissions unset (inherits repo default, which may be too broad). Anti-pattern: {\"all\": \"write\"} — grants maximum permissions to every GitHub API scope, enabling supply-chain attacks if the job is compromised."
+                  },
+                  "environment_protection": {
+                    "type": "object",
+                    "description": "Environment protection rules for deployment gates. Apply environment_protection when a job deploys to or modifies a shared environment (staging, production). Decision rule: any job that writes to production or sends real money/emails requires environment_protection. Example: deployment job with required_reviewers=1 and wait_timer_minutes=5. Use to require manual approval or introduce a wait period before production deployments proceed. Anti-pattern: adding environment_protection to every CI job (including unit tests) — over-use creates approval bottlenecks that defeat CI automation.",
+                    "additionalProperties": false,
+                    "properties": {
+                      "required_reviewers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Number of required human approvers before deployment proceeds. Set to 1 or more for production environments to enforce change-control gates."
+                      },
+                      "wait_timer_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Mandatory delay in minutes before deployment proceeds after approval. Useful for giving teams time to abort a deployment if an issue is discovered post-approval."
+                      }
+                    }
                   }
                 }
               }
-            }
+            },
+            "required": [
+              "job_id",
+              "name",
+              "steps",
+              "environment_ref"
+            ],
+            "description": "A single CI job definition with steps, dependency ordering, environment targeting, and security configuration."
           }
         },
-        "required": [
-          "job_id",
-          "name",
-          "steps",
-          "environment_ref"
-        ]
-      }
-    },
-    "coverage_thresholds": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "lines": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
-        },
-        "branches": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
+        "coverage_thresholds": {
+          "type": "object",
+          "description": "Minimum passing thresholds for code coverage that CI enforces. Failing to meet any threshold causes the gate to fail. Set these to reflect your team's quality bar \u2014 typical minimums are 80% line coverage and 70% branch coverage for production services.",
+          "additionalProperties": false,
+          "properties": {
+            "lines": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Minimum line coverage percentage required. Example: 80 means at least 80% of lines must be exercised by tests. Failing this threshold fails the gate."
+            },
+            "branches": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Minimum branch coverage percentage required. Example: 70 means at least 70% of conditional branches must be exercised. Higher values reduce the risk of untested edge-case paths."
+            }
+          }
         }
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "jobs"
+      ],
+      "description": "Step-specific properties for 12_ci_gates."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "jobs",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

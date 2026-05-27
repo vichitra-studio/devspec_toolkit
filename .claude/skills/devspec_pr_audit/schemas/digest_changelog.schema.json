@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:changelog",
+  "title": "digest_changelog",
+  "description": "Digest projection of a changelog markdown file (CHANGELOG.md or changelog/*.md). Extracts structured version and change-category facts for D11/D12 checks. No prose summarisation — structured lists only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a changelog digest.",
+      "type": "string",
+      "const": "digest_changelog"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root (e.g. CHANGELOG.md or changelog/v0.3.0.md).",
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Changelog-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version_label", "section_headers"],
+      "properties": {
+        "version_label": {
+          "description": "Version label for the primary version section in this file (e.g. Unreleased, 0.3.0). Derived from the top-level ## heading.",
+          "type": "string",
+          "minLength": 1
+        },
+        "release_date": {
+          "description": "Release date string if present in the version heading (e.g. 2026-02-26). Empty string if not present (unreleased).",
+          "type": "string"
+        },
+        "is_unreleased": {
+          "description": "True if this file or section describes unreleased changes (version_label is Unreleased or file is unreleased.md).",
+          "type": "boolean"
+        },
+        "breaking": {
+          "description": "Change-line strings under a Breaking or Required section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "added": {
+          "description": "Change-line strings under an Added section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "changed": {
+          "description": "Change-line strings under a Changed section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "removed": {
+          "description": "Change-line strings under a Removed section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "deprecated": {
+          "description": "Change-line strings under a Deprecated section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "fixed": {
+          "description": "Change-line strings under a Fixed section header.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "section_headers": {
+          "description": "All H3-level (###) section header texts found inside the version block, in document order.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "total_entries": {
+          "description": "Total count of change-line entries across all sections.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "has_breaking_changes": {
+          "description": "True if the breaking[] array is non-empty.",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -7,30 +7,39 @@ from pathlib import Path
 
 class StepScriptBridgeTests(unittest.TestCase):
     def test_script_style_step_checks_are_executed_under_unittest_discovery(self):
-        repo_root = Path(__file__).resolve().parents[3]
-        toolkit_root = repo_root / "devspec_toolkit"
+        toolkit_root = Path(__file__).resolve().parents[2]
+        repo_root = toolkit_root
         scripts_dir = toolkit_root / "tests" / "integration"
         pythonpath_prefix = str(toolkit_root / "tools")
 
+        # expected_returncodes: {0} for valid fixtures, {1} for invalid fixtures.
         cases = [
             ("test_step_00.py", [], repo_root, {0}),
             ("test_step_01.py", [], repo_root, {0}),
             ("test_step_02.py", [], repo_root, {0}),
             ("test_step_02a.py", ["--self-test"], toolkit_root, {0}),
-            # These script-style tests are still migration-era wrappers with mixed fixture semantics;
-            # allow pass/fail but still fail on crashes/tracebacks.
+            # Step 03 fixture uses project-tier term ID (cn:project:term:*) not in core canon → E110
+            # from canonical-integrity. Schema validation passes. Architectural limitation of fixture-only testing.
             ("test_step_03.py", [str(toolkit_root / "tests" / "fixtures" / "step_03" / "valid_minimal.json")], repo_root, {0, 1}),
-            ("test_step_04.py", [], repo_root, {0, 1}),
-            ("test_step_05.py", [], repo_root, {0, 1}),
-            ("test_step_06.py", [], toolkit_root, {0, 1}),
-            ("test_step_07.py", [], toolkit_root, {0, 1}),
-            ("test_step_08.py", [], repo_root, {0, 1}),
-            ("test_step_09.py", [], toolkit_root, {0, 1}),
-            ("test_step_10.py", [str(toolkit_root / "tests" / "fixtures" / "step_10")], repo_root, {0, 1}),
+            # Step 04 fixture uses project-tier capability IDs (cn:project:*) not in core canon → E110
+            # from canonical-integrity. Schema validation passes. Architectural limitation of fixture-only testing.
+            ("test_step_04.py", [str(toolkit_root / "tests" / "fixtures" / "step_04" / "valid_comprehensive.json")], repo_root, {0, 1}),
+            ("test_step_05.py", [str(toolkit_root / "tests" / "fixtures" / "step_05" / "valid_rest_api.json")], repo_root, {0}),
+            # Step 06 fixture references api IDs from 05_interface_contracts.json → E590 in fixture-only context.
+            ("test_step_06.py", [str(toolkit_root / "tests" / "fixtures" / "step_06" / "valid_full.json")], repo_root, {0, 1}),
+            ("test_step_07.py", [str(toolkit_root / "tests" / "fixtures" / "step_07" / "valid_full.json")], repo_root, {0}),
+            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_generic.json")], repo_root, {0}),
+            ("test_step_09.py", [str(toolkit_root / "tests" / "fixtures" / "step_09" / "valid_complete.json")], repo_root, {0}),
+            ("test_step_10.py", [str(toolkit_root / "tests" / "fixtures" / "step_10" / "valid_full.json")], repo_root, {0}),
             ("test_step_11.py", [], repo_root, {0}),
             ("test_step_12.py", [str(toolkit_root / "tests" / "fixtures" / "step_12" / "valid_dag.json")], repo_root, {0}),
             ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "valid_manifest.json")], repo_root, {0}),
-            ("test_step_15.py", [str(toolkit_root / "tests" / "fixtures" / "step_15")], repo_root, {0}),
+            ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "valid_none_required.json")], repo_root, {0}),
+            ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "invalid_empty_no_decision.json")], repo_root, {1}),
+            ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "invalid_status_mismatch.json")], repo_root, {1}),
+            ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "invalid_status_mismatch_2.json")], repo_root, {1}),
+            ("test_step_13.py", [str(toolkit_root / "tests" / "fixtures" / "step_13" / "invalid_naming.json")], repo_root, {1}),
+            ("test_step_15.py", [str(toolkit_root / "tests" / "fixtures" / "step_15" / "valid_minimal.json")], repo_root, {0}),
         ]
 
         for script_name, args, cwd, expected_returncodes in cases:

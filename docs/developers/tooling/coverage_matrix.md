@@ -3,7 +3,7 @@
 The coverage matrix ties every requirement to a verifying artifact so that the spec, fixtures, and implementation stay aligned.
 
 ## Command
-Use the `matrix` subcommand documented in the [command cheatsheet](../reference.md#command-cheatsheet). When invoked with `--out tools/trace_matrix.json`, it writes the canonical report alongside other toolkit outputs.
+Use the `matrix` subcommand documented in the [command cheatsheet](../reference.md#command-cheatsheet). When invoked with `--out spec/extras/trace_matrix.json`, it writes the canonical report alongside other toolkit outputs.
 
 - `spec/` — root of the spec artifacts.
 - `--out` — optional path for the generated JSON report (`-` to print to stdout).
@@ -24,10 +24,10 @@ The output lists each FR ↔ API ↔ fixture ↔ NFR chain. CI can diff this fil
 Add the matrix command to CI alongside the [core validation commands](../reference.md#core-validation-commands) so drift is detected automatically. Always run:
 
 ```bash
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ```
 
-CI should fail if `tools/trace_matrix.json` differs from the committed expectation without matching spec changes or if required trace links are missing.
+CI should fail if `spec/extras/trace_matrix.json` differs from the committed expectation without matching spec changes or if required trace links are missing.
 
 ## Troubleshooting
 - **Missing FR trace**: ensure each FR in `04_fr_list.json` has at least one `traceRef` pointing to an API ID.

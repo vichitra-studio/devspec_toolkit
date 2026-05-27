@@ -31,6 +31,15 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
 ├─ schema/                   # JSON Schemas per step + shared atoms/collections/errors
 ├─ spec/common/              # shared seed manifest (toolkit baseline)
 └─ tools/                    # CLI package + schema registry
+   └─ specdev_tools/         # Python CLI package
+      ├─ cli.py              # entry point
+      ├─ core/               # errors, registry, trace_types, changelog_parser
+      ├─ validation/         # validate, validators/, linters (fixtures, seed, docs,
+      │                      #   quality, hallucination, dependency, forward-replay,
+      │                      #   traceability, invariants, governance, matrix)
+      ├─ generation/         # prompt_generator, prompt_schema_sync, schema_differ
+      ├─ canonical/          # autofix, integrity, lint, registry
+      └─ migration/          # planner, runner
 
 ```
 
@@ -71,9 +80,14 @@ All authoritative CLI examples, guardrails, and troubleshooting checklists live 
 - [docs/README.md](docs/README.md) — documentation map.
 - [tools/README.md](tools/README.md) — CLI packaging details.
 
-- [.github/workflows/ci.yml](.github/workflows/ci.yml) — sample workflow generated via `gen-ci`.
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) — the toolkit's own CI pipeline.
+
+---
+
+## Platform Support
+macOS and Linux are fully supported. Windows users should run the toolkit under WSL2.
 
 ---
 
 ## License
-Choose what suits your org (Apache-2.0, MIT, etc.) and place it in [LICENSE](LICENSE).
+This toolkit is released under the [MIT License](LICENSE).

@@ -33,12 +33,5 @@
   "breakglass_key": "some-key",
   "key_ttl_seconds": 600,
   "config_value": 500,
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ]
+  "canonical_refs_used": []
 }

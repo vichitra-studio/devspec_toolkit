@@ -1,0 +1,74 @@
+{
+  "$schema": "vc:00-charter",
+  "id": "project-missing-scope",
+  "title": "Project Missing Scope Charter",
+  "owner": "product",
+  "created_at": "2023-10-27T10:00:00Z",
+  "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
+  "out_of_scope": [
+    "Mobile App",
+    "Legacy Data Migration",
+    "Third-party Integrations"
+  ],
+  "assumptions": [
+    "Existing AWS infrastructure is available"
+  ],
+  "risks": [
+    "Team capacity constraints"
+  ],
+  "stakeholders": [
+    {
+      "role": "CTO",
+      "needs": [
+        "Scalability",
+        "Security"
+      ]
+    }
+  ],
+  "user_segments": [
+    {
+      "segment_id": "admin-users",
+      "description": "System administrators",
+      "jobs_to_be_done": [
+        "Manage users",
+        "View system logs"
+      ],
+      "pains": [
+        "Slow load times"
+      ],
+      "gains": [
+        "Faster troubleshooting"
+      ]
+    }
+  ],
+  "success_metrics": [
+    {
+      "metric_id": "latency",
+      "name": "API Latency",
+      "target": 200,
+      "unit": "ms",
+      "unit_ref": {
+        "id": "cn:core:unit:ms",
+        "kind": "unit"
+      },
+      "measurement_method": "P95 via Datadog"
+    },
+    {
+      "metric_id": "uptime",
+      "name": "System Uptime",
+      "target": 99.99,
+      "unit": "percent",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      },
+      "measurement_method": "Monthly monitoring"
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:unit:ms",
+      "kind": "unit"
+    }
+  ]
+}

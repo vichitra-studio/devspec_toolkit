@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:step-order",
+  "title": "Step Order Configuration",
+  "description": "Defines the strict waterfall dependency DAG, pipeline policies, and downstream consumer mappings for the spec-driven development workflow.",
+  "type": "object",
+  "required": [
+    "version",
+    "policy",
+    "steps",
+    "downstream_consumers",
+    "coverage_thresholds"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the step_order configuration format."
+    },
+    "_notes": {
+      "type": "object",
+      "description": "Human-readable documentation notes explaining design decisions. Not consumed by tooling.",
+      "additionalProperties": {
+        "type": "string",
+        "description": "A human-readable documentation note."
+      }
+    },
+    "policy": {
+      "type": "object",
+      "description": "Pipeline execution policy governing dependency resolution and replay behavior.",
+      "required": [
+        "mode",
+        "allow_self_dependency",
+        "allow_forward_dependency",
+        "require_full_forward_replay_on_change",
+        "status_write_exemptions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "description": "Pipeline execution mode. Currently only 'strict_waterfall' is supported."
+        },
+        "allow_self_dependency": {
+          "type": "boolean",
+          "description": "Whether a step is permitted to list itself as its own dependency."
+        },
+        "allow_forward_dependency": {
+          "type": "boolean",
+          "description": "Whether a step may depend on a step that appears later in the pipeline ordering."
+        },
+        "require_full_forward_replay_on_change": {
+          "type": "boolean",
+          "description": "When true, any upstream change requires full replay of all downstream steps."
+        },
+        "status_write_exemptions": {
+          "type": "object",
+          "description": "Maps step IDs to arrays of JSON path patterns that are exempt from triggering forward replay. Prevents infinite replay cycles for status-only writes.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A JSON path pattern exempt from replay (e.g., '$.milestones[*].status')."
+            },
+            "description": "Array of JSON path patterns exempt from triggering forward replay for this step."
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of step IDs defining the strict waterfall sequence. Position determines dependency eligibility.",
+      "minItems": 1,
+      "items": {
+        "$ref": "vc:core:atoms#stepId",
+        "description": "Step identifier: two-digit number optionally followed by a single lowercase letter suffix (a, b, or c)."
+      }
+    },
+    "coverage_thresholds": {
+      "type": "object",
+      "description": "Thresholds governing traceability coverage requirements for the spec pipeline.",
+      "required": [
+        "fr_coverage",
+        "mode"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "fr_coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum percentage of functional requirements that must be traced to downstream artifacts."
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "warn",
+            "error"
+          ],
+          "description": "Whether coverage threshold violations produce warnings or hard errors."
+        }
+      }
+    },
+    "downstream_consumers": {
+      "type": "object",
+      "description": "Maps each step ID to the list of steps that actively consume its output. Used by 'specdev prompt-context' to surface relevant upstream artifacts. NOT used by forward-replay checks.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "vc:core:atoms#stepId",
+          "description": "A step ID (two-digit, optionally with letter suffix) that consumes this step's output."
+        },
+        "description": "Array of step IDs that consume output from this step."
+      }
+    },
+    "step_metadata": {
+      "type": "object",
+      "description": "Per-step declarative metadata: upstream spec inputs. Optional — when present, the consistency linter validates required_spec_inputs against the inverse of downstream_consumers. The field is independently optional; the linter treats omission as an empty list and still catches missing edges via the cross-source comparison.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Metadata block for a single step. The field is optional to allow incremental per-step migration; the linter validates whatever is declared and treats absence as an empty list. Keys at this level must reference steps declared in the top-level `steps` array — phantom step keys are caught by `_lint_step_metadata_consistency` (E543).",
+        "additionalProperties": false,
+        "properties": {
+          "required_spec_inputs": {
+            "type": "array",
+            "description": "Step IDs whose output this step ingests as input. Must match the inverse of downstream_consumers (a step is listed here iff the producer lists this step in its downstream_consumers). Optional — when omitted, the linter treats this side as empty and surfaces any missing edge via E543.",
+            "items": {
+              "$ref": "vc:core:atoms#stepId",
+              "description": "A step ID that produces upstream input for this step."
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

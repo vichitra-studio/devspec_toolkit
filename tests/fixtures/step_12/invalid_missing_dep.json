@@ -2,14 +2,6 @@
   "id": "broken-ci-pipeline",
   "owner": "api",
   "created_at": "2026-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "trace": [
     {
       "type": "doc",
@@ -20,6 +12,7 @@
     {
       "job_id": "job-a",
       "name": "Job A",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "non-existent-job"
       ],
@@ -31,5 +24,6 @@
         }
       ]
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

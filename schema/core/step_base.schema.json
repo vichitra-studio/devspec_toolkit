@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:core:step-base",
+  "$anchor": "stepBase",
+  "title": "Step Base",
+  "description": "Shared base properties for all pipeline step schemas. Does not set additionalProperties — intended as a composable fragment.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema URI identifying the schema this artifact conforms to. Format: vc:{NN}-{step-name}. Examples: 'vc:00-charter' for a charter artifact, 'vc:01-capabilities' for capabilities, 'vc:04-fr-list' for FR list. Must match the $id of the step schema exactly as registered in schema_registry.json. Do NOT use HTTP URLs — the registry uses vc: URNs. An incorrect URI here causes schema resolution to fail silently."
+    },
+    "id": {
+      "$ref": "vc:core:atoms#kebabId",
+      "description": "Unique kebab-case identifier for this artifact instance. Convention: {step-noun}-v{N}. Examples: 'charter-v1', 'capabilities-v1', 'fr-list-v1', 'system-sketch-v1', 'nfrs-v1'. Increment the version suffix only on full regeneration of the artifact. Anti-pattern: using a capability or FR prefix (cap-*, fr-*) for an artifact-level ID — those prefixes are reserved for items within the artifact, not the artifact itself."
+    },
+    "owner": {
+      "$ref": "vc:core:atoms#owner",
+      "description": "Owner of this spec artifact. Allowed values are enforced by vc:core:atoms#owner (the single authority). Choose the team that creates, maintains, and is accountable for this artifact."
+    },
+    "created_at": {
+      "$ref": "vc:core:atoms#timestamp",
+      "description": "ISO 8601 timestamp of when this artifact was generated or last regenerated. Always use UTC with Z suffix. Example: '2025-10-16T22:06:04.202593Z'. Update this field whenever the artifact is fully regenerated from scratch. Do not update it for minor edits — use a separate updated_at field if tracking incremental changes."
+    },
+    "canonical_refs_used": {
+      "$ref": "vc:core:collections#canonicalRefArray",
+      "description": "Aggregate list of every canonical registry reference used anywhere in this artifact. Aggregation rule: collect one entry per unique `id` from all `*_ref` fields (capability_ref, entity_ref, unit_ref, status_ref, etc.) across the entire document, deduplicated. Example: if you wrote {\"id\": \"cn:project:term:billing-amount\", \"kind\": \"term\"} in two different fields, include it once here. Required even when empty — use [] when no canonical references were made. Validated by canonical-integrity checks at build time."
+    },
+    "canonical_proposals": {
+      "$ref": "vc:core:collections#canonicalProposalArray",
+      "description": "Optional by default; individual step schemas may promote this to required (e.g., 03_glossary). Array of proposed canonical entries discovered during this step's analysis. Decision rule: populate this field whenever the AI generator encounters a domain concept that (a) does not yet exist in the canon registry and (b) appears in a field that accepts a canonical reference (e.g., capability_ref, entity_ref, unit_ref). Omit entirely if no new canonical terms were identified — do not include an empty array unless the step schema requires it. Example: Step 01 introduces a new capability concept 'merchant-account' not in the registry — add a proposal: {\"temp_id\": \"merchant-account\", \"kind\": \"entity\", \"proposed_label\": \"Merchant Account\", \"definition\": \"A business entity registered to accept payments through the platform.\", \"source_field\": \"capabilities[*].capability_ref\"}. Example: Step 04 introduces a new action verb 'reconcile' not in the registry — add a proposal with kind 'action'. Anti-pattern: adding a proposal for a concept that already exists in the canon registry under a different label — check aliases.json first, as the existing entry may already cover the concept under an alternate name."
+    },
+    "canonical_conflicts": {
+      "$ref": "vc:core:collections#canonicalConflictArray",
+      "description": "Optional. Array of conflicts between proposed canonical entries and existing registry entries, produced by canonical-autofix tooling — do not author manually. When present (non-empty), each entry identifies a field_path where an input value matched multiple canon entries and could not be auto-resolved. Omit entirely if no conflicts were detected. Structure per entry: {field_path: string, input_value: string, candidate_ids: [cn:id-1, cn:id-2], reason: string}."
+    },
+    "_migration_notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "A migration annotation string added by canonical-autofix or align tooling."
+      },
+      "description": "Optional migration annotations added by canonical-autofix or align tooling during schema migrations. Do NOT populate this field manually — it is written exclusively by specdev tooling (canonical-autofix, align apply). Human authors should leave this field absent. If present after a tooling run, it documents what was auto-corrected and should be reviewed before committing."
+    },
+    "spec_refs_ingested": {
+      "$ref": "vc:core:collections#specRefIngestedArray",
+      "description": "Optional record of upstream spec artifacts consumed during generation of this artifact. Each entry captures {step_id, artifact_id, hash?} so drift detection and forward-replay can identify when a downstream artifact was produced against an upstream that has since changed. Populated by AI authoring prompts when producing the artifact; validated by dependency-order-lint. Anti-pattern: listing every upstream step — list only the specific artifacts that shaped this output."
+    },
+    "seed_refs_ingested": {
+      "$ref": "vc:core:collections#seedRefArray",
+      "description": "Optional record of seed documents consumed during generation of this artifact. Each entry captures {seed_id, hash?, version?} so drift detection can identify when the artifact was derived from a seed version that has since changed. Applies to any step whose prompt reads seed documents directly, as determined by the manifest. Anti-pattern: adding entries for seeds the prompt did not actually read — use only for seeds whose content materially shaped this artifact."
+    }
+  },
+  "required": [
+    "id",
+    "owner",
+    "created_at",
+    "canonical_refs_used"
+  ]
+}

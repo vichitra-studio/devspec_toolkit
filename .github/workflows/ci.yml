@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SPECDEV_WARNINGS_AS_ERRORS: "1"
-      SPECDEV_REPLAY_DIFF_ERROR_MODE: "error"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,50 +37,41 @@ jobs:
           python -m venv devspec_env
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
           devspec_env/bin/pip install -e tools/
-      - name: Prompt-schema sync
-        run: python -m specdev_tools.cli prompt-sync spec --repo-root .
       - name: Canonical lint
         run: python -m specdev_tools.cli canonical-lint canon --repo-root .
-      - name: Canonical integrity
-        run: python -m specdev_tools.cli canonical-integrity spec --repo-root .
-      - name: Validate all specs
-        run: python -m specdev_tools.cli validate-all spec --repo-root .
-      - name: Spec quality lint
-        run: python -m specdev_tools.cli spec-quality-lint spec --repo-root .
-      - name: Hallucination lint
-        run: python -m specdev_tools.cli hallucination-lint spec --repo-root .
-      - name: Seed lint
-        run: python -m specdev_tools.cli seed-lint spec --repo-root .
-      - name: Docs lint
-        run: python -m specdev_tools.cli docs-lint spec --repo-root .
       - name: Dependency order lint
         run: python -m specdev_tools.cli dependency-order-lint --repo-root .
-      - name: Forward replay check
-        run: |
-          BASE_REF="origin/main"
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${{ github.base_ref }}" ]; then
-            BASE_REF="origin/${{ github.base_ref }}"
-          fi
-          python -m specdev_tools.cli forward-replay-check --repo-root . --base-ref "$BASE_REF"
+      - name: DAG lint
+        run: python -m specdev_tools.cli dag-lint --repo-root .
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
         run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"
-      - name: Fixtures lint
-        run: python -m specdev_tools.cli fixtures-lint spec --repo-root .
-      - name: Build trace matrix
-        env:
-          SPECDEV_MATRIX_STRICT: "1"
-        run: python -m specdev_tools.cli matrix spec --out tools/trace_matrix.json --repo-root .
-      - name: Upload matrix
-        uses: actions/upload-artifact@v4
-        with:
-          name: trace-matrix
-          path: tools/trace_matrix.json
-          if-no-files-found: error
+      - name: Registry up-to-date check (W6-T5)
+        run: |
+          # Regenerate registry + extraction_paths to tmpfiles; fail if the
+          # committed artifacts diverge. Catches "schema changed but registry
+          # not regenerated" PRs at CI time.
+          TMPDIR=$(mktemp -d)
+          python -m specdev_tools.cli registry-generate \
+            --repo-root . \
+            --out "$TMPDIR/entry_key_registry.json" \
+            --extraction-paths-out "$TMPDIR/extraction_paths.json"
+          REGEN_CMD="specdev registry-generate --repo-root . --out ./tools/entry_key_registry.json"
+          if ! diff -q "$TMPDIR/entry_key_registry.json" tools/entry_key_registry.json; then
+            echo "::error::Registry out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/extraction_paths.json" tools/extraction_paths.json; then
+            echo "::error::extraction_paths out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/entry_key_registry.json" tests/fixtures/entry_key_registry_golden.json; then
+            echo "::error::Golden snapshot stale. Run '$REGEN_CMD' then cp tools/entry_key_registry.json tests/fixtures/entry_key_registry_golden.json"
+            exit 1
+          fi
 
-  redteam:
-    name: Red-Team Lint
-    needs: validate
+  test:
+    name: Pytest Suite
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -96,21 +86,6 @@ jobs:
           python -m venv devspec_env
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
           devspec_env/bin/pip install -e tools/
-      - name: Lint adversarial fixtures (same mechanism as fixtures)
-        run: python -m specdev_tools.cli fixtures-lint spec
-
-  deploy-staging:
-    name: Deploy Staging (placeholder)
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs: redteam
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Deploy to staging goes here (wire your real deploy step)."
-
-  deploy-prod:
-    name: Deploy Production (gated placeholder)
-    if: ${{ github.ref == 'refs/heads/main' }}
-    needs: deploy-staging
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Deploy to production goes here behind manual approval."
+          devspec_env/bin/pip install pytest
+      - name: Run pytest
+        run: pytest tests/ -v

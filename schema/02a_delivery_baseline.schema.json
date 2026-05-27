@@ -1,98 +1,88 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/02a_delivery_baseline.schema.json",
+  "$id": "vc:02a-delivery-baseline",
   "title": "02a_delivery_baseline",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "trace": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-      }
-    },
-    "environments": {
+    {
       "type": "object",
-      "propertyNames": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentName"
-      },
-      "additionalProperties": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentConfig"
+      "properties": {
+        "trace": {
+          "description": "Traceability links connecting this delivery baseline to upstream spec artifacts. Use type 'capability' to reference capabilities (cap-*) this baseline operationalises (the kind of the target; describe the 'implements' relationship in note). Use type 'charter-goal' to reference charter goals (goal-*) that constrain this environment configuration (describe the 'derives_from' relationship in note). Example: [{\"type\": \"capability\", \"id\": \"cap-continuous-deployment\", \"note\": \"Implements this capability; baseline defines the CI/CD pipeline\"}, {\"type\": \"charter-goal\", \"id\": \"goal-deployment-scope\", \"note\": \"Derives from this charter goal; environment structure follows the charter deployment scope\"}]. At least one trace entry per baseline. Anti-pattern: omitting trace entirely — baselines without trace links cannot be validated against charter scope. Anti-pattern: using verb-types such as 'implements' or 'derives_from' — type must be the canonical kind of the target artifact, not a relationship verb; put the relationship verb in note.",
+          "type": "array",
+          "items": {
+            "$ref": "vc:core:collections#traceRef",
+            "description": "A traceability reference linking this delivery baseline to the upstream spec artifacts it formalises. At step 02a, set type to the canonical kind of the target artifact — e.g., 'capability' for cap-* targets (describe the operationalising relationship in note), 'charter-goal' for goal-* charter targets (describe the constraint relationship in note). Verbs like 'implements' and 'derives_from' are NOT valid types — put the relationship verb in note. Example: {\"type\": \"capability\", \"id\": \"cap-continuous-deployment\", \"note\": \"Implements this capability; baseline formalises the component topology\"}."
+          }
+        },
+        "environments": {
+          "description": "Map of environment names to their configuration objects. Each key must be one of the canonical environment names (dev, ci, staging, prod). The value is a key-value config map capturing environment-specific overrides for infrastructure, scaling, and feature flags. Decision rule: include only keys whose value differs across at least two environments — if a key has the same value in every environment, omit it; shared defaults belong in application configuration, not here. Worked example: if 'api_url' is 'https://api.staging.example.com' in staging and 'https://api.example.com' in prod, include it; if 'log_level' is always 'info' in every environment, omit it entirely. Correct: {\"dev\": {\"replica_count\": 1, \"log_level\": \"debug\", \"api_url\": \"https://api.dev.example.com\"}, \"prod\": {\"replica_count\": 3, \"log_level\": \"warn\", \"api_url\": \"https://api.example.com\"}}. Anti-pattern: duplicating keys with identical values across all environments (e.g., {\"dev\": {\"timeout\": 30}, \"staging\": {\"timeout\": 30}, \"prod\": {\"timeout\": 30}}) — this creates a false impression that values vary and pollutes the diff when values do change; also avoid listing every possible config key regardless of whether it actually varies between environments.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "vc:core:collections#environmentName",
+            "description": "Environment name constraint: must be a valid environment (dev, ci, staging, prod)."
+          },
+          "additionalProperties": {
+            "$ref": "vc:core:collections#environmentConfig",
+            "description": "Configuration block for one deployment environment. Must capture the settings that differ between tiers — e.g., replica count, database URL pattern, feature flags, resource limits. Values should reflect actual delivery targets, not placeholder strings."
+          },
+          "required": [
+            "dev",
+            "ci",
+            "staging",
+            "prod"
+          ],
+          "minProperties": 4
+        },
+        "ci_gates": {
+          "description": "Ordered list of CI gate identifiers that must all pass before a deployment is considered promotable. At least one gate must be provided (enforced by minItems). Decision rule: the name must be recognizable to a developer reading the CI log — use kebab-case that matches what the gate actually validates. Standard names: 'unit-tests', 'lint', 'type-check', 'security-scan', 'integration-tests', 'e2e-smoke', 'coverage-check'. Worked examples: ['unit-tests', 'lint', 'type-check', 'security-scan'] for a typical backend service; ['unit-tests', 'integration-tests', 'e2e-smoke', 'coverage-check'] for a full-stack app. Anti-pattern: 'tests' (ambiguous — unit, integration, or e2e?), 'CI' (too generic to be actionable), 'checks' (not machine-identifiable); also avoid capital letters and spaces as they break pipeline job name matching.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "CI gate identifier in kebab-case (e.g., 'unit-tests', 'lint', 'security-scan'). Should match a pipeline job name in the host repo's CI configuration.",
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          }
+        },
+        "secrets": {
+          "description": "List of secret names (environment variable keys) that the delivery pipeline requires at runtime. Each entry should be the exact env-var name injected by the secrets manager — e.g., 'DATABASE_URL', 'API_KEY_STRIPE', 'JWT_SECRET'. Do not include values or partial keys. This list drives audit trails and helps reviewers confirm all secrets are provisioned before deployment. Omit internal framework secrets that are auto-injected by the platform.",
+          "$ref": "vc:core:collections#stringArray"
+        },
+        "compliance": {
+          "description": "List of compliance standards or regulatory frameworks this delivery baseline must satisfy. Use canonical short names: 'SOC2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO27001'. Each entry should reflect an actual external or internal obligation — not aspirational standards. If no formal compliance applies, use an empty array rather than inventing entries. This list is consumed by the governance check (step 10) to verify that compliance-gating CI gates are present.",
+          "$ref": "vc:core:collections#stringArray"
+        },
+        "environment_ref": {
+          "description": "Canonical reference to the environment definitions in the canonical registry. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:prod\", \"kind\": \"environment\", \"label\": \"prod\"}. Common IDs: 'cn:core:environment:prod', 'cn:core:environment:staging', 'cn:core:environment:dev'. Should match one of the keys in the 'environments' object of this artifact. Validated by canonical-integrity lint.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "environment" } } }
+          ]
+        },
+        "command_ref": {
+          "description": "Canonical reference to the CLI command this CI gate invokes. Kind is structurally pinned to 'command'. Example: {\"id\": \"cn:core:command:pytest\", \"kind\": \"command\"} for pytest. Only reference commands registered in the canon.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "command" } } }
+          ]
+        },
+        "policy_ref": {
+          "description": "Canonical reference to the governance policy this baseline configuration enforces. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",
+          "allOf": [
+            { "$ref": "vc:core:collections#canonicalRef" },
+            { "properties": { "kind": { "const": "policy" } } }
+          ]
+        }
       },
       "required": [
-        "dev",
-        "ci",
-        "staging",
-        "prod"
+        "environments",
+        "ci_gates"
       ],
-      "minProperties": 4
-    },
-    "ci_gates": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "string",
-        "pattern": "^[a-z0-9-]+$"
-      }
-    },
-    "secrets": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "compliance": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
-    },
-    "environment_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-    },
-    "command_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-    },
-    "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "description": "Step-specific properties for 02a_delivery_baseline."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "environments",
-    "ci_gates",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

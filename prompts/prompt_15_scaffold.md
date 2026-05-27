@@ -1,90 +1,93 @@
 # Step 15 · Scaffold Generation
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+Run `specdev prompt-context 15` to see downstream consumers.
+
+## Role
+You are a **senior scaffolding architect and code generation specialist**. Your job is to produce a deterministic project scaffold that maps directly to the component structure from the system sketch — generating directory layout, stub files, and test scaffolding that developers can immediately build on.
+
 ## Purpose
 Generate compile-clean service skeletons and route bindings directly from the spec, capturing any manual follow-up required to keep the scaffold aligned. This artifact proves the contracts are implementable and tracks validation tasks before teams start feature work.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
 After generating the JSON artifact, implement the scaffold manually or using your preferred generator/framework CLI. Ensure the generated routes match `05_interface_contracts.json`.
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 15 · Scaffold Generation** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+### Extraction Intent
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 15 · Scaffold Generation**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+#### Primary Sources (directly consumed)
+- `spec/15_scaffold.json` (if updating): current scaffold state for incremental generation
+- **02_system_sketch.json**: Component IDs, service boundaries, and **tech_stack** (`tech_stack.languages`, `tech_stack.frameworks`, `tech_stack.infrastructure`, `tech_stack.tools` — primary source of technology decisions) used to derive the project_skeleton module structure, language/framework selection, and scaffold directory conventions
+- **02a_delivery_baseline.json**: Deployment environment and infrastructure constraints used to select appropriate framework configurations and container orchestration templates for the scaffold
+- **05_interface_contracts.json**: All API endpoint definitions (api_id, path, method) used to generate the interface_map with one-to-one binding between each contract and its scaffold route entry
+- **09_impl_plan.json**: Refined technology stack (version pins, spike-discovered tools) and milestone sequencing consumed to supplement Step 02 tech_stack with implementation-time additions
+- **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
+#### Reference Sources (context only)
+- `spec/04_fr_list.json`: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
+- `spec/14_roadmap.json`: for phased scaffold generation (generate components in milestone order)
+- **00_charter.json**: Project identity and scope boundaries used to name the scaffold service and constrain module generation to in-scope domains only
+- **01_capabilities.json**: Capability definitions used to verify that scaffold modules cover all declared system capabilities and no capability lacks a corresponding code entry point
+- **03_glossary.json**: Domain terminology definitions used to ensure scaffold module names, route identifiers, and code structure follow the project's canonical vocabulary consistently
+- **06_invariants.json**: System invariant rules used to inform validator configuration and ensure scaffold includes enforcement hooks for critical data integrity constraints
+- **07_nfrs.json**: Performance thresholds and security requirements used to configure scaffold middleware layers (rate limiting, authentication, logging) matching declared non-functional targets
+- **08_fixtures.json**: Test fixture definitions used to verify that scaffolded routes have corresponding test harness entry points and that fixture targets map to actual interface_map entries
+- **10_governance.json**: Governance labels and commit conventions used to configure scaffold CI integration and ensure generated code follows the project's declared governance workflow
+- **11_redteam.json**: Threat model findings used to ensure scaffold includes security-hardened route handlers and middleware for endpoints identified as high-risk attack surfaces
+- **13_extension_manifest.json**: Extension manifest entries used to verify that extension-specific domains have corresponding scaffold modules and route bindings when applicable
+- **13a_completeness_assessment.json**: Gap findings and completeness ratings used to identify specification holes that may require scaffold placeholder stubs or deferred route markers
+- **14_roadmap.json**: Milestone sequencing and task decomposition used to prioritize which scaffold routes and modules are generated first based on implementation phase ordering
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["15"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- Interface Contracts `spec/05_interface_contracts.json` for route map; System Sketch `spec/02_system_sketch.json` for component context.
-- FRs `spec/04_fr_list.json` for behavior coverage.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference; any org boilerplate.
-
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Scaffold Ledger: service_skeleton (language/framework/modules) and route_map mapping each public `api_ref` to path/method. Do not output it.
-- Ensure one-to-one mapping to critical APIs; include validators that check spec/code sync.
-- Self-audit; if route_map misses APIs or skeleton is inconsistent with org standards, ask Gap Questions.
-- Rewrite to minimal viable skeleton aligned with codegen/validators.
-- Emit JSON when coherent.
+## Operating Flow: Inventory → Map → Validate → Emit
+- **Inventory**: Build a private Scaffold Ledger from system sketch components and delivery baseline constraints. Map each component to its scaffold directory and framework config.
+- **Map**: For each public interface_ref in `05_interface_contracts.json`, create one `interface_map` entry binding the canonical API to a route path, method, and handler stub.
+- **Validate**: Self-audit: verify every capability has a module entry, every public API has a route binding, validators are executable commands.
+- **Emit**: Write artifact only when all components are mapped and all required fields are populated.
 
 ## Heuristics For Completeness
 - Optional→expected: include validators (schema sync, openapi/gen consistency, trace checks).
 - Ambiguity scrub: minimal module set, clear names; avoid framework‑specific jargon where not needed.
 
 ## Self-Audit Gate
-- If the route map does not strictly match Step 05 APIs, ask.
-- Gating items:
-  - Route map includes all public APIs; paths/methods consistent with contracts.
-  - Service skeleton sufficient to run a minimal service; validators listed.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/09_impl_plan.json` is present and contains at least one milestone entry.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. DO NOT invent preconditions, postconditions, or error states as they are not supported by the schema.
-6. Set owner to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. Populate `trace` and `links` to connect to Step 05 or other artifacts if applicable.
-8. DO NOT guess `build_status`; default to `pending` if not known.
-9. DO NOT duplicate `api_ref` values in the route map.
-10. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+## Clarification Questions
+- If the route map does not strictly match Step 05 APIs, ask.
 
 ## Negative Constraints
 - **DO NOT** invent modules not specified in `spec/09_impl_plan.json` or `spec/01_capabilities.json`.
 - **DO NOT** diverge from the route map defined in Step 05; scaffold must match contract.
-- **DO NOT** mark build status as `green` if validators have not been executed.
+- **DO NOT** mark `build_status` as `green` without evidence that validators have been executed; the schema enforces structural coupling between `build_status` and `validators`.
 - **DO NOT** include logic or implementation code; this is a scaffold only.
 
-## Step-Specific Completeness Checklist
-- `service_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
-- `route_map` covers all in-scope APIs (Step 5) with path/method and `api_ref` links.
-- `validators` list includes code or config checks needed to keep generated code aligned with specs.
-- `build_status` reflects build health; default to `pending` until CI succeeds.
+## Coverage Closure
+Before emitting, verify:
+- Route map includes all public APIs; paths/methods consistent with contracts.
+- Service skeleton sufficient to run a minimal service; validators listed.
+- Every `api_id` in `spec/05_interface_contracts.json` has a corresponding entry in `interface_map` with a matching `method` and `path`.
+- Every service `component_id` in `spec/02_system_sketch.json` has a scaffold module or directory represented in `project_skeleton`.
+- Every `fr_id` with an acceptance criterion requiring a specific HTTP endpoint has that endpoint present in the generated scaffold.
+- All `interface_ref` values in `interface_map` resolve to valid `api_id` entries in `spec/05_interface_contracts.json`.
+- If any API contract cannot be scaffolded (e.g., async job, event): add a gap question (Clarify mode) rather than silently omitting the route.
+- [ ] Every upstream ID from ingested context has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every component from Step 02 system sketch has a corresponding directory or module in the scaffold
+- [ ] Directory structure matches the component hierarchy and trust boundaries from Step 02
+- [ ] Every scaffold stub has at least one corresponding test file placeholder
+- [ ] Every `interface_map` route has a corresponding stub handler in the `project_skeleton` directory structure (not just a directory entry)
 
-## Field-by-Field Guidance
-- service_skeleton.language/framework: e.g., `python` + `fastapi`, `node` + `express`.
-- service_skeleton.modules: high-level modules or packages to generate.
-- route_map[*].api_ref: `api-*` from interface contracts.
-- route_map[*].path/method: concrete routing info for the chosen framework.
-- validators: names of validators or scripts to run (e.g., `spec-validate`, `openapi-sync`).
-- build_status: `pending`, `green`, or `red`.
+## Step-Specific Completeness Checklist
+- `project_skeleton` specifies language, framework, and core modules sufficient to build/run a minimal service.
+- `interface_map` covers all in-scope APIs (Step 5) with path/method and `interface_ref` links.
+- `validators` must be populated when `build_status` is `green` (minimum item count per schema). Include commands that verify schema correctness, type safety, and lint compliance for the project languages.
+- `build_status` reflects build health; allowed values are defined in the schema.
 
 ## Best Practices
-- **Sync**: Mirror Step 05 interface contracts when building the `route_map`, keeping `api_ref`, `path`, and `method` in sync.
-- **Reproducibility**: Document `service_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
+- **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.
+- **Reproducibility**: Document `project_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
 - **Validation**: Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
 - **Status**: Track `build_status` honestly (`green`, `red`, `pending`) to surface blockers before implementation accelerates.
 
@@ -94,10 +97,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **False Green**: Marking build status green without running validators, giving a false sense of readiness.
 - **Route Drift**: Creating route paths that differ from Step 05 definitions, breaking client compatibility.
 
-## Quick Reference
-- Service Skeleton: `language` (required), optional `framework` and `modules`.
-- Route Map: `api_ref`, `path`, `method` for each route.
-
 # Clarification Questions
 - What language/framework should the scaffold target? Any org standards or templates to reuse?
 - Which APIs from Step 5 must be present in the initial route map?
@@ -105,61 +104,25 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What is the current build status and criteria for moving to `green`?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/15_scaffold.schema.json
+- Schema URI: vc:15-scaffold
 - Schema File: schema/15_scaffold.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:15-scaffold",
   "id": "scaffold-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python"
   },
-  "route_map": [],
+  "interface_map": [],
   "validators": [
     "specdev-tools validate-all spec --repo-root ."
   ],
   "build_status": "pending",
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
-
+  "canonical_refs_used": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

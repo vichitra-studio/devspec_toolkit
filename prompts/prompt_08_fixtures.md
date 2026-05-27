@@ -1,96 +1,98 @@
 # Step 08 · Test Plan & Fixtures
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds 2 downstream steps.
+
+## Role
+You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data covering every high-priority FR acceptance criterion. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Supply deterministic inputs and expected outputs that exercise functional and non-functional behaviors across the spec. These fixtures form the backbone of automated validation, red-team loops, and regression detection.
 
 ## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
-
-Then lint the fixtures for completeness:
+Lint the fixtures for completeness:
 ```bash
 ./tools/run_specdev.sh fixtures-lint <spec_dir> --repo-root ./devspec_toolkit
 ```
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 8 · Test Plan & Fixtures** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product scope boundaries and success metrics to determine which behaviors are in-scope for fixture coverage and to tag smoke fixtures for critical business flows
+- **01_capabilities.json**: Capability IDs and priority rankings to identify high-priority capabilities whose FRs require mandatory smoke-tagged fixtures and to prioritize fixture creation order
+- **02_system_sketch.json**: Component IDs, inter-component data flow paths, and **tech_stack** (framework choices that determine test runner, fixture format, and setup/teardown patterns — e.g., pytest fixtures for Python, Jest for TypeScript, testcontainers for integration tests) to determine which components need contract-mode fixtures and to structure end-to-end fixture chains across service boundaries
+- **02a_delivery_baseline.json**: Environment definitions and CI pipeline configuration to determine which fixture tags map to which pipeline stages and to validate that fixture execution is feasible in each environment
+- **03_glossary.json**: Canonical term IDs, entity field names, and domain vocabulary to ensure all fixture input payloads and expected output fields use exact glossary terms rather than invented or inconsistent field names
+- **04_fr_list.json**: Functional requirement IDs, acceptance criteria including happy-path and negative cases, preconditions, and postconditions to generate at least one fixture per acceptance criterion with matching target references
+- **05_interface_contracts.json**: API IDs, request/response schema references, error definitions with status codes, and security requirements to build contract-mode fixtures with exact payload shapes and negative fixtures for every enumerated error
+- **06_invariants.json**: Invariant IDs with severity error and their executable expressions to create negative-case fixtures that verify each critical invariant is enforced and that violations produce the expected rejection behavior
+- **07_nfrs.json**: NFR IDs with category latency or throughput, their numeric targets, and units to generate benchmark and load-test fixtures tagged appropriately for performance validation in CI pipelines
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 8 · Test Plan & Fixtures**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+## Operating Flow: Map → Generate → Validate → Emit
+- **Map**: For each high-priority FR and its acceptance criteria, identify the fixture(s) needed. Track coverage in a private Context Ledger.
+- **Generate**: Create fixture data that is concrete, realistic, and deterministic. Each fixture should represent a specific scenario (happy path, boundary case, error case).
+- **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `targets` entry.
+- **Emit**: Write the artifact only when coverage is complete.
 
+**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why.
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["08"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
+### Weak-vs-Strong Fixture Examples
 
-## Context To Ingest
-- FRs `spec/04_fr_list.json` for acceptance criteria; Interface Contracts `spec/05_interface_contracts.json` for payloads.
-- Invariants `spec/06_invariants.json` and NFRs `spec/07_nfrs.json` for negative and performance cases.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Example fixtures in `example/devspec_kit/spec/08_fixtures.json` for structure and modes.
-
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Coverage Ledger mapping FR acceptance criteria to fixtures: happy-path, edge, and failure, plus contract/e2e/redteam modes. Do not output it.
-- Align inputs/expected with interface schemas; include negative cases for each enumerated error.
-- **Self-Correction**: Verify that every `target` ID actually exists in the provided context (Steps 4, 5, 7, 06). If an ID is missing, ask a clarification question instead of hallucinating it.
-- Rewrite expected outcomes precisely (no narratives); add targets and tags; finalise modes.
-- Emit JSON when coverage is representative.
+| Weak | Strong |
+|------|--------|
+| Test login | `fix-auth-login-success`: POST /auth/sessions with valid credentials → 200 + signed token |
+| Error case | `fix-auth-login-bad-password`: POST /auth/sessions with wrong password → 401 `INVALID_CREDENTIALS` |
+| Data test | `fix-user-profile-update-valid`: PUT /users/{id} with valid fields → 200 + updated profile |
+| Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- Optional→expected: add targets to FRs/APIs/invariants; add `smoke` tags for critical flows and `load` where NFRs exist.
+- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes are defined by `vc:core:collections#traceRef` (see schema/core/collections.schema.json for the full authoritative prefix list); MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
-- Gating items:
-  - Each high-priority FR has ≥1 fixture; negative fixtures exist for key errors; contract mode covers each public API.
-  - Inputs/expected align with schemas; targets list correct IDs; tags present for CI gating where needed.
-
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
-## Step-Specific Completeness Checklist
-- Fixtures cover happy-path, edge, and failure scenarios for high-priority FRs and APIs.
-- Mix `mode` values across layers (unit, contract, e2e, redteam) to prove behavior.
-- Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
-- `targets` link fixtures to FRs/APIs/NFRs/invariants to enable coverage reporting.
-- Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/06_invariants.json` is present and contains at least one invariant entry.
 
 ## Negative Constraints
 - **NEVER** invent new IDs. Every trace ID must exist in the upstream specs.
 - **NEVER** use generic placeholder IDs (e.g., `api-login`) unless they match the actual spec.
 - **NEVER** include markdown commentary or key-value pairs outside the JSON block.
-- **NEVER** generate a fixture without at least one target (orphan fixtures are invalid).
+- **NEVER** generate a fixture without at least one entry in `targets` (orphan fixtures are invalid).
 
-## Field-by-Field Guidance
-- fixture_id: `fixture-<scenario>`; keep stable.
-- description: concise statement of intent; reference the behavior being proven.
-- targets: Array of traceRef objects `{"type": "...", "id": "..."}` that reference `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.
-- mode: `unit`, `contract`, `e2e`, or `redteam`.
-  - **contract**: usage requires `expected` to have `status`, `body`, and optionally `headers`.
-- input: minimal JSON payload or setup state; prefer explicit fields over narrative.
-- expected: precise expected payload/state; include error shapes for negative cases.
-- tags: optional labels for grouping and CI selection (e.g. `smoke`, `security`).
+## Coverage Closure
+Before emitting, verify:
+- Every FR acceptance criterion in `spec/04_fr_list.json` has ≥1 fixture with a matching `targets` entry referencing that `fr_id`.
+- Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
+- Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
+- Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
+- All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
+- If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
+- [ ] Every upstream ID from ingested context has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
+- [ ] Every FR with error conditions has at least one fixture covering the failure path
+- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `vc:core:collections#traceRef` for the full authoritative prefix vocabulary)
+- [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
+
+## Step-Specific Completeness Checklist
+- Fixtures cover happy-path, edge, and failure scenarios for high-priority FRs and APIs.
+- Mix `mode` values across layers (see schema/08_fixtures.schema.json → `vc:core:atoms#testingMode` for the authoritative mode enum) to prove behavior.
+- Each fixture has minimal `input` and precise `expected` output/state; ambiguous assertions are avoided.
+- `targets` link fixtures to FRs/APIs/NFRs/invariants to enable coverage reporting.
+- Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
+
+## Cross-Step Synthesis Notes
+- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`.
+- **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 
 ## Best Practices
 - **Coverage**: Cover happy-path, edge, and failure scenarios by mixing `mode` values (unit, contract, e2e, redteam).
 - **Trace**: Use `targets` to reference FRs, APIs, NFRs, or invariants so coverage reports stay accurate.
-- **Minimalism**: Keep `input` and `expected` payloads minimal but sufficient to prove the requirement, reusing glossary terms.
+- **Minimalism**: Keep `input` and `expected` payloads to the minimum fields required to prove the requirement (only fields referenced in the FR acceptance criteria or API request/response schemas), reusing `term_id` values from `spec/03_glossary.json`.
 - **Gating**: Tag fixtures (e.g., `smoke`, `load`) to guide CI gating and spec-to-impl planning.
 
 ## Common Pitfalls
@@ -99,43 +101,54 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Complexity**: Overloading fixtures with multiple expectations, making failures hard to diagnose.
 - **Drift**: Forgetting to update fixtures when interface contracts version, causing format mismatches.
 
-## Quick Reference
-- ID Format: `fixture-<scenario>`; remain stable across revisions.
-- Required Fields: `fixture_id`, `mode`, `input`, `expected`, and `targets`.
-- Mode Choices: `unit`, `contract`, `e2e`, `redteam`; use multiple to cover layers.
-- Trace Hooks: populate `targets` with IDs like `fr-*`, `api-*`, `nfr-*`, or `invariant-*`.
-
 # Clarification Questions
 - Which acceptance criteria lack fixtures today? Prioritize those first.
 - What are the top negative/error scenarios (auth, validation, conflicts, rate limits) that must be encoded?
 - Which inputs/outputs are necessary and sufficient to prove the behavior? Any non-deterministic fields to ignore?
 - Which scenarios must run as smoke/contract in CI vs e2e? Any red-team cases to add now?
 
+## Invariant Evaluation Sample
+
+If Step 06 declares any invariants in a runtime-evaluable language (`cel` or `jsonlogic`), the project needs a dedicated sample fixture that provides the evaluation context for `invariants-check`. Without it, the CI gate added in Step 12 cannot exercise the rules and will either report zero evaluable rules or fail outright.
+
+**Location.** Write the sample to `spec/samples/invariants_sample.json` in the project's spec directory. This is a dedicated file — do not embed it in `spec/08_fixtures.json`. Its shape (a context-only document) and its lifecycle (tracks Step 06, not Step 05) are different from request/response fixtures.
+
+**Shape.** A single JSON document that populates every variable path referenced by the CEL or JSONLogic expressions in `spec/06_invariants.json`. The sample should represent one consistent happy-path scenario in which every invariant evaluates to `true`.
+
+**Derivation procedure.** Walk every expression in Step 06, extract all variable references (e.g. `post.status`, `request.user.role`, `response.headers.cache_control`), take the union of those paths, and populate each one with a realistic value drawn from Step 05 contracts or Step 08 fixture data. Use concrete values — never `"TBD"` or other sentinels. Keep CEL-compatible key names (alphanumeric plus underscores); map hyphenated header names or similar to underscore form in the sample.
+
+**Maintenance contract.** Any PR that adds, modifies, or removes an invariant in Step 06 MUST update this sample in the same PR. This is part of downstream replay discipline. Once Step 12 wires `invariants-check` into CI, a broken sample breaks CI.
+
+**Verification.** After authoring or updating the sample, run:
+
+```bash
+./tools/run_specdev.sh invariants-check <spec_dir> \
+  --sample spec/samples/invariants_sample.json \
+  --repo-root <toolkit_root> \
+  [--spec-root ./spec] [--git-root .]
+```
+
+Iterate until every rule reports `evaluable=true` and `result=true`. Any rule that stays unevaluable signals either a missing variable path in the sample or a malformed expression in Step 06 — fix the true root cause; do not weaken the sample to hide the problem. Run with `--strict` (or `SPECDEV_INVARIANTS_STRICT=1`) once the sample is complete so unevaluable rules become CI errors.
+
+**When no sample is needed.** If every invariant in Step 06 uses a non-runtime language (`prose`, `informal`, or similar) and none are runtime-evaluable, the sample file is not required. Make this determination explicitly by inspecting `spec/06_invariants.json` — do not assume.
+
+See also: Step 06 (`prompt_06_invariants.md`) for invariant authoring, and Step 12 (`prompt_12_ci_gates.md`) for the CI gate that consumes this sample.
+
 # Schema Reference
-- Schema URI: https://specdev.local/schema/08_fixtures.schema.json
+- Schema URI: vc:08-fixtures
 - Schema File: schema/08_fixtures.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:08-fixtures",
   "id": "fixtures-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
   "fixtures": [
     {
-      "fixture_id": "fixture-auth-login-success",
+      "fixture_id": "fix-auth-login-success",
       "mode": "contract",
       "input": {
         "email": "user@example.com",
@@ -144,50 +157,10 @@ You are a senior specification author and validator. Your job is to emit a singl
       "expected": {
         "status": 200
       },
-      "targets": [
-        {
-          "type": "api",
-          "id": "api-auth-login"
-        }
-      ],
-      "tag_ref": {
-        "id": "cn:core:tag:smoke",
-        "kind": "tag"
-      }
+      "targets": [{ "type": "api", "id": "api-auth-login", "note": "Validates: this fixture exercises the auth login API contract" }],
+      "tag_ref": { "id": "cn:core:tag:smoke", "kind": "tag" }
     }
   ],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:tag:smoke",
-      "kind": "tag"
-    }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

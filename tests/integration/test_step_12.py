@@ -138,21 +138,17 @@ def main():
     
     fixture_path = Path(sys.argv[1])
     
-    print("=== Step 12 Verification Script ===")
     
     if fixture_path.is_dir():
         # Test all fixture files in directory
         fixture_files = list(fixture_path.glob("*.json"))
         if not fixture_files:
-            print("No fixture files found in directory")
             sys.exit(1)
         
         results = []
         for fixture_file in fixture_files:
-            print(f"\nValidating {fixture_file.name}...")
             valid, msg = validate_fixture(fixture_file)
             if valid:
-                print(f"✓ SUCCESS: {msg}")
                 results.append((fixture_file.name, True))
             else:
                 print(f"✗ FAILED: {msg}")
@@ -160,11 +156,8 @@ def main():
         
         # Summary
         success_count = sum(1 for _, valid in results if valid)
-        print(f"\n=== SUMMARY ===")
-        print(f"Passed: {success_count}/{len(results)} fixtures")
         
         if success_count == len(results):
-            print("✓ ALL VERIFICATION TESTS PASSED")
             return 0
         else:
             print("✗ SOME VERIFICATION TESTS FAILED")
@@ -172,11 +165,8 @@ def main():
             
     else:
         # Test single fixture file
-        print(f"\nValidating {fixture_path.name}...")
         valid, msg = validate_fixture(fixture_path)
         if valid:
-            print(f"✓ SUCCESS: {msg}")
-            print("✓ VERIFICATION PASSED")
             return 0
         else:
             print(f"✗ FAILED: {msg}")

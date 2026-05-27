@@ -1,18 +1,11 @@
 {
-  "$schema": "https://specdev.local/schema/10_governance.schema.json",
+  "$schema": "vc:10-governance",
   "id": "governance-invalid-enum",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "spec_first_policy": true,
   "pr_rules": [
     "random-check-that-does-not-exist"
-  ]
+  ],
+  "canonical_refs_used": []
 }

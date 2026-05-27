@@ -1,23 +1,6 @@
 {
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "entity",
-  "entries": [
-    {
-      "id": "cn:core:entity:user",
-      "kind": "entity",
-      "preferred_label": "user",
-      "definition": "Primary actor record representing an authenticated or identifiable person.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "account-holder"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    }
-  ]
+  "entries": []
 }

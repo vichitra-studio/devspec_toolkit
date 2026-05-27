@@ -1,0 +1,14 @@
+{
+  "$schema": "vc:07-nfrs",
+  "id": "spec-corpus-07",
+  "nfrs": [
+    {
+      "nfr_id": "NFR-CORPUS-001",
+      "title": "Corpus sample NFR",
+      "description": "A minimal NFR for spec_corpus fixture testing.",
+      "trace": [
+        {"type": "api", "id": "API-CORPUS-001"}
+      ]
+    }
+  ]
+}

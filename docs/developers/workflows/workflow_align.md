@@ -33,9 +33,9 @@ Before starting an alignment or migration:
     ```bash
     git submodule update --remote devspec_toolkit
     ```
-3.  **Virtual Env**: specific dev environment active.
+3.  **Virtual Env**: `devspec_env` active (run `source devspec_env/bin/activate` from the toolkit root).
     ```bash
-    source dev_env/bin/activate
+    source devspec_env/bin/activate
     ```
 
 ---

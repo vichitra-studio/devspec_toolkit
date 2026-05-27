@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import json
+import os
+from collections import defaultdict
+from glob import glob
+
+from ..canonical.registry import CanonicalRegistry
+from ..core.errors import SpecError, make_error
+
+
+# Declarative enum↔canon pairings: (schema_rel_path, json_path_segments, canon_kind)
+# Add a new line whenever a schema enum should track a canon kind.
+_ENUM_CANON_PAIRINGS = [
+    ("core/collections.schema.json", ["$defs", "environmentName", "enum"], "environment"),
+    ("core/collections.schema.json", ["$defs", "stageName", "enum"], "stage"),
+    ("core/atoms.schema.json", ["$defs", "nfrCategory", "enum"], "nfr_category"),
+    ("core/atoms.schema.json", ["$defs", "owner", "enum"], "owner"),
+]
+
+
+def lint_canon_schema_alignment(
+    repo_root: str,
+    canon_dir: str = "canon",
+    project_canon_dir: str | None = None,
+) -> list[SpecError]:
+    """Check alignment between canon kinds and JSON Schema enum constraints."""
+    errors: list[SpecError] = []
+    schema_dir = os.path.join(repo_root, "schema")
+
+    # Load canon kinds → {kind: set_of_preferred_labels}
+    registry = CanonicalRegistry.load(repo_root, canon_dir=canon_dir, project_canon_dir=project_canon_dir)
+    canon_kinds: dict[str, set[str]] = defaultdict(set)
+    for entry in registry.entries.values():
+        label = entry.payload.get("preferred_label", "")
+        if label:
+            canon_kinds[entry.kind].add(label)
+
+    # Phase 1: Check explicit pairings
+    registered_keys: set[tuple[str, str]] = set()
+    for schema_rel, json_path, kind in _ENUM_CANON_PAIRINGS:
+        path_str = "/".join(json_path)
+        registered_keys.add((schema_rel, path_str))
+
+        schema_path = os.path.join(schema_dir, schema_rel)
+        if not os.path.exists(schema_path):
+            errors.append(make_error("E552", f"MISSING_PAIRED_SCHEMA {schema_rel}"))
+            continue
+
+        with open(schema_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        enum_values = _resolve_json_path(data, json_path)
+        if enum_values is None:
+            errors.append(make_error("E553", f"MISSING_ENUM_PATH {schema_rel}:{path_str}"))
+            continue
+
+        enum_set = set(enum_values)
+        canon_labels = canon_kinds.get(kind, set())
+
+        missing = sorted(canon_labels - enum_set)
+        extra = sorted(enum_set - canon_labels)
+
+        if missing:
+            errors.append(make_error(
+                "E554",
+                f"CANON_ENUM_DRIFT {schema_rel}:{path_str} "
+                f"missing canon {kind} entries: {missing}",
+            ))
+        if extra:
+            errors.append(make_error(
+                "E551",
+                f"SCHEMA_ENUM_EXTRA {schema_rel}:{path_str} "
+                f"has values not in canon {kind}: {extra}",
+            ))
+
+    # Category B exclusions: enums that are intentional subsets of a canon kind
+    # or domain-specific enums whose overlap with a canon kind is coincidental.
+    _EXCLUDED_DISCOVERY_ENUMS = {
+        # step 11 mitigations.type is an artifact-type enum, not a trace_type
+        ("11_redteam.schema.json", "allOf/1/properties/threats/items/properties/mitigations/items/properties/type/enum"),
+        ("16_impl_context.schema.json", "$defs/specRef/properties/type/enum"),
+        # build_status is an intentional 3-value subset of the status canon kind
+        ("15_scaffold.schema.json", "properties/build_status/enum"),
+    }
+
+    # Phase 2: Discovery scan (advisory)
+    for schema_path in sorted(glob(os.path.join(schema_dir, "**", "*.json"), recursive=True)):
+        rel = os.path.relpath(schema_path, schema_dir)
+        with open(schema_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for path_str, values in _extract_enums(data):
+            if (rel, path_str) in registered_keys:
+                continue
+            if (rel, path_str) in _EXCLUDED_DISCOVERY_ENUMS:
+                continue
+            enum_set = set(values)
+            if len(enum_set) < 3:
+                continue
+            for kind, labels in canon_kinds.items():
+                overlap = len(enum_set & labels)
+                if overlap >= 3 and overlap / len(enum_set) >= 0.8:
+                    errors.append(make_error(
+                        "W552",
+                        f"POTENTIAL_UNREGISTERED_PAIRING {rel}:{path_str} "
+                        f"overlaps {overlap}/{len(enum_set)} with canon kind '{kind}'",
+                    ))
+    return errors
+
+
+def _resolve_json_path(data: dict, path: list[str]):
+    """Walk a JSON object by path segments, return the final value or None."""
+    current = data
+    for segment in path:
+        if isinstance(current, dict) and segment in current:
+            current = current[segment]
+        else:
+            return None
+    return current if isinstance(current, list) else None
+
+
+def _is_allof_narrowing(schema: dict) -> bool:
+    """Detect allOf: [{$ref: ...}, {enum: [...]}] — intentional narrowing, not drift."""
+    all_of = schema.get("allOf")
+    if not isinstance(all_of, list) or len(all_of) < 2:
+        return False
+    has_ref = any(isinstance(item, dict) and "$ref" in item for item in all_of)
+    has_enum = any(isinstance(item, dict) and "enum" in item for item in all_of)
+    return has_ref and has_enum
+
+
+def _extract_enums(schema: dict, path: str = "") -> list[tuple[str, list[str]]]:
+    """Recursively extract all enum arrays from a JSON Schema."""
+    results: list[tuple[str, list[str]]] = []
+    if not isinstance(schema, dict):
+        return results
+    # Skip enums inside allOf narrowing patterns (valid semantic composition)
+    if _is_allof_narrowing(schema):
+        return results
+    if "enum" in schema and isinstance(schema["enum"], list):
+        values = [v for v in schema["enum"] if isinstance(v, str)]
+        if values:
+            results.append((path + "/enum" if path else "enum", values))
+    for key, value in schema.items():
+        if key.startswith("$") and key != "$defs":
+            continue
+        child_path = f"{path}/{key}" if path else key
+        if isinstance(value, dict):
+            results.extend(_extract_enums(value, child_path))
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, dict):
+                    results.extend(_extract_enums(item, f"{child_path}/{i}"))
+    return results

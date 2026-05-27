@@ -1,3 +1,36 @@
+# CLI Reference
+
+## Submodule-Aware Flags
+
+The following flags are available on `validate`, `validate-all`, and `forward-replay-check` commands:
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--repo-root` | Path to devspec_toolkit directory (for schema resolution) | `.` |
+| `--spec-root` | Path to the spec directory (for submodule deployments where spec/ is outside toolkit) | `None` (uses `repo_root/spec`) |
+| `--git-root` | Path to the host repo git root (for submodule deployments where git root differs from toolkit root) | `None` (uses `repo_root`) |
+
+### Examples
+
+```bash
+# Standard (non-submodule) usage
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+
+# Submodule deployment
+./tools/run_specdev.sh validate-all spec \
+  --repo-root ./devspec_toolkit \
+  --spec-root ./spec \
+  --git-root .
+
+# Forward replay check with explicit roots
+./tools/run_specdev.sh forward-replay-check \
+  --repo-root ./devspec_toolkit \
+  --git-root . \
+  --spec-root ./spec
+```
+
+---
+
 # Developer Reference
 
 This reference collects recurring facts that developers need while authoring or reviewing specs. It replaces ad-hoc snippets scattered across multiple documents; other guides intentionally link here for the canonical commands and troubleshooting flow.
@@ -19,9 +52,13 @@ This reference collects recurring facts that developers need while authoring or 
 - **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from [schema/core/](../../schema/core/).
 
+## Path Conventions
+See [path_conventions.md](path_conventions.md) for canonical path variables (`$PRODUCT_ROOT`, `$TOOLKIT_ROOT`, `$SPEC_DIR`, etc.) and the dual-root convention.
+
 ## Scope Lock (`spec_dir`)
 - Enforce scope lock for every repo: set and persist `spec_dir` explicitly instead of inferring from cwd.
-- For this repository layout, the locked path is `devspec_toolkit/spec` (not top-level `spec`).
+- **Consumer repos** (projects that vendor the toolkit as a submodule): the locked `spec_dir` is `<product-repo>/spec/` — this is where your live spec artifacts live.
+- **Toolkit repo itself**: the toolkit does not maintain spec waterfall artifacts and does not run spec validation against itself. Seed templates for host bootstrap live in `seed_templates/`.
 - Automation and CI must pass the same `spec_dir` to every command to avoid path-assumption drift.
 
 ## Command Cheatsheet
@@ -41,12 +78,11 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 
 # Traceability & fixtures
-./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out tools/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 
-# Seed and docs enforcement
+# Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh docs-lint spec --repo-root ./devspec_toolkit
 
 # Invariants & Governance
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
@@ -58,18 +94,68 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
 
+# Canon/schema alignment
+./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit
+
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
+
+# DAG completeness lint (validates downstream_consumers consistency)
+./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
+
+# Extraction intent validation (prompts vs step_order.json)
+./tools/run_specdev.sh extraction-intent-check --repo-root ./devspec_toolkit
+
+# Environment diagnostic (read-only — prints active config)
+./tools/run_specdev.sh env-check --repo-root ./devspec_toolkit
 
 # Prompt workflow reminders
 ./tools/run_specdev.sh ai-help --step 04
 
 # Changelog utilities (migration system)
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --version 0.1.0 --repo-root ./devspec_toolkit
-./tools/run_specdev.sh changelog --validate 0.1.0 --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --version <version> --repo-root ./devspec_toolkit
+./tools/run_specdev.sh changelog --validate <version> --repo-root ./devspec_toolkit
 ```
+
+### DAG & Extraction Intent Commands
+
+#### `dag-lint`
+
+Validates the completeness and consistency of the dependency DAG defined in `tools/step_order.json`. This is a standalone command — it is **not** included in `validate-all`.
+
+**What it checks:**
+- Every non-terminal step has at least one `downstream_consumers` entry (E596 DAG_DEAD_END_PRODUCER). Step 16c is exempt as the terminal step.
+- Every `downstream_consumers` entry is consistent with the computed step ordering (E599 DAG_CONSUMER_INCONSISTENCY). If step X lists Y as a consumer, Y must appear after X in the `steps` list.
+- No circular dependencies in the computed upstream graph (E585 DAG_CIRCULAR_DEPENDENCY).
+- Prompt extraction intent entries reference only computed upstream steps (W596 UNDECLARED_UPSTREAM_REF).
+
+**When to run:** After modifying `tools/step_order.json` or any prompt's `### Extraction Intent` section. Also runs automatically via pre-commit hook and CI gate.
+
+#### `extraction-intent-check`
+
+Validates that each prompt's `### Extraction Intent` section is consistent with the allowed upstream steps computed at runtime from `tools/step_order.json` (all steps preceding the current step in the `steps` list).
+
+**What it checks:**
+- Every allowed upstream dependency has a corresponding extraction intent entry (E597 EXTRACTION_INTENT_UPSTREAM_GAP).
+- Extraction intent entries reference valid steps (E598 EXTRACTION_INTENT_INVALID_REF).
+- Intent text is specific (W597 EXTRACTION_INTENT_VAGUE — fewer than 10 words or contains weasel words).
+- Extraction intent sections are non-empty when present (E591 EXTRACTION_INTENT_EMPTY).
+
+**When to run:** After adding or modifying `### Extraction Intent` sections in prompts.
+
+#### `env-check`
+
+Read-only diagnostic that prints the active validation configuration. Modifies no state.
+
+**What it displays:**
+- All active `SPECDEV_*` environment variables and their values.
+- W→E promotion status: ALL (18 pairs via `SPECDEV_WARNINGS_AS_ERRORS=1`), SELECTIVE (per-code via `SPECDEV_PROMOTE_CODES`), or OFF.
+- Forward-replay base ref resolution (explicit, upstream tracking, or fallback).
+- Spec directory and step_order.json paths.
+
+**When to run:** When troubleshooting CI failures related to W→E promotion, replay base ref, or configuration issues.
 
 ### Alignment & Migration
 ```bash
@@ -92,11 +178,11 @@ specdev align prompts --spec-dir spec --output prompts/migration/ --mode upgrade
 
 
 ### Step-Specific Verification
-For deep validation of specific steps (DAGs, cycles, logic), use the dedicated scripts:
+For deep validation of specific steps (DAGs, cycles, logic), use `pytest` to run the dedicated integration tests:
 ```bash
-python devspec_toolkit/tests/integration/test_step_02.py spec/02_system_sketch.json
-python devspec_toolkit/tests/integration/test_step_12.py tests/fixtures/step_12/valid_dag.json
-python devspec_toolkit/tests/integration/test_step_15.py tests/fixtures/step_15/valid_full.json
+pytest devspec_toolkit/tests/integration/test_step_02.py --spec spec/02_system_sketch.json -v
+pytest devspec_toolkit/tests/integration/test_step_12.py --spec tests/fixtures/step_12/valid_dag.json -v
+pytest devspec_toolkit/tests/integration/test_step_15.py --spec tests/fixtures/step_15/valid_full.json -v
 ```
 
 For Step 13a, generate `spec/13a_completeness_assessment.json` via `prompts/prompt_13a_completeness_assessment.md` and validate it like any other artifact:
@@ -110,11 +196,11 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - Workflow is forward-only.
 - There is no refinement mode.
 - Any accepted upstream change requires full replay of all downstream steps before merge.
-- In strict mode, CI runs quality, hallucination, dependency-order, and replay checks as blocking gates.
+- In strict mode, host-repo CI should run quality, hallucination, dependency-order, and replay checks as blocking gates.
 
 ## Two-Phase AI Runner Mode
 - Prompts support a two-phase flow: Clarify (questions only) → Emit (disk-first JSON artifact write).
-- Agents read each prompt’s “Context To Ingest”, follow the “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing.
+- Agents follow the prompt’s “Operating Flow”, apply the “Self‑Audit Gate”, and ask targeted questions if gating items are missing. Agents read the “Context To Ingest” section for steps that include it; steps that use “Coverage Closure” apply that section instead.
 - Runners should honor the manifest interaction hints: see `docs/agents/manifest.json` (`interaction_mode: two_phase`).
 - Operational guidance for agents and runner tips: `docs/agents/agents.md`.
 
@@ -122,9 +208,8 @@ Invoke commands from the root of your host repository so relative paths to `spec
 1. Edit the JSON artifact.
 2. Run `validate`.
 3. Run `seed-lint` to ensure required seed context is referenced and current.
-4. Run `docs-lint` to enforce README coverage and documentation policy.
-5. If any traceability changed, regenerate the matrix and lint fixtures.
-6. Update governance-compliant commit messages per `spec/10_governance.json`.
+4. If any traceability changed, regenerate the matrix and lint fixtures.
+5. Update governance-compliant commit messages per `spec/10_governance.json`.
 
 ## Troubleshooting Checklist
 - **Schema not found**: run from repo root or configure `--repo-root`; confirm [tools/schema_registry.json](../../tools/schema_registry.json).
@@ -144,8 +229,24 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - **Scaffold (Step 15) failures**:
   - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
   - `duplicate api_ref`: Each API Contract can only be mapped once.
+- **Canon/schema alignment failures** (`canon-schema-alignment`):
+  - `E554 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
+  - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
+  - `E552 MISSING_PAIRED_SCHEMA`: Schema file referenced in pairing config not found.
+  - `E553 MISSING_ENUM_PATH`: JSON path referenced in pairing config not found in schema.
+  - `W552 POTENTIAL_UNREGISTERED_PAIRING`: Unregistered schema enum has high overlap (>=80%) with a canon kind; consider adding an explicit pairing.
 
+## Architecture Notes
 
+### `trace_types.py` (dynamic loading)
+`trace_types.py` now loads valid trace types from `canon/kinds/trace_type.json` via `CanonicalRegistry` at import time. If canon loading fails for any reason, it falls back to a hardcoded set of types and aliases. This keeps the canonical registry as the single source of truth while maintaining resilience.
+
+### `step_order.json` schema changes
+- The `step_metadata` field has been **removed**.
+- A `downstream_consumers` field has been **added**. It maps each step ID to a list of step IDs that directly consume its output (e.g., `"04": ["05", "06", ...]`). This replaces the extraction-intent data previously stored in `step_metadata` and is used by the `prompt-context` command.
+
+### `prompt-context` output format
+The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) instead of the previous 3-column format (`Step`, `Name`, `Extraction Intent`). Consumer lists are derived from the `downstream_consumers` field in `step_order.json`.
 
 ## Related Resources
 - [index.md](index.md) — Navigational overview of every document set.

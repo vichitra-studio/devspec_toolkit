@@ -1,0 +1,22 @@
+code: E530
+subcode: LINKED_TEST_FILE_NOT_FOUND
+title: "Linked test file not found"
+trigger: |
+  hallucination-lint extracts a path-shaped token (containing a slash or a
+  recognised extension: .py, .ts, .js, .go, .java, .rb, .sh, .json) from a
+  `linked_test_expectation` field and checks it against the filesystem
+  (git_root first, then repo_root).  The path does not exist.
+
+  bash -c "..." / sh -c '...' wrappers are unwrapped before extraction.
+  Compound commands (&&, ||, ;) are skipped — no single authoritative path.
+resolution: |
+  1. Correct the path in the artifact:
+       specdev json patch "<spec-file>" \
+         '.<jq-path>' '"<correct-test-path>"'
+  2. Or create the missing test file at the path already in the artifact.
+
+  Verify the fix:
+       specdev spec-check spec \
+         --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+see_also:
+  - E530-INVENTED_ENUM_OR_ID

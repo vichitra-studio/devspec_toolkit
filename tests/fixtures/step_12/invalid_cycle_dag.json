@@ -2,14 +2,6 @@
   "id": "cycle-ci-pipeline",
   "owner": "api",
   "created_at": "2026-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "trace": [
     {
       "type": "doc",
@@ -20,6 +12,7 @@
     {
       "job_id": "job-a",
       "name": "Job A",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-b"
       ],
@@ -34,6 +27,7 @@
     {
       "job_id": "job-b",
       "name": "Job B",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-c"
       ],
@@ -48,6 +42,7 @@
     {
       "job_id": "job-c",
       "name": "Job C",
+      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
       "requires": [
         "job-a"
       ],
@@ -59,5 +54,6 @@
         }
       ]
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

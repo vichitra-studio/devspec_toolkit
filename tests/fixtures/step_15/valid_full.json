@@ -1,16 +1,9 @@
 {
+  "$schema": "vc:15-scaffold",
   "id": "valid-full-scaffold",
   "owner": "api",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python",
     "framework": "fastapi",
     "modules": [
@@ -18,14 +11,14 @@
       "uvicorn"
     ]
   },
-  "route_map": [
+  "interface_map": [
     {
-      "api_ref": "api-get-users",
+      "interface_ref": "api-get-users",
       "path": "/users",
       "method": "GET"
     },
     {
-      "api_ref": "api-create-user",
+      "interface_ref": "api-create-user",
       "path": "/users",
       "method": "POST"
     }
@@ -37,12 +30,15 @@
   "build_status": "green",
   "trace": [
     {
-      "target": "req-001"
+      "type": "implements",
+      "id": "req-001"
     }
   ],
   "links": [
     {
-      "target": "https://example.com/docs"
+      "rel": "documentation",
+      "href": "https://example.com/docs"
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

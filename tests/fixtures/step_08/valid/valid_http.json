@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/08_fixtures.schema.json",
+  "$schema": "vc:08-fixtures",
   "id": "fixtures-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "fixtures": [
     {
       "fixture_id": "fixture-http-success",
@@ -34,7 +26,17 @@
         "headers": {
           "content-type": "application/json"
         }
+      },
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag"
       }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag"
     }
   ]
 }

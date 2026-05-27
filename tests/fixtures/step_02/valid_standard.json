@@ -2,14 +2,6 @@
   "id": "system-sketch-standard",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "components": [
     {
       "component_id": "user-service",
@@ -137,5 +129,20 @@
         }
       ]
     }
-  ]
+  ],
+  "tech_stack": {
+    "languages": [
+      { "name": "TypeScript", "version": "5.4", "rationale": "Type safety for service development" }
+    ],
+    "frameworks": [
+      { "name": "Express", "version": "^4.19", "rationale": "HTTP framework for user-service and auth-service" }
+    ],
+    "infrastructure": [
+      { "name": "PostgreSQL", "version": "16", "rationale": "Primary data store for user-db component" }
+    ],
+    "tools": [
+      { "name": "ESLint", "version": "^9.0", "rationale": "Linting for TypeScript codebase" }
+    ]
+  },
+  "canonical_refs_used": []
 }

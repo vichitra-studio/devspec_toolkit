@@ -1,0 +1,221 @@
+---
+name: specdev-context
+description: >
+  Load context for a pipeline step. Required before any spec-related work: authoring,
+  reviewing, analysing, debugging, or answering questions about spec files or pipeline steps.
+  Never read files under spec/ directly with the Read tool — use this skill's primitives.
+  Trigger on: any mention of a step number, "what does step NN need", "look at step NN",
+  "work on step NN", "/specdev-context NN", or any task involving spec files, milestones,
+  cross-step concepts, or backlog follow-up.
+---
+
+# /specdev-context — Step Context Loader
+
+Single entry point for all spec reads. Two flows: **Orientation** (load context for a step) and **Action** (apply surgical edits driven by a source of findings). Both compose existing CLI primitives. Subagents handle exploration; the main thread handles synthesis.
+
+## Path variables
+
+| Variable | Meaning |
+|---|---|
+| `$TOOLKIT_ROOT` | Toolkit submodule root (typically `./devspec_toolkit`) |
+| `$SPEC_DIR` | Host spec directory (typically `./spec`) |
+| `$GIT_ROOT` | Host repo root (typically `.`) |
+
+All paths resolve from `$GIT_ROOT`. If running from `$TOOLKIT_ROOT`, paths break — `cd` to `$GIT_ROOT` first.
+
+## Hard bans
+
+| Banned |
+|---|
+| `Read` on any file under `$SPEC_DIR/` |
+| `Read` on any file under `$TOOLKIT_ROOT/canon/kinds/` |
+| `Read` on tool-output dump files (`*.txt`, `.specdev/`, `/tmp/`) |
+| `cat` / `Bash` reads of spec or canon files |
+| `Edit` on any existing file under `$SPEC_DIR/` (use `specdev json patch/insert/delete`) |
+| `Write` on existing spec files (`Write` is allowed **only** for creating a brand-new step file that does not yet exist) |
+| Unfiltered `specdev json read <file>` — always pass a jq filter |
+| `specdev json read` with a filter that traverses into a path whose shape you have not directly inspected this session — run `json structure` or `json keys` against the parent path first. Guessing field names produces "Cannot iterate over null" errors |
+| `--spec-root` or `--git-root` on `specdev json` read/edit subcommands (`read`, `read-multi`, `keys`, `structure`, `schema`, `patch`, `insert`, `delete`) — the CLI silently strips them, but the canonical invocation omits them. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` (anchors relative file paths) |
+| Hardcoded "FRs live in step 04 / APIs in step 05" mappings — use `entry_key_registry` |
+| `specdev context extract` (removed — hard-fails) |
+
+Explicitly allowed: `Read` on `$TOOLKIT_ROOT/prompts/prompt_NN_*.md` and `$TOOLKIT_ROOT/prompts/shared_expectations.md`.
+
+## Surgical query rules
+
+- Always pass a jq filter to `specdev json read`. Unfiltered reads of whole spec files are banned.
+- **Shape-first**: before composing any new `json read` filter on a path you have not just inspected, run one of `specdev json structure <file>`, `specdev json keys <file> '<parent-path>'`, or `specdev json schema <file> <path>`. Each takes <1 second and prevents the dominant `json read` failure class. Do not trust priors about field names.
+- Run `specdev <command> --help` when unsure about flags. Do not assume.
+- **Flag scope**: `--spec-root` and `--git-root` apply to validation/governance commands (`spec-check`, `validate`, `matrix`, `governance-check`, etc.); `canon-accept` accepts `--git-root` only. Most `specdev json …` subcommands accept `--repo-root` only — the CLI silently strips the other two if passed. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file paths.
+
+**Retry trap**: when a `json read` fails, do not retry with another guessed path — the failure means your assumption about the parent shape is wrong. Drop back to a shape probe (`json structure` / `json keys` / `json schema`) and rebuild the filter from real field names.
+
+## The three static indices
+
+| Index | Path | Answers |
+|---|---|---|
+| `step_order.json` | `$TOOLKIT_ROOT/tools/step_order.json` | "Which steps are downstream of step N? Which upstream files feed step N?" |
+| `trace_matrix.json` | `$GIT_ROOT/spec/extras/trace_matrix.json` | "If I change entity E, which other entities are linked? Fixed link categories: `apis`, `fixtures`, `nfrs`, `threats`. (`trace_type.json` is a separate vocabulary registry for `trace[]` arrays inside entities — not the matrix keys.)" |
+| `entry_key_registry.json` | `$TOOLKIT_ROOT/tools/entry_key_registry.json` | "Which file/array/id_field holds entities of kind K? Registry is keyed by filename: `{<file>: {step, arrays: [{array_path, id_field, kind}]}}`. Each array entry may also carry an optional `nested: [{array_path, id_field, kind}]` array (present in `fr`, `threat`, `milestone`) for sub-array entries. To find the file for a kind, scan entries." |
+
+**Composition rule**: when walking from a kind to its owning file, from an entity to its dependents, or from a step to its downstream files — compose these three indices. Never hardcode the mappings they encode.
+
+**Cross-index walks:**
+- kind → owning file/step: `entry_key_registry.json` → walk `step_order.json` `downstream_consumers` for downstream blast radius.
+- cross-step link → both endpoint ids → `entry_key_registry.json` for each id's kind/file/step → downstream impact via `step_order.json`.
+- entry's step → `step_order.json` `step_metadata.required_spec_inputs` → upstream files it was derived from.
+
+**Update cadence:**
+- `step_order.json` — hand-curated by toolkit maintainers when a pipeline step is added or a DAG edge changes. `downstream_consumers` and `step_metadata.required_spec_inputs` must stay inverse-consistent (E543 STEP_METADATA_INCONSISTENT).
+- `trace_matrix.json` — regenerated by `specdev matrix` or any context command. W604 TRACE_MATRIX_STALE fires when the matrix is older than `14_roadmap.json`. → run `specdev matrix $SPEC_DIR --repo-root $TOOLKIT_ROOT` to regenerate, then retry.
+- `entry_key_registry.json` — regenerated by `specdev registry-generate --repo-root <toolkit>` after any schema change. The three generator-owned files (`tools/entry_key_registry.json`, `tools/extraction_paths.json`, `tests/fixtures/entry_key_registry_golden.json`) must not be hand-edited; CI enforces byte-exact equality.
+
+## Subagent delegation
+
+For tasks requiring more than 5 reads to compose an answer — cross-step concept reviews, milestone audits, backlog impact amplification — spawn a subagent. Give it the task; it runs the reads internally and returns a structured report: `findings` (list of `{file, id, observation}`), `recommendations` (list of actionable items), and any explicit deliverables the caller requested. The orchestrator's context stays focused on decisions.
+
+For single-step tasks (load context, patch one entry, verify), do the reads inline.
+
+## Orientation flow
+
+Invoked on a step, optionally with a scope hint (entry-id, milestone-id, fr-prefix, concept keyword). Skip Step 3 if no scope hint was provided.
+
+### Step 1 — Orient
+
+```bash
+specdev context structure $SPEC_DIR --step <NN> --repo-root $TOOLKIT_ROOT
+```
+
+Returns a structural skeleton: required upstream files, per-file array counts, canon kinds used.
+
+### Step 2 — Know shape (mandatory before any new `json read` filter)
+
+```bash
+specdev json structure $SPEC_DIR/<NN>_*.json
+specdev json keys      $SPEC_DIR/<NN>_*.json '<parent-jq-path>'
+specdev json schema    $SPEC_DIR/<NN>_*.json '<jq-path>' --repo-root $TOOLKIT_ROOT
+```
+
+Pick whichever probe matches the question — `structure` for the whole skeleton, `keys` for "what fields exist at this path", `schema` for typed constraints. Skipping Step 2 is the root cause of the most common `json read` failure ("Cannot iterate over null") — see the **Retry trap** note under Surgical query rules.
+
+### Step 3 — Scope resolution (only if a scope hint was provided)
+
+Compose primitives based on the hint:
+
+- **Entry id**: scan the registry for the kind, then read the matching entry:
+  ```bash
+  specdev json read $TOOLKIT_ROOT/tools/entry_key_registry.json \
+    '.registry | to_entries[] | .key as $f | .value | .arrays[] | select(.kind == "<K>") | . + {file: $f}'
+  # then:
+  specdev json read $SPEC_DIR/<file> '.<array>[] | select(.<id_field> == "<entry-id>")'
+  ```
+- **Milestone id**: `specdev json read $SPEC_DIR/14_roadmap.json '.milestones[] | select(.milestone_id == "<id>")'`; then the per-milestone plan at `$SPEC_DIR/impl_context/ms_*_plan.json`; then the trace matrix slice for the milestone's FRs.
+- **Concept keyword / FR prefix**: `specdev json read $GIT_ROOT/spec/extras/trace_matrix.json '.matrix[] | select(.fr_id | startswith("<prefix>"))'`; drill into specific entries via `json read`. Run `specdev json structure $GIT_ROOT/spec/extras/trace_matrix.json` first if you're unsure of the matrix shape.
+
+### Step 4 — Canon
+
+```bash
+specdev context canon --step <NN> --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR
+```
+
+### Step 5 — Prompt contract
+
+Read `$TOOLKIT_ROOT/prompts/shared_expectations.md` (required before any prompt execution) **and** `$TOOLKIT_ROOT/prompts/prompt_<NN>_*.md` (step's authoring contract).
+
+## Action flow
+
+Run when the task is to apply edits driven by a source of findings.
+
+### Step 1 — Acquire findings
+
+| Source | Command |
+|---|---|
+| Backlog | `specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT --json` |
+| Edit intent | Caller supplies findings |
+| Spec-check errors | `specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json` |
+
+Each finding has minimally `{id, severity, description, impact[]}`. The `impact[]` is a list of pointer-shaped `(file, id)` targets. If the source produced zero actionable findings (empty `records[]` for backlog, empty `findings[]` for spec-check, no items supplied for edit intent), stop and report "no findings" — do not proceed to Step 2.
+
+### Step 2 — Validate pointers
+
+`specdev json resolve-pointers` reads a JSON array of `{file, id}` (or `{file, jq_path}`) objects from stdin; returns hits/misses with `nearest[]` hints.
+
+```bash
+specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT --json \
+  | jq '[.records[]?.impact[]?
+         | if type == "string" and test(":") then split(":") | {file: .[0], id: .[1]}
+           elif type == "object" then {file, id}
+           else empty end]' \
+  | specdev json resolve-pointers --repo-root $TOOLKIT_ROOT --git-root $GIT_ROOT
+```
+
+The shape guard (`if type ==`) keeps the pipeline robust to either string (`"file:id"`) or object (`{file, id}`) impact entries. Surface unresolved pointers to the caller; do not silently drop.
+
+### Step 3 — Amplify impact (optional)
+
+When a finding's `impact[]` may be incomplete (typical for newly-recorded `emergent_ambiguities`), walk the three indices to compute the full blast radius before patching:
+
+1. For each entity in the impact set, query `$GIT_ROOT/spec/extras/trace_matrix.json` for all linked entities. The matrix has fixed link categories `apis`, `fixtures`, `nfrs`, `threats` — these are structural keys, not derived from `trace_type.json`.
+2. For each linked entity, look up its owning file via `$TOOLKIT_ROOT/tools/entry_key_registry.json` (kind → file/step).
+3. Union all `(file, id)` pairs into the amplified impact set.
+4. Optionally query `$TOOLKIT_ROOT/tools/step_order.json` `.downstream_consumers["<step>"]` for step-level blast radius.
+
+### Step 4 — Surgical edit
+
+```bash
+specdev json patch <file> '<jq-path>' '<value>' \
+  --against-schema-field <step>.<field> --repo-root $TOOLKIT_ROOT
+```
+
+Use `insert` for array append, `delete` for removal. Always pass `--against-schema-field` for schema-validated writes. Format: `<step>.<field>` where `<step>` is the numeric step and `<field>` is the top-level schema field name (e.g. `04.functional_requirements`). Preview with `--dry-run` for non-trivial edits. When `impact[]` contains multiple `(file, id)` pairs, apply patches one at a time; do not batch multiple patches into a single call. Run spec-check between patches.
+
+### Step 5 — Verify
+
+```bash
+specdev spec-check $SPEC_DIR --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json
+specdev forward-replay-check --repo-root $TOOLKIT_ROOT --spec-root $SPEC_DIR --git-root $GIT_ROOT --json
+```
+
+If both green: done. If errors surface, fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
+
+## Writing primitives
+
+| Situation | Command |
+|---|---|
+| New step file (does not yet exist) | `Write` tool for initial creation only; then `spec-check` to validate |
+| Replace a scalar | `specdev json patch <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
+| Append to array / merge into object | `specdev json insert <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
+| Delete a field or entry | `specdev json delete <file> '<jq-path>'` |
+| Preview before write | All three accept `--dry-run` |
+
+## Cross-tier canon drift
+
+When `spec-check` reports the same canonical id resolving differently in `$TOOLKIT_ROOT/canon/manifest.json` vs `$SPEC_DIR/canon/manifest.json`, query both, decide which is authoritative, and surface to caller for human resolution. Do not silently align one side.
+
+## Upstream drift recording
+
+When a checklist assertion would diverge from the cited spec entry, log it as `plan.ambiguities[]` (16a) or `execution.emergent_ambiguities[]` (16b+). The `impact[]` of each new entry MUST be computed via the Action flow's amplification procedure (Step 3 above).
+
+Verify routing:
+
+```bash
+specdev upstream-backlog $SPEC_DIR --repo-root $TOOLKIT_ROOT
+```
+
+Entries landing in `Unclassified` mean `impact[]` lacks a step-routable path.
+
+## Permission allow-list
+
+**Auto-invocable** (no human confirmation):
+`context structure`, `context canon`, `json read`, `json read-multi`, `json keys`, `json structure`, `json schema`, `json resolve-pointers`, `json patch`, `json insert`, `json delete`, `spec-check --json`, `forward-replay-check --json`, `upstream-backlog --json`, `matrix`, `guide`, `registry-check`, `registry-generate`. Other read-only diagnostics (`align status`, `env-check`, `prompt-context`, `ai-help`) are auto-invocable by default.
+
+**Human required**:
+`canon-accept`, `align apply`, `git commit`, `git push`.
+
+## Error handling
+
+- **Command exits non-zero**: surface stderr to the caller and stop.
+- **`json resolve-pointers` reports misses**: surface the miss set with `nearest[]` hints. Do not silently drop.
+- **`spec-check` fails after a patch**: fix the lowest-numbered failing entry first, re-validate. One fix per cycle.
+- **`forward-replay-check` reports invalidation**: feed affected entries into another Action flow iteration. Cap at 3 iterations — if invalidation persists, surface to caller for human review.
+- **Error code lookup**: `specdev guide <error-code>` for the canonical remediation playbook.

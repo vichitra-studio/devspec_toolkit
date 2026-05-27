@@ -1,26 +1,21 @@
 {
+  "$schema": "vc:15-scaffold",
   "id": "valid-minimal-scaffold",
   "owner": "api",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python"
   },
-  "route_map": [],
+  "interface_map": [],
   "validators": [
     "spec-validate"
   ],
   "build_status": "pending",
   "trace": [
     {
-      "target": "trace-target-id"
+      "type": "implements",
+      "id": "trace-target-id"
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

@@ -1,22 +1,15 @@
 {
-  "$schema": "https://specdev.local/schema/15_scaffold.schema.json",
+  "$schema": "vc:15-scaffold",
   "id": "scaffold-invalid-green",
   "owner": "api",
   "created_at": "2023-10-27T10:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python"
   },
-  "route_map": [],
+  "interface_map": [],
   "validators": [],
   "build_status": "green",
   "trace": [],
-  "links": []
+  "links": [],
+  "canonical_refs_used": []
 }

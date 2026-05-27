@@ -2,17 +2,10 @@
   "id": "invalid-missing-validator",
   "owner": "api",
   "created_at": "2025-01-01T12:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
-  "service_skeleton": {
+  "project_skeleton": {
     "language": "python"
   },
-  "route_map": [],
-  "build_status": "pending"
+  "interface_map": [],
+  "build_status": "pending",
+  "canonical_refs_used": []
 }

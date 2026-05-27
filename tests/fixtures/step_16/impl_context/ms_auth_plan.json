@@ -1,0 +1,119 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "ms-auth-plan",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "JWT issuance and refresh endpoints for the ms-auth milestone.",
+      "scope_in": [
+        "jwt-token-validation",
+        "login-endpoint"
+      ],
+      "scope_out": [
+        "oauth-flows",
+        "third-party-sso",
+        "mobile-push-auth"
+      ],
+      "target_file_patterns": [
+        "src/auth.py",
+        "tests/test_auth.py"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Auth",
+          "summary": "Implement JWT issuance and refresh."
+        }
+      ],
+      "checklist": [
+        {
+          "id": "AUTH_LOGIN_01",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-user-login",
+            "line_range": "L10-L20",
+            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+          },
+          "description": "Implement login endpoint returning a signed JWT.",
+          "type": "behavior",
+          "layer": "service",
+          "linked_test_expectation": "login endpoint issues valid JWT",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-login-success",
+          "milestone_ref": "ms-auth",
+          "implementation": {
+            "status": "verified",
+            "files_touched": [
+              "src/auth.py"
+            ],
+            "actions": [
+              {
+                "type": "file_create",
+                "target": "src/auth.py",
+                "description": "Create auth module",
+                "evidence": {
+                  "type": "log",
+                  "content": "pytest tests/test_auth.py::test_login_issues_jwt PASS — 1 test for fr-user-login",
+                  "evidence_ref": "ci://run/42"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "AUTH_LOGIN_01_VAL",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-user-login",
+            "line_range": "L10-L20",
+            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+          },
+          "description": "Validate login endpoint issues valid JWT.",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "login validation passes",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-login-success",
+          "milestone_ref": "ms-auth",
+          "implementation": {
+            "status": "verified",
+            "files_touched": [
+              "tests/test_auth.py"
+            ],
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verified fr-user-login JWT claim structure matches spec.",
+                "evidence": {
+                  "type": "log",
+                  "content": "Manual review confirmed fr-user-login claim set: iss, sub, exp, iat all PASS",
+                  "evidence_ref": "review://2024-01-02"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Auth endpoint is user-visible — README updated with login flow.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "pytest tests/test_auth.py"
+      ]
+    }
+  },
+  "canonical_refs_used": []
+}

@@ -1,4 +1,5 @@
 {
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "governance_label",
   "entries": [
@@ -17,6 +18,63 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label",
+      "preferred_label": "mandatory",
+      "definition": "Governance label for extensions or controls that must be implemented before the artifact is shippable. Blocks release if absent. Equivalent to 'Must Have' in MoSCoW.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "must-have",
+        "required",
+        "p0",
+        "critical"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-10T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:governance_label:recommended",
+      "kind": "governance_label",
+      "preferred_label": "recommended",
+      "definition": "Governance label for extensions or controls that should be implemented unless explicitly deprioritised. Equivalent to 'Should Have' in MoSCoW.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "should-have",
+        "p1"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-10T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:governance_label:optional",
+      "kind": "governance_label",
+      "preferred_label": "optional",
+      "definition": "Governance label for extensions or controls that are nice-to-have and may be deferred without blocking release. Equivalent to 'Could Have' in MoSCoW.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [
+        "nice-to-have",
+        "could-have",
+        "p2"
+      ],
+      "lifecycle": {
+        "introduced_at": "2026-04-10T00:00:00Z"
       }
     }
   ]

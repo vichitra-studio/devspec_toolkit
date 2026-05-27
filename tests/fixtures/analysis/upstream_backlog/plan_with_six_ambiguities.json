@@ -1,0 +1,54 @@
+{
+  "id": "ms-custom-pages-brand",
+  "summary": "Brand custom pages milestone",
+  "execution": {
+    "emergent_ambiguities": [
+      {
+        "id": "amb-new-wcag-pairing-ratchet",
+        "description": "task-validate-wcag-aaa pairing ratchet: AAA_01 deferred by design",
+        "severity": "low",
+        "impact": [
+          "PAGES_BRAND_WCAG_AAA_01",
+          "PAGES_BRAND_WCAG_AAA_02",
+          "spec/09_impl_plan.json:task-validate-wcag-aaa",
+          "devspec_toolkit E307 linter"
+        ]
+      },
+      {
+        "id": "amb-new-studio-email",
+        "description": "Studio email copy pending",
+        "severity": "low",
+        "status": "tracking",
+        "impact": ["PAGES_BRAND_CONTACT_PAGE_01", "plan.summary"]
+      },
+      {
+        "id": "amb-new-test-cmd-paths",
+        "description": "Test command paths need owner sign-off",
+        "severity": "low",
+        "status": "tracking",
+        "impact": ["plan.review_requirements"]
+      },
+      {
+        "id": "amb-new-responsive-375",
+        "description": "Responsive 375px layout undecided",
+        "severity": "high",
+        "status": "deferred",
+        "impact": ["PAGES_BRAND_RESPONSIVE_01"]
+      },
+      {
+        "id": "amb-new-wcag-aaa",
+        "description": "Should we ratchet WCAG AAA globally",
+        "severity": "low",
+        "status": "deferred",
+        "impact": ["PAGES_BRAND_WCAG_AAA_01"]
+      },
+      {
+        "id": "amb-new-gallery-runtime",
+        "description": "Gallery runtime widget signed off",
+        "severity": "low",
+        "status": "resolved",
+        "impact": ["PAGES_BRAND_GALLERY_PAGE_02"]
+      }
+    ]
+  }
+}

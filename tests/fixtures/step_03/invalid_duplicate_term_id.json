@@ -2,28 +2,32 @@
   "id": "glossary-duplicate-term-id",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "terms": [
     {
       "term_id": "term-billing-amount",
       "term": "amount1",
       "definition": "The monetary value of a transaction or charge, including currency denomination and any applicable taxes or fees.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount",
+        "kind": "term",
+        "label": "amount1"
+      }
     },
     {
       "term_id": "term-billing-amount",
       "term": "amount2",
-      "definition": "Another monetary value definition.",
+      "definition": "Another monetary value definition with a duplicate term identifier for testing.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount",
+        "kind": "term",
+        "label": "amount2"
+      }
     }
-  ]
+  ],
+  "canonical_proposals": [],
+  "canonical_refs_used": []
 }

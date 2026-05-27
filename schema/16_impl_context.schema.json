@@ -1,13 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/16_impl_context.schema.json",
+  "$id": "vc:16-impl-context",
   "title": "16_impl_context",
   "description": "Unified artifact for the implementation loop (Plan -> Code -> Review). Enforces Checklist-Driven Implementation with evidence binding.",
-  "type": "object",
-  "additionalProperties": false,
   "$defs": {
     "specRef": {
       "type": "object",
+      "description": "A reference to a spec artifact with precise code location binding.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -19,25 +18,31 @@
             "inv",
             "fixture",
             "doc",
-            "code"
-          ]
+            "code",
+            "task"
+          ],
+          "description": "The artifact type being referenced. Decision rule: use 'code' when pointing to a specific function, class, or code block; use 'doc' when pointing to a specification document, schema, or guide; use 'task' when the reference is a roadmap coverage item (a Step 14 task-* id) rather than a spec artifact. Example: use 'code' when the reference is 'src/auth/jwt.py' (an implementation file); use 'doc' when the reference is 'vc:04-fr-list' (a spec schema); use 'task' when the reference is 'task-install-ghost-local' from the roadmap. Anti-pattern: using 'doc' to reference a source code file, or using 'fr' to label a roadmap task-* id."
         },
         "id": {
-          "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+          "$ref": "vc:core:atoms#kebabId",
+          "description": "Kebab-case identifier of the referenced artifact."
         },
         "note": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional contextual note about this reference."
         },
         "line_range": {
           "type": "string",
-          "pattern": "^L\\d+-L\\d+$"
+          "pattern": "^L\\d+-L\\d+$",
+          "description": "Line range in the source file (e.g., 'L10-L25')."
         },
         "commit_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$",
           "not": {
             "pattern": "^0{40}$"
-          }
+          },
+          "description": "Full 40-character git commit hash pinning this reference. Must not be all zeros."
         }
       },
       "required": [
@@ -48,13 +53,7 @@
       ]
     },
     "severityLevel": {
-      "type": "string",
-      "enum": [
-        "low",
-        "medium",
-        "high",
-        "critical"
-      ]
+      "$ref": "vc:core:atoms#severityLevel"
     },
     "executionStatus": {
       "type": "string",
@@ -63,10 +62,12 @@
         "failed",
         "blocked",
         "partial"
-      ]
+      ],
+      "description": "Execution outcome. Decision rule: 'partial' = started but not all sub-tasks complete; 'blocked' = cannot proceed due to an unresolved dependency or ambiguity (document the blocker in deferred_reason). Example: use 'blocked' when an upstream API contract is not finalised; use 'partial' when 3 of 5 test suites pass but 2 are still running. Anti-pattern: using 'partial' for a run that has not started at all (use 'passed'/'failed' after completion)."
     },
     "evidenceObject": {
       "type": "object",
+      "description": "Concrete evidence proving that a requirement or check was satisfied. Good evidence example: {content: 'All 47 unit tests pass with 94% branch coverage — see CI run #1234', evidence_ref: 'ci://run/1234', path: 'tests/unit/auth/'}. Bad evidence example: {content: 'tests pass'} — too vague to trace. The 'content' field must contain verbatim output or a precise description; use 'path' and 'section' to pin the source location.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -76,21 +77,26 @@
             "snippet",
             "screenshot",
             "reference"
-          ]
+          ],
+          "description": "The form of evidence: log output, code snippet, screenshot, or external reference."
         },
         "content": {
           "type": "string",
           "minLength": 20,
-          "pattern": "\\S"
+          "pattern": "\\S",
+          "description": "The evidence content itself (minimum 20 characters, must contain non-whitespace). Example: '47 unit tests pass, branch coverage 94% per pytest-cov report' (good). Anti-pattern: 'done' or 'completed' — too vague to trace back to an observable outcome."
         },
         "evidence_ref": {
-          "type": "string"
+          "type": "string",
+          "description": "URL or CI run reference that makes the evidence independently verifiable. Include when the evidence has a stable external URL or CI run reference. Examples: 'ci://github-actions/run/12345' (CI run reference), 'https://sonarcloud.io/summary/new_code?id=myproject' (external quality dashboard). Omit when the evidence is inline command output with no external reference (e.g., a local test run captured in the 'content' field). Anti-pattern: leaving blank when a CI run URL is available — the URL is what makes the evidence auditable and reproducible."
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Relative path from repo root where the evidence was captured. Examples: 'src/auth/handlers.py', 'tests/unit/auth/'. Anti-pattern: absolute paths like '/Users/dev/project/src/auth/'."
         },
         "section": {
-          "type": "string"
+          "type": "string",
+          "description": "Section or function name within the file where evidence was found. Examples: 'authenticate_user function', 'AuthMiddleware class', 'POST /auth/login handler'. Anti-pattern: 'main' or 'utils' (too vague to locate)."
         }
       },
       "required": [
@@ -99,34 +105,25 @@
       ]
     }
   },
+  "type": "object",
   "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId",
-      "description": "The Step ID from the Roadmap (e.g., step-api-core)."
-    },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
     "extensions": {
       "type": "object",
-      "description": "Structured extensions for domain-specific data.",
+      "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.status here).",
       "additionalProperties": false,
       "properties": {
         "review_state": {
           "type": "object",
+          "description": "Records the outcome of a human or automated review pass on this implementation context. Populate after a review cycle completes — leave absent until a review has run. Sub-fields: outcome (the result of the review), verified_by (reviewer identity as a GitHub handle or CI system name), review_date (ISO 8601 timestamp of when the review occurred). Example: {outcome: 'approved', verified_by: '@alice', review_date: '2025-10-16T10:00:00Z'}. Anti-pattern: populating review_state with outcome: 'pending' before any review has occurred — leave the entire field absent until a review cycle has completed.",
           "additionalProperties": false,
           "properties": {
             "outcome": {
-              "type": "string"
+              "type": "string",
+              "description": "Review outcome. Standard values with decision rules: 'verified' = all checklist items satisfied and tests pass; 'partial' = majority done, 1–2 non-blocking gaps; 'failed' = blocking finding present; 'changes_requested' = reviewer has blocking findings (use this, not 'rejected' — findings are fixable); 'blocked' = cannot review until upstream issues resolved; 'pending' = not yet reviewed. Anti-pattern: 'done' (not a standard value)."
             },
             "verified_by": {
-              "type": "string"
+              "type": "string",
+              "description": "Identity of the person or system that verified the review. Format: GitHub handle or CI system name. Examples: '@alice', 'github-actions[bot]', 'ci-pipeline-12345'. Anti-pattern: 'me' or 'developer' (not traceable)."
             }
           },
           "required": [
@@ -135,12 +132,15 @@
         },
         "execution_context": {
           "type": "object",
+          "description": "Extension for execution-time overrides and configuration.",
           "additionalProperties": false,
           "properties": {
             "command_overrides": {
               "type": "object",
+              "description": "Map of command names to override values for execution. Example: {\"validate\": \"python -m pytest tests/unit/ --tb=short\", \"lint\": \"ruff check src/\"}. Anti-pattern: overriding commands without documenting why in a code comment or the plan's deferred_reason.",
               "additionalProperties": {
-                "type": "string"
+                "type": "string",
+                "description": "Override value for a specific command name."
               }
             }
           }
@@ -157,36 +157,58 @@
           "enum": [
             "active",
             "deferred"
-          ]
+          ],
+          "description": "Plan lifecycle status. Decision rules: 'active' = plan is being worked; 'deferred' = explicitly postponed with documented reason. Transition: active → deferred requires populating deferred_reason. Anti-pattern: using 'deferred' without populating deferred_reason."
         },
         "deferred_reason": {
-          "type": "string"
+          "type": "string",
+          "description": "Explanation for why this plan was deferred. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition)."
         },
         "summary": {
           "type": "object",
+          "description": "High-level scope summary including what is in and out of scope.",
           "additionalProperties": false,
           "properties": {
             "functional_summary": {
-              "type": "string"
+              "type": "string",
+              "description": "1–3 sentences naming the capability, primary actor, and key constraints. Example: 'Implements JWT authentication for the mobile API. Validates tokens on every protected endpoint using RS256 signing. Tokens expire after 24 hours with no refresh flow in this release.' Anti-pattern: 'This implements the auth stuff.' (no actor, no constraints)."
             },
             "scope_in": {
               "type": "array",
+              "description": "Items explicitly included in the scope of this plan.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 3,
+                "pattern": "\\S",
+                "description": "An item explicitly in scope. Examples: 'JWT token validation on all /api/v1/* routes', 'POST /auth/login endpoint with email+password'. Anti-pattern: 'authentication' (no endpoint or operation specified)."
               }
             },
             "scope_out": {
               "type": "array",
+              "description": "Items explicitly excluded from the scope of this plan.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "minLength": 3,
+                "pattern": "\\S",
+                "description": "An item explicitly out of scope. Examples: 'OAuth2 social login (deferred to Phase 2)', 'Password reset flow (separate FR)'. Anti-pattern: 'everything else'."
               }
             },
             "target_file_patterns": {
               "type": "array",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "Glob pattern relative to repo root. Examples: 'src/auth/**/*.py', 'tests/unit/auth/test_*.py'. Anti-pattern: '*.py' (matches entire repo)."
               },
-              "description": "Explicit list of files/directories to modify or create."
+              "description": "Per-milestone file globs that bound execution.files_touched. Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) does not carry this field — scope at the anchor level is expressed via scope_in/scope_out, file-level enforcement is per-milestone."
+            },
+            "milestone_supporting_files": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Files touched across multiple checklist items (READMEs, shared test fixtures, build config, cross-cutting e2e specs). Listed files are exempt from W603 FILES_OUTSIDE_TASK_SCOPE. Declared by 16a planner; consumed by W603 validator.",
+              "default": []
             }
           },
           "required": [
@@ -206,20 +228,36 @@
               "enum": [
                 "required",
                 "not_required"
-              ]
+              ],
+              "description": "Whether documentation updates are required for this change. Decision rules: 'required' = any non-test, non-doc source file is modified in this implementation — docs will need updating (default assumption when user-facing behavior changes); 'not_required' = ONLY test files or schema files are modified with no user-facing behavior change, OR the change is an internal refactor with no external interface change. When 'required', the docs_touched array must list all affected doc files. Anti-pattern: defaulting to 'not_required' to avoid doc work — if any source file changes user-visible behavior, set 'required'."
             },
             "rationale": {
               "type": "string",
-              "minLength": 10
+              "minLength": 10,
+              "description": "Explanation of why documentation is or is not required for this change (minimum 10 characters). Should name the specific change that drives the decision. Examples: 'Adding POST /auth/token endpoint — new API docs page required', 'Internal refactor of session cache key format — no external interface change', 'Updating rate limit from 100 to 200 req/min — API reference must reflect new limit'. Avoid: 'docs required', 'no docs needed' — these restate the status without explaining the reasoning."
             },
             "docs_touched": {
               "type": "array",
+              "description": "List of documentation files that need to be updated.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "Relative path from repo root to a doc file. Examples: 'docs/api/authentication.md', 'README.md'. Anti-pattern: doc file names without directory path (e.g., 'authentication.md')."
               }
             },
             "status_ref": {
-              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+              "description": "Canonical reference for the docs impact status. Recommended canonical ID: cn:core:status:docs-required or cn:core:status:docs-not-required (define status kind in project canon if not yet created). Should match the 'status' field value.",
+              "allOf": [
+                {
+                  "$ref": "vc:core:collections#canonicalRef"
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "const": "status"
+                    }
+                  }
+                }
+              ]
             }
           },
           "required": [
@@ -232,11 +270,11 @@
                 "properties": {
                   "status": {
                     "const": "required"
-                  },
-                  "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                   }
-                }
+                },
+                "required": [
+                  "status"
+                ]
               },
               "then": {
                 "required": [
@@ -253,48 +291,58 @@
         },
         "spec_alignment": {
           "type": "object",
+          "description": "Alignment of the plan with upstream spec requirements and checklist items.",
           "additionalProperties": false,
           "properties": {
             "requirements_summary": {
               "type": "array",
-              "description": "Thematic grouping of requirements.",
+              "description": "2–4 themed requirement groups, each with a business-domain name and 2–6 requirements. Themes are business-domain names (e.g., 'Authentication & Authorization', 'Payment Handling'), not technical layers. Anti-pattern: one giant unthemed list, or themes named 'Theme 1', 'General', 'Misc'.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "theme": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Business-domain label grouping related requirements — NOT a technical layer. Group by what the system does for users, not how it is built. Examples: 'Authentication & Authorization', 'Order Processing', 'Payment Handling'. A good theme has 2–6 requirements; split if >8. Anti-pattern: 'Utils', 'Helpers', 'Services' (technical layers); 'Theme 1', 'General', 'Misc' (generic/empty labels). Keep under 50 characters."
                   },
                   "summary": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "1–2 sentences naming the key actors, interactions, and constraints that define this theme's scope. Include what the system does and for whom. Examples: 'User authentication flows using JWT tokens with 24-hour TTL; covers login, token refresh, and revocation endpoints.' 'Order lifecycle management from cart submission to fulfilment confirmation; includes payment capture and inventory reservation.' Anti-pattern: 'This theme covers authentication.' (too brief, no actors or constraints); copy-pasting requirement statements directly into the summary."
                   },
                   "spec_refs": {
                     "type": "array",
+                    "description": "Spec references that belong to this thematic group.",
                     "items": {
-                      "$ref": "#/$defs/specRef"
+                      "$ref": "#/$defs/specRef",
+                      "description": "A specRef object pointing to the spec artifact this requirement derives from. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].statement'}. Anti-pattern: pointing to a code file instead of a spec document."
                     }
                   }
                 },
                 "required": [
                   "theme",
                   "summary"
-                ]
+                ],
+                "description": "A thematic grouping of related spec requirements with optional references."
               }
             },
             "checklist": {
               "type": "array",
+              "description": "Checklist items that must be satisfied for spec compliance.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#screamingSnakeId"
+                    "$ref": "vc:core:atoms#screamingSnakeId",
+                    "description": "Unique SCREAMING_SNAKE_CASE identifier for this checklist item. Name it after the requirement it verifies. Examples: 'AUTH_JWT_VALIDATION', 'PAYMENT_IDEMPOTENCY_KEY', 'RATE_LIMIT_ENFORCEMENT'. Anti-pattern: 'ITEM_1', 'CHECK_001' (sequential numbers are not traceable to a spec requirement)."
                   },
                   "spec_ref": {
-                    "$ref": "#/$defs/specRef"
+                    "$ref": "#/$defs/specRef",
+                    "description": "Reference to the spec artifact this checklist item verifies. Use type='doc' for schema/spec references. Example: {type: 'doc', id: 'vc:06-invariants', field: 'rules[0].expression'} for an item verifying an invariant expression. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].acceptance_criteria[0].text'} for an acceptance criterion. Anti-pattern: pointing to a code file (type='code') — checklist spec_refs should point to the spec document, not the implementation."
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Complete the sentence 'This checklist item is satisfied when [observable, verifiable condition].' Examples: 'This item is satisfied when POST /auth/login returns 401 with error code INVALID_CREDENTIALS for an unknown email address.' 'This item is satisfied when the JWT_VALIDATION_TIMEOUT_MS constant is defined in src/config/timeouts.py and its value is ≤ 50.' Anti-pattern: 'Check that authentication works' (no observable condition, no specific endpoint or value)."
                   },
                   "type": {
                     "type": "string",
@@ -307,7 +355,8 @@
                       "logging",
                       "docs",
                       "security"
-                    ]
+                    ],
+                    "description": "Classification of this checklist item by the type of requirement it represents. Decision rules: 'behavior' — a functional action the system performs (login flow, submit order, redirect after auth); 'constraint' — a limit or boundary condition (rate limit, max file size, character limit); 'validation' — an input/output correctness check (schema valid, format check, referential integrity); 'security' — an auth, authz, encryption, or injection-prevention surface; 'performance' — a latency, throughput, or resource usage requirement; 'logging' — an audit trail, observability, or monitoring event; 'docs' — documentation that must be produced or updated; 'metadata' — canonical reference or traceability field correctness. Anti-pattern: using 'behavior' as the default when 'security' or 'constraint' applies — the type drives per-type rollup reporting."
                   },
                   "layer": {
                     "type": "string",
@@ -321,7 +370,8 @@
                       "docs",
                       "config",
                       "security"
-                    ]
+                    ],
+                    "description": "Architecture layer this checklist item targets. Decision rules: 'api' = HTTP routes and request handling; 'service' = business/domain logic and rules; 'db' = database schema, migrations, storage operations; 'security' = auth/authz/crypto/input validation middleware; 'tests' = test files and fixtures; 'config' = environment config and feature flags; 'docs' = documentation files; 'model' = domain objects and type definitions; 'integration' = external system calls and adapters. Example: use 'api' for the route handler; use 'service' for the token validation logic called by that handler. Anti-pattern: using 'api' for business logic that happens to be triggered via an API call."
                   },
                   "checklist_status": {
                     "type": "string",
@@ -329,29 +379,41 @@
                       "active",
                       "deferred"
                     ],
-                    "default": "active"
+                    "default": "active",
+                    "description": "Lifecycle of this checklist item. Decision rules: 'active' = required for the current plan; 'deferred' = explicitly postponed (requires a deferred_reason on the parent plan). Impact: any 'deferred' item blocks the overall 'done' status unless documented. Anti-pattern: 'deferred' as a synonym for 'not started yet' — use 'active' with implementation.status 'pending' for items not yet begun."
                   },
                   "linked_test_expectation": {
+                    "description": "Test expectation(s) that validate this checklist item. Format: test function name or test description string. Examples: 'test_login_invalid_credentials_returns_401', 'POST /auth/login with unknown email → 401 INVALID_CREDENTIALS'. Can be a single string or array of strings. Anti-pattern: 'see tests' (not traceable to a specific test).",
                     "oneOf": [
                       {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "description": "A single test expectation string — test function name or description."
                       },
                       {
                         "type": "array",
                         "minItems": 1,
                         "items": {
                           "type": "string",
-                          "minLength": 1
-                        }
+                          "minLength": 1,
+                          "description": "A test expectation string — test function name or description (non-empty)."
+                        },
+                        "description": "An array of test expectation strings."
                       }
                     ]
                   },
                   "nfr_refs": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                    "$ref": "vc:core:collections#kebabIdArray",
+                    "description": "Kebab-case IDs of the NFRs from 07_nfrs.json that this checklist item verifies. Example: ['nfr-auth-p95-latency', 'nfr-auth-availability']. Anti-pattern: using the nfr display name as a string instead of the kebab-case nfr_id format."
                   },
                   "fixture_ref": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    "$ref": "vc:core:atoms#kebabId",
+                    "description": "Fixture ID from 08_fixtures.json that validates this checklist item. Example: 'fix-auth-login-invalid-credentials'. Anti-pattern: referencing a test file path instead of a fixture ID."
+                  },
+                  "milestone_ref": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "description": "Milestone ID from step 14 (spec/14_roadmap.json) that this checklist item belongs to. Format: kebab-case matching a milestones[*].milestone_id value from the roadmap. Example: 'milestone-q1-core-auth'. When an impl_context covers a single milestone, all checklist items share the same milestone_ref. When it spans multiple milestones, set milestone_ref on each item to enable per-milestone progress tracking."
                   },
                   "implementation": {
                     "type": "object",
@@ -365,16 +427,20 @@
                           "in_progress",
                           "verified",
                           "deferred"
-                        ]
+                        ],
+                        "description": "Current implementation status. Transition rules: pending → in_progress (when first file is touched) → verified (all checklist items have evidence) → deferred (if paused mid-implementation with documented reason). Anti-pattern: jumping to 'verified' without populating action evidence."
                       },
                       "files_touched": {
                         "type": "array",
+                        "description": "Files modified or created to implement this checklist item.",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "A file path modified or created for this checklist item."
                         }
                       },
                       "actions": {
                         "type": "array",
+                        "description": "Ordered list of implementation actions to satisfy this checklist item. Include steps for reading existing code, writing code, running tests, and updating docs. Order: read → write → run → validate → document. Example first action: {type: 'file_create', description: 'Create JWT validator module', target: 'src/auth/jwt_validator.py'}. Anti-pattern: a single action 'implement everything' (not atomic, not traceable).",
                         "minItems": 1,
                         "items": {
                           "type": "object",
@@ -387,22 +453,39 @@
                                 "file_edit",
                                 "run_command",
                                 "manual_verification"
-                              ]
+                              ],
+                              "description": "The kind of action. Decision rules: 'file_create' = create a new source file; 'file_edit' = modify an existing source file; 'run_command' = execute a test, lint, or validation command; 'manual_verification' = step requiring human review. Recommended order: file_edit/file_create first, then run_command to verify, then manual_verification if needed."
                             },
                             "description": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "Description of what this action does."
                             },
                             "target": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "Relative path from repo root for file_create/file_edit actions; command string for run_command/manual_verification actions. Examples: 'src/auth/jwt_validator.py' (file_edit), 'pytest tests/unit/auth/ -v' (run_command). Anti-pattern: absolute paths like '/Users/dev/project/src/auth/jwt_validator.py'."
                             },
                             "command": {
-                              "type": "string"
+                              "type": "string",
+                              "description": "Shell command to execute for run_command actions. Must be executable as-is. Examples: 'pytest tests/unit/auth/ --tb=short', 'ruff check src/auth/', 'python -m mypy src/auth/'. Anti-pattern: 'run tests' (not executable as-is)."
                             },
                             "evidence": {
-                              "$ref": "#/$defs/evidenceObject"
+                              "$ref": "#/$defs/evidenceObject",
+                              "description": "Evidence proving this action was completed successfully."
                             },
                             "command_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                              "description": "Canonical reference for the command in the registry.",
+                              "allOf": [
+                                {
+                                  "$ref": "vc:core:collections#canonicalRef"
+                                },
+                                {
+                                  "properties": {
+                                    "kind": {
+                                      "const": "command"
+                                    }
+                                  }
+                                }
+                              ]
                             }
                           },
                           "required": [
@@ -419,7 +502,10 @@
                                       "file_edit"
                                     ]
                                   }
-                                }
+                                },
+                                "required": [
+                                  "type"
+                                ]
                               },
                               "then": {
                                 "required": [
@@ -438,7 +524,10 @@
                                   "type": {
                                     "const": "run_command"
                                   }
-                                }
+                                },
+                                "required": [
+                                  "type"
+                                ]
                               },
                               "then": {
                                 "required": [
@@ -447,18 +536,28 @@
                                 "properties": {
                                   "command": {
                                     "minLength": 1
-                                  },
-                                  "command_ref": {
-                                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                                   }
                                 }
                               }
                             }
-                          ]
+                          ],
+                          "description": "An atomic implementation action (file create/edit, command, or manual verification)."
                         }
                       },
                       "status_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                        "description": "Canonical reference for this checklist item's implementation status. Recommended canonical ID: cn:core:status:impl-verified or cn:core:status:impl-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/in_progress/verified/deferred).",
+                        "allOf": [
+                          {
+                            "$ref": "vc:core:collections#canonicalRef"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "status"
+                              }
+                            }
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -471,11 +570,11 @@
                           "properties": {
                             "status": {
                               "const": "verified"
-                            },
-                            "status_ref": {
-                              "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                             }
-                          }
+                          },
+                          "required": [
+                            "status"
+                          ]
                         },
                         "then": {
                           "properties": {
@@ -506,7 +605,10 @@
                           "checklist_status": {
                             "const": "deferred"
                           }
-                        }
+                        },
+                        "required": [
+                          "checklist_status"
+                        ]
                       }
                     },
                     "then": {
@@ -514,8 +616,29 @@
                         "implementation"
                       ]
                     }
+                  },
+                  {
+                    "if": {
+                      "not": {
+                        "properties": {
+                          "checklist_status": {
+                            "const": "deferred"
+                          }
+                        },
+                        "required": [
+                          "checklist_status"
+                        ]
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "nfr_refs",
+                        "fixture_ref"
+                      ]
+                    }
                   }
-                ]
+                ],
+                "description": "A single checklist item binding a spec requirement to its implementation, tests, and evidence."
               }
             }
           },
@@ -525,15 +648,18 @@
         },
         "ambiguities": {
           "type": "array",
+          "description": "Spec ambiguities discovered during planning that need resolution or tracking.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Unique kebab-case identifier for this ambiguity."
               },
               "description": {
-                "type": "string"
+                "type": "string",
+                "description": "Description of the ambiguity and its potential impact."
               },
               "source": {
                 "type": "string",
@@ -543,52 +669,69 @@
                   "plan",
                   "mixed",
                   "review"
-                ]
+                ],
+                "description": "Where the ambiguity originated. Decision rules: 'spec' = the spec document itself contains conflicting requirements; 'code' = the spec is clear but implementation exposed an edge case (e.g., a race condition not covered); 'mixed' = spec is unclear AND implementation exposed it further; 'plan' = the planning step introduced a gap; 'review' = discovered during code review. Example: use 'code' when you discover a race condition not covered by the spec."
               },
               "severity": {
                 "type": "string",
                 "enum": [
                   "blocking",
                   "non_blocking"
-                ]
+                ],
+                "description": "Whether this planning-phase ambiguity blocks progress or can be worked around. Decision rules: 'blocking' = implementation cannot proceed without resolution (e.g., conflicting invariants, missing auth requirements); 'non_blocking' = implementation can proceed with a documented assumption (e.g., UI copy, logging format). Anti-pattern: marking everything 'blocking' — only use for genuine blockers that halt implementation. Uses a binary scale — distinct from emergent_ambiguities[].severity which uses low/medium/high/critical."
               },
               "impact": {
                 "type": "array",
+                "description": "List of areas or artifacts affected by this ambiguity.",
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "An area or artifact affected by this ambiguity."
                 }
               },
               "proposed_assumption": {
-                "type": "string"
+                "type": "string",
+                "description": "Proposed assumption to resolve the ambiguity if no authoritative answer is available."
               },
               "mitigation": {
                 "type": "string",
-                "minLength": 10
+                "minLength": 10,
+                "description": "Mitigation strategy for non-blocking ambiguities (minimum 10 characters)."
               },
               "status": {
-                "type": "string",
-                "enum": [
-                  "resolved",
-                  "tracking",
-                  "deferred",
-                  "blocked"
-                ]
+                "$ref": "vc:core:atoms#ambiguityStatus",
+                "description": "Current resolution status of this ambiguity. Uses the shared ambiguityStatus atom (resolved/tracking/deferred/blocked) — matches emergent_ambiguities and the anchor's ambiguities."
               },
               "decision": {
-                "type": "string"
+                "type": "string",
+                "description": "The decision made to resolve this ambiguity, if resolved."
               },
               "resolved": {
+                "description": "Resolution indicator -- a string explanation or boolean flag.",
                 "oneOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "description": "String explanation of how the ambiguity was resolved."
                   },
                   {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Boolean flag indicating whether the ambiguity has been resolved."
                   }
                 ]
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "description": "Canonical reference for this planning ambiguity's resolution status. Recommended canonical ID: cn:core:status:ambiguity-resolved or cn:core:status:ambiguity-tracking (define status kind in project canon if not yet created). Should match the 'status' field value (resolved/tracking/deferred/blocked).",
+                "allOf": [
+                  {
+                    "$ref": "vc:core:collections#canonicalRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "status"
+                      }
+                    }
+                  }
+                ]
               }
             },
             "required": [
@@ -603,7 +746,10 @@
                     "severity": {
                       "const": "non_blocking"
                     }
-                  }
+                  },
+                  "required": [
+                    "severity"
+                  ]
                 },
                 "then": {
                   "required": [
@@ -611,26 +757,33 @@
                   ]
                 }
               }
-            ]
+            ],
+            "description": "A spec ambiguity discovered during planning with severity, impact, and resolution tracking."
           }
         },
         "solution": {
           "type": "object",
+          "description": "High-level solution architecture and risk assessment.",
           "additionalProperties": false,
           "properties": {
             "architecture_sketch": {
-              "type": "string"
+              "type": "string",
+              "description": "3–6 sentences describing key components and their interactions. Name the components (not 'it'), the protocol (HTTP/gRPC/event), and the data store. Example: 'The auth service receives JWT validation requests via HTTP from the API gateway. It checks the token signature against the public key fetched from the key rotation service. Valid tokens are cached in Redis for 5 minutes. Invalid or expired tokens return 401.' Anti-pattern: 'See system sketch' (not self-contained)."
             },
             "sequence_of_concerns": {
               "type": "array",
+              "description": "Ordered concerns to address during implementation. Work through concerns in this order so downstream steps build on stable foundations: (1) API contract / data model, (2) core business logic, (3) data persistence, (4) error states, (5) security surfaces, (6) observability hooks. Examples: 'Define auth service API contract and JWT claims structure', 'Design session store schema in Redis', 'Map auth error states to HTTP status codes'. Anti-pattern: listing concerns in random order; vague entries like 'error handling' without naming which errors or where.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A concern to address during implementation, in priority order."
               }
             },
             "risks": {
               "type": "array",
+              "description": "Risks identified in the proposed solution, each naming the risk and its mitigation.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A risk and its mitigation. Example: 'JWT secret rotation may invalidate active sessions — mitigate by supporting key overlap window of 24h.' Anti-pattern: 'Performance issues' (no mitigation or specificity)."
               }
             }
           },
@@ -640,78 +793,94 @@
         },
         "context": {
           "type": "object",
+          "description": "Existing codebase context and coding examples relevant to this implementation.",
           "additionalProperties": false,
           "properties": {
             "existing_structures": {
               "type": "array",
-              "description": "Known code or non-code structures. Strings may reference non-code artifacts; objects must cite real code signatures.",
+              "description": "Code artifacts relevant to this implementation. Each entry identifies a specific function or class, not just a file. Object form example: {signature: 'def validate_jwt(token: str) -> Claims:', source_file: 'src/auth/jwt.py', line_range: 'L45-L62'}. String form for non-code artifacts. Anti-pattern: listing file names without identifying the specific function or class.",
               "items": {
                 "oneOf": [
                   {
-                    "type": "string"
+                    "type": "string",
+                    "description": "A free-text reference to a non-code or code structure."
                   },
                   {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "signature": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Function or class signature in the existing codebase."
                       },
                       "source_file": {
                         "type": "string",
-                        "pattern": "^[^/].*\\.(py|ts|js|go|rs)$"
+                        "pattern": "^[^/].*\\.(py|ts|js|go|rs)$",
+                        "description": "Relative path to the source file containing this structure."
                       },
                       "line_range": {
                         "type": "string",
-                        "pattern": "^L\\d+-L\\d+$"
+                        "pattern": "^L\\d+-L\\d+$",
+                        "description": "Line range where the structure is defined (e.g., 'L10-L25')."
                       }
                     },
                     "required": [
                       "signature",
                       "source_file"
-                    ]
+                    ],
+                    "description": "A typed code signature referencing a specific function or class in the codebase."
                   }
-                ]
+                ],
+                "description": "An existing codebase structure -- either a free-text reference or a typed code signature with file location."
               }
             },
             "coding_examples": {
               "type": "array",
+              "description": "1–3 short examples showing the key patterns for this implementation. Each should be standalone and runnable. Anti-pattern: examples longer than 20 lines (use references to existing_structures instead).",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "title": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Imperative verb phrase naming the pattern demonstrated. Examples: 'Validate JWT with RS256', 'Return 401 on expired token', 'Cache validated token in Redis'. Anti-pattern: 'Example 1' or 'Auth example' (no pattern named)."
                   },
                   "description": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Explanation of the pattern or technique demonstrated."
                   },
                   "code": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Working code in the target language, 5–20 lines. Include a comment on the key line. Anti-pattern: pseudocode or incomplete stubs that cannot be run as-is."
                   }
                 },
                 "required": [
                   "title",
                   "code"
-                ]
+                ],
+                "description": "A coding example with title, optional description, and code content."
               }
             }
           }
         },
         "review_requirements": {
           "type": "object",
+          "description": "Requirements for reviewing the implementation, including test commands and measurement methods.",
           "additionalProperties": false,
           "properties": {
             "guidelines": {
-              "type": "string"
+              "type": "string",
+              "description": "3–7 specific rules or constraints for this implementation. Examples: 'Use RS256 — never HS256 for production tokens', 'Always validate token expiry before checking claims', 'Log authentication failures at WARN level with redacted token'. Anti-pattern: 'Follow best practices' (unactionable — name the specific practice)."
             },
             "test_commands": {
               "type": "array",
+              "description": "Commands to run to verify the implementation.",
               "items": {
                 "oneOf": [
                   {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "description": "A simple shell command string."
                   },
                   {
                     "type": "object",
@@ -719,68 +888,85 @@
                     "properties": {
                       "command": {
                         "type": "string",
-                        "minLength": 1
+                        "minLength": 1,
+                        "description": "Shell command to execute for verification."
                       },
                       "expected_exit_code": {
                         "type": "integer",
-                        "default": 0
+                        "default": 0,
+                        "description": "Expected exit code from the command (default: 0 for success)."
                       },
                       "timeout_seconds": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 3600
+                        "maximum": 3600,
+                        "description": "Maximum time in seconds before the command is killed."
                       },
                       "description": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Human-readable description of what this test command verifies."
                       },
                       "command_ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                        "description": "Canonical reference for the command in the registry.",
+                        "allOf": [
+                          {
+                            "$ref": "vc:core:collections#canonicalRef"
+                          },
+                          {
+                            "properties": {
+                              "kind": {
+                                "const": "command"
+                              }
+                            }
+                          }
+                        ]
                       }
                     },
                     "required": [
                       "command"
-                    ]
+                    ],
+                    "description": "A structured test command with expected exit code, timeout, and optional description."
                   }
-                ]
+                ],
+                "description": "A test command. Use string form for a single shell command; use object form when structured metadata (timeout, env vars, expected exit code) is needed. Example string: 'pytest tests/unit/auth/ --tb=short -q'. Example object: {command: 'pytest tests/integration/auth/', timeout_seconds: 120, expected_exit_code: 0}. Anti-pattern: 'run tests' (string form must be executable as-is)."
               }
             },
             "nfr_measurement_methods": {
               "type": "object",
+              "description": "Map of nfr_id → measurement approach. Example: {\"nfr-auth-p95-latency\": {\"description\": \"measure p95 latency from DataDog APM — auth.validate_token metric\", \"command\": \"datadog metric query...\"}, \"nfr-auth-availability\": {\"description\": \"error budget from PagerDuty SLO dashboard\"}}. Anti-pattern: vague 'monitor in prod' entries with no measurement command or dashboard reference.",
               "additionalProperties": false,
-              "properties": {
-                "nfr-availability-uptime": {
+              "patternProperties": {
+                "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
                   "type": "object",
+                  "description": "Measurement method for a specific NFR.",
                   "additionalProperties": false,
                   "properties": {
                     "command": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Command to run to measure this NFR."
                     },
                     "expected": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Expected output or threshold for the NFR measurement."
                     },
                     "description": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Description of how this NFR is measured."
                     },
                     "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-                    }
-                  }
-                },
-                "nfr-privacy-cookie-free": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "command": {
-                      "type": "string"
-                    },
-                    "expected": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "command_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                      "description": "Canonical reference for the measurement command.",
+                      "allOf": [
+                        {
+                          "$ref": "vc:core:collections#canonicalRef"
+                        },
+                        {
+                          "properties": {
+                            "kind": {
+                              "const": "command"
+                            }
+                          }
+                        }
+                      ]
                     }
                   }
                 }
@@ -788,16 +974,12 @@
             },
             "timeout_constants": {
               "type": "object",
+              "description": "Map of SCREAMING_SNAKE_CASE constant name → milliseconds value. Names should describe the operation being guarded. Example: {\"JWT_VALIDATION_TIMEOUT_MS\": 50, \"AUTH_SERVICE_CONNECT_TIMEOUT_MS\": 500, \"REDIS_CACHE_TTL_MS\": 300000}. Anti-pattern: 'DEFAULT_TIMEOUT' (does not identify the operation being guarded).",
               "additionalProperties": false,
-              "properties": {
-                "EMAIL_DELIVERY_TIMEOUT": {
-                  "type": "integer"
-                },
-                "DNS_VERIFICATION_TIMEOUT": {
-                  "type": "integer"
-                },
-                "ANALYTICS_BEACON_TIMEOUT": {
-                  "type": "integer"
+              "patternProperties": {
+                "^[A-Z][A-Z0-9_]*$": {
+                  "type": "integer",
+                  "description": "Timeout value in milliseconds."
                 }
               }
             }
@@ -807,247 +989,377 @@
           ]
         },
         "docs": {
+          "description": "Documentation plan: either not applicable with a reason, or planned with required updates.",
           "oneOf": [
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "not_applicable"
+                  "const": "not_applicable",
+                  "description": "Indicates documentation updates are not applicable."
                 },
                 "reason": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Reason why documentation updates are not applicable."
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the docs not_applicable status. Recommended canonical ID: cn:core:status:docs-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status",
                 "reason"
-              ]
+              ],
+              "description": "Documentation status when updates are not applicable."
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "planned"
+                  "const": "planned",
+                  "description": "Indicates documentation updates are planned."
                 },
                 "required_updates": {
                   "type": "array",
+                  "description": "List of documentation files that need updating.",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "path": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "File path of the documentation to update."
                       },
                       "update_summary": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Summary of the changes needed in this document."
                       }
                     },
                     "required": [
                       "path",
                       "update_summary"
-                    ]
+                    ],
+                    "description": "A documentation file that needs updating, with path and change summary."
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the docs planned status. Recommended canonical ID: cn:core:status:docs-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status",
                 "required_updates"
-              ]
+              ],
+              "description": "Documentation status when updates are planned, with required update details."
             }
           ]
         },
         "security": {
+          "description": "Security plan: either not applicable with a reason, or planned with fixtures and spec mutations.",
           "oneOf": [
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "not_applicable"
+                  "const": "not_applicable",
+                  "description": "Whether a security review is required for this change. Decision rule: use 'planned' when the implementation touches authentication/authorization logic, input validation for user-supplied data, cryptographic operations, secrets handling, or any public-facing endpoint. Use 'not_applicable' only for test-only changes, documentation-only updates, or purely internal refactors that do not alter security surfaces. When in doubt, use 'planned' — it is safer to include a security review than to skip one. Anti-pattern: always writing 'not_applicable' for every implementation task (defeats the security review gate)."
                 },
                 "reason": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Reason why security changes are not applicable."
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the security not_applicable status. Recommended canonical ID: cn:core:status:security-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status",
                 "reason"
-              ]
+              ],
+              "description": "Security status when changes are not applicable."
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "planned"
+                  "const": "planned",
+                  "description": "Whether a security review is required for this change. Decision rule: use 'planned' when the implementation touches authentication/authorization logic, input validation for user-supplied data, cryptographic operations, secrets handling, or any public-facing endpoint. Use 'not_applicable' only for test-only changes, documentation-only updates, or purely internal refactors that do not alter security surfaces. When in doubt, use 'planned' — it is safer to include a security review than to skip one. Anti-pattern: always writing 'not_applicable' for every implementation task (defeats the security review gate)."
                 },
                 "new_fixtures": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                  "$ref": "vc:core:collections#kebabIdArray",
+                  "description": "IDs of new security fixtures to create."
                 },
                 "spec_mutations": {
                   "type": "array",
+                  "description": "Planned mutations to security-related spec artifacts.",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "ref": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
+                        "$ref": "vc:core:collections#traceRef",
+                        "description": "Trace reference to the spec artifact being mutated."
                       },
                       "change": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Description of the change to make."
                       },
                       "reason": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Reason for the security-related spec mutation."
                       }
                     },
                     "required": [
                       "ref",
                       "change",
                       "reason"
-                    ]
+                    ],
+                    "description": "A planned security-related mutation to a spec artifact."
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the security planned status. Recommended canonical ID: cn:core:status:security-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status"
-              ]
+              ],
+              "description": "Security status when changes are planned, with fixtures and spec mutations."
             }
           ]
         },
         "delivery": {
+          "description": "Delivery observability plan: either not applicable, or planned with dashboards and alerts.",
           "oneOf": [
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "not_applicable"
+                  "const": "not_applicable",
+                  "description": "Whether delivery observability work is required for this change. Decision rule: use 'planned' when the change introduces a new external API, adds a new service, changes an existing service's SLA, or adds a new background job that needs monitoring. Use 'not_applicable' for changes that have no new production observable surface (internal refactors, test additions, config-only changes)."
                 },
                 "reason": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Reason why delivery observability is not applicable."
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the delivery not_applicable status. Recommended canonical ID: cn:core:status:delivery-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status",
                 "reason"
-              ]
+              ],
+              "description": "Delivery observability status when not applicable."
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "planned"
+                  "const": "planned",
+                  "description": "Whether delivery observability work is required for this change. Decision rule: use 'planned' when the change introduces a new external API, adds a new service, changes an existing service's SLA, or adds a new background job that needs monitoring. Use 'not_applicable' for changes that have no new production observable surface (internal refactors, test additions, config-only changes)."
                 },
                 "dashboards": {
                   "type": "array",
+                  "description": "Monitoring dashboards to create or update.",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "dashboard_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                        "$ref": "vc:core:atoms#kebabId",
+                        "description": "Unique kebab-case identifier for this dashboard."
                       },
                       "nfr_refs": {
-                        "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+                        "$ref": "vc:core:collections#kebabIdArray",
+                        "description": "NFR IDs this dashboard monitors."
                       },
                       "url": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "URL of the dashboard."
                       }
                     },
                     "required": [
                       "dashboard_id"
-                    ]
+                    ],
+                    "description": "A monitoring dashboard definition with NFR references and optional URL."
                   }
                 },
                 "alerts": {
                   "type": "array",
+                  "description": "Alert rules to create for observability.",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "alert_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                        "$ref": "vc:core:atoms#kebabId",
+                        "description": "Unique kebab-case identifier for this alert."
                       },
                       "nfr_ref": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                        "$ref": "vc:core:atoms#kebabId",
+                        "description": "NFR ID this alert monitors."
                       },
                       "rule": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Alert rule expression or condition."
                       },
                       "severity": {
-                        "$ref": "#/$defs/severityLevel"
+                        "$ref": "#/$defs/severityLevel",
+                        "description": "Severity level of the alert."
                       }
                     },
                     "required": [
                       "alert_id",
                       "rule"
-                    ]
+                    ],
+                    "description": "An alert rule definition with severity and NFR binding."
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the delivery planned status. Recommended canonical ID: cn:core:status:delivery-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status"
-              ]
+              ],
+              "description": "Delivery observability status when planned, with dashboards and alerts."
             }
           ]
         },
         "drift": {
+          "description": "Specification drift monitoring plan for this implementation. Decision rule — use 'planned' variant when: the change introduces a new API contract, modifies a configuration schema, adds a spec invariant that could drift between environments, or changes a public interface. Use 'not_applicable' variant when: the change is test-only, documentation-only, internal refactoring with no interface change, or a private implementation detail with no spec-level contract. Anti-pattern: always writing 'not_applicable' to avoid drift monitoring — drift in production API contracts causes silent spec/code divergence.",
           "oneOf": [
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "not_applicable"
+                  "const": "not_applicable",
+                  "description": "Indicates drift detection is not applicable."
                 },
                 "reason": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Reason why drift detection is not applicable."
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the drift not_applicable status. Recommended canonical ID: cn:core:status:drift-not-applicable (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status",
                 "reason"
-              ]
+              ],
+              "description": "Drift detection status when not applicable."
             },
             {
               "type": "object",
               "additionalProperties": false,
               "properties": {
                 "status": {
-                  "const": "planned"
+                  "const": "planned",
+                  "description": "Indicates drift detection checks are planned."
                 },
                 "checks": {
                   "type": "array",
+                  "description": "Scheduled drift detection checks.",
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
                       "check_id": {
-                        "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                        "$ref": "vc:core:atoms#kebabId",
+                        "description": "Unique kebab-case identifier for this drift check."
                       },
                       "target": {
                         "type": "string",
@@ -1058,7 +1370,8 @@
                           "invariant",
                           "fixture",
                           "config"
-                        ]
+                        ],
+                        "description": "The type of artifact being checked for drift."
                       },
                       "method": {
                         "type": "string",
@@ -1067,7 +1380,8 @@
                           "log-diff",
                           "schema-diff",
                           "trace-replay"
-                        ]
+                        ],
+                        "description": "Detection method: runtime sampling, log comparison, schema diff, or trace replay."
                       },
                       "schedule": {
                         "type": "string",
@@ -1075,48 +1389,69 @@
                         "description": "Named interval (hourly/daily/weekly/monthly) or cron expression"
                       },
                       "severity": {
-                        "$ref": "#/$defs/severityLevel"
+                        "$ref": "#/$defs/severityLevel",
+                        "description": "Severity level when drift is detected."
                       },
                       "remediation_policy": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Policy for remediating detected drift."
                       }
                     },
                     "required": [
                       "check_id",
                       "target",
                       "method"
-                    ]
+                    ],
+                    "description": "A scheduled drift detection check targeting a specific artifact type."
                   }
                 },
                 "status_ref": {
-                  "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                  "description": "Canonical reference for the drift planned status. Recommended canonical ID: cn:core:status:drift-planned (define status kind in project canon if not yet created).",
+                  "allOf": [
+                    {
+                      "$ref": "vc:core:collections#canonicalRef"
+                    },
+                    {
+                      "properties": {
+                        "kind": {
+                          "const": "status"
+                        }
+                      }
+                    }
+                  ]
                 }
               },
               "required": [
                 "status"
-              ]
+              ],
+              "description": "Drift detection status when planned, with scheduled checks."
             }
           ]
         },
         "coverage_status": {
           "type": "object",
+          "description": "Summary counts of checklist item states.",
           "additionalProperties": false,
           "properties": {
             "total": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Total number of checklist items."
             },
             "verified": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Number of checklist items that have been verified."
             },
             "deferred": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Number of checklist items that have been deferred."
             },
             "pending": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Number of checklist items still pending."
             }
           },
           "required": [
@@ -1128,22 +1463,28 @@
         },
         "scope_validation": {
           "type": "object",
+          "description": "Validation that implementation stayed within declared scope.",
           "additionalProperties": false,
           "properties": {
             "in_scope": {
               "type": "array",
+              "description": "Items confirmed as within scope during implementation.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "An item confirmed as within scope during implementation."
               }
             },
             "out_of_scope": {
               "type": "array",
+              "description": "Items confirmed as out of scope during implementation.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "An item confirmed as out of scope during implementation."
               }
             },
             "acknowledged": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Whether scope boundaries have been explicitly acknowledged."
             }
           },
           "allOf": [
@@ -1153,7 +1494,10 @@
                   "out_of_scope": {
                     "minItems": 1
                   }
-                }
+                },
+                "required": [
+                  "out_of_scope"
+                ]
               },
               "then": {
                 "required": [
@@ -1161,7 +1505,8 @@
                 ],
                 "properties": {
                   "acknowledged": {
-                    "const": true
+                    "const": true,
+                    "description": "Must be true when out_of_scope items exist, confirming scope boundaries were acknowledged."
                   }
                 }
               }
@@ -1169,7 +1514,19 @@
           ]
         },
         "status_ref": {
-          "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+          "description": "Canonical reference for the top-level plan status. Recommended canonical ID: cn:core:status:plan-active or cn:core:status:plan-deferred (define status kind in project canon if not yet created). Should match the plan's 'status' field (active/deferred).",
+          "allOf": [
+            {
+              "$ref": "vc:core:collections#canonicalRef"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "status"
+                }
+              }
+            }
+          ]
         }
       },
       "required": [
@@ -1184,9 +1541,6 @@
             "properties": {
               "status": {
                 "const": "deferred"
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
               }
             }
           },
@@ -1268,57 +1622,83 @@
       "properties": {
         "files_touched": {
           "type": "array",
+          "description": "All files modified or created during execution.",
           "items": {
-            "type": "string"
+            "type": "string",
+            "description": "A file path modified or created during execution."
           }
         },
         "execution_results": {
           "type": "array",
+          "description": "Results from running test and verification commands.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "status": {
-                "$ref": "#/$defs/executionStatus"
+                "$ref": "#/$defs/executionStatus",
+                "description": "Outcome status of this execution result."
               },
               "outcome_description": {
-                "type": "string"
+                "type": "string",
+                "description": "Human-readable description of the execution outcome."
               },
               "reasoning": {
-                "type": "string"
+                "type": "string",
+                "description": "Explanation of why this outcome occurred."
               },
               "command": {
-                "type": "string"
+                "type": "string",
+                "description": "The command that was executed."
               },
               "evidence": {
                 "type": "string",
-                "minLength": 20
+                "minLength": 20,
+                "description": "Concrete evidence supporting this execution result. Should contain raw command output, test runner output, or observable system behavior — not assertions. Include file paths, test counts (e.g., '5 passed'), commit hashes, or exit codes. Avoid vague claims like 'it worked'; capture actual output. Minimum 20 characters."
               },
               "evidence_ref": {
-                "type": "string"
+                "type": "string",
+                "description": "External reference or URI pointing to the evidence source."
               },
               "evidence_binding": {
                 "type": "object",
+                "description": "Cryptographic binding proving evidence authenticity.",
                 "additionalProperties": false,
                 "properties": {
                   "timestamp": {
                     "type": "string",
-                    "format": "date-time"
+                    "format": "date-time",
+                    "description": "ISO 8601 timestamp of when the evidence was captured."
                   },
                   "sha256": {
                     "type": "string",
-                    "pattern": "^[a-f0-9]{64}$"
+                    "pattern": "^[a-f0-9]{64}$",
+                    "description": "SHA-256 hash of the evidence content."
                   },
                   "exit_code": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 255
+                    "maximum": 255,
+                    "description": "Exit code returned by the command."
                   },
                   "command": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "The command that produced this evidence."
                   },
                   "command_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "description": "Canonical reference for the command in the registry.",
+                    "allOf": [
+                      {
+                        "$ref": "vc:core:collections#canonicalRef"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "command"
+                          }
+                        }
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -1328,10 +1708,34 @@
                 ]
               },
               "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "description": "Canonical reference for this execution result's outcome status. Recommended canonical ID: cn:core:status:exec-passed or cn:core:status:exec-failed (define status kind in project canon if not yet created). Should match the 'status' field value (passed/failed/blocked/partial).",
+                "allOf": [
+                  {
+                    "$ref": "vc:core:collections#canonicalRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "status"
+                      }
+                    }
+                  }
+                ]
               },
               "command_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                "description": "Canonical reference for the command in the registry.",
+                "allOf": [
+                  {
+                    "$ref": "vc:core:collections#canonicalRef"
+                  },
+                  {
+                    "properties": {
+                      "kind": {
+                        "const": "command"
+                      }
+                    }
+                  }
+                ]
               }
             },
             "required": [
@@ -1347,11 +1751,11 @@
                   "properties": {
                     "status": {
                       "const": "passed"
-                    },
-                    "status_ref": {
-                      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
                     }
-                  }
+                  },
+                  "required": [
+                    "status"
+                  ]
                 },
                 "then": {
                   "required": [
@@ -1360,93 +1764,80 @@
                   ],
                   "properties": {
                     "evidence": {
-                      "pattern": "(PASSED|passed|OK|SUCCESS|\u2713|0 (errors|failures?|failed)|\\d+ passed)"
+                      "pattern": "(PASSED|passed|OK|SUCCESS|✓|0 (errors|failures?|failed)|\\d+ passed)"
                     }
                   }
                 }
               }
-            ]
+            ],
+            "description": "Result from running a single test or verification command during execution."
           }
         },
         "critical_evidence": {
           "type": "object",
+          "description": "Summary of critical evidence linking checklist items to test outcomes.",
           "additionalProperties": false,
           "properties": {
             "satisfied_checklist_ids": {
               "type": "array",
+              "description": "Checklist item IDs that have been satisfied with evidence.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A checklist item ID that has been satisfied with evidence."
               }
             },
             "passed_test_commands": {
               "type": "array",
+              "description": "Test commands that passed during execution.",
               "items": {
-                "type": "string"
+                "type": "string",
+                "description": "A test command that passed during execution."
               }
             }
           }
         },
         "config_validation": {
           "type": "object",
+          "description": "Validation status of configuration artifacts (dashboards, alerts, drift schedules).",
           "additionalProperties": false,
           "properties": {
             "dashboard_links_valid": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Whether all dashboard links are valid and reachable."
             },
             "alert_rules_valid": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Whether all alert rules are syntactically valid."
             },
             "drift_schedules_valid": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Whether all drift detection schedules are valid cron expressions."
             },
             "notes": {
-              "type": "string"
+              "type": "string",
+              "description": "Additional notes about configuration validation results."
             }
           }
         },
         "emergent_ambiguities": {
           "type": "array",
+          "description": "Ambiguities discovered during execution that were not anticipated in planning. Reuses the shared `crossCycleAmbiguityItem` shape (same as the anchor's ambiguities) — distinct from planning-phase ambiguities which carry richer 16a-only fields (source/proposed_assumption/mitigation/decision/resolved) and a blocking/non_blocking binary severity.",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-              },
-              "description": {
-                "type": "string"
-              },
-              "severity": {
-                "type": "string"
-              },
-              "impact": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "status": {
-                "type": "string"
-              },
-              "status_ref": {
-                "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-              }
-            },
-            "required": [
-              "id",
-              "description",
-              "severity"
-            ]
+            "$ref": "vc:core:collections#crossCycleAmbiguityItem",
+            "description": "An ambiguity discovered during execution that was not anticipated in planning."
           }
         },
         "final_status": {
           "type": "object",
+          "description": "Final execution status summarizing test results and CI outcome.",
           "additionalProperties": false,
           "properties": {
             "test_results": {
               "type": "array",
+              "description": "Summary of test results from execution.",
               "items": {
-                "type": "object"
+                "type": "object",
+                "description": "A test result summary object. Structure is intentionally flexible to accommodate different test runners. Should include at minimum a test name/ID and pass/fail status."
               }
             },
             "ci_status": {
@@ -1454,7 +1845,8 @@
               "enum": [
                 "green",
                 "red"
-              ]
+              ],
+              "description": "Overall CI status: green (all passing) or red (failures present)."
             }
           }
         }
@@ -1462,16 +1854,19 @@
     },
     "review": {
       "type": "object",
+      "description": "Review phase: findings, ratings, verdict, and fixture/deployment status.",
       "additionalProperties": false,
       "properties": {
         "findings": {
           "type": "array",
+          "description": "Issues found during review with severity and remediation plans.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "id": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Unique kebab-case identifier for this finding."
               },
               "type": {
                 "type": "string",
@@ -1483,7 +1878,8 @@
                   "design",
                   "tests",
                   "docs"
-                ]
+                ],
+                "description": "Category of the finding: bug, gap, scope creep, style, design, tests, or docs."
               },
               "severity": {
                 "type": "string",
@@ -1492,40 +1888,52 @@
                   "major",
                   "minor",
                   "nit"
-                ]
+                ],
+                "description": "Severity of the finding from blocking (must fix) to nit (optional). Uses a review-specific four-tier scale (blocking/major/minor/nit) — distinct from severityLevel (low/medium/high/critical) and ambiguity severity (blocking/non_blocking) used elsewhere in this schema."
               },
               "spec_ref": {
-                "$ref": "#/$defs/specRef"
+                "$ref": "#/$defs/specRef",
+                "description": "Reference to the spec artifact related to this finding."
               },
               "description": {
-                "type": "string"
+                "type": "string",
+                "description": "A finding description must include: (1) what was observed (file:line reference where applicable), (2) why it matters (the impact), (3) which spec requirement it violates (checklist item ID or FR/NFR reference). Minimum 40 characters. Examples: 'Missing null check on AuthService.verify_token() at src/auth/service.py:42 — causes NullPointerException when a session token expires mid-request. Violates VERIFY_TOKEN checklist item.'; 'No retry logic on payment gateway calls in checkout_service.py — violates nfr-payment-availability (99.9% uptime) when Stripe returns 503.' Anti-pattern: 'Code quality issue found' (no location, no impact, no spec reference); 'See comments in PR' (not self-contained)."
               },
               "related_checklist_ids": {
                 "type": "array",
+                "description": "Checklist item IDs related to this finding.",
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "A checklist item ID related to this finding."
                 }
               },
               "remediation_task": {
                 "type": "object",
+                "description": "Task definition for remediating this finding (required for blocking/major).",
                 "additionalProperties": false,
                 "properties": {
                   "task_id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    "$ref": "vc:core:atoms#kebabId",
+                    "description": "Unique kebab-case identifier for the remediation task."
                   },
                   "summary": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Summary of the remediation work required."
                   },
                   "files_to_touch": {
                     "type": "array",
+                    "description": "Files that need to be modified for remediation.",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "A file path that needs modification for remediation."
                     }
                   },
                   "checklist_ids": {
                     "type": "array",
+                    "description": "Checklist item IDs that the remediation must satisfy.",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "A checklist item ID that the remediation must satisfy."
                     }
                   }
                 },
@@ -1538,13 +1946,16 @@
               },
               "metadata": {
                 "type": "object",
+                "description": "Additional metadata about the finding's source and impact.",
                 "additionalProperties": false,
                 "properties": {
                   "source": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Where the finding was discovered (e.g., code review, test run)."
                   },
                   "impact": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Description of the impact if this finding is not addressed."
                   }
                 },
                 "required": [
@@ -1571,7 +1982,10 @@
                         "major"
                       ]
                     }
-                  }
+                  },
+                  "required": [
+                    "severity"
+                  ]
                 },
                 "then": {
                   "required": [
@@ -1579,37 +1993,44 @@
                   ]
                 }
               }
-            ]
+            ],
+            "description": "A review finding with type, severity, spec reference, and optional remediation task."
           }
         },
         "ratings": {
           "type": "object",
+          "description": "Quality ratings across five dimensions (0-5 scale).",
           "additionalProperties": false,
           "properties": {
             "spec_completeness": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5
+              "maximum": 5,
+              "description": "Rating of how completely the spec requirements were implemented (integer 0–5). Rubric: 0 = no spec requirements addressed; 1 = fewer than 25% of FRs implemented or all implementations are stubs; 2 = 25–50% of FRs implemented with some evidence; 3 = 50–75% of FRs implemented with test coverage; 4 = more than 75% of FRs implemented with minor documented gaps; 5 = all FRs fully implemented with evidence binding to fixtures and acceptance criteria. Anti-pattern: assigning 5 when any FR lacks test coverage."
             },
             "code_quality": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5
+              "maximum": 5,
+              "description": "Rating of overall code quality in the implementation (integer 0–5). Rubric: 0 = code does not compile or run; 1 = compiles but has critical design flaws (no error handling, hardcoded secrets, no tests); 2 = functional but significant quality issues (duplicated logic, no type safety, missing input validation); 3 = acceptable quality with minor issues (some duplication, partial type safety); 4 = good quality (clean separation of concerns, typed, validated, tested); 5 = excellent quality (SOLID principles, comprehensive types, full input validation, no duplication). Anti-pattern: assigning 5 without running a linter."
             },
             "tests_completeness": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5
+              "maximum": 5,
+              "description": "Rating of test coverage completeness (integer 0–5). Rubric: 0 = no tests; 1 = fewer than 25% of acceptance criteria have test coverage; 2 = 25–50% of acceptance criteria covered; 3 = 50–75% coverage including at least one negative/error path test; 4 = more than 75% coverage with error paths and boundary conditions; 5 = all acceptance criteria covered including edge cases, error paths, and at least one contract or e2e test. Anti-pattern: using line coverage percentage as the sole basis — criterion coverage is the relevant measure."
             },
             "docs_completeness": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5
+              "maximum": 5,
+              "description": "Rating of documentation completeness for this implementation (integer 0–5). Rubric: 0 = no documentation; 1 = only inline comments on obvious code; 2 = README exists but incomplete (missing setup or usage); 3 = README covers setup and basic usage; 4 = README plus API reference or architecture decision records for non-obvious choices; 5 = full documentation including setup, usage, API reference, operational runbook, and all ADRs. Score based on docs_impact.docs_touched — if docs_impact.status is 'not_required', a score of 3 or higher is acceptable."
             },
             "metadata_usage": {
               "type": "integer",
               "minimum": 0,
-              "maximum": 5
+              "maximum": 5,
+              "description": "Rating of how well canonical references and traceability metadata are used (integer 0–5). Rubric: 0 = no canonical_refs_used, no trace links; 1 = canonical_refs_used present but empty when refs exist, trace links missing; 2 = some canonical refs populated but inconsistent (missing kinds or labels); 3 = all *_ref fields populated with valid cn: IDs, canonical_refs_used aggregated; 4 = all refs populated, canonical_refs_used correctly deduplicated, canonical_proposals added for new terms; 5 = all refs populated, proposals complete, no fabricated cn: IDs, all trace links resolve. Anti-pattern: assigning 5 without running canonical-integrity lint."
             }
           },
           "required": [
@@ -1624,31 +2045,39 @@
           "type": "string",
           "enum": [
             "verified",
-            "deferred",
-            "rejected"
-          ]
+            "needs_work",
+            "blocked",
+            "deferred"
+          ],
+          "description": "Final review verdict: verified (approved for merge), needs_work (revisions required), blocked (external blocker), or deferred (postponed)."
         },
         "next_actions": {
-          "type": "string"
+          "type": "string",
+          "description": "Specify the concrete action, the responsible party (if known), and the prerequisite condition. Next actions must be executable without further clarification. Examples: 'Fix 3 BLOCKING findings (auth null check, missing retry logic, uncovered error states) before resubmitting for APPROVED verdict.'; 'Deploy to staging via CI pipeline after this APPROVED verdict — coordinate with @platform-team on deployment slot.'; 'Schedule security review with @security-team — required before prod deployment per governance rule gr-security-review.' Anti-pattern: 'Continue with implementation' (not a specific action); 'Review the findings' (circular — this is the current step)."
         },
         "fixture_status": {
           "type": "object",
+          "description": "Status of fixture test results and CI for implemented interfaces.",
           "additionalProperties": false,
           "properties": {
-            "implemented_endpoints": {
+            "implemented_interfaces": {
               "type": "array",
+              "description": "Trace IDs of interfaces that have been implemented.",
               "items": {
-                "$ref": "https://specdev.local/schema/core/collections/1#traceId"
+                "$ref": "vc:core:collections#traceId",
+                "description": "Trace ID of an implemented interface."
               }
             },
             "test_results": {
               "type": "array",
+              "description": "Per-fixture test outcomes.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "fixture_ref": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    "$ref": "vc:core:atoms#kebabId",
+                    "description": "Fixture ID being tested."
                   },
                   "status": {
                     "type": "string",
@@ -1656,19 +2085,34 @@
                       "pass",
                       "fail",
                       "skip"
-                    ]
+                    ],
+                    "description": "Test result: pass, fail, or skip."
                   },
                   "notes": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Additional notes about this test result."
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "description": "Canonical reference for this fixture's test result status. Recommended canonical ID: cn:core:status:test-pass, cn:core:status:test-fail, or cn:core:status:test-skip (define status kind in project canon if not yet created). Should match the 'status' field value (pass/fail/skip).",
+                    "allOf": [
+                      {
+                        "$ref": "vc:core:collections#canonicalRef"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "status"
+                          }
+                        }
+                      }
+                    ]
                   }
                 },
                 "required": [
                   "fixture_ref",
                   "status"
-                ]
+                ],
+                "description": "Per-fixture test result with pass/fail/skip status."
               }
             },
             "ci_status": {
@@ -1676,11 +2120,12 @@
               "enum": [
                 "green",
                 "red"
-              ]
+              ],
+              "description": "CI status for fixture tests: green (all passing) or red (failures)."
             }
           },
           "required": [
-            "implemented_endpoints",
+            "implemented_interfaces",
             "test_results",
             "ci_status"
           ]
@@ -1690,34 +2135,41 @@
           "enum": [
             "green",
             "red"
-          ]
+          ],
+          "description": "Security review status: green (no issues) or red (issues present)."
         },
         "delivery_status": {
           "type": "object",
+          "description": "Deployment status across environments.",
           "additionalProperties": false,
           "properties": {
             "deployments": {
               "type": "array",
+              "description": "List of deployments with their environment and status.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "env": {
+                    "description": "Target deployment environment.",
                     "allOf": [
                       {
-                        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/environmentName"
+                        "$ref": "vc:core:collections#environmentName",
+                        "description": "Inherits the environment name constraint from core collections."
                       },
                       {
                         "enum": [
                           "dev",
                           "staging",
                           "prod"
-                        ]
+                        ],
+                        "description": "Restricts deployment environments to dev, staging, or prod (excludes ci)."
                       }
                     ]
                   },
                   "build_id": {
-                    "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+                    "$ref": "vc:core:atoms#kebabId",
+                    "description": "Unique kebab-case identifier for this build/deployment."
                   },
                   "status": {
                     "type": "string",
@@ -1725,19 +2177,97 @@
                       "pending",
                       "success",
                       "failed"
-                    ]
+                    ],
+                    "description": "Deployment status: pending, success, or failed."
                   },
                   "status_ref": {
-                    "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+                    "description": "Canonical reference for this deployment's status. Recommended canonical ID: cn:core:status:deploy-success, cn:core:status:deploy-failed, or cn:core:status:deploy-pending (define status kind in project canon if not yet created). Should match the 'status' field value (pending/success/failed).",
+                    "allOf": [
+                      {
+                        "$ref": "vc:core:collections#canonicalRef"
+                      },
+                      {
+                        "properties": {
+                          "kind": {
+                            "const": "status"
+                          }
+                        }
+                      }
+                    ]
                   }
                 },
                 "required": [
                   "env",
                   "build_id"
-                ]
+                ],
+                "description": "A deployment record with environment, build ID, and status."
               }
             }
           }
+        },
+        "semantic_review": {
+          "type": "object",
+          "description": "Semantic review checking FR coverage, hallucinated features, and scope delta. A quality semantic review: (1) traces every FR from the spec to at least one checklist item and evidence summary; (2) explicitly lists any features implemented without spec backing under hallucinated_features; (3) provides a scope_delta narrative if unplanned work occurred. Avoid marking FRs 'satisfied' without linking concrete evidence. The review should be machine-verifiable: reference checklist IDs, not vague assertions.",
+          "properties": {
+            "fr_coverage": {
+              "type": "array",
+              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. Should cover every FR referenced in the plan's spec_alignment. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence binding.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fr_id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "description": "Functional requirement ID being assessed."
+                  },
+                  "satisfied": {
+                    "type": "boolean",
+                    "description": "Whether this FR has been satisfied by the implementation."
+                  },
+                  "evidence_summary": {
+                    "type": "string",
+                    "minLength": 20,
+                    "description": "Concrete evidence summary showing how this FR was satisfied. Should reference file paths, test output, commit hashes, or observable system behavior. Avoid assertions without supporting data (e.g., prefer 'IMPL_CHECK_001 verified at tests/test_auth.py:L45 — 3 passing tests' over 'implemented correctly'). Minimum 20 characters."
+                  },
+                  "checklist_ids": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "vc:core:atoms#screamingSnakeId"
+                    },
+                    "uniqueItems": true,
+                    "description": "IDs of checklist items verified for this FR. Each must be a SCREAMING_SNAKE_CASE identifier matching a checklist item defined in plan.spec_alignment.checklist."
+                  }
+                },
+                "required": [
+                  "fr_id",
+                  "satisfied",
+                  "evidence_summary",
+                  "checklist_ids"
+                ],
+                "additionalProperties": false,
+                "description": "Per-FR coverage assessment with satisfaction status and evidence summary."
+              },
+              "minItems": 1
+            },
+            "hallucinated_features": {
+              "type": "array",
+              "description": "Features implemented that were not specified in the spec (scope creep detection).",
+              "items": {
+                "type": "string",
+                "minLength": 10,
+                "description": "Description of a feature implemented without spec backing (minimum 10 characters)."
+              }
+            },
+            "scope_delta": {
+              "type": "string",
+              "description": "Free-text summary of any scope creep or unplanned features detected"
+            }
+          },
+          "required": [
+            "fr_coverage",
+            "hallucinated_features"
+          ],
+          "additionalProperties": false
         }
       },
       "allOf": [
@@ -1760,7 +2290,8 @@
               "fixture_status": {
                 "properties": {
                   "ci_status": {
-                    "const": "green"
+                    "const": "green",
+                    "description": "CI status must be green when verdict is verified."
                   }
                 },
                 "required": [
@@ -1769,45 +2300,65 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "required": [
+              "verdict"
+            ],
+            "properties": {
+              "verdict": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "semantic_review"
+            ]
+          }
         }
       ]
     },
     "policy_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+      "description": "Canonical reference to the governance policy applicable to this implementation context. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Validated by canonical-integrity lint.",
+      "allOf": [
+        {
+          "$ref": "vc:core:collections#canonicalRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "policy"
+            }
+          }
+        }
+      ]
     },
     "risk_category_ref": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
-      },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "description": "Canonical reference to the primary risk category for this implementation. Kind must be 'risk_category'. Example: {\"id\": \"cn:core:risk_category:delivery-risk\", \"kind\": \"risk_category\", \"label\": \"delivery risk\"} or {\"id\": \"cn:core:risk_category:security\", \"kind\": \"risk_category\", \"label\": \"security\"}. Validated by canonical-integrity lint.",
+      "allOf": [
+        {
+          "$ref": "vc:core:collections#canonicalRef"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "risk_category"
+            }
+          }
+        }
+      ]
     }
   },
   "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "plan",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+    "plan"
+  ],
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
+    }
+  ],
+  "unevaluatedProperties": false
 }

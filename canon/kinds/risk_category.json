@@ -1,56 +1,96 @@
 {
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "risk_category",
   "entries": [
     {
-      "id": "cn:core:risk_category:authn",
+      "id": "cn:core:risk_category:security",
       "kind": "risk_category",
-      "preferred_label": "authn",
-      "definition": "Risk related to user authentication mechanisms.",
+      "preferred_label": "security",
+      "definition": "Risks concerning authentication, authorization, confidentiality, and integrity of the system.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [
-        "authentication"
-      ],
+      "aliases": [],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:business-logic",
+      "kind": "risk_category",
+      "preferred_label": "business-logic",
+      "definition": "Risks from incorrect or abusable business rules (e.g., invalid state transitions, value bounds).",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-integrity",
+      "kind": "risk_category",
+      "preferred_label": "data-integrity",
+      "definition": "Risks to the correctness, consistency, and durability of stored or transmitted data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:data-privacy",
+      "kind": "risk_category",
+      "preferred_label": "data-privacy",
+      "definition": "Risks concerning exposure or mishandling of personal or sensitive data.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:risk_category:delivery-risk",
+      "kind": "risk_category",
+      "preferred_label": "delivery-risk",
+      "definition": "Risks to on-time, on-scope delivery of the implementation.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
       }
     },
     {
       "id": "cn:core:risk_category:authz",
       "kind": "risk_category",
       "preferred_label": "authz",
-      "definition": "Risk related to authorization and access control.",
+      "definition": "Risks concerning access-control and authorization decisions.",
       "version": "1.0.0",
       "status": "active",
       "owners": [
         "spec-platform"
       ],
-      "aliases": [
-        "authorization"
-      ],
+      "aliases": [],
       "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:risk_category:data-privacy",
-      "kind": "risk_category",
-      "preferred_label": "data_privacy",
-      "definition": "Risk related to misuse or exposure of sensitive data.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "privacy"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
+        "introduced_at": "2026-05-24T00:00:00Z"
       }
     }
   ]

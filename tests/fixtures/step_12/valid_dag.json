@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/12_ci_gates.schema.json",
+  "$schema": "vc:12-ci-gates",
   "id": "valid-ci-pipeline",
   "owner": "api",
   "created_at": "2026-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "trace": [
     {
       "type": "doc",
@@ -27,7 +19,11 @@
           "name": "Install Dependencies",
           "command": "npm install"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "lint",
@@ -41,7 +37,11 @@
           "name": "Run Linter",
           "command": "npm run lint"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "test",
@@ -55,7 +55,11 @@
           "name": "Execute Test Suite",
           "command": "npm test"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
     },
     {
       "job_id": "deploy",
@@ -70,11 +74,16 @@
           "name": "Deploy",
           "command": "bash ./scripts/deploy.sh"
         }
-      ]
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:staging",
+        "kind": "environment"
+      }
     }
   ],
   "coverage_thresholds": {
     "lines": 80,
     "branches": 70
-  }
+  },
+  "canonical_refs_used": []
 }

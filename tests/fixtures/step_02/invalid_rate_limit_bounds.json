@@ -2,14 +2,6 @@
   "id": "system-sketch-invalid-rate-limit-bounds",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "components": [
     {
       "component_id": "user-service",
@@ -62,5 +54,12 @@
         }
       ]
     }
-  ]
+  ],
+  "tech_stack": {
+    "languages": [{ "name": "Python", "version": "3.12" }],
+    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
+    "infrastructure": [{ "name": "SQLite", "version": "3" }],
+    "tools": [{ "name": "pytest", "version": "8.0" }]
+  },
+  "canonical_refs_used": []
 }

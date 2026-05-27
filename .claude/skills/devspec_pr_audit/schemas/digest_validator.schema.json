@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:validator",
+  "title": "digest_validator",
+  "description": "Digest projection of a Python validator/generation module. Captures exported functions, error/warning codes emitted, and schema path references for coverage and drift analysis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a validator digest.",
+      "type": "string",
+      "const": "digest_validator"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root (e.g. tools/specdev_tools/validation/hallucination_lint.py).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^tools/.*\\.py$"
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Validator-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_path", "error_codes", "warning_codes", "checks_exported"],
+      "properties": {
+        "module_path": {
+          "description": "Python module dotted path derived from the file path (e.g. tools.specdev_tools.validation.hallucination_lint).",
+          "type": "string",
+          "minLength": 1
+        },
+        "error_codes": {
+          "description": "E-codes (e.g. E530, E110) emitted via make_error() calls in this module. Extracted from AST literals.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^E[0-9]{3}$"
+          },
+          "uniqueItems": true
+        },
+        "warning_codes": {
+          "description": "W-codes (e.g. W570) emitted via make_error() calls in this module.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^W[0-9]{3}$"
+          },
+          "uniqueItems": true
+        },
+        "checks_exported": {
+          "description": "Public function names (not prefixed with _) defined at module top-level. These are the callable check entry points.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "guide_refs": {
+          "description": "Guide code strings found as string literals in this module (e.g. E110-UNKNOWN_CANONICAL_ID). Indicates which error codes have associated guide documentation.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "schema_paths_referenced": {
+          "description": "Schema file path strings referenced inside this module (e.g. relative .schema.json path strings found in literals).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "imports": {
+          "description": "Top-level import module names (first component only, e.g. json, os, re). Useful for dependency drift detection.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

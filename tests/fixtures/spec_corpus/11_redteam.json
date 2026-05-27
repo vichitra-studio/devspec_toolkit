@@ -1,0 +1,16 @@
+{
+  "$schema": "vc:11-redteam",
+  "id": "spec-corpus-11",
+  "threats": [
+    {
+      "threat_id": "THR-CORPUS-001",
+      "title": "Corpus sample threat",
+      "description": "A minimal threat for spec_corpus fixture testing.",
+      "target_ids": [
+        {"type": "api", "id": "API-CORPUS-001"}
+      ],
+      "mitigations": []
+    }
+  ],
+  "edge_cases": []
+}

@@ -1,102 +1,92 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/03_glossary.schema.json",
+  "$id": "vc:03-glossary",
   "title": "03_glossary",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "terms": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "term_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "term": {
-            "type": "string",
-            "minLength": 2
-          },
-          "acronym": {
-            "type": "string",
-            "pattern": "^[A-Z0-9]{2,}$"
-          },
-          "definition": {
-            "type": "string",
-            "minLength": 20
-          },
-          "domain": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[a-z]+(?:-[a-z]+)*$"
-          },
-          "units": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9/]+$"
-          },
-          "term_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "acronym_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "unit_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+    {
+      "type": "object",
+      "properties": {
+        "terms": {
+          "description": "Array of domain-specific terms with definitions, used to establish shared vocabulary across specs.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single glossary term with its definition, domain classification, and canonical references.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "term_id": {
+                "description": "Unique kebab-case identifier for this glossary term. Convention: term-{domain}-{noun}. Examples: 'term-billing-reconciliation', 'term-auth-session-token', 'term-payment-settlement'. The domain segment should match the 'domain' field value. Must be stable — downstream steps reference this ID in trace links. Anti-pattern: 'term-1', 'term-concept-a' — sequential labels cannot be traced to meaning.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "term": {
+                "description": "The glossary term being defined. Use the canonical form of the term as it appears in project documentation. Capitalization should match usage: capitalize proper nouns and acronyms (e.g., 'JWT Token', 'REST API'), lowercase common technical terms ('endpoint', 'payload'). The term should be a noun or noun phrase. Avoid defining verbs or phrases.",
+                "type": "string",
+                "minLength": 2
+              },
+              "acronym": {
+                "description": "Optional uppercase acronym or abbreviation for this term (e.g., 'JWT' for JSON Web Token, 'API' for Application Programming Interface). Must be 2+ uppercase letters/digits. Include only if the acronym (1) appears ≥3 times in project documentation or code, OR (2) is standard industry usage that any practitioner would know. Examples of valid inclusions: 'JWT' (industry standard, appears in all auth flows), 'PII' (regulatory term used throughout compliance sections), 'API' (foundational term). Examples of when to omit: 'MP' for 'Monthly Payment' that appears only once; 'CCO' for an internal role title never referenced in code. Anti-pattern: including every capitalised phrase in the spec — acronyms should genuinely save space and reduce ambiguity.",
+                "type": "string",
+                "pattern": "^[A-Z0-9]{2,}$"
+              },
+              "definition": {
+                "description": "Clear, precise definition of the term as used in THIS project. Must be at least 20 characters (enforced by minLength). Should: (1) define the term without using the term itself, (2) distinguish it from similar terms in the domain, (3) be specific to the project context rather than a generic dictionary definition. Example: 'A short-lived cryptographic credential issued by the authentication service upon successful login, valid for 15 minutes. Distinct from the refresh_token which is long-lived.' Avoid: circular definitions, vague descriptions, generic Wikipedia-style prose.",
+                "type": "string",
+                "minLength": 20
+              },
+              "domain": {
+                "description": "Optional knowledge domain or subdomain this term belongs to. Use lowercase-alphabetic kebab-case (no digits) (e.g., 'billing', 'auth', 'user-management'). Unlike standard kebabId, domain values must not contain digits (enforced by pattern). While optional, providing a domain helps organise large glossaries and improves canonical canon clustering. If provided, each term should belong to exactly one domain. Decision rule: assign the domain where the term was first introduced, not all domains where it is used. Example: 'settlement-period' — first introduced in the billing domain, used in reporting too — domain='billing'. Wrong: domain='auth2' (digits not allowed), domain='general' (too broad), domain='billing-reporting' (pick one primary domain). Decision rules: 'authentication' for login/session terms, 'billing' for payment/invoice terms, 'data-processing' for ETL/pipeline terms, 'product' for cross-cutting business terms. Examples: term 'session-token' → domain 'authentication'; term 'invoice-line-item' → domain 'billing'. Anti-pattern: assigning domain='general' or domain='common' to avoid making a choice — pick the domain where the term has the most specific meaning; 'general', 'misc', 'all' prevent linter grouping and downstream filtering.",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[a-z]+(?:-[a-z]+)*$"
+              },
+              "units": {
+                "description": "Unit of measurement if this term represents a measurable quantity. Use standard abbreviations (e.g., 'ms' for milliseconds, 'MB/s' for megabytes per second, 'req/s' for requests per second). Only include when the term has a natural numeric unit; omit for non-quantitative terms.",
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9/]+$"
+              },
+              "term_ref": {
+                "description": "Canonical reference to the canon entry for this term. Kind must be 'term'. Example: {\"id\": \"cn:project:term:billing-reconciliation\", \"kind\": \"term\", \"label\": \"billing reconciliation\"}. The id must match an entry in canon/manifest.json, or a canonical_proposals entry must be added. This is the primary mechanism for promoting a glossary term to the shared vocabulary. Validated by canonical-integrity lint.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "term" } } }
+                ]
+              },
+              "acronym_ref": {
+                "description": "Canonical reference to the canon entry for the acronym form of this term. Kind must be 'acronym'. Example: {\"id\": \"cn:project:acronym:jwt\", \"kind\": \"acronym\", \"label\": \"JWT\"}. Only present when the 'acronym' field is also set. Links the short form to the same concept as term_ref, ensuring the acronym resolves to the canonical definition. Validated by canonical-integrity lint.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "acronym" } } }
+                ]
+              },
+              "unit_ref": {
+                "description": "Canonical reference to the unit of measurement for this term. Kind is structurally pinned to 'unit'. Example: {\"id\": \"cn:core:unit:ms\", \"kind\": \"unit\"} for milliseconds. Only present when the 'units' field is also set — they must be consistent. Common unit IDs: cn:core:unit:ms, cn:core:unit:percent, cn:core:unit:count. Validated by canonical-integrity lint.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "unit" } } }
+                ]
+              }
+            },
+            "required": [
+              "term_id",
+              "term",
+              "definition",
+              "term_ref"
+            ]
           }
-        },
-        "required": [
-          "term_id",
-          "term",
-          "definition",
-          "term_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "terms",
+        "canonical_proposals"
+      ],
+      "description": "Step-specific properties for 03_glossary."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "terms",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

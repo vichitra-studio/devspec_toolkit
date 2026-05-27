@@ -31,5 +31,6 @@
       "target_id": "cn:core:metric:failure-rate",
       "status": "active"
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

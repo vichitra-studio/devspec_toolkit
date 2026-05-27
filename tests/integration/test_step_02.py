@@ -2,10 +2,7 @@ import json
 import os
 import sys
 
-# Add tools directory to path so we can import specdev_tools
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../tools")))
-
-from specdev_tools.validators.step_02 import validate_step_02
+from specdev_tools.validation.validators.step_02 import validate_step_02
 
 # Adjust these for when the script is moved to tests/integration
 TOOLKIT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
@@ -45,7 +42,7 @@ def load_capability_ids(path):
     return capability_ids
 
 def validate_file(file_path: str, should_pass: bool, capability_ids) -> bool:
-    print(f"\nValidating {file_path} (Expect {'PASS' if should_pass else 'FAIL'})...")
+    pass
     with open(file_path) as handle:
         instance = json.load(handle)
 
@@ -57,7 +54,7 @@ def validate_file(file_path: str, should_pass: bool, capability_ids) -> bool:
 
     if should_pass:
         if passed:
-            print("✅ PASS")
+            pass
             return True
         for err in errors:
             print(f"❌ FAIL: {err}")
@@ -72,13 +69,13 @@ def validate_file(file_path: str, should_pass: bool, capability_ids) -> bool:
     return True
 
 def main() -> None:
-    print("Resolving capabilities...")
+    pass
     capabilities_path = resolve_capabilities_path()
     capability_ids = load_capability_ids(capabilities_path)
     if capability_ids:
-        print(f"Capability coverage source: {capabilities_path}")
+        pass
     else:
-        print("Capability coverage check skipped (no capabilities file found)")
+        pass
 
     valid_fixtures = [
         "valid_minimal.json",
@@ -88,6 +85,7 @@ def main() -> None:
     invalid_fixtures = [
         "invalid_empty_components.json",
         "invalid_missing_required.json",
+        "invalid_missing_tech_stack.json",
         "invalid_no_responsibilities.json",
         "invalid_not_enough_responsibilities.json",
         "invalid_too_many_responsibilities.json",

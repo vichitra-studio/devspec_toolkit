@@ -1,0 +1,18 @@
+{
+  "id": "ms-schema-bypass",
+  "summary": "Record-level schema bypass — exercises E520 exit-2 without malformed JSON",
+  "execution": {
+    "emergent_ambiguities": [
+      {
+        "severity": "low",
+        "impact": ["plan.summary"]
+      },
+      {
+        "id": "amb-good",
+        "severity": "low",
+        "status": "tracking",
+        "impact": ["spec/09_impl_plan.json:task-x"]
+      }
+    ]
+  }
+}

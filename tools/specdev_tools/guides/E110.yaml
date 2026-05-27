@@ -1,0 +1,22 @@
+code: E110
+subcode: UNKNOWN_CANONICAL_ID
+title: "Unknown canonical ID"
+trigger: |
+  A cn:-prefixed ID used in a spec artifact is not registered in any loaded
+  canon directory (toolkit core canon or project canon).  This fires when
+  --spec-root / --git-root are omitted and the project-level canon is not
+  discovered, or when the ID is genuinely absent from all canon files.
+resolution: |
+  1. Ensure you pass the correct flags so the project canon is loaded:
+       specdev spec-check spec \
+         --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+  2. If the ID is new, declare it in canonical_proposals in the artifact,
+     then promote it with:
+       specdev canon-accept --from <spec-file> \
+         --repo-root ./devspec_toolkit --git-root . \
+         --namespace cn:project: --owner product
+  3. If the ID should live in the toolkit core canon, add it to
+     devspec_toolkit/canon/kinds/<kind>.json and re-check.
+see_also:
+  - E120
+  - E211

@@ -17,6 +17,11 @@ Use this index to locate the developer-facing material while working through the
 ## Tooling & Diagnostics
 - [`tooling/coverage_matrix.md`](tooling/coverage_matrix.md) — traceability mechanics and enforcement.
 - [`tooling/gap_hunter_checklist.md`](tooling/gap_hunter_checklist.md) — repeatable gap-hunting process.
+
+### Tools
+- [`tools/align.md`](tools/align.md) — CLI for managing version migrations and spec alignment.
+- [`tools/schema_differ.md`](tools/schema_differ.md) — Library for detecting schema changes.
+- [`tools/prompt_context.md`](tools/prompt_context.md) — Query tool for understanding step dependencies and downstream consumers.
 - [`tools/changelog_parser.md`](tools/changelog_parser.md) — changelog YAML parser for migration system.
 
 ## Step Guides

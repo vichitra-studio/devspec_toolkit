@@ -1,109 +1,137 @@
 # Step 04 · Functional Requirements
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+Run `specdev prompt-context 04` to see downstream consumers. This prompt's output feeds 13 downstream steps.
+
+## Role
+You are a **senior requirements engineer specializing in falsifiable behavioral specifications**. Your job is to emit a single JSON artifact for **Step 04 · Functional Requirements** that transforms capabilities into verifiable system behaviors. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
 ## Purpose
 Turn capabilities into falsifiable statements of system behavior with clear entry conditions, expected outcomes, and measurable acceptance evidence. These requirements become the contract linking stakeholder intent to APIs, fixtures, and monitoring.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 4 · Functional Requirements** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+For each upstream artifact ingested, extract the following:
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 4 · Functional Requirements**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+### Must-Extract (required for valid output)
+Items without which this step cannot emit a valid artifact:
+- **01_capabilities.json**: Capability IDs for traceability binding; scope (in/out/future) to determine which behaviors need FRs; use as primary source of behaviors alongside charter goals/constraints
+- **00_charter.json**: `problem_statement` and project scope boundaries for grounding FR rationale and priority decisions; in-scope items drive FR coverage
 
+### Should-Extract (strongly recommended)
+Items that substantially improve FR quality:
+- **00_charter.json**: `user_segments` jobs-to-be-done (JTBDs) and `success_metrics` to validate that FRs address real user needs and measurable outcomes
+- **02_system_sketch.json**: Component IDs and trust boundaries for mapping FRs to responsible system components and integration points
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["04"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
+### May-Extract (if present, enriches output)
+Optional signals that improve specificity when available:
+- **02a_delivery_baseline.json**: Environment definitions and deployment stages for determining FR acceptance criteria feasibility constraints
+- **03_glossary.json**: Domain terms for consistent naming in FR statements and acceptance criteria; do not depend on downstream interface/NFR artifacts in this step
 
-## Context To Ingest
-- Charter `spec/00_charter.json` (goals/constraints) and Capabilities `spec/01_capabilities.json` as the source of behaviors.
-- Glossary `spec/03_glossary.json` to anchor terms; do not depend on downstream interface/NFR artifacts in this step.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Use examples from `example/devspec_kit` for criterion shape only; do not depend on downstream fixture artifacts.
+## Operating Flow: Enumerate → Decompose → Falsify → Trace → Emit
+- **Enumerate**: Build a private Context Ledger mapping every in-scope capability to ≥1 candidate FR. Include rationale and boundary conditions. Do not output it.
+- **Decompose**: Split multi-behavior candidates using the Granularity Heuristic. One FR = one observable behavior = one subject + one verb + one measurable outcome.
+- **Falsify**: For each FR, write ≥2 acceptance criteria that could prove the FR false if violated. Confirm Given–When–Then phrasing and measurability.
+- **Trace**: Link every FR to its originating capability; add API, NFR, and governance trace refs where known IDs exist.
+- **Emit**: Write artifact only when every FR is falsifiable, decomposed to a single behavior, and fully traced.
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of candidate FRs (one behavior each) mapped from capabilities; include rationale, pre/postconditions, and ≥2 acceptance criteria candidates with measurable outcomes. Do not output it.
-- Propose `fixture_ref` names aligned to Step 8 naming; propose `trace` to capabilities/APIs/NFRs.
-- Self-audit; if any FR lacks clear entry conditions or measurable outcomes, ask Gap Questions.
-- Rewrite statements to outcome language, finalize criteria, and align traces.
-- Emit JSON when all FRs are falsifiable and traceable.
+### Implicit Requirements Discovery Checklist
+Before emitting, verify these system-level behaviors have been considered as FR candidates:
+- **Error handling**: What happens on invalid input, service failure, or timeout?
+- **Authorization**: Which operations require authenticated/authorized actors?
+- **Input validation**: What are the bounds and formats for every user-provided input?
+- **Audit logging**: Which state-changing operations must produce an audit trail?
+- **Idempotency**: Which operations must produce the same result when repeated?
+- **Pagination**: Which list operations must support bounded page sizes?
+- **Concurrency**: Which operations need locking, queuing, or conflict detection?
+- **Rate limiting**: Which operations must be protected from abusive call volumes?
+- **Data lifecycle**: Where must data be retained, archived, or purged?
+If any of these apply to in-scope capabilities, they MUST generate FRs unless explicitly excluded in the charter.
+
+### Granularity Heuristics
+**Rule**: One FR = one behavior = one subject + one verb + one measurable outcome.
+
+> **Forward contract note**: Acceptance criteria written here become the contract that Step 14 task decomposition must satisfy — write them as falsifiable conditions, not implementation steps.
+
+**Split when**:
+- The statement has multiple subjects (“users and admins shall…”)
+- The statement has multiple conditions joined by “and”
+- The statement describes both a happy path and an error path
+- The behavior maps to more than one distinct acceptance criterion topic
+
+**Granularity test**: If you cannot write a single failing test that specifically disproves this FR (and only this FR), it is too coarse.
 
 ## Heuristics For Completeness
-- Optional→expected: include pre/postconditions for FRs impacting state or permissions; include fixture_ref suggestions for high-priority FRs.
+- MUST include pre/postconditions for FRs that modify state or enforce permissions (as identified in `spec/01_capabilities.json` scope).
 - Auto-trace: link FRs to capability and any API that delivers the behavior; include NFR trace where performance is key.
 - Ambiguity scrub: ban “should/could/fast/easy”; use “Given–When–Then” phrasing in acceptance criteria.
 
+### Weak-vs-Strong FR Examples
+
+| ❌ Weak | ✅ Strong |
+|---------|----------|
+| The system should let users log in easily. | The system shall authenticate a registered user with valid credentials and return a signed session token within 2s. |
+| Admins can manage users. | The system shall allow an admin to deactivate a user account, immediately invalidating all active sessions for that account. |
+| The API should handle errors. | The system shall return HTTP 422 with a structured error body when required fields are missing from a POST request. |
+| Reports must be fast. | The system shall generate a usage report for ≤10,000 records within 5 seconds at p99. |
+| The system should support pagination. | The system shall return paginated results for all list endpoints, with a default page size of 20 and a maximum of 100. |
+
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
-- Gating items:
-  - Every in-scope capability maps to ≥1 FR; each FR covers one behavior.
-  - Each FR has ≥1 acceptance criterion with measurable outcome; top FRs include ≥2.
-  - Preconditions/postconditions present where boundaries exist.
-  - Traces to capability and (if known) API/NFR; IDs are kebab-case and stable.
-
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
-## Step-Specific Completeness Checklist
-- FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
-- Each FR includes preconditions and postconditions where relevant to bound the behavior.
-- Every FR has at least one acceptance criterion with a stable `criterion_id` and specific, measurable text.
-- Where possible, acceptance criteria reference a `fixture_ref` that can be authored in Step 8.
-- `trace` links map FRs to capabilities, APIs, NFRs, or governance where applicable.
-- IDs are stable and descriptive (avoid renaming once referenced downstream).
-
-## Field-by-Field Guidance
-- functional_requirements[*].fr_id: `fr-<behavior>`; one behavior per FR.
-- statement: outcome-oriented phrasing; avoid implementation details and multiple behaviors.
-- rationale: why this FR exists (tie to business value or risk).
-- preconditions/postconditions: set when environment or state boundaries exist.
-- acceptance_criteria[*].text: exact observable outcome; include inputs and expected outputs/state changes.
-- acceptance_criteria[*].fixture_ref: reference `fixture-*` to drive automation; use `fixture-*-tbd` if not yet created.
-- trace: link to `capability-*`, `api-*`, `nfr-*`, or `invariant-*` as known.
-- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}`. Do not use simple strings or arrays of strings.
-
-## Best Practices
-- **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
-- **Boundaries**: Provide `preconditions` and `postconditions` so testers and implementers know the boundaries of each behavior.
-- **Criteria**: Ensure every acceptance criterion has a stable `criterion_id` and, when possible, a `fixture_ref` to drive automation.
-- **Trace**: Use `trace` arrays to link FRs back to capabilities, APIs, NFRs, or governance rules cover-to-cover.
-
-## Common Pitfalls
-- **Bundling**: Bundling multiple behaviors into one FR, making it impossible to prove completeness.
-- **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
-- **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
-- **Implementation**: Embedding implementation details (e.g., method names) instead of outcomes, limiting design options.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/03_glossary.json` is present and contains at least one term entry.
+- All seeds listed for step "04" in `spec/common/seed_manifest.json` are present and non-empty (if step_requirements["04"] is non-empty).
 
 ## Negative Constraints
 - **DO NOT** use implementation details (function names, DB tables) in statements.
 - **DO NOT** bundle multiple behaviors into one FR.
 - **DO NOT** leave acceptance criteria vague ('it works').
 - **DO NOT** trace to non-existent IDs.
-- **DO NOT** use simple strings or arrays of strings for trace fields - always use the object structure.
+- **DO NOT** use simple strings for trace field values — the schema enforces the object structure.
+- **DO NOT** use subjective language ("fast", "secure", "user-friendly").
+- **DO NOT** write FRs that are implementation steps rather than observable behaviors.
 
-## Quick Reference
-- ID Format: `fr-<descriptor>` with stable suffixes for traceability.
-- Required Fields: every FR needs `statement`, `acceptance_criteria`, and `fr_id`.
-- Criteria Structure: each criterion requires `criterion_id` and `text`; add `fixture_ref` when automation exists.
-- Trace Hooks: expect coverage from `trace` to Capabilities (`capability-*`), APIs (`api-*`), or NFRs.
+## Coverage Closure
+Before emitting, verify:
+- Every upstream requirement referenced in "Extraction Intent" is represented in at least one FR's `trace` array, OR explicitly documented as a gap with rationale.
+- No upstream capability, FR, or milestone ID is silently dropped.
+- All `trace` / `links` IDs resolve to IDs present in the referenced upstream spec file.
+- If any upstream ID cannot be traced: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every FR statement is falsifiable — there exists a test that could prove it wrong
+- [ ] No two FRs describe overlapping behaviors (each FR has a unique behavior boundary)
+- [ ] No ID referenced by this step (capability_ref, api_id, nfr_id) conflicts with the same ID in a sibling step
+- [ ] Each FR's `acceptance_criteria` is written at the behavioral level — concrete enough that Step 14 tasks can derive execution-level criteria without contradiction
+- [ ] Functional requirements meet the schema minimum count
+
+**Extraction Mandate**:
+- Every capability ID from `01_capabilities.json` must map to ≥1 FR. List any capability left without an FR and explain why.
+
+## Step-Specific Completeness Checklist
+- FR list fully covers in-scope capabilities; each FR describes exactly one behavior and is falsifiable.
+- Each FR includes preconditions and postconditions where relevant to bound the behavior.
+- Every FR has acceptance criteria that meet the schema minimum count; each criterion has a stable `criterion_id` and specific, measurable text.
+- Do **not** declare fixture coverage on acceptance criteria — fixture↔FR binding is authored in Step 08 via `fixture.targets[]`. Step 04 acceptance criteria carry only `criterion_id` and `text`.
+- `trace` links MUST map every FR to its originating capability from `spec/01_capabilities.json`; MUST also map to APIs, NFRs, or governance IDs when those IDs exist in the corresponding upstream spec files.
+- IDs are stable and descriptive (avoid renaming once referenced downstream).
+
+## Cross-Step Synthesis Notes
+- **Trace Object Structure**: The trace field must be an array of objects with the structure: `{"type": "capability", "id": "cap-user-auth", "note": "Implements core behavior"}` for capability links; use `"fr"` when linking to another FR (e.g., when an FR splits or refines another). Valid `type` values must match a canonical trace type from `canon/kinds/trace_type.json` (e.g., `capability`, `fr`, `api`, `nfr`, `charter-goal`). Do not use simple strings or arrays of strings.
+
+## Best Practices
+- **Statement**: Write `statement` text that is testable, scoped to a single behavior, and measurable against success metrics.
+- **Boundaries**: Provide `preconditions` and `postconditions` so testers and implementers know the boundaries of each behavior.
+- **Criteria**: Ensure every acceptance criterion has a stable `criterion_id` and concrete, falsifiable `text`. Fixture coverage is authored later in Step 08.
+- **Trace**: Use `trace` arrays to link FRs back to capabilities, APIs, NFRs, or governance rules cover-to-cover.
+
+## Common Pitfalls
+- **Bundling**: Bundling multiple behaviors into one FR, making it impossible to prove completeness.
+- **Vague Criteria**: Leaving acceptance criteria generic or missing, which blocks fixture authoring.
+- **Missing Link**: Skipping trace links, severing coverage reporting across spec steps.
+- **Implementation**: Embedding implementation details (function names, DB tables, internal method signatures) instead of outcomes, limiting design options.
 
 # Clarification Questions
 - Which specific user or system behaviors must we guarantee in this phase? What is explicitly excluded?
@@ -113,27 +141,17 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Which capabilities, APIs, or NFRs does each FR map to? Any governance constraints to reflect?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/04_fr_list.schema.json
+- Schema URI: vc:04-fr-list
 - Schema File: schema/04_fr_list.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:04-fr-list",
   "id": "functional-requirements-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
   "functional_requirements": [
     {
       "fr_id": "fr-auth-login",
@@ -142,46 +160,50 @@ You are a senior specification author and validator. Your job is to emit a singl
         {
           "criterion_id": "ac-auth-login-success",
           "text": "Valid credentials return a signed token and user id."
+        },
+        {
+          "criterion_id": "ac-auth-login-failure",
+          "text": "Invalid credentials return a 401 error with no token."
+        }
+      ],
+      "trace": [
+        {
+          "type": "capability",
+          "id": "cap-user-auth"
         }
       ],
       "capability_ref": {
-        "id": "cn:core:capability:example",
-        "kind": "capability"
+        "id": "cn:project:capability:user-authentication",
+        "kind": "capability",
+        "label": "User Authentication"
+      }
+    },
+    {
+      "fr_id": "fr-auth-logout",
+      "statement": "The system shall invalidate the session token and end the user session on logout.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-auth-logout-success",
+          "text": "A valid session token is invalidated and subsequent requests with it return 401."
+        },
+        {
+          "criterion_id": "ac-auth-logout-idempotent",
+          "text": "Repeated logout requests with the same token return 401 without error."
+        }
+      ],
+      "trace": [
+        {
+          "type": "capability",
+          "id": "cap-user-auth"
+        }
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:user-authentication",
+        "kind": "capability",
+        "label": "User Authentication"
       }
     }
   ],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [
-    {
-      "id": "cn:core:capability:example",
-      "kind": "capability"
-    }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

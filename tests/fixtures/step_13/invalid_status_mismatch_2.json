@@ -1,0 +1,34 @@
+{
+  "$schema": "vc:13-extension-manifest",
+  "id": "extension-generator-v1",
+  "owner": "system",
+  "created_at": "2026-01-15T00:00:00Z",
+  "extension_decision": {
+    "status": "none-required",
+    "rationale": "Claims none required but provides extensions \u2014 this should fail the allOf maxItems constraint."
+  },
+  "extensions": [
+    {
+      "extension_id": "ext-01-database",
+      "title": "Database Schema",
+      "area_of_concern": "Data",
+      "justification": "Core spec steps lack entity-relationship modeling, migration sequencing, and index strategy sections.",
+      "required_schema_sections": [
+        "tables",
+        "relationships",
+        "database_config"
+      ],
+      "schema_design_guidelines": "Reuse vc:core:atoms#kebabId for table IDs. Include a validation_rules section with check constraints.",
+      "governance_label_ref": {
+        "id": "cn:core:governance_label:mandatory",
+        "kind": "governance_label"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:governance_label:mandatory",
+      "kind": "governance_label"
+    }
+  ]
+}

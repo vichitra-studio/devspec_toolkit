@@ -1,0 +1,104 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "ms-session-plan",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Session creation and revocation endpoints for the ms-session milestone.",
+      "scope_in": [
+        "session-management"
+      ],
+      "scope_out": [
+        "oauth-flows",
+        "third-party-sso",
+        "mobile-push-auth"
+      ],
+      "target_file_patterns": [
+        "src/session.py"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Session",
+          "summary": "Implement session creation and revocation."
+        }
+      ],
+      "checklist": [
+        {
+          "id": "SESSION_CREATE_01",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-session-create",
+            "line_range": "L25-L40",
+            "commit_hash": "b2c3d4e5f6a71234567890123456789012345678"
+          },
+          "description": "Implement session creation endpoint.",
+          "type": "behavior",
+          "layer": "service",
+          "linked_test_expectation": "session creation returns session id",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-session-create",
+          "milestone_ref": "ms-session",
+          "implementation": {
+            "status": "in_progress",
+            "files_touched": [
+              "src/session.py"
+            ],
+            "actions": [
+              {
+                "type": "file_create",
+                "target": "src/session.py",
+                "description": "Create session module"
+              }
+            ]
+          }
+        },
+        {
+          "id": "SESSION_CREATE_01_VAL",
+          "spec_ref": {
+            "type": "fr",
+            "id": "fr-session-create",
+            "line_range": "L25-L40",
+            "commit_hash": "b2c3d4e5f6a71234567890123456789012345678"
+          },
+          "description": "Validate session creation endpoint returns session id.",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "session creation validation passes",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-session-create",
+          "milestone_ref": "ms-session",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify session creation returns a session id."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Session endpoints are user-visible — README updated with session flow.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "pytest tests/test_session.py"
+      ]
+    }
+  },
+  "canonical_refs_used": []
+}

@@ -1,208 +1,222 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "$id": "vc:05-interface-contracts",
   "title": "05_interface_contracts",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "apis": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "api_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string",
-            "pattern": "^v\\d+(?:\\.\\d+)*$"
-          },
-          "protocol": {
-            "type": "string",
-            "enum": [
-              "http",
-              "grpc",
-              "ws",
-              "mqtt"
-            ]
-          },
-          "route": {
-            "type": "string"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "GET",
-              "POST",
-              "PUT",
-              "PATCH",
-              "DELETE"
-            ]
-          },
-          "request_schema_ref": {
-            "type": "string"
-          },
-          "response_schema_ref": {
-            "type": "string"
-          },
-          "errors": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/errors/1#errorState"
-            }
-          },
-          "parameters": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "in": {
-                  "type": "string",
-                  "enum": [
-                    "query",
-                    "path",
-                    "header"
-                  ]
-                },
-                "required": {
-                  "type": "boolean"
-                },
-                "schema": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                }
-              },
-              "required": [
-                "name",
-                "in",
-                "required"
-              ]
-            }
-          },
-          "example_refs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "security": {
-            "type": "string",
-            "enum": [
-              "none",
-              "api-key",
-              "oauth2",
-              "jwt",
-              "mTLS"
-            ]
-          },
-          "owner": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "interface_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "event_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "policy_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "enum_provenance": {
+    {
+      "type": "object",
+      "properties": {
+        "apis": {
+          "description": "Array of API interface contracts defining endpoints, protocols, and security requirements. Each entry should cover at least one distinct interface boundary; do not bundle unrelated resources into a single API entry.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single API contract with path, method, parameters, security, and traceability. Every API should be traceable to at least one functional requirement. End-to-end worked example — a complete login endpoint entry: {\"api_id\": \"api-auth-login\", \"name\": \"User Login\", \"version\": \"v1\", \"protocol\": \"http\", \"method\": \"POST\", \"path\": \"/auth/login\", \"owner\": \"api\", \"security\": \"none\", \"trace\": [{\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"Implements this functional requirement\"}], \"parameters\": [{\"name\": \"X-Request-ID\", \"in\": \"header\", \"required\": false}], \"input_schema_ref\": \"schemas/auth/login_request.json\", \"output_schema_ref\": \"schemas/auth/login_response.json\", \"errors\": [{\"code\": \"invalid-credentials\", \"message\": \"Email or password did not match — caller must not retry without user correction\", \"severity\": \"error\"}, {\"code\": \"internal-error\", \"message\": \"Unexpected server failure\", \"severity\": \"error\"}], \"example_refs\": [\"fix-auth-login-success\", \"fix-auth-login-invalid-credentials\"], \"interface_ref\": {\"id\": \"cn:project:interface:auth-login\", \"kind\": \"interface\", \"label\": \"auth-login\"}}. Decision rule: every required field (api_id, name, version, protocol, owner, interface_ref, trace) must be present; omit optional fields (path, method) only for non-HTTP protocols.",
             "type": "object",
             "additionalProperties": false,
-            "description": "Provenance tracking for externally-sourced enums in this API.",
             "properties": {
-              "source_url": {
-                "type": "string",
-                "format": "uri"
+              "api_id": {
+                "description": "Unique kebab-case identifier for this API. Recommended format: api-{noun}-{verb-or-noun}. Example: 'api-user-auth', 'api-order-management'. Should be stable across spec versions — changing this ID breaks all downstream traces. Decision rule: use noun-verb for action endpoints that don't map to a standard CRUD resource (api-user-authenticate, api-session-refresh, api-report-export); use noun-only for standard CRUD endpoints where the method conveys the action (api-user, api-order, api-payment). Anti-pattern: api-1 (not human-readable), api-post-to-user (embeds HTTP method), api-user-management (too generic — use api-user).",
+                "$ref": "vc:core:atoms#kebabId"
               },
-              "source_date": {
-                "type": "string",
-                "format": "date"
-              },
-              "resolved_version": {
+              "name": {
+                "description": "Human-readable name for this API endpoint, suitable for display in API documentation and dashboards. Decision rules: use 'Create {Entity}' for POST endpoints that create resources; 'Get {Entity}' or 'List {Entities}' for GET endpoints; 'Update {Entity}' for PUT/PATCH; 'Delete {Entity}' for DELETE. Examples: 'Create User Session', 'Get Order Details', 'List Payment Methods', 'Update Profile'. Anti-pattern: 'POST /users/login' (uses HTTP method — names should be action-oriented, not path-oriented).",
                 "type": "string"
               },
-              "resolved_at": {
-                "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-              },
-              "resolver": {
+              "version": {
+                "description": "API version string. Must match pattern vN[.N]* (enforced by pattern). Examples: 'v1', 'v2.1', 'v3.0.1'.",
                 "type": "string",
-                "description": "Tool or person that resolved the enum values."
+                "pattern": "^v\\d+(?:\\.\\d+)*$"
+              },
+              "protocol": {
+                "description": "Transport protocol for this API. 'http': HTTP-based REST API. 'grpc': binary RPC protocol using Protocol Buffers. 'ws': WebSocket persistent bidirectional connection. 'mqtt': MQTT event/messaging protocol.",
+                "$ref": "vc:core:atoms#apiProtocol"
+              },
+              "path": {
+                "description": "URL path for this endpoint. Optional — omit for non-HTTP protocols (e.g., gRPC, MQTT). Should follow REST conventions: use nouns for resources, kebab-case for multi-word segments, path parameters in {braces}. Worked examples: '/auth/login' (action endpoint with no path params — use POST method); '/users/{user_id}/profile' (resource with a single path param — GET or PUT); '/orders/{order_id}/items/{item_id}' (nested resource with two path params). No trailing slash. No query parameters (those go in parameters array). Anti-pattern: '/getUser' (verb in path — use GET /users/{id} instead); '/api/v1/auth/login' (include the version prefix in the path only if the API versioning contract explicitly specifies path-based versioning — prefer version field for version tracking).",
+                "type": "string"
+              },
+              "method": {
+                "description": "When provided, must be one of: GET, POST, PUT, PATCH, DELETE (enforced by enum). Optional — omit for non-HTTP protocols such as gRPC, WebSocket, or event buses. OPTIONS and HEAD are only available in Step 15 scaffold (httpMethodFull). Decision rules: GET — read with no side effects, safe and idempotent, never for actions; POST — create a new resource or trigger a non-idempotent action (login, payment); PUT — full replacement of an existing resource, idempotent (caller provides complete object); PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource, idempotent. Anti-pattern: POST for idempotent updates (use PUT or PATCH); GET for operations with side effects (use POST or PUT).",
+                "$ref": "vc:core:atoms#httpMethod"
+              },
+              "input_schema_ref": {
+                "description": "Relative path from the repository root to the JSON Schema file defining the request body payload for this API. Use forward slashes. Concrete examples: 'schemas/auth/login_request.json' (relative to spec dir, preferred convention); '#/$defs/LoginRequest' (JSON Pointer into the current document, valid but couples schema to this file); 'https://schema.example.com/auth/login_request.json' (absolute URL, valid for externally hosted schemas). Use the placeholder '-tbd' when the schema has not yet been defined — signals that Step 08 (Fixtures) needs this schema before it can model request payloads. Omit this field entirely for endpoints with no request body (GET, DELETE, OPTIONS, HEAD). Anti-pattern: './request_body' (forward-slash relative without a leading schema directory — ambiguous root) or an empty string (use '-tbd' instead).",
+                "type": "string"
+              },
+              "output_schema_ref": {
+                "description": "Relative path from the repository root to the JSON Schema file defining the response body for this API. Use forward slashes. Concrete examples: 'schemas/auth/login_response.json' (success response shape for a login endpoint); 'schemas/common/error_response.json' (shared error envelope — reuse this for all 4xx/5xx shapes rather than duplicating error structure per endpoint). The referenced schema should cover both success and error response shapes — use a oneOf or discriminated union in the schema file if needed. Use the placeholder '-tbd' when the response schema has not yet been defined. Anti-pattern: omitting output_schema_ref for endpoints that return a structured response body (GET, POST that creates a resource, POST that returns a token) — callers cannot validate response contracts without this reference.",
+                "type": "string"
+              },
+              "errors": {
+                "description": "All meaningful failure modes this API endpoint may return. Decision rule: always include at minimum one 4xx (client error) and one 5xx (server error). Example minimum set for an authenticated endpoint: unauthorized (missing/invalid token), forbidden (insufficient permissions), not-found (resource absent), rate-limit-exceeded (too many requests), internal-error (unexpected server failure). See vc:core:errors#errorState for the allowed fields: code, message, and severity.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:errors#errorState",
+                  "description": "An error state this API may return. Structure per vc:core:errors#errorState: {\"code\": \"kebab-case-error-code\", \"message\": \"human-readable description\", \"severity\": \"error|warn\"}. Example: {\"code\": \"auth-token-expired\", \"message\": \"Bearer token TTL has elapsed — caller should refresh the token and retry once\", \"severity\": \"error\"}. Anti-pattern: adding http_status or condition fields — errorState has additionalProperties: false and only allows code, message, and severity. Anti-pattern: using SCREAMING_SNAKE_CASE for the code field — errorState.code is a kebabId (lowercase, hyphens only)."
+                }
+              },
+              "parameters": {
+                "description": "Array of query, path, or header parameters accepted by this endpoint. Include path parameters (always required), query parameters with well-defined types, and authentication headers. Request body fields go in input_schema_ref — not here. Decision rule: a parameter goes in parameters[] when it is outside the request body (path, query, header) or when it needs separate documentation (e.g., a pagination query param with min/max constraints). Anti-pattern: listing request body fields as parameters; omitting required path parameters (they must always appear here with required: true).",
+                "type": "array",
+                "items": {
+                  "description": "A single API parameter with its name, location (query/path/header), and whether it is required.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "description": "Name of the parameter as it appears in the request. Use camelCase for JSON-style APIs (consistent with request body field naming). Use snake_case to match existing API conventions in the codebase. Examples for path params: 'userId', 'orderId', 'itemId'. Examples for query params: 'page', 'pageSize', 'sortBy'. Examples for headers: 'X-Request-ID', 'X-Correlation-ID'. Anti-pattern: mixing camelCase and snake_case in the same API — pick one and be consistent.",
+                      "type": "string"
+                    },
+                    "in": {
+                      "description": "Where the parameter is located: query string, URL path, or request header.",
+                      "type": "string",
+                      "enum": [
+                        "query",
+                        "path",
+                        "header"
+                      ]
+                    },
+                    "required": {
+                      "description": "Whether this parameter must be provided in the request. Decision rules: set true for all path parameters (the URL is structurally invalid without them); set false for query parameters that have server-side defaults; set true for authentication headers (Authorization, X-API-Key); set false for optional filter/pagination query params. Anti-pattern: setting required: false for a path parameter — path params are always required by definition.",
+                      "type": "boolean"
+                    },
+                    "schema": {
+                      "description": "Canonical kebab-case ID referencing a shared parameter schema atom registered in the canon registry. This field accepts a kebabId string (pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$) — not an inline JSON Schema object. For inline type constraints (e.g., string with format, integer with minimum), use input_schema_ref pointing to an external schema file instead of this field. Anti-pattern: expecting to pass an object like {\"type\": \"string\"} here — this field only accepts a kebab-case ID string referencing an existing atom.",
+                      "$ref": "vc:core:atoms#kebabId"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "in",
+                    "required"
+                  ]
+                }
+              },
+              "example_refs": {
+                "description": "References to fixture IDs from Step 08 (spec/08_fixtures.json). Minimum 2 scenarios per API: happy path and at least one error case. Format: array of fixture_id strings. Worked example — happy path + error case pairing: [\"fix-auth-login-success\", \"fix-auth-login-invalid-credentials\"] covers the successful login and the credential-mismatch failure. For endpoints with multiple failure modes, add one fixture per distinct error: [\"fix-auth-login-success\", \"fix-auth-login-invalid-credentials\", \"fix-auth-login-rate-limited\"]. Use '-tbd' suffix as a placeholder during Step 05 authoring before Step 08 is written: [\"fix-auth-login-success-tbd\", \"fix-auth-login-unauthorized-tbd\"]. Populate with real fixture IDs after Step 08 is complete. Anti-pattern: only providing success-case fixtures (leaves error behaviour unspecified and untestable); empty array (provides no verifiable contract at all).",
+                "$ref": "vc:core:collections#stringArray"
+              },
+              "security": {
+                "description": "Authentication/authorization mechanism for this API. Decision rules: 'none' — only for internal-only endpoints with no public exposure (e.g., health checks reachable only inside the VPC); 'jwt' — for service-to-service internal calls with short-lived tokens (no user delegation needed); 'oauth2' — when users delegate access to a third-party or when the API is user-facing with scope-based authorization; 'api-key' — for server-to-server integrations where a rotating shared secret is acceptable; 'mTLS' — for zero-trust service mesh environments where every service must present a certificate. Anti-pattern: 'none' for any endpoint reachable from outside the VPC — all externally accessible endpoints must use at minimum 'jwt' or 'api-key'.",
+                "$ref": "vc:core:atoms#apiSecurity"
+              },
+              "owner": {
+                "description": "Team or domain responsible for this API endpoint. Must be one of 8 canonical values: 'api' (backend services), 'ui' (frontend/UX), 'system' (platform/infrastructure), 'ops' (operations/DevOps), 'data' (data engineering/analytics), 'product', 'business', 'engineering'. Typically 'api' for REST endpoints owned by backend teams. Use 'system' for infrastructure-level APIs (health checks, metrics endpoints).",
+                "$ref": "vc:core:atoms#owner"
+              },
+              "trace": {
+                "description": "Traceability references linking this API to the functional requirements it fulfills. Every API must trace to at least one FR using type='fr'. Example: [{\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"Implements this functional requirement; provides the authentication endpoint\"}]. Multiple FRs can be traced when one API serves several FRs. APIs without trace links are floating contracts that cannot be validated against the spec. Consult the items description below for approved trace types. Valid trace types at Step 05: type 'fr' pointing to fr-* IDs (the functional requirement this API contract fulfils; put 'implements' in note), or type 'capability' pointing to cap-* IDs (when the API directly implements a capability without an intermediate FR; put 'implements' in note). Every API must have at least one trace to an FR (type='fr'). Anti-pattern: using verb-types such as 'implements' — type must be the canonical kind of the target artifact, not a relationship verb; put the relationship verb in note. Anti-pattern: tracing to a charter-* or nfr-* ID — APIs implement FRs and capabilities, not NFRs (NFRs constrain APIs, not the other way).",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "vc:core:collections#traceRef",
+                  "description": "A traceability reference linking this API contract to the functional requirements it fulfils. At step 05, use type 'fr' pointing to fr-* IDs from spec/04_fr_list.json (the kind of the target; describe the 'implements' relationship in note). Example: {\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"Implements this functional requirement\"}. A single API endpoint may implement multiple FRs — add one trace entry per FR addressed. Anti-pattern: using verb-types such as 'implements' or 'relates-to' — type must be the canonical kind of the target artifact, not a relationship verb; put the relationship verb in note. Endpoints without trace links cannot be validated against spec completeness."
+                }
+              },
+              "interface_ref": {
+                "description": "Canonical reference linking this API to a shared interface contract. Endpoints that share the same request/response contract — for example, GET /users/{id} and GET /orders/{id}/user both returning the same UserProfile shape — should share one interface_ref. Each genuinely distinct contract gets its own interface_ref entry. Worked example: {\"id\": \"cn:project:interface:user-read\", \"kind\": \"interface\", \"label\": \"user-read\"} for any endpoint that reads and returns a UserProfile. Required — ensures the API is registered in the shared interface vocabulary. Decision rule: check canon/manifest.json for existing interface entries before creating a new one; reuse when the request/response shape is truly shared; create a new entry only when introducing a contract not yet represented. Anti-pattern: one interface_ref for all endpoints in a service — each distinct contract needs its own entry; the interface_ref describes what the contract looks like, not which service owns it.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "interface" } } }
+                ]
+              },
+              "event_ref": {
+                "description": "Canonical reference to events emitted or consumed by this API after processing a request. Include event_ref when the API endpoint publishes to or subscribes from a message queue as a side effect of handling a request — for example, a POST /orders endpoint that publishes an 'order-confirmed' event after persisting the order. Worked example: {\"id\": \"cn:project:event:order-confirmed\", \"kind\": \"event\", \"label\": \"order-confirmed\"}. The id must correspond to an entry in canon/manifest.json under the 'event' namespace. Omit for pure request-response endpoints with no side-effect events. Anti-pattern: adding event_ref to a GET endpoint — read-only endpoints do not publish events and should not reference the event registry.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "event" } } }
+                ]
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the primary domain entity this API operates on. Links to the canonical entity registry and helps downstream code generation target the correct model. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"} for a user-management API; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"Order\"} for an order-management API. The id must match an entry in canon/manifest.json under the 'entity' namespace. Anti-pattern: using a 'ref' field instead of 'id' — canonicalRef requires the 'id' field (additionalProperties: false rejects 'ref'); listing multiple entities here — use entity_ref for the single primary entity only; secondary entity relationships belong in the API description or trace links.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
+              },
+              "policy_ref": {
+                "description": "Canonical reference to the access control or governance policy for this API. Kind is structurally pinned to 'policy'. Example: {\"id\": \"cn:core:policy:spec-first\", \"kind\": \"policy\"}. Include when the endpoint has access control rules beyond simple authentication. Omit for public endpoints with no authorization logic.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "policy" } } }
+                ]
+              },
+              "enum_provenance": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Required when the enum values for a field in this API are sourced from an external standard rather than defined internally. Decision rule: populate enum_provenance whenever an enum set comes from an external source (ISO 4217 currency codes, IANA language tags, country codes, card brand lists). Omit for project-internal enums (custom status values, internal category codes). Example for ISO 4217: {\"source_url\": \"https://www.iso.org/iso-4217-currency-codes.html\", \"source_date\": \"2024-01-15\", \"resolved_version\": \"2024 edition\", \"resolved_at\": \"2024-01-15T10:00:00Z\", \"resolver\": \"finance-team\"}",
+                "properties": {
+                  "source_url": {
+                    "description": "URL of the external source where the enum values originate. Use the canonical standards body URL. Examples: 'https://www.iso.org/iso-4217-currency-codes.html' (currency codes), 'https://www.iana.org/assignments/language-subtag-registry' (language tags), 'https://stripe.com/docs/api/cards/object#card_object-brand' (card brands from Stripe API docs).",
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "source_date": {
+                    "description": "Date when the enum values were retrieved from the source, in YYYY-MM-DD format. Example: '2024-01-15'. Used to determine when to re-check the source for additions or changes. Anti-pattern: leaving source_date unset — without it, there is no basis for deciding when to refresh.",
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "resolved_version": {
+                    "description": "Version or edition of the external source used to resolve enum values. Examples: '2024 edition' (for ISO standards), '2024-01' (for monthly-updated registry), 'v2.3.1' (for versioned API spec), '2024-01-15 snapshot' (for date-versioned snapshots). Use whatever version identifier the source itself provides.",
+                    "type": "string"
+                  },
+                  "resolved_at": {
+                    "description": "ISO 8601 timestamp when the enum values were resolved.",
+                    "$ref": "vc:core:atoms#timestamp"
+                  },
+                  "resolver": {
+                    "type": "string",
+                    "description": "Identity of the person or team that retrieved and resolved the enum values from the source, along with enough detail to reproduce the extraction. Worked example: 'OpenAPI spec at https://partner-api.example.com/openapi.json — fetched 2025-01-15, enum values extracted from paths./orders.get.parameters[?(@.name==\"status\")].schema.enum' — this provides the source location, fetch date, and JSONPath to the exact field. Simpler examples: 'finance-team — retrieved from https://www.iso.org/iso-4217-currency-codes.html on 2024-01-15'; 'automated-ci-scraper — see scripts/fetch_enums.py'. Anti-pattern: 'manual' (not attributable to a specific source or extraction method — there is no way to verify or refresh the enum set)."
+                  }
+                },
+                "required": [
+                  "source_url",
+                  "source_date",
+                  "resolved_at"
+                ]
               }
             },
             "required": [
-              "source_url",
-              "source_date",
-              "resolved_at"
+              "api_id",
+              "name",
+              "version",
+              "protocol",
+              "owner",
+              "interface_ref",
+              "trace"
             ]
           }
         },
-        "required": [
-          "api_id",
-          "name",
-          "version",
-          "protocol",
-          "owner",
-          "interface_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "out_of_scope": {
+          "description": "Functional requirements explicitly excluded from API contract coverage, with rationale. Use when an FR has no observable API boundary — e.g., internal code constraints, CSS rendering concerns, phase-deferred features. Every uncovered FR must appear here or as a trace on an existing API.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fr_id": {
+                "description": "The FR identifier excluded from API coverage.",
+                "type": "string"
+              },
+              "rationale": {
+                "description": "Why this FR has no API contract — e.g., internal constraint, phase deferral, cross-cutting rendering concern.",
+                "type": "string"
+              }
+            },
+            "required": ["fr_id", "rationale"]
+          }
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "apis"
+      ],
+      "description": "Step-specific properties for 05_interface_contracts."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "apis",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

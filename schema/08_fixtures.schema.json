@@ -1,107 +1,85 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/08_fixtures.schema.json",
+  "$id": "vc:08-fixtures",
   "title": "08_fixtures",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "fixtures": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "fixture_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "targets": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "mode": {
-            "type": "string",
-            "enum": [
-              "unit",
-              "contract",
-              "e2e",
-              "redteam"
+    {
+      "type": "object",
+      "properties": {
+        "fixtures": {
+          "description": "Array of test fixtures providing concrete input/expected pairs for validating spec artifacts. Each fixture must reference at least one spec artifact and provide verifiable input/output pairs. A fixture typically validates one acceptance criterion from an FR and one API contract simultaneously. Example: fix-auth-login-success validates ac-login-success from fr-user-login AND the success response contract for api-auth-login. Anti-pattern: fixtures that target only an FR without also targeting the corresponding API contract when one exists.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "description": "A single test fixture with input data, expected output, testing mode, and target references. Fixtures are the executable contracts between spec and implementation.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fixture_id": {
+                "description": "Unique kebab-case identifier for this fixture. Naming convention: fix-{feature}-{scenario}-{mode-suffix-optional}. Examples: 'fix-auth-login-success' (happy path unit test), 'fix-auth-login-invalid-e2e' (end-to-end invalid credentials test), 'fix-payment-duplicate-redteam' (adversarial duplicate payment test). Should be stable across spec versions — renaming breaks traceability links. Anti-pattern: 'fix-1', 'fix-test-001' (sequential labels with no traceable meaning).",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "description": {
+                "description": "Human-readable description of what this fixture tests. Format: 'Given [precondition], when [action], then [expected outcome].' Example: 'Given a user account with email alice@example.com exists and email_verified=true, when POST /auth/login is called with correct credentials, then a 200 response with a JWT token is returned within 200ms.' Alternative format: '{fr-id or target}: {scenario} → {expected outcome}'. Examples: 'fr-user-login: valid credentials submitted → 200 OK with session_token in response body', 'api-payment-charge: amount exceeds account balance → 422 INSUFFICIENT_FUNDS error with retry guidance'. Anti-pattern: 'Tests login' (no precondition, action, or expected outcome); 'FR-03 login test' — use the kebab-case fr-id format (not FR-03 number format) and include the expected outcome.",
+                "type": "string"
+              },
+              "targets": {
+                "description": "Array of spec artifact references that this fixture validates. Include all artifacts this fixture provides evidence for. Decision rule: list both the FR (behavioral correctness) and the API (contract compliance) when a fixture covers both. Example targets array: [{\"id\": \"fr-user-login\", \"type\": \"fr\", \"note\": \"validates: FR acceptance criterion\"}, {\"id\": \"api-auth-login\", \"type\": \"api\", \"note\": \"validates: API contract\"}]. type = the canonical kind of the target (fr, api, nfr, invariant); the validates relationship goes in note. Both the FR acceptance criterion and the API contract are validated by the same fixture. Validated artifacts must exist in the upstream spec files — a missing target ID causes fixtures-lint to fail. Anti-pattern: targeting only the FR without the corresponding API contract. Valid target ID types: fr-* (functional requirement from Step 04), api-* (API contract from Step 05), nfr-* (non-functional requirement from Step 07), inv-* (invariant from Step 06). Each fixture must target at least one artifact. Target at least one FR and one API when the fixture validates an HTTP endpoint — this ensures both the requirement and the contract are covered. Anti-pattern: targeting only the FR without the corresponding API contract, or fabricating a target ID that does not exist in the spec.",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "vc:core:collections#traceRef",
+                  "description": "A trace reference to a spec artifact this fixture validates. At step 08, type = the canonical kind of the validated target: use type='fr' for fr-* IDs, type='api' for api-* IDs, type='nfr' for nfr-* IDs, type='invariant' for inv-* IDs. The validates relationship goes in note. Example: {\"type\": \"fr\", \"id\": \"fr-user-login\", \"note\": \"validates: happy path — valid credentials return session token\"}. Anti-pattern: type='validates' — 'validates' is a relationship verb, not a canonical kind; use the target's kind instead. Anti-pattern: pointing to a cap-* ID — fixtures target FRs and APIs, not capabilities directly."
+                }
+              },
+              "mode": {
+                "description": "Testing mode that determines how this fixture is executed. Decision rules: 'unit' — test a single function or validation rule in complete isolation with all dependencies mocked, no network calls; 'contract' — test the request/response boundary at the API layer, service dependencies mocked but the HTTP handler is live (use for api-* targets); 'e2e' — test a full user journey across integrated components where the service layer is real (use for fr-* targets that span multiple components); 'redteam' — adversarial inputs designed to trigger security, data-integrity, or business-logic violations. For fr-user-login: unit mode tests the JWT signing logic in isolation (all HTTP mocked); contract mode tests the POST /auth/login endpoint with auth service mocked; e2e mode tests the full login flow including DB and session store; redteam mode tests alg:none JWT attack and SQL injection in the email field. Anti-pattern: using 'unit' for fixtures that reference an api-* target — those should be 'contract' or 'e2e'.",
+                "$ref": "vc:core:atoms#testingMode"
+              },
+              "input": {
+                "description": "The input data used to set up this fixture's test scenario. Should be concrete and realistic — use representative values that reflect actual production data shapes. Include: required fields, boundary values, and any data that triggers the specific behavior being tested. Good: {\"email\": \"alice@example.com\", \"password\": \"hunter2\"} (real-looking, domain-specific). Bad: {\"email\": \"test\", \"password\": \"test\"} (not representative of real data) or {\"data\": {...}} (wrapped in unnecessary envelope). Use realistic but non-PII data. Avoid: generic placeholder values ('foo', 'test123'), incomplete objects, or data that doesn't reflect the real system's constraints.",
+                "$ref": "vc:core:collections#anyJson"
+              },
+              "expected": {
+                "description": "The expected system behavior after applying the input. Each outcome should be: (1) specific — reference exact field names, status codes, or system states; (2) verifiable — an engineer should be able to write an assertion from this; (3) complete — cover all observable effects of the operation. Example: 'Response status 201, response body contains user_id and auth_token, database record created with correct email hash'.",
+                "$ref": "vc:core:collections#anyJson"
+              },
+              "tags": {
+                "description": "Array of short labels for categorising and filtering fixtures in CI. At least one tag recommended. Standard tags to consider: 'smoke' (run on every commit), 'regression' (run on PR), 'performance' (load/stress tests), 'security' (auth/authz coverage), 'slow' (tests that take >5s). Example: [\"auth\", \"critical\", \"pii\"]. CI pipeline runs --tags critical for pre-merge gates and --tags auth for auth-service-specific test suites. Each tag must match the pattern ^[A-Za-z0-9_.:-]{1,64}$. Anti-pattern: more than 5 tags per fixture — over-tagging reduces the value of tag-based filtering. Anti-pattern: custom tags that are never filtered on in CI — tags only add value when pipeline configuration uses them.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#tag",
+                  "description": "A short categorisation label. Use lowercase letters, digits, dots, colons, and hyphens only. Examples: 'smoke', 'regression', 'security', 'slow', 'env:prod-only', 'fr:user-login'. Colon-separated tags (env:, fr:) create namespaced categories. Anti-pattern: spaces or uppercase (use dots/colons as separators, not spaces); avoid tags longer than 20 characters."
+                }
+              },
+              "tag_ref": {
+                "description": "Canonical reference to a tag defined in the canonical registry. Required for every fixture. Kind is structurally pinned to 'tag'. Example: {\"id\": \"cn:core:tag:critical-path\", \"kind\": \"tag\", \"label\": \"critical-path\"}. Always populate tag_ref with the primary canonical tag for this fixture. If the appropriate tag is not yet in the canon registry, add it there first using 'specdev canon-accept' before authoring this fixture.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "tag" } } }
+                ]
+              }
+            },
+            "required": [
+              "fixture_id",
+              "mode",
+              "input",
+              "expected",
+              "targets",
+              "tag_ref"
             ]
-          },
-          "input": {
-            "$ref": "https://specdev.local/schema/core/collections/1#anyJson"
-          },
-          "expected": {
-            "$ref": "https://specdev.local/schema/core/collections/1#anyJson"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/atoms/1#tag"
-            }
-          },
-          "tag_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
-        },
-        "required": [
-          "fixture_id",
-          "mode",
-          "input",
-          "expected",
-          "targets",
-          "tag_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "fixtures"
+      ],
+      "description": "Step-specific properties for 08_fixtures."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "fixtures",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

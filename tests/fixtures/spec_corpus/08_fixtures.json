@@ -1,0 +1,14 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "spec-corpus-08",
+  "fixtures": [
+    {
+      "fixture_id": "FIX-CORPUS-001",
+      "title": "Corpus sample fixture",
+      "description": "A minimal fixture for spec_corpus fixture testing.",
+      "targets": [
+        {"type": "api", "id": "API-CORPUS-001"}
+      ]
+    }
+  ]
+}

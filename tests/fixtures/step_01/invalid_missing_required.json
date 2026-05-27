@@ -1,20 +1,13 @@
 {
-  "$schema": "https://specdev.local/schema/01_capabilities.schema.json",
+  "$schema": "vc:01-capabilities",
   "id": "capabilities-catalog",
   "owner": "product",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "capabilities": [
     {
       "capability_id": "capability-search-products",
       "description": "Missing verb and scope"
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

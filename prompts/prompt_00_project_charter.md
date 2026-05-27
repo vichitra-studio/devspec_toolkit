@@ -1,102 +1,72 @@
 # Step 00 · Project Charter
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+## Role
+You are a **senior product strategist and scope analyst**. Your job is to emit a single JSON artifact for **Step 00 · Project Charter** that captures business scope in falsifiable, machine-checkable language. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
+Run `specdev prompt-context 00` to see downstream consumers. This prompt's output feeds 8 downstream steps.
+
 ## Purpose
 Establish the authoritative charter that captures the business problem, intended users, constraints, and measurable success criteria in falsifiable language. This artifact anchors downstream decisions by making scope boundaries, stakeholder needs, and success metrics explicit enough to trace through every later step.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 0 · Project Charter** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+For each upstream artifact ingested, extract the following:
+- **Seeds**: per spec/common/seed_manifest.json step_requirements["00"]
+- **Existing org context** (if present): Business objectives, compliance posture, target users/markets from any product briefs in repo
+- **spec/03_glossary.json, spec/07_nfrs.json** (if present): Align metrics/units and terminology with early drafts
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 0 · Project Charter**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
-
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["00"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- **Primary Source:** `docs/seed/seed_overview.md` (required) for high-level scoping.
-- **Constraints Source:** `docs/seed/seed_tech_stack.md` (required) to trace hardware/legacy constraints into `out_of_scope` or `assumptions`.
-- Existing org context: business objectives, compliance posture, target users/markets (summarize from any product briefs present in repo).
-- Specs in `spec/` if present: early drafts of `03_glossary.json`, `07_nfrs.json` (to align metrics/units), and any legacy charter-like docs.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md` (formerly `template/shared_expectations.md`), reference `devspec_toolkit/docs/developers/reference.md`.
-- Examples: `example/devspec_kit/spec/00_charter.json`, `example/devspec_kit/spec/07_nfrs.json` for shape of success metrics.
-
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger containing: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics (metric→unit→target→method). Do not output it.
-- Cross-check metrics against any NFRs/monitoring references to align names and units; align segments with Glossary terms.
-- Self-audit against the checklist; if scope, metrics, or stakeholders are unclear, ask Gap Questions instead of guessing; wait for answers.
-- Rewrite for measurability: ensure problem statement and metrics have explicit units, targets, and measurement methods; propose `links` to anticipated FRs/NFRs where obvious.
-- Emit a single JSON artifact only after the above is satisfied.
+## Operating Flow: Extract → Scope → Validate → Emit
+- **Extract**: Build a private Context Ledger from all seeds listed for this step in the manifest. Capture: problem statement (who/what/impact), in/out-of-scope boundaries, assumptions, risks, stakeholders (roles→needs), user_segments (JTBD/pains/gains), and candidate success_metrics. Do not output it. For any seed covering tech stack or infrastructure: extract hardware/legacy constraints for `out_of_scope`, technology constraints for `risks`, and dependency risks for `assumptions`. Do not leave seed tech constraint data unreflected — every tech constraint must map to a charter field.
+- **Scope**: Cross-check metrics against seed documents to align metric names and units; align segment terminology with seed document terminology.
+- **Validate**: Self-audit against the checklist; if scope, metrics, or stakeholders are unclear, ask Gap Questions instead of guessing; wait for answers. Rewrite for measurability: ensure problem statement and metrics have explicit units, targets, and measurement methods; propose `links` to anticipated FRs/NFRs where obvious.
+- **Emit**: Emit a single JSON artifact only after the above is satisfied.
 
 ## Heuristics For Completeness (soft, non-binding)
-- Elevate optional→expected: include baselines and measurement_method for success_metrics when historical data or dashboards are referenced; include stakeholders and user_segments that materially affect scope.
-- Auto-link seeds: add `links` to likely downstream FRs (`fr-*` once known) and NFR categories inferred from metrics (e.g., latency, cost).
-- Ambiguity scrub: remove “improve/optimize/user-friendly/fast”; replace with quantifiable targets and timeframes.
+- MUST include baselines and measurement_method for success_metrics when any seed listed in the manifest for this step references historical data or dashboards; MUST include stakeholders and user_segments that materially affect scope as identified in the seed documents.
+- Auto-link seeds: add `links` to downstream FRs (`fr-*` once known) and NFR categories derived from `success_metrics` units (read `canon/manifest.json` for valid NFR category values).
+- Ambiguity scrub: MUST replace any instance of “improve”, “optimize”, “user-friendly”, or “fast” with a quantifiable target (numeric value + unit + timeframe) derived from seed success criteria or seed constraints (per the manifest).
 
-## Self-Audit Gate (do not output)
-- Set `generation_quality.preflight_passed=true` only when evidence is sufficient and contradictions are resolved; otherwise stop and ask targeted questions.
-- Gating items to check before emitting:
-  - Problem statement names users, pain, measurable business impact, and hard constraints.
-  - In/out-of-scope each list ≥3 specific items tied to integrations/features/regions.
-  - Stakeholders include at least product/eng/ops/security roles with distinct needs.
-  - User segments include JTBD/pains/gains for primary personas.
-  - Success metrics include unit+target+measurement_method (baseline where available) for ≥2 metrics.
-  - Owner reflects accountability for charter maintenance.
-
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
-## Step-Specific Completeness Checklist
-- Problem statement specifies the primary pain, affected users, measurable business impact, and hard constraints (time, budget, compliance).
-- Scope is explicit: at least 3–5 in-scope items and 3–5 out-of-scope items; avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
-- Stakeholders list covers decision-makers and operators; each stakeholder has a role and specific needs that drive requirements or success metrics.
-- User segments are distinct; each includes jobs-to-be-done, pains, and gains that map to capabilities and FRs.
-- Success metrics: each metric includes metric_id, name, unit, target, measurement_method, and—where known—baseline grounded in existing data.
-- Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
-- Owner is set based on who will maintain the charter and is not just a default.
+## Self-Audit Gate
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/common/seed_manifest.json` is present and lists at least one seed for step "00".
+- All seeds listed for step "00" in the manifest are present and non-empty.
 
 ## Negative Constraints
 - **DO NOT** use vague "business speak" (e.g. "optimize", "improve") without measurable metrics.
-- **DO NOT** omit the `owner` field; accountability is required.
+- **DO NOT** use a default or placeholder value for `owner`; set it to the accountable team.
 - **DO NOT** use placeholder TBDs for critical sections like `problem_statement` or `success_metrics`.
 - **DO NOT** list stakeholders without defining their specific `needs`.
 
-## Field-by-Field Guidance
-- id: stable kebab-case; prefer `project_charter-<initiative>`.
-- owner: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, or `engineering`; pick the accountable group for charter updates.
-- problem_statement: 1–3 sentences, explicit on users, pain, outcome, and constraints.
-- in_scope/out_of_scope: concrete bullets; include integrations, data domains, and delivery boundaries.
-- assumptions: facts taken for granted (e.g., existing identity provider, data retention rules).
-- risks: delivery and operational risks with concise phrasing (e.g., dependency readiness, legal review timelines).
-- stakeholders: roles (e.g., Security Lead, Support Manager) with clear needs (e.g., audit logs retained 1 year).
-- user_segments: include description and JTBD; pains and gains should be testable or observable later.
-- success_metrics: target must be measurable in units; measurement_method states how/where it will be captured (e.g., analytics event, dashboard query).
-- links: trace to FRs/NFRs/governance ids when known; use temporary `*-tbd` anchors if not yet defined.
+## Coverage Closure
+Before emitting, verify:
+- Every requirement stated in any seed listed for this step in the manifest is reflected in `in_scope`, `out_of_scope`, `success_metrics`, `user_segments`, `assumptions`, or `risks`, OR explicitly listed in `out_of_scope` with rationale.
+- No seed requirement is silently dropped — this is the root artifact; nothing upstream can be deferred.
+- All metric names and units in `success_metrics` align with terminology used in the seed documents.
+- If any seed statement is ambiguous or contradictory: add a gap question (Clarify mode) rather than making an assumption.
+- [ ] Every upstream ID referenced in extraction intent has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] `in_scope` and `out_of_scope` each contain specific items (not vague categories)
+- [ ] All `assumptions` and `risks` are traceable to entries in the seeds ingested for this step
+- [ ] Every tech constraint from seeds is reflected in `assumptions`, `risks`, or `out_of_scope`
+- [ ] Every stakeholder's `needs` trace to at least one `success_metric` or scope item
+- [ ] Every `success_metric` has all required fields populated (no vague targets)
+
+## Step-Specific Completeness Checklist
+- Problem statement specifies the primary pain, affected users, measurable business impact, and hard constraints (time, budget, compliance).
+- Scope is explicit: avoid vague wording (e.g., "optimize", "improve") without measurable anchors.
+- Stakeholders list covers decision-makers and operators; each stakeholder has a role and specific needs that drive requirements or success metrics.
+- User segments are distinct; each includes jobs-to-be-done, pains, and gains that map to capabilities and FRs.
+- Success metrics: each metric MUST include all schema-required fields; when any ingested seed or product brief contains historical values, populate the optional `baseline` field with that data.
+- Links include at least one cross-reference to downstream steps (e.g., FRs, NFRs) or upstream governance/constraints.
+- Owner is set based on who will maintain the charter and is not just a default.
 
 ## Best Practices
-- **Problem Statement**: Write a crisp statement grounded in user pain and measurable outcomes, avoiding solutioneering.
-- **Success Metrics**: Pair each `success_metric` with a realistic baseline, target, unit, and measurement method.
-- **Scope**: Define in/out of scope explicitly to prevent creep; capture at least 3 items each.
+- **Problem Statement**: Write a statement of 1-3 sentences that names the affected users, their pain, the measurable business impact, and hard constraints — sourced from the ingested seeds. Avoid solutioneering.
+- **Success Metrics**: Ensure each `success_metric` is measurable and traceable to seed document data; populate all schema-required fields.
+- **Scope**: Define in/out of scope explicitly to prevent creep.
 - **Users**: Describe each `user_segment` with jobs-to-be-done, pains, and gains to map requirements to value.
 - **Risks**: Record critical `assumptions` and `risks` with enough context to inform governance.
 - **Stakeholders**: Identify real stakeholders (not just titles) to drive prioritization.
@@ -108,14 +78,6 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **Missing Stakeholders**: Forgetting key segments or stakeholders (breaks downstream traceability).
 - **Scope Creep**: Missing an "out-of-scope" list, leading to ambiguity.
 
-## Quick Reference
-- Required: `id`, `owner`, `created_at`, `problem_statement`, `success_metrics`.
-- **Validation Gates**: 
-  - `stakeholders` MUST have `needs`.
-  - `success_metrics` MUST have `measurement_method`.
-  - `in_scope` MUST have at least 3 items.
-- Stakeholders: list roles and needs; must inform later FRs and NFRs.
-
 # Clarification Questions
 - What are the top 3 measurable business outcomes (with units and targets) and by when?
 - Which user segments are in primary focus, and what critical JTBD do they have today that we must address?
@@ -126,56 +88,84 @@ You are a senior specification author and validator. Your job is to emit a singl
 - Which upstream systems, dependencies, or programs does this charter rely on, and what risks do they introduce?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/00_charter.schema.json
+- Schema URI: vc:00-charter
 - Schema File: schema/00_charter.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
-  "id": "project-charter-catalog",
+  "$schema": "vc:00-charter",
+  "id": "charter-v1",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
-  ],
   "title": "Project Charter",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
-  "success_metrics": [],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
+  "in_scope": [
+    "User authentication flows",
+    "Session lifecycle management",
+    "Token refresh and expiry handling"
+  ],
+  "out_of_scope": [
+    "OAuth third-party integrations",
+    "Legacy SSO migration",
+    "Mobile biometric authentication"
+  ],
+  "assumptions": [
+    "Existing user database schema remains unchanged"
+  ],
+  "risks": [
+    "Session storage capacity under peak load"
+  ],
+  "stakeholders": [
+    {
+      "role": "Engineering Lead",
+      "needs": [
+        "Clear authentication requirements",
+        "Defined session lifecycle"
+      ]
+    }
+  ],
+  "user_segments": [
+    {
+      "segment_id": "end-user",
+      "description": "Registered users who authenticate via standard login flows.",
+      "jobs_to_be_done": [
+        "Log in securely"
+      ],
+      "pains": [
+        "Inconsistent session handling"
+      ],
+      "gains": [
+        "Reliable authentication"
+      ]
+    }
+  ],
+  "success_metrics": [
+    {
+      "metric_id": "login-success-rate",
+      "name": "Login Success Rate",
+      "target": ">= 99.5%",
+      "unit": "percent",
+      "measurement_method": "Ratio of successful logins to total attempts via auth service metrics dashboard",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      }
     },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
-
+    {
+      "metric_id": "session-error-rate",
+      "name": "Session Error Rate",
+      "target": "< 0.1%",
+      "unit": "percent",
+      "measurement_method": "Ratio of session errors to total sessions from error tracking dashboard",
+      "unit_ref": {
+        "id": "cn:core:unit:percent",
+        "kind": "unit"
+      }
+    }
+  ],
+  "canonical_refs_used": []
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

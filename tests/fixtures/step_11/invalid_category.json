@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/11_redteam.schema.json",
+  "$schema": "vc:11-redteam",
   "id": "redteam-catalog-invalid-category",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "threats": [
     {
       "threat_id": "threat-input-injection",
@@ -23,6 +15,7 @@
         }
       ],
       "category": "invalid-category",
+      "risk_category_ref": {"id": "cn:core:risk_category:auth", "kind": "risk_category"},
       "mitigations": [
         {
           "type": "inv",
@@ -37,5 +30,6 @@
       "id": "ec-query-timeout",
       "description": "Query timeouts during complex retrieval operations"
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

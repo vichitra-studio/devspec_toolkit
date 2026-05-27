@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:migration",
+  "title": "digest_migration",
+  "description": "Digest projection of a migration / versioning artifact (changelog/migrations/** or other migration_versioning slice files that are not the top-level unreleased changelog). Captures the migration kind, affected canonical entities, target toolkit version, and breaking-change flag for K1/K3 drift checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a migration digest.",
+      "type": "string",
+      "const": "digest_migration"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root.",
+      "type": "string",
+      "minLength": 1
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Migration-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migration_path", "kind", "affected_entities", "is_breaking"],
+      "properties": {
+        "migration_path": {
+          "description": "Echo of source_file for ergonomic downstream lookup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "description": "Inferred migration category. Derived from filename hints (added/changed/deprecated/removed/fixed) or section headings inside the file. 'unknown' when no signal is present.",
+          "type": "string",
+          "enum": ["added", "changed", "deprecated", "removed", "fixed", "unknown"]
+        },
+        "affected_entities": {
+          "description": "Canonical IDs mentioned in the file (matches the cn:... / fr-... / api-... / nfr-... / inv-... patterns).",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "target_version": {
+          "description": "Toolkit version associated with this migration if inferable from the filename (e.g. v0.4.0.md) or a 'target version' line in the body. Absent when not inferable.",
+          "type": "string",
+          "minLength": 1
+        },
+        "is_breaking": {
+          "description": "True when the file declares a breaking change (filename or content contains 'breaking', or a 'Breaking' heading is present).",
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

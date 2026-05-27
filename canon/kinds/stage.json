@@ -1,6 +1,9 @@
 {
+  "$schema": "vc:canon:kind",
+  "$comment": "Current values are identical to environment.json. Stage values represent CI/CD pipeline phases and are expected to diverge as canary, blue-green, and other pipeline-specific stages are added.",
   "registry_version": "1.0.0",
   "kind": "stage",
+  "description": "Authoritative registry of pipeline stage names. A stage represents a phase in the CI/CD pipeline (where code goes THROUGH: build → test → deploy). Schema field stageName in schema/core/collections.schema.json references this file as its canonical source.",
   "entries": [
     {
       "id": "cn:core:stage:ci",

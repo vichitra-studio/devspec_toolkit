@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/04_fr_list.schema.json",
+  "$schema": "vc:04-fr-list",
   "id": "functional-requirements-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "functional_requirements": [
     {
       "fr_id": "fr-user-login",
@@ -21,33 +13,25 @@
         "System is accessible"
       ],
       "postconditions": [
-        "User session is established",
-        "User is redirected to dashboard"
+        "User session is created",
+        "Access token is returned"
       ],
       "acceptance_criteria": [
-        {
-          "criterion_id": "ac-login-success",
-          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard",
-          "fixture_ref": "fixture-user-login-success"
-        },
-        {
-          "criterion_id": "ac-login-failure",
-          "text": "Given invalid username or password, when user submits login form, then system displays error message",
-          "fixture_ref": "fixture-user-login-failure"
-        }
+        {"criterion_id": "ac-user-login-1", "text": "Valid credentials return 200 with access token"},
+        {"criterion_id": "ac-user-login-2", "text": "Invalid credentials return 401 with error message"}
       ],
+      "priority": "must-have",
       "trace": [
-        {
-          "type": "capability",
-          "id": "cap-user-authentication",
-          "note": "Implements core authentication behavior"
-        },
         {
           "type": "api",
           "id": "api-login",
           "note": "Authentication API endpoint"
         }
-      ]
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:cap-user-authentication",
+        "kind": "capability"
+      }
     },
     {
       "fr_id": "fr-user-logout",
@@ -57,23 +41,29 @@
         "User is authenticated"
       ],
       "postconditions": [
-        "User session is terminated",
-        "User is redirected to login page"
+        "Session is invalidated",
+        "User cannot access protected resources"
       ],
       "acceptance_criteria": [
-        {
-          "criterion_id": "ac-logout-success",
-          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page",
-          "fixture_ref": "fixture-user-logout-success"
-        }
+        {"criterion_id": "ac-user-logout-1", "text": "Logout invalidates session token"},
+        {"criterion_id": "ac-user-logout-2", "text": "Subsequent requests with old token return 401"}
       ],
+      "priority": "must-have",
       "trace": [
         {
           "type": "capability",
           "id": "cap-user-session-management",
           "note": "Manages user session lifecycle"
         }
-      ]
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:cap-user-session-management",
+        "kind": "capability"
+      }
     }
+  ],
+  "canonical_refs_used": [
+    {"id": "cn:project:capability:cap-user-authentication", "kind": "capability"},
+    {"id": "cn:project:capability:cap-user-session-management", "kind": "capability"}
   ]
 }

@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "$schema": "vc:14-roadmap",
   "id": "roadmap-v1-migration",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "migration_plan": "Migrate legacy auth tables to the new schema after core API validation.",
   "tech_stack": {
     "languages": [
@@ -66,11 +58,23 @@
         },
         {
           "task_id": "configure-docker-compose",
-          "description": "Configure Docker compose for DB and App"
+          "description": "Configure Docker compose for DB and App",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "docker-compose-runs",
+              "text": "Docker compose up starts both DB and app containers successfully."
+            }
+          ]
         },
         {
           "task_id": "implement-health-check",
-          "description": "Implement health check endpoint"
+          "description": "Implement health check endpoint",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "health-endpoint-ok",
+              "text": "GET /health returns 200 with JSON status body."
+            }
+          ]
         }
       ],
       "deliverables": [
@@ -79,6 +83,8 @@
           "id": "health-endpoint"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     }
@@ -92,18 +98,5 @@
     }
   ],
   "trace": [],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  "canonical_refs_used": []
 }

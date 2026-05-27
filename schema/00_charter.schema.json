@@ -1,187 +1,230 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/00_charter.schema.json",
+  "$id": "vc:00-charter",
   "title": "00_charter",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "title": {
-      "type": "string"
-    },
-    "problem_statement": {
-      "type": "string",
-      "minLength": 20
-    },
-    "in_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 3
-    },
-    "out_of_scope": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 3
-    },
-    "assumptions": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 1
-    },
-    "risks": {
-      "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-      "minItems": 1
-    },
-    "stakeholders": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "role": {
-            "type": "string"
-          },
-          "needs": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "role_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+    {
+      "type": "object",
+      "properties": {
+        "title": {
+          "description": "Short human-readable title for the project charter. Use 2–6 words in Title Case, noun phrase identifying the system. Examples: 'Billing Reconciliation API', 'Customer Self-Service Portal', 'Inventory Management Service', 'Checkout Payment Flow'. Anti-patterns: 'Project Charter' (generic placeholder), 'System' (too vague), multi-sentence titles.",
+          "type": "string"
+        },
+        "problem_statement": {
+          "description": "Concise description of the problem this project aims to solve. Must be at least 20 characters (enforced by minLength). Should identify the affected users/stakeholders, the current pain point, and the business impact. Avoid solution-language; focus on the problem space.",
+          "type": "string",
+          "minLength": 20
+        },
+        "in_scope": {
+          "description": "Items explicitly within the boundaries of this project. At least 3 items must be provided (enforced by minItems). Each item should be a concrete deliverable, capability, or integration point.",
+          "$ref": "vc:core:collections#stringArray",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "description": "A specific, bounded statement of what this project includes. Each item should cover one of: a capability delivered ('JWT-based authentication for web and mobile clients'), an integration built ('Stripe payment gateway integration for one-time charges'), a data domain managed ('User profile storage with GDPR-compliant soft-delete'), or a delivery boundary ('Production deployment to AWS eu-west-1'). Avoid vague items like 'authentication' or 'user management' — every item should name a concrete deliverable. At least one item per category (capability, integration, data domain) produces a well-bounded scope."
           }
         },
-        "required": [
-          "role",
-          "needs"
-        ]
-      }
-    },
-    "user_segments": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "segment_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "jobs_to_be_done": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "pains": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "gains": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
+        "out_of_scope": {
+          "description": "Items explicitly excluded from this project. At least 3 items must be provided (enforced by minItems). Use to prevent scope creep and set stakeholder expectations.",
+          "$ref": "vc:core:collections#stringArray",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "description": "A specific statement of what this project explicitly excludes. Items should address the same categories as in_scope: capabilities deferred ('OAuth third-party identity provider — post-launch only'), integrations excluded ('Mobile biometric authentication via Face ID/Touch ID'), data domains out of bounds ('Historical order archive migration — separate initiative'), and delivery targets not in scope ('On-premises deployment — cloud-only for this release'). Vague items like 'everything else' or 'future features' are not useful — name the specific thing being excluded and (optionally) why."
           }
         },
-        "required": [
-          "segment_id",
-          "description",
-          "jobs_to_be_done",
-          "pains",
-          "gains"
-        ]
-      }
-    },
-    "success_metrics": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "metric_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "name": {
-            "type": "string"
-          },
-          "baseline": {
-            "oneOf": [
-              {
-                "type": "number"
-              },
-              {
+        "assumptions": {
+          "description": "Assumptions made during project scoping that could affect delivery if invalidated. At least one must be provided (enforced by minItems). Each should be falsifiable and monitorable.",
+          "$ref": "vc:core:collections#stringArray",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "description": "A specific, falsifiable statement about a condition taken for granted during project scoping. Write in present tense as a fact: 'Existing PostgreSQL user database schema remains unchanged during development', 'Email delivery via SendGrid is available in all target regions', 'Legal review for PII retention policy will complete before beta launch'. Distinguish assumptions from risks: an assumption is something you believe to be true (and must monitor); a risk is something that could go wrong. If an assumption is invalidated during delivery, it becomes a blocking issue."
+          }
+        },
+        "risks": {
+          "description": "Known risks that could impact project success or timeline. At least one must be provided (enforced by minItems). Each should be specific enough to have a mitigation strategy.",
+          "$ref": "vc:core:collections#stringArray",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "description": "A specific, named risk that could impact project success, timeline, or quality. Use concise noun-phrase format: 'Third-party payment gateway API instability during peak load periods', 'Legal review timeline for PII data retention policy exceeds sprint schedule', 'Mobile team dependency on auth service API contract finalisation before Sprint 3'. Distinguish risks from assumptions: a risk is something that might go wrong; an assumption is something believed to be true. Each risk should be specific enough that a mitigation strategy can be written for it."
+          }
+        },
+        "stakeholders": {
+          "description": "Array of stakeholder roles and their needs relevant to this project.",
+          "type": "array",
+          "items": {
+            "description": "A single stakeholder entry identifying a role and what that role needs from the project.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "role": {
+                "description": "Functional role describing how this stakeholder relates to this project's outcomes — not their org-chart title or personal name. Decision rule: use the role that captures their accountability to the project deliverables, kept to 2-4 words. Examples: 'Product Manager' (owns feature prioritisation), 'Compliance Officer' (accountable for regulatory sign-off), 'Support Agent' (handles end-user escalations), 'External Auditor' (reviews access and audit logs), 'End User' (primary consumer of the delivered capability). Anti-patterns: 'John Smith' (a name, not a role — names change and cannot be traced to accountability), 'Senior Engineer' (org-chart title that does not describe what this person is accountable for in this project).",
                 "type": "string"
-              }
-            ]
-          },
-          "target": {
-            "oneOf": [
-              {
-                "type": "number"
               },
-              {
-                "type": "string"
+              "needs": {
+                "description": "What this stakeholder needs from the project. Be specific about their measurable success criteria. At least one need per stakeholder (enforced by minItems). Each item should name a specific, verifiable outcome — see item description for the full format guide. Stakeholder needs must be specific enough to inform downstream FRs (Step 04) and NFRs (Step 07) — each need should be traceable to at least one functional requirement or non-functional requirement. Anti-pattern: vague needs like 'good performance' that cannot be mapped to a specific FR or NFR metric.",
+                "$ref": "vc:core:collections#stringArray",
+                "items": {
+                  "type": "string",
+                  "description": "What this stakeholder requires the project to deliver for them to consider it successful. Write as a specific, measurable requirement from their perspective: 'Audit logs retained for 12 months and exportable as CSV for compliance reviews', 'P95 API latency under 200ms so the mobile app meets App Store performance guidelines', 'Role-based access control so support agents cannot view raw payment data'. Avoid vague entries like 'good performance' or 'security requirements' — name the specific outcome this stakeholder needs."
+                }
+              },
+              "role_ref": {
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "role" } } }
+                ],
+                "description": "Canonical reference to a role defined in the canonical registry. Kind is structurally pinned to role. Example: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"Reviewer\"}. Omit if no canon entry exists for this role — do not fabricate an ID. Create a canonical_proposals entry instead. Use real example ID: cn:core:role:reviewer"
               }
+            },
+            "required": [
+              "role",
+              "needs"
             ]
-          },
-          "unit": {
-            "type": "string"
-          },
-          "measurement_method": {
-            "type": "string"
-          },
-          "unit_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
           }
         },
-        "required": [
-          "metric_id",
-          "name",
-          "target",
-          "unit",
-          "measurement_method",
-          "unit_ref"
-        ]
-      }
-    },
-    "links": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#link"
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        "user_segments": {
+          "description": "Array of distinct user segments the project serves, each with jobs-to-be-done analysis.",
+          "type": "array",
+          "items": {
+            "description": "A user segment describing a target audience, their goals, pains, and gains.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "segment_id": {
+                "description": "Unique kebab-case identifier for this user segment. Convention: seg-{descriptive-noun}. Examples: 'seg-finance-admin', 'seg-api-integrator', 'seg-self-service-customer', 'seg-support-agent'. Should be stable — downstream steps (01 capabilities, 04 FRs) reference this ID in trace links. Anti-pattern: 'seg-1', 'seg-power-user' — sequential labels and generic names cannot be traced to meaning.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "description": {
+                "description": "Who this user segment is, characterized by the behavioral, technical, or role-based attributes that make them distinct from other segments. Focus on characteristics that drive different product needs. Examples: 'Finance administrators who reconcile monthly billing across 3+ cost centers using exported CSV reports', 'End customers who view and dispute individual charges via the self-service portal on mobile devices', 'API integrators who embed payment flows into third-party checkout experiences'. Avoid: 'Power users', 'Regular users' — these names do not capture the distinguishing characteristics.",
+                "type": "string"
+              },
+              "jobs_to_be_done": {
+                "description": "Primary jobs this segment needs to accomplish using this system. Format: imperative verb + specific object + situational context. Examples: 'Reconcile monthly billing charges against internal cost centre codes before the month-end close', 'Dispute a specific charge during an active customer service call without navigating multiple screens', 'Export all transaction history for a given date range as CSV for external audit submission'. Avoid one-word jobs ('Manage orders', 'Process payments') — they omit the context that distinguishes this segment's needs.",
+                "$ref": "vc:core:collections#stringArray"
+              },
+              "pains": {
+                "description": "Current friction points, obstacles, or frustrations this segment experiences without the solution. List the specific mechanism of pain, not just its surface label.",
+                "$ref": "vc:core:collections#stringArray",
+                "items": {
+                  "type": "string",
+                  "description": "A specific friction, obstacle, or frustration this segment currently faces. Name the mechanism of pain and its scale or frequency where possible. Examples: 'Manual reconciliation of 3 separate billing systems requiring 4+ hours per billing cycle', 'No visibility into pending charge status until statement closes — every delayed charge triggers a support ticket', 'Cannot export transaction history without contacting support, blocking SOC2 audit preparation'. Avoid surface labels: 'Slow performance', 'Confusing interface', 'Hard to use' — these do not identify the specific friction."
+                }
+              },
+              "gains": {
+                "description": "Specific, measurable outcomes or benefits this segment expects once the solution exists. Each gain should address one or more of the pains listed above.",
+                "$ref": "vc:core:collections#stringArray",
+                "items": {
+                  "type": "string",
+                  "description": "A concrete, measurable benefit this segment will gain from the solution. Include the outcome and an indicator of its scale or value where possible. Examples: 'Reduce monthly billing reconciliation from 4 hours to under 30 minutes by consolidating all billing data in one view', 'See pending charge status in real-time during checkout — eliminates avoidable dispute support tickets', 'Export full transaction history as CSV without human intervention — required for SOC2 audit preparation'. Avoid vague positives: 'Better performance', 'Easier to use', 'Save time' — these do not name the specific outcome or its measure."
+                }
+              }
+            },
+            "required": [
+              "segment_id",
+              "description",
+              "jobs_to_be_done",
+              "pains",
+              "gains"
+            ]
+          }
+        },
+        "success_metrics": {
+          "description": "Quantifiable metrics used to measure project success. At least 2 must be provided (enforced by minItems).",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "description": "A single success metric with target and measurement method, plus optional baseline. When baseline is unknown, omit it rather than guessing — measurement can establish it post-launch.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "metric_id": {
+                "description": "Unique kebab-case identifier for this metric. Convention: metric-{noun-phrase}. Examples: 'metric-checkout-conversion', 'metric-api-p95-latency', 'metric-monthly-active-users', 'metric-reconciliation-error-rate'. Must be stable across spec versions — downstream steps reference this ID in capability success_metric_refs. Anti-pattern: 'metric-1', 'metric-kpi-3' — sequential labels cannot be traced to meaning.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "name": {
+                "description": "Human-readable metric name displayed in reports and dashboards. Use Title Case, 3–6 words, noun phrase describing what is measured. Examples: 'Checkout Page Load Time', 'Monthly Active Users', 'Reconciliation Error Rate', 'API Auth Success Rate', 'Checkout Conversion Rate'. Avoid single words ('Latency', 'Users', 'Errors') — they are ambiguous across multiple metrics. Avoid full sentences or clauses.",
+                "type": "string"
+              },
+              "baseline": {
+                "description": "Optional. Current measured value before this project begins. If provided, establishes the improvement delta. Include units.",
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "description": "Current measured value before this project begins, in the same units as the target. When a baseline is unknown, omit the field entirely rather than guessing. Example: if unit is 'ms' and current P95 latency is 450ms, set baseline to 450."
+                  },
+                  {
+                    "type": "string",
+                    "description": "String baseline value when the numeric form is inappropriate. Choose the form based on what you have: (1) numeric when you have a single measured value with units matching the target — e.g., 450 when target is '< 200ms'; (2) string 'unknown' when no prior measurement exists; (3) string 'N/A' when this is a new capability with no prior state; (4) string with range when the current baseline is itself a range — e.g., '4-6 hours per billing cycle'. Use 'unknown' when no current measurement exists yet and a baseline will be established post-launch; 'N/A' when baseline is not applicable because this is a new capability with no prior state; '4-6 hours per billing cycle' when the current baseline is a range with units rather than a single number; '< 5% monthly' when the existing baseline is itself expressed as a threshold. Omit the field entirely rather than guessing. Anti-pattern: '0' as a string when the intent is 'no baseline exists' — use 'unknown' instead, as '0' implies a measured value of zero rather than absence of measurement."
+                  }
+                ]
+              },
+              "target": {
+                "description": "Measurable target value with units. Decision rule: use the numeric form when the target is a single threshold with no operator (e.g., 200); use the string form when the target needs an operator, condition, or context. Examples: '< 200ms' (string, latency threshold), '>= 99.9%' (string, availability), '< 0.1% error rate' (string, rate), 95 (number, conversion percentage). The string form is preferred — it is self-documenting. Anti-pattern: '200' as a number when the intent is 'under 200ms' — use the string form.",
+                "oneOf": [
+                  {
+                    "type": "number",
+                    "description": "Use numeric form only when the direction is unambiguous from the metric name. Example: 95 for 'Checkout Conversion Rate' (higher is better, so 95 means 'at least 95%'). Example: 5 for 'Maximum Retry Count' (exact value, not a threshold). If there is any ambiguity about direction or threshold, use the string form instead. Anti-pattern: 200 when the intent is 'under 200ms' — the operator must be explicit, so use the string form '< 200ms'."
+                  },
+                  {
+                    "type": "string",
+                    "description": "Use string form when the target includes an operator (<, >, >=, <=), a unit abbreviation, or a condition expression — this makes the threshold self-documenting. Examples: '< 200ms' (latency threshold with operator and unit), '>= 99.9%' (availability with minimum operator), '< 0.1% error rate' (rate with operator and label). Anti-pattern: writing 200 as a number when the intent is 'under 200ms' — the operator must appear explicitly in the string form."
+                  }
+                ]
+              },
+              "unit": {
+                "description": "Unit of measurement for this metric. Use standard abbreviations: 'ms' (milliseconds), 'percent' (percentage points), 'count' (raw count), 'req/s' (requests per second), 'MB' (megabytes), 'USD' (currency). The `unit_ref` field links this to the canonical unit registry. Always use the abbreviated form from the approved list: 'ms' (not 'milliseconds'), 'percent' (not 'pct' or '%'), 'count' (not 'number' or 'qty'), 'req/s' (not 'rps' or 'requests per second'). Anti-pattern: 'milliseconds' or 'percentage points' — use the canonical abbreviation so unit_ref can reference the exact term in the canon registry.",
+                "type": "string"
+              },
+              "measurement_method": {
+                "description": "How this metric is measured. Name the specific tool, dashboard, query, or manual process. Examples: 'P95 latency from DataDog APM dashboard — apm.page.load metric', 'Monthly active users counted from analytics.users_active_monthly BigQuery table', 'Reconciliation error rate from weekly reconciliation job exit code log in CloudWatch'. Avoid: 'Measured by monitoring', 'From the dashboard', 'Manual check' — these are too vague for a reviewer to reproduce the measurement.",
+                "type": "string"
+              },
+              "unit_ref": {
+                "description": "Canonical reference to the unit defined in the canonical registry. Kind is structurally pinned to 'unit'. Example: {\"id\": \"cn:core:unit:ms\", \"kind\": \"unit\"} for milliseconds, {\"id\": \"cn:core:unit:percent\", \"kind\": \"unit\"} for percentages. Must be consistent with the 'unit' field value.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "unit" } } }
+                ]
+              }
+            },
+            "required": [
+              "metric_id",
+              "name",
+              "target",
+              "unit",
+              "measurement_method",
+              "unit_ref"
+            ]
+          }
+        },
+        "links": {
+          "description": "Array of external links relevant to the charter (design docs, research, stakeholder briefs). Each entry should use a meaningful 'rel' value. Common rel values: 'source' (the original requirements document), 'design' (Figma, Miro, or architecture doc), 'research' (user research or market analysis), 'documentation' (existing API or product docs). Complete example: {\"rel\": \"design\", \"href\": \"https://www.figma.com/file/abc123\", \"spec_ref\": \"figma-wireframes\"}. A 'relevant' link directly informs spec decisions (design files, research reports, requirements documents). An 'irrelevant' link is a general reference that doesn't affect any spec decision (company homepage, Wikipedia). Omit if no relevant external links exist. Anti-pattern: adding links to project management tools (Jira, Linear) — use stakeholder or governance fields for those.",
+          "type": "array",
+          "items": {
+            "$ref": "vc:core:collections#link",
+            "description": "A link to an external resource related to the charter."
+          }
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "problem_statement",
+        "in_scope",
+        "out_of_scope",
+        "assumptions",
+        "risks",
+        "success_metrics",
+        "stakeholders",
+        "user_segments"
+      ],
+      "description": "Step-specific properties for 00_charter."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "problem_statement",
-    "success_metrics",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

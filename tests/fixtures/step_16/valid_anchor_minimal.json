@@ -1,0 +1,20 @@
+{
+  "$schema": "vc:16-anchor",
+  "id": "anchor-v1",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "artifact_role": "anchor",
+  "canonical_refs_used": [],
+  "plan": {
+    "summary": {
+      "functional_summary": "Full authentication implementation across two milestones.",
+      "scope_in": ["jwt-token-validation", "login-endpoint"],
+      "scope_out": ["oauth-flows", "third-party-sso"]
+    },
+    "ambiguities": [],
+    "drift": {
+      "checks": []
+    },
+    "milestone_index": []
+  }
+}

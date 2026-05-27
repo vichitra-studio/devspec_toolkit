@@ -1,0 +1,29 @@
+{
+  "$schema": "vc:16-anchor",
+  "id": "anchor-v1",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "artifact_role": "anchor",
+  "canonical_refs_used": [],
+  "plan": {
+    "summary": {
+      "functional_summary": "Anchor that incorrectly carries a spec_alignment.checklist (belongs on milestone plans only).",
+      "scope_in": ["jwt-token-validation"],
+      "scope_out": ["oauth-flows"]
+    },
+    "ambiguities": [],
+    "drift": { "checks": [] },
+    "milestone_index": [],
+    "spec_alignment": {
+      "checklist": [
+        {
+          "id": "AUTH_LOGIN_01",
+          "type": "behavior",
+          "layer": "api",
+          "description": "Login endpoint accepts valid credentials.",
+          "spec_ref": { "type": "fr", "id": "fr-login" }
+        }
+      ]
+    }
+  }
+}

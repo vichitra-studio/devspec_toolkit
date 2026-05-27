@@ -1,193 +1,147 @@
-#!/usr/bin/env python3
 """
-Verification script for Step 11 (Red‑Team / Failure Modes) hardening changes.
-This script validates that the schema changes are working correctly and
-that referenced IDs in both targets AND mitigations actually exist in upstream files.
+Integration tests for Step 11 (Red-Team / Failure Modes) validation.
+
+Validates that step 11 fixtures conform to schema and that reference
+validation logic works correctly using self-contained mock data.
 """
 
 import json
-import sys
-import os
 from pathlib import Path
 
-# Add the devspec_toolkit/tools package to path so we can import specdev_tools
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+import pytest
 
-def load_json_file(filepath):
-    """Load and parse JSON file."""
-    try:
-        if not os.path.exists(filepath):
-            # Try relative to repo root if not found
-            if os.path.exists(os.path.join(".", filepath)):
-                filepath = os.path.join(".", filepath)
-            else:
-                print(f"Warning: File not found: {filepath}")
-                return None
-        
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Error loading {filepath}: {e}")
-        return None
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "step_11"
 
-def validate_schema_compliance(filepath):
-    """Validate that the file complies with the new schema."""
-    try:
-        # Use simple os.system or subprocess if import fails, but let's try to mock the validation 
-        # since we are focusing on logic validation here and we trust the schema file itself.
-        # However, for a proper tool we should use `specdev_tools`. 
-        # Assuming the environment has it. If not, basic JSON load is the fallback check.
-        # For this specific run, we'll rely on the logic checks mainly.
-        return True
-    except Exception as e:
-        print(f"Validation error for {filepath}: {e}")
-        return False
 
-def build_id_index():
-    """Build a comprehensive index of all valid IDs from the spec."""
-    index = {
-        'api': set(),
-        'component': set(),
-        'fr': set(),
-        'nfr': set(),
-        'inv': set(),
-        'fixture': set(),
-        'doc': set(),
-        'capability': set()
-    }
-    
-    # Load APIs from 05
-    contracts = load_json_file("spec/05_interface_contracts.json")
-    if contracts:
-        for api in contracts.get('apis', []):
-            if 'api_id' in api: index['api'].add(api['api_id'])
-            
-    # Load Components from 02
-    sketch = load_json_file("spec/02_system_sketch.json")
-    if sketch:
-        for comp in sketch.get('components', []):
-            if 'component_id' in comp: index['component'].add(comp['component_id'])
-            
-    # Load FRs from 04
-    frs = load_json_file("spec/04_fr_list.json")
-    if frs:
-        for fr in frs.get('functional_requirements', []):
-            if 'fr_id' in fr: index['fr'].add(fr['fr_id'])
-            
-    # Load NFRs from 07
-    nfrs = load_json_file("spec/07_nfrs.json")
-    if nfrs:
-        for nfr in nfrs.get('nfrs', []):
-            if 'nfr_id' in nfr: index['nfr'].add(nfr['nfr_id'])
-            
-    # Load Invariants from 06
-    invs = load_json_file("spec/06_invariants.json")
-    if invs:
-        for inv in invs.get('rules', []):
-            if 'inv_id' in inv: index['inv'].add(inv['inv_id'])
-            
-    # Load Capabilities from 01
-    caps = load_json_file("spec/01_capabilities.json")
-    if caps:
-        for cap in caps.get('capabilities', []):
-            if 'pk' in cap: index['capability'].add(cap['pk'])
+# ---------------------------------------------------------------------------
+# Mock ID index (replaces live spec/ reads)
+# ---------------------------------------------------------------------------
 
-    # Load Fixtures from 08
-    fixtures = load_json_file("spec/08_fixtures.json")
-    if fixtures:
-        for fix in fixtures.get('fixtures', []):
-            if 'fixture_id' in fix: index['fixture'].add(fix['fixture_id'])
+MOCK_ID_INDEX = {
+    "api": {"api-ask", "api-search", "api-trace-retrieval"},
+    "component": {"comp-retrieval-engine", "comp-auth-service"},
+    "fr": {"fr-read-document", "fr-search-docs"},
+    "nfr": {"nfr-availability-api", "nfr-latency-p99"},
+    "inv": {"invariant-payload-validation", "inv-input-validation"},
+    "fixture": {"fix-happy-path-search"},
+    "doc": set(),
+    "capability": {"cap-search"},
+}
 
-    print(f"Loaded ID Index: APIs={len(index['api'])}, Components={len(index['component'])}, "
-          f"FRs={len(index['fr'])}, NFRs={len(index['nfr'])}, Invariants={len(index['inv'])}, "
-          f"Capabilities={len(index['capability'])}, Fixtures={len(index['fixture'])}")
-    return index
 
-def validate_references(fixture_data, id_index):
-    """Validate that all referenced IDs exist in the index."""
-    threats = fixture_data.get('threats', [])
-    all_valid = True
-    
-    for i, threat in enumerate(threats):
-        # 1. Validate Target IDs
-        target_ids = threat.get('target_ids', [])
-        current_threat_id = threat.get('threat_id', f"threat-{i}")
-        
-        if not target_ids:
-             print(f"❌ Threat {current_threat_id} has NO target_ids (Mandatory)")
-             all_valid = False
+# ---------------------------------------------------------------------------
+# Helper: reference validation (extracted from old script)
+# ---------------------------------------------------------------------------
 
-        for j, target in enumerate(target_ids):
-            t_type = target.get('type')
-            t_id = target.get('id')
-            
-            if t_type not in ['api', 'component']:
-                print(f"❌ Threat {current_threat_id}: Invalid target type '{t_type}'")
-                all_valid = False
+
+def _validate_references(fixture_data, id_index):
+    """Return list of error strings for invalid references."""
+    errors = []
+    for threat in fixture_data.get("threats", []):
+        threat_id = threat.get("threat_id", "<unknown>")
+
+        # Target IDs
+        for target in threat.get("target_ids", []):
+            t_type = target.get("type")
+            t_id = target.get("id")
+            if t_type not in ("api", "component"):
+                errors.append(
+                    f"Threat {threat_id}: invalid target type '{t_type}'"
+                )
                 continue
-                
-            if t_id not in id_index.get(t_type, set()):
-                # Only fail if we actually loaded that type (to avoid false negatives if file missing)
-                if len(id_index.get(t_type, set())) > 0:
-                    print(f"❌ Threat {current_threat_id}: Target ID '{t_id}' ({t_type}) NOT FOUND in spec")
-                    all_valid = False
-            else:
-                pass # Valid
+            known = id_index.get(t_type, set())
+            if known and t_id not in known:
+                errors.append(
+                    f"Threat {threat_id}: target '{t_id}' ({t_type}) not found"
+                )
 
-        # 2. Validate Mitigation IDs
-        mitigations = threat.get('mitigations', [])
-        for k, mit in enumerate(mitigations):
-            m_type = mit.get('type')
-            m_id = mit.get('id')
-            
-            # Types: fr, api, nfr, inv, fixture, doc, capability
-            # We enforce checks for the ones we have loaded
-            if m_type in ['inv', 'nfr', 'fr', 'api', 'capability', 'fixture']:
-                 if m_id not in id_index.get(m_type, set()):
-                    if len(id_index.get(m_type, set())) > 0:
-                        print(f"❌ Threat {current_threat_id}: Mitigation ID '{m_id}' ({m_type}) NOT FOUND in spec")
-                        all_valid = False
-    
-    return all_valid
+        # Mitigation IDs
+        for mit in threat.get("mitigations", []):
+            m_type = mit.get("type")
+            m_id = mit.get("id")
+            if m_type in ("inv", "nfr", "fr", "api", "capability", "fixture"):
+                known = id_index.get(m_type, set())
+                if known and m_id not in known:
+                    errors.append(
+                        f"Threat {threat_id}: mitigation '{m_id}' ({m_type}) not found"
+                    )
 
-def main():
-    """Main verification function."""
-    print("=== Step 11 Verification Script (Enhanced) ===")
-    
-    # Buid Index
-    id_index = build_id_index()
-    
-    # Test fixtures directory
-    fixtures_dir = "devspec_toolkit/tests/fixtures/step_11"
-    if not os.path.exists(fixtures_dir):
-        # try relative
-        fixtures_dir = "tests/fixtures/step_11"
-        
-    if not os.path.exists(fixtures_dir):
-        print(f"Error: Fixtures dir not found: {fixtures_dir}")
-        return 1
-    
-    # Valid fixture
-    valid_path = os.path.join(fixtures_dir, "valid_full.json")
-    print(f"\nValidating {valid_path}...")
-    
-    valid_fixture = load_json_file(valid_path)
-    if valid_fixture:
-        refs_valid = validate_references(valid_fixture, id_index)
-        if refs_valid:
-            print("✅ ID Reference validation passed")
-        else:
-            print("❌ ID Reference validation failed")
-            return 1
-    else:
-        print("❌ Could not load valid_full.json")
-        return 1
-    
-    # Note: We skip negative tests for this run to focus on the 'valid' integration integrity
-    # But in a real CI we would run them all.
-    
-    print("\n=== VERIFICATION COMPLETE ===")
-    return 0
+    return errors
 
-if __name__ == "__main__":
-    sys.exit(main())
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+class TestStep11Fixtures:
+    """Validate step 11 test fixtures."""
+
+    def test_valid_full_loads(self):
+        """valid_full.json is well-formed JSON."""
+        path = FIXTURES_DIR / "valid_full.json"
+        data = json.loads(path.read_text())
+        assert data["id"] == "redteam-catalog"
+        assert len(data["threats"]) >= 1
+
+    def test_valid_full_has_required_fields(self):
+        """valid_full.json contains all required top-level fields."""
+        data = json.loads((FIXTURES_DIR / "valid_full.json").read_text())
+        for field in ("$schema", "id", "owner", "threats", "edge_cases"):
+            assert field in data, f"Missing required field: {field}"
+
+    def test_valid_full_references_resolve(self):
+        """All target and mitigation IDs in valid_full.json resolve against mock index."""
+        data = json.loads((FIXTURES_DIR / "valid_full.json").read_text())
+        errors = _validate_references(data, MOCK_ID_INDEX)
+        assert errors == [], f"Reference errors: {errors}"
+
+    def test_invalid_missing_target_lacks_target_ids(self):
+        """invalid_missing_target.json has a threat without target_ids."""
+        data = json.loads(
+            (FIXTURES_DIR / "invalid_missing_target.json").read_text()
+        )
+        threat = data["threats"][0]
+        assert "target_ids" not in threat, (
+            "Expected missing target_ids in invalid fixture"
+        )
+
+    def test_invalid_category_has_bad_category(self):
+        """invalid_category.json uses a non-enum category value."""
+        data = json.loads(
+            (FIXTURES_DIR / "invalid_category.json").read_text()
+        )
+        threat = data["threats"][0]
+        assert threat["category"] == "invalid-category"
+
+    def test_unresolvable_mitigation_detected(self):
+        """Reference validator catches a mitigation ID that does not exist."""
+        fake_fixture = {
+            "threats": [
+                {
+                    "threat_id": "threat-test",
+                    "target_ids": [{"type": "api", "id": "api-ask"}],
+                    "mitigations": [
+                        {"type": "fr", "id": "fr-does-not-exist"}
+                    ],
+                }
+            ]
+        }
+        errors = _validate_references(fake_fixture, MOCK_ID_INDEX)
+        assert len(errors) == 1
+        assert "fr-does-not-exist" in errors[0]
+
+    def test_invalid_target_type_detected(self):
+        """Reference validator rejects a target type outside api/component."""
+        fake_fixture = {
+            "threats": [
+                {
+                    "threat_id": "threat-test",
+                    "target_ids": [{"type": "widget", "id": "w-1"}],
+                    "mitigations": [],
+                }
+            ]
+        }
+        errors = _validate_references(fake_fixture, MOCK_ID_INDEX)
+        assert len(errors) == 1
+        assert "invalid target type" in errors[0]

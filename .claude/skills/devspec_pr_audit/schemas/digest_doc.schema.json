@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:audit:digest:doc",
+  "title": "digest_doc",
+  "description": "Digest projection of a documentation markdown file (docs/**/*.md, CLAUDE.md, or **/SHARED_*.md). Captures heading outline, fenced code-block inventory, referenced specdev commands, and referenced file paths for cross-doc drift checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["digest_type", "source_file", "source_sha", "extractor_version", "extracted_at", "payload"],
+  "properties": {
+    "digest_type": {
+      "description": "Discriminator constant identifying this as a documentation digest.",
+      "type": "string",
+      "const": "digest_doc"
+    },
+    "source_file": {
+      "description": "Relative path of the source file from the toolkit root.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^.*\\.md$"
+    },
+    "source_sha": {
+      "description": "40-character git blob SHA of the source file at extraction time.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "extractor_version": {
+      "description": "Semver version of the extractor script that produced this digest.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "extracted_at": {
+      "description": "Unix epoch seconds when this digest was produced.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "description": "Doc-specific audit facts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc_path", "headings", "code_blocks", "referenced_commands", "referenced_files"],
+      "properties": {
+        "doc_path": {
+          "description": "Echo of source_file for ergonomic downstream lookup.",
+          "type": "string",
+          "minLength": 1
+        },
+        "headings": {
+          "description": "All markdown headings in document order, each with its depth (1-6) and text.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/heading"
+          }
+        },
+        "code_blocks": {
+          "description": "Fenced code blocks in document order. Each entry records the declared language (empty string when no info-string) and the line count of the block body (excluding fence lines).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/code_block"
+          }
+        },
+        "referenced_commands": {
+          "description": "Unique `specdev <subcommand>` mentions found in the document (e.g. 'specdev spec-check', 'specdev validate'). Subcommand only — flags excluded.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "referenced_files": {
+          "description": "Markdown link targets that look like repository file paths (contain a slash or end with a recognised extension). External URLs are excluded.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "frontmatter": {
+          "description": "Parsed YAML frontmatter block if present at the top of the document. Absent when no frontmatter exists or it could not be parsed. Stored as an arbitrary JSON object (free-form by design).",
+          "type": "object"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "heading": {
+      "description": "A single markdown heading.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["depth", "text"],
+      "properties": {
+        "depth": {
+          "description": "Heading depth (1=H1, 6=H6).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "text": {
+          "description": "Heading text with the leading hashes and trailing whitespace stripped.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "code_block": {
+      "description": "A single fenced code block.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "line_count"],
+      "properties": {
+        "language": {
+          "description": "Info-string after the opening fence (e.g. 'bash', 'python', 'json'). Empty string when no info-string is given.",
+          "type": "string"
+        },
+        "line_count": {
+          "description": "Number of lines inside the fence (excluding the opening and closing fence lines themselves).",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

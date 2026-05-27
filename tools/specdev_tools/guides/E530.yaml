@@ -1,0 +1,20 @@
+code: E530
+title: "Hallucination / invented value"
+trigger: |
+  A value in a spec artifact does not match any allowed enum member, canonical
+  ID, or registered entry.  This is the base E530 catch-all; more specific
+  subcodes (INVENTED_ENUM_OR_ID, LINKED_TEST_FILE_NOT_FOUND) provide targeted
+  remediation.
+resolution: |
+  Consult the specific subcode guide for targeted steps:
+    specdev guide E530-INVENTED_ENUM_OR_ID
+    specdev guide E530-LINKED_TEST_FILE_NOT_FOUND
+
+  General approach:
+    - Replace invented values with valid entries from the allowlist or canon.
+    - If the value is legitimately new, register it (canon-accept, allowlist
+      extension, or schema enum update as appropriate).
+see_also:
+  - E530-INVENTED_ENUM_OR_ID
+  - E530-LINKED_TEST_FILE_NOT_FOUND
+  - E110

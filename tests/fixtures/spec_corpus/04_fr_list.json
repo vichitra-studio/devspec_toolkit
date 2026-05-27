@@ -1,0 +1,18 @@
+{
+  "$schema": "vc:04-fr-list",
+  "id": "spec-corpus-04",
+  "functional_requirements": [
+    {
+      "fr_id": "FR-CORPUS-001",
+      "title": "Corpus sample functional requirement",
+      "description": "A minimal FR for spec_corpus fixture testing.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "AC-CORPUS-001",
+          "description": "The system must satisfy the corpus criterion."
+        }
+      ],
+      "trace": []
+    }
+  ]
+}

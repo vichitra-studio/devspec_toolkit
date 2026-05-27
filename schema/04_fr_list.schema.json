@@ -1,126 +1,128 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/04_fr_list.schema.json",
+  "$id": "vc:04-fr-list",
   "title": "04_fr_list",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+  "allOf": [
+    {
+      "$ref": "vc:core:step-base",
+      "description": "Inherits shared step-base properties ($schema, id, owner, created_at, canonical_refs_used)."
     },
-    "owner": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#owner"
-    },
-    "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
-    },
-    "seed_refs": {
-      "$ref": "https://specdev.local/schema/core/collections/1#seedRefArray"
-    },
-    "functional_requirements": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "fr_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "statement": {
-            "type": "string",
-            "minLength": 20
-          },
-          "rationale": {
-            "type": "string"
-          },
-          "preconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "postconditions": {
-            "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-          },
-          "acceptance_criteria": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "criterion_id": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-                },
-                "text": {
-                  "type": "string",
-                  "minLength": 15
-                },
-                "fixture_ref": {
-                  "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+    {
+      "type": "object",
+      "properties": {
+        "functional_requirements": {
+          "description": "Array of functional requirements derived from capabilities, each with acceptance criteria and trace links. Each FR must bind to exactly one capability and include at least two testable acceptance criteria. Worked example of a complete FR entry: {\"fr_id\": \"fr-user-login\", \"statement\": \"The system must authenticate users via email and password and return a session token.\", \"priority\": \"must-have\", \"acceptance_criteria\": [{\"criterion_id\": \"ac-login-success\", \"text\": \"Given valid credentials, the system returns a 200 response with a JWT token within 200ms.\"}, {\"criterion_id\": \"ac-login-invalid\", \"text\": \"Given invalid credentials, the system returns 401 with error code INVALID_CREDENTIALS.\"}], \"trace\": [{\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Implements this capability\"}], \"capability_ref\": {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}, \"entity_ref\": {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"}}. Anti-pattern: an FR array with a single entry that conflates multiple behaviors (e.g., login + logout + password reset in one statement).",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "description": "A single functional requirement with statement, acceptance criteria, and traceability. A single FR is insufficient — at least two functional requirements are required to establish meaningful coverage.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fr_id": {
+                "description": "Unique kebab-case identifier. Recommended format: fr-{domain}-{action}. Examples: 'fr-user-login', 'fr-checkout-payment', 'fr-auth-token-refresh'. The domain identifies the subsystem; the action describes the behavior. Should be stable across spec versions — changing an fr_id breaks traceability.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "statement": {
+                "description": "Clear, falsifiable statement of a single system behavior. Must be at least 20 characters (enforced by minLength). Should describe WHAT the system does, not HOW. Structure: subject + verb + object + measurable condition. Example: 'The system shall return a 401 Unauthorized response within 200ms when an expired token is presented.' Avoid: vague terms ('user-friendly', 'fast', 'easily'), implementation details, compound statements (use multiple FRs instead).",
+                "type": "string",
+                "minLength": 20
+              },
+              "rationale": {
+                "description": "Business or technical justification for why this FR exists. If it traces to a compliance requirement, cite the regulation and clause. If it traces to a user story, name the user scenario and pain point. Good rationale: 'Email+password authentication is the baseline requirement per the security policy; OAuth is deferred to Phase 2 to reduce initial scope.' Problematic rationale: 'Needed for authentication' (restates the FR without explaining the decision to include this specific approach). Examples: 'Required by PCI DSS 6.5.10 to prevent session fixation attacks after privilege change', 'Addresses Finance Admin segment pain: manual reconciliation takes 4+ hours per cycle', 'Enables the checkout conversion success metric by reducing friction at payment step'. Minimum 15 characters. Anti-pattern: 'This is needed by the team' — provide the actual business driver.",
+                "type": "string"
+              },
+              "priority": {
+                "description": "MoSCoW classification for this functional requirement. Decision rules: 'must-have' = legal/compliance requirement, safety-critical, or explicit blocker for other must-have FRs; 'should-have' = high business value, agreed by product stakeholders, effort within current sprint budget; 'could-have' = nice-to-have, deferred if timeline slips, no dependency from 'must-have' items; 'wont-have' = explicitly excluded for this release but documented to prevent scope creep. Anti-pattern: labelling all FRs 'must-have' (defeats MoSCoW prioritisation — typically ≤60% of FRs should be 'must-have'). Optional — when omitted, priority is determined by stakeholder discussion outside the schema.",
+                "type": "string",
+                "enum": ["must-have", "should-have", "could-have", "wont-have"]
+              },
+              "preconditions": {
+                "description": "State conditions that must hold before this FR can execute. Omit if the FR is stateless (a pure read with no prerequisites). Include when the system state before execution affects correctness or authorization. Examples for fr-user-login: 'User account exists in the users table with email_verified = true', 'Rate limit counter for this IP is below 10 requests per minute'. Anti-pattern: 'User is valid' (too vague — specify which database field and what value it must hold). General examples: 'User session exists and token is not expired', 'Shopping cart contains at least one item with available inventory'.",
+                "$ref": "vc:core:collections#stringArray"
+              },
+              "postconditions": {
+                "description": "State conditions guaranteed to hold after successful execution. Include at least one for any FR that mutates state or produces a persistent output. Examples for fr-user-login: 'A session_tokens table entry is created with user_id, token_hash, and expiry = now() + 24h', 'login_events audit log entry is written with timestamp, user_id, and IP address'. Anti-pattern: 'User is logged in' (already a precondition result — postconditions describe what changed in the system). General examples: 'Session record is persisted to session store with 24-hour TTL', 'Order status transitions from PENDING to CONFIRMED and confirmation email is enqueued'. Anti-pattern: 'Data is saved' (too vague — name the specific state change, including persistence and timing guarantees).",
+                "$ref": "vc:core:collections#stringArray"
+              },
+              "acceptance_criteria": {
+                "description": "Testable criteria that define when this requirement is satisfied. At least 2 criteria required (minItems enforced). Each criterion must be falsifiable — verifiable by an automated test or a human reviewer following a deterministic procedure. Required coverage: (1) happy path — system behaves correctly given valid input; (2) at least one error/edge case — system rejects invalid input or handles failure gracefully. Testable (Tier 3): 'Given a valid JWT with RS256 signing, POST /auth/validate returns 200 with the decoded claims within 50ms.' Non-testable (anti-pattern): 'The login should work correctly' — no input, expected output, or timing constraint. Anti-pattern: 'User is logged in successfully' (not falsifiable — no observable artifact); 'System works correctly' (circular — not a criterion).",
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "description": "A single acceptance criterion with an ID and testable text. Fixture coverage is authored in Step 08 via fixture.targets[] referencing the parent FR — Step 04 does not declare fixture references.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "criterion_id": {
+                      "description": "Unique kebab-case identifier for this acceptance criterion. Convention: ac-{fr_id_slug}-{n} where fr_id_slug is the parent FR's id without the 'fr-' prefix and n is a sequence number starting at 1. Examples: 'ac-user-login-1', 'ac-user-login-2', 'ac-payment-processing-1'. This format allows criteria to be reverse-traced to their parent FR without looking up the document. Anti-pattern: 'ac-1', 'ac-criterion-a' — generic IDs that lose the FR relationship.",
+                      "$ref": "vc:core:atoms#kebabId"
+                    },
+                    "text": {
+                      "description": "Testable criterion text that can be objectively verified. Must be at least 15 characters (enforced by minLength). Should be specific enough to write an automated test. Avoid subjective terms like 'fast', 'good', 'user-friendly'. Include concrete thresholds, expected behaviors, and boundary conditions. Example: 'Given an expired JWT token, when the API is called, then it returns HTTP 401 with error code AUTH-001 within 200ms.'",
+                      "type": "string",
+                      "minLength": 15
+                    }
+                  },
+                  "required": [
+                    "criterion_id",
+                    "text"
+                  ]
                 }
               },
-              "required": [
-                "criterion_id",
-                "text"
-              ]
-            }
-          },
-          "trace": {
-            "type": "array",
-            "items": {
-              "$ref": "https://specdev.local/schema/core/collections/1#traceRef"
-            }
-          },
-          "capability_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "action_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "entity_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
-          },
-          "status_ref": {
-            "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRef"
+              "trace": {
+                "description": "Traceability links back to upstream capabilities or charter items. Every FR must trace to at least one upstream capability using type='capability'. Example: [{\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Implements this capability; provides the credential validation flow\"}]. FRs without trace links are orphaned requirements that cannot be validated against charter scope. The trace items provide the approved types and formats — this parent description provides the cardinality requirement. Valid trace types at Step 04: type 'capability' pointing to cap-* IDs (the capability this FR realises; put 'implements' in note), type 'fr' pointing to fr-* IDs (for FRs that split or refine another FR; put 'derives_from' in note). Downstream: APIs (api-*) and NFRs (nfr-*) will trace back to fr-* IDs from their own step. Minimum: every FR must have at least one trace to a capability (type='capability'). Anti-pattern: using verb-types such as 'implements' or 'derives_from' — type must be the canonical kind of the target artifact, not a relationship verb; put the relationship verb in note. Anti-pattern: tracing to a charter artifact ID instead of a capability ID — use cap-* not charter-*.",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "vc:core:collections#traceRef",
+                  "description": "A traceability reference linking this FR to the upstream capability it implements. At step 04, use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json (the kind of the target; put the 'implements' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Implements this capability\"}. Multiple traces allowed when an FR partially implements multiple capabilities. An FR without a trace link is an orphan requirement — every FR must trace to at least one capability."
+                }
+              },
+              "capability_ref": {
+                "description": "Canonical reference to the capability this requirement implements. The `kind` must be 'capability'. The `id` follows the pattern cn:<namespace>:capability:<slug>. Example: {\"id\": \"cn:project:capability:user-authentication\", \"kind\": \"capability\", \"label\": \"User Authentication\"}. The label should copy the capability's preferred_label from the canon registry. Required — every FR must bind to exactly one capability in the canon.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "capability" } } }
+                ]
+              },
+              "action_ref": {
+                "description": "Canonical reference to the action verb that is the key operation in this requirement's statement. The `kind` must be 'action'. Decision rule: pick the verb that names the primary state mutation this FR produces. When the FR statement contains multiple verbs, choose the outermost action — the one whose outcome defines success. Examples: for 'System validates credentials and creates a session token' → action is 'authenticate' (the overall behaviour), not 'validate' or 'create'. For fr-order-create, the outermost action is 'create' (not 'validate' or 'persist'). Cross-check: action_ref.label must match the capability's verb field. Anti-pattern: 'process' or 'handle' — these are too generic to be a canonical action. Example: {\"id\": \"cn:project:action:authenticate\", \"kind\": \"action\", \"label\": \"authenticate\"}. Ensures consistent verb vocabulary across all FRs, API contracts, and data models downstream.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "action" } } }
+                ]
+              },
+              "entity_ref": {
+                "description": "Canonical reference to the primary domain entity this requirement operates on. The `kind` must be 'entity'. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"}. Use the entity that is the direct subject or object of the operation — for 'create order', entity_ref points to the Order entity. Drives consistent entity naming in API contracts, data models, and test fixtures downstream.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "entity" } } }
+                ]
+              },
+              "status_ref": {
+                "description": "Canonical reference to the lifecycle status value this requirement transitions or checks. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:active\", \"kind\": \"status\"}. Include when the FR operates on an entity with a lifecycle status. Omit for FRs that apply regardless of entity status.",
+                "allOf": [
+                  { "$ref": "vc:core:collections#canonicalRef" },
+                  { "properties": { "kind": { "const": "status" } } }
+                ]
+              }
+            },
+            "required": [
+              "fr_id",
+              "statement",
+              "acceptance_criteria",
+              "trace",
+              "capability_ref"
+            ]
           }
-        },
-        "required": [
-          "fr_id",
-          "statement",
-          "acceptance_criteria",
-          "capability_ref"
-        ]
-      }
-    },
-    "generation_quality": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/generationQuality"
-    },
-    "canonical_refs_used": {
-      "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalRefArray"
-    },
-    "canonical_proposals": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalProposal"
+        }
       },
-      "default": []
-    },
-    "canonical_conflicts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://specdev.local/schema/core/collections/1#/$defs/canonicalConflict"
-      },
-      "default": []
+      "required": [
+        "functional_requirements"
+      ],
+      "description": "Step-specific properties for 04_fr_list."
     }
-  },
-  "required": [
-    "id",
-    "owner",
-    "created_at",
-    "seed_refs",
-    "functional_requirements",
-    "generation_quality",
-    "canonical_refs_used",
-    "canonical_proposals",
-    "canonical_conflicts"
-  ]
+  ],
+  "unevaluatedProperties": false
 }

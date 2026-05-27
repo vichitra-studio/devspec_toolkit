@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/14_roadmap.schema.json",
+  "$schema": "vc:14-roadmap",
   "id": "roadmap-invalid-missing-source-milestones",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "tech_stack": {
     "languages": [
       {
@@ -61,10 +53,13 @@
           "id": "health-endpoint"
         }
       ],
+      "fr_refs": [],
+      "capability_refs": [],
       "risks": [],
       "spikes": []
     }
   ],
   "dependencies": [],
-  "trace": []
+  "trace": [],
+  "canonical_refs_used": []
 }

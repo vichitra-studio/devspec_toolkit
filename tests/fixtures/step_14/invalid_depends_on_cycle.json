@@ -1,0 +1,64 @@
+{
+  "$schema": "vc:14-roadmap",
+  "id": "roadmap-cycle-test",
+  "owner": "system",
+  "created_at": "2025-01-01T00:00:00Z",
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "python",
+        "version": "3.9"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": "0.95.0"
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "milestone_id": "m1-core-foundation",
+      "name": "Core Foundation",
+      "target_date": "2025-02-01",
+      "user_story": "As a developer, I want a stable base API so that I can build features.",
+      "source_milestones": [
+        "m1-core-foundation"
+      ],
+      "tasks": [
+        {
+          "task_id": "task-a",
+          "description": "Task A depends on task-c creating a cycle",
+          "depends_on": [
+            "task-b"
+          ]
+        },
+        {
+          "task_id": "task-b",
+          "description": "Task B depends on task-c in the cycle",
+          "depends_on": [
+            "task-c"
+          ]
+        },
+        {
+          "task_id": "task-c",
+          "description": "Task C depends on task-a completing the cycle",
+          "depends_on": [
+            "task-a"
+          ]
+        }
+      ],
+      "deliverables": [
+        {
+          "type": "api",
+          "id": "base-api"
+        }
+      ],
+      "fr_refs": [],
+      "capability_refs": []
+    }
+  ],
+  "dependencies": [],
+  "canonical_refs_used": []
+}

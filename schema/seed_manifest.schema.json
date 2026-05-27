@@ -1,48 +1,34 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specdev.local/schema/seed_manifest.schema.json",
+  "$id": "vc:seed-manifest",
   "title": "seed_manifest",
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URI identifying the schema this seed manifest conforms to."
+    },
     "seed_manifest_id": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+      "$ref": "vc:core:atoms#kebabId",
+      "description": "Unique kebab-case identifier for this seed manifest instance. Convention: {product-or-repo-slug}-seed-manifest. Examples: 'billing-api-seed-manifest', 'customer-portal-seed-manifest', 'devspec-toolkit-seed-manifest'. Should match the host repository name. Anti-pattern: 'seed-manifest-v1' (too generic) or using a version suffix here — version the manifest via the 'version' field."
     },
     "version": {
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "SemVer string (MAJOR.MINOR.PATCH) for the seed manifest format. Increment MINOR when adding new seeds; increment MAJOR for breaking structural changes."
     },
     "created_at": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+      "$ref": "vc:core:atoms#timestamp",
+      "description": "ISO 8601 datetime when this seed manifest was initially created. Format: YYYY-MM-DDTHH:MM:SSZ."
     },
     "last_updated": {
-      "$ref": "https://specdev.local/schema/core/atoms/1#timestamp"
+      "$ref": "vc:core:atoms#timestamp",
+      "description": "ISO 8601 datetime of the most recent modification to this manifest. Format: YYYY-MM-DDTHH:MM:SSZ. Update whenever seeds or step_requirements change."
     },
     "global_seed_order": {
-      "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-    },
-    "nested_order": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "level_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
-          },
-          "description": {
-            "type": "string"
-          },
-          "seed_ids": {
-            "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
-          }
-        },
-        "required": [
-          "level_id",
-          "seed_ids"
-        ]
-      }
+      "$ref": "vc:core:collections#kebabIdArray",
+      "description": "Defines the canonical READ ORDER for seeds. It does NOT by itself cause a seed to be ingested at any step — per-step inclusion is governed by step_requirements[NN]. When a step's required seeds are resolved they are emitted in this order; required seeds absent from this list are appended afterward. Should include at minimum the IDs for the host's declared seed files."
     },
     "seeds": {
       "type": "array",
@@ -52,18 +38,22 @@
         "additionalProperties": false,
         "properties": {
           "seed_id": {
-            "$ref": "https://specdev.local/schema/core/atoms/1#kebabId"
+            "$ref": "vc:core:atoms#kebabId",
+            "description": "Unique kebab-case identifier for this seed document. Should be referenced by step_requirements (which routes the seed to steps) and may also appear in global_seed_order (which governs read order only); seed-lint validates these references. Example: 'seed-overview', 'seed-tech-stack'. Convention: use the filename stem in kebab-case."
           },
           "path": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "File path to the seed document relative to the repository root. Example: 'docs/seed/seed_overview.md'."
           },
           "description": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "What this seed file contains. Helps prompts understand whether to prioritize this seed for their step. Write from the prompt's perspective: what will it learn from this seed? Example: 'High-level product overview, goals, and user personas. Read first for all steps.' Avoid vague summaries like 'overview doc'."
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether this seed document must be present for pipeline execution. true: pipeline will error if this file is missing. false: seed is optional and prompts may skip it when absent."
           },
           "source_type": {
             "type": "string",
@@ -72,7 +62,17 @@
               "spec",
               "config",
               "other"
-            ]
+            ],
+            "description": "Category of the seed source. 'doc': narrative documentation (PRDs, meeting notes, design docs) — prose documents that are human-readable only. 'spec': formal specification or schema — JSON, YAML, or CSV files that can be parsed programmatically. 'config': project configuration or environment settings. 'other': any source not fitting the above categories. When a document is both narrative and machine-parseable, prefer 'spec' if it has a defined schema, or 'doc' if it is primarily human-authored prose. Anti-pattern: classifying a plaintext changelog as 'spec' — it must have a parseable format (JSON/YAML/CSV) to qualify."
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "description": "Optional SHA-256 content hash of the seed file at manifest-update time, in 'sha256:<hex>' format as written by the seed-index tooling. Populated to let downstream validators detect whether a seed has changed since the manifest was last refreshed."
+          },
+          "version": {
+            "type": "string",
+            "description": "Optional version identifier for the seed document (semver like '1.2.0', a date like '2026-04-01', or a revision like 'rev-42'). Track this when the seed has an explicit author-maintained version. Distinct from `hash` — version is an author intent, hash is a verifiable content fingerprint."
           }
         },
         "required": [
@@ -81,63 +81,27 @@
           "description",
           "required",
           "source_type"
-        ]
-      }
+        ],
+        "description": "Definition of a single seed document: its location, type, and role in the pipeline."
+      },
+      "description": "Registry of all seed files available for this project. Each entry describes a seed file's purpose and scope. Seeds are source-of-truth documents (PRDs, technical specs, meeting notes) that ground AI outputs in project reality. Must contain at least one entry; each seed_id here should be referenced by step_requirements (routing) and may also appear in global_seed_order (read order only), validated by seed-lint."
     },
     "step_requirements": {
       "type": "object",
       "patternProperties": {
-        "^(\\d{2}[a-z]?)$": {
-          "$ref": "https://specdev.local/schema/core/collections/1#kebabIdArray"
+        "^(\\d{2}[a-c]?)$": {
+          "description": "Array of seed IDs required for the pipeline step identified by the parent key. Each seed ID must match a seeds[*].seed_id value in this manifest. Example key-value pair: '04': ['seed-overview', 'seed-tech-stack'] (FR list step requires both seeds). For multi-part steps use the full step key: '16a': ['seed-overview', 'seed-tech-stack', 'seed-domain-model']. Anti-pattern: key format '4' instead of '04' — step keys must be zero-padded two-digit strings, or the full step identifier for multi-part steps (e.g., '16a', '16b').",
+          "$ref": "vc:core:collections#kebabIdArray"
         }
       },
-      "additionalProperties": false
-    },
-    "docs_policy": {
-      "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "readme_required": {
-          "type": "boolean"
-        },
-        "root_readme_required": {
-          "type": "boolean"
-        },
-        "readme_depth_default": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "readme_depth_by_scope": {
-          "type": "object",
-          "patternProperties": {
-            "^.+/$": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          "additionalProperties": false
-        },
-        "scope": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-          "minItems": 1
-        },
-        "exclusions": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray"
-        },
-        "doc_paths": {
-          "$ref": "https://specdev.local/schema/core/collections/1#stringArray",
-          "minItems": 1
-        }
-      },
-      "required": [
-        "readme_required",
-        "root_readme_required",
-        "readme_depth_default",
-        "readme_depth_by_scope",
-        "scope",
-        "exclusions",
-        "doc_paths"
-      ]
+      "description": "Mapping from pipeline step IDs to the seed files required by that step. Each step's AI prompt uses this to know which seed files to ingest. Key: step ID matching the pattern NN or NNx (e.g., '04', '05', '16a'). Value: array of seed IDs from the seeds registry. This is the authoritative inclusion set — only seeds listed here are ingested at a step. Steps with no entry (or an empty array) require no seeds — there is no fallback to global_seed_order, which governs read order only."
+    },
+    "doc_paths": {
+      "description": "Array of glob patterns identifying documentation files in the repository that the step_16 docs_impact validator monitors. Use forward-slash glob syntax relative to the repository root. Examples: ['docs/**/*.md', 'README.md', 'api-reference/**/*.yaml', 'guides/*.md']. Anti-pattern: absolute paths or OS-specific separators ('docs\\*.md') — use forward-slash glob syntax only. Anti-pattern: listing individual files when a glob covers them ('README.md', 'SETUP.md' → use '*.md' at the root level instead).",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
     }
   },
   "required": [
@@ -146,9 +110,8 @@
     "created_at",
     "last_updated",
     "global_seed_order",
-    "nested_order",
     "seeds",
-    "step_requirements",
-    "docs_policy"
-  ]
+    "step_requirements"
+  ],
+  "description": "Schema for the seed manifest defining seed documents, their ordering, and step requirements."
 }

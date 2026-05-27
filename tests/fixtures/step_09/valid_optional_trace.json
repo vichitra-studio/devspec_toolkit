@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/09_impl_plan.schema.json",
+  "$schema": "vc:09-impl-plan",
   "id": "impl-plan-invalid-missing-trace",
   "owner": "api",
   "created_at": "2025-10-22T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "tech_stack": {
     "languages": [
       {
@@ -39,5 +31,12 @@
   },
   "milestones": [],
   "migration_plan": "No migration required.",
-  "dependencies": []
+  "dependencies": [],
+  "trace": [
+    {
+      "type": "fr",
+      "id": "fr-initial-setup"
+    }
+  ],
+  "canonical_refs_used": []
 }

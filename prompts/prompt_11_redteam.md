@@ -1,13 +1,11 @@
 # Step 11 · Red‑Team / Failure Modes
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+Run `specdev prompt-context 11` to see downstream consumers.
+
 ## Purpose
 Proactively identify security threats, failure modes, and edge cases. Ensure every threat is directly **traceable** to a specific public API or system component, and define actionable **mitigations** linked to requirements or invariants.
-
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
 
 # Role
 You are a senior security architect and "Red Team" specialist. Your job is to emit a single JSON artifact for **Step 11 · Red‑Team / Failure Modes** that is machine-checkable. You must identify specific threats against the defined interfaces and system sketch, not generic security platitudes. You must think like an attacker who knows the system internals.
@@ -23,34 +21,36 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
-- **Constraint:** EVERY mitigation must link to a requirement (NFR, Inv, FR) or be a clear directive.
+- **Constraint:** EVERY mitigation MUST link to an existing upstream artifact ID using the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive (valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items — e.g., `fr`, `api`, `nfr`, `inv`, `fixture`, `doc`, `capability`). If no existing ID applies, MUST define a new entry with `type: capability` and a concrete action in `note`.
 
 ## Taxonomy of Threats
-Use the `category` field to classify threats precisely:
+Use the `category` field to classify threats precisely. The authoritative enum is defined in `vc:core:atoms#threatCategory` — only the five values below are valid:
 1.  **`authn` (Authentication)**: "Who are you?" (e.g., Session fixation, Credential stuffing).
 2.  **`authz` (Authorization)**: "Can you do this?" (e.g., IDOR, Privilege Escalation, Admin bypass).
 3.  **`business_logic`**: Flaws in the workflow itself (e.g., Buying 0 items for $0, skipping payment step).
 4.  **`transport`**: Data in motion (e.g., MitM, Cleartext logging, weak TLS).
 5.  **`data_privacy`**: Data at rest/leakage (e.g., PII exposure in logs, GDPR violation, unnecessary data collection).
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["11"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product scope boundaries, compliance posture, and regulatory constraints that define which threat categories are mandatory and which data sensitivity levels apply
+- **01_capabilities.json**: Capability IDs, priority rankings, and scope definitions to assess which capabilities carry the highest business impact if compromised or degraded
+- **02_system_sketch.json**: Component IDs and subsystem boundaries to identify trust boundary crossings; inter-component communication paths and external integration points to map attack surfaces; **tech_stack** entries (specific framework/runtime versions with known CVE surfaces or security-critical configuration defaults — e.g., Django CSRF middleware vs manual CSRF in Express) to bind every threat to a concrete `target_ids` entry
+- **02a_delivery_baseline.json**: Deployment environment definitions and infrastructure topology to identify environment-specific attack surfaces and operational failure modes per stage
+- **03_glossary.json**: Domain term definitions and entity relationships to write threat descriptions and vectors using precise, unambiguous domain language rather than generic security jargon
+- **04_fr_list.json**: Functional requirement IDs, business logic workflows, preconditions, and postconditions to identify business logic abuse scenarios and link mitigations via traceRef
+- **05_interface_contracts.json**: API IDs, HTTP methods, authentication modes, request/response schemas, and error states to enumerate per-endpoint threat vectors and ensure every public API has coverage
+- **06_invariants.json**: Invariant IDs and enforcement conditions to link threat mitigations to existing invariant controls via traceRef and verify every security invariant has a corresponding threat test
+- **07_nfrs.json**: NFR IDs, performance thresholds, and availability targets to define resource exhaustion thresholds, link mitigations via traceRef, and scope edge case trigger conditions
+- **08_fixtures.json**: Test fixture scenarios and boundary value definitions to identify edge case failure modes and ensure fixture coverage aligns with threat mitigation validation
+- **09_impl_plan.json**: Technology stack selections, framework versions, and infrastructure choices to identify technology-specific vulnerability classes and attack vectors unique to the chosen stack
+- **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
 
-## Context To Ingest
-1.  **Attack Surface**: `spec/05_interface_contracts.json` (APIs) and `spec/02_system_sketch.json` (Components).
-2.  **Defenses**: `spec/06_invariants.json` (Security/Safety rules) and `spec/07_nfrs.json` (Security constraints).
-3.  **Logic**: `spec/04_fr_list.json` (Business rules).
-4.  **Guide**: `devspec_toolkit/docs/prompts/shared_expectations.md`.
-
-## Operating Flow: Attack → Trace → Mitigate
-1.  **Surface Analysis**: For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?".
-2.  **Categorize**: Classify threats into `authn`, `authz`, `business_logic`, `transport`, or `data_privacy`.
-3.  **Trace**: Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY.
-4.  **Mitigate**: Define mitigations. Prefer linking to existing `inv-*` or `nfr-*` IDs using the `traceRef` structure. If a new control is needed, specify it clearly.
-5.  **Edge Cases**: Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
+## Operating Flow: Threat Model → Exploit → Mitigate → Emit
+1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — valid categories are `authn`, `authz`, `business_logic`, `transport`, and `data_privacy` (see Taxonomy of Threats below for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to these five schema-defined categories.
+2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
+3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
+4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
 
 ## Examples: Weak vs. Strong
 | Quality | Threat Description | Vector | Linking |
@@ -61,25 +61,19 @@ Use the `category` field to classify threats precisely:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `target_ids: [{type: api, id: api-user-profile}]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every `public` API in Step 05 should have at least one mapped threat (e.g., AuthZ bypass, Rate Limit abuse).
+- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector).
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If you list a mitigation "Enforce Role Check", link it to the actual invariant `inv-authz-admin-only`.
 
-
 ## Self-Audit Gate
-- [ ] Does every threat in `threats` have a non-empty `target_ids` array?
-- [ ] Are all `target_ids` valid IDs from Step 05 (APIs) or Step 02 (Components)?
-- [ ] Are `mitigations` structured objects with types, not just strings?
-- [ ] Are `edge_cases` structured with IDs?
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/05_interface_contracts.json` is present and contains at least one api entry.
+- `spec/02_system_sketch.json` is present and contains at least one component entry.
+- `spec/06_invariants.json` is present and contains at least one invariant entry.
 
-# Output Rules
-1.  Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2.  Do not dump JSON in the chat thread; respond with a short confirmation that the artifact path was written and validation status.
-3.  Follow the referenced step schema exactly.
-4.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
-5.  `target_ids`: MUST be populated for every threat.
-6.  `mitigations`: MUST use `traceRef` structure (type + id).
-7.  `category`: MUST be one of the allowed enum values.
+## Clarification Questions
+- If the system operates in a regulated, high-risk, or domain-specific context not evident from upstream specs, ask about domain-specific threat categories before finalizing.
+- If the access control model is not fully specified in upstream interface contracts, ask Gap Questions rather than assuming a threat surface.
 
 ## Negative Constraints
 - **DO NOT** list generic threats (e.g., "OWASP Top 10") without specific application context.
@@ -87,27 +81,54 @@ Use the `category` field to classify threats precisely:
 - **DO NOT** use vague mitigations (e.g., "Fix it"); link to specific Invariants or NFRs.
 - **DO NOT** ignore edge cases; operational failure modes are just as critical as security threats.
 
+## Coverage Closure
+Before emitting, verify:
+- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`. For low-risk internal-only endpoints with no viable threat, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
+- Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
+- Every security-relevant `inv_id` in `spec/06_invariants.json` has a corresponding threat entry that tests its enforcement.
+- All `target_ids[*].id` values resolve to existing `api_id`, `component_id`, or `fr_id` values in their referenced spec files.
+- If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
+- [ ] Every upstream ID from ingested context has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
+- [ ] All mitigations are structured objects (not plain strings)
+- [ ] High-severity threats have ≥1 mitigation each
+- [ ] Every high-priority FR has at least one threat scenario modeled
+- [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
+- [ ] Attack surfaces align with trust zone boundaries from the system sketch
+- [ ] All `mitigations` are structured objects with `type` and `id` fields (per schema `vc:11-redteam`), not plain strings
+- [ ] All `edge_cases` entries have a structured `id` field
+
+## Step-Specific Output Constraints
+1.  `trace`: Include a root trace to `step-11` or relevant governance ticket.
+2.  `target_ids`: MUST be populated for every threat.
+3.  `mitigations`: MUST use the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive. Valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items.
+4.  `category`: MUST be one of the allowed enum values (defined in `vc:core:atoms#threatCategory`).
+5.  `risk_category_ref`: REQUIRED for every threat. Must be a canonical ref object with `kind: "risk_category"` resolving to an entry in `canon/manifest.json`. Resolve the canonical ID from `canon/manifest.json` (kind: `risk_category`); if no matching entry exists, add one via `canonical_proposals` before authoring the artifact. Validated by canonical-integrity lint (E110).
+
 ## Step-Specific Completeness Checklist
 - [ ] **Surface Coverage**: Every `public` API and critical component has at least one mapped threat.
 - [ ] **Category Diversity**: Threats are not just `authz`; `transport`, `business_logic`, and `data_privacy` are represented.
 - [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified.
-- [ ] **Traceability Integrity**: Every threat has a valid `target_id` pointing to an existing Step 05 or Step 02 ID.
+- [ ] **Traceability Integrity**: Every threat has a valid `target_ids` array pointing to existing Step 05 or Step 02 IDs.
 - [ ] **Mitigation Actionability**: Mitigations link to specific Invariants/NFRs or define concrete new capabilities (no vague "Fix it" notes).
 
-## Field-by-Field Guidance
+## Cross-Step Synthesis Notes
 - **id**: `redteam-catalog` (Fixed).
 - **threats**:
     - `threat_id`: `threat-<category>-<slug>` (e.g., `threat-authz-elevation`).
     - `description`: A detailed narrative of the attack scenario. Don't be vague; explain *how* the attack works in the context of the system (e.g. "Attacker injects SQL into the 'user_id' parameter to bypass auth").
     - `vector`: The specific technical method (e.g., "JWT Substitution", "SQL Injection", "Race Condition").
-    - `target_ids`: Array of objects `{ "type": "api"|"component", "id": "..." }`. **CRITICAL**: These must match actual upstream IDs.
-    - `category`: strictly validation against enum (`authn`, `authz`, `business_logic`, `transport`, `data_privacy`).
-    - `mitigations`: Array of references.
-        - If mitigating via an Invariant: `{ "type": "inv", "id": "inv-...", "note": "Enforced by middleware" }`.
-        - If mitigating via NFR: `{ "type": "nfr", "id": "nfr-..." }`.
-        - If new: `{ "type": "capability", "id": "cap-new-measure", "note": "Implement specific check" }`.
+    - `target_ids`: Array of traceRef objects `{ "type": "<trace-type>", "id": "<upstream-id>" }`. Valid types include `api`, `component`, `inv`, `fr`, and any other canonical trace type — consult schema `vc:11-redteam` target_ids items (`vc:core:collections#traceRef`). **CRITICAL**: These must match actual upstream IDs from Step 02/05/06.
+    - `category`: strictly validated against the schema enum `vc:core:atoms#threatCategory` — see Taxonomy of Threats above.
+    - `mitigations`: Array of structured objects. Full `type` enum is defined in schema `vc:11-redteam` (mitigations items.type.enum). Examples:
+        - Invariant: `{ "type": "inv", "id": "inv-...", "note": "Enforced by middleware" }`.
+        - NFR: `{ "type": "nfr", "id": "nfr-..." }`.
+        - FR: `{ "type": "fr", "id": "fr-..." }`.
+        - New capability: `{ "type": "capability", "id": "cap-new-measure", "note": "Implement specific check" }`.
     - `mitigation.note`: Optional context explaining *how* the linked item mitigates the threat (e.g., "Rate limit of 5rps prevents resource exhaustion").
-    - `severity`: `low`, `medium`, `high`, `critical`.
+    - `severity`: validated against `vc:core:atoms#severityLevel` (schema-enforced — do not restate values here).
 - **edge_cases**:
     - `id`: `ec-<slug>` (e.g., `ec-timeout-upstream`).
     - `description`: The specific operational scenario (e.g. "Upstream API returns 429 after 100 requests").
@@ -115,7 +136,7 @@ Use the `category` field to classify threats precisely:
 
 ## Best Practices
 - **Think Like a Harrower**: Don't just list bugs; list *exploits*. How would you break the specific business logic defined in `04_fr_list.json`?
-- **Link Everything**: A threat without a `target_id` is a hallucination. A mitigation without a `traceRef` is a wish.
+- **Link Everything**: A threat without `target_ids` is a hallucination. A mitigation without a structured `{type, id}` trace link is a wish.
 - **Diversity**: Don't stop at SQL Injection. Look for Logic Flaws (e.g., skipping payment steps), Race Conditions, and Privacy Leaks.
 - **Specificity**: "API returns 500" is bad. "API leaks stack trace allowing causing info disclosure" is good.
 
@@ -125,12 +146,6 @@ Use the `category` field to classify threats precisely:
 - **Vague Mitigations**: "Implement security" (Bad) vs "Enforce `inv-authz-admin` validation" (Good).
 - **Ignoring Edge Cases**: Only focusing on malicious hackers and forgetting about timeouts, retries, and concurrency limits.
 
-## Quick Reference
-- **ID Format**: `redteam-catalog` (file), `threat-<cat>-<slug>`, `ec-<slug>`.
-- **Categories**: `authn`, `authz`, `business_logic`, `transport`, `data_privacy`.
-- **Targets**: Link to `api-*` (Step 05) or `component-*` (Step 02).
-- **Mitigation Types**: `inv` (Step 06), `nfr` (Step 07), `fr` (Step 04), `doc` (Step 10).
-
 # Clarification Questions
 - Are there any specific compliance requirements (GDPR, HIPAA) that dictate data privacy threats?
 - Which third-party integrations (from System Sketch) are considered untrusted trust boundaries?
@@ -138,27 +153,19 @@ Use the `category` field to classify threats precisely:
 - What is the expected throughput (NFRs) to define "Resource Exhaustion" thresholds?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/11_redteam.schema.json
+- Schema URI: vc:11-redteam
 - Schema File: schema/11_redteam.schema.json
 - Schema Registry: tools/schema_registry.json
 
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
-
 # Output Contract
+> **Note**: `risk_category_ref.id` values in the example below are illustrative slugs. Authoritative canonical IDs for `risk_category` entries **must be resolved from `canon/manifest.json`** (kind: `risk_category`). If no matching entry exists yet, add one via `canonical_proposals` and run `canon-accept` before authoring the artifact — do NOT copy unresolved IDs verbatim, as canonical-integrity lint (E110) will reject them.
+
 ```json
 {
+  "$schema": "vc:11-redteam",
   "id": "redteam-catalog",
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    }
-  ],
   "trace": [
     {
       "type": "doc",
@@ -198,38 +205,12 @@ Use the `category` field to classify threats precisely:
       "trigger": "Connection Pool Exhaustion"
     }
   ],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
   "canonical_refs_used": [
     {
       "id": "cn:core:risk_category:authz",
       "kind": "risk_category"
     }
-  ],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
+  ]
 }
 ```
 
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

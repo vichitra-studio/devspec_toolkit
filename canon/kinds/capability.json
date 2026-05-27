@@ -1,24 +1,6 @@
 {
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "capability",
-  "entries": [
-    {
-      "id": "cn:core:capability:authentication",
-      "kind": "capability",
-      "preferred_label": "authentication",
-      "definition": "Ability to verify identity and establish authenticated sessions.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "auth",
-        "authn"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    }
-  ]
+  "entries": []
 }

@@ -28,18 +28,18 @@ def load_schema_store(schema_dir):
                         if "$id" in schema:
                             store[schema["$id"]] = Resource.from_contents(schema)
                     except Exception as e:
-                        print(f"Skipping {path}: {e}")
+                        pass
     return store
 
 def validate_file(validator, file_path, should_pass=True):
-    print(f"\nValidating {file_path} (Expect {'PASS' if should_pass else 'FAIL'})...")
+    pass
     with open(file_path) as f:
         instance = json.load(f)
     
     try:
         validator.validate(instance)
         if should_pass:
-            print("✅ PASS")
+            pass
             return True
         else:
             print("❌ FAIL (Unexpected Pass)")
@@ -50,11 +50,11 @@ def validate_file(validator, file_path, should_pass=True):
             return True
         else:
             print(f"❌ FAIL: {e.message}")
-            print(f"Context: {e.path}")
+            pass
             return False
 
 def main():
-    print("Loading schemas...")
+    pass
     store = load_schema_store(SCHEMA_DIR)
     registry = Registry().with_resources(store.items())
     
@@ -92,3 +92,32 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import unittest
+from pathlib import Path
+
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
+
+
+class Step00IntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.repo_root = Path(__file__).resolve().parents[2]
+        self.fixtures_dir = self.repo_root / "tests" / "fixtures" / "step_00"
+
+    def test_invalid_missing_scope_fails_validation(self):
+        """invalid_missing_scope.json must fail because in_scope is required."""
+        errors = specdev_validate_file(
+            str(self.repo_root),
+            str(self.fixtures_dir / "invalid_missing_scope.json"),
+        )
+        self.assertTrue(errors, "Expected validation errors for missing in_scope")
+        rendered = [e.render() for e in errors]
+        self.assertTrue(
+            any("in_scope" in msg for msg in rendered),
+            f"Expected an error mentioning 'in_scope', got: {rendered}",
+        )

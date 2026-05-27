@@ -2,21 +2,20 @@
   "id": "glossary-short-def",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "terms": [
     {
       "term_id": "term-billing-amount",
       "term": "amount",
       "definition": "The value of a transaction.",
       "domain": "billing",
-      "units": "USD"
+      "units": "USD",
+      "term_ref": {
+        "id": "cn:project:term:billing-amount",
+        "kind": "term",
+        "label": "amount"
+      }
     }
-  ]
+  ],
+  "canonical_proposals": [],
+  "canonical_refs_used": []
 }

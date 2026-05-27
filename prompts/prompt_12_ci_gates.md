@@ -1,97 +1,75 @@
 # Step 12 · CI Gates
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+## Role
+You are a **senior DevOps engineer and CI gate architect**. Your job is to emit a single JSON artifact for **Step 12 · CI Gates** that defines automated quality checkpoints as machine-executable commands. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
+Run `specdev prompt-context 12` to see downstream consumers.
+
 ## Purpose
 Translate governance rules and fixture expectations into enforceable CI automation. Well-specified gates keep the spec authoritative by blocking merges that violate schemas, fixtures, or coverage commitments.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+## Extraction Intent
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 12 · CI Gates** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+### Primary Sources (directly consumed)
+- `spec/10_governance.json`: commit patterns, PR rules, quality gates — these ARE the CI gate definitions
+- `spec/04_fr_list.json`: high-priority FRs that must be gated
 
-## Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 12 · CI Gates**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+### Reference Sources (context only)
+- `spec/02a_delivery_baseline.json`: CI gate definitions and deployment environments — referenced for coverage closure (every ci_gate must map to a job_id) and environment_ref sourcing
+- `spec/06_invariants.json`: Invariant entries — determines whether an invariants-check job step is required
+- `spec/07_nfrs.json`: Performance and availability targets that need gate thresholds — referenced to verify completeness of gate coverage
+- `spec/08_fixtures.json`: Fixture entries — Self-Audit Gate prerequisite confirming at least one fixture entry exists
+- `spec/05_interface_contracts.json`: API contracts for schema validation gates — referenced to verify completeness of gate coverage
+- `spec/09_impl_plan.json`: Milestone deliverables for completeness gate design — referenced to verify completeness of gate coverage
+- `spec/11_redteam.json`: Security mitigations that require automated verification — referenced to verify completeness of gate coverage
+- All other spec steps: referenced only to verify completeness of gate coverage
 
-
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["12"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
-
-## Context To Ingest
-- Delivery Baseline `spec/02a_delivery_baseline.json` for environments and required gates.
-- Governance `spec/10_governance.json` for policies; existing CI configs if present.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private CI Ledger: list jobs (id/name), dependencies (`requires`), steps (validators/commands), and optional coverage thresholds. Do not output it.
-- Ensure core validations (schema, fixtures-lint, matrix, invariants, governance) appear in appropriate jobs.
-- Self-audit; if DAG or coverage policy unclear, ask Gap Questions.
-- Rewrite job/step names to match tooling; finalize thresholds.
-- Emit JSON when DAG and steps are explicit.
+## Operating Flow: Survey → Gate → Threshold → Emit
+- **Survey**: Survey all mandatory spec steps and their validators — identify every step that requires a CI quality checkpoint, including schema validation, fixture lint, traceability matrix, invariants, governance, and red team mitigations.
+- **Gate**: Gate each step with a specific CLI command from the toolkit (e.g., `validate-all`, `fixtures-lint`, `invariants-check`, `governance-check`). No gate may be a manual review step — every gate must be machine-executable.
+- **Threshold**: Set thresholds for pass/fail criteria for each gate — numeric coverage percentages, zero-error exit codes, or explicit count limits. No subjective pass criteria allowed.
+- **Emit**: Write the artifact when all gates have executable commands, measurable thresholds, and correct stage assignments.
 
 ## Heuristics For Completeness
-- Optional→expected: include governance check and invariants evaluation; add coverage thresholds when NFRs imply them.
+- MUST include a `governance-check` job step when `spec/10_governance.json` defines `pr_rules`. MUST include an `invariants-check` job step when `spec/06_invariants.json` contains >=1 invariant. MUST populate `coverage_thresholds` when any NFR in `spec/07_nfrs.json` specifies a coverage metric.
 - Ambiguity scrub: make pipeline DAG explicit; avoid implicit sequencing.
 
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
-- Gating items:
-  - All core validations present; dependencies declared; steps named clearly.
-  - Coverage thresholds stated or explicitly deferred with rationale.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/10_governance.json` is present and contains at least one pr_rules entry.
+- `spec/07_nfrs.json` is present and contains at least one nfr entry.
+- `spec/08_fixtures.json` is present and contains at least one fixture entry.
 
 ## Negative Constraints
 - Do not output YAML, Markdown prose, or any text outside the JSON schema.
 - Do not use placeholders like TBD or TODO.
 - Do not invent CI steps that do not map to actual tools in `specdev_tools` or standard shell commands.
-- Do not output unstructured strings for steps; use structured objects with `id`, `name`, and `command`.
-- Do not include any fields outside the schema. `additionalProperties` is false everywhere.
+- Do not output unstructured strings for steps; use structured step objects as defined by schema `vc:12-ci-gates` (required fields enforced by the schema).
+
+## Coverage Closure
+Before emitting, verify:
+- Every `ci_gate` defined in `spec/02a_delivery_baseline.json` is implemented as a `job_id` in this artifact. For any gate that cannot be expressed as a CI job, add a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
+- All `pr_rules` commands from `spec/10_governance.json` have corresponding CI job steps.
+- Every environment stage (`dev`, `ci`, `staging`, `prod`) in the delivery baseline has coverage from ≥1 CI job.
+- All `requires` dependencies between jobs form a valid DAG — no circular dependencies.
+- If any required gate cannot be expressed as a CI job: add a gap question (Clarify mode) rather than omitting it.
+- [ ] Every upstream ID from ingested context has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every governance rule from Step 10 has a corresponding CI gate
+- [ ] Every high-severity red team mitigation from Step 11 has a verifiable gate
+- [ ] All gate commands are executable (not pseudo-code or placeholders)
+- [ ] Every mandatory spec step has a corresponding CI validation command
+- [ ] All referenced validation commands exist in the toolkit CLI (verify against CLAUDE.md CLI reference)
+- [ ] Gate thresholds are numeric and measurable — no subjective pass criteria
 
 ## Hallucination Vectors
 - Do not invent new tools or commands that do not exist in the repository.
 - Do not reference non-existent job IDs in `requires` fields.
-- Do not use commands that do not start with allowed prefixes (e.g., `python -m`, `bash`, `npm`).
+- Use only commands that correspond to tools present in this repository's tooling (specdev CLI, shell scripts in `tools/`, or standard POSIX shell commands). Do not invent command prefixes or reference tools not confirmed in the repo.
 - Do not create circular dependencies in job requirements.
-
-## Tooling Context
-Available CLI tools include:
-- `./tools/run_specdev.sh validate --repo-root ./devspec_toolkit` - Validate spec artifacts against schemas
-- `./tools/run_specdev.sh validate-all --repo-root ./devspec_toolkit` - Validate all spec artifacts
-- `./tools/run_specdev.sh fixtures-lint --repo-root ./devspec_toolkit` - Lint fixture files for compliance
-- `./tools/run_specdev.sh matrix --repo-root ./devspec_toolkit` - Generate traceability matrix
-- `./tools/run_specdev.sh invariants-check --repo-root ./devspec_toolkit --sample ./path/to/sample.json` - Check spec invariants
-- `./tools/run_specdev.sh governance-check --repo-root ./devspec_toolkit` - Validate governance policies
-- `./tools/run_specdev.sh seed-lint --repo-root ./devspec_toolkit` - Validate seed requirements
-- `./tools/run_specdev.sh docs-lint --repo-root ./devspec_toolkit` - Enforce docs policy
-
-## Canonical Registry (Required Input)
-- Load `canon/manifest.json` — the authoritative registry of all canonical terms.
-- Load `canon/aliases.json` — the alias resolution table.
-- For every semantic field you populate, search the manifest for a matching entry by `kind` + `preferred_label` or alias.
-- If a match exists: populate the corresponding `*_ref` field with `{id, kind}` at minimum.
-- If no match exists: add an entry to `canonical_proposals` with `temp_id`, `kind`, `proposed_label`, `definition`, and `source_field`.
-- If multiple matches exist or the match is ambiguous: add an entry to `canonical_conflicts`.
-- NEVER leave a `*_ref` field empty when a matching canonical entry exists.
-- NEVER use a deprecated canonical without checking `replaced_by` first.
-
-
-## Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set owner to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
 
 ## Step-Specific Completeness Checklist
 - Job graph is complete: all required jobs listed with dependencies in `requires` as needed.
@@ -99,27 +77,20 @@ Available CLI tools include:
 - Coverage thresholds are set (lines/branches) or intentionally omitted with rationale (not in JSON).
 - Job names and IDs map to actual CI runner capabilities.
 
-## Field-by-Field Guidance
-- jobs[*].job_id/name: stable identifiers; names are human-readable.
-- jobs[*].requires: upstream job IDs to create a DAG; omit or empty for roots.
-- jobs[*].steps: structured objects with `id`, `name`, and `command` fields.
-- coverage_thresholds: set lines/branches numbers between 0 and 100.
+## Cross-Step Synthesis Notes
+- jobs[*].environment_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) sourced from `spec/02a_delivery_baseline.json` -> `environments[]`. Each job MUST reference the environment it targets (e.g., `ci`, `staging`, `prod`). Look up the environment ID in `canon/manifest.json` to resolve the canonical ref. If the environment is not in the canonical registry, add it to `canonical_proposals`.
 
 ## Best Practices
 - **Jobs**: Define each `job` with reproducible `steps` (CLI commands, scripts) and `requires` dependencies to express the pipeline graph.
 - **Naming**: Align job names with reality (e.g., `validate`, `fixtures`, `redteam`, `deploy`) to match tooling and dashboards.
 - **Coverage**: Set `coverage_thresholds` that reflect NFR commitments and update them when metric expectations change.
-- **Stability**: Keep job IDs in kebab-case and stable so generated CI configs and monitoring references remain valid.
+- **Stability**: Keep job IDs stable so generated CI configs and monitoring references remain valid. Kebab-case format is enforced by schema `vc:12-ci-gates` via `vc:core:atoms#kebabId`.
 
 ## Common Pitfalls
 - **Vague Steps**: Leaving steps as generic notes instead of exact commands, making automation impossible.
 - **Race Conditions**: Forgetting job dependencies, causing parallel runs that violate required ordering (e.g., fixtures before deploy).
 - **Perma-Red**: Setting aspirational coverage numbers with no plan to meet them, leading to perma-red pipelines.
 - **Drift**: Duplicating job IDs or renaming them without updating CI scripts and governance docs.
-
-## Quick Reference
-- Jobs: `job_id`, `name`, `requires`, `steps`.
-- Coverage: `lines`, `branches` between 0 and 100.
 
 # Clarification Questions
 - Which validation steps must be enforced in CI to block merges? Any coverage targets?
@@ -128,47 +99,34 @@ Available CLI tools include:
 - Should scaffolding or codegen checks be included to prevent drift from specs?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/12_ci_gates.schema.json
+- Schema URI: vc:12-ci-gates
 - Schema File: schema/12_ci_gates.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:12-ci-gates",
   "id": "ci-gates-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
+  "jobs": [
+    {
+      "job_id": "validate-specs",
+      "name": "Validate All Spec Artifacts",
+      "steps": [
+        {
+          "id": "step-validate-all",
+          "name": "Run schema validation",
+          "command": "./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit"
+        }
+      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      }
+    }
   ],
-  "jobs": [],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
-
+  "canonical_refs_used": []
 }
 ```
-
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

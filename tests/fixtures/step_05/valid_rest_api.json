@@ -1,26 +1,18 @@
 {
-  "$schema": "https://specdev.local/schema/05_interface_contracts.schema.json",
+  "$schema": "vc:05-interface-contracts",
   "id": "interface-contracts-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "apis": [
     {
       "api_id": "api-user-login",
       "name": "User Login",
       "version": "v1",
       "protocol": "http",
-      "route": "/login",
+      "path": "/login",
       "method": "POST",
-      "request_schema_ref": "schemas/payloads/login-request.json",
-      "response_schema_ref": "schemas/payloads/login-response.json",
+      "input_schema_ref": "schemas/payloads/login-request.json",
+      "output_schema_ref": "schemas/payloads/login-response.json",
       "errors": [
         {
           "code": "invalid-credentials",
@@ -49,6 +41,16 @@
       ],
       "security": "none",
       "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
       "trace": [
         {
           "type": "fr",
@@ -61,10 +63,10 @@
       "name": "User Profile",
       "version": "v1",
       "protocol": "http",
-      "route": "/users/{id}",
+      "path": "/users/{id}",
       "method": "GET",
-      "request_schema_ref": "-tbd",
-      "response_schema_ref": "schemas/payloads/user-profile.json",
+      "input_schema_ref": "schemas/payloads/user-profile-request.json",
+      "output_schema_ref": "schemas/payloads/user-profile.json",
       "errors": [
         {
           "code": "user-not-found",
@@ -82,12 +84,29 @@
       ],
       "security": "jwt",
       "owner": "api",
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface",
+        "version": "1.0.0"
+      },
+      "enum_provenance": {
+        "source_url": "https://example.com/api-errors",
+        "source_date": "2025-01-01",
+        "resolved_at": "2025-01-01T00:00:00Z"
+      },
       "trace": [
         {
           "type": "fr",
           "id": "fr-user-profile"
         }
       ]
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:interface:http-json",
+      "kind": "interface",
+      "version": "1.0.0"
     }
   ]
 }

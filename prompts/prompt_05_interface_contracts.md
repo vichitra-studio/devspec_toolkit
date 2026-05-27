@@ -1,101 +1,68 @@
 # Step 05 · Interface Contracts
 
+> **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
+
+## Role
+You are a **senior API architect with REST/HTTP expertise**. Your job is to emit a single JSON artifact for **Step 05 · Interface Contracts** that converts behavioral FRs into precise, implementation-ready API specifications. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+
+Run `specdev prompt-context 05` to see downstream consumers. This prompt's output feeds 9 downstream steps.
+
 ## Purpose
 Document the external facing contracts (routes, schemas, security, and versioning) that expose capabilities to clients and downstream systems. Accurate interface contracts let scaffolding tools, test fixtures, and runtime monitors enforce the spec without hand translation.
 
-## Tool Execution
-Validate the generated JSON:
-```bash
-./tools/run_specdev.sh validate <path_to_artifact> --repo-root ./devspec_toolkit
-```
+### Extraction Intent
+For each upstream artifact ingested, extract the following:
+- **00_charter.json**: Product scope boundaries, success metrics, and high-level constraints that determine which interfaces are in-scope and what security or compliance postures apply to each API
+- **01_capabilities.json**: Capability IDs and their priority rankings to ensure every high-priority capability surfaces at least one corresponding API contract entry
+- **02_system_sketch.json**: Component IDs, trust boundaries, inter-component communication paths, and **tech_stack** (framework and language choices that inform API style — e.g., REST with FastAPI, GraphQL with Apollo, gRPC with protobuf) to assign each API to an owning component and enforce correct security at boundary crossings
+- **02a_delivery_baseline.json**: Deployment environments and infrastructure constraints that influence protocol choices, versioning strategies, and transport-level security requirements for each API
+- **03_glossary.json**: Term IDs, canonical resource names, and action vocabulary to align all route paths, request/response field names, and error names with the shared domain language
+- **04_fr_list.json**: Functional requirement IDs, acceptance criteria, preconditions, postconditions, and input/output payload descriptions to derive one or more API contracts per externally observable FR behavior
 
-# Role
-You are a senior specification author and validator. Your job is to emit a single JSON artifact for **Step 5 · Interface Contracts** that is machine-checkable and immediately consumable by CI and generators. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
+## Operating Flow: Map → Design → Validate → Trace → Emit
+- **Map**: For every FR with external-observable behavior, identify the API operation(s) needed. Track coverage in a private Context Ledger.
+- **Design**: Apply REST Design Heuristics to shape resource URLs, method semantics, request/response schemas, and error contracts.
+- **Validate**: Verify every FR with observable behavior has ≥1 API. Every endpoint has ≥1 error response. Avoid duplicate `interface_ref` values — each distinct contract should have a unique `interface_ref` entry.
+- **Trace**: Link each API to its originating FR(s) and any NFR performance targets.
+- **Emit**: Write the artifact only when all FRs are covered and design heuristics pass.
 
-# Task
-- **Input context:** previously authored spec artifacts (Charter, Capabilities, Glossary, FRs, etc.) available to you in the workspace; organizational constraints; known IDs for cross-references.
-- **Objective:** produce a complete, falsifiable artifact for **Step 5 · Interface Contracts**.
-- **Output type:** one JSON document conforming to the referenced step schema.
-- **Determinism:** when unspecified, choose the minimal valid value that preserves falsifiability and traceability.
-- **Traceability:** if this step has `trace` or `links`, connect to at least one upstream or downstream artifact.
+**Extraction Mandate**: Every FR with observable external behavior must map to ≥1 API. List any FR left without an API and explain why (e.g., internal-only behavior, handled by event system).
 
+### REST Design Heuristics
+- **Resource naming**: Use plural nouns for collections (`/users`, `/sessions`). Avoid verbs in URLs except for RPC-style actions (`/auth/refresh`).
+- **URL structure**: Nest resources to show ownership (`/users/{id}/sessions`). Keep nesting ≤2 levels deep.
+- **Method semantics**: See the schema's `method` field (→ `vc:core:atoms#httpMethod`) for the authoritative decision rules per HTTP verb.
+- **Pagination**: All collection endpoints MUST support `limit`/`offset` or cursor-based pagination. Default and max page sizes must be defined.
+- **Error responses**: Every endpoint MUST define at least one 4xx and one 5xx error response. Include `code` and `message` in all error bodies.
+- **Versioning**: Use URL path versioning (`/v1/`) unless the charter specifies otherwise. Version bump required on breaking changes.
 
-## Seed Order & Mandatory Sources
-- Read `spec/common/seed_manifest.json` first; follow `global_seed_order` and `step_requirements["05"]`.
-- Ingest required seeds in order before any other context.
-- Populate `seed_refs` with the seeds actually used.
-- If a required seed is missing or stale, stop and request it before proceeding.
+### Implicit API Discovery
+Before finalizing, ensure these are addressed:
+- Every FR with an external-observable behavior → at least one API endpoint
+- Every error handling FR → at least one error response contract
+- Every authentication/authorization FR → at least one auth endpoint or security scheme
+- Every pagination FR → page size parameters on all collection endpoints
+- Every audit logging FR → no API-level changes needed (handled internally, but note it)
 
-## Context To Ingest
-- FRs `spec/04_fr_list.json` to derive behaviors and acceptance evidence.
-- System Sketch `spec/02_system_sketch.json` for owners and integration points.
-- Glossary `spec/03_glossary.json` for resource/action naming.
-- Guides: Shared expectations `devspec_toolkit/docs/prompts/shared_expectations.md`, developer reference.
-- Use example fixtures for payload shapes and error cases; do not depend on downstream fixture artifacts.
+### Weak-vs-Strong API Examples
 
-## Operating Flow: Synthesize → Clarify → Emit
-- Build a private Context Ledger of APIs (id, name, version, protocol, route/method, request/response schemas, security, errors, owner, traces). Do not output it.
-- Map APIs to FRs; ensure each FR with external behavior has an interface or rationale for being internal-only.
-- Self-audit; if schemas, security, or errors are unclear, ask Gap Questions (do not guess).
-- Rewrite for precision: fill schema refs, enumerate meaningful errors, define security consistent with governance; finalize traces.
-- Emit JSON when contracts are testable.
+| ❌ Weak | ✅ Strong |
+|---------|----------|
+| POST /login — handles auth | POST /v1/auth/sessions — creates a session token; 201 on success, 401 on bad credentials, 422 on missing fields |
+| GET /users — returns users | GET /v1/users?limit=20&offset=0 — returns paginated user list; 200 with `items[]` and `total_count`; 401 if unauthenticated |
+| DELETE /user/{id} | DELETE /v1/users/{user_id} — deactivates account; 204 on success, 404 if not found, 403 if not admin |
 
 ## Heuristics For Completeness
-- Optional→expected: provide schema refs when fixtures or FRs imply payloads; include at least one error state for non-GET mutating operations.
-- Versioning: bump version when request/response formats or semantics change materially.
-- Security: avoid `none` for sensitive resources; align with NFRs and governance.
+- MUST provide `input_schema_ref` and `output_schema_ref` when the corresponding FR in `spec/04_fr_list.json` specifies input/output payloads or when fixtures in Step 8 will need payload shapes; MUST include at least one error state for every non-GET mutating operation.
+- Versioning: MUST bump version when request/response formats or semantics change materially.
+- Security: MUST NOT use `none` for APIs that access authenticated resources, PII, or state-mutating operations as identified in `spec/04_fr_list.json` preconditions; MUST align with NFRs and governance.
 
 ## Self-Audit Gate
-- If `generation_quality.preflight_passed` cannot be set to `true` with current evidence, stop and ask targeted questions.
-- Gating items:
-  - For HTTP: route and method set; for gRPC: service/method identified.
-  - Request/response schemas known or marked `-tbd` with plan; errors enumerated.
-  - Security explicitly chosen and justified; owner set; traces to FRs/capabilities present.
+> Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
+- `spec/04_fr_list.json` is present and contains at least one functional_requirements entry.
+- `spec/01_capabilities.json` is present and contains at least one capability entry.
+- `spec/03_glossary.json` is present and contains at least one term entry.
 
-# Output Rules
-1. Write the final JSON artifact directly to disk at the step path under `spec/` (or runner-provided path).
-2. The JSON must validate against the referenced step schema listed in `Schema Reference`.
-3. All IDs must be unique kebab-case strings.
-4. Use concrete verbs and measurable outcomes; avoid adjectives that are not testable.
-5. Include explicit preconditions, postconditions, and error states where applicable to the schema.
-6. Set `owner` to one of: `api`, `ui`, `system`, `ops`, `data`, `product`, `business`, `engineering`.
-7. If the schema supports `trace` or `links`, include at least one reference to connect artifacts across steps.
-8. Do not include any fields outside the schema. `additionalProperties` is false everywhere.
-
-## Step-Specific Completeness Checklist
-- Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
-- Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
-- `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
-- `security` reflects real enforcement aligned with governance (e.g., `jwt`, `mTLS`).
-- `trace` links to FRs/capabilities that justify the API; add example_refs where helpful for fixtures.
-- No mixed concerns: separate entries for distinct behaviors or versioned variants.
-
-## Field-by-Field Guidance
-- api_id: `api-<resource>-<action>`; stable across codegen and monitoring.
-- name: human-readable, maps to resource/action.
-- version: `v<major>[.<minor>]` per semver pattern in schema.
-- protocol: `http`, `grpc`, `ws`, or `mqtt`; route/method must align with protocol semantics.
-- route/method: concrete path and verb for HTTP; use gRPC service/method names for grpc.
-- request_schema_ref/response_schema_ref: pointers to canonical schemas; prefer machine-resolvable locations.
-- errors: use shared error objects where possible; include codes/messages.
-- security: `none`, `api-key`, `oauth2`, `jwt`, or `mTLS` based on threat model.
-- trace: `fr-*`, `capability-*`, `nfr-*` as applicable to justify existence.
-- **Trace Format**: When specifying trace references, use the exact JSON object format: `[{"type": "fr", "id": "fr-login", "note": "..."}]` - not string arrays like `["fr-login"]` or simple objects like `{"fr": "fr-login"}`.
-
-## Best Practices
-- **Stability**: Keep `api_id` stable and map each entry to an owning component from the system sketch.
-- **Versioning**: Use semver-compatible `version` strings (`v1`, `v1.1`) and update in lockstep with schema changes.
-- **Payloads**: Provide `request_schema_ref`, `response_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
-- **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
-- **Trace**: Populate `trace` references to FR IDs or capabilities proving why the interface exists.
-- **Protocols**: For non-HTTP protocols like gRPC, use POST method; for MQTT, map routes to topic paths.
-- **Non-HTTP Protocols**: For gRPC methods, use POST method; for MQTT, map routes to topic paths (e.g., `/topic/{id}`).
-
-## Common Pitfalls
-- **Sync Drift**: Forgetting to sync `route` or `method` with implementation scaffolds, breaking generated clients.
-- **Mixed Concerns**: Mixing multiple behaviors into a single API entry, hiding error handling and version strategy.
-- **Empty Errors**: Leaving `errors` empty, which prevents negative fixture coverage and red-team planning.
-- **Bad Versioning**: Using free-form version strings that violate the schema pattern and confuse change management.
 ## Negative Constraints
 - **DO NOT** use generic error names like 'Error'—be specific (e.g., 'user-not-found').
 - **DO NOT** use `TBD` without a plan.
@@ -104,12 +71,49 @@ You are a senior specification author and validator. Your job is to emit a singl
 - **DO NOT** mix error types in a single API entry (separate distinct behaviors).
 - **DO NOT** use vague or non-specific error codes.
 
-## Quick Reference
-- ID Format: `interface_contracts-<descriptor>`; APIs use `api-<resource>-<action>`.
-- Required Fields: each API needs `api_id`, `name`, `version`, `protocol`, and `owner`.
-- Allowed Protocols: `http`, `grpc`, `ws`, `mqtt`.
-- Security Flag: choose from `none`, `api-key`, `oauth2`, `jwt`, `mTLS`.
-- Trace: use `trace` to reference FRs (`fr-*`) or Capabilities (`capability-*`).
+## Clarification Questions
+- If access control rules, permission boundaries, or identity model are not defined in `spec/04_fr_list.json` preconditions or `spec/00_charter.json` constraints, MUST ask Gap Questions — do not assume a model.
+
+## Coverage Closure
+Before emitting, verify:
+- Every FR in `spec/04_fr_list.json` that specifies an observable external behavior is covered by ≥1 `api_id` in this artifact, OR explicitly listed in `out_of_scope` with rationale.
+- All `trace` entries on APIs reference valid `fr_id` values from `spec/04_fr_list.json`.
+- Every `component_id` from `spec/02_system_sketch.json` that exposes an interface has at least one API contract defined here.
+- All resource and action names align with `term_id` values from `spec/03_glossary.json`.
+- If any FR requires an API that cannot be defined yet: add a gap question (Clarify mode) rather than omitting the endpoint.
+- [ ] Every upstream ID from ingested context has been consumed
+- [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
+- [ ] All required fields populated from actual upstream data (not hallucinated)
+- [ ] Every endpoint defines ≥1 error response for each applicable HTTP error class (4xx, 5xx)
+- [ ] Resource naming is consistent across all APIs (no mixed singular/plural, no verbs in resource paths)
+- [ ] Every externally-observable FR behavior has at least one API endpoint
+- [ ] No ID referenced by this step (fr_id, nfr_id, inv_id) conflicts with the same ID in a sibling step
+
+## Step-Specific Completeness Checklist
+- Each API entry has version, protocol, route/path (or equivalent), method (where applicable), and owner.
+- Request/response schema refs are provided or marked `-tbd` with intent to deliver before fixtures.
+- `errors` enumerates meaningful error states (codes, names) to enable negative fixtures.
+- `security` MUST reflect real enforcement aligned with governance; valid values are defined in the schema's `security` field (see schema/05_interface_contracts.schema.json → `vc:core:atoms#apiSecurity`).
+- `trace` links to FRs/capabilities that justify the API; add example_refs where helpful for fixtures.
+- No mixed concerns: separate entries for distinct behaviors or versioned variants.
+
+## Cross-Step Synthesis Notes
+- **Trace Format**: When specifying trace references, use the exact JSON object format: `[{"type": "fr", "id": "fr-login", "note": "Implements: ..."}]` - not string arrays like `["fr-login"]` or simple objects like `{"fr": "fr-login"}`. At step 05, use type `fr` (the kind of the target) pointing to fr-* IDs; state the implements relationship in note.
+- **Semantic Drift Prevention**: When tracing an API to an upstream FR, copy the exact FR `statement` text verbatim into the trace `note` field. Do not paraphrase. Example: `"note": "Implements: 'The system shall authenticate a registered user and return a signed session token.'"`. This prevents trace drift when FR text is later revised.
+
+## Best Practices
+- **Stability**: Keep `api_id` stable and map each entry to an owning component from the system sketch.
+- **Versioning**: Use `version` strings conforming to the pattern enforced by schema/05_interface_contracts.schema.json, and update in lockstep with schema changes.
+- **Payloads**: Provide `input_schema_ref`, `output_schema_ref`, and enumerated `errors` so fixtures and clients know exact payloads.
+- **Security**: Define `security` and `auth` expectations explicitly to align with governance and monitoring.
+- **Trace**: Populate `trace` references to FR IDs or capabilities proving why the interface exists.
+- **Non-HTTP Protocols**: For gRPC methods, use POST method; for MQTT, map routes to topic paths (e.g., `/topic/{id}`).
+
+## Common Pitfalls
+- **Sync Drift**: Forgetting to sync `path` or `method` with implementation scaffolds, breaking generated clients.
+- **Mixed Concerns**: Mixing multiple behaviors into a single API entry, hiding error handling and version strategy.
+- **Empty Errors**: Leaving `errors` empty, which prevents negative fixture coverage and red-team planning.
+- **Bad Versioning**: Using free-form version strings that violate the schema pattern and confuse change management.
 
 # Clarification Questions
 - For each API, what is the exact behavior and which FR(s) does it satisfy?
@@ -119,54 +123,32 @@ You are a senior specification author and validator. Your job is to emit a singl
 - What is the versioning strategy and deprecation policy? Any breaking changes planned soon?
 
 # Schema Reference
-- Schema URI: https://specdev.local/schema/05_interface_contracts.schema.json
+- Schema URI: vc:05-interface-contracts
 - Schema File: schema/05_interface_contracts.schema.json
 - Schema Registry: tools/schema_registry.json
-
-## Hardening Protocol
-- fail-closed preflight: verify required fields, allowed enums, referenced IDs, and command/tool existence before emitting JSON.
-- No-Invention Rules: do not invent IDs, enums, commands, files, metrics, stages, or canonical mappings that are not grounded in provided inputs.
-- Completeness Closure: run a final closure pass to confirm required sections, trace/canonical closure, and seed coverage are complete.
-- blocker report: if required inputs are missing, conflicting, or ambiguous after clarification, stop and return a blocker report instead of speculative output.
 
 # Output Contract
 ```json
 {
+  "$schema": "vc:05-interface-contracts",
   "id": "interface-contracts-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {"seed_id": "seed-overview"}
+  "apis": [
+    {
+      "api_id": "api-example-resource",
+      "name": "Example Resource API",
+      "version": "v1",
+      "protocol": "http",
+      "owner": "api",
+      "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
+      "trace": [{"type": "fr", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
+      "errors": [
+        {"code": "unauthenticated", "message": "No valid auth token provided"},
+        {"code": "resource-not-found", "message": "The requested resource does not exist"}
+      ]
+    }
   ],
-  "apis": [],
-  "generation_quality": {
-    "preflight_passed": true,
-    "evidence_records": [],
-    "unresolved_inputs": [],
-    "assumptions": [],
-    "placeholder_scan": {
-      "has_placeholders": false,
-      "tokens_found": []
-    },
-    "self_check_results": []
-  },
-  "canonical_refs_used": [],
-  "canonical_proposals": [],
-  "canonical_conflicts": []
-
+  "canonical_refs_used": []
 }
 ```
-
-## Canonical Registry (Required Input)
-
-Before generating output, you MUST load and search `canon/manifest.json` for existing canonical entries. Use this registry to:
-1. Bind `*_ref` fields to existing canonical IDs (`cn:<namespace>:<kind>:<slug>`)
-2. Resolve aliases via `canon/aliases.json`
-3. Propose new entries in `canonical_proposals` when no match exists
-4. Flag conflicts in `canonical_conflicts` when ambiguous matches are found
-## Canonical Binding Rules
-1. `canonical_refs_used` is REQUIRED and must list every canonical ID referenced by any `*_ref` field in this artifact.
-2. `canonical_proposals` is REQUIRED (may be empty `[]`). Populate it for any new term, metric, entity, role, etc. that does not exist in the registry.
-3. `canonical_conflicts` is REQUIRED (may be empty `[]`). Populate it when a field value matches multiple canonical entries or contradicts an existing definition.
-4. `generation_quality` is REQUIRED. Set `preflight_passed: true` only after confirming all canonical bindings are resolved.
-5. For each `*_ref` field in the schema: if the semantic content exists, the ref MUST be populated. This is not optional.

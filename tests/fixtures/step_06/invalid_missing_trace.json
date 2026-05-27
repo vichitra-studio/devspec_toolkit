@@ -1,16 +1,8 @@
 {
-  "$schema": "https://specdev.local/schema/06_invariants.schema.json",
+  "$schema": "vc:06-invariants",
   "id": "invariants-catalog",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "seed_refs": [
-    {
-      "seed_id": "seed-overview"
-    },
-    {
-      "seed_id": "seed-tech-stack"
-    }
-  ],
   "rules": [
     {
       "inv_id": "invariant-user-authentication",
@@ -26,7 +18,9 @@
           "api-secure-endpoint"
         ]
       },
-      "severity": "error"
+      "severity": "error",
+      "policy_ref": {"id": "cn:core:policy:spec-first", "kind": "policy"}
     }
-  ]
+  ],
+  "canonical_refs_used": []
 }

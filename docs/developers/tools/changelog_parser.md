@@ -64,7 +64,6 @@ changes = get_changes_between(changelog_dir, "0.1.0", "0.2.0")
 @dataclass
 class VersionChangelog:
     version: str           # "0.1.0"
-    release_date: str      # "2026-01-14"
     breaking: bool         # True if breaking changes
     description: str       # Release notes
     changes: List[ChangelogEntry]
@@ -102,6 +101,6 @@ class ChangelogEntry:
 
 ## See Also
 
-- [Migration System Spec](../design/migration_system_spec_v0.1.0.md)
+- [Migration System Spec](../design/migration_system_spec.md)
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [changelog/format.yaml](../../../changelog/format.yaml)

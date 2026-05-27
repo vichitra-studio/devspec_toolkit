@@ -1,4 +1,5 @@
 {
+  "$schema": "vc:canon:kind",
   "registry_version": "1.0.0",
   "kind": "tag",
   "entries": [
@@ -17,6 +18,36 @@
       ],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tag:smoke",
+      "kind": "tag",
+      "preferred_label": "smoke",
+      "definition": "Tag marking smoke-test coverage for high-priority paths.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
+      }
+    },
+    {
+      "id": "cn:core:tag:load",
+      "kind": "tag",
+      "preferred_label": "load",
+      "definition": "Tag marking load / performance-benchmark coverage.",
+      "version": "1.0.0",
+      "status": "active",
+      "owners": [
+        "spec-platform"
+      ],
+      "aliases": [],
+      "lifecycle": {
+        "introduced_at": "2026-05-24T00:00:00Z"
       }
     }
   ]
