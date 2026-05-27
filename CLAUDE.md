@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code (claude.ai/code) when working with the **AI Spec Driven Development Toolkit** — a schema-first workflow that turns spec → implementation into a deterministic pipeline backed by machine-checkable artifacts.
+Guidance for Claude Code (CLI, desktop app, web, and IDE extensions) when working with the **AI Spec Driven Development Toolkit** — a schema-first workflow that turns spec → implementation into a deterministic pipeline backed by machine-checkable artifacts.
 
 This file auto-loads in any host that vendors the toolkit as a git submodule at `<host-repo>/devspec_toolkit/`. Most guidance below assumes that host context; toolkit-internal development notes are in the final section.
 

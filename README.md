@@ -84,5 +84,10 @@ All authoritative CLI examples, guardrails, and troubleshooting checklists live 
 
 ---
 
+## Platform Support
+macOS and Linux are fully supported. Windows users should run the toolkit under WSL2.
+
+---
+
 ## License
-Choose what suits your org (Apache-2.0, MIT, etc.) and place it in [LICENSE](LICENSE).
+This toolkit is released under the [MIT License](LICENSE).
