@@ -50,6 +50,35 @@ _SCHEMA_FILE_TO_STEP_KEY: dict[str, str] = {
 }
 
 
+def _schema_step_key(schema_filename: str) -> str:
+    """Derive the ``schema_contracts`` step key for a schema filename.
+
+    Single source of truth for the filename → step-key mapping shared by
+    ``run_prompt_schema_sync`` and ``_schema_contract_step_keys`` so a coverage
+    guard cannot drift from the engine's own derivation.
+    """
+    if schema_filename in _SCHEMA_FILE_TO_STEP_KEY:
+        return _SCHEMA_FILE_TO_STEP_KEY[schema_filename]
+    return schema_filename.split("_", 1)[0]
+
+
+def _schema_contract_step_keys(repo_root: Path) -> set[str]:
+    """Return the set of step keys the engine would register in
+    ``schema_contracts`` (every non-seed ``schema/*.schema.json``).
+
+    A prompt whose ``base_step`` is absent from this set is silently skipped by
+    ``_validate_output_contracts`` (``if not contract: continue``) — i.e. never
+    validated. The anti-vacuity coverage guard asserts no such prompt exists.
+    """
+    keys: set[str] = set()
+    for schema_file in sorted(glob.glob(str(repo_root / "schema" / "*.schema.json"))):
+        step = _schema_step_key(Path(schema_file).name)
+        if step == "seed":
+            continue
+        keys.add(step)
+    return keys
+
+
 def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     root = Path(os.path.abspath(repo_root))
     schema_dir = root / "schema"
@@ -61,10 +90,7 @@ def run_prompt_schema_sync(repo_root: str) -> list[SpecError]:
     schema_files = sorted(glob.glob(str(schema_dir / "*.schema.json")))
     for schema_file in schema_files:
         schema_filename = Path(schema_file).name
-        if schema_filename in _SCHEMA_FILE_TO_STEP_KEY:
-            step = _SCHEMA_FILE_TO_STEP_KEY[schema_filename]
-        else:
-            step = schema_filename.split("_", 1)[0]
+        step = _schema_step_key(schema_filename)
         if step == "seed":
             continue
         try:
