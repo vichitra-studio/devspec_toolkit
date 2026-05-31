@@ -43,6 +43,13 @@ jobs:
         run: python -m specdev_tools.cli dependency-order-lint --repo-root .
       - name: DAG lint
         run: python -m specdev_tools.cli dag-lint --repo-root .
+      - name: Prompt/schema sync (output-contract drift)
+        # Validates every prompt's Output Contract example against its step
+        # schema (E310 drift, W580 sub-step drift). W580 is promoted to a
+        # failure here by the job-level SPECDEV_WARNINGS_AS_ERRORS. Drift also
+        # fails the test job via test_repo_prompt_schema_sync_is_clean; this
+        # step surfaces it explicitly and early in the validate gate.
+        run: python -m specdev_tools.cli prompt-sync --repo-root .
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
         run: python -m specdev_tools.cli governance-check spec --message "${{ github.event.pull_request.title }}"

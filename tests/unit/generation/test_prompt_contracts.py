@@ -3,90 +3,23 @@ import json
 import unittest
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
-
-from specdev_tools.core.registry import SchemaRegistry
-
 
 class PromptContractsTests(unittest.TestCase):
     def setUp(self):
         self.repo_root = Path(__file__).resolve().parents[3]
         self.prompt_dir = Path(__file__).resolve().parents[3] / "prompts"
 
-    def test_output_contract_examples_include_metadata_fields(self):
-        for path in sorted(self.prompt_dir.glob("prompt_*.md")):
-            text = path.read_text(encoding="utf-8")
-            if "# Output Contract" not in text or "## Metadata Contract" not in text:
-                continue
-            section = text.split("# Output Contract", 1)[1].split("## Metadata Contract", 1)[0]
-            blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
-            self.assertTrue(blocks, msg=path.name)
-            parsed = []
-            for idx, block in enumerate(blocks):
-                try:
-                    parsed.append(json.loads(block))
-                except json.JSONDecodeError as exc:
-                    self.fail(f"{path.name} output-contract block {idx} invalid JSON: {exc}")
-            output_payload = parsed[-1]
-            self.assertIsInstance(output_payload, dict, msg=path.name)
-            self.assertIn("canonical_refs_used", output_payload, msg=path.name)
-
-    def test_output_contract_examples_validate_against_step_schemas(self):
-        registry = SchemaRegistry(str(self.repo_root))
-        jsonschema_registry = registry.to_referencing_registry()
-        step_to_schema: dict[str, str] = {}
-        for uri in registry.store:
-            match = re.match(r"^vc:(\d{2}[a-z]?)-", uri)
-            if match:
-                step_to_schema[match.group(1)] = uri
-
-        for path in sorted(self.prompt_dir.glob("prompt_*.md")):
-            name_match = re.match(r"prompt_(\d{2}[a-z]?)_", path.name)
-            if not name_match:
-                continue
-            step = name_match.group(1)
-            schema_uri = step_to_schema.get(step)
-            if step in {"16a", "16b", "16c"}:
-                schema_uri = step_to_schema.get("16")
-            if not schema_uri:
-                continue
-
-            text = path.read_text(encoding="utf-8")
-            if "# Output Contract" not in text or "## Metadata Contract" not in text:
-                continue
-            section = text.split("# Output Contract", 1)[1].split("## Metadata Contract", 1)[0]
-            blocks = re.findall(r"```json\s*(.*?)\s*```", section, flags=re.DOTALL)
-            self.assertTrue(blocks, msg=f"{path.name} missing output-contract JSON block")
-
-            payload = json.loads(blocks[-1])
-            self.assertIsInstance(payload, dict, msg=f"{path.name} output payload must be object")
-            payload_no_schema = dict(payload)
-            payload_no_schema.pop("$schema", None)
-            # Dead fields removed from prompts (FIX-082) but still required by
-            # step schemas until FIX-061..065 removes them from schemas.
-            # Inject defaults so schema validation passes.
-            _dead_field_defaults = {
-                "canonical_proposals": [],
-                "canonical_conflicts": [],
-            }
-            for field, default in _dead_field_defaults.items():
-                payload_no_schema.setdefault(field, default)
-
-            schema = registry.load(schema_uri)
-            validator = Draft202012Validator(
-                schema,
-                registry=jsonschema_registry,
-                format_checker=Draft202012Validator.FORMAT_CHECKER,
-            )
-            errors = sorted(validator.iter_errors(payload_no_schema), key=lambda e: list(e.path))
-            self.assertEqual(
-                [],
-                errors,
-                msg=(
-                    f"{path.name} output-contract example fails schema validation: "
-                    f"{errors[0].json_path if errors else '$'}: {errors[0].message if errors else ''}"
-                ),
-            )
+    # NOTE: The former tests `test_output_contract_examples_include_metadata_fields`
+    # and `test_output_contract_examples_validate_against_step_schemas` were
+    # removed (DEVSPEC-83). Both gated on a `## Metadata Contract` heading that
+    # exists in no prompt, so they silently skipped every prompt and validated
+    # nothing. Their intent — full schema validation of each prompt's Output
+    # Contract example — is enforced authoritatively by the engine
+    # (`_validate_output_payload` runs Draft202012 validation → E310) and
+    # exercised by `test_repo_prompt_schema_sync_is_clean` plus the
+    # positive-detection suite in test_prompt_schema_sync.py. The anti-vacuity
+    # coverage guard there (`test_every_prompt_maps_to_a_covered_schema`)
+    # prevents this silent-skip class from recurring.
 
     def test_no_legacy_completeness_threshold_phrasing_remains(self):
         legacy_patterns = (

@@ -13,6 +13,51 @@ class PromptSchemaSyncTests(unittest.TestCase):
         errs = run_prompt_schema_sync(str(repo_root))
         self.assertEqual([], errs, msg=f"Repo prompt/schema drift detected: {errs}")
 
+    def test_every_prompt_maps_to_a_covered_schema(self):
+        """Anti-vacuity guard (DEVSPEC-83).
+
+        ``_validate_output_contracts`` silently skips any prompt whose filename
+        yields no step key (``if not step: continue``) or whose ``base_step`` has
+        no registered schema (``if not contract: continue``) — emitting nothing.
+        A prompt added without a matching schema would therefore go unvalidated
+        while ``test_repo_prompt_schema_sync_is_clean`` still passes (the gate
+        goes vacuous). This guard fails loudly on that class of regression.
+
+        It reuses the engine's own derivation helpers so it cannot drift from
+        what the engine actually does.
+        """
+        from specdev_tools.generation.prompt_schema_sync import (
+            _schema_contract_step_keys,
+            _PROMPT_STEP_OVERRIDE,
+            _step_from_prompt_name,
+            _SUBSTEP_TO_BASE_SCHEMA,
+        )
+
+        repo_root = Path(__file__).resolve().parents[3]
+        schema_keys = _schema_contract_step_keys(repo_root)
+        prompt_paths = sorted((repo_root / "prompts").glob("prompt_*.md"))
+        self.assertTrue(prompt_paths, msg="no prompt_*.md files found — guard would be vacuous")
+
+        uncovered: list[str] = []
+        for path in prompt_paths:
+            name = path.name
+            step = _PROMPT_STEP_OVERRIDE.get(name) or _step_from_prompt_name(name)
+            if step is None:
+                self.fail(f"{name}: filename yields no step key — engine silently skips it")
+            base_step = _SUBSTEP_TO_BASE_SCHEMA.get(step, step)
+            if base_step not in schema_keys:
+                uncovered.append(f"{name} (base_step={base_step!r})")
+
+        self.assertEqual(
+            [],
+            uncovered,
+            msg=(
+                "prompts not covered by any schema — engine validates nothing for them: "
+                f"{uncovered}. Add the matching schema/<step>_*.schema.json or a "
+                "_PROMPT_STEP_OVERRIDE / _SCHEMA_FILE_TO_STEP_KEY entry."
+            ),
+        )
+
     def test_detects_missing_required(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
