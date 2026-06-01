@@ -1,3 +1,9 @@
+# Sentinel file for in-progress (unreleased) changes.
+# At release time:
+#   1. Rename this file to changelog/vX.Y.Z.yaml
+#   2. Update the `version` field below to match (e.g. "1.0.1")
+#   3. Add the new version to the Version Index in CHANGELOG.md
+#   4. Run: specdev changelog --validate X.Y.Z
 version: "unreleased"
 breaking: false
 description: >
@@ -5,23 +11,5 @@ description: >
   extracting stamp_specdev_version into a shared helper and updating E608
   messages to direct users to the new command.
 
-changes:
-  - type: add_module
-    description: >
-      New `specdev update` command — syncs a project to the current toolkit
-      version. Re-stamps specdev_version on no structural changes (exit 0);
-      directs through specdev align (apply --auto → prompts → validate) when
-      schema migration is required (exit 1).
-    migration:
-      action: none
-      note: "No spec artifact changes — CLI addition only."
-
-  - type: fix
-    description: >
-      stamp_specdev_version extracted from validate_post_migration into a
-      shared helper. is_migration=False preserves last_migration and omits
-      migration_history entries; is_migration=True (align validate only)
-      appends a history entry and updates last_migration.
-    migration:
-      action: none
-      note: "Behavioural fix to audit trail; no spec schema changes."
+# No schema changes in this release — CLI addition and internal refactor only.
+changes: []

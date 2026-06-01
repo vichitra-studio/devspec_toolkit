@@ -13,7 +13,7 @@
 ### Changed
 
 - `spec_check` E608 messages now direct users to `specdev update` instead of
-  `specdev align` directly.
+  `specdev align` directly. (DEVSPEC-87)
 - `stamp_specdev_version` extracted from `validate_post_migration` into
   `schema_differ.py` as a shared helper. Plain re-stamps (`is_migration=False`)
   preserve `last_migration` and never add a `migration_history` entry; migration
