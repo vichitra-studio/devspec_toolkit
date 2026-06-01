@@ -363,7 +363,7 @@
 
 **Trigger**: Fires in any of three cases: (1) `spec/specdev_version` is absent or is present but malformed / missing the `toolkit_version` key; (2) the active toolkit version cannot be read from `tools/pyproject.toml` (file missing or unparseable); (3) the `toolkit_version` recorded in `spec/specdev_version` differs from the active toolkit version.
 
-**Resolution**: Run `specdev align` to migrate spec artifacts to the current toolkit version before making further edits. If the file is stale or incorrect, update `spec/specdev_version` manually after verifying your toolkit version with `specdev --version`.
+**Resolution**: Run `specdev update <spec_dir>` to sync your project to the current toolkit version. When there are no schema changes, `update` re-stamps `spec/specdev_version` instantly. When schema changes are required, it directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`), finalizing with `specdev align validate <spec_dir>` — which runs full post-migration validation and stamps the new version with a migration-history entry.
 
 **Promotable**: No (error only).
 
