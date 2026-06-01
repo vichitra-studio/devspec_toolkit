@@ -27,16 +27,16 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Needed for commit history if checking multiple commits
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8
         with:
-          python-version: "3.x"
-          cache: "pip"
+          enable-cache: true
       - name: Setup Virtual Environment & Install tooling
         run: |
-          python -m venv devspec_env
+          uv python install 3.13
+          uv venv devspec_env --python 3.13
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
-          devspec_env/bin/pip install -e tools/
+          uv pip install --python devspec_env/bin/python -e tools/
       - name: Canonical lint
         run: python -m specdev_tools.cli canonical-lint canon --repo-root .
       - name: Dependency order lint
@@ -76,16 +76,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8
         with:
-          python-version: "3.x"
-          cache: "pip"
+          enable-cache: true
       - name: Setup Virtual Environment & Install tooling
         run: |
-          python -m venv devspec_env
+          uv python install 3.13
+          uv venv devspec_env --python 3.13
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
-          devspec_env/bin/pip install -e tools/
-          devspec_env/bin/pip install pytest
+          uv pip install --python devspec_env/bin/python -e "./tools[dev]"
       - name: Run pytest
         run: pytest tests/ -v

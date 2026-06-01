@@ -1,5 +1,5 @@
 # Pre-commit hooks for the DevSpec Toolkit (toolkit-internal).
-# Install: pip install pre-commit && pre-commit install
+# Install: bash scripts/init_toolkit_dev.sh  (or: uv pip install pre-commit && pre-commit install)
 # Run manually: pre-commit run --all-files
 #
 # Host repos that vendor the toolkit as a submodule should copy the

@@ -3,7 +3,7 @@
 # Copy this file to your host repo root as .pre-commit-config.yaml.
 # Adjust --repo-root to match your toolkit submodule path (default: ./devspec_toolkit).
 #
-# Install: pip install pre-commit && pre-commit install
+# Install: uv pip install pre-commit && pre-commit install
 # Run manually: pre-commit run --all-files
 repos:
   - repo: local

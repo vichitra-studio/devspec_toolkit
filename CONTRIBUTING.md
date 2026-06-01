@@ -17,12 +17,10 @@ Thanks for your interest in improving the **AI Spec Driven Development Toolkit**
    cd devspec_toolkit
    git checkout -b my-change
    ```
-3. **Set up the environment** (see [docs/developers/getting_started.md](docs/developers/getting_started.md) for full details):
+3. **Set up the environment** (see [docs/developers/getting_started.md](docs/developers/getting_started.md) for full details). This requires [`uv`](https://docs.astral.sh/uv/) (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`). The script provisions a managed CPython 3.13, creates the `devspec_env` virtualenv, installs the toolkit editable with its dev tooling, and wires up the git hooks:
    ```bash
-   python3 -m venv devspec_env
+   bash scripts/init_toolkit_dev.sh
    source devspec_env/bin/activate
-   pip install -r tools/requirements.txt
-   pip install -e ./tools
    ```
 4. **Make your change.** Keep it focused — one logical change per pull request.
 5. **Validate locally** before pushing:

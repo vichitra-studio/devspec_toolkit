@@ -4,24 +4,49 @@ set -eo pipefail
 # Setup script for the devspec toolkit virtual environment.
 #
 # Uses `uv` to provision a managed CPython 3.13 interpreter and an isolated
-# virtualenv. Python 3.13 is REQUIRED on Apple Silicon: the toolkit depends on
-# cel-python, whose `google-re2` dependency has no arm64-macOS wheel and fails
-# to build from source — but cel-python drops google-re2 on Python 3.13/arm64
-# macOS (per its dependency markers) and falls back to the stdlib `re` engine.
+# virtualenv. Python 3.13 is REQUIRED: the toolkit depends on cel-python, which
+# pulls in google-re2 (a native extension). google-re2 only ships prebuilt wheels
+# for cp313 (including macOS arm64); on older interpreters there is no arm64 wheel,
+# so the install falls back to a source build that needs abseil headers and fails.
+# Running on 3.13 takes the prebuilt-wheel path and sidesteps the build entirely.
 # The managed interpreter lives under uv's user-local cache (~/.local/share/uv),
 # never the system Python, so nothing is installed system-wide.
+#
+# Usage:
+#   setup_devspec_env.sh [--tools-dir DIR] [--venv-name NAME]
+#     --tools-dir DIR    Path to the toolkit 'tools/' dir (default: auto-detect)
+#     --venv-name NAME   Name of the virtualenv to create (default: devspec_env)
+
+TOOLS_DIR=""
+VENV_NAME="devspec_env"
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --tools-dir)
+            TOOLS_DIR="$2"; shift 2 ;;
+        --venv-name)
+            VENV_NAME="$2"; shift 2 ;;
+        *)
+            echo "ERROR: unknown argument '$1'" >&2
+            echo "Usage: $0 [--tools-dir DIR] [--venv-name NAME]" >&2
+            exit 1 ;;
+    esac
+done
 
 echo "Setting up devspec toolkit environment (uv-managed)..."
 
-# --- locate the toolkit 'tools/' dir (host submodule layout OR toolkit-internal) ---
-if [ -d "./devspec_toolkit/tools" ]; then
-    TOOLS_DIR="./devspec_toolkit/tools"          # host repo: toolkit vendored at ./devspec_toolkit
-elif [ -d "./tools/specdev_tools" ]; then
-    TOOLS_DIR="./tools"                          # running from inside the toolkit itself
-else
-    echo "ERROR: cannot find the toolkit 'tools/' dir (looked for ./devspec_toolkit/tools and ./tools)." >&2
-    echo "Run this from your host repo root (toolkit vendored at ./devspec_toolkit) or from the toolkit root." >&2
-    exit 1
+# --- locate the toolkit 'tools/' dir (only when not provided explicitly) ---
+if [ -z "$TOOLS_DIR" ]; then
+    if [ -d "./devspec_toolkit/tools" ]; then
+        TOOLS_DIR="./devspec_toolkit/tools"      # host repo: toolkit vendored at ./devspec_toolkit
+    elif [ -d "./tools/specdev_tools" ]; then
+        TOOLS_DIR="./tools"                      # running from inside the toolkit itself
+    else
+        echo "ERROR: cannot find the toolkit 'tools/' dir (looked for ./devspec_toolkit/tools and ./tools)." >&2
+        echo "Run this from your host repo root (toolkit vendored at ./devspec_toolkit) or from the toolkit root," >&2
+        echo "or pass --tools-dir explicitly." >&2
+        exit 1
+    fi
 fi
 echo "Using toolkit tools dir: ${TOOLS_DIR}"
 
@@ -39,32 +64,32 @@ uv python install 3.13
 
 # --- (re)create the virtualenv on the managed interpreter ---
 # If an env already exists but is NOT Python 3.13 (e.g. left over from an older
-# system-Python setup), rebuild it. Reusing a non-3.13 env would make the
-# `uv pip install` step pull the unbuildable google-re2 on arm64 macOS,
-# defeating the entire purpose of this script.
+# system-Python setup), rebuild it. Reusing a non-3.13 env would make the install
+# step pull the unbuildable google-re2 source dist on arm64 macOS, defeating the
+# entire purpose of this script.
 NEED_VENV=1
-if [ -d "devspec_env" ]; then
-    EXISTING_PY=$(devspec_env/bin/python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "unknown")
+if [ -d "${VENV_NAME}" ]; then
+    EXISTING_PY=$("${VENV_NAME}/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "unknown")
     if [ "$EXISTING_PY" = "3.13" ]; then
-        echo "Virtual environment 'devspec_env' already exists on Python 3.13 (reusing)."
+        echo "Virtual environment '${VENV_NAME}' already exists on Python 3.13 (reusing)."
         NEED_VENV=0
     else
-        echo "Existing 'devspec_env' is Python ${EXISTING_PY}, not 3.13 — rebuilding."
-        rm -rf devspec_env
+        echo "Existing '${VENV_NAME}' is Python ${EXISTING_PY}, not 3.13 — rebuilding."
+        rm -rf "${VENV_NAME}"
     fi
 fi
 if [ "$NEED_VENV" -eq 1 ]; then
-    echo "Creating virtual environment 'devspec_env' on Python 3.13..."
-    uv venv devspec_env --python 3.13
+    echo "Creating virtual environment '${VENV_NAME}' on Python 3.13..."
+    uv venv "${VENV_NAME}" --python 3.13
 fi
 
 # shellcheck disable=SC1091
-source devspec_env/bin/activate
+source "${VENV_NAME}/bin/activate"
 
-# --- install dependencies + the toolkit (editable) into the venv ---
-echo "Installing toolkit dependencies..."
-uv pip install -r "${TOOLS_DIR}/requirements.txt"
-echo "Installing devspec toolkit (editable)..."
+# --- install the toolkit (editable) + its dependencies into the venv ---
+# pyproject.toml is the single source of truth for dependencies; the editable
+# install resolves them (no separate requirements.txt).
+echo "Installing devspec toolkit (editable) + dependencies..."
 uv pip install -e "${TOOLS_DIR}"
 
 # --- verify ---
@@ -74,6 +99,6 @@ specdev --help >/dev/null && echo "specdev CLI OK"
 
 echo ""
 echo "Setup complete. Activate with:"
-echo "  source devspec_env/bin/activate"
+echo "  source ${VENV_NAME}/bin/activate"
 echo "Then run, e.g.:"
 echo "  specdev --help"
