@@ -59,7 +59,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - name: Setup uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.1.0
       - name: Setup virtualenv & install tooling
         run: |
           uv python install 3.13
