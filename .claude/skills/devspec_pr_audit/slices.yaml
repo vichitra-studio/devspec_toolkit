@@ -58,7 +58,6 @@ exclusions:
   - ".pre-commit-config.yaml"
   - "pyrightconfig.json"
   - "LICENSE"
-  - "tools/requirements.txt"
   # Toolkit's own self-spec dir (audited by specdev itself, not this framework)
   - "spec/**"
   # Python type-marker files (no semantic content)

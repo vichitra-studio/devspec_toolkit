@@ -7,7 +7,7 @@ The `changelog_parser` module parses and validates YAML changelog files for the 
 The parser is included in `specdev_tools`. Ensure the toolkit is installed:
 
 ```bash
-pip install -e ./devspec_toolkit/tools
+uv pip install -e ./devspec_toolkit/tools
 ```
 
 ## CLI Usage

@@ -16,6 +16,11 @@ specdev --help                  # list subcommands
 specdev <command> --help       # usage for one command
 ```
 
+First-time toolkit-internal setup (requires [`uv`](https://docs.astral.sh/uv/)) — provisions a managed CPython 3.13, builds `devspec_env`, installs the toolkit + dev tooling, and configures git hooks:
+```bash
+bash scripts/init_toolkit_dev.sh
+```
+
 If the venv isn't active, use the wrapper:
 ```bash
 ./tools/run_specdev.sh <command> ...

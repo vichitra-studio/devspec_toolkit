@@ -58,18 +58,15 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          cache: "pip"
-      - name: Create virtualenv
-        run: python -m venv devspec_env  # Matches default --venv-name
-      - name: Install tooling
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+      - name: Setup virtualenv & install tooling
         run: |
-          devspec_env/bin/pip install --upgrade pip
-          devspec_env/bin/pip install -r devspec_toolkit/tools/requirements.txt
-          devspec_env/bin/pip install -e devspec_toolkit/tools/
+          uv python install 3.13
+          uv venv devspec_env --python 3.13  # Matches default --venv-name
+          # $GITHUB_PATH applies to LATER steps; this step targets the interpreter explicitly.
+          echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
+          uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
       - name: Validate all specs
         run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
       - name: Governance check (PR Title)
@@ -436,9 +433,22 @@ def main():
     args = parser.parse_args()
 
     target_dir = os.path.abspath(args.target)
-    
+
     if not os.path.exists(target_dir):
         print(f"Error: Target directory {target_dir} does not exist.")
+        sys.exit(1)
+
+    # Fail fast if uv is missing: the environment setup (step 6) is uv-driven, so
+    # check up front rather than scaffolding a half-built repo and erroring out later.
+    if shutil.which("uv") is None:
+        print(
+            "Error: 'uv' is not installed, but it is required to set up the "
+            "Python 3.13 environment.\n"
+            "Install it (user-local; does not touch system Python):\n"
+            "  curl -LsSf https://astral.sh/uv/install.sh | sh\n"
+            "  (or: brew install uv)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # 1. Check if git repo
@@ -660,43 +670,35 @@ def main():
         config_content = _build_pre_commit_config(rel_toolkit_root)
         with open(pre_commit_file, "w") as f:
             f.write(config_content)
-        print("Note: You need to install pre-commit (pip install pre-commit) and run 'pre-commit install'")
+        print("Note: pre-commit will be installed into the virtualenv and 'pre-commit install' run automatically.")
     else:
         print(".pre-commit-config.yaml exists. Please manually ensure devspec hooks are configured.")
 
-    # 6. Setup Virtual Environment
+    # 6. Setup Virtual Environment (uv-managed Python 3.13) via the shared primitive.
+    # setup_devspec_env.sh provisions a managed CPython 3.13, (re)creates the venv, and
+    # installs the toolkit + deps editable from pyproject.toml. It is idempotent (reuses
+    # an existing 3.13 venv), so no exists/else split is needed here. macOS/Linux only.
     venv_name = args.venv_name
     venv_dir = os.path.join(target_dir, venv_name)
-    if not os.path.exists(venv_dir):
-        print(f"Creating virtual environment '{venv_name}'...")
-        run_cmd([sys.executable, "-m", "venv", venv_name], cwd=target_dir)
-        
-        # Determine pip path (bin vs Scripts for cross-platform compatibility, though likely unix here)
-        venv_bin = os.path.join(venv_dir, "Scripts" if sys.platform == "win32" else "bin")
-        pip_cmd = os.path.join(venv_bin, "pip")
+    setup_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "setup_devspec_env.sh")
+    print(f"Setting up virtual environment '{venv_name}' (uv / Python 3.13)...")
+    run_cmd(
+        ["bash", setup_script,
+         "--tools-dir", os.path.join(actual_toolkit_root, "tools"),
+         "--venv-name", venv_name],
+        cwd=target_dir,
+    )
 
-        print("Upgrading pip...")
-        run_cmd([pip_cmd, "install", "--upgrade", "pip"], cwd=target_dir)
+    venv_bin = os.path.join(venv_dir, "bin")
 
-        print("Installing pre-commit...")
-        run_cmd([pip_cmd, "install", "pre-commit"], cwd=target_dir)
-
-        print("Installing toolkit dependencies...")
-        
-        # requirements.txt path relative to actual toolkit root
-        reqs_path = os.path.join(actual_toolkit_root, "tools", "requirements.txt")
-        if os.path.exists(reqs_path):
-            run_cmd([pip_cmd, "install", "-r", reqs_path], cwd=target_dir)
-        
-        # Install toolkit in editable mode
-        tools_path = os.path.join(actual_toolkit_root, "tools")
-        if os.path.exists(tools_path):
-            run_cmd([pip_cmd, "install", "-e", tools_path], cwd=target_dir)
-
-    else:
-        print(f"Virtual environment '{venv_name}' already exists.")
-        # We still need the bin paths for subsequent steps
-        venv_bin = os.path.join(venv_dir, "Scripts" if sys.platform == "win32" else "bin")
+    # pre-commit is a host-repo dev tool (not a toolkit runtime dep), so install it
+    # into the venv explicitly. --python targets the venv interpreter (no activation needed).
+    print("Installing pre-commit into the virtual environment...")
+    run_cmd(
+        ["uv", "pip", "install", "pre-commit",
+         "--python", os.path.join(venv_bin, "python")],
+        cwd=target_dir,
+    )
 
     # 7. Setup Git Hooks (Always run/check)
     print("Ensuring git hooks are installed...")

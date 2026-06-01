@@ -144,14 +144,21 @@ class TestManifestDerivedSeedBootstrap:
 class TestCiWorkflowRender:
     def test_default_venv_name_in_ci(self):
         content = _render_ci_workflow(".", "devspec_env")
-        assert "python -m venv devspec_env" in content
-        assert "devspec_env/bin/pip" in content
+        # uv-driven setup: managed Python + venv on the default name
+        assert "astral-sh/setup-uv" in content
+        assert "uv venv devspec_env --python 3.13" in content
+        assert "uv pip install --python devspec_env/bin/python" in content
+        # the old pip/venv path must be gone
+        assert "python -m venv" not in content
+        assert "/bin/pip install" not in content
 
     def test_custom_venv_name_propagates(self):
         content = _render_ci_workflow(".", "customenv")
-        assert "python -m venv customenv" in content
-        assert "customenv/bin/pip install" in content
-        assert "devspec_env/bin/pip" not in content
+        assert "uv venv customenv --python 3.13" in content
+        assert "uv pip install --python customenv/bin/python" in content
+        assert "customenv/bin" in content
+        # no leakage of the default venv name when a custom one is requested
+        assert "devspec_env" not in content
 
     def test_toolkit_path_substitution(self):
         content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")

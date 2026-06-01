@@ -9,13 +9,32 @@ description = "Internal tooling for DevSpec Toolkit"
 authors = [{name = "Vichitra Collective"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.9"
+# Python 3.13 is required because of the cel-python -> google-re2 native dependency:
+#   * On macOS arm64, cel-python 0.4.x DROPS google-re2 on Python 3.13 (per its
+#     dependency markers) and falls back to the stdlib `re` engine — so there is no
+#     native build at all. On older interpreters the marker keeps google-re2, which
+#     has no arm64 wheel and source-builds against missing abseil headers → failure.
+#   * On Linux, google-re2 stays in but installs from a prebuilt manylinux wheel.
+# Pinning requires-python to >=3.13 is what guarantees the no-build path.
+requires-python = ">=3.13"
 dependencies = [
     "jsonschema>=4.21.1",
     "pyyaml>=6.0.1",
     "jsonschema-specifications>=2023.12.1",
     "pyjwt>=2.8.0",
+    # Keep <0.5.0: cel-python 0.5.0 changes CEL missing-variable semantics (missing
+    # identifiers no longer resolve to falsy defaults), which breaks the invariant
+    # linter's evaluability contract (see tests/unit/validation/linters/test_invariants*).
+    # Do not relax this cap without updating that evaluation logic and its tests.
     "cel-python>=0.4.0,<0.5.0",
+]
+
+[project.optional-dependencies]
+# Dev tooling, declared here so it is the single source of truth (no ad-hoc
+# `pip install pytest` in CI). Install with: uv pip install -e "./tools[dev]"
+dev = [
+    "pytest",
+    "pre-commit",
 ]
 
 [project.scripts]

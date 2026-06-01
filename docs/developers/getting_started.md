@@ -3,7 +3,8 @@
 This guide onboards developers to the end-to-end spec workflow and shows how to work with the repository, prompts, and validation tooling. It consolidates the information that previously lived in the quick start and tutorial documents so there is a single source of truth for human readers. Other docs reference this file for environment setup so keep it authoritative.
 
 ## Prerequisites
-- Python 3.10+ for running the CLI and validation commands
+- [`uv`](https://docs.astral.sh/uv/) — the Python package/interpreter manager that drives setup (install: `curl -LsSf https://astral.sh/uv/install.sh | sh`, or `brew install uv`). It provisions a managed CPython 3.13; you do not need a system Python.
+- Python 3.13 is required (provisioned automatically by `uv`). The toolkit pins `requires-python = ">=3.13"` to avoid a failing `google-re2` source build: on macOS arm64 the `cel-python` markers drop `google-re2` on 3.13 (stdlib `re` fallback, no native build); on Linux it installs from a prebuilt manylinux wheel. On older interpreters the marker keeps `google-re2`, which has no arm64 wheel and source-builds against missing abseil headers.
 - (Optional) Node.js for exercising generated scaffolds
 - Access to an AI assistant that can emit valid JSON
 - Familiarity with Git and basic JSON editing
@@ -35,7 +36,9 @@ source devspec_env/bin/activate
 ```
 
 > [!NOTE]
-> If you prefer manual setup, ensure you create a virtual environment, install `tools/requirements.txt`, and install the package with `pip install -e ./devspec_toolkit/tools`.
+> If you prefer manual setup, use uv: `uv venv devspec_env --python 3.13`, activate it, then `uv pip install -e ./devspec_toolkit/tools` (dependencies are declared in `pyproject.toml` — there is no separate requirements file).
+>
+> **Developing the toolkit itself?** From the toolkit checkout run `bash scripts/init_toolkit_dev.sh` — it sets up the uv-managed Python 3.13 environment, installs the dev tooling, and configures the pre-commit hooks in one step.
 
 All validation and linting commands must run through `./tools/run_specdev.sh ...`; do not call internal modules directly. This is the only supported entrypoint and ensures the virtualenv guard and schema registry behavior are applied consistently.
 The wrapper invokes the `devspec_env` Python directly, so it works even if you have not activated the environment in your current shell.
