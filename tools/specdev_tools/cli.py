@@ -377,6 +377,21 @@ def main():
                     help="Skip confirmation prompts (for non-interactive use)")
     al.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    upd = sub.add_parser(
+        "update",
+        help="Sync project to current toolkit version (re-stamp or direct to align)",
+    )
+    upd.add_argument("spec_dir", help="Path to project spec/ directory")
+    upd.add_argument("--repo-root", default=".", help="Toolkit root directory")
+    upd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without writing any files",
+    )
+    upd.add_argument(
+        "--json", action="store_true", help="Output results as JSON", dest="json_output"
+    )
+
     pc = sub.add_parser("prompt-context", help="Show downstream consumers for a step")
     pc.add_argument("step", help="Step ID (e.g., '04', '16c')")
     pc.add_argument("--repo-root", default=".")
@@ -1540,6 +1555,51 @@ def main():
                 print(f"\u2705 Toolkit Version: {toolkit_version}")
                 print("\nResult: \u2705 PASSED")
                 print("Migration complete. spec/specdev_version updated.")
+
+    elif args.cmd == "update":
+        from .update import run_update, UpdateResult
+        repo_root = Path(os.path.abspath(args.repo_root))
+        spec_dir = Path(os.path.abspath(args.spec_dir))
+
+        if not spec_dir.exists():
+            err_msg = f"E520 UNRESOLVED_INPUT missing_spec_dir {spec_dir}"
+            if getattr(args, "json_output", False):
+                _json_exit([err_msg], "update")
+            else:
+                print(f"Error: Spec directory not found: {spec_dir}", file=sys.stderr)
+                sys.exit(1)
+
+        result: UpdateResult = run_update(
+            spec_dir, repo_root, dry_run=getattr(args, "dry_run", False)
+        )
+
+        if getattr(args, "json_output", False):
+            status_str = "PASS" if result.exit_code == 0 else "FAIL"
+            errors_list = (
+                [{"code": "E608", "message": result.message, "severity": "error"}]
+                if result.exit_code != 0 and result.status in ("error", "needs_migration")
+                else []
+            )
+            out = {
+                "status": status_str,
+                "error_count": len(errors_list),
+                "warning_count": len(result.warnings),
+                "command": "update",
+                "errors": errors_list,
+                "warnings": result.warnings,
+                "output": result.message,
+                "update_status": result.status,
+                "from_version": result.from_version,
+                "to_version": result.to_version,
+                "dry_run": result.dry_run,
+            }
+            print(json.dumps(out, indent=2))
+            sys.exit(result.exit_code)
+        else:
+            for w in result.warnings:
+                print(f"⚠️  Warning: {w}", file=sys.stderr)
+            print(result.message)
+            sys.exit(result.exit_code)
 
     elif args.cmd == "prompt-context":
         repo_root = os.path.abspath(args.repo_root)

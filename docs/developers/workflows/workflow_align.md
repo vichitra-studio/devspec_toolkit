@@ -86,7 +86,9 @@ specdev align apply --auto
 **What this does**:
 *   Renames files (e.g., `13_scaffold.json` → `15_scaffold.json`).
 *   Updates `$schema` URLs in JSON files.
-*   Updates `spec/specdev_version` to mark migration as "in_progress".
+*   Adds an in-progress marker to `spec/specdev_version` (`migration_status: in_progress` + `target_version`), leaving `toolkit_version` at the **old** value.
+
+> `apply --auto` does **not** finalize the version. It only marks the migration as in-progress; `toolkit_version` is advanced — and a `migration_history` entry recorded — solely by `align validate` (step 7), once the full migration is verified. The in-progress marker is cleared at that point.
 
 ### 5. Generate AI Prompts
 For complex changes (like converting prose to JSON or inferring new fields), generate tailored AI prompts.

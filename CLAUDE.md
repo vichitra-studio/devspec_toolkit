@@ -44,6 +44,7 @@ If a command rejects a flag with "unrecognized arguments", drop that flag and re
 - `canon-accept` writes via `--git-root` and does **not** accept `--spec-root`.
 - Most `specdev json …` subcommands (`read`, `read-multi`, `keys`, `structure`, `schema`, `patch`, `insert`, `delete`) take `--repo-root` only. The CLI now silently strips `--spec-root`/`--git-root` from these, so passing them is harmless — but the canonical invocation omits both. Exception: `specdev json resolve-pointers` legitimately accepts `--git-root` to anchor relative file-path resolution (and warns-then-ignores `--spec-root`); both flags are passed through unchanged.
 - Most diagnostic / utility commands (e.g. `ai-help`, `env-check`, `dependency-order-lint`, `prompt-context`, `dag-lint`, `extraction-intent-check`) take only `--repo-root`.
+- `update` takes `spec_dir` (positional) + `--repo-root` only — does **not** accept `--spec-root` or `--git-root`.
 
 For toolkit-internal development (cwd = toolkit root), the flags default sensibly and can usually be omitted.
 
@@ -63,6 +64,10 @@ For toolkit-internal development (cwd = toolkit root), the flags default sensibl
 Full command catalog: `docs/developers/reference.md`. Use `--help` on any subcommand for current flags.
 
 ```bash
+# After bumping devspec_toolkit submodule — sync project to new toolkit version
+# (re-stamps spec/specdev_version if no schema changes; directs to align if changes required)
+specdev update spec --repo-root ./devspec_toolkit
+
 # Unified gate check — runs all applicable validation / lint checks
 specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 

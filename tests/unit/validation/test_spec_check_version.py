@@ -51,7 +51,7 @@ class TestCheckToolkitVersionMatch:
         assert err.code == "E608"
         assert "0.9.0" in err.message
         assert "1.0.0" in err.message
-        assert "specdev align" in err.message
+        assert "specdev update" in err.message
 
     def test_no_specdev_version_file_returns_e608(self, tmp_path):
         toolkit_root = _make_toolkit_root(tmp_path / "toolkit", "1.0.0")
@@ -62,7 +62,7 @@ class TestCheckToolkitVersionMatch:
         assert isinstance(err, SpecError)
         assert err.code == "E608"
         assert "specdev_version" in err.message
-        assert "specdev align" in err.message
+        assert "specdev update" in err.message
 
     def test_malformed_specdev_version_file_returns_e608(self, tmp_path):
         """specdev_version exists but lacks the toolkit_version key — must get a distinct E608."""

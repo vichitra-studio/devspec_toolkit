@@ -53,15 +53,16 @@ The toolkit uses semantic versioning. Check the current version in [tools/pyproj
 grep 'version' devspec_toolkit/tools/pyproject.toml
 ```
 
-The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev align` on each migration. Every project must have this file; `spec-check` reports E608 if it is absent.
+The toolkit tracks which version your specs were written for in a `spec/specdev_version` file. This file is created at project initialization (by `init_project.py`) and updated by `specdev update` whenever the toolkit version changes. Every project must have this file; `spec-check` reports E608 if it is absent.
 
-**Check if you are up to date:**
+**Sync your project to the current toolkit version:**
 ```bash
-specdev align status
+specdev update spec --repo-root ./devspec_toolkit
 ```
 
-*   **Aligned**: You are good to go.
-*   **Mismatch**: You need to run the [Migration Workflow](workflows/workflow_align.md).
+*   **No schema changes**: `specdev_version` is re-stamped instantly and you are good to go.
+*   **Schema changes required**: The command directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`). `align validate` runs full post-migration validation and stamps `specdev_version` with a migration-history entry.
+*   See the [Migration Workflow](workflows/workflow_align.md) for the full align walkthrough.
 
 ```yaml
 # Example spec/specdev_version
