@@ -11,5 +11,25 @@ description: >
   extracting stamp_specdev_version into a shared helper and updating E608
   messages to direct users to the new command.
 
-# No schema changes in this release — CLI addition and internal refactor only.
-changes: []
+# No schema or step changes — entries below are informational (action: none).
+changes:
+  - type: add_module
+    description: >
+      New `specdev update` command — syncs a project to the current toolkit
+      version. Re-stamps specdev_version on no structural changes (exit 0);
+      directs through specdev align (apply --auto → prompts → validate) when
+      schema migration is required (exit 1). Supports --dry-run and --json.
+    migration:
+      action: none
+      note: "CLI addition only — no spec artifact changes."
+
+  - type: internal_restructure
+    description: >
+      stamp_specdev_version extracted from validate_post_migration into a
+      shared helper in schema_differ.py. is_migration=False preserves
+      last_migration and omits migration_history entries; is_migration=True
+      (align validate only) appends a history entry and updates last_migration.
+      E608 messages in spec_check updated to direct users to specdev update.
+    migration:
+      action: none
+      note: "Internal refactor and message update — no spec schema changes."
