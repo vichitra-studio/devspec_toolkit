@@ -67,6 +67,7 @@ def _make_remediation(err: SpecError) -> dict[str, Any] | None:
                         "command": (
                             f"specdev json insert spec/canon/command_prefixes.json"
                             f" '.allowed_prefixes' '\"{prefix}\"'"
+                            f" --create-schema vc:canon:command-prefixes"
                         ),
                         "rationale": f"Add '{prefix}' to the project command-prefix allowlist",
                     },

@@ -142,6 +142,13 @@ prompt. This agent reads it and branches.
 4. Apply edits one at a time via `specdev json patch/insert/delete`.
    Run `specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
    after each edit batch. Do not apply all edits in a single blind batch.
+   Note: `json patch`/`insert` validate every write against the file's `$schema` and **refuse**
+   an edit that *introduces* a new schema violation (a didactic error names the failing
+   constraint or value). Validation is differential, so fixing one field while another is still invalid
+   is fine — but flipping a conditionally-gated field (a `status`/`severity`/`verdict` value
+   that makes sibling fields required) is refused until those siblings exist. Supply the
+   now-required siblings in the same or a prior edit, or patch the parent object whole.
+   (`json delete` is not validated.)
 5. If E-codes remain after the edit batch, fix the lowest-numbered failing entry first,
    re-validate, and continue. One fix per cycle.
 6. Repeat until the gate is clean or the agent exhausts the findings list.

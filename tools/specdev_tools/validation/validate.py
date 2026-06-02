@@ -16,8 +16,16 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
+# Kept as the patch-target anchor for test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution (patches validate.Draft202012Validator.iter_errors); do not remove.
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
+from ..core.schema_validate import (
+    validate_data_against_schema,
+    SchemaBootstrapError,
+    SchemaNotFoundError,
+    SchemaDecodeError,
+    SchemaReferencingError,
+    SchemaRuntimeError,
+)
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
 from ..canonical.lint import lint_canon_dirs
 from .dependency_order_lint import lint_dependency_order
@@ -174,7 +182,7 @@ def validate_file(
     _step16_cache.clear()
 
     try:
-        registry = SchemaRegistry(repo_root)
+        SchemaRegistry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
         return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e)}")]
     try:
@@ -205,29 +213,25 @@ def validate_file(
             return [make_error("E520", f"{path}: missing_schema_uri")]
 
         try:
-            schema = registry.load(schema_uri)
-        except FileNotFoundError as e:
-            return [make_error("E520", f"{path}: schema_not_found uri={schema_uri} detail={str(e)}")]
-        except json.JSONDecodeError as e:
-            return [make_error("E520", f"{path}: schema_json_decode_failed uri={schema_uri} detail={str(e)}")]
+            raw_errors = validate_data_against_schema(repo_root, data)
+        except SchemaBootstrapError as e:
+            # TOCTOU / reordering defence: helper's own bootstrap failed after the
+            # probe above succeeded.  Emit the byte-identical message the probe would
+            # have emitted so callers see a consistent schema_registry_bootstrap_failed
+            # signal regardless of which bootstrap fires.
+            return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e.original)}")]
+        except SchemaNotFoundError as e:
+            return [make_error("E520", f"{path}: schema_not_found uri={e.uri} detail={e.detail}")]
+        except SchemaDecodeError as e:
+            return [make_error("E520", f"{path}: schema_json_decode_failed uri={e.uri} detail={e.detail}")]
+        except SchemaReferencingError as e:
+            return [make_error("E520", f"{path}: schema_reference_resolution_failed {str(e.original)}")]
+        except SchemaRuntimeError as e:
+            return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e.original).__name__}: {str(e.original)}")]
 
-        # Exclude $schema from validation payload because many step schemas disallow unknown keys
-        data_for_validation = dict(data)
-        data_for_validation.pop("$schema", None)
-
-        # Build a resolver store
-        reg = registry.to_referencing_registry()
-        v = Draft202012Validator(
-            schema,
-            registry=reg,
-            format_checker=Draft202012Validator.FORMAT_CHECKER
-        )
-        try:
-            errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
-        except _WrappedReferencingError as e:
-            return [make_error("E520", f"{path}: schema_reference_resolution_failed {str(e)}")]
-        except Exception as e:
-            return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}")]
+        # Sort by path tuple for deterministic ordering (mirrors the original
+        # sorted(v.iter_errors(...), key=lambda e: e.path) call).
+        errors = sorted(raw_errors, key=lambda t: t[0])
 
         # Resolve step once — use content-based refinement for impl_context/
         # artifacts so 16b/16c sub-step validators actually run during
@@ -236,8 +240,8 @@ def validate_file(
 
         # Enhance error messages with context
         enhanced_errors: list[SpecError] = []
-        for e in errors:
-            error_msg = f"{path}:{'/'.join(map(str, e.path))}: {e.message}"
+        for path_tuple, message in errors:
+            error_msg = f"{path}:{'/'.join(map(str, path_tuple))}: {message}"
 
             # Add context about what to do next
             if step != "unknown":

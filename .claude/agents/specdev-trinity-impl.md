@@ -176,6 +176,15 @@ invocation prompt. This agent reads it and branches.
    ```
    and the group's test command (or project-level fallback). Do not apply all edits in a
    single blind batch.
+   Note: `json patch`/`insert` validate every write against the artifact's `$schema` and
+   **refuse** an edit that *introduces* a new schema violation (a didactic error names the
+   failing constraint or value). Validation is differential, so repairing one field while another stays
+   invalid is fine — but a conditionally-gated field (a `status`/`severity`/`verdict` value
+   that makes siblings required, e.g. a finding `severity` requiring `remediation_task`, or an
+   implementation `status: verified` requiring `evidence` on each action) must be patched
+   together with its now-required siblings (same or prior edit, or patch the parent object
+   whole). This is schema-enforced validation, distinct from the separate `status`/`status_ref`
+   closed-transition gate in §11.5. `json delete` is not validated.
 5. Validate emergent ambiguities written to `execution.emergent_ambiguities[]` against the
    live `crossCycleAmbiguityItem` schema before writing (required fields: `{id, description,
    severity}`; optional fields: `{decision, resolved, status, status_ref, impact[]}`; see E7).

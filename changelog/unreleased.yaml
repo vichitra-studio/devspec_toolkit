@@ -1,0 +1,118 @@
+version: "unreleased"
+breaking: false
+
+description: |
+  DEVSPEC-37 — Schema-aware json writes, _effective_schema fix, and merge
+  consolidation. Removes the broken --against-schema-field opt-in guardrail
+  and replaces it with implicit differential whole-document schema validation
+  built into json patch and json insert. Fixes _effective_schema's property
+  overwrite bug so specdev json schema can navigate step-specific and
+  conditional-gated fields. Consolidates schema-property-merge logic into a
+  canonical core/schema_nav.py helper (DRY/SoC). Adds a registered schema
+  for command_prefixes.json and a --create-schema bootstrap flag on json insert
+  so the E530 remediation flow is not broken by the new validation invariant.
+
+changes:
+  - type: remove_validator
+    description: >
+      Removed the --against-schema-field <step>.<field> flag from
+      specdev json patch and specdev json insert. The flag was broken (wrong
+      schema selected for multi-schema steps such as step 16; top-level-only
+      resolution could not validate any nested or leaf write), structurally
+      inadequate, and universally unused. Deleted: validate_against_schema_field,
+      _find_schema_file, the argparse args, and the main() dispatch blocks that
+      invoked them. The SKILL.md mandate for the flag is replaced with a note
+      that validation is now automatic.
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      specdev json patch and specdev json insert now perform implicit
+      always-on differential whole-document schema validation before every
+      write. The file's own $schema URI is used for schema resolution (so
+      multi-schema steps resolve correctly — the step 16 disambiguation that
+      broke the old flag is a non-issue here). A write is refused only when
+      it *introduces* a schema violation that was not already present in the
+      document (differential / before-after diff), preserving incremental
+      one-patch-at-a-time repair without deadlock. Additional refuse cases:
+      the file has no $schema (didactic error), or the patch targets the
+      $schema key itself (content-based detection, robust to any jq form).
+      No --no-validate CLI bypass is exposed; the internal validate=True
+      parameter is the only control, available to test code only. json delete
+      is unchanged (no value written; spec-check covers required-field
+      removal). Bare agent invocations (no --repo-root) resolve the toolkit
+      root via a package-relative fallback so the constraint holds in
+      submodule/host deployments without requiring agents to pass --repo-root.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      _effective_schema (used by specdev json schema) now resolves a node's
+      effective properties own-first before merging allOf branches, and also
+      unions properties from oneOf/anyOf/if-then-else conditional branches for
+      discovery purposes. Previously, the allOf merge overwrote the node's own
+      properties (the merged_props overwrite bug), causing specdev json schema
+      to drop all step-specific fields on any schema node that combined own
+      properties with an allOf. For example, specdev json schema on a step-16
+      impl-context plan file could not navigate to .plan, .execution, or
+      .review. The fix makes all step-specific fields and conditional-gated
+      fields (e.g. plan.docs.required_updates) navigable by discovery. The
+      corrected docstring at json_utils.py removes the false claim that
+      conditional branches never add navigable properties.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      Schema-property-merge logic unified into a new canonical helper
+      tools/specdev_tools/core/schema_nav.py (effective_schema). Previously
+      three independent implementations existed: _effective_schema (with the
+      overwrite bug), merge_allof (context/_utils.py, correct), and
+      _get_all_properties (registry/generate.py, correct). All three now
+      route through the shared helper. merge_allof and _get_all_properties
+      use include_conditionals=False (behavior byte-preserved; conditionals
+      are a discovery-only concern). _effective_schema uses
+      include_conditionals=True to close the oneOf/if-then-else gap for
+      specdev json schema. A new companion module
+      tools/specdev_tools/core/schema_validate.py factors the schema-layer
+      validation logic shared by validate_file and the new WS1 constraint.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev validate / spec-check (and the new json write guard) now fail
+      closed on all registry.load I/O errors, not just FileNotFoundError.
+      Previously, validate.py only caught FileNotFoundError from registry.load;
+      PermissionError and other OSErrors escaped uncaught. The new
+      core/schema_validate.py helper catches the full OSError family and routes
+      every case to SchemaNotFoundError → E520 schema_not_found. The E520
+      message format is unchanged; only the set of caught exception types is
+      wider. This was an intentional improvement in the DEVSPEC-37 refactor and
+      is documented in the SchemaNotFoundError class docstring.
+    migration:
+      action: none
+
+  - type: add_definition
+    description: >
+      New schema canon/command_prefixes.schema.json ($id vc:canon:command-prefixes)
+      for the command_prefixes.json allowlist file (type object,
+      additionalProperties false; required: allowed_prefixes array of string;
+      optional: $schema uri, _description string). Registered in
+      tools/schema_registry.json. The toolkit's own tools/command_prefixes.json
+      gains a $schema key. This prevents the new WS1 no-$schema refuse rule
+      from blocking the E530 remediation flow, which emits specdev json insert
+      commands targeting command_prefixes.json. Alongside: new --create-schema
+      <uri> flag on specdev json insert only. When the target file does not
+      exist and --create-schema is given, the command seeds the file with
+      {"$schema": "<uri>"} and bootstraps the array-valued field (null-coalescing
+      create-variant jq filter), then runs the standard WS1 differential
+      validation against the seed. Enables first-use bootstrap of
+      spec/canon/command_prefixes.json by E530 remediation candidates without
+      a separate file-creation step. Note: add is not a valid change_type in
+      this toolkit's format.yaml; add_definition is the closest permitted
+      kind for a new schema definition + its associated CLI flag.
+    migration:
+      action: none

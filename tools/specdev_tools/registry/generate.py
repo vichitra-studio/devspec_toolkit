@@ -42,6 +42,8 @@ import json
 import os
 from typing import Any
 
+from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+
 
 # ---------------------------------------------------------------------------
 # Constants / overrides
@@ -160,14 +162,24 @@ def _get_all_properties(schema: dict[str, Any]) -> dict[str, Any]:
 
     Preserves insertion order (Python 3.7+), which is the schema-declaration
     order.  Later allOf entries override earlier ones if keys collide (rare).
+
+    Thin adapter over ``schema_nav.effective_schema`` (conditionals OFF, no-op
+    resolver).  Generate intentionally does NOT resolve the ``vc:core:step-base``
+    ``$ref`` — only inline step-specific top-level properties are wanted.  The
+    no-op resolver returns None (non-dict) for any ``$ref`` node, causing
+    effective_schema to treat that branch as empty — same as before.
+
+    Projects ``["properties"]`` only; ``["required"]`` is discarded (generate
+    never reads required; the helper always sets ``required=[]``).
     """
-    props: dict[str, Any] = {}
-    if "properties" in schema:
-        props.update(schema["properties"])
-    for item in schema.get("allOf", []):
-        if isinstance(item, dict):
-            props.update(_get_all_properties(item))
-    return props
+    # No-op resolver: returns None (non-dict) for any $ref node so that
+    # effective_schema skips bare-$ref branches without resolving them.
+    # MUST return non-dict (None) — not the node itself — per the helper contract.
+    def _noop_resolver(_node: dict) -> None:
+        return None
+
+    e = _schema_nav_effective_schema(schema, _noop_resolver, include_conditionals=False)
+    return e["properties"]
 
 
 # ---------------------------------------------------------------------------
@@ -395,10 +407,18 @@ def _scan_schema_for_arrays(
 def _schema_file_for_step(step: str, schema_dir: str) -> str | None:
     """Return the path to the schema file for a step, or None if none exists.
 
-    For step 16, only 16_impl_context.schema.json is used (16_anchor.schema.json
-    is an internal anchor schema and is skipped).
+    Fail-loud hardening: after the SCHEMA_SKIP filter, if >1 file remains for
+    the same step, raises ``ValueError`` naming the step, the remaining files,
+    and the fix instruction (add the non-spec schema to SCHEMA_SKIP).
+
+    Today exactly 1 file remains for every step after the filter, so this raise
+    is purely future-proofing — it NEVER triggers on the current schema corpus.
+    Step 16 has two schema files (16_impl_context, 16_anchor) but 16_anchor is
+    in SCHEMA_SKIP, so only 16_impl_context remains and the raise does not fire.
+
+    This makes the selector ORDER-INDEPENDENT and FAIL-LOUD rather than silently
+    picking the lexicographic-first when an unhandled multi-schema step is added.
     """
-    # Use glob to find NN_*.schema.json
     pattern = os.path.join(schema_dir, f"{step}_*.schema.json")
     matches = [
         p for p in sorted(glob.glob(pattern))
@@ -406,10 +426,17 @@ def _schema_file_for_step(step: str, schema_dir: str) -> str | None:
     ]
     if not matches:
         return None
-    # If multiple remain after skip-filter, take the first lexicographically.
-    # In practice this only happens for step 16 (impl_context, anchor) but
-    # 16_anchor.schema.json is in SCHEMA_SKIP so only impl_context remains.
-    return matches[0]
+    if len(matches) == 1:
+        return matches[0]
+    # >1 match after SCHEMA_SKIP filter: unhandled ambiguity — fail loud.
+    # To fix: add the non-spec schema file(s) to SCHEMA_SKIP in generate.py.
+    remaining = [os.path.basename(p) for p in matches]
+    raise ValueError(
+        f"_schema_file_for_step: step '{step}' has {len(matches)} schema files "
+        f"remaining after SCHEMA_SKIP filter: {remaining!r}. "
+        f"Add the non-spec schema(s) to SCHEMA_SKIP in "
+        f"tools/specdev_tools/registry/generate.py."
+    )
 
 
 def _spec_basename_for_step(step: str, schema_path: str) -> str:

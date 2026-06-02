@@ -11,7 +11,7 @@ resolution: |
 
   Option A — extend the project allowlist:
     Create or edit spec/canon/command_prefixes.json:
-      {"allowed_prefixes": ["<verb>", ...]}
+      {"$schema": "vc:canon:command-prefixes", "allowed_prefixes": ["<verb>", ...]}
     This file is merged with the toolkit default at runtime.
 
   Option B — register as a canonical command and attach a command_ref:

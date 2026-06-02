@@ -237,6 +237,9 @@ class TestMakeRemediation:
         for c in candidates:
             assert c["command"].startswith("specdev ")
             assert "frobulate" in c["command"]
+        # extend_prefixes must include --create-schema flag for first-use bootstrap (WS4)
+        extend_cmd = next(c["command"] for c in candidates if c["kind"] == "extend_prefixes")
+        assert "--create-schema vc:canon:command-prefixes" in extend_cmd
         assert "frobulate" in r["owner_story"]
 
     def test_e530_invented_enum_non_command_returns_none(self) -> None:
