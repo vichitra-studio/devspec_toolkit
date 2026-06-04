@@ -26,7 +26,7 @@ dependencies = [
     # identifiers no longer resolve to falsy defaults), which breaks the invariant
     # linter's evaluability contract (see tests/unit/validation/linters/test_invariants*).
     # Do not relax this cap without updating that evaluation logic and its tests.
-    "cel-python>=0.4.0,<0.5.0",
+    "cel-python>=0.4.0,<0.6.0",
 ]
 
 [project.optional-dependencies]
