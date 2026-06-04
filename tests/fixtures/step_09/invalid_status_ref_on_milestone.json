@@ -39,7 +39,12 @@
           "type": "fr",
           "id": "fr-initial-setup"
         }
-      ]
+      ],
+      "status_ref": {
+        "id": "cn:project:status:pending",
+        "kind": "status",
+        "label": "pending"
+      }
     }
   ],
   "migration_plan": "No migration required.",

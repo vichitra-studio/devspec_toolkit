@@ -20,7 +20,7 @@ These rules apply only when migrating an existing 16a artifact forward — they 
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 For host-repo (submodule) deployments, use `spec-check` with the full flag set:

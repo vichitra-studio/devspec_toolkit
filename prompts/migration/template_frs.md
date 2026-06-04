@@ -17,7 +17,7 @@
 **Step-specific fields:**
 
 - `$schema`: Must reference the URI above for the target toolkit version.
-- `functional_requirements`: Array of FR objects (minItems: 1). Each entry requires:
+- `functional_requirements`: Array of FR objects (minItems: 2). Each entry requires:
   - `fr_id`: kebab-case identifier with `fr-` prefix (e.g., `fr-user-login`).
   - `statement`: String (minLength: 20) — falsifiable statement of a single system behavior.
   - `acceptance_criteria`: Array of criterion objects (minItems: 2). Each requires `criterion_id` (kebab-case) and `text` (string, minLength: 15).
@@ -40,14 +40,13 @@ The migrated artifact MUST include:
 - `functional_requirements[].postconditions`: Array of strings — state conditions after execution.
 - `functional_requirements[].action_ref`: Canonical reference (kind: `action`) for the primary verb.
 - `functional_requirements[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
-- `functional_requirements[].status_ref`: Canonical reference (kind: `stage`) for the lifecycle status.
 
 ## Validation
 
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/04_fr_list.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ## Context

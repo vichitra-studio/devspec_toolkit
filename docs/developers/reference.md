@@ -117,6 +117,10 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 ./tools/run_specdev.sh changelog --list --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --version <version> --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh changelog --validate <version> --repo-root ./devspec_toolkit
+
+# Trinity milestone-state — deterministic phase-position computation (DEVSPEC-38)
+./tools/run_specdev.sh milestone-state --batch-id <batch-id> \
+  --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### DAG & Extraction Intent Commands
@@ -156,6 +160,62 @@ Read-only diagnostic that prints the active validation configuration. Modifies n
 - Spec directory and step_order.json paths.
 
 **When to run:** When troubleshooting CI failures related to W→E promotion, replay base ref, or configuration issues.
+
+#### `milestone-state`
+
+Deterministic milestone-state computation for the Trinity loop. Reads
+`spec/impl_context/ms_<batch-id>_plan.json`, probes `.specdev/findings/` under the host
+git root, and emits a single JSON object to stdout.
+
+This command replaces the LLM-evaluated `milestone_state` mode of the `specdev-scope` agent
+(DEVSPEC-38, D7/D7a). The `specdev-scope` agent now delegates to this command and passes its
+output through unchanged, so the output contract is identical for skills that parse it.
+
+**Flags:**
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--batch-id BATCH_ID` | Yes | Milestone batch identifier (e.g. `phase2_newsletter_send`) |
+| `--repo-root REPO_ROOT` | No | Toolkit root directory (schema tier). Default: cwd |
+| `--spec-root SPEC_ROOT` | No | Host spec directory used to locate `spec/impl_context/ms_<batch-id>_plan.json`. Default: `<repo-root>/spec` |
+| `--git-root GIT_ROOT` | No | Host repo git root used to locate `.specdev/findings/` (host-relative, NOT under spec-root). Default: `<repo-root>` |
+
+**Output contract** (JSON to stdout):
+
+```json
+{
+  "milestone_id": "<string>",
+  "groups": [
+    {
+      "group_id": "<string>",
+      "state": "<pending|code_converged|blocked|verified|deferred>",
+      "implementation_converged_at": "<ISO8601 or null>",
+      "reviewer_rounds": "<integer>",
+      "findings_resolved_path": "<path or null>",
+      "blocking_amb_ids": ["<string>"],
+      "blocking_amb_health": [{"id": "<string>", "status": "<string>", "resolved": <boolean>, "well_formed": <boolean>}],
+      "fixtures_exercised": ["<string>"]
+    }
+  ],
+  "derived_phase_position": "<pending|impl_in_progress|impl_complete|review_pending|review_complete|operator_pending|closed>",
+  "blockers": [
+    { "kind": "ambiguity", "id": "<string>", "issue": "<string>" }
+  ]
+}
+```
+
+**Submodule deployment:**
+
+```bash
+specdev milestone-state \
+  --batch-id phase2_newsletter_send \
+  --repo-root ./devspec_toolkit \
+  --spec-root ./spec \
+  --git-root .
+```
+
+**When to run:** When debugging Trinity loop state, verifying phase-position transitions, or
+smoke-testing the `specdev-trinity` skill's milestone dispatch.
 
 ### Alignment & Migration
 ```bash

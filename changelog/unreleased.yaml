@@ -1,5 +1,5 @@
 version: "unreleased"
-breaking: false
+breaking: true
 
 description: |
   DEVSPEC-37 — Schema-aware json writes, _effective_schema fix, and merge
@@ -11,6 +11,21 @@ description: |
   canonical core/schema_nav.py helper (DRY/SoC). Adds a registered schema
   for command_prefixes.json and a --create-schema bootstrap flag on json insert
   so the E530 remediation flow is not broken by the new validation invariant.
+
+  DEVSPEC-38 — Remove status_ref from the spec data model; retire the status
+  canon kind; add deterministic milestone-state engine. Breaking: removes the
+  optional status_ref field from 21 schema properties across 6 files; under
+  additionalProperties:false, host specs carrying status_ref will fail
+  validation. The canon status kind (7 entries, 7 aliases) is retired — the
+  schema string enums are now the sole status vocabulary. Adds specdev
+  milestone-state CLI command for deterministic Trinity phase-position
+  computation (replaces LLM-evaluated specdev-scope milestone_state mode).
+  Versioning note (D4): this breaking change lands in 1.0.1 without a 2.0.0
+  major bump — single private host, no external consumers; the cost is near
+  zero. This is a consciously-recorded auditable decision, not CI-enforced.
+  Separately, the governance-check step in ci.yml (specdev governance-check)
+  validates PR-title commit conventions against the Step 10 governance rules,
+  but does not gate semver policy.
 
 changes:
   - type: remove_validator
@@ -114,5 +129,66 @@ changes:
       a separate file-creation step. Note: add is not a valid change_type in
       this toolkit's format.yaml; add_definition is the closest permitted
       kind for a new schema definition + its associated CLI flag.
+    migration:
+      action: none
+
+  # DEVSPEC-38 changes below
+
+  - type: remove_field
+    description: >
+      DEVSPEC-38: Removed the optional status_ref canonical-reference field from
+      21 schema properties across 6 files: schema/04_fr_list.schema.json (1
+      property), schema/06_invariants.schema.json (1), schema/09_impl_plan.schema.json
+      (1), schema/14_roadmap.schema.json (2), schema/16_impl_context.schema.json (15),
+      and schema/core/collections.schema.json (1). All affected schemas use
+      additionalProperties:false, so host spec files carrying status_ref will fail
+      validation after this change. At the 04 and 06 sites there was no sibling
+      status string; status_ref was the sole status field there (host never populated
+      these — 0 data loss, but FR- and invariant-level canonical status tracking is
+      dropped by design). At all other sites the status string is the retained source
+      of truth; 100% of host status_ref objects had a sibling status string (REF-ONLY
+      = 0 / 736 verified), so deletion is lossless.
+    migration:
+      action: auto
+      note: >
+        Delete every status_ref object from all spec artifacts. Remove now-orphaned
+        cn:*:status:* IDs from each file's canonical_refs_used[]. Run
+        specdev canonical-autofix <spec-dir> --write to reconcile canonical_refs_used
+        automatically (the sync prunes stale cn:* IDs). Full steps in
+        WIP/migration/DEVSPEC-38_host_migration.md.
+
+  - type: change_schema
+    description: >
+      DEVSPEC-38: Retired the canon status kind. Deleted canon/kinds/status.json
+      (7 entries: active, blocked, deferred, green, pending, red, verified). Removed
+      7 status aliases from canon/aliases.json (approved→verified, fail→red,
+      failed→red, not started→pending, pass→green, passed→green, postponed→deferred).
+      Removed 14 kind:status entries from canon/manifest.json (7 canonical entries +
+      7 mirrored alias entries). The schema status string enums are now the single
+      source of truth for status vocabulary. This resolves the enum↔label divergence
+      described in DEVSPEC-38: the milestone-lifecycle enums (in_progress, done,
+      needs_work) and the health/CI canon labels (active, green, red) were never the
+      same vocabulary. Retiring the canon kind removes the second vocabulary entirely.
+      Also removed dead Python status machinery: INFERENCE_RULES status rule
+      (core/constants.py), alias_value_fields["status_ref"] (canonical/integrity.py),
+      and "status" from _FALLBACK_DIRECT_FIELDS (canonical/integrity.py).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      DEVSPEC-38: New tools/specdev_tools/context/milestone_state.py — pure,
+      unit-tested deterministic milestone-state engine. Provides
+      derive_group_state() and derive_phase_position() functions. Inputs:
+      implementation.status string + .specdev/findings/ filesystem probes +
+      deterministic blocking-ambiguity string-match. No status_ref. New CLI
+      subcommand specdev milestone-state (--batch-id required; --repo-root,
+      --spec-root, --git-root optional). Output: {milestone_id, groups[],
+      derived_phase_position, blockers[]} with per-group blocking_amb_health.
+      Replaces the LLM-evaluated milestone_state mode of the specdev-scope agent
+      (D7/D7a). The specdev-scope agent now delegates to this CLI and passes the
+      JSON through unchanged — the orchestration contract is identical, specdev-trinity
+      skill parsing is unaffected. Removes macOS/Linux stat/date shell branches;
+      uses os.stat().st_mtime + datetime.fromtimestamp with timezone.utc cross-platform.
     migration:
       action: none

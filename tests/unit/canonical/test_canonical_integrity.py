@@ -417,11 +417,11 @@ class CanonicalIntegrityTests(unittest.TestCase):
                         "$id": "vc:test",
                         "type": "object",
                         "properties": {
-                            "status": {"type": "string"},
-                            "status_ref": {
+                            "stage": {"type": "string"},
+                            "stage_ref": {
                                 "allOf": [
                                     {"$ref": "vc:core:collections#canonicalRef"},
-                                    {"properties": {"kind": {"const": "status"}}},
+                                    {"properties": {"kind": {"const": "stage"}}},
                                 ]
                             },
                             "canonical_refs_used": {"type": "array"},
@@ -429,7 +429,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                             "canonical_conflicts": {"type": "array"},
                         },
                         "required": [
-                            "status",
+                            "stage",
                             "canonical_refs_used",
                             "canonical_proposals",
                             "canonical_conflicts",
@@ -443,7 +443,7 @@ class CanonicalIntegrityTests(unittest.TestCase):
                 json.dumps(
                     {
                         "$schema": "vc:test",
-                        "status": "passed",
+                        "stage": "prod",
                         "canonical_refs_used": [],
                         "canonical_proposals": [],
                         "canonical_conflicts": [],
@@ -456,11 +456,11 @@ class CanonicalIntegrityTests(unittest.TestCase):
             self.assertTrue(
                 any(
                     "unresolved_canonical_semantic" in e.render()
-                    and "field=status" in e.render()
-                    and "kind=status" in e.render()
+                    and "field=stage" in e.render()
+                    and "kind=stage" in e.render()
                     for e in errs
                 ),
-                f"Expected E210 unresolved_canonical_semantic for status/status_ref, got: {[e.render() for e in errs]}",
+                f"Expected E210 unresolved_canonical_semantic for stage/stage_ref, got: {[e.render() for e in errs]}",
             )
 
     def test_can_require_manifest_schema_registration(self):

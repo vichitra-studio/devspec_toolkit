@@ -143,13 +143,6 @@
                       ],
                       "description": "Task-level status: 'pending' (not started), 'in_progress' (actively being worked), 'done' (completed and verified). Note: tasks cannot be 'deferred' — only milestones support deferral. If a task's parent milestone is deferred, the task remains 'pending'."
                     },
-                    "status_ref": {
-                      "description": "Canonical reference to the task status in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Must be consistent with the task's 'status' field value.",
-                      "allOf": [
-                        { "$ref": "vc:core:collections#canonicalRef" },
-                        { "properties": { "kind": { "const": "status" } } }
-                      ]
-                    },
                     "environment_ref": {
                       "description": "Canonical reference to the target environment for this task. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Use to indicate which environment this task targets for deployment or testing. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'.",
                       "allOf": [
@@ -231,13 +224,6 @@
               "spikes": {
                 "$ref": "vc:core:collections#stringArray",
                 "description": "Time-boxed technical investigations required to resolve specific uncertainties before work can proceed. Decision rule: each spike entry must name (1) the question being answered, (2) the time budget, and (3) the expected output. Examples: 'Evaluate Redis Cluster vs Elasticache for session store — 2-day spike, output: architectural decision record with latency benchmarks.' 'Prototype JWT rotation with zero-downtime rollover — 1-day spike, output: working proof of concept committed to feature branch.' Anti-pattern: 'Investigate performance' or 'Research options' (open-ended spikes with no time box or defined output cannot be completed or reviewed)."
-              },
-              "status_ref": {
-                "description": "Canonical reference to the milestone status in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Must be consistent with the 'status' field value.",
-                "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "status" } } }
-                ]
               }
             },
             "required": [

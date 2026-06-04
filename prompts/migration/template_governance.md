@@ -41,7 +41,7 @@ The migrated artifact MUST include:
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/10_governance.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): test migration"
 ```
 

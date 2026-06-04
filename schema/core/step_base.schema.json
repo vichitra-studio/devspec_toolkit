@@ -25,7 +25,7 @@
     },
     "canonical_refs_used": {
       "$ref": "vc:core:collections#canonicalRefArray",
-      "description": "Aggregate list of every canonical registry reference used anywhere in this artifact. Aggregation rule: collect one entry per unique `id` from all `*_ref` fields (capability_ref, entity_ref, unit_ref, status_ref, etc.) across the entire document, deduplicated. Example: if you wrote {\"id\": \"cn:project:term:billing-amount\", \"kind\": \"term\"} in two different fields, include it once here. Required even when empty — use [] when no canonical references were made. Validated by canonical-integrity checks at build time."
+      "description": "Aggregate list of every canonical registry reference used anywhere in this artifact. Aggregation rule: collect one entry per unique `id` from all `*_ref` fields (capability_ref, entity_ref, unit_ref, etc.) across the entire document, deduplicated. Example: if you wrote {\"id\": \"cn:project:term:billing-amount\", \"kind\": \"term\"} in two different fields, include it once here. Required even when empty — use [] when no canonical references were made. Validated by canonical-integrity checks at build time."
     },
     "canonical_proposals": {
       "$ref": "vc:core:collections#canonicalProposalArray",

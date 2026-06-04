@@ -503,10 +503,9 @@ class CliTests(unittest.TestCase):
                 {"id": "cn:core:stage:prod", "kind": "stage"},
                 payload.get("stage_ref"),
             )
-            self.assertEqual(
-                {"id": "cn:core:status:active", "kind": "status"},
-                payload.get("status_ref"),
-            )
+            # status_ref inference removed (DEVSPEC-38): status is a plain
+            # string enum; the autofix no longer infers status_ref.
+            self.assertIsNone(payload.get("status_ref"))
             self.assertEqual(
                 {"id": "cn:core:role:reviewer", "kind": "role"},
                 payload.get("role_ref"),

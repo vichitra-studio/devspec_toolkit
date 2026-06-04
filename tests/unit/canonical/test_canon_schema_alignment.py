@@ -214,7 +214,7 @@ class CanonSchemaAlignmentTests(unittest.TestCase):
             with patch(f"{_MODULE}._ENUM_CANON_PAIRINGS", []):
                 errors = lint_canon_schema_alignment(tmp)
 
-            w552 = [e for e in errors if isinstance(e, str) and e.startswith("W552")]
+            w552 = [e for e in errors if e.code == "W552"]
             self.assertEqual(w552, [])
 
 

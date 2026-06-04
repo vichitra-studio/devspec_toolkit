@@ -529,8 +529,8 @@ def test_plan_docs_surfaces_cross_branch_union_fields():
 
     This is the F3-conditional guard.  plan.docs has no own properties; its
     schema is entirely defined by two oneOf branches:
-      - not_applicable branch: contributes 'reason' (and 'status_ref')
-      - planned branch:        contributes 'required_updates' (and 'status_ref')
+      - not_applicable branch: contributes 'reason'
+      - planned branch:        contributes 'required_updates'
 
     Both 'reason' and 'required_updates' appearing together in allowed_properties
     proves that include_conditionals=True propagated correctly through the

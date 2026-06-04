@@ -79,10 +79,12 @@ class SchemaContractsTests(unittest.TestCase):
         # references through shared $defs would otherwise fail this guard.
         no_step_specific_refs = {
             "13a_completeness_assessment.schema.json",
-            # vc:16-anchor's only canonical-ref slot (`status_ref` on ambiguity
-            # items) is inherited through the `crossCycleAmbiguityItem` $def in
-            # vc:core:collections.  Inline counter would report 0 even though
-            # the slot exists.
+            # vc:16-anchor has zero step-specific canonical-ref slots after
+            # DEVSPEC-38 removed `status_ref` from `crossCycleAmbiguityItem`
+            # in vc:core:collections.  The inline counter (which does not
+            # follow $refs into shared $defs) would report 0, so the file is
+            # excluded here.  vc:16-impl-context retains canonical-ref slots
+            # (command, policy, risk_category, …) and remains in scope.
             "16_anchor.schema.json",
         }
         for path in sorted(self.schema_root.glob("[0-9][0-9]*.schema.json")):
@@ -99,19 +101,19 @@ class SchemaContractsTests(unittest.TestCase):
             "02": {"entity", "interface", "event"},
             "02a": {"environment", "policy", "command"},
             "03": {"term", "acronym", "unit"},
-            "04": {"capability", "action", "entity", "status"},
+            "04": {"capability", "action", "entity"},
             "05": {"interface", "event", "entity", "policy"},
-            "06": {"policy", "risk_category", "status"},
+            "06": {"policy", "risk_category"},
             "07": {"metric", "unit", "stage", "environment"},
             "08": {"tag"},
-            "09": {"status", "environment", "tech_stack", "dependency"},
+            "09": {"environment", "tech_stack", "dependency"},
             "10": {"policy", "command", "id_pattern"},
             "11": {"risk_category", "policy"},
             "12": {"command", "environment", "role"},
             "13": {"tag", "policy", "id_pattern", "governance_label"},
-            "14": {"status", "environment", "metric", "tech_stack", "dependency"},
+            "14": {"environment", "metric", "tech_stack", "dependency"},
             "15": {"command"},
-            "16": {"status", "command", "policy", "risk_category"},
+            "16": {"command", "policy", "risk_category"},
         }
         for step, expected_kinds in expected_by_step.items():
             candidates = sorted(self.schema_root.glob(f"{step}_*.schema.json"))

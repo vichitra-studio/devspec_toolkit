@@ -51,7 +51,7 @@
           },
           "status": {
             "$ref": "vc:core:atoms#milestoneStatus",
-            "description": "Current status of this milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release."
+            "description": "Current status of this milestone. Valid values and their decision rules are defined by the canonical milestoneStatus atom (vc:core:atoms#milestoneStatus)."
           },
           "risks": {
             "$ref": "vc:core:collections#stringArray",
@@ -75,13 +75,6 @@
             "type": "array",
             "items": { "$ref": "vc:core:atoms#kebabId" },
             "uniqueItems": true
-          },
-          "status_ref": {
-            "description": "Canonical reference to the status value in the canonical registry. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:pending\", \"kind\": \"status\"}. Should be consistent with the 'status' field value.",
-            "allOf": [
-              { "$ref": "vc:core:collections#canonicalRef" },
-              { "properties": { "kind": { "const": "status" } } }
-            ]
           }
         },
         "required": [

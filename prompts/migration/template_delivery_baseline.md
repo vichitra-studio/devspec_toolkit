@@ -41,7 +41,7 @@ The migrated artifact MUST include:
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/02a_delivery_baseline.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ## Context

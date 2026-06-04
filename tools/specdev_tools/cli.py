@@ -431,6 +431,46 @@ def main():
     cca.add_argument("--dry-run", action="store_true", help="Report what would be added without writing")
     cca.add_argument("--json", action="store_true", help="Output results as JSON", dest="json_output")
 
+    # --- milestone-state subcommand ---
+    ms = sub.add_parser(
+        "milestone-state",
+        help="Compute deterministic milestone state from plan file and findings filesystem",
+        description=(
+            "Read ms_<batch_id>_plan.json from <spec-root>/impl_context/ and probe "
+            ".specdev/findings/ under <git-root> to derive per-group state and the "
+            "milestone-level derived_phase_position.  Emits a single JSON object to "
+            "stdout; no extra text.  (DEVSPEC-38 D7 — replaces the LLM-evaluated "
+            "milestone_state mode of specdev-scope.)"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ms.add_argument(
+        "--batch-id",
+        required=True,
+        help="Milestone batch identifier, e.g. 'phase2_newsletter_send'.",
+    )
+    ms.add_argument(
+        "--repo-root",
+        default=".",
+        help="Toolkit root directory (schema tier).  Default: cwd.",
+    )
+    ms.add_argument(
+        "--spec-root",
+        default=None,
+        help=(
+            "Host spec directory (e.g. ./spec).  Used to locate "
+            "spec/impl_context/ms_<batch-id>_plan.json.  Default: <repo-root>/spec."
+        ),
+    )
+    ms.add_argument(
+        "--git-root",
+        default=None,
+        help=(
+            "Host repo git root.  Used to locate .specdev/findings/ (host-relative, "
+            "NOT under spec-root).  Default: <repo-root>."
+        ),
+    )
+
     # --- context subcommand group ---
     ctx_p = sub.add_parser("context", help="Context preparation commands")
     ctx_sub = ctx_p.add_subparsers(dest="context_cmd", help="Context subcommand")
@@ -1804,6 +1844,41 @@ def main():
                 print(f"OK (dry-run: {len(added)} would be added, {len(skipped)} skipped, {malformed} malformed)")
             else:
                 print(f"OK ({len(added)} added, {len(skipped)} skipped, {malformed} malformed)")
+
+    elif args.cmd == "milestone-state":
+        from .context.milestone_state import compute_milestone_state
+
+        repo_root = os.path.abspath(args.repo_root)
+        batch_id: str = args.batch_id
+
+        # Locate the plan file: <spec_root>/impl_context/ms_<batch_id>_plan.json
+        if getattr(args, "spec_root", None):
+            spec_root = os.path.abspath(args.spec_root)
+        else:
+            spec_root = os.path.join(repo_root, "spec")
+        plan_path = os.path.join(
+            spec_root, "impl_context", f"ms_{batch_id}_plan.json"
+        )
+        if not os.path.isfile(plan_path):
+            print(
+                f"E520 UNRESOLVED_INPUT missing_plan_file {plan_path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        # Locate .specdev/findings/ — host-relative (under git_root, NOT spec_root).
+        # glob() returns [] for a missing/empty directory — no extra check needed.
+        if getattr(args, "git_root", None):
+            git_root = os.path.abspath(args.git_root)
+        else:
+            git_root = repo_root
+        findings_dir = os.path.join(git_root, ".specdev", "findings")
+
+        with open(plan_path, "r", encoding="utf-8") as _fh:
+            plan = json.load(_fh)
+
+        result = compute_milestone_state(plan, findings_dir, batch_id)
+        print(json.dumps(result, indent=2))
 
     elif args.cmd == "context":
         from .context import (

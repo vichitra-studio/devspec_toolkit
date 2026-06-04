@@ -55,8 +55,6 @@ INFERENCE_RULES: tuple[tuple[str, str, str], ...] = (
     ("stage", "stage_ref", "stage"),
     ("stage", "environment_ref", "environment"),
     ("environment", "environment_ref", "environment"),
-    ("status", "status_ref", "status"),
-    ("state", "state_ref", "status"),
     ("role", "role_ref", "role"),
     ("actor", "actor_ref", "role"),
     ("entity", "entity_ref", "entity"),

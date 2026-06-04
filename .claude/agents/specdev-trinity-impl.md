@@ -183,11 +183,11 @@ invocation prompt. This agent reads it and branches.
    that makes siblings required, e.g. a finding `severity` requiring `remediation_task`, or an
    implementation `status: verified` requiring `evidence` on each action) must be patched
    together with its now-required siblings (same or prior edit, or patch the parent object
-   whole). This is schema-enforced validation, distinct from the separate `status`/`status_ref`
-   closed-transition gate in §11.5. `json delete` is not validated.
+   whole). This is schema-enforced validation, distinct from the operator-driven `status`
+   verified transition in §11.5. `json delete` is not validated.
 5. Validate emergent ambiguities written to `execution.emergent_ambiguities[]` against the
    live `crossCycleAmbiguityItem` schema before writing (required fields: `{id, description,
-   severity}`; optional fields: `{decision, resolved, status, status_ref, impact[]}`; see E7).
+   severity}`; optional fields: `{decision, resolved, status, impact[]}`; see E7).
 6. If gate E-codes persist after an edit batch and unprocessed findings remain: continue to
    the next finding. If E-codes persist after all findings are processed, surface them in
    `errors_remaining`.
@@ -304,7 +304,7 @@ If an action or finding resolution would require editing a file outside these pa
   ```
   Required fields per `crossCycleAmbiguityItem` in
   `devspec_toolkit/schema/core/collections.schema.json`: `{id, description, severity}`.
-  Optional fields: `{decision, resolved, status, status_ref, impact[]}` where `impact[]`
+  Optional fields: `{decision, resolved, status, impact[]}` where `impact[]`
   items are **plain strings** (verified shape — no `amb_id` field, no `reactivation_condition`
   field, `impact[]` is not an object array; see §11.1.2 for proposed Day-3 extensions not yet
   landed).
@@ -339,12 +339,11 @@ artifacts at query time — it is never stored in the plan artifact.
 `devspec_toolkit/schema/16_impl_context.schema.json` L423–L432, enum
 `{pending, in_progress, verified, deferred}`) **stays at `pending`** throughout impl + review
 phases per E11 / §11.5. Operator flips to `verified` after deploy + live verification, by
-applying two patches:
+applying a single patch:
 1. `implementation.status = 'verified'`
-2. `implementation.status_ref = {"id": "cn:core:status:verified", "kind": "status"}`
 
-Both are required; setting only the string-enum without `status_ref` blocks the `closed`
-roll-up in `specdev-scope mode=milestone_state`.
+The status string is the single source of truth. The `specdev milestone-state` CLI reads it
+directly to compute the `verified` and `closed` roll-up states.
 
 ---
 
@@ -505,7 +504,7 @@ Or on partial success:
 - Does not use `reactivation_condition` or `impact_routes[]` — these are proposed Day-3
   schema extensions to `crossCycleAmbiguityItem` (K2 §11.1.2, §13). Current emergent
   ambiguities use only the live shape: required `{id, description, severity}`, optional
-  `{decision, resolved, status, status_ref, impact[]}` with `impact[]` as plain strings.
+  `{decision, resolved, status, impact[]}` with `impact[]` as plain strings.
 - Does not commit changes. The user authorizes commits separately.
 - Does not merge findings from sibling reviewers. The skill does this with the jq one-liner.
 - Does not invoke `specdev findings emit/merge/dedup` — no such CLI exists.

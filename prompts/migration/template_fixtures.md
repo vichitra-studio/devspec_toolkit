@@ -42,7 +42,7 @@ The migrated artifact MUST include:
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/08_fixtures.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
 ```
 

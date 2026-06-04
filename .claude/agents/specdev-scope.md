@@ -6,9 +6,10 @@ description: >
   assignments, max_rounds, rationale). Dispatched once per loop invocation before any
   reviewer agents run. Trigger: any invocation of /specdev-review, /specdev-step, or
   /specdev-trinity.
-  Milestone-state mode (mode: "milestone_state"): derives per-group implementation state
-  and milestone-level phase position from filesystem + existing schema fields; used by
-  /specdev-trinity --phase impl|review orchestration (§11.2 protocol).
+  Milestone-state mode (mode: "milestone_state"): delegates per-group implementation state
+  and milestone-level phase position computation to the `specdev milestone-state` CLI and
+  returns its JSON verbatim; used by /specdev-trinity --phase impl|review orchestration
+  (§11.2 protocol).
 model: haiku
 tools: [Bash, Read, Grep]
 ---
@@ -180,12 +181,7 @@ Dispatcher specifies mode in input. Two modes:
 **Mode-scoped Bash carve-out (extends §Tools allowlist for this mode only):**
 | Command | Purpose |
 |---|---|
-| `ls .specdev/findings/...` | Filesystem probe for derived state |
-| `jq '<filter>' <file>` | Inspect findings file `.findings == []` and similar |
-| `stat -f %m <file>` (macOS) / `stat -c %Y <file>` (Linux) | mtime for `implementation_converged_at` derivation |
-| `date -r <epoch> -u +%FT%TZ` (macOS) / `date -u +%FT%TZ -d @<epoch>` (Linux) | Convert epoch to ISO 8601 |
-
-These commands are read-only filesystem operations — no schema or canon side effects.
+| `specdev milestone-state --batch-id <batch_id> --repo-root <toolkit-root> --spec-root <host-spec> --git-root <host-root>` | Compute full milestone state deterministically |
 
 **Input contract:**
 ```json
@@ -195,42 +191,19 @@ These commands are read-only filesystem operations — no schema or canon side e
 }
 ```
 
-**Reads:**
-- `spec/impl_context/ms_<batch_id>_plan.json` via `specdev json read` with targeted filters
-- `.specdev/findings/findings_*.json` via filesystem (`ls`/`jq` on files matching `findings_<group_id>_*` and `findings_<batch_id>_review_*`)
+**Procedure:**
 
-**State derivation per group:**
+Run the CLI and return its stdout JSON verbatim as the entire output:
 
-For each `group` in `plan.spec_alignment.checklist[]`:
-- `group_id = checklist[i].id`
-- `implementation_converged_at`: latest mtime of `.specdev/findings/findings_<group_id>_<round>_<ts>.json` whose `.findings == []` (use `jq '.findings == []'` to check). If no such file, `null`.
-- `reviewer_rounds`: count of `.specdev/findings/findings_<group_id>_*_r*.json` (per-reviewer outputs)
-- `findings_resolved_path`: most-recent empty-findings file path, or `null`
-- `blocking_amb_ids[]`: ids from `execution.emergent_ambiguities[]` where `status == "blocked"` AND `resolved == false` AND `impact[]`-strings reference this `group_id` OR `description` references this `group_id` (heuristic — flagged in output as low-precision until amb cross-ref is structured)
-- `fixtures_exercised[]`: derived from `checklist[i].fixture_ref` directly (if present); otherwise null. `fixture_ref` is a direct field on checklist items (e.g. `"fix-email-zoho-transactional-contract"`) — no `spec/08_fixtures.json` indirection required.
+```bash
+specdev milestone-state \
+  --batch-id <batch_id> \
+  --repo-root ./devspec_toolkit \
+  --spec-root ./spec \
+  --git-root .
+```
 
-**State enum (computed per group):**
-
-| State | Predicate |
-|---|---|
-| `pending` | No `implementation_converged_at` (no empty-findings file found on filesystem) |
-| `executing` | Transient — only seen mid-dispatch; not persisted, not normally observed |
-| `code_converged` | `implementation_converged_at` present AND `findings_resolved_path` is an empty-findings file |
-| `blocked` | `code_converged` AND ≥1 `blocking_amb_id` with `status=blocked` AND `resolved=false` |
-| `verified` | `implementation.status == "verified"` AND `implementation.status_ref.id == "cn:core:status:verified"` (operator-driven; both required) |
-| `deferred` | `checklist_status == "deferred"` (excluded from roll-up predicates) |
-
-**Roll-up — `derived_phase_position`:**
-
-| `derived_phase_position` | Predicate |
-|---|---|
-| `pending` | Every non-deferred group `state == pending` |
-| `impl_in_progress` | ≥1 non-deferred group in {`executing`, `code_converged`} AND ≥1 non-deferred group `state == pending` |
-| `impl_complete` | Every non-deferred group in {`code_converged`, `blocked`, `verified`} AND no milestone-review empty-findings file |
-| `review_pending` | `impl_complete` AND no `.specdev/findings/findings_<batch_id>_review_*.json` with empty findings |
-| `review_complete` | ≥1 `.specdev/findings/findings_<batch_id>_review_<round>_<ts>.json` with empty findings AND every non-deferred group in {`code_converged`, `blocked`, `verified`} |
-| `operator_pending` | `review_complete` AND (≥1 non-deferred group `state == blocked` OR ≥1 unresolved blocking amb) |
-| `closed` | Every non-deferred group `implementation.status_ref.id == "cn:core:status:verified"` |
+The CLI computes the full output contract deterministically: per-group state (using `implementation.status` string as the single source of truth), `derived_phase_position`, `blockers[]`, and `blocking_amb_health` (including `well_formed`, which checks `severity` and `description` presence per the `crossCycleAmbiguityItem` schema). Do not re-derive anything by hand. Do not read plan or findings files directly.
 
 **Output contract** (single JSON to stdout, no other text):
 ```json
@@ -257,28 +230,15 @@ For each `group` in `plan.spec_alignment.checklist[]`:
 }
 ```
 
-**`blocking_amb_health.well_formed` criteria** (limited to live schema — no proposed extensions):
-- `severity` field present (required field per `crossCycleAmbiguityItem` schema)
-- `description` present (required)
-- `status` consistent with `status_ref` if both present (consistency rule: split `status_ref.id` on `':'` and take the last segment; this must equal the `status` string enum value — e.g., `status='blocked'` is consistent with `status_ref.id='cn:core:status:blocked'` or `status_ref.id='cn:project:status:blocked'`; inconsistent example: `status='blocked'` with `status_ref.id='cn:core:status:tracking'`)
+> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, and `deferred`.
 
-Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` check excludes them. When schema lands them, extend this predicate.
-
-**Procedure:**
-1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` (baseline).
-2. Read plan via `specdev json read spec/impl_context/ms_<batch_id>_plan.json '.plan.spec_alignment.checklist'` (group list) AND `'.execution.emergent_ambiguities'` AND `'.plan.summary.target_file_patterns'`.
-3. For each group, derive state per rules above:
-   - `ls .specdev/findings/findings_<group_id>_*.json 2>/dev/null` (filesystem probe)
-   - For each candidate file: `jq '.findings == []' <file>` to check empty-findings
-   - `stat -f %m <file>` (macOS) or `stat -c %Y <file>` (Linux) for mtime; convert to ISO via `date -r <epoch> -u +%FT%TZ` (macOS) or `date -d @<epoch> -u +%FT%TZ` (Linux)
-4. Compute roll-up predicates.
-5. Output single JSON object to stdout.
+Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` excludes them. When schema lands them, the CLI will be updated.
 
 ---
 
 ## What this agent does NOT do
 
-- Does not read `spec/*.json` files directly. Shape probes only (default mode); targeted `specdev json read` calls (milestone_state mode).
+- Does not read `spec/*.json` files directly. Shape probes only (default mode); milestone_state mode delegates entirely to the `specdev milestone-state` CLI.
 - Does not emit any findings. The fan-out plan (default mode) or milestone state JSON (milestone_state mode) is its entire output.
 - Does not run fixes. Read-only.
 - Does not dispatch or manage reviewer agents. It returns a plan; the skill dispatches.
