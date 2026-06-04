@@ -315,6 +315,528 @@ class TestApiCoverageCheck:
         assert not any("W583" in e for e in rendered)
 
 
+class TestMitigationCrossRef:
+    """DEVSPEC-89: mitigation IDs are cross-referenced against upstream specs."""
+
+    # ------------------------------------------------------------------
+    # inv (step 06) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_unknown_inv_id_emits_e590(self, tmp_path):
+        """When step 06 exists, a mitigation with an unknown inv id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{"inv_id": "inv-known"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-unknown"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "inv-unknown" in e for e in rendered), rendered
+
+    def test_valid_inv_id_no_e590(self, tmp_path):
+        """A mitigation referencing an inv_id that exists in step 06 should not fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{"inv_id": "inv-known"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-known"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("inv-known" in e and "E590" in e for e in rendered), rendered
+
+    def test_absent_step06_no_e590(self, tmp_path):
+        """When step 06 is absent, inv mitigations are not cross-referenced (guard)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-anything"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("inv-anything" in e and "E590" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # fr (step 04) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_unknown_fr_id_emits_e590(self, tmp_path):
+        """When step 04 exists, a mitigation with an unknown fr id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({
+            "functional_requirements": [{"fr_id": "fr-known"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fr", "id": "fr-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "fr-ghost" in e for e in rendered), rendered
+
+    def test_valid_fr_id_no_e590(self, tmp_path):
+        """A mitigation referencing an fr_id that exists in step 04 should not fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({
+            "functional_requirements": [{"fr_id": "fr-known"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fr", "id": "fr-known"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("fr-known" in e and "E590" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # capability (step 01) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_unknown_capability_id_emits_e590(self, tmp_path):
+        """When step 01 exists, a mitigation with an unknown capability id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "01_capabilities.json").write_text(json.dumps({
+            "capabilities": [{"capability_id": "cap-auth"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "capability", "id": "cap-phantom"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "cap-phantom" in e for e in rendered), rendered
+
+    def test_absent_step01_no_e590(self, tmp_path):
+        """When step 01 is absent, capability mitigations are not cross-referenced."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "capability", "id": "cap-anything"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("cap-anything" in e and "E590" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # capability (step 01) — valid id (negative control)
+    # ------------------------------------------------------------------
+
+    def test_valid_capability_id_no_e590(self, tmp_path):
+        """A mitigation referencing a cap-* ID that exists in step 01 must NOT fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "01_capabilities.json").write_text(json.dumps({
+            "capabilities": [{"capability_id": "cap-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "capability", "id": "cap-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("cap-x" in e and "E590" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # nfr (step 07) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_valid_nfr_id_no_e590(self, tmp_path):
+        """A mitigation referencing an nfr_id that exists in step 07 must NOT fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "07_nfrs.json").write_text(json.dumps({
+            "nfrs": [{"nfr_id": "nfr-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "nfr", "id": "nfr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("nfr-x" in e and "E590" in e for e in rendered), rendered
+
+    def test_unknown_nfr_id_emits_e590(self, tmp_path):
+        """When step 07 exists, a mitigation with an unknown nfr id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "07_nfrs.json").write_text(json.dumps({
+            "nfrs": [{"nfr_id": "nfr-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "nfr", "id": "nfr-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "nfr-ghost" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # fixture (step 08) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_valid_fixture_id_no_e590(self, tmp_path):
+        """A mitigation referencing a fixture_id that exists in step 08 must NOT fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "08_fixtures.json").write_text(json.dumps({
+            "fixtures": [{"fixture_id": "fix-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fixture", "id": "fix-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("fix-x" in e and "E590" in e for e in rendered), rendered
+
+    def test_unknown_fixture_id_emits_e590(self, tmp_path):
+        """When step 08 exists, a mitigation with an unknown fixture id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "08_fixtures.json").write_text(json.dumps({
+            "fixtures": [{"fixture_id": "fix-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fixture", "id": "fix-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "fix-ghost" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # api mitigation (step 05) cross-ref
+    # ------------------------------------------------------------------
+
+    def test_valid_api_mitigation_no_e590(self, tmp_path):
+        """A mitigation referencing an api_id that exists in step 05 must NOT fire E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "05_interface_contracts.json").write_text(json.dumps({
+            "apis": [{"api_id": "api-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "api", "id": "api-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("api-x" in e and "E590" in e for e in rendered), rendered
+
+    def test_unknown_api_mitigation_emits_e590(self, tmp_path):
+        """When step 05 exists, a mitigation with an unknown api id fires E590."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "05_interface_contracts.json").write_text(json.dumps({
+            "apis": [{"api_id": "api-x"}]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "api", "id": "api-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "api-ghost" in e for e in rendered), rendered
+
+    # ------------------------------------------------------------------
+    # empty upstream — present-but-empty file must still fire E590
+    # ------------------------------------------------------------------
+
+    def test_empty_upstream_mitigation_still_fires_e590(self, tmp_path):
+        """An upstream step file that exists but has an empty rules array must still
+        fire E590 for an unresolved inv mitigation (empty-set != None)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": []}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "inv-ghost" in e for e in rendered), (
+            f"empty upstream rules must still flag inv-ghost: {rendered}"
+        )
+
+    def test_empty_upstream_fr_mitigation_still_fires_e590(self, tmp_path):
+        """An upstream step 04 file that exists but has an empty functional_requirements
+        array must still fire E590 for an unresolved fr mitigation (empty-set != None)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": []}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fr", "id": "fr-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "fr-ghost" in e for e in rendered), (
+            f"empty upstream functional_requirements must still flag fr-ghost: {rendered}"
+        )
+
+    def test_empty_upstream_nfr_mitigation_still_fires_e590(self, tmp_path):
+        """An upstream step 07 file that exists but has an empty nfrs array must still
+        fire E590 for an unresolved nfr mitigation (empty-set != None)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "07_nfrs.json").write_text(json.dumps({"nfrs": []}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "nfr", "id": "nfr-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "nfr-ghost" in e for e in rendered), (
+            f"empty upstream nfrs must still flag nfr-ghost: {rendered}"
+        )
+
+    def test_empty_upstream_fixture_mitigation_still_fires_e590(self, tmp_path):
+        """An upstream step 08 file that exists but has an empty fixtures array must still
+        fire E590 for an unresolved fixture mitigation (empty-set != None)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "08_fixtures.json").write_text(json.dumps({"fixtures": []}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fixture", "id": "fix-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "fix-ghost" in e for e in rendered), (
+            f"empty upstream fixtures must still flag fix-ghost: {rendered}"
+        )
+
+    def test_empty_upstream_capability_mitigation_still_fires_e590(self, tmp_path):
+        """An upstream step 01 file that exists but has an empty capabilities array must still
+        fire E590 for an unresolved capability mitigation (empty-set != None)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "01_capabilities.json").write_text(json.dumps({"capabilities": []}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "capability", "id": "cap-ghost"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("E590" in e and "cap-ghost" in e for e in rendered), (
+            f"empty upstream capabilities must still flag cap-ghost: {rendered}"
+        )
+
+    # ------------------------------------------------------------------
+    # inv alias — type 'inv' must not produce E530 (alias → 'invariant')
+    # ------------------------------------------------------------------
+
+    def test_inv_alias_no_e530(self, tmp_path):
+        """Mitigation type 'inv' normalizes to 'invariant' and must NOT produce E530."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("E530" in e for e in rendered), (
+            f"type 'inv' alias must not produce E530: {rendered}"
+        )
+
+    # ------------------------------------------------------------------
+    # doc mitigation — always exempt from cross-ref
+    # ------------------------------------------------------------------
+
+    def test_doc_mitigation_never_e590(self, tmp_path):
+        """doc mitigations with any id must never fire E590 regardless of upstreams present."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        # Create multiple upstream files — doc should still be exempt
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [{"fr_id": "fr-x"}]}))
+        (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": [{"inv_id": "inv-x"}]}))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "doc", "id": "doc-arbitrary-runbook-id"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("doc-arbitrary-runbook-id" in e and "E590" in e for e in rendered), rendered
+
+
+class TestInvariantCoverageW615:
+    """DEVSPEC-89: W615 fires for security-relevant invariants with no referencing threat."""
+
+    def test_invariant_with_risk_category_ref_and_no_threat_emits_w615(self, tmp_path):
+        """An invariant WITH risk_category_ref and no referencing threat fires W615."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{
+                "inv_id": "inv-auth-required",
+                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
+            }]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        # No mitigation references inv-auth-required
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
+
+    def test_invariant_without_risk_category_ref_no_w615(self, tmp_path):
+        """An invariant WITHOUT risk_category_ref and no referencing threat must NOT fire W615."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{
+                "inv_id": "inv-no-risk-cat",
+                # No risk_category_ref field
+            }]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("W615" in e and "inv-no-risk-cat" in e for e in rendered), rendered
+
+    def test_invariant_with_risk_category_ref_and_referencing_threat_no_w615(self, tmp_path):
+        """An invariant WITH risk_category_ref that IS referenced by a threat mitigation must NOT fire W615."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{
+                "inv_id": "inv-auth-required",
+                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
+            }]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [{"type": "api", "id": "api-x"}],
+                "mitigations": [{"type": "inv", "id": "inv-auth-required"}],
+            }]
+        }
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
+
+    def test_absent_step06_no_w615(self, tmp_path):
+        """When step 06 is absent, W615 must not fire (guard)."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {"threats": []}
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("W615" in e for e in rendered), rendered
+
+
 class TestHostSpecSiblingResolution:
     """Bug 1 regression: when the Step 11 artifact lives in a host spec dir
     (e.g. ``host_repo/spec/11_redteam.json``) the linter must resolve sibling

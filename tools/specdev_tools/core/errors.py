@@ -208,12 +208,18 @@ ERROR_CODES = {
     # R004: host-side novelty detection — array with id-pattern items not declared in registry.
     # Severity is WARNING (not error) because the generator may not yet cover the new array.
     "W614": "UNREGISTERED_ARRAY",        # R004: host spec has array with *_id items unknown to toolkit registry
+    # DEVSPEC-89: invariant↔threat drift detection (61x)
+    # W615 fires when a step-06 invariant has a risk_category_ref but no step-11 threat
+    # mitigation references it — indicating the invariant is not exercised by any threat.
+    # E615 is its promotable counterpart (SPECDEV_WARNINGS_AS_ERRORS or SPECDEV_PROMOTE_CODES=W615).
+    "W615": "INVARIANT_UNEXERCISED_BY_THREAT",
+    "E615": "INVARIANT_UNEXERCISED_BY_THREAT",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes (W110/W120/W130/W140/W552/W553/W554/W570/W606) are excluded —
+# Non-promotable codes (W110/W120/W130/W140/W552/W570/W596) are excluded —
 # their E-counterparts have different semantics or promotion is inappropriate.
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
@@ -254,6 +260,9 @@ PROMOTABLE_PAIRS = {
     # both flag extraction-intent quality issues; vague entries are a softer
     # form of the upstream-gap error — promotion is appropriate.
     "W597": "E597",
+    # W615 INVARIANT_UNEXERCISED_BY_THREAT → E615: step-06 invariant with a
+    # risk_category_ref is not referenced by any step-11 threat mitigation.
+    "W615": "E615",
 }
 
 

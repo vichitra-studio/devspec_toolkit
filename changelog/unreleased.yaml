@@ -27,6 +27,11 @@ description: |
   validates PR-title commit conventions against the Step 10 governance rules,
   but does not gate semver policy.
 
+  DEVSPEC-89 — E590 cross-reference enforcement for step-11 mitigation IDs;
+  new W615/E615 INVARIANT_UNEXERCISED_BY_THREAT coverage check. Breaking:
+  host specs with stale or invented mitigation IDs (any type except doc) will
+  fail spec-check with E590 CROSS_STEP_ID_NOT_FOUND.
+
 changes:
   - type: remove_validator
     description: >
@@ -154,8 +159,8 @@ changes:
         Delete every status_ref object from all spec artifacts. Remove now-orphaned
         cn:*:status:* IDs from each file's canonical_refs_used[]. Run
         specdev canonical-autofix <spec-dir> --write to reconcile canonical_refs_used
-        automatically (the sync prunes stale cn:* IDs). Full steps in
-        WIP/migration/DEVSPEC-38_host_migration.md.
+        automatically (the sync prunes stale cn:* IDs). See the Migration section
+        of changelog/unreleased.md for the full inline migration steps.
 
   - type: change_schema
     description: >
@@ -192,3 +197,41 @@ changes:
       uses os.stat().st_mtime + datetime.fromtimestamp with timezone.utc cross-platform.
     migration:
       action: none
+
+  # DEVSPEC-89 changes below
+
+  - type: add_constraint
+    description: >
+      DEVSPEC-89: validate_step_11 now cross-references mitigation IDs against
+      upstream spec steps for all mitigation types except doc: capability →
+      step 01 (capabilities[].capability_id), fr → step 04
+      (functional_requirements[].fr_id), api → step 05 (apis[].api_id), inv →
+      step 06 (rules[].inv_id), nfr → step 07 (nfrs[].nfr_id), fixture → step
+      08 (fixtures[].fixture_id). When the upstream file is absent the check is
+      skipped (None sentinel). doc mitigations remain exempt from all
+      cross-reference validation. Fires E590 CROSS_STEP_ID_NOT_FOUND for
+      unresolvable IDs. Also adds W615/E615 INVARIANT_UNEXERCISED_BY_THREAT:
+      fires W615 when a step-06 invariant carries a risk_category_ref but no
+      step-11 threat mitigation of type inv references it; promotable to E615
+      via SPECDEV_WARNINGS_AS_ERRORS=1 or SPECDEV_PROMOTE_CODES=W615.
+      Additionally adds invariant_threat_coverage map (inv_id → [threat_ids])
+      to specdev matrix output. step_order.json required_spec_inputs for step
+      11 updated to include 01 and 08 (was 02,04,05,06,07; now
+      01,02,04,05,06,07,08); downstream_consumers for steps 01 and 08 updated
+      to include 11. target_ids description-only change: valid threat-target
+      types are api and component only (fr and inv removed from description).
+      prompt_11_redteam.md updated: net-new controls with no existing upstream
+      artifact must use type doc (exempt); type capability is reserved for
+      referencing an EXISTING cap-* ID from Step 01. Constraint line, Mitigate
+      step, capability example, Coverage Closure, and target_ids description in
+      Cross-Step Synthesis Notes all updated accordingly.
+    migration:
+      action: ai_assisted
+      note: >
+        Host specs with stale or invented mitigation IDs (any type except doc)
+        will newly fail spec-check with E590. Net-new type:capability controls
+        that do not reference an existing cap-* ID from step 01 must be changed
+        to type:doc with a concrete action in note. For each step-06 invariant
+        with risk_category_ref, add a threat mitigation of type:inv referencing
+        it (or suppress W615 via SPECDEV_PROMOTE_CODES if intentionally
+        deferred). Run specdev spec-check to confirm clean after remediation.

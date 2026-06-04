@@ -4,8 +4,16 @@
 
 - DEVSPEC-38: removed the `status_ref` field from 21 schema properties (under
   `additionalProperties: false`); host specs carrying `status_ref` become
-  schema-invalid and must migrate. See the host migration guide
-  (`WIP/migration/DEVSPEC-38_host_migration.md`).
+  schema-invalid and must migrate. See the Migration section below.
+
+- DEVSPEC-89: added E590 cross-reference enforcement for all step-11 mitigation
+  IDs against upstream steps 01/04/05/06/07/08; added W615/E615
+  `INVARIANT_UNEXERCISED_BY_THREAT` invariant-coverage warning (promotable).
+  Host specs with stale/invented mitigation IDs or net-new `type: capability`
+  controls will newly fail `spec-check`; remediate by referencing existing
+  upstream artifacts or switching net-new controls to `type: doc`. The fixes
+  are spec edits an AI agent can assist with — see the DEVSPEC-89 Migration
+  section below.
 
 DEVSPEC-37 — schema-aware `json` writes, `_effective_schema` fix, and merge
 consolidation.
@@ -88,7 +96,7 @@ canon kind; add deterministic milestone-state engine.
 
 > **Versioning note (D4):** this change removes a schema field under
 > `additionalProperties: false` — a semver-breaking change. It is consciously
-> landing on the `1.0.1_bug_fixes` branch and staying at version 1.0.0 rather
+> landing in version 1.0.1 (on the `1.0.1_bug_fixes` branch) rather
 > than bumping to 2.0.0. There is a single private host repo with no external
 > consumers, so the breaking-change cost is near zero. The host migration is
 > mandatory; see the migration guide referenced below.
@@ -158,10 +166,80 @@ canon kind; add deterministic milestone-state engine.
 ### Migration
 
 Host repositories carrying `status_ref` in spec artifacts must migrate before running
-`specdev spec-check`. Full migration steps are in
-[`WIP/migration/DEVSPEC-38_host_migration.md`](../WIP/migration/DEVSPEC-38_host_migration.md):
+`specdev spec-check` by performing the following steps:
 
 1. Delete every `status_ref` object from all spec artifacts.
 2. Remove now-orphaned `cn:*:status:*` IDs from each file's `canonical_refs_used[]`.
 3. Run `specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
    to confirm clean.
+
+---
+
+DEVSPEC-89 — Cross-reference enforcement for step-11 mitigation IDs; W615/E615
+invariant-coverage warning; prompt and step_order alignment.
+
+> **Versioning note:** this change adds new hard E590 enforcement and a W615
+> warning with promotable E615 — spec-check will newly fail on host specs
+> with stale/invented mitigation IDs or net-new `type: capability` controls.
+> Breaking in the same sense as DEVSPEC-38 (single private host; cost is near
+> zero; consciously recorded).
+
+### Added
+
+- **W615 / E615 `INVARIANT_UNEXERCISED_BY_THREAT`** — new warning (promotable
+  via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`) fired
+  when a step-06 invariant carries a `risk_category_ref` but no step-11 threat
+  mitigation of `type: inv` references it.  The `risk_category_ref` field is
+  the discriminator; invariants without it are not checked.
+
+- **E590 mitigation cross-reference enforcement** — `validate_step_11` now
+  cross-references mitigation IDs against their source step for all mitigation
+  types except `doc`: `capability` → step 01 (`capabilities[].capability_id`),
+  `fr` → step 04, `api` → step 05, `inv` → step 06, `nfr` → step 07,
+  `fixture` → step 08.  When the upstream file is absent the check is skipped
+  (guard: `None` ≠ empty set).  `doc` mitigations remain exempt from all
+  cross-reference validation.
+
+- **Matrix `invariant_threat_coverage` output** — `specdev matrix` emits an
+  `invariant_threat_coverage` map (`inv_id → [threat_ids]`) derived from
+  step-11 mitigations of `type: inv`.
+
+### Changed
+
+- **`target_ids` schema description** updated to reflect that only `api` and
+  `component` are valid threat-target types (no `fr` or `inv`; description-only
+  change, no schema structure change).
+
+- **`prompt_11_redteam.md` guidance** updated: net-new controls with no existing
+  upstream artifact now use `type: doc` (exempt from cross-reference); `type:
+  capability` is reserved for referencing an EXISTING `cap-*` ID from Step 01.
+  Coverage Closure, Mitigate step, and examples updated accordingly.
+
+- **`step_order.json`** — added `"01"` and `"08"` to
+  `step_metadata["11"].required_spec_inputs` (ascending order: 01,02,04,05,06,07,08);
+  added `"11"` to `downstream_consumers["01"]` and `downstream_consumers["08"]`.
+
+### Migration
+
+Host specs with step-11 artifacts must be reviewed before running `specdev spec-check`:
+
+1. Replace any mitigation with `type: capability` and an invented `cap-*` ID with
+   `type: doc` (and a descriptive `note`) unless `cap-*` is an existing ID in
+   `spec/01_capabilities.json`.
+2. Verify all other mitigation IDs (`fr`, `api`, `nfr`, `inv`, `fixture`) reference
+   IDs that exist in their respective upstream spec files.
+3. For every step-06 invariant with `risk_category_ref`, ensure at least one
+   threat mitigation of `type: inv` references it (or suppress W615 with
+   `SPECDEV_PROMOTE_CODES` if coverage is intentionally deferred).
+4. Run `specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .`
+   to confirm clean.
+
+**AI-assisted migration path:** E590 remediation is a spec-content edit, not a
+schema-structure migration, so `specdev align` does not detect or fix it (align
+diffs schema shape, while E590 is a cross-step ID-resolution error from the
+step-11 validator). Instead, the manual steps above are well-suited to an AI
+coding agent: point it at the `spec-check` E590/W615 output and have it update
+the offending mitigation IDs (or switch net-new controls to `type: doc`) against
+the upstream artifacts loaded via the `/specdev-context` skill, then re-run
+`spec-check` to confirm clean. This is the `ai_assisted` migration action
+recorded in `changelog/unreleased.yaml`.

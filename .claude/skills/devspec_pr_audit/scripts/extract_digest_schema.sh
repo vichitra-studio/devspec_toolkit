@@ -61,13 +61,16 @@ optional = [k for k in all_props if k not in required]
 print(json.dumps(sorted(optional)))
 " "$SOURCE_FILE")
 
-# additional_properties_at_root: false means additionalProperties is literally false
+# additional_properties_at_root: false means the root is CLOSED, i.e.
+# additionalProperties == false OR unevaluatedProperties == false.
+# Only report true (open) when neither closure mechanism is present.
 ADDL_PROPS_AT_ROOT=$(python3 -c "
 import json, sys
 data = json.load(open(sys.argv[1]))
 ap = data.get('additionalProperties', '__unset__')
-# false = closed (we report false for the boolean field additional_properties_at_root)
-print('false' if ap is False else 'true')
+up = data.get('unevaluatedProperties', '__unset__')
+closed = (ap is False) or (up is False)
+print('false' if closed else 'true')
 " "$SOURCE_FILE")
 
 # refs[]: all \$ref values found recursively anywhere in the schema

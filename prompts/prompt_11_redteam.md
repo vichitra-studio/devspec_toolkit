@@ -21,7 +21,7 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 - **Objective:** Produce a complete, falsifiable artifact for **Step 11** with strict traceability.
 - **Output type:** One JSON document conforming to the referenced step schema.
 - **Constraint:** EVERY threat must link to at least one target (API or Component) via `target_ids`.
-- **Constraint:** EVERY mitigation MUST link to an existing upstream artifact ID using the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive (valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items — e.g., `fr`, `api`, `nfr`, `inv`, `fixture`, `doc`, `capability`). If no existing ID applies, MUST define a new entry with `type: capability` and a concrete action in `note`.
+- **Constraint:** EVERY mitigation MUST link to an existing upstream artifact ID using the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive (valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items — e.g., `fr`, `api`, `nfr`, `inv`, `fixture`, `doc`, `capability`). If no existing upstream artifact ID applies, MUST use `type: doc` with a concrete action in `note` (`doc` is the only type exempt from upstream cross-reference). Use `type: capability` ONLY to reference an EXISTING `cap-*` ID from Step 01.
 
 ## Taxonomy of Threats
 Use the `category` field to classify threats precisely. The authoritative enum is defined in `vc:core:atoms#threatCategory` — only the five values below are valid:
@@ -38,10 +38,10 @@ For each upstream artifact ingested, extract the following:
 - **02_system_sketch.json**: Component IDs and subsystem boundaries to identify trust boundary crossings; inter-component communication paths and external integration points to map attack surfaces; **tech_stack** entries (specific framework/runtime versions with known CVE surfaces or security-critical configuration defaults — e.g., Django CSRF middleware vs manual CSRF in Express) to bind every threat to a concrete `target_ids` entry
 - **02a_delivery_baseline.json**: Deployment environment definitions and infrastructure topology to identify environment-specific attack surfaces and operational failure modes per stage
 - **03_glossary.json**: Domain term definitions and entity relationships to write threat descriptions and vectors using precise, unambiguous domain language rather than generic security jargon
-- **04_fr_list.json**: Functional requirement IDs, business logic workflows, preconditions, and postconditions to identify business logic abuse scenarios and link mitigations via traceRef
+- **04_fr_list.json**: Functional requirement IDs, business logic workflows, preconditions, and postconditions to identify business logic abuse scenarios and link mitigations using the structured mitigation object `{type, id, note?}`
 - **05_interface_contracts.json**: API IDs, HTTP methods, authentication modes, request/response schemas, and error states to enumerate per-endpoint threat vectors and ensure every public API has coverage
-- **06_invariants.json**: Invariant IDs and enforcement conditions to link threat mitigations to existing invariant controls via traceRef and verify every security invariant has a corresponding threat test
-- **07_nfrs.json**: NFR IDs, performance thresholds, and availability targets to define resource exhaustion thresholds, link mitigations via traceRef, and scope edge case trigger conditions
+- **06_invariants.json**: Invariant IDs and enforcement conditions to link threat mitigations to existing invariant controls using the structured mitigation object `{type, id, note?}` and verify every security invariant has a corresponding threat test
+- **07_nfrs.json**: NFR IDs, performance thresholds, and availability targets to define resource exhaustion thresholds, link mitigations using the structured mitigation object `{type, id, note?}`, and scope edge case trigger conditions
 - **08_fixtures.json**: Test fixture scenarios and boundary value definitions to identify edge case failure modes and ensure fixture coverage aligns with threat mitigation validation
 - **09_impl_plan.json**: Technology stack selections, framework versions, and infrastructure choices to identify technology-specific vulnerability classes and attack vectors unique to the chosen stack
 - **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
@@ -49,7 +49,7 @@ For each upstream artifact ingested, extract the following:
 ## Operating Flow: Threat Model → Exploit → Mitigate → Emit
 1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — valid categories are `authn`, `authz`, `business_logic`, `transport`, and `data_privacy` (see Taxonomy of Threats below for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to these five schema-defined categories.
 2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
-3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST create a new entry with `type: capability` and a concrete action description in `note`.
+3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST use `type: doc` with a concrete action description in `note` (`doc` is exempt from upstream cross-reference). Use `type: capability` ONLY to reference an EXISTING `cap-*` ID from Step 01.
 4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
 
 ## Examples: Weak vs. Strong
@@ -85,8 +85,8 @@ For each upstream artifact ingested, extract the following:
 Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`. For low-risk internal-only endpoints with no viable threat, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
-- Every security-relevant `inv_id` in `spec/06_invariants.json` has a corresponding threat entry that tests its enforcement.
-- All `target_ids[*].id` values resolve to existing `api_id`, `component_id`, or `fr_id` values in their referenced spec files.
+- Every step-06 invariant that carries a `risk_category_ref` must be referenced by at least one threat mitigation of `type: inv` (enforced by W615).
+- All `target_ids[*].id` values resolve to existing `api_id` or `component_id` values in their referenced spec files (steps 05 and 02 respectively).
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
 - [ ] Every upstream ID from ingested context has been consumed
 - [ ] No placeholder tokens remain (TBD, TODO, FIXME, XXX)
@@ -112,7 +112,7 @@ Before emitting, verify:
 - [ ] **Category Diversity**: Threats are not just `authz`; `transport`, `business_logic`, and `data_privacy` are represented.
 - [ ] **Edge Case Rigor**: At least 3 distinct non-malicious failure modes (e.g., timeouts, race conditions) are identified.
 - [ ] **Traceability Integrity**: Every threat has a valid `target_ids` array pointing to existing Step 05 or Step 02 IDs.
-- [ ] **Mitigation Actionability**: Mitigations link to specific Invariants/NFRs or define concrete new capabilities (no vague "Fix it" notes).
+- [ ] **Mitigation Actionability**: Mitigations link to specific Invariants/NFRs/FRs via the correct `type` value, or use `type: doc` with a concrete action in `note` for net-new proposed controls — `type: capability` is ONLY for referencing EXISTING `cap-*` IDs from Step 01 (no vague "Fix it" notes).
 
 ## Cross-Step Synthesis Notes
 - **id**: `redteam-catalog` (Fixed).
@@ -120,13 +120,14 @@ Before emitting, verify:
     - `threat_id`: `threat-<category>-<slug>` (e.g., `threat-authz-elevation`).
     - `description`: A detailed narrative of the attack scenario. Don't be vague; explain *how* the attack works in the context of the system (e.g. "Attacker injects SQL into the 'user_id' parameter to bypass auth").
     - `vector`: The specific technical method (e.g., "JWT Substitution", "SQL Injection", "Race Condition").
-    - `target_ids`: Array of traceRef objects `{ "type": "<trace-type>", "id": "<upstream-id>" }`. Valid types include `api`, `component`, `inv`, `fr`, and any other canonical trace type — consult schema `vc:11-redteam` target_ids items (`vc:core:collections#traceRef`). **CRITICAL**: These must match actual upstream IDs from Step 02/05/06.
+    - `target_ids`: Array of traceRef objects `{ "type": "<trace-type>", "id": "<upstream-id>" }`. Valid types for threat targets are `api` and `component` only — consult schema `vc:11-redteam` target_ids items (`vc:core:collections#traceRef`). **CRITICAL**: These must match actual upstream IDs from Step 02 (components) or Step 05 (APIs).
     - `category`: strictly validated against the schema enum `vc:core:atoms#threatCategory` — see Taxonomy of Threats above.
     - `mitigations`: Array of structured objects. Full `type` enum is defined in schema `vc:11-redteam` (mitigations items.type.enum). Examples:
         - Invariant: `{ "type": "inv", "id": "inv-...", "note": "Enforced by middleware" }`.
         - NFR: `{ "type": "nfr", "id": "nfr-..." }`.
         - FR: `{ "type": "fr", "id": "fr-..." }`.
-        - New capability: `{ "type": "capability", "id": "cap-new-measure", "note": "Implement specific check" }`.
+        - Existing capability ref: `{ "type": "capability", "id": "cap-existing-control", "note": "Existing cap-* ID from Step 01" }`.
+        - Net-new proposed control (no existing upstream artifact): `{ "type": "doc", "id": "doc-new-measure", "note": "Implement specific check (no existing upstream artifact yet)" }`.
     - `mitigation.note`: Optional context explaining *how* the linked item mitigates the threat (e.g., "Rate limit of 5rps prevents resource exhaustion").
     - `severity`: validated against `vc:core:atoms#severityLevel` (schema-enforced — do not restate values here).
 - **edge_cases**:

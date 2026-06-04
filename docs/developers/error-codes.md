@@ -113,11 +113,15 @@
 
 **Promotable**: W568 → E568.
 
-### E582 MILESTONE_REF_MISMATCH
+### E582 / W582 UNCOVERED_FR_REVIEW_COVERAGE
 
-**Trigger**: A checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in step 14.
+**Trigger** (E582): Fired in step 16 under two conditions: (1) a checklist item's `milestone_ref` names a milestone that does not exist in the step 14 roadmap; or (2) a non-deferred checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in the step 14 roadmap.
 
-**Resolution**: Update the checklist item's `milestone_ref` to match the milestone containing the referenced roadmap task.
+**Trigger** (W582): Fired in step 16c when a review artifact with `verdict: verified` has FRs declared in the corresponding step 14 roadmap milestone(s) that are not present in `semantic_review.fr_coverage`. If no milestone is scoped, the check runs against all milestones in the roadmap.
+
+**Resolution**: For E582 — correct the checklist item's `milestone_ref` to match an existing step 14 milestone that owns the referenced task. For W582 — add the missing FR IDs to `semantic_review.fr_coverage` in the step 16c artifact, or verify that the FR is intentionally excluded.
+
+**Promotable**: W582 → E582.
 
 ### E150 / W150 SEED_MANIFEST_NOT_PROVIDED
 
@@ -366,6 +370,16 @@
 **Resolution**: Run `specdev align` to migrate spec artifacts to the current toolkit version before making further edits. If the file is stale or incorrect, update `spec/specdev_version` manually after verifying your toolkit version with `specdev --version`.
 
 **Promotable**: No (error only).
+
+### W615 / E615 INVARIANT_UNEXERCISED_BY_THREAT
+
+**Trigger**: A step-06 invariant has a non-empty `risk_category_ref` field (marking it as security-relevant) but no step-11 threat has a mitigation of type `inv` referencing its `inv_id`. This indicates that a security-relevant invariant is not exercised by any threat in the red-team assessment, creating a gap between invariant definitions and threat coverage.
+
+Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
+
+**Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
+
+**Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
 
 ## Exception Classes
 
