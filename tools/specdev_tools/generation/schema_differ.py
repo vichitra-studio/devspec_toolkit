@@ -1246,6 +1246,70 @@ def format_apply_report(result: ApplyResult) -> str:
 
 
 # -----------------------------------------------------------------------------
+# Version Stamp
+# -----------------------------------------------------------------------------
+
+def stamp_specdev_version(
+    spec_dir: Path,
+    toolkit_version: str,
+    is_migration: bool = False,
+) -> Optional[str]:
+    """Write or update spec/specdev_version to record the current toolkit version.
+
+    Args:
+        spec_dir: Path to the project's spec/ directory.
+        toolkit_version: The toolkit version string to record.
+        is_migration: When True, appends a history entry ("Migrated to vX.Y.Z").
+                      When False (plain version bump), no history entry is added.
+
+    Returns:
+        None on success, or an error message string on failure.
+    """
+    import yaml  # lazy import — yaml is only needed at stamp time
+
+    version_file = spec_dir / "specdev_version"
+    try:
+        version_data: Dict[str, Any] = {
+            "toolkit_version": toolkit_version,
+            "created_at": _get_timestamp(),
+            # last_migration tracks the last *schema* migration via `specdev align`.
+            # Only update it when is_migration=True; plain version bumps preserve the
+            # existing value (or leave null for new files, matching init_project.py).
+            "last_migration": _get_timestamp() if is_migration else None,
+            "migration_history": [],
+        }
+
+        if version_file.exists():
+            with open(version_file, "r", encoding="utf-8") as f:
+                existing = yaml.safe_load(f) or {}
+
+            # Preserve created_at (bootstrap timestamp)
+            version_data["created_at"] = existing.get("created_at", _get_timestamp())
+            version_data["migration_history"] = existing.get("migration_history", [])
+            if not is_migration:
+                # Plain re-stamp: preserve last_migration so it still reflects the
+                # most recent actual schema migration rather than this bump.
+                version_data["last_migration"] = existing.get("last_migration", None)
+
+            if is_migration and existing.get("toolkit_version") != toolkit_version:
+                version_data["migration_history"].append(
+                    {
+                        "from": existing.get("toolkit_version", "unknown"),
+                        "to": toolkit_version,
+                        "date": _get_timestamp(),
+                        "notes": f"Migrated to v{toolkit_version}",
+                    }
+                )
+
+        with open(version_file, "w", encoding="utf-8") as f:
+            yaml.dump(version_data, f, default_flow_style=False)
+
+        return None
+    except Exception as e:
+        return f"Could not update specdev_version: {e}"
+
+
+# -----------------------------------------------------------------------------
 # Post-Migration Validation (Phase 9)
 # -----------------------------------------------------------------------------
 
@@ -1299,42 +1363,11 @@ def validate_post_migration(
 
     if errors:
         return ValidationResult(can_proceed=False, warnings=warnings, errors=errors)
-    
+
     # 4. Update Version File on Success
-    version_file = spec_dir / "specdev_version"
-    try:
-        import yaml
-        version_data = {
-            "toolkit_version": toolkit_version,
-            "created_at": _get_timestamp(),
-            "last_migration": _get_timestamp(),
-            "migration_history": []
-        }
-        
-        if version_file.exists():
-             with open(version_file, "r", encoding="utf-8") as f:
-                existing = yaml.safe_load(f) or {}
-                
-                # Preserve created_at, or set if missing (bootstrap)
-                version_data["created_at"] = existing.get("created_at", _get_timestamp())
-                
-                version_data["migration_history"] = existing.get("migration_history", [])
-                
-                # Add this migration to history
-                if existing.get("toolkit_version") != toolkit_version:
-                     history_entry = {
-                         "from": existing.get("toolkit_version", "unknown"),
-                         "to": toolkit_version,
-                         "date": _get_timestamp(),
-                         "notes": f"Migrated to v{toolkit_version}"
-                     }
-                     version_data["migration_history"].append(history_entry)
-        
-        with open(version_file, "w", encoding="utf-8") as f:
-            yaml.dump(version_data, f, default_flow_style=False)
-            
-    except Exception as e:
-        warnings.append(f"Could not update specdev_version: {e}")
+    stamp_err = stamp_specdev_version(spec_dir, toolkit_version, is_migration=True)
+    if stamp_err:
+        warnings.append(stamp_err)
 
     return ValidationResult(can_proceed=True, warnings=warnings, errors=errors)
 

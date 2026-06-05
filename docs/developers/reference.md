@@ -217,23 +217,38 @@ specdev milestone-state \
 **When to run:** When debugging Trinity loop state, verifying phase-position transitions, or
 smoke-testing the `specdev-trinity` skill's milestone dispatch.
 
-### Alignment & Migration
+### Version Update & Migration
+
+```bash
+# Sync to current toolkit version (re-stamp or direct to align)
+specdev update spec --repo-root ./devspec_toolkit
+
+# Preview what update would do without writing any files
+specdev update spec --repo-root ./devspec_toolkit --dry-run
+```
+
+When `specdev update` reports schema changes, run the migration workflow first:
 ```bash
 # Check status of spec vs toolkit version
-specdev align status --spec-dir spec
+specdev align status spec --repo-root ./devspec_toolkit
 
 # Show diff of what needs to change
-specdev align diff --spec-dir spec
+specdev align diff spec --repo-root ./devspec_toolkit
 
 # Generate an execution plan
-specdev align plan --spec-dir spec
+specdev align plan spec --repo-root ./devspec_toolkit
 
 # Apply mechanical fixes (auto-mode)
-specdev align apply --spec-dir spec --auto
+specdev align apply spec --auto --repo-root ./devspec_toolkit
 
 # Generate prompts for AI-assisted migration
-specdev align prompts --spec-dir spec --output prompts/migration/ --mode upgrade
+specdev align prompts spec --output prompts/migration/ --mode upgrade --repo-root ./devspec_toolkit
+
+# Finalize: full post-migration validation + version stamp (with migration history)
+specdev align validate spec --repo-root ./devspec_toolkit
 ```
+
+> Finalize a migration with `align validate`, not by re-running `specdev update`. `validate` stamps `spec/specdev_version` only after schema + trace-integrity checks pass and records a `migration_history` entry; `update` re-stamps after a weaker structural-diff check and omits the audit trail.
 
 
 

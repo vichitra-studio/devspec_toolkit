@@ -23,7 +23,7 @@ After generating the JSON artifact, implement the scaffold manually or using you
 - **12_ci_gates.json**: CI gate definitions used to populate the validators array with specific lint, type-check, and schema validation commands matching the project's quality gate requirements
 
 #### Reference Sources (context only)
-- `spec/04_fr_list.json`: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
+- **spec/04_fr_list.json**: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
 - `spec/14_roadmap.json`: for phased scaffold generation (generate components in milestone order)
 - **00_charter.json**: Project identity and scope boundaries used to name the scaffold service and constrain module generation to in-scope domains only
 - **01_capabilities.json**: Capability definitions used to verify that scaffold modules cover all declared system capabilities and no capability lacks a corresponding code entry point

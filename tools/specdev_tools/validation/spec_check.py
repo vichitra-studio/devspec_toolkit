@@ -54,13 +54,13 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
                 make_error(
                     "E608",
                     "spec/specdev_version exists but is malformed or missing the `toolkit_version` key. "
-                    "Re-stamp it (run `specdev align`) or fix the file.",
+                    "Re-stamp it by running `specdev update` or fix the file manually.",
                 )
             ]
         return [
             make_error(
                 "E608",
-                "No toolkit version recorded in spec/specdev_version. Run `specdev align` to stamp the project's toolkit version.",
+                "No toolkit version recorded in spec/specdev_version. Run `specdev update` to stamp the project's toolkit version.",
             )
         ]
 
@@ -81,7 +81,8 @@ def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
             "E608",
             (
                 f"Spec was built against toolkit v{host_version}, but the active "
-                f"toolkit is v{toolkit_version}. Run `specdev align` to migrate before editing specs."
+                f"toolkit is v{toolkit_version}. Run `specdev update` to sync to the current "
+                f"toolkit version before editing specs (it re-stamps, or directs you to `align` if a migration is required)."
             ),
         )
     ]

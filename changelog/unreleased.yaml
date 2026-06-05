@@ -32,6 +32,11 @@ description: |
   host specs with stale or invented mitigation IDs (any type except doc) will
   fail spec-check with E590 CROSS_STEP_ID_NOT_FOUND.
 
+  DEVSPEC-87 — Adds specdev update as the primary post-submodule-bump entry
+  point: re-stamps spec/specdev_version on no structural changes, or routes
+  through specdev align when schema migration is required. Non-breaking
+  (CLI addition + internal refactor; action: none).
+
 changes:
   - type: remove_validator
     description: >
@@ -235,3 +240,27 @@ changes:
         with risk_category_ref, add a threat mitigation of type:inv referencing
         it (or suppress W615 via SPECDEV_PROMOTE_CODES if intentionally
         deferred). Run specdev spec-check to confirm clean after remediation.
+
+  # DEVSPEC-87 changes below
+
+  - type: add_module
+    description: >
+      DEVSPEC-87: New `specdev update` command — syncs a project to the current
+      toolkit version. Re-stamps specdev_version on no structural changes
+      (exit 0); directs through specdev align (apply --auto → prompts →
+      validate) when schema migration is required (exit 1). Supports --dry-run
+      and --json.
+    migration:
+      action: none
+      note: "CLI addition only — no spec artifact changes."
+
+  - type: internal_restructure
+    description: >
+      DEVSPEC-87: stamp_specdev_version extracted from validate_post_migration
+      into a shared helper in schema_differ.py. is_migration=False preserves
+      last_migration and omits migration_history entries; is_migration=True
+      (align validate only) appends a history entry and updates last_migration.
+      E608 messages in spec_check updated to direct users to specdev update.
+    migration:
+      action: none
+      note: "Internal refactor and message update — no spec schema changes."
