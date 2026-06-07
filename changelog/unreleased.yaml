@@ -264,3 +264,37 @@ changes:
     migration:
       action: none
       note: "Internal refactor and message update — no spec schema changes."
+
+  - type: fix
+    description: >
+      DEVSPEC-91: removed two incorrect W->E promotions from PROMOTABLE_PAIRS in
+      core/errors.py where the warning and its same-numbered error describe
+      structurally different defects. (1) W597 (EXTRACTION_INTENT_VAGUE — a
+      present intent entry whose text is too short/weaselly) vs E597
+      (EXTRACTION_INTENT_UPSTREAM_GAP — a required upstream artifact has no
+      intent entry at all). (2) W590 (CROSS_STEP_UPSTREAM_MISSING — the upstream
+      artifact file is absent) vs E590 (CROSS_STEP_ID_NOT_FOUND — a referenced ID
+      is absent from a present upstream file). Promoting either under
+      SPECDEV_WARNINGS_AS_ERRORS=1 (or a matching SPECDEV_PROMOTE_CODES) emitted
+      an error code that mislabelled the defect and pointed users at the wrong
+      fix; neither has a semantically-correct fatal counterpart, so both now stay
+      warnings. Also cleaned up a dead backtick-formatted extraction-intent entry
+      in prompt_15_scaffold.md that the parser never read (step 14 remains
+      covered by its bold entry).
+    migration:
+      action: none
+      note: "Validator behavior change — vague extraction intent (W597) and missing-upstream-file (W590) are no longer promoted to fatal errors; no spec artifact changes."
+
+  - type: fix
+    description: >
+      SPECDEV_PROMOTE_CODES now warns (once, to stderr) when it lists a code that
+      cannot be promoted — either a valid-but-non-promotable warning code (e.g.
+      W590/W597) or an unrecognised/typo code. Previously such codes were
+      silently dropped by the promotion intersection in validate.py, leaving a CI
+      author believing a promotion had taken effect. Both validate-all (via
+      validate_dir) and spec-check (via _run_checks) emit the diagnostic through
+      _warn_ignored_promote_codes; behavior is unchanged when
+      SPECDEV_WARNINGS_AS_ERRORS=1 (which ignores SPECDEV_PROMOTE_CODES wholesale).
+    migration:
+      action: none
+      note: "Diagnostic-only addition — surfaces previously-silent ignored promote codes; no spec or schema changes."

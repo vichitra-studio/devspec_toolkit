@@ -34,7 +34,7 @@ from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
-from ..core.errors import PROMOTABLE_PAIRS, SpecError, make_error
+from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact, load_sibling_artifact
 from ..core.registry import SchemaRegistry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
@@ -304,6 +304,9 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
         return []
 
     failures: list[SpecError] = []
+    # Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be
+    # silently ignored because they are not promotable.
+    _warn_ignored_promote_codes()
     canonical_preflight_errors: list[SpecError] = list(
         dict.fromkeys(
             lint_canon_dirs(
@@ -395,6 +398,39 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
     failures = _apply_we_promotion(failures)
 
     return failures
+
+
+def _warn_ignored_promote_codes() -> None:
+    """Warn (to stderr) when SPECDEV_PROMOTE_CODES lists codes that will be ignored.
+
+    A code in SPECDEV_PROMOTE_CODES that is not in PROMOTABLE_PAIRS is silently
+    dropped by the promotion intersection. Surface it so a CI author who, e.g.,
+    sets ``SPECDEV_PROMOTE_CODES=W597`` (a valid but non-promotable code) or a
+    typo is not left believing a promotion took effect. Only meaningful when
+    SPECDEV_WARNINGS_AS_ERRORS is off — when it is on, promote_codes is ignored
+    wholesale and a per-code warning would mislead.
+    """
+    cfg = get_config()
+    if cfg.warnings_as_errors or not cfg.promote_codes:
+        return
+    ignored = set(cfg.promote_codes) - set(PROMOTABLE_PAIRS.keys())
+    if not ignored:
+        return
+    import sys as _sys
+    for code in sorted(ignored):
+        if code not in ERROR_CODES:
+            print(
+                f"specdev: SPECDEV_PROMOTE_CODES contains unrecognised code "
+                f"{code!r}; it will be ignored.",
+                file=_sys.stderr,
+            )
+        else:
+            print(
+                f"specdev: SPECDEV_PROMOTE_CODES contains {code} "
+                f"({ERROR_CODES[code]}) which is not a promotable code; "
+                f"it will be ignored.",
+                file=_sys.stderr,
+            )
 
 
 def _apply_we_promotion(failures: list[SpecError]) -> list[SpecError]:

@@ -55,11 +55,11 @@ class TestR9ErrorCodes(unittest.TestCase):
             self.assertIn(code, ERROR_CODES, f"{code} not registered in ERROR_CODES")
 
     def test_promotable_pairs_count(self):
-        """PROMOTABLE_PAIRS has exactly 27 W→E mappings."""
+        """PROMOTABLE_PAIRS has exactly 25 W→E mappings."""
         # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
         # This literal is an intentional regression guard — bump it in lockstep
         # whenever a W→E pair is added to or removed from that dict.
-        self.assertEqual(len(PROMOTABLE_PAIRS), 27)
+        self.assertEqual(len(PROMOTABLE_PAIRS), 25)
 
     def test_promotable_pairs_w_to_e(self):
         """Every key in PROMOTABLE_PAIRS is a W-code mapping to an E-code."""
@@ -112,7 +112,7 @@ class TestR9ErrorCodes(unittest.TestCase):
 
     def test_non_promotable_codes_excluded(self):
         """Non-promotable W-codes are NOT in PROMOTABLE_PAIRS."""
-        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W570", "W596"}
+        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W570", "W590", "W596", "W597"}
         for code in non_promotable:
             self.assertNotIn(code, PROMOTABLE_PAIRS,
                              f"{code} should not be promotable")

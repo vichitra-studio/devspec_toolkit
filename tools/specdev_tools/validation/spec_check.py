@@ -105,6 +105,12 @@ def _run_checks(
     root = Path(os.path.abspath(repo_root))
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
+    # Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be
+    # silently ignored because they are not promotable. spec-check loops
+    # validate_file directly (never validate_dir), so it needs its own call.
+    from .validate import _warn_ignored_promote_codes
+    _warn_ignored_promote_codes()
+
     # --- 1. Schema validation (validate each file) ---
     from .validate import validate_file
 

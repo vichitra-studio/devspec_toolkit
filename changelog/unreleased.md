@@ -59,6 +59,30 @@ consolidation.
 
 ### Fixed
 
+- **DEVSPEC-91: incorrect W→E promotions removed (`W597 → E597`, `W590 → E590`).**
+  Removed two entries from `PROMOTABLE_PAIRS` in `core/errors.py` where the
+  warning and its same-numbered error describe structurally different defects,
+  so promotion mislabelled the problem and pointed users at the wrong fix:
+  - `W597` (`EXTRACTION_INTENT_VAGUE` — a present intent entry whose text is too
+    short/weaselly) vs. `E597` (`EXTRACTION_INTENT_UPSTREAM_GAP` — a required
+    upstream artifact has no intent entry at all).
+  - `W590` (`CROSS_STEP_UPSTREAM_MISSING` — the upstream artifact file is absent)
+    vs. `E590` (`CROSS_STEP_ID_NOT_FOUND` — a referenced ID is absent from a
+    *present* upstream file).
+
+  Under `SPECDEV_WARNINGS_AS_ERRORS=1` (or a matching `SPECDEV_PROMOTE_CODES`)
+  these now stay warnings; neither has a semantically-correct fatal counterpart
+  (a fatal "upstream missing" would need a dedicated new E-code). Also removed a
+  dead backtick-formatted extraction-intent entry in `prompt_15_scaffold.md`
+  that the parser never read (step 14 stays covered by its bold entry).
+
+- **`SPECDEV_PROMOTE_CODES` now warns on ignored codes.** When the variable lists
+  a code that is not promotable — a valid-but-non-promotable warning (e.g.
+  `W590`/`W597`) or an unrecognised/typo code — `validate-all` and `spec-check`
+  now print a one-time stderr warning that the code will be ignored, instead of
+  silently dropping it. (The warning is suppressed under
+  `SPECDEV_WARNINGS_AS_ERRORS=1`, which ignores `SPECDEV_PROMOTE_CODES` wholesale.)
+
 - **Deprecated `datetime.utcnow()` in schema-diff timestamping.** `_get_timestamp()`
   in `schema_differ.py` now uses timezone-aware `datetime.now(timezone.utc)`
   (output format unchanged). Silences the Python 3.13 deprecation warning.

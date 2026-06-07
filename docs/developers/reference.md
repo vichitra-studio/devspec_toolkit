@@ -155,7 +155,7 @@ Read-only diagnostic that prints the active validation configuration. Modifies n
 
 **What it displays:**
 - All active `SPECDEV_*` environment variables and their values.
-- W→E promotion status: ALL (18 pairs via `SPECDEV_WARNINGS_AS_ERRORS=1`), SELECTIVE (per-code via `SPECDEV_PROMOTE_CODES`), or OFF.
+- W→E promotion status: ALL (every registered pair via `SPECDEV_WARNINGS_AS_ERRORS=1`), SELECTIVE (per-code via `SPECDEV_PROMOTE_CODES`), or OFF. The live pair count is printed from `PROMOTABLE_PAIRS`.
 - Forward-replay base ref resolution (explicit, upstream tracking, or fallback).
 - Spec directory and step_order.json paths.
 

@@ -233,7 +233,7 @@
 
 **Resolution (W590)**: Generate the missing upstream artifact first, then re-validate.
 
-**Promotable**: W590 → E590.
+**Promotable**: No. W590 (CROSS_STEP_UPSTREAM_MISSING — upstream file absent) and E590 (CROSS_STEP_ID_NOT_FOUND — ID absent from a present file) describe different defects with different resolutions. Promoting W590 to E590 would mislabel a missing-file condition as a broken ID reference, so W590 stays a warning; a fatal "upstream missing" would require a dedicated E-code.
 
 ### E591 / W591 EXTRACTION_INTENT_EMPTY
 
@@ -301,7 +301,7 @@
 
 **Resolution (W597)**: Expand the vague intent text with specific field names and extraction purposes.
 
-**Promotable**: W597 → E597.
+**Promotable**: No. W597 (EXTRACTION_INTENT_VAGUE) and E597 (EXTRACTION_INTENT_UPSTREAM_GAP) have different semantics — vague text in a present entry vs. a missing entry for a required upstream artifact. W597 has no fatal counterpart and is not promoted; promoting it would mislabel a vague entry as an upstream gap.
 
 ### E598 EXTRACTION_INTENT_INVALID_REF
 
