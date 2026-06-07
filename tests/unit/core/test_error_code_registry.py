@@ -56,6 +56,9 @@ class TestR9ErrorCodes(unittest.TestCase):
 
     def test_promotable_pairs_count(self):
         """PROMOTABLE_PAIRS has exactly 27 W→E mappings."""
+        # Authority: PROMOTABLE_PAIRS in tools/specdev_tools/core/errors.py.
+        # This literal is an intentional regression guard — bump it in lockstep
+        # whenever a W→E pair is added to or removed from that dict.
         self.assertEqual(len(PROMOTABLE_PAIRS), 27)
 
     def test_promotable_pairs_w_to_e(self):

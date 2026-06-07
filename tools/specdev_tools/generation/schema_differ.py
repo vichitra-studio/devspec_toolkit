@@ -1372,5 +1372,5 @@ def validate_post_migration(
     return ValidationResult(can_proceed=True, warnings=warnings, errors=errors)
 
 def _get_timestamp():
-    from datetime import datetime
-    return datetime.utcnow().isoformat() + "Z"
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z"

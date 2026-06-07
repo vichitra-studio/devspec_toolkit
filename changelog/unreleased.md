@@ -59,6 +59,10 @@ consolidation.
 
 ### Fixed
 
+- **Deprecated `datetime.utcnow()` in schema-diff timestamping.** `_get_timestamp()`
+  in `schema_differ.py` now uses timezone-aware `datetime.now(timezone.utc)`
+  (output format unchanged). Silences the Python 3.13 deprecation warning.
+
 - **`specdev json schema` / `_effective_schema` now navigates step-specific and
   conditional-gated fields.** Previously, the allOf merge overwrote a node's own
   `properties` with the properties gathered from `allOf` branches, discarding
