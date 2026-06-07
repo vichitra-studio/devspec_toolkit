@@ -1799,9 +1799,7 @@ class CliTests(unittest.TestCase):
                     stderr = io.StringIO()
                     with redirect_stdout(stdout), redirect_stderr(stderr):
                         try:
-                            from importlib import reload
-                            import specdev_tools.core.config as _cfg
-                            reload(_cfg)
+                            reset_config()
                             cli.main()
                             code = 0
                         except SystemExit as exc:
@@ -1834,9 +1832,7 @@ class CliTests(unittest.TestCase):
                     stderr = io.StringIO()
                     with redirect_stdout(stdout), redirect_stderr(stderr):
                         try:
-                            from importlib import reload
-                            import specdev_tools.core.config as _cfg
-                            reload(_cfg)
+                            reset_config()
                             cli.main()
                             code = 0
                         except SystemExit as exc:

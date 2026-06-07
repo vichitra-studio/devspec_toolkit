@@ -219,6 +219,13 @@ invariant-coverage warning; prompt and step_order alignment.
   `step_metadata["11"].required_spec_inputs` (ascending order: 01,02,04,05,06,07,08);
   added `"11"` to `downstream_consumers["01"]` and `downstream_consumers["08"]`.
 
+### Fixed
+
+- **`validate_step_11` fails soft on malformed `threats[]` / `target_ids[]`
+  entries.** Non-dict entries in those arrays now emit a structured `E520`
+  (mirroring the existing mitigation-object guard) instead of raising an
+  unhandled `AttributeError`. Post-audit (P2) robustness hardening.
+
 ### Migration
 
 Host specs with step-11 artifacts must be reviewed before running `specdev spec-check`:

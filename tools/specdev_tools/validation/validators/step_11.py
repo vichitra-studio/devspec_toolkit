@@ -105,13 +105,19 @@ def validate_step_11(
     # for the W615 coverage check.  Derived from step-06 full objects, not just IDs.
     security_invariant_ids: set[str] = _load_security_invariant_ids(toolkit_root, artifact_path)
 
-    for threat in instance.get("threats", []):
+    for i, threat in enumerate(instance.get("threats", [])):
+        if not isinstance(threat, dict):
+            errors.append(make_error("E520", f"threats[{i}] is not an object: {threat!r}"))
+            continue
         threat_id = threat.get("threat_id")
 
         # Target validation
         if not threat.get("target_ids"):
             errors.append(make_error("E520", f"Threat '{threat_id}' has no target_ids"))
-        for target in threat.get("target_ids", []):
+        for j, target in enumerate(threat.get("target_ids", [])):
+            if not isinstance(target, dict):
+                errors.append(make_error("E520", f"Threat '{threat_id}' target_ids[{j}] is not an object: {target!r}"))
+                continue
             t = normalize_trace_type(target.get("type", ""))
             if t and t not in _ALLOWED_THREAT_TARGET_TYPES:
                 errors.append(make_error("E530", f"Threat '{threat_id}' has invalid target type '{t}'"))
@@ -174,7 +180,11 @@ def validate_step_11(
     if api_ids is not None:
         threatened_api_ids: set[str] = set()
         for threat in instance.get("threats", []):
+            if not isinstance(threat, dict):
+                continue
             for target in threat.get("target_ids", []):
+                if not isinstance(target, dict):
+                    continue
                 t = normalize_trace_type(target.get("type", ""))
                 if t == "api":
                     tid = target.get("id", "")
@@ -194,6 +204,8 @@ def validate_step_11(
     if invariant_ids is not None and security_invariant_ids:
         mitigated_invariant_ids: set[str] = set()
         for threat in instance.get("threats", []):
+            if not isinstance(threat, dict):
+                continue
             for mitigation in threat.get("mitigations", []):
                 if not isinstance(mitigation, dict):
                     continue

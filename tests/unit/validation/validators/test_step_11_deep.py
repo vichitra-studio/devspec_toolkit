@@ -240,6 +240,109 @@ class TestNonObjectMitigation:
         assert any("non-object mitigation" in e for e in rendered)
 
 
+class TestNonObjectThreat:
+    """Defensive guard: non-dict entries in threats[] must emit E520, not AttributeError."""
+
+    def test_string_threat_emits_e520_not_attributeerror(self, toolkit_root):
+        """A string entry in threats[] must produce a structured E520, not raise AttributeError."""
+        instance = {
+            "threats": ["not-a-dict"],
+        }
+        # Must not raise — previously would blow up with AttributeError on .get()
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "threats[0]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for non-dict threat entry, got: {rendered}"
+        )
+
+    def test_int_threat_emits_e520(self, toolkit_root):
+        """An int entry in threats[] must produce a structured E520."""
+        instance = {
+            "threats": [42],
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "threats[0]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for non-dict threat entry, got: {rendered}"
+        )
+
+    def test_mixed_threats_only_bad_entry_flagged(self, toolkit_root):
+        """A valid threat followed by a non-dict entry: only the non-dict emits E520 for this guard."""
+        instance = {
+            "threats": [
+                {
+                    "threat_id": "threat-01",
+                    "target_ids": [{"type": "api", "id": "api-x"}],
+                    "mitigations": [{"type": "fr", "id": "fr-x"}],
+                },
+                "bad-entry",
+            ]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "threats[1]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for threats[1]: {rendered}"
+        )
+        assert not any("threats[0]" in e and "not an object" in e for e in rendered), (
+            f"threats[0] is valid and must not be flagged as non-object: {rendered}"
+        )
+
+
+class TestNonObjectTarget:
+    """Defensive guard: non-dict entries in target_ids[] must emit E520, not AttributeError."""
+
+    def test_string_target_emits_e520_not_attributeerror(self, toolkit_root):
+        """A string entry in target_ids[] must produce a structured E520, not raise AttributeError."""
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": ["not-a-dict"],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "target_ids[0]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for non-dict target_ids entry, got: {rendered}"
+        )
+
+    def test_int_target_emits_e520(self, toolkit_root):
+        """An int entry in target_ids[] must produce a structured E520."""
+        instance = {
+            "threats": [{
+                "threat_id": "threat-42",
+                "target_ids": [99],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "target_ids[0]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for non-dict target_ids entry, got: {rendered}"
+        )
+
+    def test_mixed_targets_only_bad_entry_flagged(self, toolkit_root):
+        """A valid target followed by a non-dict entry: only the non-dict emits the guard E520."""
+        instance = {
+            "threats": [{
+                "threat_id": "threat-01",
+                "target_ids": [
+                    {"type": "api", "id": "api-x"},
+                    "bad-target",
+                ],
+                "mitigations": [{"type": "fr", "id": "fr-x"}],
+            }]
+        }
+        errors = validate_step_11(instance, toolkit_root)
+        rendered = _render(errors)
+        assert any("E520" in e and "target_ids[1]" in e and "not an object" in e for e in rendered), (
+            f"expected E520 for target_ids[1]: {rendered}"
+        )
+        assert not any("target_ids[0]" in e and "not an object" in e for e in rendered), (
+            f"target_ids[0] is valid and must not be flagged as non-object: {rendered}"
+        )
+
+
 class TestApiCoverageCheck:
     """W583: every public API in Step 05 should be targeted by at least one threat."""
 

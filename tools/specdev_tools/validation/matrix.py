@@ -453,7 +453,8 @@ def build_trace_matrix(
         result["extensions"] = extensions
 
     # DEVSPEC-89: invariant_threat_coverage — map inv_id → [threat_ids] from
-    # mitigations of type 'inv'.  Exposes threat↔invariant edges at the top
+    # mitigations whose type normalizes to the canonical invariant label
+    # (accepts alias: inv).  Exposes threat↔invariant edges at the top
     # level of the matrix output so consumers can detect drift without
     # re-parsing individual threat objects.
     inv_to_threats: dict[str, set[str]] = collections.defaultdict(set)

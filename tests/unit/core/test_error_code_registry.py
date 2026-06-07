@@ -36,15 +36,17 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
 class TestR9ErrorCodes(unittest.TestCase):
     """Verify all R9 error codes are registered and PROMOTABLE_PAIRS is correct."""
 
-    # All new R9 codes (26 new + 4 previously unregistered)
+    # All new R9 codes (26 new + 4 previously unregistered) + DEVSPEC-89 additions
     R9_NEW_CODES = {
         "E150", "E551", "E552", "E553", "E554", "E555",
         "E571", "E572", "E573", "E580", "E581", "E585",
         "E590", "E591", "E592", "E593", "E594", "E595",
         "E596", "E597", "E598", "E599",
+        "E615",
         "W552",
         "W590", "W591", "W592", "W593", "W594", "W595",
         "W596", "W597",
+        "W615",
     }
 
     def test_all_r9_codes_registered(self):
