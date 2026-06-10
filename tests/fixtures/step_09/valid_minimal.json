@@ -29,7 +29,19 @@
       }
     ]
   },
-  "milestones": [],
+  "milestones": [
+    {
+      "milestone_id": "milestone-initial-setup",
+      "name": "Initial Setup and Foundation",
+      "status": "pending",
+      "deliverables": [
+        {
+          "type": "fr",
+          "id": "fr-initial-setup"
+        }
+      ]
+    }
+  ],
   "migration_plan": "No migration required.",
   "dependencies": [],
   "trace": [

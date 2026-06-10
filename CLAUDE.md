@@ -97,8 +97,11 @@ specdev json delete spec/03_glossary.json '.terms[3]'
 specdev env-check --repo-root ./devspec_toolkit
 
 # Regenerate toolkit-side entry-key registry + extraction_paths from schemas
-# Run after any schema change; three generator-owned files must stay byte-exact
-# with this output (enforced by CI gate — do not hand-edit them)
+# Run after any schema change; the two generator-owned files it writes
+# (entry_key_registry.json, extraction_paths.json) must stay byte-exact with
+# this output (enforced by CI gate — do not hand-edit them). Note:
+# command_prefixes.json and step_docs.json are NOT generator outputs — they are
+# manually maintained despite also living under tools/.
 specdev registry-generate --repo-root .
 ```
 
@@ -149,7 +152,7 @@ Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema pat
 | Variable | Effect |
 |---|---|
 | `SPECDEV_WARNINGS_AS_ERRORS=1` | Promote all W-codes with E-counterparts to errors |
-| `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion of listed W-codes |
+| `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion of listed W-codes. A listed code that is not promotable (absent from `PROMOTABLE_PAIRS`, e.g. `W590`/`W597`) or unrecognised is **ignored with a one-time stderr warning** naming the code (emitted by `validate-all` and `spec-check`), rather than silently dropped. |
 | `SPECDEV_MATRIX_STRICT=1` | Make matrix coverage errors fatal |
 | `SPECDEV_REPLAY_BASE_REF=<ref>` | Override forward-replay base ref |
 | `SPECDEV_REPLAY_DIFF_ERROR_MODE=error` | Make replay diff failures fatal |

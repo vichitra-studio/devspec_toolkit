@@ -67,6 +67,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "E620", "E621", "E622",
             # R004 host-side novelty detection (W6 refactor)
             "W614",
+            # DEVSPEC-89: invariant↔threat drift detection
+            "W615", "E615",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

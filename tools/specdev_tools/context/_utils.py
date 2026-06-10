@@ -10,6 +10,7 @@ import os
 from typing import Any
 
 from ..core.registry import SchemaRegistry
+from ..core.schema_nav import effective_schema as _schema_nav_effective_schema
 
 
 def load_json(path: str) -> Any:
@@ -18,10 +19,13 @@ def load_json(path: str) -> Any:
 
 
 def load_step_order(repo_root: str) -> dict:
-    """Load tools/step_order.json from *repo_root*."""
+    """Load ``tools/step_order.json`` from *repo_root*.
+
+    The DAG lives only under ``tools/``; there is no repo-root copy. If the file
+    is absent, ``load_json`` raises ``FileNotFoundError`` naming that canonical
+    ``tools/`` path — previously a dead repo-root fallback masked it.
+    """
     path = os.path.join(os.path.abspath(repo_root), "tools", "step_order.json")
-    if not os.path.exists(path):
-        path = os.path.join(os.path.abspath(repo_root), "step_order.json")
     return load_json(path)
 
 
@@ -40,16 +44,70 @@ def find_spec_file(step_id: str, spec_dir: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Fail-loud hardening: explicit disambiguation table for multi-schema steps.
+#
+# Context: some steps have more than one schema URI registered under the same
+# step prefix (e.g. step 16 has both vc:16-impl-context and vc:16-anchor).
+# The old code silently returned the first dict-order match, which happened to
+# be correct only because schema_registry.json listed vc:16-impl-context first.
+#
+# This table makes the resolution ORDER-INDEPENDENT and FAIL-LOUD:
+#   - If exactly 1 URI matches → return it (unchanged behavior, no table needed).
+#   - If >1 URIs match and the step is in this table → return the mapped primary
+#     (order-independent, deterministic).
+#   - If >1 URIs match and the step is NOT in this table → raise ValueError
+#     (fail-loud: a future multi-schema step without a table entry is caught).
+#
+# IMPORTANT: this is fail-loud hardening + explicit disambiguation.
+# It is NOT "resolution by $id" (the bigger refactor where callers say which
+# variant they want is deliberately out of scope here).
+#
+# To add a new multi-schema step: add its step_id → primary URI mapping below.
+# The primary URI must be the one that represents the canonical spec artifact.
+_MULTI_SCHEMA_STEP_PRIMARY: dict[str, str] = {
+    "16": "vc:16-impl-context",  # 16_anchor.schema.json is an internal anchor, not a spec
+}
+
+
 def find_step_schema_uri(step_id: str, registry: SchemaRegistry) -> str | None:
     """Search schema_registry for a URI that matches *step_id*.
 
     URIs follow patterns like ``vc:04-fr-list``, ``vc:02a-delivery-baseline``.
+
+    Fail-loud on unhandled ambiguity: if >1 URI matches and the step has no
+    entry in ``_MULTI_SCHEMA_STEP_PRIMARY``, raises ``ValueError`` naming the
+    step, the ambiguous URIs, and the fix instruction.  This makes the selector
+    ORDER-INDEPENDENT and FAIL-LOUD rather than silently dict-order-dependent.
     """
     needle = f"vc:{step_id}-"
-    for uri in registry.map.keys():
-        if uri.startswith(needle):
-            return uri
-    return None
+    matches = [uri for uri in registry.map.keys() if uri.startswith(needle)]
+
+    if not matches:
+        return None
+
+    if len(matches) == 1:
+        return matches[0]
+
+    # >1 match: consult the explicit disambiguation table.
+    primary = _MULTI_SCHEMA_STEP_PRIMARY.get(step_id)
+    if primary is not None and primary in matches:
+        return primary
+
+    # Stale table: primary mapped but not among current matches, or step not in table.
+    if primary is not None:
+        raise ValueError(
+            f"find_step_schema_uri: step '{step_id}' has a _MULTI_SCHEMA_STEP_PRIMARY "
+            f"entry ('{primary}') but that URI is not among the current matches "
+            f"{sorted(matches)!r}. The disambiguation table may be stale — "
+            f"update _MULTI_SCHEMA_STEP_PRIMARY in tools/specdev_tools/context/_utils.py."
+        )
+    raise ValueError(
+        f"find_step_schema_uri: step '{step_id}' matched multiple schema URIs "
+        f"{sorted(matches)!r} and has no entry in _MULTI_SCHEMA_STEP_PRIMARY. "
+        f"Add an explicit primary URI for this step to "
+        f"_MULTI_SCHEMA_STEP_PRIMARY in tools/specdev_tools/context/_utils.py."
+    )
 
 
 def merge_allof(schema: dict, registry: SchemaRegistry) -> dict:
@@ -63,28 +121,38 @@ def merge_allof(schema: dict, registry: SchemaRegistry) -> dict:
     Schemas may declare step-specific properties either at the root (alongside
     an ``allOf`` that $refs ``vc:core:step-base``) or inside an ``allOf`` branch.
     Both shapes are merged into a single property set.
+
+    Thin adapter over ``schema_nav.effective_schema`` (conditionals OFF — same
+    allOf-only, own-first behavior as before; oneOf/anyOf/if-then-else latent gap
+    is intentionally unchanged per §6 deferred scope).
     """
     ref_registry = registry.to_referencing_registry()
-    merged_props: dict[str, Any] = dict(schema.get("properties", {}))
-    merged_required: list[str] = list(schema.get("required", []))
 
-    for branch in schema.get("allOf", []) or []:
-        resolved = branch
-        if isinstance(branch, dict) and "$ref" in branch:
-            ref_uri = branch["$ref"]
-            try:
-                resolved = ref_registry.contents(ref_uri)
-            except Exception:
-                try:
-                    resolved = registry.load(ref_uri)
-                except Exception:
-                    continue
-        if not isinstance(resolved, dict):
-            continue
-        merged_props.update(resolved.get("properties", {}))
-        merged_required.extend(resolved.get("required", []))
+    def _resolve_ref(node: dict):
+        """Dual-fallback $ref resolver.
 
-    return {"properties": merged_props, "required": merged_required}
+        1. Try ``ref_registry.contents(uri)`` — handles $anchor/fragment refs.
+        2. On exception, try ``registry.load(uri)`` — handles whole-schema URIs.
+        3. On exception, return None (non-dict) so effective_schema skips branch.
+
+        MUST return None (non-dict) on failure — never raise.  effective_schema
+        has no try/except; a raise would change today's branch-skip error semantics.
+        """
+        ref_uri = node.get("$ref")
+        if not ref_uri:
+            return None
+        try:
+            return ref_registry.contents(ref_uri)
+        except Exception:
+            pass
+        try:
+            return registry.load(ref_uri)
+        except Exception:
+            pass
+        return None
+
+    e = _schema_nav_effective_schema(schema, _resolve_ref, include_conditionals=False)
+    return {"properties": e["properties"], "required": e["required"]}
 
 
 def compute_required_inputs(

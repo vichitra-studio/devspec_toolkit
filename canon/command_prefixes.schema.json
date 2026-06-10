@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:canon:command-prefixes",
+  "title": "Command Prefix Allowlist",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "JSON Schema URI identifying the schema this command prefix allowlist file conforms to."
+    },
+    "_description": {
+      "type": "string",
+      "description": "Human-readable description of the allowlist's scope and usage guidance."
+    },
+    "allowed_prefixes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of allowed command verb prefixes for hallucination-lint command detection."
+    }
+  },
+  "required": [
+    "allowed_prefixes"
+  ]
+}

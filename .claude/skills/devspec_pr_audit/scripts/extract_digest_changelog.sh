@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# EXTRACTOR_VERSION=1.0.5
-# Extract a digest_changelog JSON from CHANGELOG.md or changelog/*.md.
+# EXTRACTOR_VERSION=1.0.6
+# Extract a digest_changelog JSON from CHANGELOG.md, changelog/*.md, or changelog/*.yaml.
 # Usage: extract_digest_changelog.sh <source_file> <output_path>
 # Extracts ONLY structured facts (version labels, section headers, change-lines).
 # No free-form prose summarisation.
 
 set -euo pipefail
 
-EXTRACTOR_VERSION="1.0.5"
+EXTRACTOR_VERSION="1.0.6"
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 <source_file> <output_path>" >&2
@@ -46,6 +46,68 @@ with open(source_file, encoding="utf-8") as f:
 # ── Detect if this is an unreleased file ─────────────────────────────────────
 basename = Path(source_file).name.lower()
 is_unreleased_file = "unreleased" in basename
+
+# ── YAML branch: changelog/*.yaml files are structured YAML, not Markdown ────
+# Parse them directly rather than as Markdown; emit a compatible payload.
+if basename.endswith(".yaml") or basename.endswith(".yml"):
+    # Try PyYAML first; fall back to regex for portability.
+    yaml_data = None
+    try:
+        import yaml as _yaml
+        yaml_data = _yaml.safe_load(content)
+    except Exception:
+        yaml_data = None
+
+    if yaml_data is None:
+        # Regex fallback: extract scalar fields from YAML text.
+        yaml_data = {}
+        m = re.search(r'^version:\s*["\']?([^\s"\'#\n]+)["\']?', content, re.MULTILINE)
+        if m:
+            yaml_data["version"] = m.group(1)
+        m = re.search(r'^breaking:\s*(true|false)', content, re.MULTILINE | re.IGNORECASE)
+        if m:
+            yaml_data["breaking"] = m.group(1).lower() == "true"
+        yaml_data["changes"] = re.findall(r'^\s{2}-\s+type:', content, re.MULTILINE)
+
+    version_raw = yaml_data.get("version", "") if isinstance(yaml_data, dict) else ""
+    version_label = str(version_raw).strip('"\'') if version_raw else "Unknown"
+    # Treat "unreleased" version as unreleased regardless of casing.
+    is_unreleased = is_unreleased_file or version_label.lower() == "unreleased"
+    # breaking is a top-level bool in the changelog yaml schema.
+    breaking_flag = bool(yaml_data.get("breaking", False)) if isinstance(yaml_data, dict) else False
+    # total_entries = number of change records listed under `changes:`.
+    changes_list = yaml_data.get("changes", []) if isinstance(yaml_data, dict) else []
+    total_entries = len(changes_list) if isinstance(changes_list, list) else 0
+
+    payload = {
+        "version_label": version_label,
+        "release_date": "",
+        "is_unreleased": is_unreleased,
+        "breaking": [f"breaking: true (DEVSPEC-38 schema field removal)"] if breaking_flag else [],
+        "added": [],
+        "changed": [],
+        "removed": [],
+        "deprecated": [],
+        "fixed": [],
+        "section_headers": [],
+        "total_entries": total_entries,
+        "has_breaking_changes": breaking_flag,
+    }
+
+    digest = {
+        "digest_type": "digest_changelog",
+        "source_file": rel_path,
+        "source_sha": source_sha,
+        "extractor_version": extractor_version,
+        "extracted_at": extracted_at,
+        "payload": payload,
+    }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(digest, f, indent=2)
+
+    print(f"Wrote digest to {output_path}")
+    sys.exit(0)
 
 # ── Find the primary version section ─────────────────────────────────────────
 # Handles multiple heading styles:

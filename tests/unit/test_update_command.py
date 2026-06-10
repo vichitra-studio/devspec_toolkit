@@ -646,6 +646,88 @@ class TestRunUpdate:
         )
         assert any("uv not found" in w for w in result.warnings)
 
+    def test_stamp_failure_propagates_error(self, tmp_path):
+        """A stamp write failure in the re-stamp path surfaces as status='error'.
+
+        Covers update.py:252-263 — when stamp_specdev_version returns a non-None
+        error string, run_update must return exit_code=1, status='error', and a
+        message naming the write failure (rather than reporting a false success).
+        """
+        from specdev_tools.update import run_update
+
+        toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
+        spec_dir = _make_spec_dir(tmp_path / "sp", "0.9.0")
+
+        diff = _make_minimal_diff(source_version="0.9.0")  # no structural changes
+        with (
+            self._patch_refresh(),
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff),
+            patch(
+                "specdev_tools.generation.schema_differ.stamp_specdev_version",
+                return_value="disk full",
+            ),
+        ):
+            result = run_update(spec_dir, toolkit_root)
+
+        assert result.exit_code == 1
+        assert result.status == "error"
+        assert "Failed to write spec/specdev_version" in result.message
+        assert "disk full" in result.message
+
+    def test_dry_run_with_needs_migration_skips_refresh(self, tmp_path):
+        """dry_run=True combined with a migration-requiring diff.
+
+        Covers update.py:188-246 under dry_run: refresh is skipped (refresh_ok
+        stays None), exit_code=1 and needs_migration=True are returned, dry_run
+        propagates True, and no specdev_version write occurs. Distinct from the
+        re-stamp dry-run path (which returns status='would_update').
+        """
+        from specdev_tools.update import run_update
+
+        toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
+        spec_dir = _make_spec_dir(tmp_path / "sp", "0.9.0")
+
+        diff = _make_minimal_diff(steps_missing=1, source_version="0.9.0")
+        with (
+            patch("specdev_tools.update.refresh_venv_installation") as mock_refresh,
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff),
+        ):
+            result = run_update(spec_dir, toolkit_root, dry_run=True)
+
+        mock_refresh.assert_not_called()
+        assert result.exit_code == 1
+        assert result.status == "needs_migration"
+        assert result.needs_migration is True
+        assert result.dry_run is True
+        assert result.refresh_ok is None
+        # dry-run must not write
+        import yaml
+        data = yaml.safe_load((spec_dir / "specdev_version").read_text())
+        assert data["toolkit_version"] == "0.9.0"
+
+    def test_dry_run_restamp_reports_would_update(self, tmp_path):
+        """The re-stamp dry-run path reports status='would_update', not 'updated'.
+
+        Guards the DEVSPEC fix for finding 37715e795404: a dry-run that makes no
+        write must not claim status='updated'. Distinct, observable status so
+        consumers reading update_status do not mis-read a no-op as a write.
+        """
+        from specdev_tools.update import run_update
+
+        toolkit_root = _make_toolkit_root(tmp_path / "tk", "1.0.0")
+        spec_dir = _make_spec_dir(tmp_path / "sp", "0.9.0")
+
+        diff = _make_minimal_diff(source_version="0.9.0")  # no structural changes
+        with (
+            self._patch_refresh(),
+            patch("specdev_tools.generation.schema_differ.diff_spec_directory", return_value=diff),
+        ):
+            result = run_update(spec_dir, toolkit_root, dry_run=True)
+
+        assert result.exit_code == 0
+        assert result.dry_run is True
+        assert result.status == "would_update"
+
 
 # ---------------------------------------------------------------------------
 # CLI integration

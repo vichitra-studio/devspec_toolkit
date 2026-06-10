@@ -32,6 +32,31 @@ def _classify(errors: list[SpecError]) -> dict[str, Any]:
     return {"status": status, "error_count": e_count, "warning_count": w_count}
 
 
+def _check_result(errors: list[SpecError]) -> dict[str, Any]:
+    """Build a per-check result dict with W->E promotion applied first.
+
+    Promotion (``SPECDEV_WARNINGS_AS_ERRORS`` / ``SPECDEV_PROMOTE_CODES``) must be
+    applied *before* both the status classification and the stored error list, so
+    that:
+      - ``_classify`` reports FAIL (not WARN) when a check's only errors are
+        promotable W-codes under an active promotion contract, and
+      - the ``errors`` list — surfaced in the stderr breakdown, the JSON
+        per-check ``findings``, and the aggregate returned by ``_collect_errors``
+        — carries the promoted E-codes, so downstream consumers parsing the code
+        field do not mis-classify promoted errors as warnings.
+
+    ``_apply_we_promotion`` is a no-op (dedup only) when no promotion env is set,
+    and is idempotent on already-promoted codes (e.g. schema-validation errors
+    promoted inside ``validate_file``). Control-flow gates that branch on raw
+    codes (the ``canon_ok`` bootstrap gate) are intentionally left to read the
+    unpromoted lists; only result *storage* flows through this helper.
+    """
+    from .validate import _apply_we_promotion
+
+    promoted = _apply_we_promotion(errors)
+    return {**_classify(promoted), "errors": promoted}
+
+
 def _check_toolkit_version(repo_root: str, spec_dir: str) -> list[SpecError]:
     """Return [] if versions match, or [E608] on any error condition.
 
@@ -105,6 +130,12 @@ def _run_checks(
     root = Path(os.path.abspath(repo_root))
     checks: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
+    # Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be
+    # silently ignored because they are not promotable. spec-check loops
+    # validate_file directly (never validate_dir), so it needs its own call.
+    from .validate import _warn_ignored_promote_codes
+    _warn_ignored_promote_codes()
+
     # --- 1. Schema validation (validate each file) ---
     from .validate import validate_file
 
@@ -121,17 +152,17 @@ def _run_checks(
                     spec_root=spec_root,
                 )
             )
-    checks["schema-validation"] = {**_classify(schema_errs), "errors": schema_errs}
+    checks["schema-validation"] = _check_result(schema_errs)
 
     # --- 1b. Toolkit version gate ---
     tv_result = _check_toolkit_version(repo_root, spec_dir)
-    checks["toolkit-version"] = {**_classify(tv_result), "errors": tv_result}
+    checks["toolkit-version"] = _check_result(tv_result)
 
     # --- 2. Spec quality lint ---
     from .spec_quality_lint import lint_spec_quality
 
     quality_errs = lint_spec_quality(spec_dir)
-    checks["spec-quality-lint"] = {**_classify(quality_errs), "errors": quality_errs}
+    checks["spec-quality-lint"] = _check_result(quality_errs)
 
     # --- 3. Canonical preflight ---
     from ..canonical.lint import lint_canon_dirs
@@ -145,7 +176,7 @@ def _run_checks(
             )
         )
     )
-    checks["canonical-lint"] = {**_classify(canon_errs), "errors": canon_errs}
+    checks["canonical-lint"] = _check_result(canon_errs)
 
     # If canonical bootstrap failed, skip canon-dependent checks
     canon_ok = not any(not e.code.startswith("W") for e in canon_errs)
@@ -159,10 +190,7 @@ def _run_checks(
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
         )
-        checks["canonical-integrity"] = {
-            **_classify(integrity_errs),
-            "errors": integrity_errs,
-        }
+        checks["canonical-integrity"] = _check_result(integrity_errs)
     else:
         checks["canonical-integrity"] = {
             "status": "SKIP",
@@ -181,7 +209,7 @@ def _run_checks(
             project_canon_dir=project_canon_dir,
             git_root=git_root,
         )
-        checks["hallucination-lint"] = {**_classify(hall_errs), "errors": hall_errs}
+        checks["hallucination-lint"] = _check_result(hall_errs)
     else:
         checks["hallucination-lint"] = {
             "status": "SKIP",
@@ -192,7 +220,7 @@ def _run_checks(
     from .traceability_closure import check_traceability_closure
 
     tc_errs = check_traceability_closure(spec_dir, repo_root)
-    checks["traceability-closure"] = {**_classify(tc_errs), "errors": tc_errs}
+    checks["traceability-closure"] = _check_result(tc_errs)
 
     # --- 7. Completeness check (W564-W568) ---
     _completeness_codes = frozenset({
@@ -203,10 +231,7 @@ def _run_checks(
         e for e in tc_errs
         if isinstance(e, SpecError) and e.code in _completeness_codes
     ]
-    checks["completeness-check"] = {
-        **_classify(completeness_errs),
-        "errors": completeness_errs,
-    }
+    checks["completeness-check"] = _check_result(completeness_errs)
 
     # --- 8. Seed lint ---
     # project_root must be computed before the gate so the manifest-existence
@@ -221,7 +246,7 @@ def _run_checks(
         # For submodule deployments, seed docs are in the host repo (git_root),
         # not in the toolkit root. Pass project_root so seeds resolve correctly.
         seed_errs = lint_seeds(repo_root, spec_dir, project_root=project_root)
-        checks["seed-lint"] = {**_classify(seed_errs), "errors": seed_errs}
+        checks["seed-lint"] = _check_result(seed_errs)
     else:
         checks["seed-lint"] = {
             "status": "SKIP",
@@ -234,7 +259,7 @@ def _run_checks(
         from .fixtures_lint import lint_fixtures
 
         fix_errs = lint_fixtures(spec_dir)
-        checks["fixtures-lint"] = {**_classify(fix_errs), "errors": fix_errs}
+        checks["fixtures-lint"] = _check_result(fix_errs)
     else:
         checks["fixtures-lint"] = {
             "status": "SKIP",
@@ -246,10 +271,7 @@ def _run_checks(
         from .dependency_order_lint import lint_dependency_order
 
         dep_errs = lint_dependency_order(repo_root)
-        checks["dependency-order-lint"] = {
-            **_classify(dep_errs),
-            "errors": dep_errs,
-        }
+        checks["dependency-order-lint"] = _check_result(dep_errs)
     else:
         checks["dependency-order-lint"] = {
             "status": "SKIP",
@@ -268,7 +290,7 @@ def _run_checks(
             repo_root=repo_root,
             git_root=git_root,
         )
-        checks["registry-check"] = {**_classify(reg_errs), "errors": reg_errs}
+        checks["registry-check"] = _check_result(reg_errs)
     else:
         checks["registry-check"] = {
             "status": "SKIP",
@@ -282,7 +304,7 @@ def _run_checks(
         from .seed_lint import check_hardcoded_seed_reference
 
         hsr_errs = check_hardcoded_seed_reference(repo_root, git_root=git_root)
-        checks["hardcoded-seed-check"] = {**_classify(hsr_errs), "errors": hsr_errs}
+        checks["hardcoded-seed-check"] = _check_result(hsr_errs)
     else:
         checks["hardcoded-seed-check"] = {
             "status": "SKIP",
@@ -298,7 +320,7 @@ def _run_checks(
             repo_root=repo_root,
             project_canon_dir=project_canon_dir,
         )
-        checks["glossary-drift-check"] = {**_classify(gd_errs), "errors": gd_errs}
+        checks["glossary-drift-check"] = _check_result(gd_errs)
     else:
         checks["glossary-drift-check"] = {
             "status": "SKIP",
@@ -319,10 +341,7 @@ def _run_checks(
             git_root=effective_git_root,
             spec_root=spec_root or str(root / "spec"),
         )
-        checks["forward-replay-check"] = {
-            **_classify(replay_errs),
-            "errors": replay_errs,
-        }
+        checks["forward-replay-check"] = _check_result(replay_errs)
     else:
         checks["forward-replay-check"] = {
             "status": "SKIP",

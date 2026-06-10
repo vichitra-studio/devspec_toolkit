@@ -122,7 +122,7 @@ Before emitting output, build a private synthesis ledger (Context Ledger) contai
 
 ## 13. Namespace Resolution
 
-- `cn:core:*` — reserved for universal, toolkit-wide vocabulary: status (pending, active, deferred, blocked, verified), environment (dev, ci, staging, prod), severity levels. These are defined in the toolkit's own `canon/manifest.json` or must be created in the project's `spec/canon/kinds/` if not present.
+- `cn:core:*` — reserved for universal, toolkit-wide vocabulary: environment (dev, ci, staging, prod), severity levels. These are defined in the toolkit's own `canon/manifest.json` or must be created in the project's `spec/canon/kinds/` if not present.
 - `cn:project:*` — project-specific canonical entries: custom capabilities, roles, domain terms, dependencies. Created via `specdev canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit` from Step 03 glossary (see the "Canon management" section in CLAUDE.md).
 - Before emitting a `*_ref` field with a `cn:core:*` ID, verify the entry exists in either the toolkit's `canon/manifest.json` or the project's `spec/canon/manifest.json`. If missing, create it in the project's `spec/canon/kinds/{kind}.json` and manifest.
 - For submodule deployments: add `--namespace cn:project: --owner product` to `canon-accept` to scope entries to project canon. Use `--git-root .` when running from the host repo.

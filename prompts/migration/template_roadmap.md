@@ -36,16 +36,15 @@ The migrated artifact MUST include:
 ## Optional Fields
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `tech_stack_ref`: Canonical reference (kind: `capability`) for the tech stack registry entry.
-- `milestones[].status`: Must be one of `pending | in_progress | done | deferred`.
-- `milestones[].risk_status`: Must be one of `low | medium | high | critical`.
+- `tech_stack_ref`: Canonical reference (kind: `tech_stack`) for the tech stack registry entry.
+- `milestones[].status`: Optional milestone progress status — see `schema/14_roadmap.schema.json` (`$ref: vc:core:atoms#milestoneStatus`) for the authoritative enum values.
+- `milestones[].risk_status`: Optional milestone risk level — see `schema/14_roadmap.schema.json` (`$ref: vc:core:atoms#severityLevel`) for the authoritative enum values.
 - `milestones[].tasks[].acceptance_criteria`: Array of criterion objects (minItems: 1), each requiring `criterion_id` and `text` (minLength: 15).
-- `milestones[].tasks[].status`: Must be one of `pending | in_progress | done`.
+- `milestones[].tasks[].status`: Optional task progress status — see `schema/14_roadmap.schema.json` for the authoritative enum values (note: tasks do not support `deferred`).
 - `milestones[].tasks[].depends_on`: Array of `task_id` strings within the same milestone.
 - `milestones[].tasks[].fr_refs`: Array of `fr-*` ID strings this task addresses.
 - `milestones[].risks`: Array of named risk strings.
 - `milestones[].spikes`: Array of time-boxed investigation strings.
-- `milestones[].status_ref`: Canonical reference (kind: `stage`) for milestone status.
 - `migration_plan`: String (minLength: 1) describing migration strategy.
 - `dependencies`: Array of structured dependency objects.
 - `dependency_ref`: Canonical reference (kind: `dependency`) for the primary external dependency.
@@ -56,7 +55,7 @@ The migrated artifact MUST include:
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/14_roadmap.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ## Context

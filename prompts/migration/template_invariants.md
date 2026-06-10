@@ -22,8 +22,8 @@
   - `language`: Must be one of `jsonlogic | cel | text`.
   - `expression`: String — machine-readable expression in the specified language.
   - `scope`: Object with at least one of `components` (array of component_id strings) or `apis` (array of api_id strings).
-  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type: derives_from` pointing to a `cap-*` or `fr-*` ID.
-  - `policy_ref`: Canonical reference object (kind: `risk_category`) — required on every rule.
+  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type: capability` for `cap-*` targets or `type: fr` for `fr-*` targets; the derives-from relationship is described in the optional `note` field.
+  - `policy_ref`: Canonical reference object (kind: `policy`) — required on every rule.
 
 ## Output Contract
 
@@ -39,14 +39,13 @@ The migrated artifact MUST include:
 - `rules[].owner`: Canonical owner enum override (when different from document-level owner).
 - `rules[].enforcement_point`: Must be one of `database | service | api-gateway | client | queue | cache`.
 - `rules[].risk_category_ref`: Canonical reference (kind: `risk_category`) grouping invariants by risk domain.
-- `rules[].status_ref`: Canonical reference (kind: `stage`) for the lifecycle status (draft/active/deprecated).
 
 ## Validation
 
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/06_invariants.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ## Context
