@@ -12,6 +12,7 @@ consumed by `specdev align`.
 
 | Version | Documentation | Migration Spec |
 | :--- | :--- | :--- |
+| **[1.1.0]** | [v1.1.0.md](changelog/v1.1.0.md) | [v1.1.0.yaml](changelog/v1.1.0.yaml) |
 | **[1.0.0]** | [v1.0.0.md](changelog/v1.0.0.md) | [v1.0.0.yaml](changelog/v1.0.0.yaml) |
 
 ---
@@ -46,7 +47,15 @@ Write an entry when the change affects how someone uses the toolkit:
 ### Sections
 
 Use only the sections that apply. Standard order:
-`Added` → `Changed` → `Deprecated` → `Removed` → `Fixed` → `Security`
+`Breaking Changes` → `Added` → `Changed` → `Deprecated` → `Removed` → `Fixed` → `Security`
+
+- **Breaking Changes** — use when a release removes schema fields under
+  `additionalProperties: false`, adds hard validation that fails
+  previously-passing specs, or removes shipped CLI surface. Each bullet must
+  be self-contained: state the impact and the remediation in one paragraph.
+  Breaking items also appear under their categorical section (`Removed`,
+  `Changed`, etc.) — `Breaking Changes` is the alarm; the categorical
+  sections are the record.
 
 Do not add a `Removed` section unless something from a prior changelog
 entry is being removed.
@@ -91,17 +100,22 @@ actions. Run before cutting a release.
 
 ### Release process
 
-1. Create `changelog/vX.Y.Z.md` — human entry following the Contribution
-   Guide above.
-2. Create `changelog/vX.Y.Z.yaml` — machine migration spec; set
-   `version: "X.Y.Z"`. Use `changes: []` if no schema changes.
-3. Add the new version to the Version Index table above.
-4. Bump `version` in `tools/pyproject.toml` — the single source of truth.
-5. Confirm no doc hardcodes the version — `CLAUDE.md` references
+1. **Promote the unreleased files.** Copy `changelog/unreleased.md` to
+   `changelog/vX.Y.Z.md` and `changelog/unreleased.yaml` to
+   `changelog/vX.Y.Z.yaml`. In the YAML set `version: "X.Y.Z"` (was
+   `"unreleased"`). Strip all ticket references and internal notes from both
+   files following the Format rules above. Use `changes: []` if no schema
+   changes were accumulated.
+2. Add the new version to the Version Index table above.
+3. Bump `version` in `tools/pyproject.toml` — the single source of truth.
+4. Confirm no doc hardcodes the version — `CLAUDE.md` references
    `tools/pyproject.toml`; `docs/developers/getting_started.md` uses a
    `<current toolkit version>` placeholder.
-6. Validate: `specdev changelog --validate X.Y.Z`.
-7. Run the full test suite (`pytest tests/`).
-8. Commit: `chore(release): vX.Y.Z`.
-9. Tag `vX.Y.Z` and create a GitHub Release — release notes = the
+5. Validate: `specdev changelog --validate X.Y.Z`.
+6. Run the full test suite (`pytest tests/`).
+7. Commit: `chore(release): vX.Y.Z`.
+8. Tag `vX.Y.Z` and create a GitHub Release — release notes = the
    changelog entry for that version.
+9. **Reset the unreleased files** for the next cycle. `changelog/unreleased.md`
+   → `## [unreleased]`. `changelog/unreleased.yaml` → `version: "unreleased" /
+   breaking: false / changes: []`.
