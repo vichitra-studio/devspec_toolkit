@@ -76,7 +76,14 @@ REPO_ROOT = SCRIPT_DIR.parents[3]
 
 FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 
-# Generator-owned file basenames (from slices.yaml generated_artifacts)
+# High-value, deterministic toolkit files whose deletion is held to a P0 (D9) bar.
+# NOTE: despite the historical variable name, NOT all of these are generator
+# outputs — only entry_key_registry.json and extraction_paths.json are produced by
+# `registry-generate`. schema_registry.json, step_order.json, command_prefixes.json,
+# and step_docs.json are manually maintained but equally load-bearing, so their
+# deletion is treated with the same severity. (This set is NOT synced to
+# slices.yaml's generated_artifacts slice, which now lists only the two true
+# generator outputs.)
 GENERATED_ARTIFACT_NAMES: set[str] = {
     "schema_registry.json",
     "step_order.json",
@@ -129,12 +136,18 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
     A file removal is an *upstream change that downstream dependents must
     reflect* — catalogs.md D7 (Upstream ↔ downstream), whose generic pattern
     explicitly covers a "removed value" not propagated to dependents. So every
-    removal is tagged D7, EXCEPT a generator-owned artifact, whose absence is a
-    generator-integrity defect (D9 — the generator would re-emit it; committed =
-    gone). The catalog has no dedicated "file removed" code; D7 is the correct
-    generic fit. (Earlier revisions mis-tagged removals as D14/D3/D2 — tags whose
-    semantics, per catalogs.md, are schema-authority delegation, code↔docs, and
-    producer↔consumer shape respectively, none of which describe a deletion.)
+    removal is tagged D7, EXCEPT a load-bearing deterministic toolkit artifact
+    (the GENERATED_ARTIFACT_NAMES set), whose absence is treated as a D9
+    generator-integrity defect. For the true generator outputs
+    (entry_key_registry.json, extraction_paths.json) that is literal — the
+    generator would re-emit them, so a committed deletion is provably wrong. For
+    the manually-maintained members of the set the D9/P0 tag is a deliberate
+    high-severity choice (their loss silently breaks routing, ai-help, or
+    schema/step resolution), not a claim that a generator owns them. The catalog
+    has no dedicated "file removed" code; D7 is the correct generic fit. (Earlier
+    revisions mis-tagged removals as D14/D3/D2 — tags whose semantics, per
+    catalogs.md, are schema-authority delegation, code↔docs, and producer↔consumer
+    shape respectively, none of which describe a deletion.)
 
     Severity reflects the criticality of the removed artifact, independent of tag.
 
@@ -142,7 +155,9 @@ def _infer_catalog_tag(path: str) -> tuple[str, str]:
       canon/**                               → D7, P0  (registry everything references)
       tools/{schema_registry,step_order,
              entry_key_registry,extraction_paths,
-             command_prefixes,step_docs}.json → D9, P0  (generator-owned)
+             command_prefixes,step_docs}.json → D9, P0  (load-bearing toolkit
+                                                          data; see note above —
+                                                          only 2 are generator outputs)
       *.schema.json                          → D7, P1
       prompts/**/*.md                        → D7, P1
       tools/specdev_tools/**/*.py            → D7, P1

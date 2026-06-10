@@ -208,13 +208,22 @@ ERROR_CODES = {
     # R004: host-side novelty detection — array with id-pattern items not declared in registry.
     # Severity is WARNING (not error) because the generator may not yet cover the new array.
     "W614": "UNREGISTERED_ARRAY",        # R004: host spec has array with *_id items unknown to toolkit registry
+    # DEVSPEC-89: invariant↔threat drift detection (61x)
+    # W615 fires when a step-06 invariant has a risk_category_ref but no step-11 threat
+    # mitigation references it — indicating the invariant is not exercised by any threat.
+    # E615 is its promotable counterpart (SPECDEV_WARNINGS_AS_ERRORS or SPECDEV_PROMOTE_CODES=W615).
+    "W615": "INVARIANT_UNEXERCISED_BY_THREAT",
+    "E615": "INVARIANT_UNEXERCISED_BY_THREAT",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes (W110/W120/W130/W140/W552/W553/W554/W570/W606) are excluded —
-# their E-counterparts have different semantics or promotion is inappropriate.
+# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W590/
+# W596/W597/W606 have E-counterparts with different semantics; W570
+# (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
+# its name with the registered-but-unemitted E604 and stays advisory (see the
+# inline W604 note below).
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the
@@ -244,16 +253,38 @@ PROMOTABLE_PAIRS = {
     "W581": "E581",
     "W582": "E582",
     "W150": "E150",
-    "W590": "E590",
+    # W590 (CROSS_STEP_UPSTREAM_MISSING) is intentionally NOT in PROMOTABLE_PAIRS.
+    # E590 (CROSS_STEP_ID_NOT_FOUND) is a structurally different condition — a
+    # referenced ID is absent from a *present* upstream file — not a fatal form
+    # of "upstream file missing". Promoting W590 to E590 would emit
+    # CROSS_STEP_ID_NOT_FOUND for a check that never ran (the file was absent),
+    # mislabelling the defect and pointing users at the wrong fix (generate the
+    # missing artifact vs. fix a broken ID reference). W590 has no
+    # semantically-correct E-counterpart at this time; a fatal "upstream missing"
+    # would need a new dedicated E-code rather than reusing E590.
     "W591": "E591",
     "W592": "E592",
     "W593": "E593",
     "W594": "E594",
     "W595": "E595",
-    # W597 EXTRACTION_INTENT_VAGUE → E597 EXTRACTION_INTENT_UPSTREAM_GAP:
-    # both flag extraction-intent quality issues; vague entries are a softer
-    # form of the upstream-gap error — promotion is appropriate.
-    "W597": "E597",
+    # W597 (EXTRACTION_INTENT_VAGUE) is intentionally NOT in PROMOTABLE_PAIRS.
+    # E597 (EXTRACTION_INTENT_UPSTREAM_GAP) is a structurally different
+    # condition — a required upstream artifact has NO intent entry at all —
+    # not a fatal form of vague text. Promoting W597 to E597 would emit an
+    # UPSTREAM_GAP code for a present-but-vague entry, mislabelling the defect
+    # and pointing users at the wrong fix (add an entry vs. expand its text).
+    # W597 has no semantically-correct E-counterpart, so it stays a warning.
+    # W604 (TRACE_MATRIX_STALE) is intentionally NOT in PROMOTABLE_PAIRS.
+    # Only W604 is emitted — by the step_14 staleness check, when
+    # trace_matrix.json is missing or older than 14_roadmap.json (an mtime-based
+    # freshness heuristic that can false-positive on checkout/touch order). E604
+    # is registered under the same name as the nominal error form but is never
+    # emitted by any code path, and staleness is advisory (regenerate the matrix)
+    # rather than a hard correctness failure — so W604 stays a warning and E604
+    # is not wired to promotion.
+    # W615 INVARIANT_UNEXERCISED_BY_THREAT → E615: step-06 invariant with a
+    # risk_category_ref is not referenced by any step-11 threat mitigation.
+    "W615": "E615",
 }
 
 

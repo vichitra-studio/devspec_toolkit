@@ -452,6 +452,26 @@ def build_trace_matrix(
     if extensions:
         result["extensions"] = extensions
 
+    # DEVSPEC-89: invariant_threat_coverage — map inv_id → [threat_ids] from
+    # mitigations whose type normalizes to the canonical invariant label
+    # (accepts alias: inv).  Exposes threat↔invariant edges at the top
+    # level of the matrix output so consumers can detect drift without
+    # re-parsing individual threat objects.
+    inv_to_threats: dict[str, set[str]] = collections.defaultdict(set)
+    for th in threats:
+        for mitigation in th.get("mitigations", []):
+            if not isinstance(mitigation, dict):
+                continue
+            if _normalize_type(mitigation.get("type", "")) == "invariant":
+                inv_id = mitigation.get("id", "")
+                if inv_id:
+                    inv_to_threats[inv_id].add(th["threat_id"])
+    if inv_to_threats:
+        result["invariant_threat_coverage"] = {
+            inv_id: sorted(threat_ids)
+            for inv_id, threat_ids in sorted(inv_to_threats.items())
+        }
+
     integrity_errors = validate_trace_integrity(repo_root, spec_dir)
     if integrity_errors:
         result["integrity_errors"] = render_errors(integrity_errors)

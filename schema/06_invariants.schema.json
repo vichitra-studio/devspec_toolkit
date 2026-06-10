@@ -94,13 +94,6 @@
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "risk_category" } } }
                 ]
-              },
-              "status_ref": {
-                "description": "Canonical reference for the lifecycle status of this invariant. Kind is structurally pinned to 'status'. Tracks whether the invariant is actively enforced, draft, or deprecated. Example: {\"id\": \"cn:core:status:active\", \"kind\": \"status\"} for an actively enforced invariant. Mark as 'deprecated' rather than deleting when superseded.",
-                "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "status" } } }
-                ]
               }
             },
             "required": [

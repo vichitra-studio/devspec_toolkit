@@ -91,8 +91,7 @@ Before emitting, verify:
 - `severity` must be set deliberately (see schema/06_invariants.schema.json for authoritative enum values); prefer the harder severity for hard guarantees, the softer value for observability-only rules.
 - `enforcement_point` must match one of the canonical values defined in schema/06_invariants.schema.json (see the `enforcement_point` enum in that file for the full authoritative list).
 - `trace` connects rules to FRs/NFRs/governance to explain rationale.
-- `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/manifest.json.
-- `status_ref`: populate to track lifecycle status of this invariant (active/draft/deprecated); use a canonicalRef object with kind 'status'.
+- `risk_category_ref`: populate when this invariant maps to a known risk domain for red-team alignment (Step 11 cross-reference); use a canonicalRef object pointing to the appropriate risk category in canon/kinds/risk_category.json.
 - Avoid purely textual rules unless automation is truly not feasible.
 
 ## Best Practices

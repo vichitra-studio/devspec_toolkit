@@ -159,48 +159,6 @@
       "status": "active"
     },
     {
-      "kind": "status",
-      "normalized": "approved",
-      "target_id": "cn:core:status:verified",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "fail",
-      "target_id": "cn:core:status:red",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "failed",
-      "target_id": "cn:core:status:red",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "not started",
-      "target_id": "cn:core:status:pending",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "pass",
-      "target_id": "cn:core:status:green",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "passed",
-      "target_id": "cn:core:status:green",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "postponed",
-      "target_id": "cn:core:status:deferred",
-      "status": "active"
-    },
-    {
       "kind": "tag",
       "normalized": "priority critical",
       "target_id": "cn:core:tag:critical-path",
@@ -225,17 +183,6 @@
       "status": "deprecated",
       "lifecycle": {
         "deprecated_since": "2026-01-15",
-        "replaced_by": "cn:core:unit:ms"
-      }
-    },
-    {
-      "kind": "unit",
-      "normalized": "millisec",
-      "target_id": "cn:core:unit:ms",
-      "status": "deprecated",
-      "lifecycle": {
-        "deprecated_since": "2025-06-01",
-        "sunset_date": "2025-12-31",
         "replaced_by": "cn:core:unit:ms"
       }
     },

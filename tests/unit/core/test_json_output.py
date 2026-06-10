@@ -125,16 +125,16 @@ class TestErrorToDict:
     def test_all_structured_fields_included_when_set(self) -> None:
         err = SpecError(
             code="E110",
-            message="UNKNOWN_CANONICAL_ID cn:project:foo spec/01.json:status_ref",
+            message="UNKNOWN_CANONICAL_ID cn:project:foo spec/01.json:entity_ref",
             subcode="UNKNOWN_CANONICAL_ID",
             file="spec/01_capabilities.json",
-            jq_path=".status_ref",
+            jq_path=".entity_ref",
             value="cn:project:foo",
         )
         d = error_to_dict(err)
         assert d["subcode"] == "UNKNOWN_CANONICAL_ID"
         assert d["file"] == "spec/01_capabilities.json"
-        assert d["jq_path"] == ".status_ref"
+        assert d["jq_path"] == ".entity_ref"
         assert d["value"] == "cn:project:foo"
 
     def test_empty_string_value_is_included(self) -> None:
@@ -189,10 +189,10 @@ class TestMakeRemediation:
     def test_e110_unknown_canonical_id_shape(self) -> None:
         err = SpecError(
             code="E110",
-            message="UNKNOWN_CANONICAL_ID cn:project:foo spec/01.json:status_ref",
+            message="UNKNOWN_CANONICAL_ID cn:project:foo spec/01.json:entity_ref",
             subcode="UNKNOWN_CANONICAL_ID",
             file="spec/01_capabilities.json",
-            jq_path=".status_ref",
+            jq_path=".entity_ref",
             value="cn:project:foo",
         )
         r = _make_remediation(err)
@@ -237,6 +237,9 @@ class TestMakeRemediation:
         for c in candidates:
             assert c["command"].startswith("specdev ")
             assert "frobulate" in c["command"]
+        # extend_prefixes must include --create-schema flag for first-use bootstrap (WS4)
+        extend_cmd = next(c["command"] for c in candidates if c["kind"] == "extend_prefixes")
+        assert "--create-schema vc:canon:command-prefixes" in extend_cmd
         assert "frobulate" in r["owner_story"]
 
     def test_e530_invented_enum_non_command_returns_none(self) -> None:

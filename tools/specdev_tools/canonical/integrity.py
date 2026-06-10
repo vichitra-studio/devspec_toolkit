@@ -274,7 +274,6 @@ def _collect_observed_semantics(obj: Any, observed: dict[tuple[str, str], dict[s
         alias_value_fields: dict[str, tuple[str, ...]] = {
             "stage_ref": ("stage", "environment"),
             "environment_ref": ("environment", "stage"),
-            "status_ref": ("status",),
         }
         for key, ref in obj.items():
             if not key.endswith("_ref") or not isinstance(ref, dict):
@@ -307,7 +306,6 @@ _ALIASED_SOURCE_FIELDS: dict[str, str] = {
 _FALLBACK_DIRECT_FIELDS: set[str] = {
     "stage",
     "environment",
-    "status",
     "term",
     "acronym",
     "capability",

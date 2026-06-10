@@ -41,10 +41,10 @@
               "target_ids": {
                 "type": "array",
                 "minItems": 1,
-                "description": "Trace references to spec artifacts this threat targets. Should typically reference IDs from other spec files, e.g. api_id (from Step 05), component_id (from Step 02), or inv_id (from Step 06). Each threat must target at least one concrete artifact (enforced by minItems) — generic 'the whole system' threats are not actionable. Targeting specific artifacts enables cross-referencing with Step 06 invariants and Step 05 APIs.",
+                "description": "Trace references to spec artifacts this threat targets. Valid target types are: api (api_id from Step 05) and component (component_id from Step 02). Each threat must target at least one concrete artifact (enforced by minItems) — generic 'the whole system' threats are not actionable. Targeting specific APIs and components enables cross-referencing with Step 05 interface contracts and Step 02 system sketch.",
                 "items": {
                   "$ref": "vc:core:collections#traceRef",
-                  "description": "A trace reference to a specific spec artifact (API, component, or invariant) targeted by this threat."
+                  "description": "A trace reference to a specific spec artifact (API from Step 05 or component from Step 02) targeted by this threat."
                 }
               },
               "category": {
@@ -54,7 +54,7 @@
               "mitigations": {
                 "type": "array",
                 "minItems": 1,
-                "description": "Structured mitigations for this threat. Each mitigation should be a concrete action, not a vague aspiration. Include: (1) a specific technical or process control, (2) where it is applied (component, layer, or process), (3) how effectiveness is measured. Example: 'Apply HMAC-SHA256 signature verification on all incoming webhooks at the API gateway layer. Verified by integration test fix-05-webhook-tampered'. Mitigations must be structured objects — not plain strings. Valid mitigation target types: inv-* (invariant from Step 06 — adds an invariant to prevent the threat), nfr-* (NFR from Step 07 — adds a performance/security requirement), fr-* (FR from Step 04 — adds a functional requirement to address the threat), doc (documentation change in Step 10 governance). Each mitigation must reference an existing artifact ID. Anti-pattern: listing a mitigation without a target ID ('add input validation' with no fr-* or inv-* reference — not traceable to a spec change).",
+                "description": "Structured mitigations for this threat. Each mitigation should be a concrete action, not a vague aspiration. Include: (1) a specific technical or process control, (2) where it is applied (component, layer, or process), (3) how effectiveness is measured. Example: 'Apply HMAC-SHA256 signature verification on all incoming webhooks at the API gateway layer. Verified by integration test fix-05-webhook-tampered'. Mitigations must be structured objects — not plain strings. Valid mitigation target types: inv-* (invariant from Step 06 — adds an invariant to prevent the threat), nfr-* (NFR from Step 07 — adds a performance/security requirement), fr-* (FR from Step 04 — adds a functional requirement to address the threat), doc (net-new proposed control or documentation-based mitigation that has no existing upstream spec ID; exempt from cross-reference validation because there is no doc-ID registry in the toolkit). Each mitigation must reference an existing artifact ID. Anti-pattern: listing a mitigation without a target ID ('add input validation' with no fr-* or inv-* reference — not traceable to a spec change).",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -70,7 +70,7 @@
                         "doc",
                         "capability"
                       ],
-                      "description": "The artifact type that provides the mitigation (e.g., 'fr' for a functional requirement, 'inv' for an invariant, 'fixture' for a test fixture). For type 'capability', the id should reference a cap-* ID from Step 01 capabilities. Note: 'component' is not a separate mitigation type — component-level mitigations should be expressed as 'capability' type (the capability hosted by that component) or 'doc' type (architectural documentation)."
+                      "description": "The artifact type that provides the mitigation (e.g., 'fr' for a functional requirement, 'inv' for an invariant, 'fixture' for a test fixture). For type 'capability', the id should reference a cap-* ID from Step 01 capabilities. Use 'doc' for a net-new proposed control or documentation-based mitigation that has no existing upstream spec ID; 'doc' mitigations are exempt from cross-reference validation because there is no doc-ID registry in the toolkit."
                     },
                     "id": {
                       "$ref": "vc:core:atoms#kebabId",

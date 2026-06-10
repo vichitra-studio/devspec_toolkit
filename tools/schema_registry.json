@@ -2,6 +2,7 @@
   "vc:core:atoms": "schema/core/atoms.schema.json",
   "vc:core:canon": "schema/core/canon.schema.json",
   "vc:canon:aliases": "canon/aliases.schema.json",
+  "vc:canon:command-prefixes": "canon/command_prefixes.schema.json",
   "vc:canon:kind": "canon/kind.schema.json",
   "vc:core:collections": "schema/core/collections.schema.json",
   "vc:core:errors": "schema/core/errors.schema.json",

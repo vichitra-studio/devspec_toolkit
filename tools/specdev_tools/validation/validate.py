@@ -16,8 +16,16 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
+# Kept as the patch-target anchor for test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution (patches validate.Draft202012Validator.iter_errors); do not remove.
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
+from ..core.schema_validate import (
+    validate_data_against_schema,
+    SchemaBootstrapError,
+    SchemaNotFoundError,
+    SchemaDecodeError,
+    SchemaReferencingError,
+    SchemaRuntimeError,
+)
 from ..canonical.integrity import validate_canonical_integrity, validate_canonical_integrity_file
 from ..canonical.lint import lint_canon_dirs
 from .dependency_order_lint import lint_dependency_order
@@ -26,7 +34,7 @@ from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
-from ..core.errors import PROMOTABLE_PAIRS, SpecError, make_error
+from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact, load_sibling_artifact
 from ..core.registry import SchemaRegistry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
@@ -174,7 +182,7 @@ def validate_file(
     _step16_cache.clear()
 
     try:
-        registry = SchemaRegistry(repo_root)
+        SchemaRegistry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
         return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e)}")]
     try:
@@ -205,29 +213,25 @@ def validate_file(
             return [make_error("E520", f"{path}: missing_schema_uri")]
 
         try:
-            schema = registry.load(schema_uri)
-        except FileNotFoundError as e:
-            return [make_error("E520", f"{path}: schema_not_found uri={schema_uri} detail={str(e)}")]
-        except json.JSONDecodeError as e:
-            return [make_error("E520", f"{path}: schema_json_decode_failed uri={schema_uri} detail={str(e)}")]
+            raw_errors = validate_data_against_schema(repo_root, data)
+        except SchemaBootstrapError as e:
+            # TOCTOU / reordering defence: helper's own bootstrap failed after the
+            # probe above succeeded.  Emit the byte-identical message the probe would
+            # have emitted so callers see a consistent schema_registry_bootstrap_failed
+            # signal regardless of which bootstrap fires.
+            return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e.original)}")]
+        except SchemaNotFoundError as e:
+            return [make_error("E520", f"{path}: schema_not_found uri={e.uri} detail={e.detail}")]
+        except SchemaDecodeError as e:
+            return [make_error("E520", f"{path}: schema_json_decode_failed uri={e.uri} detail={e.detail}")]
+        except SchemaReferencingError as e:
+            return [make_error("E520", f"{path}: schema_reference_resolution_failed {str(e.original)}")]
+        except SchemaRuntimeError as e:
+            return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e.original).__name__}: {str(e.original)}")]
 
-        # Exclude $schema from validation payload because many step schemas disallow unknown keys
-        data_for_validation = dict(data)
-        data_for_validation.pop("$schema", None)
-
-        # Build a resolver store
-        reg = registry.to_referencing_registry()
-        v = Draft202012Validator(
-            schema,
-            registry=reg,
-            format_checker=Draft202012Validator.FORMAT_CHECKER
-        )
-        try:
-            errors = sorted(v.iter_errors(data_for_validation), key=lambda e: e.path)
-        except _WrappedReferencingError as e:
-            return [make_error("E520", f"{path}: schema_reference_resolution_failed {str(e)}")]
-        except Exception as e:
-            return [make_error("E521", f"{path}: schema_validation_runtime_error {type(e).__name__}: {str(e)}")]
+        # Sort by path tuple for deterministic ordering (mirrors the original
+        # sorted(v.iter_errors(...), key=lambda e: e.path) call).
+        errors = sorted(raw_errors, key=lambda t: t[0])
 
         # Resolve step once — use content-based refinement for impl_context/
         # artifacts so 16b/16c sub-step validators actually run during
@@ -236,8 +240,8 @@ def validate_file(
 
         # Enhance error messages with context
         enhanced_errors: list[SpecError] = []
-        for e in errors:
-            error_msg = f"{path}:{'/'.join(map(str, e.path))}: {e.message}"
+        for path_tuple, message in errors:
+            error_msg = f"{path}:{'/'.join(map(str, path_tuple))}: {message}"
 
             # Add context about what to do next
             if step != "unknown":
@@ -300,6 +304,9 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
         return []
 
     failures: list[SpecError] = []
+    # Surface (once per run) any SPECDEV_PROMOTE_CODES entries that will be
+    # silently ignored because they are not promotable.
+    _warn_ignored_promote_codes()
     canonical_preflight_errors: list[SpecError] = list(
         dict.fromkeys(
             lint_canon_dirs(
@@ -391,6 +398,39 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
     failures = _apply_we_promotion(failures)
 
     return failures
+
+
+def _warn_ignored_promote_codes() -> None:
+    """Warn (to stderr) when SPECDEV_PROMOTE_CODES lists codes that will be ignored.
+
+    A code in SPECDEV_PROMOTE_CODES that is not in PROMOTABLE_PAIRS is silently
+    dropped by the promotion intersection. Surface it so a CI author who, e.g.,
+    sets ``SPECDEV_PROMOTE_CODES=W597`` (a valid but non-promotable code) or a
+    typo is not left believing a promotion took effect. Only meaningful when
+    SPECDEV_WARNINGS_AS_ERRORS is off — when it is on, promote_codes is ignored
+    wholesale and a per-code warning would mislead.
+    """
+    cfg = get_config()
+    if cfg.warnings_as_errors or not cfg.promote_codes:
+        return
+    ignored = set(cfg.promote_codes) - set(PROMOTABLE_PAIRS.keys())
+    if not ignored:
+        return
+    import sys as _sys
+    for code in sorted(ignored):
+        if code not in ERROR_CODES:
+            print(
+                f"specdev: SPECDEV_PROMOTE_CODES contains unrecognised code "
+                f"{code!r}; it will be ignored.",
+                file=_sys.stderr,
+            )
+        else:
+            print(
+                f"specdev: SPECDEV_PROMOTE_CODES contains {code} "
+                f"({ERROR_CODES[code]}) which is not a promotable code; "
+                f"it will be ignored.",
+                file=_sys.stderr,
+            )
 
 
 def _apply_we_promotion(failures: list[SpecError]) -> list[SpecError]:

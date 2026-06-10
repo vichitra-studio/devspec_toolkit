@@ -922,121 +922,6 @@
       }
     },
     {
-      "id": "cn:core:status:active",
-      "kind": "status",
-      "preferred_label": "active",
-      "definition": "Work item is currently in-progress and not deferred.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:blocked",
-      "kind": "status",
-      "preferred_label": "blocked",
-      "definition": "Work item cannot proceed due to an external dependency or issue.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:deferred",
-      "kind": "status",
-      "preferred_label": "deferred",
-      "definition": "Work item is intentionally postponed with a stated rationale.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "postponed"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:green",
-      "kind": "status",
-      "preferred_label": "green",
-      "definition": "Quality gate or CI status indicating success.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "pass",
-        "passed"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:pending",
-      "kind": "status",
-      "preferred_label": "pending",
-      "definition": "Work item is planned but not started.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "not-started"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:red",
-      "kind": "status",
-      "preferred_label": "red",
-      "definition": "Quality gate or CI status indicating failure.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "fail",
-        "failed"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
-      "id": "cn:core:status:verified",
-      "kind": "status",
-      "preferred_label": "verified",
-      "definition": "Work item has been verified against its checklist and evidence.",
-      "version": "1.0.0",
-      "status": "active",
-      "owners": [
-        "spec-platform"
-      ],
-      "aliases": [
-        "approved"
-      ],
-      "lifecycle": {
-        "introduced_at": "2026-02-21T00:00:00Z"
-      }
-    },
-    {
       "id": "cn:core:tag:critical-path",
       "kind": "tag",
       "preferred_label": "critical-path",
@@ -1400,6 +1285,60 @@
       "status": "active"
     },
     {
+      "kind": "governance_label",
+      "normalized": "must-have",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "required",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p0",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "critical",
+      "target_id": "cn:core:governance_label:mandatory",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "should-have",
+      "target_id": "cn:core:governance_label:recommended",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p1",
+      "target_id": "cn:core:governance_label:recommended",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "nice-to-have",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "could-have",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
+      "kind": "governance_label",
+      "normalized": "p2",
+      "target_id": "cn:core:governance_label:optional",
+      "status": "active"
+    },
+    {
       "kind": "id_pattern",
       "normalized": "commit pattern",
       "target_id": "cn:core:id_pattern:conventional-commit",
@@ -1460,48 +1399,6 @@
       "status": "active"
     },
     {
-      "kind": "status",
-      "normalized": "approved",
-      "target_id": "cn:core:status:verified",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "fail",
-      "target_id": "cn:core:status:red",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "failed",
-      "target_id": "cn:core:status:red",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "not started",
-      "target_id": "cn:core:status:pending",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "pass",
-      "target_id": "cn:core:status:green",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "passed",
-      "target_id": "cn:core:status:green",
-      "status": "active"
-    },
-    {
-      "kind": "status",
-      "normalized": "postponed",
-      "target_id": "cn:core:status:deferred",
-      "status": "active"
-    },
-    {
       "kind": "tag",
       "normalized": "priority critical",
       "target_id": "cn:core:tag:critical-path",
@@ -1526,17 +1423,6 @@
       "status": "deprecated",
       "lifecycle": {
         "deprecated_since": "2026-01-15",
-        "replaced_by": "cn:core:unit:ms"
-      }
-    },
-    {
-      "kind": "unit",
-      "normalized": "millisec",
-      "target_id": "cn:core:unit:ms",
-      "status": "deprecated",
-      "lifecycle": {
-        "deprecated_since": "2025-06-01",
-        "sunset_date": "2025-12-31",
         "replaced_by": "cn:core:unit:ms"
       }
     },

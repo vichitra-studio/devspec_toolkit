@@ -31,7 +31,7 @@ class UpdateResult:
     """Structured result returned by run_update()."""
 
     exit_code: int
-    status: str  # "already_current" | "updated" | "needs_migration" | "error"
+    status: str  # "already_current" | "updated" | "would_update" | "needs_migration" | "error"
     from_version: Optional[str]
     to_version: Optional[str]
     needs_migration: bool = False
@@ -276,7 +276,7 @@ def run_update(
     # dry-run path
     return UpdateResult(
         exit_code=0,
-        status="updated",
+        status="would_update",
         from_version=host_version,
         to_version=toolkit_version,
         refresh_ok=None,

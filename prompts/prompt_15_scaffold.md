@@ -24,7 +24,6 @@ After generating the JSON artifact, implement the scaffold manually or using you
 
 #### Reference Sources (context only)
 - **spec/04_fr_list.json**: for stub method signatures and to verify that every endpoint-dependent FR has a corresponding scaffold route
-- `spec/14_roadmap.json`: for phased scaffold generation (generate components in milestone order)
 - **00_charter.json**: Project identity and scope boundaries used to name the scaffold service and constrain module generation to in-scope domains only
 - **01_capabilities.json**: Capability definitions used to verify that scaffold modules cover all declared system capabilities and no capability lacks a corresponding code entry point
 - **03_glossary.json**: Domain terminology definitions used to ensure scaffold module names, route identifiers, and code structure follow the project's canonical vocabulary consistently
@@ -89,7 +88,7 @@ Before emitting, verify:
 - **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.
 - **Reproducibility**: Document `project_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
 - **Validation**: Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
-- **Status**: Track `build_status` honestly (`green`, `red`, `pending`) to surface blockers before implementation accelerates.
+- **Status**: Track `build_status` honestly (allowed values are defined in the schema) to surface blockers before implementation accelerates.
 
 ## Common Pitfalls
 - **Implicit Modules**: Leaving modules unspecified, forcing teams to rediscover scaffold layout.
