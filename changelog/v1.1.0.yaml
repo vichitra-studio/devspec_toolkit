@@ -251,3 +251,37 @@ changes:
       unhandled AttributeError.
     migration:
       action: none
+
+  - type: fix
+    description: >
+      E541 (UNBOUND_CANONICAL_TERM) no longer fires on narrative free-text fields
+      of structurally-unbindable objects. Follow-up to the status_ref removal in
+      this release: objects with additionalProperties:false and no *_ref/*_refs
+      slot in their schema cannot satisfy E541's "bind a sibling ref" demand, so
+      requiring one was a schema contradiction. hallucination_lint now loads each
+      file's resolved JSON Schema (via build_id_index + schema_nav.effective_schema)
+      and suppresses E541 for free-text fields whose enclosing object is
+      structurally unbindable. Ref-capable objects (e.g. 14_roadmap milestones with
+      fr_refs/capability_refs) still fire E541, so no over-suppression. Key-name
+      skips are retained as belt-and-suspenders for artifacts lacking a $schema.
+      Affected surfaces: plan.ambiguities[].description, plan.docs_impact.rationale,
+      milestones[].name, execution.final_status.test_results[].name.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      schema_differ (specdev align diff/status/update) no longer mis-maps step 16.
+      Step 16 ships two schemas but only one root spec file: the Trinity Anchor at
+      spec/16_impl_context.json is validated against vc:16-anchor (16_anchor.schema.json),
+      while per-milestone plans under spec/impl_context/ms_*_plan.json use
+      vc:16-impl-context. The filename-stem inventory previously expected a root
+      16_impl_context.json of schema vc:16-impl-context (spurious NEEDS UPDATE on
+      $schema) and a root 16_anchor.json (spurious MISSING). The differ now remaps
+      the root step-16 file to the anchor schema and drops 16_anchor as a root step
+      (apply_step16_anchor_mapping), per the prompt contract in
+      prompts/prompt_16_impl_context.md (L8, L73). A correct host layout now reports
+      step 16 fully OK; a genuinely-wrong layout (wrong $schema or missing root
+      anchor) still flags.
+    migration:
+      action: none

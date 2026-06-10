@@ -16,13 +16,18 @@ from specdev_tools.generation.schema_differ import (
     MigrationDiff,
     ParadigmShift,
     StepDiff,
+    apply_step16_anchor_mapping,
     calculate_version_delta,
     compare_step_inventories,
     detect_paradigm_shifts,
+    diff_spec_directory,
     diff_step_fields,
     inventory_toolkit_schemas,
     inventory_user_steps,
 )
+
+# Real toolkit root (…/tests/unit/generation/test_schema_differ.py → toolkit root)
+_TOOLKIT_ROOT = Path(__file__).resolve().parents[3]
 
 
 # ---------------------------------------------------------------------------
@@ -249,3 +254,130 @@ class TestDetectParadigmShifts:
         shifts = detect_paradigm_shifts(spec_dir, tmp_path)
         detected = [s for s in shifts if s.detected]
         assert detected == []
+
+
+# ---------------------------------------------------------------------------
+# Step-16 anchor mapping (the differ "KNOWN WALL" fix)
+# ---------------------------------------------------------------------------
+
+class TestApplyStep16AnchorMapping:
+    """Unit tests for the inventory transform in isolation.
+
+    Contract source: prompts/prompt_16_impl_context.md L8 + L73 — the root
+    Trinity Anchor file spec/16_impl_context.json is validated against
+    vc:16-anchor; per-milestone plans (vc:16-impl-context) live under
+    spec/impl_context/ and are not root steps.
+    """
+
+    def test_root_step_remapped_to_anchor_schema(self, tmp_path):
+        anchor = tmp_path / "16_anchor.schema.json"
+        impl_ctx = tmp_path / "16_impl_context.schema.json"
+        inv = {"16_anchor": anchor, "16_impl_context": impl_ctx, "00_charter": tmp_path / "00_charter.schema.json"}
+        remapped = apply_step16_anchor_mapping(inv)
+        # Root step 16_impl_context now points at the ANCHOR schema file.
+        assert remapped["16_impl_context"] == anchor
+        # 16_anchor is no longer a root step (would otherwise be MISSING).
+        assert "16_anchor" not in remapped
+        # Unrelated steps untouched.
+        assert remapped["00_charter"] == tmp_path / "00_charter.schema.json"
+
+    def test_does_not_mutate_input(self, tmp_path):
+        inv = {"16_anchor": tmp_path / "a", "16_impl_context": tmp_path / "b"}
+        apply_step16_anchor_mapping(inv)
+        assert inv == {"16_anchor": tmp_path / "a", "16_impl_context": tmp_path / "b"}
+
+    def test_noop_when_no_anchor_schema(self, tmp_path):
+        # Older toolkit without 16_anchor.schema.json — transform is a no-op.
+        inv = {"00_charter": tmp_path / "c", "16_impl_context": tmp_path / "b"}
+        remapped = apply_step16_anchor_mapping(inv)
+        assert remapped == inv
+
+
+def _write_good_step16_layout(spec_dir: Path) -> None:
+    """Write a correct host step-16 layout: root anchor + per-milestone plan."""
+    impl = spec_dir / "impl_context"
+    impl.mkdir(parents=True, exist_ok=True)
+    (spec_dir / "16_impl_context.json").write_text(json.dumps({
+        "$schema": "vc:16-anchor",
+        "id": "anchor-v1",
+        "owner": "api",
+        "created_at": "2026-02-08T00:00:00Z",
+        "artifact_role": "anchor",
+        "plan": {},
+    }), encoding="utf-8")
+    # Per-milestone plan — must remain invisible to the (non-recursive) root inventory.
+    (impl / "ms_batch1_plan.json").write_text(json.dumps({
+        "$schema": "vc:16-impl-context",
+        "plan": {},
+    }), encoding="utf-8")
+
+
+class TestStep16DiffEndToEnd:
+    """End-to-end diff_spec_directory tests against the REAL toolkit schemas.
+
+    Both-directions guard:
+      (a) a correct host layout reports zero step-16 findings;
+      (b) a genuinely-wrong step-16 layout STILL flags.
+    """
+
+    def _step16(self, diff: MigrationDiff):
+        return [d for d in diff.steps if d.step_id.startswith("16")]
+
+    def test_correct_layout_zero_step16_findings(self, tmp_path):
+        spec = tmp_path / "spec"
+        spec.mkdir()
+        _write_good_step16_layout(spec)
+        diff = diff_spec_directory(spec, _TOOLKIT_ROOT)
+        s16 = self._step16(diff)
+        # Exactly one step-16 entry, mapped to the root anchor file, status ok.
+        assert [d.step_id for d in s16] == ["16_impl_context"]
+        only = s16[0]
+        assert only.status == "ok", (
+            f"expected ok, got {only.status} with diffs "
+            f"{[(f.path, f.diff_type.value) for f in (only.field_diffs or [])]}"
+        )
+        assert only.target_file is not None and only.target_file.name == "16_anchor.schema.json"
+        # No spurious 16_anchor MISSING.
+        assert not any(d.step_id == "16_anchor" for d in diff.steps)
+        # Step 16 itself contributes nothing to migration pressure (other steps
+        # are absent in this minimal fixture and legitimately report missing —
+        # we scope the assertion to step 16, the surface under test).
+        assert only.status not in ("missing", "needs_update", "needs_rename")
+        assert not (only.field_diffs or [])
+
+    def test_wrong_schema_ref_still_flags(self, tmp_path):
+        """Anchor file carrying vc:16-impl-context (the per-milestone schema)
+        must still flag SCHEMA_REF_OUTDATED expecting vc:16-anchor."""
+        spec = tmp_path / "spec"
+        spec.mkdir()
+        _write_good_step16_layout(spec)
+        # Corrupt the $schema on the root anchor to the wrong (per-milestone) URI.
+        (spec / "16_impl_context.json").write_text(json.dumps({
+            "$schema": "vc:16-impl-context",
+            "id": "anchor-v1",
+            "owner": "api",
+            "created_at": "2026-02-08T00:00:00Z",
+            "artifact_role": "anchor",
+            "plan": {},
+        }), encoding="utf-8")
+        diff = diff_spec_directory(spec, _TOOLKIT_ROOT)
+        s16 = [d for d in self._step16(diff) if d.step_id == "16_impl_context"][0]
+        assert s16.status == "needs_update"
+        schema_diffs = [f for f in (s16.field_diffs or []) if f.path == "$schema"]
+        assert schema_diffs, "expected a $schema field diff"
+        assert schema_diffs[0].expected == "vc:16-anchor"
+
+    def test_missing_root_anchor_still_flags(self, tmp_path):
+        """No root 16_impl_context.json → step missing (not silently ok)."""
+        spec = tmp_path / "spec"
+        spec.mkdir()
+        (spec / "impl_context").mkdir()
+        # Only a per-milestone plan exists; no root anchor.
+        (spec / "impl_context" / "ms_batch1_plan.json").write_text(json.dumps({
+            "$schema": "vc:16-impl-context", "plan": {},
+        }), encoding="utf-8")
+        diff = diff_spec_directory(spec, _TOOLKIT_ROOT)
+        s16 = [d for d in self._step16(diff) if d.step_id == "16_impl_context"][0]
+        assert s16.status == "missing"
+        # Still no stray 16_anchor entry.
+        assert not any(d.step_id == "16_anchor" for d in diff.steps)

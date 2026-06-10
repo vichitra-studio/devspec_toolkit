@@ -225,8 +225,47 @@ def inventory_toolkit_schemas(schema_dir: Path) -> Dict[str, Path]:
             if match:
                 step_id = match.group(1)
                 schemas[step_id] = f
-    
+
     return schemas
+
+
+def apply_step16_anchor_mapping(toolkit_schemas: Dict[str, Path]) -> Dict[str, Path]:
+    """Remap the step-16 inventory so the root file maps to the anchor schema.
+
+    The toolkit ships two step-16 schemas that are NOT both root spec files:
+
+    - ``16_anchor.schema.json`` (``vc:16-anchor``) validates the *root* Trinity
+      Anchor file ``spec/16_impl_context.json``.
+    - ``16_impl_context.schema.json`` (``vc:16-impl-context``) validates the
+      *per-milestone* plans under ``spec/impl_context/ms_*_plan.json`` — these
+      are never root spec files and must not be inventoried as one.
+
+    Source of truth: ``prompts/prompt_16_impl_context.md`` L8 ("the Trinity
+    Anchor file is ``spec/16_impl_context.json``, validated against
+    ``vc:16-anchor``") and L73 ("NEVER place 16_impl_context.json inside
+    spec/impl_context/. The anchor lives at spec/16_impl_context.json").
+
+    Filename-stem inventory mis-derives this: it expects a root
+    ``16_impl_context.json`` of schema ``vc:16-impl-context`` (wrong $schema) and
+    a root ``16_anchor.json`` (which never exists → spurious MISSING). This
+    transform encodes the prompt contract: the root step ``16_impl_context``
+    is validated by ``16_anchor.schema.json``, and ``16_anchor`` is dropped as a
+    root step. The per-milestone ``16_impl_context.schema.json`` has no root file
+    and is intentionally not represented as a root step here.
+
+    Returns a new dict; does not mutate the input. No-op when the step-16
+    schemas are absent (keeps older/partial toolkit checkouts working).
+    """
+    remapped = dict(toolkit_schemas)
+    anchor_schema = remapped.get("16_anchor")
+    if anchor_schema is None:
+        # No anchor schema present (older toolkit) — nothing to remap.
+        return remapped
+    # Root step 16_impl_context.json is validated by the ANCHOR schema.
+    remapped["16_impl_context"] = anchor_schema
+    # 16_anchor is not a root spec file — drop it so it is not flagged MISSING.
+    del remapped["16_anchor"]
+    return remapped
 
 
 def get_user_version(spec_dir: Path) -> Optional[str]:
@@ -567,7 +606,12 @@ def diff_spec_directory(
     # Inventory steps
     user_steps = inventory_user_steps(spec_dir)
     toolkit_schemas = inventory_toolkit_schemas(schema_dir)
-    
+    # Step 16 has two schemas but only one root spec file (the anchor lives at
+    # spec/16_impl_context.json validated against vc:16-anchor; per-milestone
+    # plans live under spec/impl_context/ and are not root steps). Remap so the
+    # root file diffs against the anchor schema. See apply_step16_anchor_mapping.
+    toolkit_schemas = apply_step16_anchor_mapping(toolkit_schemas)
+
     # Compare step inventories (Pass ALL changes for robust rename detection)
     step_diffs = compare_step_inventories(user_steps, toolkit_schemas, all_changes)
     
