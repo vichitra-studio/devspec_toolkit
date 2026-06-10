@@ -213,7 +213,8 @@ class TestR9PromotionSelectiveCodes(unittest.TestCase):
         self.assertIn("E593", codes)
 
     def test_invalid_code_is_ignored(self):
-        """An unrecognized code in SPECDEV_PROMOTE_CODES is silently ignored."""
+        """An unrecognized code in SPECDEV_PROMOTE_CODES does not affect returned
+        errors (it emits a stderr diagnostic but is not promoted)."""
         failures = [
             make_error("W571", "ASSUMPTION_VAGUE_QUANTIFIER spec/04.json ref=some"),
         ]
@@ -367,8 +368,8 @@ class TestR9PromotablePairsIntegrity(unittest.TestCase):
     """Sanity checks on the PROMOTABLE_PAIRS data structure."""
 
     def test_promotable_pairs_count(self):
-        """PROMOTABLE_PAIRS has the expected entries (W561 excluded to prevent double-promotion with W566)."""
-        self.assertEqual(len(PROMOTABLE_PAIRS), 26)
+        """PROMOTABLE_PAIRS has the expected entries (W561 excluded to prevent double-promotion with W566; W590 and W597 excluded — no semantically-correct E-counterpart)."""
+        self.assertEqual(len(PROMOTABLE_PAIRS), 25)
 
     def test_all_w_codes_map_to_e_codes(self):
         """Every key is a W-code and every value is the corresponding E-code."""
@@ -446,8 +447,15 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
             validate_dir(str(self.root), str(self.root / "spec"))
         mock_intent.assert_not_called()
 
-    def test_extraction_intent_errors_promotable(self):
-        """W597 from extraction_intent_check is promoted with SPECDEV_WARNINGS_AS_ERRORS=1."""
+    def test_extraction_intent_vague_not_promoted(self):
+        """W597 (EXTRACTION_INTENT_VAGUE) is NOT promoted under SPECDEV_WARNINGS_AS_ERRORS=1.
+
+        W597 has no semantically-correct E-counterpart: E597 means
+        EXTRACTION_INTENT_UPSTREAM_GAP (a required upstream artifact has no
+        intent entry at all), which is a different defect from vague text in a
+        present entry. W597 is excluded from PROMOTABLE_PAIRS and stays a
+        warning even when all warnings are promoted to errors.
+        """
         intent_errors = [
             make_error("W597", "EXTRACTION_INTENT_VAGUE step=06 text='relevant stuff'"),
         ]
@@ -462,8 +470,8 @@ class TestR9ExtractionIntentPipelineIntegration(unittest.TestCase):
                  patch("specdev_tools.validation.validate.check_extraction_intent", return_value=intent_errors):
             result = validate_dir(str(self.root), str(self.root / "spec"))
         codes = [err.code for err in result]
-        self.assertIn("E597", codes)
-        self.assertNotIn("W597", codes)
+        self.assertIn("W597", codes)
+        self.assertNotIn("E597", codes)
 
 
 if __name__ == "__main__":

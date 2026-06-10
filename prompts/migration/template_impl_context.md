@@ -58,8 +58,7 @@ Applying the split to an existing host repo:
 5. **Validate**:
 
    ```bash
-   ./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
-   ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit
+   ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
 
    `spec-check` surfaces any new E308 (scope/FR-ownership conflict), E309 (checklist ID drift), W587 (stale drift checks), W588 (unreadable milestone), and W589 (mis-schemaed milestone) signals introduced by the split.

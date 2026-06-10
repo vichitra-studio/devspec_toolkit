@@ -447,7 +447,7 @@ the filesystem under `.specdev/findings/` (same discipline as `specdev-trinity-i
 - Does not use `reactivation_condition` or `impact_routes[]` fields on emergent ambiguities —
   these are proposed Day-3 schema extensions to `crossCycleAmbiguityItem` (K2 §11.1.2, §13).
   Current emergent ambiguities use only the live shape: required `{id, description, severity}`,
-  optional `{decision, resolved, status, status_ref, impact[]}` with `impact[]` as plain strings.
+  optional `{decision, resolved, status, impact[]}` with `impact[]` as plain strings.
 - Does not commit changes.
 - Does not call WebFetch. Citation issues that cannot be verified via filesystem reads are
   flagged as `drift` findings for a follower agent to verify.

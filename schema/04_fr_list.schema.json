@@ -99,13 +99,6 @@
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "entity" } } }
                 ]
-              },
-              "status_ref": {
-                "description": "Canonical reference to the lifecycle status value this requirement transitions or checks. Kind is structurally pinned to 'status'. Example: {\"id\": \"cn:core:status:active\", \"kind\": \"status\"}. Include when the FR operates on an entity with a lifecycle status. Omit for FRs that apply regardless of entity status.",
-                "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "status" } } }
-                ]
               }
             },
             "required": [

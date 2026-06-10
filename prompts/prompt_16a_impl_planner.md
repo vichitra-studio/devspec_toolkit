@@ -146,7 +146,7 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
     *   `id`: Uppercase snake-case ID (stable). **MUST be prefixed with `milestone_index[<this milestone>].checklist_id_prefix` from the Trinity Anchor** (`spec/16_impl_context.json`). The `checklist_id_prefix` pattern and constraints are enforced by `schema/16_anchor.schema.json`. If the anchor has no entry for this milestone yet, STOP and add one before authoring the checklist.
     *   `spec_ref`: **Structured Object**. `{ type, id, line_range, commit_hash }`.
         *   *Rule*: `commit_hash` is MANDATORY. Do not use placeholders.
-        *   *Rule*: `type` must be a value from `$defs.specRef.type` enum in `schema/16_impl_context.schema.json` (the schema is the authority). For roadmap coverage checklist items (where `spec_ref.id` equals a `task-*` task_id from Step 14), `type` MUST be `"task"` — do NOT mislabel as `"fr"`. Use `"fr" | "api" | "nfr" | "inv" | "fixture"` only when `id` matches the corresponding kebab-case ID in the relevant spec artifact.
+        *   *Rule*: `type` must be a value from the `$defs.specRef.type` enum in `schema/16_impl_context.schema.json` — the schema is the authority for the allowed values; read it for the current set. Decision rules for choosing among them: use `"task"` when `id` equals a `task-*` task_id from Step 14 (roadmap coverage items) — do NOT mislabel as `"fr"`; use `"doc"` when pointing to a specification document, schema, or guide (e.g., a `vc:` schema URI); use `"code"` when pointing to a specific function, class, or code block in an implementation file; use a spec-artifact type (`"fr"`, `"api"`, `"nfr"`, `"inv"`, `"fixture"`) only when `id` matches the corresponding kebab-case ID in that artifact.
     *   `description`: **Verbose, Atomic, and Self-Explanatory**.
         *   *Rule*: Use "Subject-Action-Constraint" format.
         *   *Rule*: **NO ONE-LINERS**. Explain the "Why" and the "How" if it adds clarity.
@@ -170,9 +170,9 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
 
 Field shape (ids, required-status, enum members) is in `schema/16_impl_context.schema.json` under `plan.ambiguities[]`. Decision rules below — these are not enforceable by JSON Schema.
 
-*   List ANY ambiguity that would affect implementation. Populate `source` and `impact` when available — these are optional fields (the schema's `required` array for ambiguity items is `["id","description","severity"]`); capture them when they are known to improve fix-agent grounding.
+*   List ANY ambiguity that would affect implementation. Populate `source` and `impact` when available — they are optional fields (the required set for ambiguity items is owned by `plan.ambiguities[].items.required` in `schema/16_impl_context.schema.json`; consult the schema rather than relying on a restated list here); capture them when they are known to improve fix-agent grounding.
 *   **Severity scoping**: this section's severity uses the planning-phase enum defined in `schema/16_impl_context.schema.json` under `plan.ambiguities[].severity`. It is distinct from the anchor's `ambiguities` severity (`severityLevel`) and from `emergent_ambiguities` severity. Do not mix them.
-*   **Status enum**: values come from the canonical `vc:core:atoms#ambiguityStatus` atom — read the atom for the current set; if it drifts, trust the atom over this prompt. Pair with the registry-backed status reference for tracking.
+*   **Status enum**: values come from the canonical `vc:core:atoms#ambiguityStatus` atom — read the atom for the current set; if it drifts, trust the atom over this prompt. The status string is the single source of truth; no separate canonical reference is needed.
 *   *Rule*: a blocking ambiguity does not stop planning — flag it and plan the rest of the step.
 *   *Rule*: a non-blocking ambiguity requires a concrete mitigation describing how the coder works around it. A proposed assumption is optional context for the mitigation, not a substitute for it.
 
@@ -233,7 +233,44 @@ Field shape (ids, required-status, enum members) is in `schema/16_impl_context.s
     *   *Rule*: Every doc path must appear in `plan.summary.target_file_patterns`.
     *   *Rule*: If new directories are introduced or renamed, include `spec/common/seed_manifest.json` in `plan.summary.target_file_patterns`.
 
-## 12. Advanced Schema Fields
+## 12. `plan.docs` (Documentation Plan)
+
+The `plan.docs` field is distinct from `plan.docs_impact` — it carries a **structured documentation update plan** rather than an impact assessment.
+
+**Shape** (from `schema/16_impl_context.schema.json`): `plan.docs` is a `oneOf` between two variants:
+
+- **Not-applicable variant**: `{ "status": "not_applicable", "reason": "<string>" }` — use when this milestone introduces no documentation deliverables (e.g., an internal refactor with no external interface change, a test-only change).
+- **Planned variant**: `{ "status": "planned", "required_updates": [ { "path": "<doc-file-path>", "update_summary": "<what changes>" } ] }` — use when this milestone produces user-facing or spec-level documentation.
+
+**When to populate**:
+- Set `status: "planned"` and list `required_updates` whenever the milestone changes user-visible behavior, adds or modifies a public API, introduces a new spec artifact, or updates tooling that developers consume directly.
+- Set `status: "not_applicable"` with a concrete `reason` only for test-only changes, internal refactors with no external interface change, or documentation-only updates that are themselves the deliverable.
+- When in doubt, prefer `"planned"` — it is safer to over-declare than to miss a documentation gap.
+
+**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level. `plan.docs` is the *actionable update plan* consumed by the coding agent. Both may be present; they are not redundant — `docs_impact` gates governance approval, `docs` drives the coder's file list.
+
+**Example (planned)**:
+```json
+"docs": {
+  "status": "planned",
+  "required_updates": [
+    {
+      "path": "docs/api/authentication.md",
+      "update_summary": "Add POST /auth/token endpoint, document JWT claims structure and 24-hour TTL."
+    }
+  ]
+}
+```
+
+**Example (not applicable)**:
+```json
+"docs": {
+  "status": "not_applicable",
+  "reason": "Internal refactor of session cache key format — no external interface or API surface changes."
+}
+```
+
+## 13. Advanced Schema Fields
 Use these fields to capture high-fidelity context that doesn't fit into standard columns.
 *   **`extensions`**: Structured extensions for additional context that does not fit in the core schema.
 *   **`coding_examples`**: Structured multi-file snippets.

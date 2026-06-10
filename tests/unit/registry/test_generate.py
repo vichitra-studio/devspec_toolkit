@@ -500,3 +500,69 @@ class TestRequiredFlagEnforcement:
         assert "repo-root" in result.stderr or "repo_root" in result.stderr, (
             f"Expected stderr to mention '--repo-root' missing, got: {result.stderr!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Test 13: _schema_file_for_step — fail-loud hardening
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaFileForStepHardening:
+    """_schema_file_for_step fail-loud hardening: ValueError on unhandled ambiguity.
+
+    These tests verify the three behaviour invariants introduced by the
+    fail-loud / order-independent refactor:
+
+    1. Step 16 returns the impl_context schema (not anchor) — same result as
+       before, now proven independent of SCHEMA_SKIP rather than dict order.
+    2. Any step with exactly 0 or 1 schema after the skip-filter passes through
+       unchanged (no regression for current steps).
+    3. A synthetic directory with two non-skipped same-step schemas triggers
+       the new ValueError, naming the step and the remaining files.
+    """
+
+    def test_step_16_returns_impl_context_schema(self) -> None:
+        """_schema_file_for_step('16', schema_dir) returns 16_impl_context.schema.json.
+
+        16_anchor.schema.json is in SCHEMA_SKIP, so exactly 1 file remains.
+        This is the primary correctness invariant.
+        """
+        from specdev_tools.registry.generate import _schema_file_for_step
+
+        schema_dir = str(_TOOLKIT_ROOT / "schema")
+        result = _schema_file_for_step("16", schema_dir)
+        assert result is not None, "_schema_file_for_step('16', ...) returned None"
+        assert result.endswith("16_impl_context.schema.json"), (
+            f"Expected 16_impl_context.schema.json, got {result!r}"
+        )
+
+    def test_single_match_returned_directly(self) -> None:
+        """Steps with exactly one schema file after SCHEMA_SKIP return that file."""
+        from specdev_tools.registry.generate import _schema_file_for_step
+
+        schema_dir = str(_TOOLKIT_ROOT / "schema")
+        # Step 04 has exactly one schema file; no skip-filter entry.
+        result = _schema_file_for_step("04", schema_dir)
+        assert result is not None
+        assert "04_" in result
+
+    def test_ambiguity_raises_value_error(self, tmp_path: Path) -> None:
+        """Two non-skipped same-step schemas → ValueError naming step + files + fix hint.
+
+        Constructs a synthetic schema dir with two files matching step '99'
+        that are NOT in SCHEMA_SKIP, then asserts the new raise fires.
+        """
+        from specdev_tools.registry.generate import _schema_file_for_step
+
+        # Create two fake step-99 schema files in a temp dir
+        (tmp_path / "99_alpha.schema.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "99_beta.schema.json").write_text("{}", encoding="utf-8")
+
+        with pytest.raises(ValueError) as exc_info:
+            _schema_file_for_step("99", str(tmp_path))
+
+        msg = str(exc_info.value)
+        assert "99" in msg, f"ValueError should name the step; got: {msg!r}"
+        assert "99_alpha.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
+        assert "99_beta.schema.json" in msg, f"ValueError should list file; got: {msg!r}"
+        assert "SCHEMA_SKIP" in msg, f"ValueError should mention SCHEMA_SKIP; got: {msg!r}"

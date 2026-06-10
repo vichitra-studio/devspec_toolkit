@@ -34,12 +34,11 @@ The migrated artifact MUST include:
 ## Optional Fields
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `tech_stack_ref`: Canonical reference (kind: `capability`) for the technology stack entry.
+- `tech_stack_ref`: Canonical reference (kind: `tech_stack`) for the technology stack entry.
 - `milestones[].target_date`: ISO 8601 date string (YYYY-MM-DD).
 - `milestones[].risks`: Array of risk strings describing threats to the milestone.
 - `milestones[].spikes`: Array of strings describing time-boxed investigations.
 - `milestones[].depends_on`: Array of `milestone_id` strings (no cycles).
-- `milestones[].status_ref`: Canonical reference (kind: `stage`) for the milestone status.
 - `migration_plan`: String describing the migration strategy (required only when replacing existing systems).
 - `dependencies`: Mixed array of dependency strings or objects describing cross-team dependencies.
 - `dependency_ref`: Canonical reference (kind: `dependency`) for a registered external dependency.
@@ -50,7 +49,7 @@ The migrated artifact MUST include:
 After migration, run:
 
 ```bash
-./tools/run_specdev.sh validate spec/09_impl_plan.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ## Context

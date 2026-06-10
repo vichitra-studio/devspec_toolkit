@@ -161,33 +161,26 @@ class TestContextCanon:
             f"Expected ['capability'], got {data['canon_kinds_required']}"
         )
 
-    def test_status_kind_has_canonical_entries(self):
-        """The 'status' kind must be present with at least one cn:core:status: entry."""
-        proc = _run(
-            "context", "canon",
-            "--step", "04",
-            "--repo-root", str(REPO_ROOT),
-        )
-        data = _parse_json(proc)
-        assert "status" in data["canon_kinds"], (
-            f"'status' not found in canon_kinds. Keys: {list(data['canon_kinds'].keys())}"
-        )
-        status_entries = data["canon_kinds"]["status"]
-        assert any(
-            e.get("id", "").startswith("cn:core:status:")
-            for e in status_entries
-        ), f"No cn:core:status: entry found. entries={status_entries[:3]}"
+    # test_status_kind_has_canonical_entries deleted (DEVSPEC-38): the status
+    # canon kind is no longer schema-reachable from step 04 after status_ref
+    # removal; the guarded behaviour is intentionally gone (D6).
 
     def test_total_entries_nonzero(self):
-        """At least some canon entries must be loaded for step 04."""
+        """At least some canon entries must be loaded for a well-populated step.
+
+        Step 07 (NFRs) pulls metric, unit, stage, and environment kinds from
+        the toolkit canon — 13 entries in total.  Repointed from step 04 by
+        DEVSPEC-38: step 04 now maps only to action/capability/entity, all of
+        which have 0 toolkit-tier entries, so the count was vacuously 0.
+        """
         proc = _run(
             "context", "canon",
-            "--step", "04",
+            "--step", "07",
             "--repo-root", str(REPO_ROOT),
         )
         data = _parse_json(proc)
         assert data["total_entries"] >= 1, (
-            f"Expected at least 1 total_entries, got {data['total_entries']}"
+            f"Expected at least 1 total_entries for step 07, got {data['total_entries']}"
         )
 
 

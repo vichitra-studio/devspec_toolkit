@@ -104,10 +104,13 @@ class TestValidateFilePromotion:
         monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
         reset_config()
         try:
-            failures = [make_error("W590", "CROSS_STEP_UPSTREAM_MISSING some message")]
+            # W550 is a stable promotable pair (W550 -> E550). W590 is NOT used
+            # here: it was deliberately removed from PROMOTABLE_PAIRS because
+            # CROSS_STEP_UPSTREAM_MISSING has no semantically-correct E-counterpart.
+            failures = [make_error("W550", "SEMANTIC_COVERAGE_SKIP some message")]
             result = _apply_we_promotion(failures)
-            assert any(e.code == "E590" for e in result)
-            assert not any(e.code == "W590" for e in result)
+            assert any(e.code == "E550" for e in result)
+            assert not any(e.code == "W550" for e in result)
         finally:
             monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
             reset_config()
@@ -147,6 +150,91 @@ class TestValidateFilePromotion:
             assert result[0].code == "W590"
             assert result[0].message == "CROSS_STEP_UPSTREAM_MISSING message"
         finally:
+            reset_config()
+
+    def test_warn_ignored_promote_codes_non_promotable(self, monkeypatch, capsys):
+        """A valid-but-non-promotable code in SPECDEV_PROMOTE_CODES warns to stderr."""
+        from specdev_tools.core.config import reset_config
+        from specdev_tools.validation.validate import _warn_ignored_promote_codes
+
+        # W590 is a valid warning code that is intentionally non-promotable.
+        monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W590")
+        monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
+        reset_config()
+        try:
+            _warn_ignored_promote_codes()
+            err = capsys.readouterr().err
+            assert "W590" in err
+            assert "not a promotable code" in err
+        finally:
+            monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
+            reset_config()
+
+    def test_warn_ignored_promote_codes_unrecognised(self, monkeypatch, capsys):
+        """An unrecognised code in SPECDEV_PROMOTE_CODES warns to stderr."""
+        from specdev_tools.core.config import reset_config
+        from specdev_tools.validation.validate import _warn_ignored_promote_codes
+
+        monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "WXXX")
+        monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
+        reset_config()
+        try:
+            _warn_ignored_promote_codes()
+            err = capsys.readouterr().err
+            assert "WXXX" in err
+            assert "unrecognised" in err
+        finally:
+            monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
+            reset_config()
+
+    def test_warn_ignored_promote_codes_silent_when_promotable(self, monkeypatch, capsys):
+        """A promotable code in SPECDEV_PROMOTE_CODES produces no warning."""
+        from specdev_tools.core.config import reset_config
+        from specdev_tools.validation.validate import _warn_ignored_promote_codes
+
+        monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W571")
+        monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
+        reset_config()
+        try:
+            _warn_ignored_promote_codes()
+            assert capsys.readouterr().err == ""
+        finally:
+            monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
+            reset_config()
+
+    def test_warn_ignored_promote_codes_silent_when_warnings_as_errors(self, monkeypatch, capsys):
+        """When SPECDEV_WARNINGS_AS_ERRORS=1, promote_codes is ignored wholesale,
+        so a per-code 'ignored' warning would mislead and must be suppressed."""
+        from specdev_tools.core.config import reset_config
+        from specdev_tools.validation.validate import _warn_ignored_promote_codes
+
+        monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W590")
+        monkeypatch.setenv("SPECDEV_WARNINGS_AS_ERRORS", "1")
+        reset_config()
+        try:
+            _warn_ignored_promote_codes()
+            assert capsys.readouterr().err == ""
+        finally:
+            monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
+            monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
+            reset_config()
+
+    def test_warn_ignored_promote_codes_mixed_list(self, monkeypatch, capsys):
+        """With a mixed list, only the non-promotable code warns; the promotable
+        one is silent."""
+        from specdev_tools.core.config import reset_config
+        from specdev_tools.validation.validate import _warn_ignored_promote_codes
+
+        monkeypatch.setenv("SPECDEV_PROMOTE_CODES", "W571,W590")
+        monkeypatch.delenv("SPECDEV_WARNINGS_AS_ERRORS", raising=False)
+        reset_config()
+        try:
+            _warn_ignored_promote_codes()
+            err = capsys.readouterr().err
+            assert "W590" in err
+            assert "W571" not in err
+        finally:
+            monkeypatch.delenv("SPECDEV_PROMOTE_CODES", raising=False)
             reset_config()
 
     def test_promotable_pairs_consistency(self):

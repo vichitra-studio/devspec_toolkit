@@ -503,10 +503,9 @@ class CliTests(unittest.TestCase):
                 {"id": "cn:core:stage:prod", "kind": "stage"},
                 payload.get("stage_ref"),
             )
-            self.assertEqual(
-                {"id": "cn:core:status:active", "kind": "status"},
-                payload.get("status_ref"),
-            )
+            # status_ref inference removed (DEVSPEC-38): status is a plain
+            # string enum; the autofix no longer infers status_ref.
+            self.assertIsNone(payload.get("status_ref"))
             self.assertEqual(
                 {"id": "cn:core:role:reviewer", "kind": "role"},
                 payload.get("role_ref"),
@@ -1283,6 +1282,96 @@ class CliTests(unittest.TestCase):
             self.assertEqual("", out.strip())
             self.assertIn("missing introduced_at", err)
 
+    def test_update_command_dispatch(self):
+        """`update` dispatch invokes run_update and exits with its code (plain mode)."""
+        from specdev_tools.update import UpdateResult
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            fake = UpdateResult(
+                exit_code=0, status="updated",
+                from_version="0.9.0", to_version="1.0.0",
+                message="spec/specdev_version updated: v0.9.0 → v1.0.0",
+            )
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                code, out, err = self._run_cli(["update", str(spec_dir), "--repo-root", str(repo_root)])
+            self.assertEqual(0, code, msg=err)
+            self.assertIn("updated", out)
+            self.assertEqual(1, p_update.call_count)
+            _, kwargs = p_update.call_args
+            self.assertIs(False, kwargs.get("dry_run"))
+
+    def test_update_command_json_dry_run_dispatch(self):
+        """`update --json --dry-run` emits update_status and forwards dry_run=True."""
+        from specdev_tools.update import UpdateResult
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            fake = UpdateResult(
+                exit_code=0, status="would_update",
+                from_version="0.9.0", to_version="1.0.0",
+                message="[dry-run] Would update spec/specdev_version", dry_run=True,
+            )
+            with patch("specdev_tools.update.run_update", return_value=fake) as p_update:
+                code, out, err = self._run_cli(
+                    ["update", str(spec_dir), "--repo-root", str(repo_root), "--dry-run", "--json"]
+                )
+            self.assertEqual(0, code, msg=err)
+            payload = json.loads(out)
+            self.assertEqual("would_update", payload["update_status"])
+            self.assertTrue(payload["dry_run"])
+            _, kwargs = p_update.call_args
+            self.assertTrue(kwargs.get("dry_run"))
+
+    def test_update_command_missing_spec_dir_errors(self):
+        """`update` on a non-existent spec dir errors out before calling run_update."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            missing = repo_root / "nope"
+            with patch("specdev_tools.update.run_update") as p_update:
+                code, out, err = self._run_cli(["update", str(missing), "--repo-root", str(repo_root)])
+            self.assertEqual(1, code)
+            self.assertIn("not found", err)
+            p_update.assert_not_called()
+
+    def test_milestone_state_command_dispatch(self):
+        """`milestone-state` dispatch loads the plan and emits compute_milestone_state JSON."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_root = repo_root / "spec"
+            (spec_root / "impl_context").mkdir(parents=True)
+            (spec_root / "impl_context" / "ms_demo_plan.json").write_text(
+                json.dumps({"groups": []}), encoding="utf-8"
+            )
+            fake_state = {"batch_id": "demo", "derived_phase_position": "pending"}
+            with patch(
+                "specdev_tools.context.milestone_state.compute_milestone_state",
+                return_value=fake_state,
+            ) as p_ms:
+                code, out, err = self._run_cli(
+                    ["milestone-state", "--batch-id", "demo",
+                     "--repo-root", str(repo_root), "--spec-root", str(spec_root)]
+                )
+            self.assertEqual(0, code, msg=err)
+            payload = json.loads(out)
+            self.assertEqual("pending", payload["derived_phase_position"])
+            self.assertEqual(1, p_ms.call_count)
+
+    def test_milestone_state_missing_plan_file_errors(self):
+        """`milestone-state` with no plan file exits 1 with an E520 missing_plan_file."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_root = repo_root / "spec"
+            spec_root.mkdir()
+            code, out, err = self._run_cli(
+                ["milestone-state", "--batch-id", "absent",
+                 "--repo-root", str(repo_root), "--spec-root", str(spec_root)]
+            )
+            self.assertEqual(1, code)
+            self.assertIn("missing_plan_file", err)
+
     def test_new_b3_command_dispatch_paths(self):
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
@@ -1800,9 +1889,7 @@ class CliTests(unittest.TestCase):
                     stderr = io.StringIO()
                     with redirect_stdout(stdout), redirect_stderr(stderr):
                         try:
-                            from importlib import reload
-                            import specdev_tools.core.config as _cfg
-                            reload(_cfg)
+                            reset_config()
                             cli.main()
                             code = 0
                         except SystemExit as exc:
@@ -1835,9 +1922,7 @@ class CliTests(unittest.TestCase):
                     stderr = io.StringIO()
                     with redirect_stdout(stdout), redirect_stderr(stderr):
                         try:
-                            from importlib import reload
-                            import specdev_tools.core.config as _cfg
-                            reload(_cfg)
+                            reset_config()
                             cli.main()
                             code = 0
                         except SystemExit as exc:

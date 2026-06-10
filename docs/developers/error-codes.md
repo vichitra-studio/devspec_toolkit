@@ -113,11 +113,15 @@
 
 **Promotable**: W568 → E568.
 
-### E582 MILESTONE_REF_MISMATCH
+### E582 / W582 UNCOVERED_FR_REVIEW_COVERAGE
 
-**Trigger**: A checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in step 14.
+**Trigger** (E582): Fired in step 16 under two conditions: (1) a checklist item's `milestone_ref` names a milestone that does not exist in the step 14 roadmap; or (2) a non-deferred checklist item's `milestone_ref` does not match the milestone that owns its `spec_ref.id` task in the step 14 roadmap.
 
-**Resolution**: Update the checklist item's `milestone_ref` to match the milestone containing the referenced roadmap task.
+**Trigger** (W582): Fired in step 16c when a review artifact with `verdict: verified` has FRs declared in the corresponding step 14 roadmap milestone(s) that are not present in `semantic_review.fr_coverage`. If no milestone is scoped, the check runs against all milestones in the roadmap.
+
+**Resolution**: For E582 — correct the checklist item's `milestone_ref` to match an existing step 14 milestone that owns the referenced task. For W582 — add the missing FR IDs to `semantic_review.fr_coverage` in the step 16c artifact, or verify that the FR is intentionally excluded.
+
+**Promotable**: W582 → E582.
 
 ### E150 / W150 SEED_MANIFEST_NOT_PROVIDED
 
@@ -162,6 +166,30 @@
 **Resolution**: Add a `milestone_ref` field to the checklist item with the `milestone_id` from step 14 that owns the referenced task.
 
 **Promotable**: W581 → E581.
+
+### W583 API_UNCOVERED_BY_THREAT
+
+**Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and a public API ID is not named by the `target_ids` (entries with `type: api`) of any threat in the artifact. Each public API should be targeted by at least one threat. The check only runs when Step 05 is present (`api_ids` is not None).
+
+**Resolution**: Add a threat in Step 11 whose `target_ids` includes the uncovered API (`{"type": "api", "id": "<api-id>"}`), or confirm the API is intentionally outside threat scope.
+
+**Warning-only and non-promotable**: W583 has no E-counterpart and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
+
+### E604 / W604 TRACE_MATRIX_STALE
+
+**Trigger** (W604): Fired by the Step 14 validator when `extras/trace_matrix.json` is missing, or when its modification time is older than `14_roadmap.json` — an mtime-based freshness heuristic indicating the trace matrix may not reflect the current roadmap. Only W604 is emitted; E604 is registered as the nominal error form but is not currently produced by any code path.
+
+**Resolution**: Regenerate `extras/trace_matrix.json` so it post-dates `14_roadmap.json`, or confirm the staleness is benign (e.g. a checkout reordered file modification times).
+
+**Warning-only and non-promotable**: W604 is excluded from `PROMOTABLE_PAIRS` because matrix staleness is advisory rather than a hard correctness failure; `SPECDEV_WARNINGS_AS_ERRORS` and `SPECDEV_PROMOTE_CODES` therefore do not escalate it. E604 exists in the registry as the same-named error form but is not wired to promotion.
+
+### E210 CROSS_ARTIFACT_DRIFT
+
+**Trigger**: Fired by the canonical-integrity check when an artifact's `canonical_refs_used[]` array drifts from the canonical references actually present in the document body. Three subcodes: `canonical_refs_used_missing` (a canonical ID is referenced in the body but absent from `canonical_refs_used[]`), `canonical_refs_used_extra` (an ID is listed in `canonical_refs_used[]` but not used in the body), and `unresolved_canonical_semantic` (a semantic field carries a value with no resolved canonical ref).
+
+**Resolution**: For the `canonical_refs_used_*` subcodes, run `./tools/run_specdev.sh canonical-autofix <file> --write` to sync `canonical_refs_used[]` with the body. For `unresolved_canonical_semantic`, supply the missing canonical reference (declare it in `canonical_proposals` and run `canon-accept`, or correct the semantic value).
+
+**Promotable**: No — error-only; there is no `W210` counterpart.
 
 ---
 
@@ -229,7 +257,7 @@
 
 **Resolution (W590)**: Generate the missing upstream artifact first, then re-validate.
 
-**Promotable**: W590 → E590.
+**Promotable**: No. W590 (CROSS_STEP_UPSTREAM_MISSING — upstream file absent) and E590 (CROSS_STEP_ID_NOT_FOUND — ID absent from a present file) describe different defects with different resolutions. Promoting W590 to E590 would mislabel a missing-file condition as a broken ID reference, so W590 stays a warning; a fatal "upstream missing" would require a dedicated E-code.
 
 ### E591 / W591 EXTRACTION_INTENT_EMPTY
 
@@ -297,7 +325,7 @@
 
 **Resolution (W597)**: Expand the vague intent text with specific field names and extraction purposes.
 
-**Promotable**: W597 → E597.
+**Promotable**: No. W597 (EXTRACTION_INTENT_VAGUE) and E597 (EXTRACTION_INTENT_UPSTREAM_GAP) have different semantics — vague text in a present entry vs. a missing entry for a required upstream artifact. W597 has no fatal counterpart and is not promoted; promoting it would mislabel a vague entry as an upstream gap.
 
 ### E598 EXTRACTION_INTENT_INVALID_REF
 
@@ -366,6 +394,16 @@
 **Resolution**: Run `specdev update <spec_dir>` to sync your project to the current toolkit version. When there are no schema changes, `update` re-stamps `spec/specdev_version` instantly. When schema changes are required, it directs you through the `specdev align` flow (`apply --auto`, optionally `prompts`, then `validate`), finalizing with `specdev align validate <spec_dir>` — which runs full post-migration validation and stamps the new version with a migration-history entry.
 
 **Promotable**: No (error only).
+
+### W615 / E615 INVARIANT_UNEXERCISED_BY_THREAT
+
+**Trigger**: A step-06 invariant has a non-empty `risk_category_ref` field (marking it as security-relevant) but no step-11 threat has a mitigation of type `inv` referencing its `inv_id`. This indicates that a security-relevant invariant is not exercised by any threat in the red-team assessment, creating a gap between invariant definitions and threat coverage.
+
+Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
+
+**Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
+
+**Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
 
 ## Exception Classes
 

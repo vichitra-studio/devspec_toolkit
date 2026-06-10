@@ -47,3 +47,6 @@ tools/trace_matrix.json
 
 # devspec_pr_audit — per-run reports (transient, not tracked)
 docs/audit/runs/
+
+# devspec — runtime scheduler lock (transient, not tracked)
+.claude/scheduled_tasks.lock

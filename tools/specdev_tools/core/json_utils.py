@@ -25,6 +25,17 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
 from specdev_tools.core import entry_key_registry as _ekreg
+from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+from specdev_tools.core.schema_validate import (
+    NoSchemaError,
+    SchemaBootstrapError,
+    SchemaDecodeError,
+    SchemaNotFoundError,
+    SchemaReferencingError,
+    SchemaRuntimeError,
+    SchemaValidationError,
+    validate_data_against_schema,
+)
 
 # Detects bare array iterators (e.g. .arr[], to_entries[]) that produce value streams.
 # Used to guard read-multi, whose {key: value} construct produces one output object per
@@ -357,103 +368,142 @@ def json_write_atomic(file_path: str, data_str: str) -> None:
         os.chmod(file_path, original_mode)
 
 
-def _find_schema_file(repo_root: str, step_id: str) -> Optional[str]:
-    """Return the schema file path for *step_id*, or None if not found.
+# --- WS1: Differential schema validation helpers ---
 
-    When multiple schema files share the same numeric prefix (e.g. step 16 has
-    both ``16_anchor.schema.json`` and ``16_impl_context.schema.json``), returns
-    the lexicographically first match — deterministic, not arbitrary.
+def _resolve_effective_toolkit_root(repo_root: Optional[str]) -> str:
+    """Resolve the effective toolkit root for schema validation.
+
+    If ``repo_root`` is falsy (None/empty) **or** ``repo_root/tools/schema_registry.json``
+    does not exist (e.g. the default ``--repo-root .`` pointing at a host wrapper dir
+    in a submodule deployment), fall back to the package-relative toolkit root derived
+    from ``json_utils.__file__``.  This is the same anchor that ``_find_schema_dir``
+    candidate #2 uses, guaranteeing bare agent invocations (no ``--repo-root``) always
+    resolve the schema registry correctly.
+
+    Guard: the falsy check is performed BEFORE ``os.path.join`` so that
+    ``repo_root=None`` never reaches ``os.path.join(None, ...)``.
     """
-    schema_dir = os.path.join(repo_root, "schema")
-    if not os.path.isdir(schema_dir):
-        return None
-    matches = sorted(glob_mod.glob(os.path.join(schema_dir, f"{step_id}_*.schema.json")))
-    return matches[0] if matches else None
+    if repo_root and os.path.isfile(os.path.join(repo_root, "tools", "schema_registry.json")):
+        return repo_root
+    # Package-relative fallback: tools/specdev_tools/core/ -> ../../.. -> toolkit root
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(this_dir, "..", "..", ".."))
 
 
-def validate_against_schema_field(value_str: str, step_field: str, repo_root: str) -> List[str]:
-    """Validate *value_str* (JSON) against the schema for ``<step>.<field>``.
+def _path_tuple_to_jq(path_tuple: tuple) -> str:
+    """Convert a jsonschema path tuple to a jq-style path string.
 
-    Uses the full ref-aware schema machinery (``_effective_schema`` + ``build_id_index``)
-    so that step-base inherited fields and ``$ref``-using field schemas both resolve
-    correctly.
+    Example: ('plan', 'spec_alignment', 'checklist', 1, 'status') → '.plan.spec_alignment.checklist[1].status'
+    """
+    parts = []
+    for segment in path_tuple:
+        if isinstance(segment, int):
+            parts.append(f"[{segment}]")
+        else:
+            parts.append(f".{segment}")
+    return "".join(parts) if parts else "."
+
+
+def _call_validate_or_raise(eff_root: str, doc: dict, file_path: str) -> list:
+    """Run validate_data_against_schema, mapping every schema-validation failure
+    to a fail-CLOSED JsonUtilsError (never crash, never silently return [])."""
+    try:
+        return validate_data_against_schema(eff_root, doc)
+    except NoSchemaError:
+        raise JsonUtilsError(
+            f"{file_path} declares no $schema; json patch validates writes against "
+            "the file's schema and cannot proceed without one. "
+            "If this is a spec artifact, restore its $schema."
+        )
+    except (SchemaNotFoundError, SchemaDecodeError, SchemaBootstrapError) as exc:
+        uri = getattr(exc, "uri", None) or getattr(exc, "original", exc)
+        raise JsonUtilsError(
+            f"Could not locate schema for {file_path} ($schema URI: {uri}); "
+            "refusing to write. Check --repo-root points to the toolkit root and "
+            "that the $schema URI is registered in tools/schema_registry.json."
+        )
+    except (SchemaReferencingError, SchemaRuntimeError) as exc:
+        raise JsonUtilsError(
+            f"Could not validate this write (schema resolution/runtime error: {exc.original}); "
+            "refusing to proceed."
+        )
+    except SchemaValidationError as exc:
+        raise JsonUtilsError(f"Schema validation failed: {exc}") from exc
+    except Exception as exc:  # defensive depth — fail closed
+        raise JsonUtilsError(
+            f"Unexpected error during schema validation: {type(exc).__name__}: {exc}; "
+            "refusing to proceed."
+        ) from exc
+
+
+def _ws1_differential_check(
+    file_path: str,
+    content: str,
+    new_content: str,
+    eff_root: str,
+) -> None:
+    """Run the WS1 differential validation algorithm.
+
+    Raises ``JsonUtilsError`` (fail-closed) if the edit introduces a new schema
+    violation, if the document lacks a ``$schema``, if ``$schema`` would change,
+    or if the schema cannot be located/loaded.  Also raises on any unexpected
+    exception (defensive depth).
+
+    Does NOT raise if the edit introduces no *new* violations — pre-existing errors
+    in ``original`` that survive unchanged are ignored (enables incremental repair).
 
     Parameters
     ----------
-    value_str:
-        JSON-encoded value to validate.
-    step_field:
-        Dotted-path like ``"04.functional_requirements"``.
-    repo_root:
-        Toolkit root that contains ``schema/``.
-
-    Returns
-    -------
-    List of error message strings. Empty list means valid.
+    file_path:
+        The target file path (used only in didactic messages).
+    content:
+        The original file content (JSON string).
+    new_content:
+        The post-edit document (JSON string).
+    eff_root:
+        Already-resolved toolkit root (from ``_resolve_effective_toolkit_root``).
     """
-    parts = step_field.split(".", 1)
-    if len(parts) != 2:
-        return [
-            f"Invalid --against-schema-field format '{step_field}': "
-            "expected '<step>.<field>' (e.g. '04.functional_requirements')"
-        ]
-    step_id, field_name = parts
-
-    # Three-part form <step>.<schema_suffix>.<field> is not yet implemented.
-    if "." in field_name:
-        return [
-            f"--against-schema-field: multi-schema step disambiguation is not yet implemented. "
-            f"Use the single-schema form '<step>.<field>' (e.g. '04.functional_requirements'). "
-            f"Step 16 disambiguation ('16.anchor.field' / '16.impl_context.field') is deferred."
-        ]
-
-    schema_file = _find_schema_file(repo_root, step_id)
-    if not schema_file:
-        return [f"Schema file not found for step '{step_id}' in {os.path.join(repo_root, 'schema/')}"]
-
     try:
-        with open(schema_file, "r", encoding="utf-8") as fh:
-            schema = json.load(fh)
-    except (OSError, json.JSONDecodeError) as exc:
-        return [f"Could not load schema {schema_file}: {exc}"]
-
-    # Build a ref-aware resolver using the same id-index machinery as json_schema_discovery.
-    schema_dir = _find_schema_dir(repo_root)
-    id_index: Dict[str, str] = build_id_index(schema_dir) if schema_dir else {}
-    ref_cache: Dict[str, dict] = {}
-
-    def _resolve_node(node: dict) -> dict:
-        if not isinstance(node, dict) or "$ref" not in node:
-            return node
-        ref = node["$ref"]
-        if ref.startswith("#/$defs/"):
-            def_name = ref.split("/")[-1]
-            resolved = schema.get("$defs", {}).get(def_name)
-            return resolved if resolved else node
-        resolved = resolve_ref(ref, id_index, ref_cache)
-        return resolved if resolved else node
-
-    # Resolve $ref + merge allOf at the root level to get the merged properties map.
-    effective_root = _effective_schema(schema, _resolve_node)
-    properties = effective_root.get("properties", {})
-
-    if field_name not in properties:
-        return [f"Field '{field_name}' not found in schema properties for step '{step_id}' ({schema_file})"]
-
-    # Resolve the field sub-schema (it may itself use $ref or allOf).
-    field_schema = _effective_schema(properties[field_name], _resolve_node)
-
-    try:
-        value = json.loads(value_str)
+        original = json.loads(content)
+        new = json.loads(new_content)
     except json.JSONDecodeError as exc:
-        return [f"Value is not valid JSON: {exc}"]
+        raise JsonUtilsError(f"Internal: could not parse document for validation: {exc}") from exc
 
-    try:
-        import jsonschema as _jsonschema
-        errors = list(_jsonschema.Draft202012Validator(field_schema).iter_errors(value))
-        return [f"{e.json_path}: {e.message}" if e.json_path else e.message for e in errors]
-    except Exception as exc:
-        return [f"Schema validation error: {exc}"]
+    # Step 1: Detect $schema change (content-based, robust to any jq form).
+    if new.get("$schema") != original.get("$schema"):
+        raise JsonUtilsError(
+            "Refusing to patch $schema: it determines how the document is validated."
+        )
+
+    # Step 2: Refuse if resulting doc has no $schema.
+    if not new.get("$schema"):
+        raise JsonUtilsError(
+            f"{file_path} declares no $schema; json patch validates writes against "
+            "the file's schema and cannot proceed without one. "
+            "If this is a spec artifact, restore its $schema."
+        )
+
+    # Step 3: Validate post-edit doc — wrapped per catch strategy (fail closed).
+    errors_after = _call_validate_or_raise(eff_root, new, file_path)
+
+    # Fast path: no errors after edit → write is safe.
+    if not errors_after:
+        return
+
+    # Step 4: Compute errors_before to distinguish pre-existing from newly introduced.
+    errors_before = _call_validate_or_raise(eff_root, original, file_path)
+
+    new_errors = set(errors_after) - set(errors_before)
+    if new_errors:
+        # Sort for deterministic output.
+        sorted_errors = sorted(new_errors, key=lambda x: (x[0], x[1]))
+        lines = [
+            f"  path {_path_tuple_to_jq(path)}: {msg}"
+            for path, msg in sorted_errors
+        ]
+        raise JsonUtilsError(
+            "Write refused: this edit introduces schema violation(s):\n" + "\n".join(lines)
+        )
 
 
 def json_patch(
@@ -462,11 +512,18 @@ def json_patch(
     value: str,
     is_json: bool = True,
     dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    validate: bool = True,
 ) -> str:
     """Update a value at the path.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
     (no file is written).
+
+    When ``validate`` is True (the default), the edit is validated against the
+    document's own ``$schema`` before writing.  Uses a differential (before/after)
+    approach so that pre-existing schema violations are not treated as blockers
+    — only violations *introduced* by this edit are refused.
     """
     _check_file(file_path)
     _require_valid_filter(path_selector)
@@ -484,6 +541,11 @@ def json_patch(
         content = f.read()
 
     new_content = run_jq(args, input_data=content, timeout=10)
+
+    if validate:
+        eff_root = _resolve_effective_toolkit_root(repo_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root)
+
     if dry_run:
         return f"[dry-run] Would update {path_selector} in {file_path}:\n{new_content}"
     json_write_atomic(file_path, new_content)
@@ -496,13 +558,58 @@ def json_insert(
     value: str,
     is_json: bool = True,
     dry_run: bool = False,
+    repo_root: Optional[str] = None,
+    validate: bool = True,
+    create_schema: Optional[str] = None,
 ) -> str:
     """Append to array or merge object.
 
     Returns a confirmation message, or a preview string when *dry_run* is True
     (no file is written).
+
+    When ``validate`` is True (the default), the edit is validated against the
+    document's own ``$schema`` before writing.  Uses a differential (before/after)
+    approach so pre-existing violations are not treated as blockers.
+
+    ``create_schema``: if the target file does not exist **and** ``create_schema``
+    is set to a registered ``$schema`` URI, the file is seeded as
+    ``{"$schema": "<uri>"}`` before the insert is applied.  This bootstraps
+    array-valued fields in a single shot (e.g. the ``command_prefixes.json``
+    first-use path).  If the file already exists, ``create_schema`` is a no-op
+    (the normal path applies; WS1 validation then enforces the existing schema).
     """
-    _check_file(file_path)
+    # --- ORDERING IS LOAD-BEARING ---
+    # ``_check_file`` is normally the first statement and raises ``File not found``
+    # before any other logic.  The ``--create-schema`` seed branch MUST be the
+    # function's first action so it short-circuits ``_check_file`` for missing files.
+    # Normal (error-on-null) filter: used for existing files.
+    _normal_filter = (
+        f'({path_selector}) |= (if type=="array" then . + [$v] '
+        f'elif type=="object" then . + $v '
+        f'else error("Cannot insert into " + type) end)'
+    )
+    # Create-variant filter: null-coalesces the target so a missing array field is
+    # bootstrapped to [$v] instead of erroring "Cannot insert into null".
+    # (The normal filter hits ``else error(...)`` on a null/missing field.)
+    _create_filter = (
+        f'({path_selector}) |= (if type=="array" then . + [$v] '
+        f'elif type=="object" then . + $v '
+        f'elif type=="null" then [$v] '
+        f'else error("Cannot insert into " + type) end)'
+    )
+
+    using_seed = False
+    if create_schema and not os.path.isfile(file_path):
+        # Seed path: create the file content in memory; do NOT call _check_file.
+        content = json.dumps({"$schema": create_schema})
+        using_seed = True
+        active_filter = _create_filter
+    else:
+        _check_file(file_path)
+        with open(file_path, 'r') as f:
+            content = f.read()
+        active_filter = _normal_filter
+
     _require_valid_filter(path_selector)
 
     args = ['--indent', str(JQ_INDENT)]
@@ -511,16 +618,26 @@ def json_insert(
     else:
         args.extend(['--arg', 'v', value])
 
-    filter_expr = f'({path_selector}) |= (if type=="array" then . + [$v] elif type=="object" then . + $v else error("Cannot insert into " + type) end)'
-    args.append(filter_expr)
-
-    with open(file_path, 'r') as f:
-        content = f.read()
+    args.append(active_filter)
 
     new_content = run_jq(args, input_data=content, timeout=10)
+
+    if validate:
+        eff_root = _resolve_effective_toolkit_root(repo_root)
+        _ws1_differential_check(file_path, content, new_content, eff_root)
+
     if dry_run:
+        if using_seed:
+            return f"[dry-run] Would create and insert into {path_selector} in {file_path}:\n{new_content}"
         return f"[dry-run] Would insert into {path_selector} in {file_path}:\n{new_content}"
+
+    # On seed path, ensure the parent directory exists before writing.
+    if using_seed:
+        parent_dir = os.path.dirname(os.path.abspath(file_path))
+        os.makedirs(parent_dir, exist_ok=True)
     json_write_atomic(file_path, new_content)
+    if using_seed:
+        return f"Created and inserted into {path_selector} in {file_path}"
     return f"Inserted into {path_selector} in {file_path}"
 
 
@@ -613,51 +730,24 @@ def json_structure(file_path: str, path_selector: str = ".") -> Optional[str]:
 # --- Schema Discovery ---
 
 def _effective_schema(node: dict, resolve_fn) -> dict:
-    """Resolve $ref and merge allOf to produce a navigable schema node.
+    """Resolve $ref and merge allOf (+ oneOf/anyOf/if-then-else) to produce a navigable schema node.
 
-    Handles the two composition patterns in this codebase:
+    Thin adapter over ``schema_nav.effective_schema`` with
+    ``include_conditionals=True`` so that ``json schema`` discovery can navigate
+    into conditional-branch properties (e.g. ``plan.docs`` oneOf branches).
+
+    Handles the composition patterns in this codebase:
     - $ref: resolved via resolve_fn (local #/$defs/... or URN vc:...)
     - allOf: branches resolved and merged (properties unioned, required concatenated)
+    - oneOf/anyOf/if-then-else: branch properties unioned into navigable set
+      (required is NOT extended for conditional branches — they are mutually exclusive)
 
-    Does NOT handle oneOf, anyOf, or if/then/else. In this codebase those are
-    used only for type unions (number|string) and conditional required fields —
-    neither adds navigable properties, so discovery results remain correct.
+    Note: the old claim that oneOf/anyOf/if/then/else "never add navigable
+    properties" was false.  Dozens of schema locations define properties inside
+    conditional branches (e.g. plan.docs in 16_impl_context.schema.json);
+    enabling conditionals here allows full discovery of those fields.
     """
-    # Resolve $ref first
-    if '$ref' in node:
-        node = resolve_fn(node)
-        if not isinstance(node, dict):
-            return node
-
-    # Merge allOf branches
-    if 'allOf' in node:
-        merged_props = {}
-        merged_required = []
-        merged_defs = {}
-        base = {k: v for k, v in node.items() if k != 'allOf'}
-
-        for branch in node['allOf']:
-            branch = _effective_schema(branch, resolve_fn)
-            if 'properties' in branch:
-                merged_props.update(branch['properties'])
-            if 'required' in branch:
-                merged_required.extend(branch['required'])
-            if '$defs' in branch:
-                merged_defs.update(branch['$defs'])
-            # Copy other schema keywords (first-wins for non-mergeable keys)
-            for key in ('type', 'description', 'items', 'additionalProperties'):
-                if key in branch and key not in base:
-                    base[key] = branch[key]
-
-        if merged_props:
-            base['properties'] = merged_props
-        if merged_required:
-            base['required'] = merged_required
-        if merged_defs:
-            base.setdefault('$defs', {}).update(merged_defs)
-        return base
-
-    return node
+    return _schema_nav_effective_schema(node, resolve_fn, include_conditionals=True)
 
 
 def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optional[str] = None) -> Optional[str]:
@@ -682,7 +772,7 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
     with open(schema_path, 'r') as f:
         schema = json.load(f)
 
-    def _resolve_node(node: dict) -> dict:
+    def _resolve_node(node: dict) -> Optional[dict]:
         """Resolve a single $ref node."""
         if not isinstance(node, dict) or '$ref' not in node:
             return node
@@ -691,10 +781,10 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
         if ref.startswith('#/$defs/'):
             def_name = ref.split('/')[-1]
             resolved = schema.get('$defs', {}).get(def_name)
-            return resolved if resolved else node
+            return resolved if resolved else None
         # URN ref: resolve via $id index
         resolved = resolve_ref(ref, id_index, ref_cache)
-        return resolved if resolved else node
+        return resolved if resolved else None
 
     # Get the effective root schema (resolves allOf at root level)
     effective_root = _effective_schema(schema, _resolve_node)
@@ -1292,12 +1382,14 @@ def main():
     p_patch.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
     p_patch.add_argument("--dry-run", action="store_true", help="Preview result without writing")
     p_patch.add_argument(
-        "--against-schema-field",
-        metavar="STEP.FIELD",
-        help="Validate value against schema for <step>.<field> (e.g. '04.functional_requirements'). "
-             "Requires --repo-root.",
+        "--repo-root",
+        default=".",
+        help=(
+            "Toolkit root for schema validation (e.g. ./devspec_toolkit for submodule "
+            "deployments). Defaults to '.'; falls back to package-relative toolkit root "
+            "when tools/schema_registry.json is not found at the given path."
+        ),
     )
-    p_patch.add_argument("--repo-root", default=".", help="Toolkit root for --against-schema-field resolution")
 
     # Insert
     p_insert = subparsers.add_parser("insert", help="Insert/Append value")
@@ -1307,11 +1399,25 @@ def main():
     p_insert.add_argument("--raw", action="store_true", help="Treat value as string, not JSON")
     p_insert.add_argument("--dry-run", action="store_true", help="Preview result without writing")
     p_insert.add_argument(
-        "--against-schema-field",
-        metavar="STEP.FIELD",
-        help="Validate value against schema for <step>.<field>. Requires --repo-root.",
+        "--create-schema",
+        metavar="URI",
+        default=None,
+        help=(
+            "When the target file does not exist, seed it as {\"$schema\": \"<URI>\"} "
+            "before applying the insert. Bootstraps array-valued fields (e.g. "
+            "allowed_prefixes in command_prefixes.json) in a single shot. "
+            "No-op when the file already exists."
+        ),
     )
-    p_insert.add_argument("--repo-root", default=".", help="Toolkit root for --against-schema-field resolution")
+    p_insert.add_argument(
+        "--repo-root",
+        default=".",
+        help=(
+            "Toolkit root for schema validation (e.g. ./devspec_toolkit for submodule "
+            "deployments). Defaults to '.'; falls back to package-relative toolkit root "
+            "when tools/schema_registry.json is not found at the given path."
+        ),
+    )
 
     # Delete
     p_del = subparsers.add_parser("delete", help="Delete value")
@@ -1385,27 +1491,20 @@ def main():
         elif args.command == "read-multi":
             result = json_read_multi(args.file, args.filters)
         elif args.command == "patch":
-            schema_field = getattr(args, "against_schema_field", None)
-            if schema_field:
-                repo_root_abs = os.path.abspath(getattr(args, "repo_root", "."))
-                errs = validate_against_schema_field(args.value, schema_field, repo_root_abs)
-                if errs:
-                    for e in errs:
-                        print(f"schema-field error: {e}", file=sys.stderr)
-                    sys.exit(1)
-            result = json_patch(args.file, args.path, args.value, not args.raw,
-                                dry_run=getattr(args, "dry_run", False))
+            result = json_patch(
+                args.file, args.path, args.value, not args.raw,
+                dry_run=getattr(args, "dry_run", False),
+                repo_root=os.path.abspath(args.repo_root),
+                validate=True,
+            )
         elif args.command == "insert":
-            schema_field = getattr(args, "against_schema_field", None)
-            if schema_field:
-                repo_root_abs = os.path.abspath(getattr(args, "repo_root", "."))
-                errs = validate_against_schema_field(args.value, schema_field, repo_root_abs)
-                if errs:
-                    for e in errs:
-                        print(f"schema-field error: {e}", file=sys.stderr)
-                    sys.exit(1)
-            result = json_insert(args.file, args.path, args.value, not args.raw,
-                                 dry_run=getattr(args, "dry_run", False))
+            result = json_insert(
+                args.file, args.path, args.value, not args.raw,
+                dry_run=getattr(args, "dry_run", False),
+                repo_root=os.path.abspath(args.repo_root),
+                validate=True,
+                create_schema=getattr(args, "create_schema", None),
+            )
         elif args.command == "delete":
             result = json_delete(args.file, args.path, dry_run=getattr(args, "dry_run", False))
         elif args.command == "keys":

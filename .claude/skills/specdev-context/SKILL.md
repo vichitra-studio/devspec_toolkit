@@ -163,11 +163,10 @@ When a finding's `impact[]` may be incomplete (typical for newly-recorded `emerg
 ### Step 4 — Surgical edit
 
 ```bash
-specdev json patch <file> '<jq-path>' '<value>' \
-  --against-schema-field <step>.<field> --repo-root $TOOLKIT_ROOT
+specdev json patch <file> '<jq-path>' '<value>' --repo-root $TOOLKIT_ROOT
 ```
 
-Use `insert` for array append, `delete` for removal. Always pass `--against-schema-field` for schema-validated writes. Format: `<step>.<field>` where `<step>` is the numeric step and `<field>` is the top-level schema field name (e.g. `04.functional_requirements`). Preview with `--dry-run` for non-trivial edits. When `impact[]` contains multiple `(file, id)` pairs, apply patches one at a time; do not batch multiple patches into a single call. Run spec-check between patches.
+Use `insert` for array append, `delete` for removal. `json patch`/`insert` validate every write against the file's own `$schema` automatically — there is no flag, and `json delete` is not validated. A write is refused if it introduces a new schema violation (a didactic error naming the failing constraint or value), the file has no `$schema`, the edit would modify `$schema` itself, or the schema cannot be resolved or loaded (validation fails closed on any error). Validation is **differential** — it blocks only violations the edit *introduces*, so fixing one field while another is still invalid is allowed. A consequence: flipping a conditionally-gated field before its required siblings exist is refused — e.g. setting an implementation `status` to `verified` before its `actions[]` carry `evidence`; supply those siblings (within the same object) in the same or a prior patch, or rewrite the whole object. Preview with `--dry-run` for non-trivial edits. When `impact[]` contains multiple `(file, id)` pairs (distinct from the within-object case above), apply patches one at a time; do not batch multiple patches into a single call. Run spec-check between patches.
 
 ### Step 5 — Verify
 
@@ -183,8 +182,8 @@ If both green: done. If errors surface, fix the lowest-numbered failing entry fi
 | Situation | Command |
 |---|---|
 | New step file (does not yet exist) | `Write` tool for initial creation only; then `spec-check` to validate |
-| Replace a scalar | `specdev json patch <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
-| Append to array / merge into object | `specdev json insert <file> '<jq-path>' '<value>' --against-schema-field <step>.<field>` |
+| Replace a scalar | `specdev json patch <file> '<jq-path>' '<value>'` |
+| Append to array / merge into object | `specdev json insert <file> '<jq-path>' '<value>'` |
 | Delete a field or entry | `specdev json delete <file> '<jq-path>'` |
 | Preview before write | All three accept `--dry-run` |
 

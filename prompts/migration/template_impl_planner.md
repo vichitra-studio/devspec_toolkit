@@ -17,13 +17,10 @@ These rules apply only when migrating an existing 16a artifact forward — they 
 
 ## Validation
 
-After migration, run:
-
-```bash
-./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
-```
-
-For host-repo (submodule) deployments, use `spec-check` with the full flag set:
+After migration, run `spec-check` with the full flag set. When the `devspec_env`
+venv is active, call `specdev` directly (shown below); from a host repo
+(submodule deployment) without the venv active, run the same command through the
+`./tools/run_specdev.sh` wrapper instead:
 
 ```bash
 specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
