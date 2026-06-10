@@ -1,0 +1,253 @@
+version: "1.1.0"
+breaking: true
+
+description: |
+  Removes status_ref from the spec data model and retires the canon status kind.
+  Adds specdev update (post-submodule-bump entry point), specdev milestone-state
+  (deterministic Trinity phase-position computation), and E590/W615 cross-reference
+  enforcement for step-11 mitigation IDs. Fixes _effective_schema property-merge
+  overwrite, W→E promotion bugs in spec-check, and registry I/O error handling.
+  Adds implicit differential schema validation to json patch/insert, replacing the
+  broken --against-schema-field flag.
+
+changes:
+  - type: remove_validator
+    description: >
+      Removed the --against-schema-field <step>.<field> flag from
+      specdev json patch and specdev json insert. The flag was broken (wrong
+      schema selected for multi-schema steps such as step 16; top-level-only
+      resolution could not validate any nested or leaf write), structurally
+      inadequate, and universally unused. Deleted: validate_against_schema_field,
+      _find_schema_file, the argparse args, and the main() dispatch blocks that
+      invoked them. The SKILL.md mandate for the flag is replaced with a note
+      that validation is now automatic.
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      specdev json patch and specdev json insert now perform implicit
+      always-on differential whole-document schema validation before every
+      write. The file's own $schema URI is used for schema resolution (so
+      multi-schema steps resolve correctly). A write is refused only when
+      it introduces a schema violation that was not already present in the
+      document (differential / before-after diff), preserving incremental
+      one-patch-at-a-time repair without deadlock. Additional refuse cases:
+      the file has no $schema (didactic error), or the patch targets the
+      $schema key itself. No --no-validate CLI bypass is exposed. Bare agent
+      invocations (no --repo-root) resolve the toolkit root via a
+      package-relative fallback so the constraint holds in submodule/host
+      deployments without requiring agents to pass --repo-root.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      _effective_schema (used by specdev json schema) now resolves a node's
+      effective properties own-first before merging allOf branches, and also
+      unions properties from oneOf/anyOf/if-then-else conditional branches for
+      discovery purposes. Previously, the allOf merge overwrote the node's own
+      properties (the merged_props overwrite bug), causing specdev json schema
+      to drop all step-specific fields on any schema node that combined own
+      properties with an allOf. For example, specdev json schema on a step-16
+      impl-context plan file could not navigate to .plan, .execution, or
+      .review. The fix makes all step-specific fields and conditional-gated
+      fields navigable by discovery.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      Schema-property-merge logic unified into a new canonical helper
+      tools/specdev_tools/core/schema_nav.py (effective_schema). Previously
+      three independent implementations existed: _effective_schema (with the
+      overwrite bug), merge_allof (context/_utils.py, correct), and
+      _get_all_properties (registry/generate.py, correct). All three now
+      route through the shared helper. A new companion module
+      tools/specdev_tools/core/schema_validate.py factors the schema-layer
+      validation logic shared by validate_file and the new write constraint.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev validate / spec-check (and the json write guard) now fail
+      closed on all registry.load I/O errors, not just FileNotFoundError.
+      Previously, validate.py only caught FileNotFoundError from registry.load;
+      PermissionError and other OSErrors escaped uncaught. The new
+      core/schema_validate.py helper catches the full OSError family and routes
+      every case to SchemaNotFoundError → E520 schema_not_found. The E520
+      message format is unchanged; only the set of caught exception types is
+      wider.
+    migration:
+      action: none
+
+  - type: add_definition
+    description: >
+      New schema canon/command_prefixes.schema.json ($id vc:canon:command-prefixes)
+      for the command_prefixes.json allowlist file (type object,
+      additionalProperties false; required: allowed_prefixes array of string;
+      optional: $schema uri, _description string). Registered in
+      tools/schema_registry.json. The toolkit's own tools/command_prefixes.json
+      gains a $schema key. Alongside: new --create-schema <uri> flag on
+      specdev json insert only. When the target file does not exist and
+      --create-schema is given, the command seeds the file with
+      {"$schema": "<uri>"} and bootstraps the array-valued field, then runs
+      standard differential validation against the seed. Enables first-use
+      bootstrap of spec/canon/command_prefixes.json without a separate
+      file-creation step.
+    migration:
+      action: none
+
+  - type: remove_field
+    description: >
+      Removed the optional status_ref canonical-reference field from
+      21 schema properties across 6 files: schema/04_fr_list.schema.json (1
+      property), schema/06_invariants.schema.json (1),
+      schema/09_impl_plan.schema.json (1), schema/14_roadmap.schema.json (2),
+      schema/16_impl_context.schema.json (15), and
+      schema/core/collections.schema.json (1). All affected schemas use
+      additionalProperties:false, so host spec files carrying status_ref will
+      fail validation after this change. At all sites where a sibling status
+      string existed, deletion is lossless (100% of host status_ref objects
+      had a sibling status string, REF-ONLY = 0 / 736 verified).
+    migration:
+      action: auto
+      note: >
+        Delete every status_ref object from all spec artifacts. Remove
+        now-orphaned cn:*:status:* IDs from each file's canonical_refs_used[].
+        Run specdev canonical-autofix <spec-dir> --write to reconcile
+        canonical_refs_used automatically (the sync prunes stale cn:* IDs).
+        See the Breaking Changes section of changelog/v1.1.0.md for the full
+        migration steps.
+
+  - type: change_schema
+    description: >
+      Retired the canon status kind. Deleted canon/kinds/status.json
+      (7 entries: active, blocked, deferred, green, pending, red, verified).
+      Removed 7 status aliases from canon/aliases.json (approved→verified,
+      fail→red, failed→red, not started→pending, pass→green, passed→green,
+      postponed→deferred). Removed 14 kind:status entries from
+      canon/manifest.json (7 canonical entries + 7 mirrored alias entries).
+      The schema status string enums are now the single source of truth for
+      status vocabulary. Also removed dead Python status machinery:
+      INFERENCE_RULES status rule (core/constants.py),
+      alias_value_fields["status_ref"] (canonical/integrity.py), and
+      "status" from _FALLBACK_DIRECT_FIELDS (canonical/integrity.py).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New tools/specdev_tools/context/milestone_state.py — pure,
+      unit-tested deterministic milestone-state engine. Provides
+      derive_group_state() and derive_phase_position() functions. Inputs:
+      implementation.status string + .specdev/findings/ filesystem probes +
+      deterministic blocking-ambiguity string-match. New CLI subcommand
+      specdev milestone-state (--batch-id required; --repo-root, --spec-root,
+      --git-root optional). Output: {milestone_id, groups[],
+      derived_phase_position, blockers[]} with per-group blocking_amb_health.
+      Replaces the LLM-evaluated milestone_state mode of the specdev-scope
+      agent. The specdev-scope agent now delegates to this CLI and passes the
+      JSON through unchanged — orchestration contract and specdev-trinity skill
+      parsing are unaffected.
+    migration:
+      action: none
+
+  - type: add_constraint
+    description: >
+      validate_step_11 now cross-references mitigation IDs against upstream
+      spec steps for all mitigation types except doc: capability → step 01
+      (capabilities[].capability_id), fr → step 04
+      (functional_requirements[].fr_id), api → step 05 (apis[].api_id), inv →
+      step 06 (rules[].inv_id), nfr → step 07 (nfrs[].nfr_id), fixture → step
+      08 (fixtures[].fixture_id). When the upstream file is absent the check is
+      skipped (None sentinel). doc mitigations remain exempt. Fires E590
+      CROSS_STEP_ID_NOT_FOUND for unresolvable IDs. Also adds W615/E615
+      INVARIANT_UNEXERCISED_BY_THREAT: fires W615 when a step-06 invariant
+      carries a risk_category_ref but no step-11 threat mitigation of type inv
+      references it; promotable to E615 via SPECDEV_WARNINGS_AS_ERRORS=1 or
+      SPECDEV_PROMOTE_CODES=W615. Adds invariant_threat_coverage map
+      (inv_id → [threat_ids]) to specdev matrix output. step_order.json
+      required_spec_inputs for step 11 updated to include steps 01 and 08.
+    migration:
+      action: ai_assisted
+      note: >
+        Host specs with stale or invented mitigation IDs (any type except doc)
+        will newly fail spec-check with E590. Net-new type:capability controls
+        that do not reference an existing cap-* ID from step 01 must be changed
+        to type:doc with a concrete action in note. For each step-06 invariant
+        with risk_category_ref, add a threat mitigation of type:inv referencing
+        it (or suppress W615 via SPECDEV_PROMOTE_CODES if intentionally
+        deferred). Run specdev spec-check to confirm clean after remediation.
+
+  - type: add_module
+    description: >
+      New specdev update command — syncs a project to the current toolkit
+      version. Re-stamps specdev_version on no structural changes (exit 0);
+      directs through specdev align (apply --auto → prompts → validate) when
+      schema migration is required (exit 1). Supports --dry-run and --json.
+    migration:
+      action: none
+      note: "CLI addition only — no spec artifact changes."
+
+  - type: internal_restructure
+    description: >
+      stamp_specdev_version extracted from validate_post_migration into a
+      shared helper in schema_differ.py. is_migration=False preserves
+      last_migration and omits migration_history entries; is_migration=True
+      (align validate only) appends a history entry and updates last_migration.
+      E608 messages in spec_check updated to direct users to specdev update.
+    migration:
+      action: none
+      note: "Internal refactor and message update — no spec schema changes."
+
+  - type: fix
+    description: >
+      Removed two incorrect W→E promotions from PROMOTABLE_PAIRS in
+      core/errors.py where the warning and its same-numbered error describe
+      structurally different defects. (1) W597 (EXTRACTION_INTENT_VAGUE — a
+      present intent entry whose text is too short/weaselly) vs E597
+      (EXTRACTION_INTENT_UPSTREAM_GAP — a required upstream artifact has no
+      intent entry at all). (2) W590 (CROSS_STEP_UPSTREAM_MISSING — the upstream
+      artifact file is absent) vs E590 (CROSS_STEP_ID_NOT_FOUND — a referenced
+      ID is absent from a present upstream file). Neither has a
+      semantically-correct fatal counterpart, so both now stay warnings under
+      SPECDEV_WARNINGS_AS_ERRORS=1 or a matching SPECDEV_PROMOTE_CODES.
+    migration:
+      action: none
+      note: "W597 and W590 are no longer promoted to fatal errors; no spec artifact changes."
+
+  - type: fix
+    description: >
+      SPECDEV_PROMOTE_CODES now warns (once, to stderr) when it lists a code
+      that cannot be promoted — either a valid-but-non-promotable warning code
+      (e.g. W590/W597) or an unrecognised/typo code. Previously such codes were
+      silently dropped by the promotion intersection in validate.py. Both
+      validate-all and spec-check emit the diagnostic; behavior is unchanged
+      when SPECDEV_WARNINGS_AS_ERRORS=1 (which ignores SPECDEV_PROMOTE_CODES
+      wholesale).
+    migration:
+      action: none
+      note: "Diagnostic-only addition — surfaces previously-silent ignored promote codes."
+
+  - type: fix
+    description: >
+      spec-check now honours W→E promotion in per-check results. Previously
+      run_spec_check / run_spec_check_json classified each check's errors before
+      applying promotion, so a check whose only errors were promotable W-codes
+      still reported WARN and emitted W-prefixed codes in the JSON findings.
+      All per-check results now flow through a promote-then-classify path,
+      making the per-check status, stderr breakdown, and JSON codes consistently
+      reflect the active promotion contract.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      validate_step_11 now handles malformed threats[] and target_ids[] entries
+      gracefully. Non-dict entries in those arrays now emit a structured E520
+      (mirroring the existing mitigation-object guard) instead of raising an
+      unhandled AttributeError.
+    migration:
+      action: none
