@@ -88,7 +88,7 @@ Before emitting, verify:
 - **Sync**: Mirror Step 05 interface contracts when building the `interface_map`, keeping `interface_ref`, `path`, and `method` in sync.
 - **Reproducibility**: Document `project_skeleton` choices (language, framework, modules) so contributors can bootstrap identical environments.
 - **Validation**: Populate `validators` with commands (lint, type-check, schema validation) executed after scaffold generation.
-- **Status**: Track `build_status` honestly (`green`, `red`, `pending`) to surface blockers before implementation accelerates.
+- **Status**: Track `build_status` honestly (allowed values are defined in the schema) to surface blockers before implementation accelerates.
 
 ## Common Pitfalls
 - **Implicit Modules**: Leaving modules unspecified, forcing teams to rediscover scaffold layout.

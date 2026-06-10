@@ -3,6 +3,9 @@
 Covers:
   - invalid_status_ref_on_milestone.json: schema must REJECT a milestone with an
     unexpected `status_ref` property (additionalProperties: false violation).
+  - valid_minimal.json: schema must ACCEPT the minimal positive fixture (zero
+    errors) under the post-DEVSPEC-38 step_09 schema, including the milestones
+    minItems:1 constraint.
 """
 from __future__ import annotations
 
@@ -58,4 +61,25 @@ class TestStep09MilestoneAdditionalProperties:
         )
         assert "status_ref" in message, (
             f"Expected 'status_ref' to be named in the error message; got: {message!r}"
+        )
+
+
+class TestStep09ValidMinimal:
+    """The minimal positive fixture must validate cleanly under the step_09 schema."""
+
+    def test_valid_minimal_has_zero_schema_errors(self) -> None:
+        """valid_minimal.json must produce ZERO schema errors.
+
+        Positive conformance for the minimal step_09 impl_plan fixture. The
+        pre-DEVSPEC-38 fixture had milestones:[] which silently violated the
+        schema's minItems:1 (never exercised by any test); this guards the
+        corrected fixture (one real milestone) against regression and confirms
+        the minimal shape remains schema-valid.
+        """
+        doc = json.loads((_FIXTURES_DIR / "valid_minimal.json").read_text())
+        errors = validate_data_against_schema(_TOOLKIT_ROOT, doc)
+
+        assert errors == [], (
+            f"valid_minimal.json must validate cleanly under the step_09 schema; "
+            f"got {len(errors)} error(s): {errors!r}"
         )

@@ -76,10 +76,15 @@ def _make_remediation(err: SpecError) -> dict[str, Any] | None:
                         "command": (
                             f"specdev json insert spec/canon/kinds/command.json '.entries'"
                             f' \'{{"id":"cn:project:command:{prefix}","kind":"command",'
-                            f'"preferred_label":"{prefix}","owner":"engineering"}}\''
+                            f'"preferred_label":"{prefix}",'
+                            f'"definition":"{prefix} command (edit this description).",'
+                            f'"version":"1.0.0","status":"active","owners":["engineering"],'
+                            f'"lifecycle":{{"introduced_at":"2026-01-01T00:00:00Z"}}}}\''
                         ),
                         "rationale": (
-                            f"Register '{prefix}' as a canonical command entry,"
+                            f"Register '{prefix}' as a canonical command entry"
+                            " (all schema-required fields included — edit the"
+                            " definition, owners, and introduced_at to suit),"
                             " then add a sibling command_ref in the artifact"
                         ),
                     },

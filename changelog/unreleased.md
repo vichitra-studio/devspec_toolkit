@@ -83,6 +83,18 @@ consolidation.
   silently dropping it. (The warning is suppressed under
   `SPECDEV_WARNINGS_AS_ERRORS=1`, which ignores `SPECDEV_PROMOTE_CODES` wholesale.)
 
+- **`spec-check` now honours W→E promotion in its per-check results.** Previously
+  `run_spec_check` / `run_spec_check_json` classified and returned each check's
+  errors *before* applying promotion, so under `SPECDEV_WARNINGS_AS_ERRORS=1` (or a
+  matching `SPECDEV_PROMOTE_CODES`) a check whose only errors were promotable
+  W-codes still reported `WARN` and emitted W-prefixed codes in the JSON `findings`
+  and the aggregate. All per-check results now flow through a single
+  promote-then-classify path, so the per-check status, the stderr breakdown, and the
+  JSON codes consistently reflect the active promotion contract. Because `spec-check`
+  is the authoritative gate (core rule #1), this can make it intentionally stricter
+  than bare `validate-all` — e.g. on promotable traceability-closure warnings, which
+  `validate-all` drops before promotion.
+
 - **Deprecated `datetime.utcnow()` in schema-diff timestamping.** `_get_timestamp()`
   in `schema_differ.py` now uses timezone-aware `datetime.now(timezone.utc)`
   (output format unchanged). Silences the Python 3.13 deprecation warning.
@@ -116,6 +128,14 @@ consolidation.
   unused by agents. The associated internals (`validate_against_schema_field`,
   `_find_schema_file`) are deleted. The `specdev-context` SKILL.md mandate for
   the flag is replaced with a note that validation is now automatic.
+
+- **Two duplicate test files removed** (lossless — coverage preserved by the
+  surviving tests): `tests/unit/core/test_r9_error_codes.py` (byte-identical to
+  `tests/unit/core/test_error_code_registry.py`) and
+  `tests/unit/validation/test_r9_validate.py` (a redundant, less-isolated
+  near-duplicate of `tests/unit/validation/test_validate_deep.py`). Removed during
+  P2 audit remediation; the R9 error-code-registry and W→E promotion coverage they
+  exercised continues to run in the retained files.
 
 ---
 
@@ -161,7 +181,23 @@ canon kind; add deterministic milestone-state engine.
 
 - **Migration templates** (`template_frs.md`, `template_invariants.md`,
   `template_impl_plan.md`, `template_roadmap.md`) drop `status_ref` from their
-  optional-field lists.
+  optional-field lists. The same pass also corrected three pre-existing
+  schema-accuracy drifts in these templates (independent of the `status_ref`
+  removal):
+  - `template_frs.md`: `functional_requirements` `minItems` corrected `1 → 2`
+    to match `schema/04_fr_list.schema.json`.
+  - `template_invariants.md`: `policy_ref` kind corrected `risk_category →
+    policy` to match `schema/06_invariants.schema.json` (the sibling
+    `rules[].risk_category_ref`, kind `risk_category`, is intentionally unchanged).
+  - `template_impl_plan.md` and `template_roadmap.md`: `tech_stack_ref` kind
+    corrected `capability → tech_stack` to match `schema/09_impl_plan.schema.json`
+    and `schema/14_roadmap.schema.json`.
+
+- **All 22 migration templates** normalized their post-migration validation step
+  from a per-file `./tools/run_specdev.sh validate spec/NN_*.json --repo-root
+  ./devspec_toolkit` invocation to the unified `spec-check spec --repo-root
+  ./devspec_toolkit --spec-root ./spec --git-root .` form — matching core rule #1
+  (use `spec-check`, which resolves project canon, rather than bare `validate`).
 
 ### Removed
 

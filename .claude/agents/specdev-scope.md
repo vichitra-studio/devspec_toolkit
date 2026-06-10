@@ -212,7 +212,7 @@ The CLI computes the full output contract deterministically: per-group state (us
   "groups": [
     {
       "group_id": "...",
-      "state": "pending|executing|code_converged|blocked|verified|deferred",
+      "state": "pending|code_converged|blocked|verified|deferred",
       "implementation_converged_at": "<ISO timestamp or null>",
       "reviewer_rounds": 0,
       "findings_resolved_path": "<path or null>",

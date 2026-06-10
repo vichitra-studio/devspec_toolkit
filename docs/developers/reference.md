@@ -227,6 +227,15 @@ specdev update spec --repo-root ./devspec_toolkit
 specdev update spec --repo-root ./devspec_toolkit --dry-run
 ```
 
+**`update` flags:**
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `spec_dir` | Yes | Path to the project `spec/` directory (positional) |
+| `--repo-root REPO_ROOT` | No | Toolkit root directory. Default: cwd (`.`) |
+| `--dry-run` | No | Report what would be done without writing any files. The re-stamp path reports `update_status: would_update` (no write); a migration-requiring diff reports `needs_migration` |
+| `--json` | No | Emit a JSON envelope (`status`, `update_status`, `from_version`, `to_version`, `dry_run`, …) instead of plain text |
+
 When `specdev update` reports schema changes, run the migration workflow first:
 ```bash
 # Check status of spec vs toolkit version

@@ -24,7 +24,7 @@ We are not looking for generic "OWASP Top 10" lists. We are looking for **specif
 - **Constraint:** EVERY mitigation MUST link to an existing upstream artifact ID using the structured mitigation object `{type, id, note?}` — NOT the generic `traceRef` primitive (valid `type` values are a closed enum defined in schema `vc:11-redteam` mitigations items — e.g., `fr`, `api`, `nfr`, `inv`, `fixture`, `doc`, `capability`). If no existing upstream artifact ID applies, MUST use `type: doc` with a concrete action in `note` (`doc` is the only type exempt from upstream cross-reference). Use `type: capability` ONLY to reference an EXISTING `cap-*` ID from Step 01.
 
 ## Taxonomy of Threats
-Use the `category` field to classify threats precisely. The authoritative enum is defined in `vc:core:atoms#threatCategory` — only the five values below are valid:
+Use the `category` field to classify threats precisely. Valid values are defined and enforced by the `vc:core:atoms#threatCategory` enum — consult the atom for the authoritative, current set (schema-enforced; do not treat this section as the source of membership). The entries below are illustrative examples to guide classification, not an enumeration of the allowed values:
 1.  **`authn` (Authentication)**: "Who are you?" (e.g., Session fixation, Credential stuffing).
 2.  **`authz` (Authorization)**: "Can you do this?" (e.g., IDOR, Privilege Escalation, Admin bypass).
 3.  **`business_logic`**: Flaws in the workflow itself (e.g., Buying 0 items for $0, skipping payment step).

@@ -19,10 +19,13 @@ def load_json(path: str) -> Any:
 
 
 def load_step_order(repo_root: str) -> dict:
-    """Load tools/step_order.json from *repo_root*."""
+    """Load ``tools/step_order.json`` from *repo_root*.
+
+    The DAG lives only under ``tools/``; there is no repo-root copy. If the file
+    is absent, ``load_json`` raises ``FileNotFoundError`` naming that canonical
+    ``tools/`` path — previously a dead repo-root fallback masked it.
+    """
     path = os.path.join(os.path.abspath(repo_root), "tools", "step_order.json")
-    if not os.path.exists(path):
-        path = os.path.join(os.path.abspath(repo_root), "step_order.json")
     return load_json(path)
 
 

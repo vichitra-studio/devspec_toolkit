@@ -219,9 +219,11 @@ ERROR_CODES = {
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W590/W596/W597
-# have E-counterparts with different semantics; W570 (GRACEFUL_SKIP) has no
-# E-counterpart at all.
+# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W590/
+# W596/W597/W606 have E-counterparts with different semantics; W570
+# (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
+# its name with the registered-but-unemitted E604 and stays advisory (see the
+# inline W604 note below).
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the
@@ -272,6 +274,14 @@ PROMOTABLE_PAIRS = {
     # UPSTREAM_GAP code for a present-but-vague entry, mislabelling the defect
     # and pointing users at the wrong fix (add an entry vs. expand its text).
     # W597 has no semantically-correct E-counterpart, so it stays a warning.
+    # W604 (TRACE_MATRIX_STALE) is intentionally NOT in PROMOTABLE_PAIRS.
+    # Only W604 is emitted — by the step_14 staleness check, when
+    # trace_matrix.json is missing or older than 14_roadmap.json (an mtime-based
+    # freshness heuristic that can false-positive on checkout/touch order). E604
+    # is registered under the same name as the nominal error form but is never
+    # emitted by any code path, and staleness is advisory (regenerate the matrix)
+    # rather than a hard correctness failure — so W604 stays a warning and E604
+    # is not wired to promotion.
     # W615 INVARIANT_UNEXERCISED_BY_THREAT → E615: step-06 invariant with a
     # risk_category_ref is not referenced by any step-11 threat mitigation.
     "W615": "E615",

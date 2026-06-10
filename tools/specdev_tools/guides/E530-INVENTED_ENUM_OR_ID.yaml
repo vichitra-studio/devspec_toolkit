@@ -15,9 +15,16 @@ resolution: |
     This file is merged with the toolkit default at runtime.
 
   Option B — register as a canonical command and attach a command_ref:
-    1. Add the entry to spec/canon/kinds/command.json:
-         {"id": "cn:project:command:<verb>", "kind": "command",
-          "preferred_label": "<verb>", "owner": "engineering"}
+    1. Insert the entry into the `.entries` array of spec/canon/kinds/command.json.
+       All fields below are schema-required (schema/core/canon.schema.json
+       $defs.entry) — note `owners` is an array, and `definition`, `version`,
+       `status`, and `lifecycle.introduced_at` (an ISO-8601 date-time) are
+       mandatory. Edit the definition, owners, and timestamp to suit:
+         specdev json insert spec/canon/kinds/command.json '.entries' \
+           '{"id": "cn:project:command:<verb>", "kind": "command",
+             "preferred_label": "<verb>", "definition": "<verb> command.",
+             "version": "1.0.0", "status": "active", "owners": ["engineering"],
+             "lifecycle": {"introduced_at": "2026-01-01T00:00:00Z"}}'
     2. Add a sibling command_ref in the artifact:
          "command_ref": {"id": "cn:project:command:<verb>"}
     hallucination-lint bypasses the prefix check when a command_ref is

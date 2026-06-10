@@ -10,7 +10,8 @@ Coverage map (all 6 typed-exception rows + construction-wrap + end-to-end):
   Row "NoSchemaError (missing)"     → TestNoSchemaError.test_no_schema_missing, test_no_schema_blank
   Row "NoSchemaError (non-str)"     → TestNoSchemaError.test_no_schema_wrong_type_int, test_no_schema_wrong_type_list
   Row "SchemaNotFoundError"         → TestSchemaNotFoundError.test_schema_not_found_unregistered_uri
-  Row "SchemaDecodeError"           → TestSchemaDecodeError.test_schema_decode_error_corrupt_file
+  Row "SchemaDecodeError" (JSON)    → TestSchemaDecodeError.test_schema_decode_error_corrupt_file
+  Row "SchemaDecodeError" (Unicode) → TestSchemaDecodeError.test_schema_decode_error_unicode
   Row "SchemaReferencingError"      → TestSchemaReferencingError.test_schema_referencing_error_dangling_ref
   Row "SchemaRuntimeError (F4a)"    → TestConstructionWrap.test_construction_wrap_raises_schema_runtime_error
   F4b end-to-end                    → TestConstructionWrap.test_construction_wrap_e2e_json_patch_refuses
@@ -332,6 +333,33 @@ class TestSchemaDecodeError:
         doc = {"$schema": "vc:corrupt"}
         with pytest.raises(SchemaValidationError):
             validate_data_against_schema(str(fake_root), doc)
+
+    def test_schema_decode_error_unicode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """registry.load → UnicodeDecodeError maps to SchemaDecodeError (line 217-223).
+
+        This clause is unreachable in normal flow — the bootstrap pre-read catches
+        malformed bytes first — so it is exercised by forcing registry.load to raise
+        UnicodeDecodeError directly. UnicodeDecodeError is a ValueError subclass (NOT
+        an OSError), so the preceding OSError clause must NOT shadow it; this test
+        guards that ordering and the typed family's completeness if a future
+        SchemaRegistry change makes the path reachable.
+        """
+        import specdev_tools.core.schema_validate as _sv_mod
+
+        def _raise_unicode(self, uri):  # noqa: ANN001
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+        # Bootstrap (SchemaRegistry.__init__) still runs on the real toolkit root;
+        # only .load is replaced, so we reach Step 3 and hit the decode clause.
+        monkeypatch.setattr(_sv_mod.SchemaRegistry, "load", _raise_unicode)
+        doc = {"$schema": "vc:anything", "id": "step-test"}
+
+        with pytest.raises(SchemaDecodeError) as exc_info:
+            validate_data_against_schema(_TOOLKIT_ROOT, doc)
+
+        exc = exc_info.value
+        assert exc.uri == "vc:anything"
+        assert "invalid start byte" in exc.detail
 
 
 # ---------------------------------------------------------------------------

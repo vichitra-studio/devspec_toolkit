@@ -70,9 +70,16 @@ def _array_counts(data: dict) -> dict[str, int]:
 def _find_step_schema_uri(step_id: str, registry: SchemaRegistry) -> str | None:
     """Search schema_registry for a URI that matches *step_id*.
 
-    URIs follow patterns like ``vc:04-fr-list``, ``vc:02a-delivery-baseline``.
-    We search for URIs that start with ``vc:`` and contain the step_id (with
-    underscores normalised to dashes).
+    Thin delegator to ``_utils.find_step_schema_uri``. URIs follow patterns like
+    ``vc:04-fr-list``, ``vc:02a-delivery-baseline``. A URI matches when it
+    starts with the prefix ``vc:{step_id}-`` (a ``startswith`` prefix match — the
+    step_id is NOT normalised and underscores are not rewritten).
+
+    When more than one URI matches, selection is fail-loud and order-independent:
+    the step must have an explicit primary URI in ``_MULTI_SCHEMA_STEP_PRIMARY``
+    (e.g. step ``16`` → ``vc:16-impl-context``); otherwise — or if that table is
+    stale — the underlying call raises ``ValueError`` rather than silently
+    returning a dict-order-dependent match. Returns ``None`` when nothing matches.
     """
     return _u_find_step_schema_uri(step_id, registry)
 

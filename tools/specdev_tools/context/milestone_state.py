@@ -26,7 +26,7 @@ mandatory keystone case.
 persisted in plan files or findings.  The engine never emits it; the contract
 documents it as "not normally observed".
 
-**``impl_complete`` vs ``review_pending`` disambiguation (advisor refinement).**
+**``impl_complete`` vs ``review_pending`` disambiguation.**
 The original contract's two predicates collapse to the same condition when read
 literally.  The engine disambiguates:
 - ``impl_complete``: every non-deferred group in {code_converged, blocked,
@@ -36,7 +36,7 @@ literally.  The engine disambiguates:
 - ``review_complete``: same group condition AND ≥1 milestone-review file has
   ``findings == []``.
 
-**``impl_in_progress`` includes verified groups (advisor fix).**
+**``impl_in_progress`` includes verified groups.**
 The roll-up's "progress" set is {executing, code_converged, *verified*} so that a
 mixed milestone (some verified, some pending) correctly resolves to
 ``impl_in_progress`` instead of falling through all predicates.
