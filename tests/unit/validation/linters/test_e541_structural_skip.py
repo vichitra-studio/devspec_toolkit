@@ -489,3 +489,79 @@ class TestE541StructuralRuleEndToEnd:
                 f"Key-name skips must cover affected subtrees when $schema is absent; "
                 f"got: {[e.render() for e in e541]}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Term-specific runtime suppression (the bound_refs path)
+# ---------------------------------------------------------------------------
+
+class TestBoundRefsTermSpecificSuppression:
+    """Runtime ``bound_refs`` suppression must be term-specific, not object-level.
+
+    A sibling ``*_ref`` / ``*_refs`` key suppresses E541 only for the term whose
+    canonical id it actually binds (one of the ref's values is in the term's
+    ``cids`` set). An unrelated reference — binding a *different* canonical id —
+    must NOT suppress a mention of a different, still-unbound term.
+
+    Regression guard for the object-level over-suppression bug, where the mere
+    presence of any ``*_ref`` on a dict silenced E541 for every free-text field.
+
+    These tests pass ``schema_node=None`` so the structural rule is inactive and
+    the runtime ``bound_refs`` path is the sole suppressor under test.
+    """
+
+    _TERMS = {
+        "ghost": {"cn:project:term:ghost"},
+        "tag": {"cn:project:term:tag"},
+    }
+
+    def test_bound_refs_unrelated_ref_does_not_suppress(self):
+        """An unrelated ``*_ref`` (binding a different id) must NOT suppress E541."""
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            "tag_ref": "cn:project:term:tag",  # binds 'tag', NOT 'ghost'
+        }
+        errs = _check_free_text_terms("x.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "An unrelated *_ref (binding a different canonical id) must not "
+            "suppress E541 for a different, unbound term ('ghost')"
+        )
+
+    def test_bound_refs_matching_ref_suppresses(self):
+        """A ``*_ref`` binding the mentioned term's own canonical id suppresses E541."""
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            "term_ref": "cn:project:term:ghost",  # binds the mentioned term
+        }
+        errs = _check_free_text_terms("x.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            f"A *_ref binding the mentioned term's id must suppress E541; "
+            f"got: {[e.render() for e in e541]}"
+        )
+
+    def test_bound_refs_matching_ref_in_list_suppresses(self):
+        """The ``*_refs`` list form suppresses when the bound id is in the list."""
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            "term_refs": ["cn:project:term:other", "cn:project:term:ghost"],
+        }
+        errs = _check_free_text_terms("x.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            f"A *_refs list containing the mentioned term's id must suppress E541; "
+            f"got: {[e.render() for e in e541]}"
+        )
+
+    def test_bound_refs_partial_binding_still_fires_for_unbound_term(self):
+        """A ref binding one term must not suppress a second, unbound term in the same field."""
+        obj = {
+            "description": "Ghost integrates with the tag subsystem",
+            "term_ref": "cn:project:term:tag",  # binds 'tag' only; 'ghost' unbound
+        }
+        errs = _check_free_text_terms("x.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "A ref binding only 'tag' must still leave 'ghost' unbound → E541 fires"
+        )

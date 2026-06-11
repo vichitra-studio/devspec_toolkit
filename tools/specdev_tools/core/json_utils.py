@@ -767,7 +767,7 @@ def json_schema_discovery(file_path: str, path_selector: str, repo_root: Optiona
     _check_file(file_path)
 
     # Build index once — shared between resolve_schema_path and ref resolution
-    schema_dir = _find_schema_dir(repo_root)
+    schema_dir = find_schema_dir(repo_root)
     id_index = build_id_index(schema_dir) if schema_dir else {}
     ref_cache: Dict[str, dict] = {}
 

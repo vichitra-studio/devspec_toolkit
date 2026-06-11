@@ -9,7 +9,7 @@ Type rules (first match wins; deleted source files are skipped with a log line):
   schema     — *.schema.json under canon/ or schema/
   prompt     — *.md under prompts/ or migration_prompts/
   validator  — *.py under tools/specdev_tools/{validation,validators,canonical,
-                                              analysis,registry,generation}/
+                                              analysis,registry,generation,core}/
   cli        — tools/specdev_tools/cli.py or *.py under tools/specdev_tools/
                {guides,context}/ or *.yaml under tools/specdev_tools/guides/
   canon      — canon/**/*.{json,md} excluding *.schema.json (handled by schema)
@@ -74,7 +74,7 @@ def digest_type(path: str, slices: set[str] | None = None) -> str | None:
         if p.startswith("tests/"):
             return "test"
         validator_dirs = ("validation/", "validators/", "canonical/", "analysis/",
-                          "registry/", "generation/")
+                          "registry/", "generation/", "core/")
         if any(f"tools/specdev_tools/{d}" in p for d in validator_dirs):
             return "validator"
         if p == "tools/specdev_tools/cli.py":

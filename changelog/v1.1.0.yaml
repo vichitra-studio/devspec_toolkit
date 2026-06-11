@@ -266,6 +266,22 @@ changes:
       skips are retained as belt-and-suspenders for artifacts lacking a $schema.
       Affected surfaces: plan.ambiguities[].description, plan.docs_impact.rationale,
       milestones[].name, execution.final_status.test_results[].name.
+      The runtime ref-presence suppressor is now term-specific: a sibling
+      *_ref/*_refs suppresses E541 only for the term whose canonical ID it binds,
+      not for every free-text field on the object, so an unrelated reference no
+      longer masks a genuinely unbound term.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      specdev align status no longer recommends migration on a version downgrade.
+      When a project is on a newer toolkit version than the one it references
+      (source > target), format_status_report previously printed
+      "Migration recommended" because calculate_version_delta returns None for a
+      downgrade and the formatter conflated that None with "update required". It
+      now emits an informational "project is ahead of toolkit" line and recommends
+      no migration.
     migration:
       action: none
 

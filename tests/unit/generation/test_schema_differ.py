@@ -22,6 +22,7 @@ from specdev_tools.generation.schema_differ import (
     detect_paradigm_shifts,
     diff_spec_directory,
     diff_step_fields,
+    format_status_report,
     inventory_toolkit_schemas,
     inventory_user_steps,
 )
@@ -87,6 +88,60 @@ class TestCalculateVersionDelta:
         result = calculate_version_delta("0.1.0", "0.3.0")
         assert result is not None
         assert "2 MINOR updates" in result
+
+
+# ---------------------------------------------------------------------------
+# format_status_report — downgrade handling
+# ---------------------------------------------------------------------------
+
+class TestFormatStatusReportDowngrade:
+    """format_status_report must distinguish a downgrade (project ahead of
+    toolkit) from an upgrade-needed state. On a downgrade, calculate_version_delta
+    returns None; the formatter must emit an informational 'ahead of toolkit'
+    line and must NOT recommend migration.
+    """
+
+    def test_downgrade_reports_ahead_not_migration(self):
+        # Project on 1.2.0 referencing an older toolkit 1.0.0 → downgrade.
+        diff = MigrationDiff(
+            source_version="1.2.0",
+            target_version="1.0.0",
+            version_delta=None,  # calculate_version_delta returns None for a downgrade
+        )
+        out = format_status_report(diff)
+        assert "ahead of" in out, (
+            f"downgrade status must note the project is ahead of the toolkit; got:\n{out}"
+        )
+        assert "1.2.0" in out and "1.0.0" in out
+        assert "Migration recommended" not in out, (
+            f"a downgrade must NOT recommend migration; got:\n{out}"
+        )
+
+    def test_upgrade_still_recommends_migration(self):
+        # Guard the other direction: a real upgrade must still recommend migration.
+        diff = MigrationDiff(
+            source_version="1.0.0",
+            target_version="1.1.0",
+            version_delta="1 MINOR update",
+            summary={
+                "steps_missing": 0,
+                "steps_needs_rename": 0,
+                "steps_needs_update": 0,
+                "paradigm_shifts": 0,
+            },
+        )
+        out = format_status_report(diff)
+        assert "Migration recommended" in out, (
+            f"an upgrade must still recommend migration; got:\n{out}"
+        )
+
+    def test_aligned_version_reports_aligned(self):
+        # Same version → aligned branch, neither downgrade nor migration text.
+        diff = MigrationDiff(source_version="1.1.0", target_version="1.1.0")
+        out = format_status_report(diff)
+        assert "aligned" in out
+        assert "Migration recommended" not in out
+        assert "ahead of" not in out
 
 
 # ---------------------------------------------------------------------------

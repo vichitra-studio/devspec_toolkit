@@ -796,11 +796,18 @@ def _check_free_text_terms(
 
         structurally_unbindable = _is_structurally_unbindable(effective_node)
 
-        # Collect all ref keys present at this level (runtime fallback)
-        bound_refs = {
-            k for k in obj
-            if any(k.endswith(s) for s in _REF_SUFFIXES)
-        }
+        # Collect the canonical-id VALUES bound by *_ref / *_refs keys at this
+        # level (runtime fallback). Term-specific: a sibling ref suppresses E541
+        # for a given term only if one of its bound values is one of that term's
+        # canonical ids. Merely having *some* unrelated ref present does NOT
+        # suppress (that object-level behaviour over-suppressed E541).
+        bound_ref_ids: set[str] = set()
+        for _rk, _rv in obj.items():
+            if any(_rk.endswith(s) for s in _REF_SUFFIXES):
+                if isinstance(_rv, str):
+                    bound_ref_ids.add(_rv)
+                elif isinstance(_rv, list):
+                    bound_ref_ids.update(x for x in _rv if isinstance(x, str))
         for key, value in obj.items():
             # Skip canonical metadata subtrees entirely — these are
             # vocabulary definitions, not spec content that should bind refs.
@@ -822,13 +829,17 @@ def _check_free_text_terms(
                     pass  # skip the E541 binding check — object cannot carry a *_ref
                     # (the unconditional _check_free_text_terms recursion below is a
                     #  no-op for this string value, so descent is not re-triggered here)
-                # Skip if there's already a ref binding at this level (runtime)
-                elif bound_refs:
-                    pass  # suppressed by runtime ref presence
                 else:
                     text_lower = value.lower()
                     for term, cids in canonical_terms.items():
                         if term in text_lower:
+                            # Term-specific runtime suppression: a sibling *_ref /
+                            # *_refs whose value is one of THIS term's canonical
+                            # ids pins the mention — skip E541 for this term only.
+                            # An unrelated ref (binding a different id) does not
+                            # suppress, so a genuinely unbound term still fires.
+                            if cids & bound_ref_ids:
+                                continue
                             errs.append(make_error(
                                 "E541",
                                 f"UNBOUND_CANONICAL_TERM {rel}:{p} "

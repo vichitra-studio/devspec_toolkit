@@ -15,6 +15,14 @@
 
 **See also**: E120, E211.
 
+### E520 UNRESOLVED_INPUT / SCHEMA_NOT_FOUND
+
+**Trigger**: A validator could not resolve a required input and fails closed rather than crashing. Two message families share this code:
+- `UNRESOLVED_INPUT` — a required directory, file, or spec input was missing or unreadable (e.g. `missing_spec_dir`, `missing_canon_dir`, `invalid_json`), or a CLI input precondition was not met.
+- `schema_not_found` — the schema registry could not load the schema for a `$schema` URI. As of 1.1.0, `specdev validate` / `spec-check` fail closed on **all** registry I/O errors (previously only `FileNotFoundError` was caught; `PermissionError` and other `OSError`s now route here instead of escaping uncaught). The step-11 validator likewise emits a structured `E520` for malformed `threats[]` / `target_ids[]` entries that previously raised an unhandled `AttributeError`.
+
+**Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable.
+
 ### E530 INVENTED_ENUM_OR_ID
 
 **Trigger**: A value in a spec artifact does not match any allowed enum member, canonical ID, or registered entry.  The most common variant is a leading verb in a `command` field that is not in the toolkit or project allowlist.
@@ -61,7 +69,13 @@
 
 **Resolution**: Add the appropriate `*_ref` (e.g. `fr_ref`, `capability_ref`, `term_ref`) alongside the free-text field to bind the canonical term to its ID, or reword the field so it no longer names the canonical term.
 
-**Note**: As of 1.1.0, E541 is suppressed on free-text fields whose enclosing object is *structurally unbindable* — i.e. the object's schema sets `additionalProperties: false` and declares no `*_ref` slot, so it physically cannot carry a binding reference. Ref-capable objects (e.g. `14_roadmap` milestones with `fr_refs`/`capability_refs`) still fire E541, so legitimate unbound mentions are not over-suppressed.
+**Note**: E541 is suppressed through three independent mechanisms; a free-text field is checked only if none of them apply:
+
+1. **Structural suppression** (as of 1.1.0) — fields whose enclosing object is *structurally unbindable*: the object's schema sets `additionalProperties: false` and declares no `*_ref`/`*_refs` slot, so it physically cannot carry a binding reference. Ref-capable objects (e.g. `14_roadmap` milestones with `fr_refs`/`capability_refs`) still fire E541, so legitimate unbound mentions are not over-suppressed.
+
+2. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
+
+3. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs (e.g. the `execution` subtree's `test_results[].name`). This key-name skip is the only active suppressor for artifacts with no resolvable `$schema` (where structural suppression is inactive).
 
 ### E561 / W561 UNCOVERED_FR
 

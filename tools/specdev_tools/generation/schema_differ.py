@@ -117,7 +117,12 @@ def calculate_version_delta(
         changelog_dir: Path to changelog/ dir for breaking flag check
         
     Returns:
-        Delta string like "1 MINOR update (breaking)" or None if same version
+        Delta string like "1 MINOR update (breaking)" for an upgrade
+        (target newer than source), or ``None`` in two cases: when the
+        versions are equal, and when the source is *newer* than the target
+        (a downgrade — all major/minor/patch deltas <= 0). Callers that must
+        distinguish "aligned" from "downgrade" should compare the versions
+        directly rather than relying on this return value alone.
     """
     if not source_version or source_version == target_version:
         return None
@@ -708,6 +713,15 @@ def format_status_report(diff: MigrationDiff) -> str:
     s = diff.summary
     if diff.source_version == diff.target_version:
         lines.append("✅ Project is aligned with toolkit version")
+    elif diff.source_version and diff.version_delta is None:
+        # Downgrade: the project is on a NEWER version than the toolkit.
+        # calculate_version_delta returns None for a downgrade (the same-version
+        # case is already handled above), so there is no migration to recommend.
+        lines.append(
+            f"ℹ️  Project version {diff.source_version} is ahead of "
+            f"toolkit {diff.target_version}"
+        )
+        lines.append("   No migration needed (project is on a newer version).")
     elif diff.source_version:
         lines.append("Version Delta:")
         delta_str = diff.version_delta or "update required"
