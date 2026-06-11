@@ -399,6 +399,14 @@
 
 **Promotable**: W573 → E573.
 
+### W570 GRACEFUL_SKIP
+
+**Trigger**: A validator cannot resolve an optional upstream input needed for a cross-reference check, so it skips that check rather than emitting a false unresolved-reference error. W570 is a general graceful-skip signal emitted from several validators (`hallucination_lint`, `traceability_closure`, `seed_lint`, `canonical/autofix`, and the step-16 validator) whenever a dependency they would cross-check is absent. The representative case is the NFR-ref check in `hallucination_lint`: when `spec/07_nfrs.json` is absent, `nfr_refs` in downstream artifacts (e.g. `13_impl.json`) cannot be validated, so the linter records `W570 GRACEFUL_SKIP nfr_refs 07_nfrs.json_absent` and proceeds without flagging any `nfr-*` reference as unresolved. Each emitter's message payload names the specific check and the missing input.
+
+**Resolution**: None required — the skip is intentional and informational. To make the skipped check actually run, provide the missing upstream artifact named in the message (e.g. `spec/07_nfrs.json` via the step-07 NFR prompt) and re-run the validator.
+
+**Promotable**: No. W570 has no `E570` counterpart — a graceful skip is the *absence* of a checkable condition, not a defect, so there is nothing to promote to an error.
+
 ### Substep & Milestone Drift (58x)
 
 ### E580 / W580 SUBSTEP_DRIFT
@@ -426,6 +434,24 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 **Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 
 **Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
+
+### Step-16 Anchor Validation (W611 / W612)
+
+#### W611 ANCHOR_DRIFT_SUPPRESSED
+
+**Trigger**: The Trinity Anchor's `impl_context/` directory contains one or more JSON files, but none of them declare `$schema='vc:16-impl-context'`, so every per-milestone plan was filtered out (typically because each tripped W588/W589). With zero surviving milestone contexts, the cross-milestone E308 (scope drift) and E309 (checklist drift) checks are completely suppressed — the anchor looks clean while contributing nothing to drift detection. Does not fire when `impl_context/` is genuinely empty (`files_seen == 0`), which is a valid state for a fresh anchor.
+
+**Resolution**: Fix the W588/W589 warnings reported above the W611 line so the per-milestone plans are recognized (correct each plan's `$schema` to `vc:16-impl-context`). Once at least one plan survives filtering, E308/E309 drift detection is restored.
+
+**Promotable**: No. W611 flags a suppressed-coverage condition, not a concrete drift defect; it has no `E611` counterpart.
+
+#### W612 ANCHOR_PHANTOM_MILESTONE
+
+**Trigger**: A `milestone_index` entry in the Trinity Anchor names a `milestone_id` that does not match any `milestone_id` in `14_roadmap.json`. Phantom milestones bypass ownership, prefix, and scope-drift detection, so the mismatch is surfaced as a warning. Only checked when `14_roadmap.json` is present and readable.
+
+**Resolution**: Verify the `milestone_id` is not a typo. Either correct it to reference an existing roadmap milestone, or add the milestone to `14_roadmap.json` if it is legitimately new (replaying the step-14 roadmap step).
+
+**Promotable**: No. W612 has no `E612` counterpart — a phantom-milestone reference is advisory because the roadmap may legitimately lag a freshly-scaffolded anchor.
 
 ## Exception Classes
 

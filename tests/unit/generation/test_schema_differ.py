@@ -41,6 +41,14 @@ class TestEnums:
         assert DiffType.EXTRA_FIELD.value == "extra_field"
         assert DiffType.TYPE_MISMATCH.value == "type_mismatch"
 
+    def test_diff_type_schema_ref_outdated_enum_value(self):
+        # SCHEMA_REF_OUTDATED is emitted when a spec file's $schema does not
+        # match the expected $id (schema_differ.py:452). The step-16 anchor
+        # mapping exists precisely to avoid a *spurious* one on the root
+        # 16_impl_context file. Guard its string value against accidental
+        # renames so the wire/serialized "schema_ref" token stays stable.
+        assert DiffType.SCHEMA_REF_OUTDATED.value == "schema_ref"
+
     def test_migration_action_values(self):
         assert MigrationAction.AUTO.value == "auto"
         assert MigrationAction.AI_ASSISTED.value == "ai_assisted"
@@ -352,6 +360,22 @@ class TestApplyStep16AnchorMapping:
         inv = {"00_charter": tmp_path / "c", "16_impl_context": tmp_path / "b"}
         remapped = apply_step16_anchor_mapping(inv)
         assert remapped == inv
+
+    def test_anchor_mapping_partial_inventory_creates_impl_context(self, tmp_path):
+        # Partial inventory: 16_anchor present but 16_impl_context absent.
+        # The transform is NOT a no-op here — it remaps the root step
+        # 16_impl_context onto the anchor schema and drops 16_anchor.
+        anchor = tmp_path / "16_anchor.schema.json"
+        inv = {"16_anchor": anchor, "00_charter": tmp_path / "00_charter.schema.json"}
+        remapped = apply_step16_anchor_mapping(inv)
+        # Root step 16_impl_context is synthesized from the anchor schema...
+        assert remapped["16_impl_context"] == anchor
+        # ...and 16_anchor is dropped so it is not flagged MISSING.
+        assert "16_anchor" not in remapped
+        # Unrelated steps are untouched.
+        assert remapped["00_charter"] == tmp_path / "00_charter.schema.json"
+        # Input is not mutated.
+        assert inv == {"16_anchor": anchor, "00_charter": tmp_path / "00_charter.schema.json"}
 
 
 def _write_good_step16_layout(spec_dir: Path) -> None:

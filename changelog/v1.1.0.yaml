@@ -301,3 +301,19 @@ changes:
       anchor) still flags.
     migration:
       action: none
+
+  - type: change_schema
+    description: >
+      Trinity verified/closed transition is now keyed on implementation.status
+      (string) only. The previous dual-gate that required BOTH the status string
+      AND a status_ref.id is removed (a direct consequence of retiring the
+      status_ref field and the canon status kind in this release). Under the old
+      dual-gate, a milestone group could not advance to verified/closed unless
+      status_ref.id was also populated; with status_ref gone, the gate keys on the
+      status string alone. This affects how host-repo AI agents (specdev-scope
+      milestone_state and the specdev-trinity loop) compute milestone phase
+      position. No host action is required beyond the automatic status_ref removal
+      covered by the status_ref remove_field entry above; the dual-gate change is
+      purely a relaxation and never blocks a previously-valid transition.
+    migration:
+      action: none

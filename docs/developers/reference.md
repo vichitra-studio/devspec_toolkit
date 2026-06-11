@@ -121,7 +121,53 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 # Trinity milestone-state — deterministic phase-position computation (DEVSPEC-38)
 ./tools/run_specdev.sh milestone-state --batch-id <batch-id> \
   --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
+# Targeted JSON read/query of a spec artifact (avoids direct Read)
+./tools/run_specdev.sh json read spec/03_glossary.json '.terms[0].id' --repo-root ./devspec_toolkit
+./tools/run_specdev.sh json read-multi spec/03_glossary.json '.terms | length' '.id' --repo-root ./devspec_toolkit
+
+# Targeted JSON edit of a spec artifact (avoids direct Edit/Write)
+./tools/run_specdev.sh json patch  spec/03_glossary.json '.terms[0].domain' '"infrastructure"' --repo-root ./devspec_toolkit
+./tools/run_specdev.sh json insert spec/03_glossary.json '.terms' '<term-object-json>' --repo-root ./devspec_toolkit
+# delete/keys/structure take no --repo-root (jq-only ops)
+./tools/run_specdev.sh json delete spec/03_glossary.json '.terms[3]'
 ```
+
+### `specdev json` — artifact read/query/edit family
+
+Surgical, schema-aware access to `spec/*.json` artifacts; preferred over direct
+file reads/writes (the `/specdev-context` skill drives these under the hood). All
+positional path arguments are **jq paths/filters** (e.g. `.terms[0].id`), not RFC-6901
+JSON pointers. `--spec-root`/`--git-root` are not accepted by the read/query/write
+subcommands; `resolve-pointers` is the exception — it accepts `--git-root` (used, to
+anchor relative file-path resolution) and a deprecated `--spec-root` (accepted but
+warned-then-ignored; slated for removal). `--repo-root` support is per-subcommand (see the column below):
+it is **required** by `resolve-pointers` (registry lookup), used by `schema` for schema
+discovery (optional — falls back to `find_schema_dir`) and by `patch`/`insert` for
+differential validation, accepted-but-ignored by `read`/`read-multi`, and **not
+accepted at all** by `keys`/`structure`/`delete` (passing it errors with "unrecognized
+arguments").
+
+| Subcommand | `--repo-root` | Purpose |
+|------------|:---:|---------|
+| `specdev json read <file> <jq-filter>` | accepted (unused) | Evaluate a single jq filter against the artifact |
+| `specdev json read-multi <file> <jq...>` | accepted (unused) | Evaluate several jq filters in one call |
+| `specdev json keys <file> [jq-path]` | ✗ | List object keys at a jq path |
+| `specdev json structure <file> [jq-path]` | ✗ | Print the artifact's shape (keys/types) |
+| `specdev json schema <file> <jq-path>` | used (optional) | Navigate the resolved schema at a path (own-first property merge; unions `oneOf`/`anyOf`/`if-then-else`) |
+| `specdev json patch <file> <jq-path> <value>` | used | Set one value; differential schema-validated before write |
+| `specdev json insert <file> <jq-path> <value>` | used | Append into an array; differential schema-validated before write |
+| `specdev json delete <file> <jq-path>` | ✗ | Remove one node (jq `del()`; **no** schema validation) |
+| `specdev json resolve-pointers` (pointer list on **stdin**) | required | Resolve a canonical-ref pointer list; report to `--out <path>` or stdout (also accepts `--git-root`, default cwd) |
+
+`patch` and `insert` perform always-on differential whole-document validation using
+the file's own `$schema` URI: a write is refused only if it *introduces* a new
+violation (before/after diff), so one-patch-at-a-time repair is never deadlocked.
+There is no `--no-validate` bypass. `delete` does **not** validate — it applies a
+jq `del()` and writes atomically. `specdev json insert --create-schema <uri>`
+seeds a missing target file with `{"$schema": "<uri>"}` and bootstraps the
+array-valued field before validating — enabling first-use creation of an artifact
+(e.g. `spec/canon/command_prefixes.json`) without a separate file-creation step.
 
 ### DAG & Extraction Intent Commands
 

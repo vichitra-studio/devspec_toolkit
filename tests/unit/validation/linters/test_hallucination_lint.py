@@ -520,6 +520,25 @@ class HallucinationLintTests(unittest.TestCase):
             errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
             self.assertFalse(any("UNRESOLVED_NFR_REF" in e for e in render_errors(errs)))
 
+    def test_nfr_refs_emits_w570_when_07_absent(self):
+        # Companion to test_nfr_refs_skipped_when_07_absent: assert the POSITIVE
+        # signal — when 07_nfrs.json is absent, the linter must emit the W570
+        # GRACEFUL_SKIP diagnostic, not silently swallow the skip. Guards against
+        # a regression that drops W570 while still suppressing UNRESOLVED_NFR_REF.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "spec").mkdir()
+            (root / "spec" / "13_impl.json").write_text(
+                json.dumps({"nfr_refs": ["nfr-anything"]}),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(str(root / "spec"), repo_root=str(root))
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W570" in e and "GRACEFUL_SKIP" in e for e in rendered),
+                f"expected a W570 GRACEFUL_SKIP diagnostic, got: {rendered}",
+            )
+
 
 class ExtractPathFromStringTests(unittest.TestCase):
     """Unit tests for _extract_path_from_string covering all four branches."""

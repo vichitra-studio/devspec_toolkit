@@ -258,8 +258,14 @@ def apply_step16_anchor_mapping(toolkit_schemas: Dict[str, Path]) -> Dict[str, P
     root step. The per-milestone ``16_impl_context.schema.json`` has no root file
     and is intentionally not represented as a root step here.
 
-    Returns a new dict; does not mutate the input. No-op when the step-16
-    schemas are absent (keeps older/partial toolkit checkouts working).
+    Returns a new dict; does not mutate the input. The remap is gated solely
+    on the presence of ``16_anchor``: it is a true no-op only when ``16_anchor``
+    is absent (older toolkit checkouts). In the partial inventory case where
+    ``16_anchor`` is present but ``16_impl_context`` is absent, the function is
+    NOT a no-op — it still creates the root ``16_impl_context`` key from the
+    anchor schema and drops ``16_anchor``, because the anchor is the source of
+    truth for the root step regardless of whether the per-milestone schema was
+    inventoried.
     """
     remapped = dict(toolkit_schemas)
     anchor_schema = remapped.get("16_anchor")
