@@ -51,6 +51,8 @@ import pytest
 from specdev_tools.validation.hallucination_lint import (
     _check_free_text_terms,
     _is_structurally_unbindable,
+    _extract_slot_kinds,
+    _term_kinds_from_cids,
     _SchemaResolverCtx,
     lint_hallucinations,
 )
@@ -210,14 +212,22 @@ class TestMilestonesNameStructuralRule:
             f"got: {[e.render() for e in e541]}"
         )
 
-    def test_14_roadmap_milestones_name_still_fires(self):
-        """(b) milestones[].name in 14_roadmap MUST still fire E541.
+    def test_14_roadmap_milestones_name_suppressed_round4(self):
+        """(round-4) milestones[].name in 14_roadmap is suppressed by namespace-aware rule.
 
-        14_roadmap milestones item: ap:false WITH fr_refs/capability_refs →
-        structurally ref-capable → E541 must not be suppressed.
+        PREMISE CHANGE (round 4): pre-round-4 this test asserted E541 fires
+        because 14_roadmap milestones have ``fr_refs``/``capability_refs`` ref
+        slots.  Round-4 overturns that premise: the namespace-aware check
+        asks whether ANY slot can bind a *term* or *acronym* id — not just
+        whether any slot exists at all.
 
-        This is the over-suppression guard: if the structural rule incorrectly
-        skips 14_roadmap, this test fails.
+        14_roadmap milestone item: ap:false, ref slots = {fr_refs, capability_refs}.
+        Slot kinds = {"fr", "capability"}.  Fired term kind = "term".
+        Since "term" ∉ {"fr", "capability"}, binding is structurally impossible
+        → E541 MUST be suppressed for kind=term terms.
+
+        The over-suppression guardrail is now ``test_14_roadmap_term_ref_slot_still_fires``
+        (which uses a schema that has a ``term_ref`` slot and verifies E541 still fires).
         """
         ctx, canonical_terms = self._ctx_and_terms()
         data = {
@@ -228,7 +238,8 @@ class TestMilestonesNameStructuralRule:
                     "name": "Ghost platform setup milestone",
                     "status": "planned",
                     "deliverables": [{"type": "fr", "id": "fr-ghost-setup"}],
-                    # No fr_refs/capability_refs bound → E541 MUST fire
+                    # fr_refs/capability_refs slots exist, but kinds are "fr"/"capability"
+                    # → no namespace overlap with term kind → E541 suppressed (round 4)
                 }
             ],
         }
@@ -238,9 +249,10 @@ class TestMilestonesNameStructuralRule:
             schema_node=eff_schema, resolve_fn=resolve_fn,
         )
         e541 = [e for e in errs if e.code == "E541"]
-        assert e541, (
-            "milestones[].name in 14_roadmap must still fire E541 — it has fr_refs/capability_refs "
-            "ref slots (over-suppression guard failed)"
+        assert not e541, (
+            "milestones[].name in 14_roadmap must be suppressed by round-4 namespace-aware "
+            "rule: fr_refs/capability_refs slots have kinds 'fr'/'capability' which do not "
+            "match the term kind 'term'; got: " + str([e.render() for e in e541])
         )
 
 
@@ -373,11 +385,18 @@ class TestE541StructuralRuleEndToEnd:
                 f"got: {[e.render() for e in e541]}"
             )
 
-    def test_14_roadmap_milestones_name_still_fires_end_to_end(self):
-        """Over-suppression guard: milestones[].name in 14_roadmap must still fire E541 end-to-end.
+    def test_14_roadmap_milestones_name_suppressed_round4_end_to_end(self):
+        """Round-4: milestones[].name in 14_roadmap is suppressed end-to-end.
 
-        14_roadmap milestone items have fr_refs/capability_refs → ref-capable →
-        E541 must fire when no binding is provided.  This is the DoD #1(b) guard.
+        PREMISE CHANGE (round 4): pre-round-4 this test asserted E541 fires
+        because 14_roadmap milestones have fr_refs/capability_refs.  Round-4
+        overturns that: slot kinds {"fr", "capability"} don't match term kind
+        "term" → namespace-aware suppression → E541 must NOT fire.
+
+        The over-suppression guardrail has moved to
+        ``test_03_glossary_terms_definition_without_term_ref_fires`` which
+        proves a genuinely-unbound term (object HAS a matching term_ref slot
+        but it is NOT bound to the term id) STILL fires E541.
         """
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -389,7 +408,8 @@ class TestE541StructuralRuleEndToEnd:
                         "name": "Ghost theme and tag setup",
                         "status": "planned",
                         "deliverables": [{"type": "fr", "id": "fr-ghost-setup"}],
-                        # No fr_refs/capability_refs → E541 must fire
+                        # fr_refs/capability_refs have kinds "fr"/"capability" —
+                        # no namespace overlap with "term" → suppressed (round 4)
                     }
                 ],
             }, "14_roadmap.json")
@@ -399,9 +419,10 @@ class TestE541StructuralRuleEndToEnd:
                 require_manifest_schema_registration=False,
             )
             e541 = [e for e in errs if e.code == "E541"]
-            assert e541, (
-                "milestones[].name in 14_roadmap must still fire E541 end-to-end "
-                "(over-suppression guard failed)"
+            assert not e541, (
+                "milestones[].name in 14_roadmap must be suppressed by round-4 "
+                "namespace-aware rule (fr_refs/capability_refs are not term-kind); "
+                "got: " + str([e.render() for e in e541])
             )
 
     def test_16_impl_context_surfaces_suppressed_end_to_end(self):
@@ -564,4 +585,285 @@ class TestBoundRefsTermSpecificSuppression:
         e541 = [e for e in errs if e.code == "E541"]
         assert e541, (
             "A ref binding only 'tag' must still leave 'ghost' unbound → E541 fires"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Round-4 helpers — unit tests for _extract_slot_kinds and _term_kinds_from_cids
+# ---------------------------------------------------------------------------
+
+class TestRound4Helpers:
+    """Unit tests for the two round-4 helper functions.
+
+    These functions underpin the namespace-aware suppression logic; verifying
+    them independently gives a second line of defence against regressions that
+    might be masked by an accidentally-passing integration test.
+    """
+
+    def test_extract_slot_kinds_returns_none_for_open_schema(self):
+        """Open schema (ap not False) → None (don't suppress)."""
+        schema_open = {
+            "type": "object",
+            "properties": {"term_ref": {"type": "string"}},
+            # additionalProperties NOT set → open schema
+        }
+        result = _extract_slot_kinds(schema_open)
+        assert result is None, (
+            "_extract_slot_kinds must return None for schemas without additionalProperties:false"
+        )
+
+    def test_extract_slot_kinds_returns_none_for_none_input(self):
+        """None schema_node → None."""
+        assert _extract_slot_kinds(None) is None
+
+    def test_extract_slot_kinds_empty_for_closed_no_ref_slots(self):
+        """Closed schema (ap:false) with no ref slots → empty set (all kinds suppressed)."""
+        schema_closed_no_refs = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"id": {"type": "string"}, "description": {"type": "string"}},
+        }
+        result = _extract_slot_kinds(schema_closed_no_refs)
+        assert result == set(), (
+            "_extract_slot_kinds must return an empty set for closed schema with no ref slots"
+        )
+
+    def test_extract_slot_kinds_term_and_acronym(self):
+        """Closed schema with term_ref and acronym_ref → {'term', 'acronym'}."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "term_ref": {"type": "object"},
+                "acronym_ref": {"type": "object"},
+                "unit_ref": {"type": "object"},
+                "definition": {"type": "string"},
+            },
+        }
+        result = _extract_slot_kinds(schema)
+        assert result == {"term", "acronym", "unit"}, (
+            f"Expected {{'term', 'acronym', 'unit'}}, got {result}"
+        )
+
+    def test_extract_slot_kinds_non_term_kinds(self):
+        """NFR item: metric_ref, unit_ref, stage_ref, environment_ref → not term/acronym."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "metric_ref": {"type": "object"},
+                "unit_ref": {"type": "object"},
+                "stage_ref": {"type": "object"},
+                "environment_ref": {"type": "object"},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+            },
+        }
+        result = _extract_slot_kinds(schema)
+        assert result == {"metric", "unit", "stage", "environment"}, (
+            f"Expected {{'metric', 'unit', 'stage', 'environment'}}, got {result}"
+        )
+        assert "term" not in result, "NFR item schema must not include 'term' in slot_kinds"
+        assert "acronym" not in result, "NFR item schema must not include 'acronym' in slot_kinds"
+
+    def test_extract_slot_kinds_refs_plural(self):
+        """Plural _refs slots are stripped correctly: fr_refs → 'fr'."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "fr_refs": {"type": "array"},
+                "capability_refs": {"type": "array"},
+            },
+        }
+        result = _extract_slot_kinds(schema)
+        assert result == {"fr", "capability"}, (
+            f"Expected {{'fr', 'capability'}}, got {result}"
+        )
+
+    def test_term_kinds_from_cids_project_term(self):
+        """cn:project:term:<label> → {'term'}."""
+        result = _term_kinds_from_cids({"cn:project:term:ghost"})
+        assert result == {"term"}, f"Expected {{'term'}}, got {result}"
+
+    def test_term_kinds_from_cids_core_acronym(self):
+        """cn:core:acronym:jwt → {'acronym'}."""
+        result = _term_kinds_from_cids({"cn:core:acronym:jwt"})
+        assert result == {"acronym"}, f"Expected {{'acronym'}}, got {result}"
+
+    def test_term_kinds_from_cids_mixed(self):
+        """Multiple cids with different kinds → union of kinds."""
+        result = _term_kinds_from_cids({"cn:core:term:jwt", "cn:core:acronym:jwt"})
+        assert result == {"term", "acronym"}, f"Expected {{'term', 'acronym'}}, got {result}"
+
+    def test_term_kinds_from_cids_malformed_ignored(self):
+        """Malformed IDs (fewer than 3 colon-separated segments) are ignored."""
+        result = _term_kinds_from_cids({"bad-id", "cn:project:term:ok"})
+        # "bad-id" has 0 colons → only 1 part → no kind extracted
+        assert "term" in result, "Well-formed cn:project:term:ok must still produce 'term'"
+
+
+# ---------------------------------------------------------------------------
+# Round-4 guardrail: unbound term WITH matching term_ref slot STILL fires E541
+# ---------------------------------------------------------------------------
+
+class TestRound4GuardrailNamespaceMatchingStillFires:
+    """Guardrail: namespace-aware suppression must NOT silence genuinely-unbound terms.
+
+    An object that HAS a ``term_ref``/``acronym_ref`` slot (so the namespace
+    DOES match a ``term``/``acronym`` canonical id) must still fire E541 when:
+      (a) the slot is absent (unbound), or
+      (b) the slot is bound to a *different* canonical id than the mentioned term.
+
+    This mirrors the round-2 ``TestBoundRefsTermSpecificSuppression`` intent but
+    adds the round-4 dimension: the fix must not suppress these cases under the
+    namespace-aware check because the slot KIND matches → the namespace check
+    passes through to the runtime ``bound_ref_ids`` check → E541 fires correctly.
+
+    These tests use a synthetic schema with ``additionalProperties:false`` AND
+    ``term_ref`` so that ``slot_kinds = {"term"}`` → no namespace suppression →
+    mechanism-2 (term-specific ref-value check) is the sole decider.
+    """
+
+    _SCHEMA_WITH_TERM_REF = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "description": {"type": "string"},
+            "term_ref": {"type": "string"},
+        },
+    }
+
+    _TERMS = {
+        "ghost": {"cn:project:term:ghost"},
+    }
+
+    def test_term_ref_slot_present_but_empty_fires_e541(self):
+        """Object has term_ref slot (matching namespace) but no binding → E541 fires.
+
+        This is the §4 guardrail: a term-capable object whose term_ref is absent
+        (or not bound to the mentioned term's id) must still be flagged, regardless
+        of round-4's namespace suppression logic.
+        """
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            # term_ref is absent — the slot exists in schema but is not bound
+        }
+        # Pass the schema with term_ref → slot_kinds = {"term"} → no suppression
+        errs = _check_free_text_terms(
+            "x.json", obj, self._TERMS,
+            schema_node=self._SCHEMA_WITH_TERM_REF,
+            resolve_fn=lambda ref: None,  # trivial resolver — no $ref in this schema
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "An object with a term_ref slot (namespace matches 'term') but NO binding "
+            "must still fire E541 — round-4 namespace suppression must not over-suppress. "
+            f"(round-2 win preserved; slot_kinds should be {{'term'}} → passes through to E541)"
+        )
+
+    def test_term_ref_slot_bound_to_wrong_id_fires_e541(self):
+        """Object has term_ref bound to a different id → E541 still fires for the mentioned term.
+
+        Confirms that round-4 namespace-aware suppression (which only checks KIND
+        membership, not id value) correctly defers to mechanism-2 (term-specific
+        runtime check) when the slot kind matches but the bound id does not.
+        """
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            "term_ref": "cn:project:term:other-term",  # wrong id, not ghost
+        }
+        errs = _check_free_text_terms(
+            "x.json", obj, self._TERMS,
+            schema_node=self._SCHEMA_WITH_TERM_REF,
+            resolve_fn=lambda ref: None,
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "A term_ref bound to a DIFFERENT canonical id must not suppress E541 for "
+            "the mentioned term — mechanism-2 (term-specific runtime check) must still fire."
+        )
+
+    def test_term_ref_slot_bound_correctly_suppresses(self):
+        """Positive control: term_ref bound to the correct id must suppress E541.
+
+        Confirms that when both namespace AND id match, suppression works as expected
+        and mechanism-2 (round-2) correctly identifies the binding.
+        """
+        obj = {
+            "description": "Ghost admin login behaviour is underspecified",
+            "term_ref": "cn:project:term:ghost",  # correct binding
+        }
+        errs = _check_free_text_terms(
+            "x.json", obj, self._TERMS,
+            schema_node=self._SCHEMA_WITH_TERM_REF,
+            resolve_fn=lambda ref: None,
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            f"A correctly-bound term_ref must suppress E541; got: {[e.render() for e in e541]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Round-4: Category-A semantic skip for 03_glossary.json terms[].definition
+# ---------------------------------------------------------------------------
+
+class TestGlossaryDefinitionSemanticSkip:
+    """The glossary ``terms[].definition`` field must not fire E541.
+
+    Rationale: the glossary IS the vocabulary source.  A definition mentioning
+    other project terms (e.g., "The theme template system used by Ghost for
+    rendering...") cannot be expected to bind every mentioned term via a
+    ``term_ref`` — that would require each definition to be a cross-reference
+    graph rather than prose.  The file-scoped Category-A skip for
+    ``03_glossary.json`` → ``definition`` handles this.
+
+    Note: the glossary ``terms[]`` DOES have ``term_ref``/``acronym_ref`` slots
+    (used to bind the entry's OWN canonical id), so the namespace-aware structural
+    rule does NOT suppress it.  This explicit skip is the only mechanism that
+    covers it.  The test below verifies the skip fires for the glossary file and
+    does NOT fire for a non-glossary file (ensuring the skip is scoped correctly).
+    """
+
+    _TERMS = {"ghost": {"cn:project:term:ghost"}}
+
+    def test_glossary_definition_suppressed(self):
+        """definition in 03_glossary.json must NOT fire E541."""
+        obj = {
+            "terms": [
+                {
+                    "term_id": "term-theme",
+                    "term": "Theme",
+                    "definition": "The Ghost theme system used for rendering pages.",
+                    "term_ref": {"id": "cn:project:term:theme", "kind": "term"},
+                    # 'ghost' is mentioned in definition but NOT bound via term_ref
+                }
+            ]
+        }
+        errs = _check_free_text_terms("03_glossary.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            f"03_glossary.json terms[].definition must be suppressed by Category-A skip; "
+            f"got: {[e.render() for e in e541]}"
+        )
+
+    def test_non_glossary_definition_still_fires(self):
+        """definition in a non-glossary file is NOT covered by the glossary skip.
+
+        If a future step defines a ``definition`` field in an object with a
+        ``term_ref`` slot, E541 must still fire when the term is unbound.
+        This test uses schema_node=None (no structural suppression) to isolate
+        the file-scoped skip behaviour.
+        """
+        obj = {
+            "definition": "The Ghost admin login behaviour is underspecified",
+            # No *_ref binding ghost → E541 should fire for non-glossary files
+        }
+        # Pass schema_node=None so structural/namespace suppression is inactive
+        errs = _check_free_text_terms("04_fr_list.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "definition in a non-glossary file must still fire E541 — "
+            "the Category-A skip is scoped to 03_glossary.json only"
         )

@@ -317,3 +317,61 @@ changes:
       purely a relaxation and never blocks a previously-valid transition.
     migration:
       action: none
+
+  - type: fix
+    description: >
+      E541 (UNBOUND_CANONICAL_TERM) namespace-aware suppression — round 4
+      refinement to the structural suppression logic introduced earlier in this
+      release. The previous structural rule (round 1) suppressed E541 only when
+      the enclosing object had additionalProperties:false and NO *_ref/*_refs
+      slot at all. Objects such as nfrs[], capabilities[], frs[], ci-gate jobs[],
+      and roadmap milestones[] carry purpose-specific ref slots (metric_ref,
+      unit_ref, capability_ref, fr_refs, etc.) but no term_ref/acronym_ref slot,
+      so the round-1 rule did not suppress — and E541 fired 765 times on a
+      representative host spec tree as false positives.
+
+      Round-4 generalises the structural check from "object has no ref slot at all"
+      to "object has no ref slot whose KIND matches the fired term's kind":
+
+        * New helper _extract_slot_kinds(schema_node) extracts the set of
+          canonical kinds accepted by each *_ref/*_refs property in a closed
+          (additionalProperties:false) schema node by stripping the _ref/_refs
+          suffix (e.g. metric_ref → "metric", fr_refs → "fr").  Returns None when
+          schema is unavailable (open schema or unresolvable $schema).
+
+        * New helper _term_kinds_from_cids(cids) extracts the kind label from
+          each canonical ID (cn:<tier>:<kind>:<label> → <kind>).
+
+        * In _check_free_text_terms, when slot_kinds is available (not None),
+          each fired term is suppressed if its kind set has no intersection with
+          slot_kinds.  When slot_kinds is None, the check falls through to the
+          existing round-2 term-specific runtime suppression (cids & bound_ref_ids).
+          Round-2 is preserved: an object with a matching slot that is unbound or
+          bound to the wrong id still fires E541.
+
+        * patternProperties support added to the child-schema lookup in
+          _check_free_text_terms: when a key is not found in regular properties,
+          the first matching patternProperties pattern is used as the child schema.
+          This lets the namespace-aware rule reach patternProperty-keyed value
+          objects (e.g. nfr_measurement_methods in 16_impl_context).
+
+        * Two Category-A/B semantic skips added:
+          - 03_glossary.json → "definition" (file-scoped): glossary definitions
+            are vocabulary prose; requiring term_ref bindings for every cross-term
+            mention is semantically incorrect.
+          - "review_requirements" (global, Category B): appears only in
+            16_impl_context.schema.json; contains operational verification
+            instructions (test commands, NFR measurement methods) whose
+            description fields cannot bind canonical term refs.  Belt-and-
+            suspenders for the cases where conditional-branch schema nav loses
+            the patternProperties path to the pattern-value items.
+
+      Net effect: the host spec tree that previously triggered 765 E541 false
+      positives now reports 0 E541 after round 4.  A guardrail test class
+      (TestRound4GuardrailNamespaceMatchingStillFires) proves that objects with
+      a matching term_ref slot still fire E541 when the slot is absent or bound
+      to the wrong id, preserving the round-2 over-suppression fix.  Two
+      pre-round-4 14_roadmap tests that incorrectly asserted "any ref slot means
+      E541 fires" are updated to the correct round-4 premise and documented.
+    migration:
+      action: none

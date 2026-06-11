@@ -338,6 +338,11 @@ def _is_structurally_unbindable(schema_node: dict | None) -> bool:
     schema violation — E541 must be suppressed for all free-text fields on
     that object.  When False (or when *schema_node* is None / unresolvable),
     we fall back to the current behaviour (E541 may fire).
+
+    Note: this is the coarse (all-or-nothing) check.  Callers that know the
+    specific canonical term's *kind* should prefer ``_extract_slot_kinds`` +
+    ``_term_kinds_from_cids`` for the finer namespace-aware suppression that
+    was introduced in round 4.
     """
     if not isinstance(schema_node, dict):
         return False
@@ -349,6 +354,62 @@ def _is_structurally_unbindable(schema_node: dict | None) -> bool:
         for k in props
     )
     return not has_ref_slot
+
+
+def _extract_slot_kinds(schema_node: dict | None) -> set[str] | None:
+    """Return the set of canonical *kinds* accepted by the object's ``*_ref``/
+    ``*_refs`` slots, or ``None`` when the schema is unavailable.
+
+    The kind is inferred by stripping the ``_ref`` / ``_refs`` suffix from
+    each property key whose name ends with that suffix, then removing any
+    leading underscores.  Examples::
+
+        term_ref      → "term"
+        acronym_ref   → "acronym"
+        unit_ref      → "unit"
+        metric_ref    → "metric"
+        fr_refs       → "fr"
+        success_metric_refs → "success_metric"
+
+    Returns ``None`` (not an empty set) when *schema_node* is absent or does
+    not set ``additionalProperties: false``, signalling that the caller should
+    skip namespace suppression and fall through to the runtime ref-value check.
+    An empty set is returned only when the schema IS closed (ap:false) but
+    defines no ref slots at all — in that case every namespace is suppressed.
+    """
+    if not isinstance(schema_node, dict):
+        return None
+    if schema_node.get("additionalProperties") is not False:
+        return None
+    props = schema_node.get("properties", {})
+    kinds: set[str] = set()
+    for k in props:
+        if k.endswith("_refs"):
+            kinds.add(k[:-len("_refs")])
+        elif k.endswith("_ref"):
+            kinds.add(k[:-len("_ref")])
+    return kinds
+
+
+def _term_kinds_from_cids(cids: set[str]) -> set[str]:
+    """Derive canonical *kind* labels from a set of canonical IDs.
+
+    A canonical ID has the form ``cn:<tier>:<kind>:<label>``.  This function
+    extracts the ``<kind>`` segment from each ID.  Examples::
+
+        cn:project:term:ghost   → "term"
+        cn:core:acronym:jwt     → "acronym"
+        cn:project:metric:p99   → "metric"
+
+    IDs that do not conform to the expected four-segment format are silently
+    ignored (they cannot produce a reliable kind label).
+    """
+    kinds: set[str] = set()
+    for cid in cids:
+        parts = cid.split(":")
+        if len(parts) >= 3:
+            kinds.add(parts[2])
+    return kinds
 
 
 def _load_command_prefixes(
@@ -730,6 +791,22 @@ _E541_SKIP_KEYS = {
     "ambiguities",
     "docs_impact",
 
+    # Category B: Step 16 review_requirements subtree — belt-and-suspenders.
+    # ``review_requirements`` exists only in 16_impl_context.schema.json and
+    # contains operational verification instructions (test commands and NFR
+    # measurement methods); these are not canonical term-binding sites.
+    # The structural rule cannot suppress them because:
+    #   - ``test_commands[]`` uses ``oneOf`` (string | object); schema-nav merges
+    #     properties but loses ``additionalProperties`` from the object branch,
+    #     so _extract_slot_kinds returns None → no namespace suppression.
+    #   - ``nfr_measurement_methods`` uses ``patternProperties``; the effective
+    #     plan schema after conditional merging omits it from properties → its
+    #     values receive no child_schema → slot_kinds is None → E541 fires.
+    # This key-name skip ensures suppression when schema resolution is incomplete.
+    # ``review_requirements`` appears only in Step 16 schemas; no other current
+    # pipeline step defines it, so the skip scope is effectively Step-16-only.
+    "review_requirements",
+
     # Category C: execution subtree (16_impl_context.schema.json only).
     # execution.final_status.test_results items have additionalProperties unset
     # (intentionally free-form test-runner output — not bindable spec vocabulary).
@@ -747,8 +824,18 @@ _E541_SKIP_KEYS = {
 # from silently inheriting the exemption.
 # NOTE: The structural rule also suppresses edge_cases when $schema resolves;
 # this file-scoped entry is belt-and-suspenders for files without $schema.
+#
+# Category A (round-4): ``definition`` in 03_glossary.json is vocabulary —
+# the glossary IS the vocabulary source, so each definition field is defining
+# a term by referencing domain concepts; it cannot bind every mentioned term
+# back via a *_ref.  The glossary ``terms[]`` object DOES have ``term_ref``/
+# ``acronym_ref`` slots (used to pin the entry's OWN canonical id), so the
+# namespace-aware structural rule does NOT suppress it — this explicit skip
+# is required.  Scoped narrowly to ``03_glossary.json`` to avoid silencing
+# ``definition`` fields in any other artifact that may be legitimately bindable.
 _E541_SKIP_KEYS_BY_FILE: dict[str, set[str]] = {
     "11_redteam.json": {"edge_cases"},
+    "03_glossary.json": {"definition"},
 }
 
 
@@ -796,6 +883,13 @@ def _check_free_text_terms(
 
         structurally_unbindable = _is_structurally_unbindable(effective_node)
 
+        # Round-4: namespace-aware slot-kind suppression.
+        # _extract_slot_kinds returns None when schema is unavailable (open
+        # schema or unresolvable $schema → fall through to runtime check).
+        # When it returns a set, E541 is suppressed for any term whose kind
+        # is absent from that set — binding is structurally impossible.
+        slot_kinds: set[str] | None = _extract_slot_kinds(effective_node)
+
         # Collect the canonical-id VALUES bound by *_ref / *_refs keys at this
         # level (runtime fallback). Term-specific: a sibling ref suppresses E541
         # for a given term only if one of its bound values is one of that term's
@@ -815,16 +909,28 @@ def _check_free_text_terms(
                 continue
             p = f"{path}.{key}" if path else key
 
-            # Compute child schema node for recursion
+            # Compute child schema node for recursion.
+            # Check ``properties`` first, then fall back to ``patternProperties``
+            # (match the first pattern whose regex matches the key).
             child_schema: dict | None = None
             if effective_node is not None and resolve_fn is not None:
                 props = effective_node.get("properties", {})
                 if key in props:
                     child_schema = props[key]
+                else:
+                    # patternProperties: find the first pattern that matches key
+                    pattern_props = effective_node.get("patternProperties", {})
+                    for pattern, p_schema in pattern_props.items():
+                        try:
+                            if re.search(pattern, key) is not None:
+                                child_schema = p_schema
+                                break
+                        except re.error:
+                            pass
 
             if key in _FREE_TEXT_FIELDS and isinstance(value, str) and len(value) >= 3:
                 # Skip if the schema says this object structurally cannot carry
-                # a binding ref (additionalProperties:false, no *_ref slot).
+                # a binding ref (additionalProperties:false, no *_ref slot at all).
                 if structurally_unbindable:
                     pass  # skip the E541 binding check — object cannot carry a *_ref
                     # (the unconditional _check_free_text_terms recursion below is a
@@ -833,8 +939,20 @@ def _check_free_text_terms(
                     text_lower = value.lower()
                     for term, cids in canonical_terms.items():
                         if term in text_lower:
-                            # Term-specific runtime suppression: a sibling *_ref /
-                            # *_refs whose value is one of THIS term's canonical
+                            # Round-4 namespace-aware suppression: if the schema is
+                            # closed (ap:false) and none of its *_ref/*_refs slots can
+                            # accept the fired term's kind, binding is structurally
+                            # impossible → suppress E541 for this term.
+                            # slot_kinds is None when schema is unavailable → skip this
+                            # check and fall through to the runtime bound_ref_ids path.
+                            if slot_kinds is not None:
+                                term_kinds = _term_kinds_from_cids(cids)
+                                if not (term_kinds & slot_kinds):
+                                    # No namespace overlap — structurally unbindable
+                                    # for this term's kind.  Suppress and continue.
+                                    continue
+                            # Term-specific runtime suppression (round 2): a sibling
+                            # *_ref/*_refs whose value is one of THIS term's canonical
                             # ids pins the mention — skip E541 for this term only.
                             # An unrelated ref (binding a different id) does not
                             # suppress, so a genuinely unbound term still fires.
