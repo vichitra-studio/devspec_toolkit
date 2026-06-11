@@ -55,6 +55,14 @@
 
 **Note**: `out_of_scope[]` entries suppress W564 (UNCOVERED_FR_API). Without this check, a contradicted `out_of_scope[]` entry would silently mask a real API trace from coverage reporting.
 
+### E541 UNBOUND_CANONICAL_TERM
+
+**Trigger**: A free-text field (e.g. a `description`, `rationale`, or `intent`) mentions a canonical term registered in `canon/` without a sibling binding reference (a `*_ref` slot) that pins the term to its canonical ID. The mention reads as an unbound, hallucination-prone reference.
+
+**Resolution**: Add the appropriate `*_ref` (e.g. `fr_ref`, `capability_ref`, `term_ref`) alongside the free-text field to bind the canonical term to its ID, or reword the field so it no longer names the canonical term.
+
+**Note**: As of 1.1.0, E541 is suppressed on free-text fields whose enclosing object is *structurally unbindable* — i.e. the object's schema sets `additionalProperties: false` and declares no `*_ref` slot, so it physically cannot carry a binding reference. Ref-capable objects (e.g. `14_roadmap` milestones with `fr_refs`/`capability_refs`) still fire E541, so legitimate unbound mentions are not over-suppressed.
+
 ### E561 / W561 UNCOVERED_FR
 
 **Trigger**: A functional requirement defined in step 04 is not assigned to any milestone in step 14 (`fr_refs`).

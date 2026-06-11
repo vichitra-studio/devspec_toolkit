@@ -9,7 +9,7 @@ from typing import Any
 from ..canonical.lint import lint_canon_dirs
 from ..canonical.registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
-from ..core.json_utils import _find_schema_dir, build_id_index, resolve_ref as _resolve_urn_ref
+from ..core.json_utils import find_schema_dir, build_id_index, resolve_ref as _resolve_urn_ref
 from ..core.registry import derive_allowed_upstream
 from ..core.schema_nav import effective_schema as _nav_effective_schema
 from ..core.trace_types import is_valid_trace_type
@@ -271,7 +271,7 @@ class _SchemaResolverCtx:
     """
 
     def __init__(self, repo_root: str | None) -> None:
-        schema_dir = _find_schema_dir(repo_root)
+        schema_dir = find_schema_dir(repo_root)
         self._id_index: dict[str, str] = build_id_index(schema_dir) if schema_dir else {}
         self._ref_cache: dict[str, dict] = {}
 
@@ -819,7 +819,9 @@ def _check_free_text_terms(
                 # Skip if the schema says this object structurally cannot carry
                 # a binding ref (additionalProperties:false, no *_ref slot).
                 if structurally_unbindable:
-                    pass  # suppressed — do NOT recurse into free-text value
+                    pass  # skip the E541 binding check — object cannot carry a *_ref
+                    # (the unconditional _check_free_text_terms recursion below is a
+                    #  no-op for this string value, so descent is not re-triggered here)
                 # Skip if there's already a ref binding at this level (runtime)
                 elif bound_refs:
                     pass  # suppressed by runtime ref presence

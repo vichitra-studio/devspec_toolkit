@@ -60,7 +60,7 @@ from specdev_tools.core.schema_nav import effective_schema as _nav_effective_sch
 # Helpers
 # ---------------------------------------------------------------------------
 
-_TOOLKIT_ROOT = str(Path(__file__).parents[5])  # tools/specdev_tools/validation/linters → toolkit root
+_TOOLKIT_ROOT = str(Path(__file__).parents[4])  # tests/unit/validation/linters → toolkit root
 
 
 def _codes(errs):

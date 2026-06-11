@@ -214,8 +214,12 @@ def resolve_ref(ref: str, id_index: Dict[str, str], cache: Dict[str, dict]) -> O
     return None
 
 
-def _find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
+def find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
     """Locate the schema/ directory.
+
+    Public API: this is part of json_utils' supported surface and may be imported
+    by other toolkit modules (e.g. validation linters). The legacy
+    ``_find_schema_dir`` name is retained below as a backward-compatible alias.
 
     Search order:
     1. repo_root/schema (explicit --repo-root from CLI)
@@ -241,6 +245,11 @@ def _find_schema_dir(repo_root: Optional[str] = None) -> Optional[str]:
     return None
 
 
+# Backward-compatible alias for the formerly-private name. Retained so existing
+# internal callers and imports continue to resolve; prefer ``find_schema_dir``.
+_find_schema_dir = find_schema_dir
+
+
 def resolve_schema_path(
     file_path: str,
     repo_root: Optional[str] = None,
@@ -261,7 +270,7 @@ def resolve_schema_path(
 
     # 2. Build or reuse $id index
     if id_index is None:
-        schema_dir = _find_schema_dir(repo_root)
+        schema_dir = find_schema_dir(repo_root)
         if schema_dir:
             id_index = build_id_index(schema_dir)
 
