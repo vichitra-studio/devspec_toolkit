@@ -226,8 +226,19 @@ class TestMilestonesNameStructuralRule:
         Since "term" ∉ {"fr", "capability"}, binding is structurally impossible
         → E541 MUST be suppressed for kind=term terms.
 
-        The over-suppression guardrail is now ``test_14_roadmap_term_ref_slot_still_fires``
-        (which uses a schema that has a ``term_ref`` slot and verifies E541 still fires).
+        The over-suppression guardrail is
+        ``TestRound4GuardrailNamespaceMatchingStillFires`` (which uses a
+        synthetic schema WITH a ``term_ref`` slot and verifies E541 still fires
+        when the slot is absent or bound to the wrong id), plus the real-schema
+        unit test
+        ``TestRound4GuardrailRealSchemaStillFires::test_glossary_term_ref_slot_unbound_fires``
+        (which drives ``vc:03-glossary`` through ``_SchemaResolverCtx`` and
+        confirms E541 fires for an unbound mention with ``term_ref`` available
+        in the schema).
+        Note: ``14_roadmap.schema.json`` has NO ``term_ref`` slot, so a
+        "14_roadmap with term_ref" test is structurally incoherent and does not
+        exist; ``03_glossary.json`` (the only schema with ``term_ref``) is the
+        coherent vehicle.
         """
         ctx, canonical_terms = self._ctx_and_terms()
         data = {
@@ -472,6 +483,64 @@ class TestE541StructuralRuleEndToEnd:
                 f"got {len(e541)} E541(s): {[e.render() for e in e541]}"
             )
 
+    def test_03_glossary_terms_definition_without_term_ref_fires(self):
+        """End-to-end guard: E541 FIRES for a genuinely-unbound term with a real schema.
+
+        This is the both-directions side (b) guard for the round-4 namespace-aware
+        suppression: an object that HAS a matching ``term_ref`` slot (so the slot
+        kind DOES overlap the term kind → no namespace suppression) but does NOT
+        bind the mentioned term must still fire E541.
+
+        Vehicle: a spec file with ``$schema: vc:03-glossary`` (the real glossary
+        schema, which has a ``term_ref`` slot on ``terms[]`` items → slot_kinds
+        includes "term" → namespace check does NOT suppress).  The file is named
+        ``glossary.json`` (not ``03_glossary.json``) so the file-scoped
+        ``definition`` Category-A skip does not apply — ``definition`` is a live
+        free-text field here.  The terms item mentions "Ghost" in ``definition``
+        but provides no ``term_ref`` binding → ``bound_ref_ids ∩ cids = ∅`` →
+        E541 must fire.
+
+        This confirms that round-4 namespace-aware suppression does NOT
+        over-suppress: when slot kind matches the term kind, the check falls
+        through to mechanism-2 (term-specific runtime check) and fires correctly.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            _write_minimal_canon(root, "Ghost")
+            spec = root / "spec"
+            spec.mkdir()
+            # File NOT named "03_glossary.json" → file-scoped definition skip inactive
+            # $schema vc:03-glossary → real schema nav → term_ref slot present in schema
+            # → slot_kinds includes "term" → no namespace suppression
+            # definition mentions "ghost" with no term_ref in data → E541 fires
+            (spec / "glossary.json").write_text(
+                json.dumps({
+                    "$schema": "vc:03-glossary",
+                    "terms": [
+                        {
+                            "term_id": "term-theme",
+                            "term": "Theme",
+                            "definition": "The Ghost theme system for rendering pages.",
+                            # term_ref slot exists in schema but is absent here → unbound
+                        }
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_hallucinations(
+                str(spec),
+                repo_root=str(root),
+                require_manifest_schema_registration=False,
+            )
+            e541 = [e for e in errs if e.code == "E541"]
+            assert e541, (
+                "E541 must fire end-to-end for a genuinely-unbound term when the real "
+                "vc:03-glossary schema provides a term_ref slot (slot_kinds ∋ 'term') "
+                "but the data contains no term_ref binding — round-4 namespace suppression "
+                "must NOT over-suppress when slot kind matches term kind. "
+                "This is the DoD #1(b) both-directions end-to-end guard."
+            )
+
     def test_no_schema_falls_back_to_key_name_skips(self):
         """Files without $schema fall back to key-name skips only.
 
@@ -697,10 +766,31 @@ class TestRound4Helpers:
         assert result == {"term", "acronym"}, f"Expected {{'term', 'acronym'}}, got {result}"
 
     def test_term_kinds_from_cids_malformed_ignored(self):
-        """Malformed IDs (fewer than 3 colon-separated segments) are ignored."""
-        result = _term_kinds_from_cids({"bad-id", "cn:project:term:ok"})
-        # "bad-id" has 0 colons → only 1 part → no kind extracted
-        assert "term" in result, "Well-formed cn:project:term:ok must still produce 'term'"
+        """IDs not in the four-segment cn:<tier>:<kind>:<label> form are silently ignored.
+
+        This covers:
+        - 1-segment ("bad-id"): 1 part, not >= 4 → ignored
+        - 3-segment ("cn:project:acronym"): 3 parts, not >= 4 → ignored despite
+          appearing canonical; under the old >= 3 guard it would have produced
+          "acronym", but the contract requires FOUR segments.
+
+        A well-formed 4-segment ID mixed in must still produce its kind correctly.
+        """
+        # 1-segment: ignored
+        assert _term_kinds_from_cids({"bad-id"}) == set(), (
+            "'bad-id' is 1-segment and must be ignored → empty set"
+        )
+        # 3-segment: looks like cn:<tier>:<kind> but missing <label> → ignored
+        assert _term_kinds_from_cids({"cn:project:acronym"}) == set(), (
+            "'cn:project:acronym' is 3-segment (no label) and must be ignored; "
+            "under >= 3 it would have produced 'acronym', but the contract requires 4 segments"
+        )
+        # 4-segment: valid
+        result = _term_kinds_from_cids({"bad-id", "cn:project:acronym", "cn:project:term:ok"})
+        assert result == {"term"}, (
+            "Only the 4-segment 'cn:project:term:ok' is well-formed; "
+            "bad-id (1-seg) and cn:project:acronym (3-seg) must both be ignored"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -867,3 +957,213 @@ class TestGlossaryDefinitionSemanticSkip:
             "definition in a non-glossary file must still fire E541 — "
             "the Category-A skip is scoped to 03_glossary.json only"
         )
+
+
+# ---------------------------------------------------------------------------
+# Round-4 guardrail: real-schema term_ref slot unit test (Finding #2 / T1)
+# ---------------------------------------------------------------------------
+
+class TestRound4GuardrailRealSchemaStillFires:
+    """Guardrail: real vc:03-glossary schema via _SchemaResolverCtx confirms E541 still fires.
+
+    ``TestRound4GuardrailNamespaceMatchingStillFires`` uses a synthetic schema to
+    isolate the mechanism-2 ref-value check.  This companion class exercises the
+    REAL ``vc:03-glossary`` schema through ``_SchemaResolverCtx`` to ensure the
+    schema-nav path itself does not introduce a regression.
+
+    ``03_glossary.json`` is the only production schema with a ``term_ref`` slot on
+    its data objects (``terms[]`` items).  Its ``terms[]`` item schema has
+    ``additionalProperties:false`` and ``term_ref``/``acronym_ref``/``unit_ref``
+    slots → ``slot_kinds = {"term", "acronym", "unit"}`` → the namespace-aware
+    check does NOT suppress for term-kind terms → mechanism-2 (runtime bound-ref
+    check) decides whether E541 fires.
+
+    Note: the file-scoped ``definition`` skip applies when the filename is
+    ``03_glossary.json``.  These tests use a different filename so the
+    ``definition`` field is live and the real suppression path is exercised.
+    """
+
+    _TERMS = {"ghost": {"cn:project:term:ghost"}}
+
+    def test_glossary_term_ref_slot_unbound_fires(self):
+        """Real vc:03-glossary schema: term_ref slot present in schema but absent in data → E541 fires.
+
+        This is the unit-level over-suppression boundary guard using the real
+        schema (complement to ``TestRound4GuardrailNamespaceMatchingStillFires``
+        which uses a synthetic schema).  It ensures that schema-nav failures
+        cannot silently suppress E541 through this path.
+        """
+        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        data = {
+            "$schema": "vc:03-glossary",
+            "terms": [
+                {
+                    "term_id": "term-theme",
+                    "term": "Theme",
+                    "definition": "The Ghost theme system for rendering pages.",
+                    # term_ref slot exists in schema but is absent here → unbound
+                }
+            ],
+        }
+        eff_schema, resolve_fn = ctx.load_file_schema(data)
+        errs = _check_free_text_terms(
+            # NOT "03_glossary.json" → file-scoped definition skip inactive
+            "glossary.json", data, self._TERMS,
+            schema_node=eff_schema, resolve_fn=resolve_fn,
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "vc:03-glossary terms[] item has term_ref slot (slot_kinds ∋ 'term') but "
+            "no term_ref binding in data → mechanism-2 runtime check must fire E541. "
+            "Round-4 namespace-aware suppression must NOT over-suppress when the slot "
+            "kind matches the term kind."
+        )
+
+    def test_glossary_term_ref_slot_correctly_bound_suppresses(self):
+        """Positive control: term_ref bound to the mentioned term's id suppresses E541.
+
+        Confirms that when the real vc:03-glossary schema is used and the data
+        contains a term_ref binding matching the mentioned term's canonical ID,
+        E541 is correctly suppressed by mechanism-2.
+        """
+        ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
+        data = {
+            "$schema": "vc:03-glossary",
+            "terms": [
+                {
+                    "term_id": "term-ghost",
+                    "term": "Ghost",
+                    "definition": "The Ghost CMS platform.",
+                    "term_ref": "cn:project:term:ghost",  # correct binding
+                }
+            ],
+        }
+        eff_schema, resolve_fn = ctx.load_file_schema(data)
+        errs = _check_free_text_terms(
+            "glossary.json", data, self._TERMS,
+            schema_node=eff_schema, resolve_fn=resolve_fn,
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            f"term_ref correctly bound to the mentioned term's id must suppress E541 "
+            f"via mechanism-2; got: {[e.render() for e in e541]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# patternProperties child-schema lookup coverage (Finding #4 / T3)
+# ---------------------------------------------------------------------------
+
+class TestPatternPropertiesChildSchemaLookup:
+    """Coverage for the patternProperties fallback in _check_free_text_terms.
+
+    When a dict key is not found in a schema's ``properties``, the child-schema
+    lookup falls back to ``patternProperties``: the first pattern whose regex
+    matches the key is used.  This branch IS reachable in production: the
+    ``vc:seed-manifest`` schema's ``step_requirements`` property uses
+    ``patternProperties`` (pattern ``^(\\d{2}[a-c]?)$``) so when
+    ``_check_free_text_terms`` processes a ``step_requirements`` dict like
+    ``{"00": [...], "01": [...]}`` it reaches this fallback for each key.
+
+    These tests use synthetic schemas (honest: the production patternProperties
+    sites contain array-typed values with no free-text opportunity, so we must
+    synthesise to get discriminating E541 outcomes).  The synthetic schema tests
+    the MECHANISM; the docstring above documents the real-world reachability.
+
+    The discrimination test confirms the branch works correctly: a broken lookup
+    (``child_schema=None``) would fall back to schema-less mode (no suppression,
+    E541 fires).  A working lookup (``child_schema`` set to ap:false no-ref-slot
+    schema) applies structural suppression (E541 suppressed).  So
+    ``assert not e541`` passes ONLY when the patternProperties path computes and
+    passes the correct ``child_schema``.
+    """
+
+    _TERMS = {"ghost": {"cn:project:term:ghost"}}
+
+    def test_pattern_matched_key_gets_child_schema_suppression(self):
+        """patternProperties lookup sets correct child_schema → suppression applied.
+
+        Schema: outer dict has a ``patternProperties`` entry for ``^[a-z]+$``.
+        Value schema: ``{ap:false, no *_ref slots, description field}`` →
+        ``slot_kinds = set()`` → structurally unbindable → E541 suppressed.
+
+        If the patternProperties lookup were broken (child_schema stays None):
+        no structural suppression → E541 would fire → ``assert not e541`` fails.
+        Therefore this assertion is a discriminating guard for the branch.
+
+        Note: cited real-world reachability — ``vc:seed-manifest`` schema's
+        ``step_requirements`` uses patternProperties (pattern ``^(\\d{2}[a-c]?)$``),
+        and keys like ``"00"`` are not in ``properties``, so the fallback runs
+        for every step-requirements key in a seed-manifest file.
+        """
+        pattern_value_schema: dict = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "description": {"type": "string"},
+                # No *_ref/*_refs → slot_kinds = set() → structurally unbindable
+            },
+        }
+        outer_schema: dict = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {},  # empty → key "abc" not found here
+            "patternProperties": {
+                "^[a-z]+$": pattern_value_schema,
+            },
+        }
+        data = {
+            "abc": {
+                "description": "Ghost admin login behaviour is underspecified",
+            }
+        }
+        errs = _check_free_text_terms(
+            "x.json", data, self._TERMS,
+            schema_node=outer_schema,
+            resolve_fn=lambda ref: None,  # no $ref in synthetic schema
+        )
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            "patternProperties child_schema must be found and applied — the ap:false "
+            "no-ref-slot value schema makes the object structurally unbindable → "
+            "E541 must be suppressed. If this fails, the patternProperties lookup "
+            "is broken (child_schema=None → no suppression → E541 fires). "
+            f"Got: {[e.render() for e in e541]}"
+        )
+
+    def test_re_error_in_pattern_does_not_crash(self):
+        """A malformed regex in patternProperties is silently skipped (no crash, no suppression).
+
+        The ``re.error`` guard in the patternProperties loop must swallow the
+        exception and continue to the next pattern.  If a bad pattern is the only
+        one, no child_schema is found → schema-less mode → E541 fires normally.
+        """
+        bad_pattern_schema: dict = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {},
+            "patternProperties": {
+                "[":  # invalid regex → re.error must be caught
+                    {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"description": {"type": "string"}},
+                    }
+            },
+        }
+        data = {
+            "abc": {
+                "description": "Ghost admin login behaviour is underspecified",
+            }
+        }
+        # Must not raise; and since bad pattern is skipped → child_schema=None →
+        # no suppression → the inner object (no *_ref) fires E541 from the
+        # schema-less runtime path.
+        errs = _check_free_text_terms(
+            "x.json", data, self._TERMS,
+            schema_node=bad_pattern_schema,
+            resolve_fn=lambda ref: None,
+        )
+        # Should not crash — that's the primary assertion.
+        # E541 may or may not fire (no binding either way); we check it's a list.
+        assert isinstance(errs, list), "re.error guard must not propagate exceptions"

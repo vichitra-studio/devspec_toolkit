@@ -69,13 +69,19 @@
 
 **Resolution**: Add the appropriate `*_ref` (e.g. `fr_ref`, `capability_ref`, `term_ref`) alongside the free-text field to bind the canonical term to its ID, or reword the field so it no longer names the canonical term.
 
-**Note**: E541 is suppressed through three independent mechanisms; a free-text field is checked only if none of them apply:
+**Note**: E541 is suppressed through four independent mechanisms; a free-text field is checked only if none of them apply:
 
-1. **Structural suppression** (as of 1.1.0) — fields whose enclosing object is *structurally unbindable*: the object's schema sets `additionalProperties: false` and declares no `*_ref`/`*_refs` slot, so it physically cannot carry a binding reference. Ref-capable objects (e.g. `14_roadmap` milestones with `fr_refs`/`capability_refs`) still fire E541, so legitimate unbound mentions are not over-suppressed.
+1. **Structural suppression** (as of 1.1.0) — fields whose enclosing object is *structurally unbindable*: the object's schema sets `additionalProperties: false` and declares no `*_ref`/`*_refs` slot, so it physically cannot carry a binding reference.
 
-2. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
+2. **Namespace-aware slot-kind suppression** (as of 1.1.0, round 4) — an object whose schema sets `additionalProperties: false` and declares only *purpose-specific* ref slots (e.g. `fr_refs`, `capability_refs`, `metric_ref`) that cannot accept a `term`/`acronym` canonical ID is also suppressed. The check extracts the kind labels from each `*_ref`/`*_refs` slot name (e.g. `fr_refs` → kind `fr`; `capability_refs` → kind `capability`) and suppresses E541 for a given term when the term's canonical kind (e.g. `term`) is absent from the slot-kind set. Example: `14_roadmap` milestones have `fr_refs`/`capability_refs` (slot kinds `{"fr", "capability"}`); a `term`-kind canonical ID has no namespace overlap → E541 is suppressed. Objects that DO have a matching slot (e.g. `03_glossary.json` `terms[]` items with `term_ref`) are NOT suppressed by this mechanism — they fall through to mechanism 3 (runtime binding check).
 
-3. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs (e.g. the `execution` subtree's `test_results[].name`). This key-name skip is the only active suppressor for artifacts with no resolvable `$schema` (where structural suppression is inactive).
+3. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
+
+4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. Two key skips added in 1.1.0 (round 4):
+   - **`review_requirements`** (global, Category B) — appears in `16_impl_context.schema.json`; contains operational verification instructions (test commands, NFR measurement methods) whose description fields cannot bind canonical term refs.
+   - **`definition` in `03_glossary.json`** (file-scoped, Category A) — glossary definitions are vocabulary prose; requiring `term_ref` bindings for every cross-term mention in the definition text is semantically incorrect. This skip applies only when the file's basename is `03_glossary.json`; a `definition` field in any other file is still checked normally.
+
+   The key-name skip is the only active suppressor for artifacts with no resolvable `$schema` (where structural suppression is inactive).
 
 ### E561 / W561 UNCOVERED_FR
 

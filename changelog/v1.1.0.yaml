@@ -352,8 +352,12 @@ changes:
         * patternProperties support added to the child-schema lookup in
           _check_free_text_terms: when a key is not found in regular properties,
           the first matching patternProperties pattern is used as the child schema.
-          This lets the namespace-aware rule reach patternProperty-keyed value
-          objects (e.g. nfr_measurement_methods in 16_impl_context).
+          Confirmed reachable: vc:seed-manifest → step_requirements uses
+          patternProperties (pattern ^(\d{2}[a-c]?)$), so keys like "00" reach
+          this fallback.  The originally cited site (nfr_measurement_methods
+          under 16_impl_context) is unreachable because its parent
+          review_requirements is in _E541_SKIP_KEYS; the branch is kept because
+          it is exercised by the seed-manifest path.
 
         * Two Category-A/B semantic skips added:
           - 03_glossary.json → "definition" (file-scoped): glossary definitions
@@ -367,11 +371,60 @@ changes:
             the patternProperties path to the pattern-value items.
 
       Net effect: the host spec tree that previously triggered 765 E541 false
-      positives now reports 0 E541 after round 4.  A guardrail test class
-      (TestRound4GuardrailNamespaceMatchingStillFires) proves that objects with
-      a matching term_ref slot still fire E541 when the slot is absent or bound
-      to the wrong id, preserving the round-2 over-suppression fix.  Two
-      pre-round-4 14_roadmap tests that incorrectly asserted "any ref slot means
-      E541 fires" are updated to the correct round-4 premise and documented.
+      positives now reports 0 E541 after round 4.  Two guardrail test classes
+      confirm that objects with a matching term_ref slot still fire E541 when
+      the slot is absent or bound to the wrong id, preserving the round-2
+      over-suppression fix: TestRound4GuardrailNamespaceMatchingStillFires
+      (synthetic schema) and TestRound4GuardrailRealSchemaStillFires (real
+      vc:03-glossary schema via _SchemaResolverCtx).  Two pre-round-4 14_roadmap
+      tests that incorrectly asserted "any ref slot means E541 fires" are updated
+      to the correct round-4 premise and documented.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      E541 post-audit remediation (round 4, PR-audit findings on be67184).
+      Addresses 8 findings raised by the PR audit of the round-4 commit:
+
+        * Phantom test references corrected: docstrings in
+          test_14_roadmap_milestones_name_suppressed_round4 and its end-to-end
+          counterpart previously named non-existent tests as replacement
+          guardrails.  The docstrings now cite the actual existing and newly
+          added tests.  The incoherent name test_14_roadmap_term_ref_slot_still_fires
+          (14_roadmap.schema.json has no term_ref slot) is replaced with the
+          real guardrail names.
+
+        * TestRound4GuardrailRealSchemaStillFires added: exercises the real
+          vc:03-glossary schema through _SchemaResolverCtx (not a synthetic
+          dict) and asserts E541 fires when term_ref is present in the schema
+          but absent or wrong in data.  Guards against schema-nav regressions
+          that the synthetic-schema class cannot detect.
+
+        * test_03_glossary_terms_definition_without_term_ref_fires added to
+          TestE541StructuralRuleEndToEnd: drives lint_hallucinations with a
+          real on-disk spec file using vc:03-glossary schema and asserts E541
+          fires.  Restores the DoD #1(b) both-directions end-to-end guard
+          (previously only the suppression direction was tested after the
+          round-4 flip).
+
+        * TestPatternPropertiesChildSchemaLookup added: covers the
+          patternProperties fallback in _check_free_text_terms with a
+          discriminating suppression assertion and an re.error guard test.
+          Documents real-world reachability via vc:seed-manifest
+          step_requirements.
+
+        * _term_kinds_from_cids guard corrected from len(parts) >= 3 to
+          len(parts) >= 4: aligns with the docstring that requires four-segment
+          cn:<tier>:<kind>:<label> form.  Three-segment IDs (e.g. cn:project:term)
+          are now correctly ignored.  All real canonical IDs in the registry are
+          four-segment so behaviour is unchanged for valid IDs.
+
+        * docs/developers/error-codes.md E541 section updated: three-mechanism
+          list expanded to four (namespace-aware slot-kind check added as
+          mechanism 2), stale claim that 14_roadmap milestones "still fire E541"
+          corrected (they are suppressed by mechanism 2 as of round 4), and two
+          new key-name skips documented (review_requirements global;
+          03_glossary.json → definition file-scoped).
     migration:
       action: none

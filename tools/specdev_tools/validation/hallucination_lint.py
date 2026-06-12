@@ -407,7 +407,7 @@ def _term_kinds_from_cids(cids: set[str]) -> set[str]:
     kinds: set[str] = set()
     for cid in cids:
         parts = cid.split(":")
-        if len(parts) >= 3:
+        if len(parts) >= 4:
             kinds.add(parts[2])
     return kinds
 
