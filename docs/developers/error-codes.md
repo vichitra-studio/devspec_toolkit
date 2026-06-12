@@ -77,11 +77,27 @@
 
 3. **Term-specific runtime suppression** (the `bound_refs` path) — when a sibling `*_ref`/`*_refs` key is present at the same object level, it suppresses E541 only for the specific term(s) it binds: suppression applies when one of the ref's *values* is one of the mentioned term's canonical IDs. An unrelated reference (binding a different ID) does **not** suppress, so a genuinely unbound term in the same object still fires. (Prior to this release the check was object-level — any ref present suppressed every free-text field — which over-suppressed legitimate unbound mentions.)
 
-4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. Two key skips added in 1.1.0 (round 4):
-   - **`review_requirements`** (global, Category B) — appears in `16_impl_context.schema.json`; contains operational verification instructions (test commands, NFR measurement methods) whose description fields cannot bind canonical term refs.
-   - **`definition` in `03_glossary.json`** (file-scoped, Category A) — glossary definitions are vocabulary prose; requiring `term_ref` bindings for every cross-term mention in the definition text is semantically incorrect. This skip applies only when the file's basename is `03_glossary.json`; a `definition` field in any other file is still checked normally.
+4. **Key-name skip fallback** (the `_E541_SKIP_KEYS` / `_E541_SKIP_KEYS_BY_FILE` path) — certain keys are always exempt regardless of schema, because their subtrees are vocabulary definitions or free-form runner output rather than spec content that should bind refs. The complete set of exempted keys, sourced from `hallucination_lint.py` lines 774–838:
 
-   The key-name skip is the only active suppressor for artifacts with no resolvable `$schema` (where structural suppression is inactive).
+   **Global skips (`_E541_SKIP_KEYS`):**
+
+   *Category A — canonical vocabulary subtrees:*
+   - **`canonical_proposals`**, **`canonical_refs_used`**, **`canonical_conflicts`** — canonical metadata; not spec content that should bind refs
+   - **`tech_stack`**, **`user_segments`**, **`seeds`** — structured enumerations whose values are not canonical term-binding sites
+
+   *Category B — Step 16 implementation/narrative subtrees (belt-and-suspenders for `impl_context/` artifacts with variable filenames where `$schema` lookup is unreliable):*
+   - **`actions`**, **`coding_examples`** — Step 16a/16b implementation subtrees
+   - **`emergent_ambiguities`**, **`ambiguities`**, **`docs_impact`** — Step 16 narrative subtrees
+   - **`review_requirements`** — Step 16 operational verification instructions (test commands, NFR measurement methods); these are not canonical term-binding sites. Note: structural suppression cannot reliably cover these because `test_commands[]` uses `oneOf` and `nfr_measurement_methods` uses `patternProperties`, both of which can cause `slot_kinds` to resolve as `None` under certain schema-navigation paths.
+
+   *Category C — free-form runner output:*
+   - **`execution`** — `execution.final_status.test_results` items have `additionalProperties` unset (intentionally free-form test-runner output). The structural rule requires `additionalProperties: false` and will NOT suppress items with unset `additionalProperties`, so a key-name skip is necessary. Example subtree that triggers this: a `16_impl_context.json` artifact's `execution.final_status.test_results[]` items describing test-runner output such as `{"name": "test_send_newsletter", "status": "passed", "duration": 1.2}`.
+
+   **File-scoped skips (`_E541_SKIP_KEYS_BY_FILE`):**
+   - **`edge_cases` in `11_redteam.json`** — unbindable narrative subtree; the red-team schema sets `additionalProperties: false` with no `*_ref` field on `edge_cases` items. Scoped to that file to avoid silently exempting a future `edge_cases` key in another artifact.
+   - **`definition` in `03_glossary.json`** — glossary definitions are vocabulary prose; requiring `term_ref` bindings for every cross-term mention in the definition text is semantically incorrect. This skip applies only when the file's basename is `03_glossary.json`; a `definition` field in any other file is still checked normally. Note: the glossary `terms[]` object DOES have `term_ref`/`acronym_ref` slots (used to pin the entry's own canonical ID), so the namespace-aware structural rule does NOT suppress it — this explicit skip is required.
+
+   For artifacts with no resolvable `$schema` (where structural suppression and namespace-aware slot-kind suppression are inactive), two mechanisms remain active: the key-name skip (mechanism 4) and the term-specific runtime `bound_ref_ids` suppression (mechanism 3). Mechanism 3 — the `bound_ref_ids` collection at `hallucination_lint.py` lines 898–904 — is unconditional and has no guard on `schema_node`; the check `if cids & bound_ref_ids: continue` (line 959) fires regardless of whether `$schema` resolved. A sibling `*_ref` binding the mentioned term therefore suppresses E541 for that specific term even in a schema-free artifact.
 
 ### E561 / W561 UNCOVERED_FR
 

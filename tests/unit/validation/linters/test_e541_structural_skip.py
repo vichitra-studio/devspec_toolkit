@@ -1165,5 +1165,88 @@ class TestPatternPropertiesChildSchemaLookup:
             resolve_fn=lambda ref: None,
         )
         # Should not crash — that's the primary assertion.
-        # E541 may or may not fire (no binding either way); we check it's a list.
         assert isinstance(errs, list), "re.error guard must not propagate exceptions"
+        # Discriminating assertion: bad regex → pattern skipped → child_schema=None
+        # → schema-less mode for the inner dict → structurally_unbindable=False →
+        # slot_kinds=None → bound_ref_ids={} → E541 fires for the unbound "ghost" term.
+        # This would be green even if the re.error guard were removed (crash would
+        # surface), but it proves the schema-less fallback path fires E541 as documented.
+        e541 = [e for e in errs if e.code == "E541"]
+        assert len(e541) >= 1, (
+            "bad-regex patternProperties: child_schema=None → schema-less mode → "
+            "E541 must fire for the unbound 'ghost' mention; "
+            f"got {len(e541)} E541(s) from {[e.render() for e in errs]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# review_requirements key-name skip coverage (round-4 addition, DEVSPEC-38)
+# ---------------------------------------------------------------------------
+
+class TestReviewRequirementsKeyNameSkip:
+    """The ``review_requirements`` subtree must not fire E541.
+
+    ``review_requirements`` is in ``_E541_SKIP_KEYS`` (Category B) because its
+    sub-fields (``test_commands``, ``nfr_measurement_methods``) contain
+    operational verification instructions — not canonical term-binding sites.
+    The structural rule cannot reliably suppress them (schema-nav loses
+    ``additionalProperties`` through oneOf merges, and patternProperties values
+    receive no child_schema), so an explicit key-name skip is required.
+
+    The discriminating design: both tests use the same data and the same
+    canonical term (``ghost``).  The ONLY variable is the parent key name.
+    Under ``review_requirements`` the key-name skip fires and E541 is
+    suppressed.  Under ``description`` (a non-skipped free-text key) E541
+    fires — proving the fixture is not vacuous and that removing the
+    ``review_requirements`` skip would break the suppression test.
+    """
+
+    _TERMS = {"ghost": {"cn:project:term:ghost"}}
+
+    def test_review_requirements_key_name_suppressed(self):
+        """Free-text value nested under ``review_requirements`` must NOT fire E541.
+
+        _is_e541_skipped returns True for ``review_requirements`` → the entire
+        subtree is skipped before any free-text checks run → E541 must be absent.
+        """
+        obj = {
+            "review_requirements": {
+                "description": "Ghost admin login flow passes end-to-end",
+                "test_commands": [
+                    "Ghost admin login flow passes end-to-end"
+                ],
+                "nfr_measurement_methods": {
+                    "perf": "Measure Ghost page load under 500 ms"
+                },
+            }
+        }
+        errs = _check_free_text_terms("ms_plan.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert not e541, (
+            "review_requirements subtree must be suppressed by key-name skip in "
+            "_E541_SKIP_KEYS; E541 must not fire for canonical terms mentioned in "
+            "review_requirements.description (a _FREE_TEXT_FIELDS key) because the "
+            "key-name skip fires before any free-text scan of the subtree; "
+            f"got: {[e.render() for e in e541]}"
+        )
+
+    def test_review_requirements_non_skipped_sibling_still_fires(self):
+        """Positive control: the same canonical term under a non-skipped key fires E541.
+
+        This confirms the fixture is discriminating: if ``review_requirements``
+        were removed from ``_E541_SKIP_KEYS``, the suppression test above would
+        also fire E541 and fail.  This sibling test uses an identical value under
+        ``description`` (not in _E541_SKIP_KEYS) to prove the term IS detectable
+        and no other suppression mechanism silences it.
+        """
+        obj = {
+            "description": "Ghost admin login flow passes end-to-end",
+            # Same text as above but under a non-skipped key → must fire E541
+        }
+        errs = _check_free_text_terms("ms_plan.json", obj, self._TERMS)
+        e541 = [e for e in errs if e.code == "E541"]
+        assert e541, (
+            "The same 'ghost' mention under a non-skipped key ('description') must fire "
+            "E541 — this proves the review_requirements suppression test is not vacuous "
+            "and that the term is genuinely detectable."
+        )
