@@ -1,4 +1,25 @@
 version: "unreleased"
 breaking: false
 
-changes: []
+changes:
+  - type: fix
+    description: >
+      Removed orphaned integration test file
+      tests/integration/test_matrix_registry_refactor.py
+      (class TestMatrixRegistryRefactorGolden). The file was architecturally
+      flawed: it reached out of the toolkit submodule into the embedding host's
+      spec/ directory (HOST_SPEC_DIR = toolkit_root/../spec), creating an
+      inverted submodule→host dependency. Its golden fixture
+      tests/fixtures/trace_matrix_pre_refactor.json was deleted in commit
+      99afe72, causing test_output_matches_golden to fail with "golden missing"
+      on every run. The two non-golden methods
+      (test_registry_driven_path_is_taken, test_matrix_rows_have_required_fields)
+      were fully covered by the self-contained
+      tests/integration/test_matrix_spec_corpus.py (TestMatrixSpecCorpus), which
+      runs the same assertions against the toolkit-owned spec_corpus fixture. No
+      coverage was ported because all unique value in the orphan was the
+      host-coupled byte snapshot (test_output_matches_golden), which cannot be
+      meaningfully replicated without a live host spec.
+    migration:
+      action: none
+      note: "Test-hygiene removal — no spec artifact or schema changes."
