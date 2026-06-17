@@ -589,16 +589,36 @@
                   },
                   {
                     "if": {
-                      "not": {
-                        "properties": {
-                          "checklist_status": {
-                            "const": "deferred"
+                      "allOf": [
+                        {
+                          "not": {
+                            "properties": {
+                              "checklist_status": {
+                                "const": "deferred"
+                              }
+                            },
+                            "required": [
+                              "checklist_status"
+                            ]
                           }
                         },
-                        "required": [
-                          "checklist_status"
-                        ]
-                      }
+                        {
+                          "properties": {
+                            "type": {
+                              "enum": [
+                                "behavior",
+                                "constraint",
+                                "validation",
+                                "perf",
+                                "security"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      ]
                     },
                     "then": {
                       "required": [

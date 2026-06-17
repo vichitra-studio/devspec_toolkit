@@ -1,0 +1,71 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "step-impl-metadata-no-proof",
+  "owner": "api",
+  "created_at": "2024-01-01T00:00:00Z",
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Non-deferred metadata checklist item that legitimately omits nfr_refs and fixture_ref.",
+      "scope_in": [
+        "core"
+      ],
+      "scope_out": [
+        "extras"
+      ],
+      "target_file_patterns": [
+        "tsconfig.json"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Config",
+          "summary": "Configuration correctness item with no measurable NFR or runtime fixture"
+        }
+      ],
+      "checklist": [
+        {
+          "id": "REQ_CONFIG_001",
+          "spec_ref": {
+            "type": "task",
+            "id": "task-init-config",
+            "line_range": "L10-L20",
+            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
+          },
+          "description": "Configure project build settings so the type-checker runs clean; a config-layer concern with no measurable NFR target or runtime fixture.",
+          "type": "metadata",
+          "layer": "config",
+          "checklist_status": "active",
+          "linked_test_expectation": "build config present and type-check passes",
+          "implementation": {
+            "status": "in_progress",
+            "files_touched": [
+              "tsconfig.json"
+            ],
+            "actions": [
+              {
+                "type": "file_create",
+                "target": "tsconfig.json",
+                "description": "Create TypeScript config"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "npx tsc --noEmit"
+      ]
+    }
+  },
+  "canonical_refs_used": []
+}

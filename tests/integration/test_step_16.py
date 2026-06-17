@@ -73,6 +73,17 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(len(errors) > 0, "Invalid fixture (missing fixture_ref) should fail validation")
         self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
     
+    def test_valid_metadata_item_without_proof(self):
+        # A non-deferred metadata item legitimately omits nfr_refs and fixture_ref.
+        # The nfr_refs+fixture_ref requirement (schema allOf branch + step_16
+        # TYPES_REQUIRING_PROOF) applies only to proof-types
+        # (behavior/constraint/validation/perf/security); metadata/docs/logging
+        # are exempt. Guards against a future revert of the schema branch gate.
+        path = os.path.join(self.fixtures_dir, "valid_metadata_no_proof.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")
+        self.assertFalse(any(e.code == "E520" for e in errors), f"Metadata item must not trigger E520. Got: {errors}")
+
     def test_invalid_invalid_type(self):
         # Expect failure due to invalid type
         path = os.path.join(self.fixtures_dir, "invalid_invalid_type.json")
