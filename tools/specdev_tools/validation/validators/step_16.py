@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
 import hashlib
 import json
 import os
@@ -38,7 +38,7 @@ _BUILTIN_DOC_BASENAMES: frozenset[str] = frozenset({
 # and 16c each call validate_step_16(), the first call computes the result and
 # subsequent calls for the same artifact return cached results.  This prevents
 # the triple execution overhead without changing the public API (AUDIT-029).
-_step16_cache: Dict[str, list[SpecError]] = {}
+_step16_cache: dict[str, list[SpecError]] = {}
 
 def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = None) -> Optional[str]:
     """Locate the host's spec/common/seed_manifest.json without upward-walk ancestor escape.
@@ -95,7 +95,7 @@ def _find_seed_manifest(spec_path: Optional[str], spec_root: Optional[str] = Non
     return None
 
 
-def _is_anchor(spec_path: Optional[str], data: Optional[Dict[str, Any]] = None) -> bool:
+def _is_anchor(spec_path: Optional[str], data: Optional[dict[str, Any]] = None) -> bool:
     """Detect whether this artifact is the Step 16 Trinity Anchor (vs. a 16a/16b/16c plan).
 
     Two-tier detection (defence-in-depth): prefers the `artifact_role` field
@@ -115,7 +115,7 @@ def _is_anchor(spec_path: Optional[str], data: Optional[Dict[str, Any]] = None) 
     return p.name == "16_impl_context.json" and p.parent.name != "impl_context"
 
 
-def _load_roadmap(spec_path: str) -> Optional[Dict[str, Any]]:
+def _load_roadmap(spec_path: str) -> Optional[dict[str, Any]]:
     """Load 14_roadmap.json relative to spec_path with correct path resolution.
 
     Resolves correctly for both anchor and milestone plan artifacts:
@@ -140,7 +140,7 @@ def _load_roadmap(spec_path: str) -> Optional[Dict[str, Any]]:
     return json.loads(roadmap_path.read_text())
 
 
-def _collect_milestone_refs(data: Dict[str, Any]) -> set[str]:
+def _collect_milestone_refs(data: dict[str, Any]) -> set[str]:
     """Extract unique milestone_ref values from checklist items."""
     checklist = (
         data.get("plan", {})
@@ -157,7 +157,7 @@ def _collect_milestone_refs(data: Dict[str, Any]) -> set[str]:
     return refs
 
 
-def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: list[SpecError]) -> None:
+def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
 
     Groups non-deferred checklist items by their spec_ref.id and checks that each
@@ -167,7 +167,7 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
     """
     from collections import defaultdict
 
-    groups: Dict[str, set] = defaultdict(set)
+    groups: dict[str, set] = defaultdict(set)
     for item in checklist:
         if not isinstance(item, dict):
             continue
@@ -199,24 +199,56 @@ def _check_behavior_validation_pairing(checklist: List[Dict[str, Any]], errors: 
             )
 
 
-def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
+def _build_fr_ids_with_nfrs(nfrs_data: Optional[dict[str, Any]]) -> Optional[set[str]]:
+    """Return the set of FR IDs that have at least one direct NFR trace.
+
+    Returns None when nfrs_data is None so callers can distinguish "gate
+    explicitly skipped" from "gate ran and produced empty set" — the two cases
+    have different semantics: None means 07_nfrs.json was absent (graceful skip),
+    empty set means the file existed but no FRs were traced.
     """
-    Deep validation for Step 16 (Implementation Context).
+    if nfrs_data is None:
+        return None
+    return {
+        trace["id"]
+        for nfr in nfrs_data.get("nfrs", [])
+        if isinstance(nfr, dict)
+        for trace in nfr.get("trace", [])
+        if isinstance(trace, dict) and trace.get("type") == "fr" and trace.get("id")
+    }
+
+
+def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None, nfrs_data: Optional[dict[str, Any]] = None) -> list[SpecError]:
+    """Deep validation for Step 16 (Implementation Context).
 
     Args:
         data: The parsed JSON content of the step file.
         toolkit_root: The root directory of the toolkit (for resolving references).
+        spec_path: Absolute path to the artifact file being validated, used for
+            sibling-file lookups (roadmap, seed manifest). None disables those checks.
+        spec_root: Path to the host spec root directory, used for cross-step
+            artifact discovery. None falls back to artifact-directory scans.
+        nfrs_data: Parsed 07_nfrs.json dict, or None. When provided, nfr_refs is
+            required only for checklist items whose spec_ref.id has at least one
+            NFR tracing to it (direct trace, type=="fr"). When None, the gate is
+            skipped entirely — consistent with the W570 graceful-skip pattern.
 
     Returns:
         List of SpecError objects. Empty list if valid.
     """
-    # Cache lookup: hash data + spec_path + spec_root to detect identical invocations from 16a/16b/16c
-    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "") + "\0" + (spec_root or "")
+    # Cache lookup: hash data + spec_path + spec_root + nfrs_data to detect identical invocations
+    nfrs_json = json.dumps(nfrs_data, sort_keys=True) if nfrs_data is not None else ""
+    cache_input = json.dumps(data, sort_keys=True) + "\0" + (spec_path or "") + "\0" + (spec_root or "") + "\0" + nfrs_json
     cache_key = hashlib.md5(cache_input.encode()).hexdigest()
     if cache_key in _step16_cache:
         return list(_step16_cache[cache_key])  # Return a copy
 
     errors: list[SpecError] = []
+
+    # Build FR-has-NFR lookup from 07_nfrs.json trace entries (direct type=="fr" only).
+    # Intentionally excludes API-mediated indirect links — consistent with matrix.py's
+    # direct-trace enumeration and avoids two-hop resolution complexity.
+    fr_ids_with_nfrs = _build_fr_ids_with_nfrs(nfrs_data)
 
     plan = data.get("plan", {})
     checklist = plan.get("spec_alignment", {}).get("checklist", [])
@@ -238,13 +270,19 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
         if item_layer not in VALID_CHECKLIST_LAYERS:
             errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}"))
 
-        # Logic Check: New checklist fields (nfr_refs, fixture_ref) required for non-deferred items
-        # Only types that have measurable NFR/fixture associations require proof; types like
+        # Logic Check: checklist fields required for non-deferred proof-type items.
+        # Only types with measurable NFR/fixture associations require proof; types like
         # docs, metadata, logging, and config legitimately have no NFR or fixture link.
+        # nfr_refs gate: only fire when the owning FR has at least one NFR tracing to it
+        # in 07_nfrs.json (direct trace, type=="fr"). When nfrs_data is absent the gate
+        # silently skips — consistent with the W570 graceful-skip pattern.
         if checklist_status != "deferred" and item_type in TYPES_REQUIRING_PROOF:
+            spec_ref = item.get("spec_ref", {})
+            spec_ref_fr_id = spec_ref.get("id") if isinstance(spec_ref, dict) and spec_ref.get("type") == "fr" else None
+
             nfr_refs = item.get("nfr_refs", [])
-            if not nfr_refs:
-                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no nfr_refs"))
+            if not nfr_refs and fr_ids_with_nfrs is not None and spec_ref_fr_id in fr_ids_with_nfrs:
+                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no nfr_refs (FR '{spec_ref_fr_id}' has NFRs in 07_nfrs.json)"))
 
             fixture_ref = item.get("fixture_ref")
             if not fixture_ref:
@@ -351,7 +389,7 @@ def validate_step_16(data: Dict[str, Any], toolkit_root: str, spec_path: Optiona
             errors.append(make_error("E520", f"File '{f}' is touched by implementation but not covered by target_file_patterns."))
 
     manifest_path = _find_seed_manifest(spec_path, spec_root)
-    doc_patterns: List[str] = []
+    doc_patterns: list[str] = []
     doc_patterns_valid = False
     if manifest_path:
         try:

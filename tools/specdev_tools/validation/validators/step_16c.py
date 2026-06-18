@@ -15,7 +15,7 @@ from .step_16b import validate_step_16b
 VALID_VERDICTS = frozenset({"verified", "needs_work", "blocked", "deferred"})
 
 
-def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None) -> list[SpecError]:
+def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None, nfrs_data: Optional[dict[str, Any]] = None) -> list[SpecError]:
     """Deep validation for Step 16c (Review phase).
 
     A 16c artifact is a 16b execution augmented with a ``review`` section.
@@ -23,7 +23,7 @@ def validate_step_16c(data: dict[str, Any], toolkit_root: str, spec_path: Option
     16c-specific verdict + semantic-review checks below.  Chains up through
     ``validate_step_16b`` → ``validate_step_16a`` → ``validate_step_16``.
     """
-    errors = validate_step_16b(data, toolkit_root, spec_path, spec_root)
+    errors = validate_step_16b(data, toolkit_root, spec_path, spec_root, nfrs_data)
 
     review = data.get("review", {})
     if not isinstance(review, dict):

@@ -514,21 +514,27 @@ def _load_capability_ids(repo_root: str, file_path: str) -> set[str] | None:
 
 
 def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
-    """Load full NFR data dict (not just IDs) for step_03 cross-ref validation.
+    """Load full NFR data dict (not just IDs) for step_03 and step_16 cross-ref validation.
 
     Cannot use ``load_upstream_ids`` because step_03 needs the entire JSON dict,
-    not a set of IDs (AUDIT-019)."""
-    # Try sibling first, then fallback to spec/
-    for prefix in ("07",):
-        artifact_dir = os.path.dirname(file_path) if file_path else ""
-        for d in (artifact_dir, os.path.join(repo_root, "spec")):
-            if not d or not os.path.isdir(d):
-                continue
-            for fn in os.listdir(d):
-                if fn.startswith(f"{prefix}_") and fn.endswith(".json"):
-                    data = load_json_artifact(os.path.join(d, fn))
-                    if data:
-                        return data
+    not a set of IDs (AUDIT-019).
+
+    Search order mirrors ``_load_roadmap`` / ``_find_seed_manifest``: when the
+    artifact lives inside ``impl_context/``, 07_nfrs.json is at the spec root
+    (parent), not in the same directory as the plan."""
+    artifact_dir = os.path.dirname(file_path) if file_path else ""
+    search_dirs = [artifact_dir]
+    if os.path.basename(artifact_dir) == "impl_context":
+        search_dirs.append(os.path.dirname(artifact_dir))
+    search_dirs.append(os.path.join(repo_root, "spec"))
+    for d in search_dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for fn in os.listdir(d):
+            if fn.startswith("07_") and fn.endswith(".json"):
+                data = load_json_artifact(os.path.join(d, fn))
+                if data:
+                    return data
     return None
 
 
@@ -604,9 +610,9 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     #   validators (16c→16b→16a→base) preserves downstream checks; _step16_cache
     #   deduplicates the base pass so chain-up is O(1) in base work.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
-    "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
-    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
-    "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
+    "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
+    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
+    "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
 }
 
 

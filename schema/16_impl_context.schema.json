@@ -622,7 +622,6 @@
                     },
                     "then": {
                       "required": [
-                        "nfr_refs",
                         "fixture_ref"
                       ]
                     }

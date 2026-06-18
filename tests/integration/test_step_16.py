@@ -59,13 +59,235 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(len(errors) > 0, "Invalid fixture (bad enum) should fail validation")
         self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
     
-    def test_invalid_missing_nfr_refs(self):
-        # Expect failure because non-deferred item has no nfr_refs
+    def test_nfr_refs_gate_skips_entirely_when_07_nfrs_absent(self):
+        # Path A: 07_nfrs.json absent → nfrs_data is None → gate silently skips.
+        # The fixture has no sibling 07_nfrs.json and the toolkit spec/ has none either.
+        # Filter on the validator's specific message text, not the filename (which also
+        # contains "nfr_refs" and would falsely match every error from this fixture).
         path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
         errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "Invalid fixture (missing nfr_refs) should fail validation")
-        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
-    
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertEqual(nfr_e520, [], f"Absent 07_nfrs.json must skip the nfr_refs gate entirely. Got: {nfr_e520}")
+
+    def test_e520_nfr_refs_required_when_fr_has_nfrs(self):
+        # Enforcement: behavior-type item for an FR that IS referenced by an NFR
+        # must supply nfr_refs.  Uses the secondary search path (sibling of plan) rather
+        # than the production layout; see test_e520_nfr_refs_required_production_layout
+        # for the primary search path test.
+        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        nfrs_data = {
+            "$schema": "vc:07-nfrs",
+            "nfrs": [
+                {
+                    "nfr_id": "nfr-login-perf",
+                    "title": "Login response time",
+                    "category": "performance",
+                    "trace": [{"type": "fr", "id": "fr-core-login"}]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            # 07_nfrs.json in artifact sibling dir so _load_nfrs_data finds it first
+            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertTrue(
+            len(nfr_e520) > 0,
+            f"Expected E520 for missing nfr_refs when FR has NFRs. Got: {errors}"
+        )
+        self.assertTrue(
+            any("fr-core-login" in e.message for e in nfr_e520),
+            f"Expected E520 message to name the FR. Got: {[e.message for e in nfr_e520]}"
+        )
+
+    def test_e520_nfr_refs_required_production_layout(self):
+        # Enforcement: production layout — 07_nfrs.json at spec root (parent of impl_context/),
+        # not as a sibling of the plan.  This is the primary search path and the main use case
+        # for this gate.  Verifies _load_nfrs_data correctly ascends to the spec root when the
+        # plan is nested inside impl_context/.
+        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        nfrs_data = {
+            "$schema": "vc:07-nfrs",
+            "nfrs": [
+                {
+                    "nfr_id": "nfr-login-perf",
+                    "title": "Login response time",
+                    "category": "performance",
+                    "trace": [{"type": "fr", "id": "fr-core-login"}]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            # Production layout: 07_nfrs.json lives at spec root (parent of impl_context/)
+            (tmp_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertTrue(
+            len(nfr_e520) > 0,
+            f"Expected E520 for missing nfr_refs (production layout). Got: {errors}"
+        )
+        self.assertTrue(
+            any("fr-core-login" in e.message for e in nfr_e520),
+            f"Expected E520 message to name the FR. Got: {[e.message for e in nfr_e520]}"
+        )
+
+    def test_nfr_refs_gate_does_not_fire_when_fr_not_in_nfrs_traces(self):
+        # Path B: 07_nfrs.json is present but traces a *different* FR.
+        # The checklist item's FR (fr-core-login) has no NFR trace → gate must not fire.
+        # This is the core new behavior: eliminated false-positives for FRs with no NFRs.
+        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        nfrs_data = {
+            "$schema": "vc:07-nfrs",
+            "nfrs": [
+                {
+                    "nfr_id": "nfr-checkout-perf",
+                    "title": "Checkout response time",
+                    "category": "performance",
+                    "trace": [{"type": "fr", "id": "fr-checkout-flow"}]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertEqual(nfr_e520, [], f"FR not present in NFR traces must not trigger nfr_refs E520. Got: {nfr_e520}")
+
+    def test_nfr_refs_gate_does_not_fire_when_nfrs_list_is_empty(self):
+        # Edge case: 07_nfrs.json exists with an empty nfrs array.
+        # _build_fr_ids_with_nfrs returns an empty set → no FR is in it → gate does not fire.
+        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        nfrs_data = {"$schema": "vc:07-nfrs", "nfrs": []}
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertEqual(nfr_e520, [], f"Empty nfrs array must not trigger nfr_refs E520. Got: {nfr_e520}")
+
+    def test_nfr_refs_gate_does_not_fire_for_non_fr_spec_ref_type(self):
+        # A behavior-type item with spec_ref.type != "fr" (e.g. "api") must never trigger
+        # the nfr_refs gate regardless of what 07_nfrs.json contains.
+        # spec_ref_fr_id is None for non-fr types; None is never in fr_ids_with_nfrs.
+        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Patch the checklist item's spec_ref to type "api" so it's non-FR
+        data["plan"]["spec_alignment"]["checklist"][0]["spec_ref"]["type"] = "api"
+        data["plan"]["spec_alignment"]["checklist"][0]["spec_ref"]["id"] = "api-login-endpoint"
+        nfrs_data = {
+            "$schema": "vc:07-nfrs",
+            "nfrs": [
+                {
+                    "nfr_id": "nfr-login-perf",
+                    "title": "Login response time",
+                    "category": "performance",
+                    "trace": [{"type": "fr", "id": "fr-core-login"}]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
+        self.assertEqual(nfr_e520, [], f"Non-FR spec_ref must not trigger nfr_refs E520. Got: {nfr_e520}")
+
+    def test_false_positive_eliminated_proof_type_no_nfr_trace(self):
+        # End-to-end proof that the false positive is fully gone at every layer (schema + validator).
+        # A proof-type item with fixture_ref but no nfr_refs, whose FR is absent from 07_nfrs.json
+        # traces, must produce zero errors — not just zero nfr_refs-specific errors.
+        base_path = os.path.join(self.fixtures_dir, "valid_minimal.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # Strip nfr_refs from the item; fixture_ref remains so fixture_ref gate cannot fire.
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item.pop("nfr_refs", None)
+        # 07_nfrs.json is present but traces a different FR — fr-core-login is not traced.
+        nfrs_data = {
+            "$schema": "vc:07-nfrs",
+            "nfrs": [
+                {
+                    "nfr_id": "nfr-checkout-perf",
+                    "title": "Checkout response time",
+                    "category": "performance",
+                    "trace": [{"type": "fr", "id": "fr-checkout-flow"}]
+                }
+            ]
+        }
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            # Production layout: 07_nfrs.json at spec root (parent of impl_context/).
+            (tmp_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+        self.assertEqual(errors, [],
+            f"Valid proof-type item with no nfr_refs (FR not in NFR traces) must pass fully. Got: {errors}")
+
     def test_invalid_missing_fixture_ref(self):
         # Expect failure because non-deferred item has no fixture_ref
         path = os.path.join(self.fixtures_dir, "invalid_missing_fixture_ref.json")
@@ -75,10 +297,9 @@ class TestStep16(unittest.TestCase):
     
     def test_valid_metadata_item_without_proof(self):
         # A non-deferred metadata item legitimately omits nfr_refs and fixture_ref.
-        # The nfr_refs+fixture_ref requirement (schema allOf branch + step_16
-        # TYPES_REQUIRING_PROOF) applies only to proof-types
-        # (behavior/constraint/validation/perf/security); metadata/docs/logging
-        # are exempt. Guards against a future revert of the schema branch gate.
+        # The fixture_ref requirement (schema allOf branch + step_16 TYPES_REQUIRING_PROOF)
+        # applies only to proof-types (behavior/constraint/validation/perf/security);
+        # metadata/docs/logging are exempt. Guards against a future revert of the schema branch.
         path = os.path.join(self.fixtures_dir, "valid_metadata_no_proof.json")
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")

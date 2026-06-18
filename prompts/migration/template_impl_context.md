@@ -38,7 +38,7 @@ One file per milestone (shared across 16a plan / 16b execution / 16c review). Re
 - `plan.status`: `active | deferred`.
 - `plan.summary`: Same structure as the anchor but scoped to this milestone.
 - `plan.spec_alignment.checklist`: Array of checklist items. Each item id **MUST be prefixed with the `checklist_id_prefix` declared for this milestone in the anchor's `milestone_index[]`** (e.g. prefix `AUTH` → `AUTH_LOGIN_01`). Two milestones sharing a prefix trigger E309 ANCHOR_CHECKLIST_DRIFT.
-- Non-deferred checklist items also require `implementation` (with `status` and `actions`), `nfr_refs`, and `fixture_ref` for behavioural types.
+- Non-deferred checklist items also require `implementation` (with `status` and `actions`) and `fixture_ref` for behavioural types. `nfr_refs` is required for behavioural types **only when the owning FR has at least one NFR tracing to it in `07_nfrs.json`** — FRs with no NFRs may omit it without an error.
 - `plan.review_requirements.test_commands`: Array with `minItems: 1` when `status == "active"`.
 
 Optional sections (populated as the Trinity Loop progresses):
