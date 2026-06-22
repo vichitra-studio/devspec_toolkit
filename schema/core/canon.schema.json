@@ -20,8 +20,8 @@
         "$ref": "#/$defs/entry",
         "description": "A canonical registry entry."
       },
-      "minItems": 1,
-      "description": "Array of canonical registry entries defining the shared vocabulary."
+      "minItems": 0,
+      "description": "Array of canonical registry entries defining the shared vocabulary. New projects start with an empty array; entries are added via specdev canon-accept after Step 03."
     },
     "aliases": {
       "type": "array",

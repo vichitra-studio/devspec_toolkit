@@ -1,4 +1,14 @@
 version: "unreleased"
 breaking: false
 
-changes: []
+changes:
+  - type: fix
+    description: >
+      Relaxed the vc:core:canon JSON Schema entries.minItems constraint from 1
+      to 0. init_project.py bootstraps spec/canon/manifest.json with
+      entries: [] before any specdev canon-accept has run (Step 03), so the
+      prior minItems: 1 caused spec-check and canonical-integrity to emit E520
+      schema_invalid on every new project until the canon was populated. New
+      projects legitimately start with an empty project-canon registry.
+    migration:
+      action: none

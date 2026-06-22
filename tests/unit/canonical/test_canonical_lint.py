@@ -573,5 +573,40 @@ class StructuredFieldsLintTests(unittest.TestCase):
             self.assertIn("modular_count=", err.value)
 
 
+    def test_lint_canon_dir_accepts_bootstrap_manifest_with_empty_entries(self):
+        """Bootstrap spec/canon/manifest.json has entries: [] — must not raise schema_invalid (DEVSPEC-104)."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir(parents=True)
+            (root / "schema" / "core").mkdir(parents=True)
+            (root / "tools").mkdir(parents=True)
+            (root / "schema" / "core" / "canon.schema.json").write_text(
+                (Path(__file__).resolve().parents[3] / "schema" / "core" / "canon.schema.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps({"vc:core:canon": "schema/core/canon.schema.json"}),
+                encoding="utf-8",
+            )
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps({
+                    "$schema": "vc:core:canon",
+                    "registry_version": "1.0.0",
+                    "entries": [],
+                    "aliases": [],
+                }),
+                encoding="utf-8",
+            )
+            errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
+            self.assertFalse(
+                any("schema_invalid" in e.render() and "manifest.json" in e.render() for e in errs),
+                msg=f"Bootstrap manifest with entries:[] must not emit schema_invalid: {[e.render() for e in errs]}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
