@@ -16,17 +16,19 @@ def _build_pre_commit_config(rel_toolkit_root: str) -> str:
     if os.path.exists(template_path):
         with open(template_path) as f:
             content = f.read()
-        # Replace the default ./devspec_toolkit with the actual relative path
-        return content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
+        # Replace ./devspec_toolkit (flags) and bare devspec_toolkit/ (files: patterns)
+        content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
+        content = content.replace("devspec_toolkit/", f"{rel_toolkit_root}/")
+        return content
     # Fallback: minimal config if template is missing
     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
     return f"""# Pre-commit hooks — template not found, minimal config generated.
 repos:
   - repo: local
     hooks:
-      - id: validate-all
+      - id: spec-check
         name: Validate all spec files
-        entry: python -m specdev_tools.cli validate-all spec {repo_root_flag}
+        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: spec/.*\\.json$
@@ -722,9 +724,9 @@ def main():
                     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
                     governance_hook = f"""      - id: devspec-governance
         name: DevSpec Governance Check
-        entry: python -m specdev_tools.cli governance-check spec {repo_root_flag} --message
+        entry: devspec_env/bin/python -m specdev_tools.cli governance-check spec {repo_root_flag} --spec-root ./spec --git-root . --message
         language: system
-        pass_filenames: false
+        pass_filenames: true
         stages: [commit-msg]
 """
                     with open(config_path, "a") as f:

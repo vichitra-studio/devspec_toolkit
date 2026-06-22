@@ -18,9 +18,9 @@ class TestBuildPreCommitConfig:
         content = _build_pre_commit_config("custom/path")
         assert "--repo-root ./custom/path" in content
 
-    def test_contains_validate_all_hook(self):
+    def test_contains_spec_check_hook(self):
         content = _build_pre_commit_config("devspec_toolkit")
-        assert "validate-all" in content
+        assert "spec-check" in content
 
     def test_contains_canonical_lint_hook(self):
         content = _build_pre_commit_config("devspec_toolkit")
@@ -37,7 +37,25 @@ class TestBuildPreCommitConfig:
     def test_path_substitution_applied(self):
         content = _build_pre_commit_config("my_toolkit")
         assert "./devspec_toolkit" not in content
+        assert "devspec_toolkit/" not in content
         assert "./my_toolkit" in content
+        assert "my_toolkit/" in content
+
+    def test_contains_dag_lint_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "dag-lint" in content
+
+    def test_contains_extraction_intent_check_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "extraction-intent-check" in content
+
+    def test_contains_canon_schema_alignment_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "canon-schema-alignment" in content
+
+    def test_contains_canonical_integrity_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "canonical-integrity" in content
 
 
 class TestManifestDerivedSeedBootstrap:

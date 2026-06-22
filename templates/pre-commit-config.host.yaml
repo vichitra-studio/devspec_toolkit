@@ -10,56 +10,56 @@ repos:
     hooks:
       - id: dag-lint
         name: DAG completeness lint
-        entry: python -m specdev_tools.cli dag-lint --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli dag-lint --repo-root ./devspec_toolkit
         language: system
         pass_filenames: false
         files: (devspec_toolkit/tools/step_order\.json|devspec_toolkit/prompts/prompt_.*\.md)$
         types: [file]
       - id: extraction-intent-check
         name: Extraction intent validation
-        entry: python -m specdev_tools.cli extraction-intent-check --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli extraction-intent-check --repo-root ./devspec_toolkit
         language: system
         pass_filenames: false
         files: (devspec_toolkit/tools/step_order\.json|devspec_toolkit/prompts/prompt_.*\.md)$
         types: [file]
-      - id: validate-all
+      - id: spec-check
         name: Validate all spec files
-        entry: python -m specdev_tools.cli validate-all spec --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: spec/.*\.json$
         types: [file]
       - id: seed-lint
         name: Seed reference lint
-        entry: python -m specdev_tools.cli seed-lint spec --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: spec/.*\.json$
         types: [file]
       - id: canonical-lint
         name: Canonical registry lint
-        entry: python -m specdev_tools.cli canonical-lint canon --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli canonical-lint canon --repo-root ./devspec_toolkit
         language: system
         pass_filenames: false
         files: devspec_toolkit/canon/.*\.json$
         types: [file]
       - id: canon-schema-alignment
         name: Canon-schema alignment check
-        entry: python -m specdev_tools.cli canon-schema-alignment --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli canon-schema-alignment --repo-root ./devspec_toolkit
         language: system
         pass_filenames: false
         files: (devspec_toolkit/schema/.*\.json|devspec_toolkit/canon/.*\.json)$
         types: [file]
       - id: canonical-integrity
         name: Canonical integrity check
-        entry: python -m specdev_tools.cli canonical-integrity spec --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: (spec/.*\.json|devspec_toolkit/canon/.*\.json)$
         types: [file]
       - id: dependency-order-lint
         name: Dependency order lint
-        entry: python -m specdev_tools.cli dependency-order-lint --repo-root ./devspec_toolkit
+        entry: devspec_env/bin/python -m specdev_tools.cli dependency-order-lint --repo-root ./devspec_toolkit
         language: system
         pass_filenames: false
         files: devspec_toolkit/tools/step_order\.json$
@@ -67,7 +67,7 @@ repos:
       # Optional: prompt-schema sync (~2.4s, uncomment if you want prompt/schema drift checks)
       # - id: prompt-sync
       #   name: Prompt-schema sync validation
-      #   entry: python -m specdev_tools.cli prompt-sync spec --repo-root ./devspec_toolkit
+      #   entry: devspec_env/bin/python -m specdev_tools.cli prompt-sync spec --repo-root ./devspec_toolkit
       #   language: system
       #   pass_filenames: false
       #   files: (devspec_toolkit/prompts/prompt_.*\.md|devspec_toolkit/schema/.*\.json)$
