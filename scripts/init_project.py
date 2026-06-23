@@ -70,7 +70,7 @@ jobs:
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
           uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
       - name: Validate all specs
-        run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+        run: ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
         run: ./tools/run_specdev.sh governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root ./devspec_toolkit

@@ -189,6 +189,13 @@ class TestCiWorkflowRender:
         # no leakage of the default venv name when a custom one is requested
         assert "devspec_env" not in content
 
+    def test_ci_uses_spec_check_not_validate_all(self):
+        content = _render_ci_workflow(".", "devspec_env")
+        assert "spec-check" in content
+        assert "validate-all" not in content
+        assert "--spec-root ./spec" in content
+        assert "--git-root ." in content
+
     def test_toolkit_path_substitution(self):
         content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")
         assert "vendor/devspec_toolkit/tools" in content

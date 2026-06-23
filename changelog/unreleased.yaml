@@ -34,3 +34,19 @@ changes:
       message file.
     migration:
       action: none
+  - type: change_schema
+    description: >
+      Extended the changelog format schema (changelog/format.yaml) optional_fields
+      with source_of_truth and render_target, declaring the authoritative YAML source
+      file and its rendered Markdown target. Consumed by the ChangelogFormat parser in
+      tools/specdev_tools/core/changelog_parser.py.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      The generated host CI workflow (init_project.py _render_ci_workflow) now runs
+      spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . instead
+      of validate-all, so project-canon resolves and new host repositories no longer emit
+      false E110 errors in CI. This mirrors the earlier pre-commit hook fix.
+    migration:
+      action: none

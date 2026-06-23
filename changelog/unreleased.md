@@ -19,3 +19,12 @@
 - The generated `devspec-governance` commit-msg hook now sets `pass_filenames: true` (was
   `false`) so pre-commit passes the commit-message file path to `governance-check --message`,
   which previously received no message file.
+
+- Extended the changelog format schema (`changelog/format.yaml`) `optional_fields` with
+  `source_of_truth` and `render_target`, declaring the authoritative YAML source file and
+  its rendered Markdown target. Consumed by the `ChangelogFormat` parser.
+
+- The generated host CI workflow (`init_project.py` `_render_ci_workflow`) now runs
+  `spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` instead of
+  `validate-all`, so project-canon resolves and new host repos no longer emit false E110s in
+  CI (matching the pre-commit hook fix).
