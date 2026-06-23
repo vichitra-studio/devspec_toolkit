@@ -20,6 +20,44 @@ class CanonicalLintTests(unittest.TestCase):
         errs = lint_manifest(manifest)
         self.assertTrue(any(e.code == "E420" for e in errs))
 
+    def _make_entry(self, status: str, lifecycle: dict) -> dict:
+        return {
+            "registry_version": "1.0.0",
+            "entries": [
+                {
+                    "id": "cn:core:term:test",
+                    "kind": "term",
+                    "preferred_label": "test",
+                    "definition": "test entry",
+                    "version": "1.0.0",
+                    "status": status,
+                    "owners": ["spec-platform"],
+                    "lifecycle": lifecycle,
+                }
+            ],
+            "aliases": [],
+        }
+
+    def test_sunset_requires_sunset_after(self):
+        manifest = self._make_entry(
+            "sunset",
+            {"introduced_at": "2026-01-01T00:00:00Z", "deprecated_since": "2026-03-01T00:00:00Z"},
+        )
+        errs = lint_manifest(manifest)
+        e420 = [e for e in errs if e.code == "E420"]
+        self.assertTrue(e420, f"Expected E420 for sunset entry missing sunset_after, got: {[e.render() for e in errs]}")
+        self.assertTrue(any("sunset_after" in e.render() for e in e420))
+
+    def test_retired_requires_retired_at(self):
+        manifest = self._make_entry(
+            "retired",
+            {"introduced_at": "2026-01-01T00:00:00Z"},
+        )
+        errs = lint_manifest(manifest)
+        e420 = [e for e in errs if e.code == "E420"]
+        self.assertTrue(e420, f"Expected E420 for retired entry missing retired_at, got: {[e.render() for e in errs]}")
+        self.assertTrue(any("retired_at" in e.render() for e in e420))
+
     def test_missing_manifest_reports_unresolved_input(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
@@ -221,42 +259,7 @@ class CanonicalLintTests(unittest.TestCase):
             (root / "tools").mkdir(parents=True)
 
             (root / "schema" / "core" / "canon.schema.json").write_text(
-                json.dumps(
-                    {
-                        "$schema": "https://json-schema.org/draft/2020-12/schema",
-                        "$id": "vc:core:canon",
-                        "$defs": {
-                            "semver": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
-                            "alias": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "kind": {"type": "string"},
-                                    "normalized": {"type": "string"},
-                                    "target_id": {"type": "string"},
-                                    "status": {"type": "string"},
-                                },
-                                "required": ["kind", "normalized", "target_id", "status"],
-                            },
-                            "entry": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "id": {"type": "string"},
-                                    "kind": {"type": "string"},
-                                    "preferred_label": {"type": "string"},
-                                    "definition": {"type": "string"},
-                                    "version": {"type": "string"},
-                                    "status": {"type": "string"},
-                                    "owners": {"type": "array", "items": {"type": "string"}},
-                                    "aliases": {"type": "array", "items": {"type": "string"}},
-                                    "lifecycle": {"type": "object", "properties": {"introduced_at": {"type": "string"}}, "required": ["introduced_at"]},
-                                },
-                                "required": ["id", "kind", "preferred_label", "definition", "version", "status", "owners", "lifecycle"],
-                            },
-                        },
-                    }
-                ),
+                (Path(__file__).resolve().parents[3] / "schema" / "core" / "canon.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             (root / "canon" / "aliases.schema.json").write_text(

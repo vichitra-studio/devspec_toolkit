@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+from unittest import mock
 
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
@@ -38,8 +39,18 @@ class TestBuildPreCommitConfig:
         content = _build_pre_commit_config("my_toolkit")
         assert "./devspec_toolkit" not in content
         assert "devspec_toolkit/" not in content
+        assert "devspec_toolkit/tools" not in content
         assert "./my_toolkit" in content
         assert "my_toolkit/" in content
+
+    def test_build_pre_commit_config_missing_template(self):
+        with mock.patch("os.path.exists", return_value=False):
+            content = _build_pre_commit_config("devspec_toolkit")
+        assert "spec-check" in content
+        assert "devspec_env/bin/python" in content
+        assert "--repo-root ./devspec_toolkit" in content
+        assert "--spec-root ./spec" in content
+        assert "--git-root ." in content
 
     def test_contains_dag_lint_hook(self):
         content = _build_pre_commit_config("devspec_toolkit")
