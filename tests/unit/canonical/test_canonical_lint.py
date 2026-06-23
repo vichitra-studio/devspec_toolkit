@@ -20,6 +20,35 @@ class CanonicalLintTests(unittest.TestCase):
         errs = lint_manifest(manifest)
         self.assertTrue(any(e.code == "E420" for e in errs))
 
+    def test_deprecated_alias_requires_deprecated_since(self):
+        manifest = {
+            "registry_version": "1.0.0",
+            "entries": [
+                {
+                    "id": "cn:core:term:jwt",
+                    "kind": "term",
+                    "preferred_label": "JWT",
+                    "definition": "JSON Web Token.",
+                    "version": "1.0.0",
+                    "status": "active",
+                    "owners": ["spec-platform"],
+                    "lifecycle": {"introduced_at": "2026-02-21T00:00:00Z"},
+                }
+            ],
+            "aliases": [
+                {
+                    "kind": "term",
+                    "normalized": "json web token",
+                    "target_id": "cn:core:term:jwt",
+                    "status": "deprecated",
+                }
+            ],
+        }
+        errs = lint_manifest(manifest)
+        e420 = [e for e in errs if e.code == "E420"]
+        self.assertTrue(e420, f"Expected E420 for deprecated alias missing deprecated_since, got: {[e.render() for e in errs]}")
+        self.assertTrue(any("alias=" in e.render() and "deprecated_since" in e.render() for e in e420))
+
     def _make_entry(self, status: str, lifecycle: dict) -> dict:
         return {
             "registry_version": "1.0.0",
@@ -370,6 +399,51 @@ class CanonicalLintTests(unittest.TestCase):
 
             errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
             self.assertTrue(any("schema_invalid" in e.render() and "manifest.json" in e.render() for e in errs))
+
+    def test_lint_canon_dir_rejects_manifest_with_additional_properties(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "canon").mkdir(parents=True)
+            (root / "schema" / "core").mkdir(parents=True)
+            (root / "tools").mkdir(parents=True)
+
+            (root / "schema" / "core" / "canon.schema.json").write_text(
+                (Path(__file__).resolve().parents[3] / "schema" / "core" / "canon.schema.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            (root / "tools" / "schema_registry.json").write_text(
+                json.dumps(
+                    {
+                        "vc:core:canon": "schema/core/canon.schema.json",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (root / "canon" / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "registry_version": "1.0.0",
+                        "entries": [],
+                        "aliases": [],
+                        "canonical_refs_used": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errs = lint_canon_dir(str(root), require_manifest_schema_registration=False)
+            self.assertTrue(
+                any(
+                    "schema_invalid" in e.render()
+                    and "manifest.json" in e.render()
+                    and "canonical_refs_used" in e.render()
+                    for e in errs
+                )
+            )
 
     def test_lint_canon_dir_can_require_manifest_schema_registration(self):
         import tempfile

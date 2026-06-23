@@ -4,13 +4,15 @@
     {
       "id": "cn:core:metric:error-rate",
       "kind": "metric",
+      "preferred_label": "Error Rate",
+      "definition": "The proportion of requests that result in an error.",
       "version": "2.1.0",
       "status": "active",
+      "owners": ["ops"],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
     }
   ],
-  "aliases": [],
-  "canonical_refs_used": []
+  "aliases": []
 }

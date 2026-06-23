@@ -1,8 +1,10 @@
 version: "unreleased"
 breaking: false
+source_of_truth: changelog/unreleased.yaml
+render_target: changelog/unreleased.md
 
 changes:
-  - type: fix
+  - type: change_schema
     description: >
       Relaxed the vc:core:canon JSON Schema entries.minItems constraint from 1
       to 0. init_project.py bootstraps spec/canon/manifest.json with
@@ -22,5 +24,13 @@ changes:
       --spec-root ./spec and --git-root . so project-canon resolution works
       correctly. The seed-lint, canonical-integrity, and prompt-sync hooks
       likewise receive --spec-root/--git-root where applicable.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      The generated devspec-governance commit-msg hook now sets
+      pass_filenames: true (was false) so pre-commit passes the commit-message
+      file path to governance-check --message, which previously received no
+      message file.
     migration:
       action: none

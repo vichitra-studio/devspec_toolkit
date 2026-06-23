@@ -4,7 +4,11 @@
     {
       "id": "cn:core:metric:error-rate",
       "kind": "metric",
+      "preferred_label": "Error Rate",
+      "definition": "The proportion of requests that result in an error.",
+      "version": "1.0.0",
       "status": "active",
+      "owners": ["ops"],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
@@ -12,7 +16,11 @@
     {
       "id": "cn:core:metric:failure-rate",
       "kind": "metric",
+      "preferred_label": "Failure Rate",
+      "definition": "The proportion of requests that result in a failure.",
+      "version": "1.0.0",
       "status": "active",
+      "owners": ["ops"],
       "lifecycle": {
         "introduced_at": "2026-02-21T00:00:00Z"
       }
@@ -31,6 +39,5 @@
       "target_id": "cn:core:metric:failure-rate",
       "status": "active"
     }
-  ],
-  "canonical_refs_used": []
+  ]
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EXTRACTOR_VERSION=1.0.6
+# EXTRACTOR_VERSION=1.0.7
 # Extract a digest_changelog JSON from CHANGELOG.md, changelog/*.md, or changelog/*.yaml.
 # Usage: extract_digest_changelog.sh <source_file> <output_path>
 # Extracts ONLY structured facts (version labels, section headers, change-lines).
@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-EXTRACTOR_VERSION="1.0.6"
+EXTRACTOR_VERSION="1.0.7"
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 <source_file> <output_path>" >&2
@@ -67,7 +67,7 @@ if basename.endswith(".yaml") or basename.endswith(".yml"):
         m = re.search(r'^breaking:\s*(true|false)', content, re.MULTILINE | re.IGNORECASE)
         if m:
             yaml_data["breaking"] = m.group(1).lower() == "true"
-        yaml_data["changes"] = re.findall(r'^\s{2}-\s+type:', content, re.MULTILINE)
+        yaml_data["changes"] = [{"type": t} for t in re.findall(r'^\s{2}-\s+type:\s*(\S+)', content, re.MULTILINE)]
 
     version_raw = yaml_data.get("version", "") if isinstance(yaml_data, dict) else ""
     version_label = str(version_raw).strip('"\'') if version_raw else "Unknown"
@@ -79,16 +79,41 @@ if basename.endswith(".yaml") or basename.endswith(".yml"):
     changes_list = yaml_data.get("changes", []) if isinstance(yaml_data, dict) else []
     total_entries = len(changes_list) if isinstance(changes_list, list) else 0
 
+    # Map changelog change_types (format.yaml) → Keep-a-Changelog categories.
+    CHANGE_TYPE_CATEGORY = {
+        "add_step": "added", "add_field": "added", "add_constraint": "added",
+        "add_module": "added", "add_config": "added", "add_definition": "added",
+        "add_script": "added",
+        "remove_step": "removed", "remove_field": "removed",
+        "remove_validator": "removed",
+        "rename_step": "changed", "rename_field": "changed",
+        "merge_steps": "changed", "split_step": "changed",
+        "change_type": "changed", "change_config": "changed",
+        "change_schema": "changed", "paradigm_shift": "changed",
+        "internal_restructure": "changed",
+        "fix": "fixed",
+    }
+
+    categorized = {"added": [], "changed": [], "removed": [], "deprecated": [], "fixed": []}
+    for ch in changes_list:
+        if not isinstance(ch, dict):
+            continue
+        ctype = str(ch.get("type", "")).strip()
+        desc = str(ch.get("description", "")).strip()
+        cat = CHANGE_TYPE_CATEGORY.get(ctype)
+        if cat and desc:
+            categorized[cat].append(desc)
+
     payload = {
         "version_label": version_label,
         "release_date": "",
         "is_unreleased": is_unreleased,
         "breaking": [f"breaking: true (DEVSPEC-38 schema field removal)"] if breaking_flag else [],
-        "added": [],
-        "changed": [],
-        "removed": [],
-        "deprecated": [],
-        "fixed": [],
+        "added": categorized["added"],
+        "changed": categorized["changed"],
+        "removed": categorized["removed"],
+        "deprecated": categorized["deprecated"],
+        "fixed": categorized["fixed"],
         "section_headers": [],
         "total_entries": total_entries,
         "has_breaking_changes": breaking_flag,

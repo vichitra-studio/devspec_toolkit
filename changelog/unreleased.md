@@ -15,3 +15,7 @@
   and `--git-root .` so project-canon resolution works correctly. The `seed-lint`,
   `canonical-integrity`, and `prompt-sync` hooks likewise receive `--spec-root`/`--git-root`
   where applicable.
+
+- The generated `devspec-governance` commit-msg hook now sets `pass_filenames: true` (was
+  `false`) so pre-commit passes the commit-message file path to `governance-check --message`,
+  which previously received no message file.
