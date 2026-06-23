@@ -28,3 +28,8 @@
   `spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` instead of
   `validate-all`, so project-canon resolves and new host repos no longer emit false E110s in
   CI (matching the pre-commit hook fix).
+
+- Corrected submodule-deployment documentation and prompt-contract examples to pass the
+  project-canon flags (`--spec-root ./spec --git-root .`) on spec-validating commands, and
+  switched the CI-gates and scaffold prompt examples to `spec-check`. Bare invocations
+  previously emitted false E110s when followed in a host repo.

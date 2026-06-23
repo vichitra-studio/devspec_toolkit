@@ -50,3 +50,12 @@ changes:
       false E110 errors in CI. This mirrors the earlier pre-commit hook fix.
     migration:
       action: none
+  - type: fix
+    description: >
+      Corrected submodule-deployment documentation and prompt-contract examples to pass
+      the project-canon flags (--spec-root ./spec --git-root .) on spec-validating commands,
+      and switched the CI-gates and scaffold prompt examples to spec-check. Previously these
+      examples used bare invocations that fail to resolve project canon and emit false E110s
+      when followed in a host repo.
+    migration:
+      action: none

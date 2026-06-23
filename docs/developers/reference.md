@@ -75,24 +75,24 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 ```bash
 # Validation
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Traceability & fixtures
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
-./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Seed enforcement
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Invariants & Governance
-./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
-./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
+./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --sample ./path/to/sample.json
+./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --message "feat(spec): add login [fr-initial-login]"
 
 # Quality, hallucination, and canonical integrity
-./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Canon/schema alignment
 ./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit

@@ -62,7 +62,7 @@ First, update the toolkit and run the full validation suite to see what broke.
 git submodule update --remote devspec_toolkit
 
 # Run validation across the entire spec
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### 2. Triage The Breaks

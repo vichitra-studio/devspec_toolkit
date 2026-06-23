@@ -119,7 +119,7 @@ Before emitting, verify:
   },
   "interface_map": [],
   "validators": [
-    "specdev-tools validate-all spec --repo-root ."
+    "specdev-tools spec-check spec --repo-root ."
   ],
   "build_status": "pending",
   "canonical_refs_used": []

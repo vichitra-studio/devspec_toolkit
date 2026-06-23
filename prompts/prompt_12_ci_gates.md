@@ -118,7 +118,7 @@ Before emitting, verify:
         {
           "id": "step-validate-all",
           "name": "Run schema validation",
-          "command": "./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit"
+          "command": "./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root ."
         }
       ],
       "environment_ref": {
