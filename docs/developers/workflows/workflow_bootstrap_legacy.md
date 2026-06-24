@@ -38,6 +38,8 @@ Before writing any new content, check which spec artifacts are missing.
 ```bash
 # List all spec artifacts and their validation status
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+# Or run the unified gate, which resolves project canon and runs every applicable check:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Check the canonical registry for alignment issues
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -153,13 +155,13 @@ Use this step if the project has measurable delivery metrics to capture before P
 After emitting, promote project-specific terms to the canon registry:
 
 ```bash
-./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --git-root .
 ```
 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/03_glossary.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 2.4: Functional Requirements — `spec/04_fr_list.json`
@@ -311,6 +313,8 @@ Add potential security threats for the project. `target_ids` must reference API 
 
 **Validation ritual after all Phase 4 steps:**
 ```bash
+# Or run the unified gate in place of validate-all + the individual lints below:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -498,8 +502,10 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 
 ## Completion & Next Steps
 
-1. Run the full validation suite to confirm complete coverage across all phases:
+1. Run the full validation suite to confirm complete coverage across all phases
+   (or substitute the unified `spec-check` gate for `validate-all`):
    ```bash
+   ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .

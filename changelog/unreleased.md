@@ -1,12 +1,22 @@
 ## [unreleased]
 
-### Fixed
+### Changed
 
 - Relaxed the `vc:core:canon` JSON Schema `entries.minItems` constraint from 1 to 0.
   `init_project.py` bootstraps `spec/canon/manifest.json` with `entries: []` before any
   `specdev canon-accept` has run (Step 03), so the prior `minItems: 1` caused `spec-check`
   and `canonical-integrity` to emit E520 `schema_invalid` on every new project until the
   canon was populated. New projects legitimately start with an empty project-canon registry.
+
+- Extended the changelog format schema (`changelog/format.yaml`) `optional_fields` with
+  `source_of_truth` and `render_target`, declaring the authoritative YAML source file and
+  its rendered Markdown target. These keys are allowlisted as opaque `optional_fields`: the
+  `ChangelogFormat` parser permits them as optional top-level fields —
+  neither required nor read — so their values are never consumed. YAML-to-Markdown
+  parity between the two paths is a manual
+  convention, not tool-enforced.
+
+### Fixed
 
 - Fixed the generated pre-commit hook configuration for macOS and submodule deployments.
   All hook entry points are now invoked via `devspec_env/bin/python` instead of the ambient
@@ -19,10 +29,6 @@
 - The generated `devspec-governance` commit-msg hook now sets `pass_filenames: true` (was
   `false`) so pre-commit passes the commit-message file path to `governance-check --message`,
   which previously received no message file.
-
-- Extended the changelog format schema (`changelog/format.yaml`) `optional_fields` with
-  `source_of_truth` and `render_target`, declaring the authoritative YAML source file and
-  its rendered Markdown target. Consumed by the `ChangelogFormat` parser.
 
 - The generated host CI workflow (`init_project.py` `_render_ci_workflow`) now runs
   `spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .` instead of

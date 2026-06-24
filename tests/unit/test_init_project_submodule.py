@@ -68,6 +68,12 @@ class TestBuildPreCommitConfig:
         content = _build_pre_commit_config("devspec_toolkit")
         assert "canonical-integrity" in content
 
+    def test_custom_venv_name_propagates(self):
+        content = _build_pre_commit_config("devspec_toolkit", "customenv")
+        assert "customenv/bin/python" in content
+        # no leakage of the default venv name when a custom one is requested
+        assert "devspec_env/bin/python" not in content
+
 
 class TestManifestDerivedSeedBootstrap:
     """Verify that seed templates land at the paths declared in seeds[].path,

@@ -127,6 +127,11 @@ Before emitting, verify:
       }
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:environment:ci",
+      "kind": "environment"
+    }
+  ]
 }
 ```

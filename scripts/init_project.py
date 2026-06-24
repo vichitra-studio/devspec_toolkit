@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-def _build_pre_commit_config(rel_toolkit_root: str) -> str:
+def _build_pre_commit_config(rel_toolkit_root: str, venv_name: str = "devspec_env") -> str:
     """Read the host pre-commit template and substitute the toolkit root path."""
     template_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -19,6 +19,7 @@ def _build_pre_commit_config(rel_toolkit_root: str) -> str:
         # Replace ./devspec_toolkit (flags) and bare devspec_toolkit/ (files: patterns)
         content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
         content = content.replace("devspec_toolkit/", f"{rel_toolkit_root}/")
+        content = content.replace("devspec_env", venv_name)
         return content
     # Fallback: minimal config if template is missing
     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
@@ -28,7 +29,7 @@ repos:
     hooks:
       - id: spec-check
         name: Validate all spec files
-        entry: devspec_env/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root .
+        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: spec/.*\\.json$
@@ -669,7 +670,7 @@ def main():
     pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
     if not os.path.exists(pre_commit_file):
         print("Creating .pre-commit-config.yaml...")
-        config_content = _build_pre_commit_config(rel_toolkit_root)
+        config_content = _build_pre_commit_config(rel_toolkit_root, args.venv_name)
         with open(pre_commit_file, "w") as f:
             f.write(config_content)
         print("Note: pre-commit will be installed into the virtualenv and 'pre-commit install' run automatically.")
@@ -724,7 +725,7 @@ def main():
                     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
                     governance_hook = f"""      - id: devspec-governance
         name: DevSpec Governance Check
-        entry: devspec_env/bin/python -m specdev_tools.cli governance-check spec {repo_root_flag} --spec-root ./spec --git-root . --message
+        entry: {venv_name}/bin/python -m specdev_tools.cli governance-check spec {repo_root_flag} --spec-root ./spec --git-root . --message
         language: system
         pass_filenames: true
         stages: [commit-msg]

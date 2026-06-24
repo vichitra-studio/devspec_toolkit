@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+# Requires Python >= 3.9 (uses dict[str, list[str]] PEP 585 builtin generics).
+# DEVSPEC_PYTHON lets callers point at a managed venv interpreter; defaults to python3.
+PYTHON="${DEVSPEC_PYTHON:-python3}"
+
 EXTRACTOR_VERSION="1.0.7"
 
 if [[ $# -lt 2 ]]; then
@@ -27,7 +31,7 @@ EXTRACTED_AT=$(date +%s)
 REL_PATH="${SOURCE_FILE#./}"
 
 # ── All extraction via Python (structured markdown parsing) ──────────────────
-python3 - "$SOURCE_FILE" "$OUTPUT_PATH" "$REL_PATH" "$SOURCE_SHA" "$EXTRACTOR_VERSION" "$EXTRACTED_AT" <<'PYEOF'
+"$PYTHON" - "$SOURCE_FILE" "$OUTPUT_PATH" "$REL_PATH" "$SOURCE_SHA" "$EXTRACTOR_VERSION" "$EXTRACTED_AT" <<'PYEOF'
 import re
 import json
 import sys

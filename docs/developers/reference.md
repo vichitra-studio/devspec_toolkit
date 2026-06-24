@@ -2,7 +2,16 @@
 
 ## Submodule-Aware Flags
 
-The following flags are available on `validate`, `validate-all`, and `forward-replay-check` commands:
+The following flags are available on most spec-operating commands, including
+`validate`, `validate-all`, `spec-check`, `matrix`, `seed-lint`, `fixtures-lint`,
+`invariants-check`, `governance-check`, `canonical-lint`, `canonical-integrity`,
+`spec-quality-lint`, `hallucination-lint`, `traceability-check`, `forward-replay-check`,
+`milestone-state`, and `canon-schema-alignment`. Per-command exceptions (per
+CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
+`--spec-root`; most `specdev json` subcommands take `--repo-root` only; and
+diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
+`dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root` only.
+Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -13,7 +22,8 @@ The following flags are available on `validate`, `validate-all`, and `forward-re
 ### Examples
 
 ```bash
-# Standard (non-submodule) usage
+# Standard (non-submodule) usage — intentionally flagless: when spec/ lives under the
+# toolkit root, --spec-root/--git-root default correctly and are omitted on purpose.
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 
 # Submodule deployment
@@ -73,6 +83,10 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 
 ### Core validation commands
 ```bash
+# Unified gate — runs all applicable validation / lint checks (preferred over bare validate-all;
+# resolves project canon, so it avoids the false E110s that validate-all alone can emit)
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
 # Validation
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -91,7 +105,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 # Quality, hallucination, and canonical integrity
 ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
-./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Canon/schema alignment
@@ -99,7 +113,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
-./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
+./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --base-ref origin/main
 
 # DAG completeness lint (validates downstream_consumers consistency)
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit

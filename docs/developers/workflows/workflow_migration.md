@@ -62,6 +62,8 @@ First, update the toolkit and run the full validation suite to see what broke.
 git submodule update --remote devspec_toolkit
 
 # Run validation across the entire spec
+# (or substitute the unified spec-check gate, which resolves project canon:
+#  ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .)
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 

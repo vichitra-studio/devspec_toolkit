@@ -22,6 +22,8 @@ Each spec step uses the **two-phase Clarify/Emit protocol**:
 ### Pre-Flight Check
 Before starting, ensure your current specs are clean and valid.
 ```bash
+# Or run the unified gate, which resolves project canon and runs every applicable check:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
@@ -206,8 +208,9 @@ Supply the executed artifact path. The reviewer validates execution against the 
     ```bash
     mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
     ```
-2.  **Final Validation**:
+2.  **Final Validation** (or substitute the unified `spec-check` gate for `validate-all`):
     ```bash
+    ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
