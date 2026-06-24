@@ -10,9 +10,9 @@
 
 - Extended the changelog format schema (`changelog/format.yaml`) `optional_fields` with
   `source_of_truth` and `render_target`, declaring the authoritative YAML source file and
-  its rendered Markdown target. These keys are allowlisted as opaque `optional_fields`: the
-  `ChangelogFormat` parser permits them as optional top-level fields —
-  neither required nor read — so their values are never consumed. YAML-to-Markdown
+  its rendered Markdown target. These keys are declared in `changelog/format.yaml`'s
+  `optional_fields`, so the `ChangelogFormat` parser accepts them as optional top-level
+  keys in versioned changelog files without consuming their values. YAML-to-Markdown
   parity between the two paths is a manual
   convention, not tool-enforced.
 

@@ -28,7 +28,7 @@ Translate governance rules and fixture expectations into enforceable CI automati
 
 ## Operating Flow: Survey → Gate → Threshold → Emit
 - **Survey**: Survey all mandatory spec steps and their validators — identify every step that requires a CI quality checkpoint, including schema validation, fixture lint, traceability matrix, invariants, governance, and red team mitigations.
-- **Gate**: Gate each step with a specific CLI command from the toolkit (e.g., `validate-all`, `fixtures-lint`, `invariants-check`, `governance-check`). No gate may be a manual review step — every gate must be machine-executable.
+- **Gate**: Gate each step with a specific CLI command from the toolkit (e.g., `spec-check`, `fixtures-lint`, `invariants-check`, `governance-check`). No gate may be a manual review step — every gate must be machine-executable.
 - **Threshold**: Set thresholds for pass/fail criteria for each gate — numeric coverage percentages, zero-error exit codes, or explicit count limits. No subjective pass criteria allowed.
 - **Emit**: Write the artifact when all gates have executable commands, measurable thresholds, and correct stage assignments.
 

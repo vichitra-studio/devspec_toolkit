@@ -44,7 +44,7 @@ class TestBuildPreCommitConfig:
         assert "my_toolkit/" in content
 
     def test_build_pre_commit_config_missing_template(self):
-        with mock.patch("os.path.exists", return_value=False):
+        with mock.patch("init_project.os.path.exists", return_value=False):
             content = _build_pre_commit_config("devspec_toolkit")
         assert "spec-check" in content
         assert "devspec_env/bin/python" in content

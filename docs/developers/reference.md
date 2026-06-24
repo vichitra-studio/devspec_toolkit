@@ -109,7 +109,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Canon/schema alignment
-./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
