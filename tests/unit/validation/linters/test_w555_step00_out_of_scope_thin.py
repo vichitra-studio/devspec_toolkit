@@ -35,7 +35,7 @@ import os
 import tempfile
 import unittest
 
-from specdev_tools.validation.seed_lint import lint_seeds
+from specdev_tools.validation.seed_lint import lint_seeds, _count_substantive_out_of_scope
 from specdev_tools.core.errors import render_errors, PROMOTABLE_PAIRS
 
 # Absolute path to toolkit root (needed for step_order.json / schema_registry.json).
@@ -232,27 +232,30 @@ _SEED_BOLD_LEAD_WITHOUT_COLON = """\
 """
 
 # Seed that proves cross-delimiter fence isolation (T1 fix).
-# A ```-opened fenced block contains a ~~~ line followed by two fake bullets that
-# look like out-of-scope items.  Without the T1 fix the ~~~ line prematurely
-# "closes" the ``` fence (old boolean toggle), the fake bullets are counted as
-# substantive, and W555 stays silent for the real out-of-scope section below (which
-# has only 1 genuine item → total 3 → no W555 — false-negative).
-# With the fix, the ~~~ line is fence CONTENT (delimiter mismatch), so the ``` block
-# is skipped in its entirety.  The single genuine bullet outside the fence is
-# counted correctly → total_substantive = 1 < 3 → W555 must fire.
+# The out-of-scope section contains:
+#   1. one genuine bullet OUTSIDE the fence,
+#   2. a ```-opened fenced block that contains a ~~~ line followed by two fake
+#      bullets that look like out-of-scope items.
+#
+# Old boolean-toggle impl: the ~~~ line inside the ``` block toggles in_fenced
+# OFF, so the two subsequent fake bullets are visible to the bullet counter while
+# in_section is still True → count = 3 → W555 does NOT fire (false-negative).
+#
+# Current fence_char impl: the ~~~ line is a non-matching delimiter inside a
+# backtick fence → treated as fence content, fence stays open; the two fake
+# bullets are skipped; only the one genuine bullet counts → count = 1 < 3
+# → W555 fires (true-positive).
 _SEED_CROSS_DELIMITER_FENCE = """\
 # Product Brief
 
-## 2. Examples
-
-```
-~~~ delimiter inside backtick fence — must NOT close it
-- Fake non-goal inside backtick fence (not substantive).
-- Another fake non-goal inside backtick fence (not substantive).
-```
-
 ### 3.2 Out-of-Scope (Non-Goals)
-- Only one genuine non-goal is provided.
+- Genuine non-goal kept outside the fence.
+```
+pseudo code line
+~~~
+- fake bullet alpha
+- fake bullet beta
+```
 """
 
 # Seed with exactly three EMPTY bullets ("- " with no text after the dash+space).
@@ -736,18 +739,38 @@ class TestW555Step00OutOfScopeThin(unittest.TestCase):
 
     def test_fires_when_cross_delimiter_fence_contains_fake_bullets(self):
         """A ```-opened fence containing a ~~~ line plus two fake out-of-scope
-        bullets must NOT have those bullets counted.  Only the one genuine bullet
-        OUTSIDE the fence is substantive → aggregate < 3 → W555 fires.
+        bullets under the out-of-scope heading must NOT have those fake bullets
+        counted.  Only the one genuine bullet OUTSIDE the fence is substantive
+        → aggregate = 1 < 3 → W555 fires.
 
-        Discriminating (T1 fix):  Without the fix the ~~~ line inside the ```
-        block prematurely flips the old boolean ``in_fenced`` flag, the fake
-        bullets escape the fence filter and get counted, raising the aggregate to
-        3 → W555 stays silent (false-negative).  With the fix the ~~~ line is
-        treated as fence content (delimiter mismatch), the ``` block is skipped in
-        full, and only the 1 genuine bullet is counted → W555 fires.
+        Discriminating (T1 fix): the fixture places the out-of-scope heading
+        FIRST, then one genuine bullet, then a ```-opened fence that contains a
+        ~~~ line and two fake bullets.
 
-        Uses a real temp project; lint_seeds() and the parser are NOT mocked.
+        OLD boolean-toggle impl: the ~~~ line inside the ``` block flips
+        in_fenced OFF, so the two subsequent fake bullets are counted while
+        in_section is still True → count = 3 → W555 does NOT fire (false-neg).
+
+        CURRENT fence_char impl: the ~~~ line is a non-matching delimiter inside a
+        backtick fence → treated as fence content, fence stays open; the two fake
+        bullets are skipped; only the genuine bullet counts → count = 1 → W555
+        fires (true-positive).
+
+        Two assertions are made:
+        (a) Direct unit check: _count_substantive_out_of_scope returns 1.
+        (b) Full lint run: exactly one W555 is emitted.
+
+        lint_seeds() and the parser are NOT mocked.
         """
+        # (a) Direct unit-level assertion — count must be 1 with the real impl.
+        self.assertEqual(
+            _count_substantive_out_of_scope(_SEED_CROSS_DELIMITER_FENCE),
+            1,
+            "Expected _count_substantive_out_of_scope to return 1: only the genuine "
+            "bullet outside the fence should be counted; the two fake bullets inside "
+            "the backtick fence (after ~~~) must be skipped.",
+        )
+        # (b) Full lint run — exactly one W555 must fire.
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_dir = _build_project(
                 tmpdir,
