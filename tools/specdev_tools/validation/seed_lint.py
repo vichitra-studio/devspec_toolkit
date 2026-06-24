@@ -256,19 +256,28 @@ def _count_substantive_out_of_scope(text: str) -> int:
     out-of-scope heading is present.
     """
     in_section = False
-    in_fenced = False
+    fence_char: str | None = None  # None = outside fence; "`" or "~" = inside fence
     count = 0
     for line in text.splitlines():
-        # Toggle backtick or tilde fenced code block state; skip the toggle
-        # line itself and all content inside.  Accepted limitation: the toggle
-        # treats any line starting with 3+ backticks or tildes as a fence
-        # delimiter and does NOT match opening/closing fence lengths per
-        # CommonMark; this is an accepted simplification for a warning-level check.
+        # Track fenced code block state by the opening delimiter character so
+        # that cross-delimiter lines inside a fence (e.g. a ~~~ line inside a
+        # ```-opened fence) are treated as fence content, not toggles.
+        # Accepted limitation: the scanner tracks the opening delimiter character
+        # but does NOT match fence-delimiter LENGTHS per CommonMark (e.g. `````
+        # vs ```) — that length simplification remains an accepted simplification
+        # for a warning-level check.
         stripped = line.strip()
         if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fenced = not in_fenced
+            delim = stripped[0]
+            if fence_char is None:
+                # Open the fence; record which delimiter started it.
+                fence_char = delim
+            elif delim == fence_char:
+                # Matching closing delimiter — close the fence.
+                fence_char = None
+            # else: non-matching delimiter inside the fence — fence content; fall through.
             continue
-        if in_fenced:
+        if fence_char is not None:
             continue
         if _HEADING_RE.match(line):
             if in_section:
@@ -322,6 +331,11 @@ def _check_step00_out_of_scope_thin(
         total_substantive += _count_substantive_out_of_scope(text)
 
     # Threshold 3 matches schema/00_charter.schema.json "out_of_scope": {"minItems": 3}.
+    # The value is restated inline (not read from the schema at runtime) by design:
+    # (1) it follows the validation layer's established mirror-with-comment convention
+    #     for schema-owned bounds (cf. step_16.py, step_16b.py, linter_utils.py); and
+    # (2) reading a Step-00 schema from the seed layer would couple seeds to Step 00 —
+    #     exactly the separation W555 exists to preserve.
     # If that schema constraint is bumped, update this threshold to match.
     if total_substantive < 3:
         errors.append(make_error(

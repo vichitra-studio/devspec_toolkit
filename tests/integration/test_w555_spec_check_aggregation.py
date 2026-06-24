@@ -44,7 +44,8 @@ def _w555_project(tmp_path, request):
     (seed_dir / "seed_overview.md").write_text(request.param, encoding="utf-8")
 
     # Minimal manifest: one seed routed to step "00".
-    # No $schema URI → avoids E520 missing_schema_uri noise but seed-lint
+    # No $schema URI → E520 (missing_schema_uri) IS emitted, but it is irrelevant
+    # to this test — the assertions check only W555 presence/absence; seed-lint
     # still runs via the project_root/spec/common/seed_manifest.json gate.
     manifest = {
         "seed_manifest_id": "seed-manifest-w555-integration",

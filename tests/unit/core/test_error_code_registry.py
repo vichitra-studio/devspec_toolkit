@@ -113,7 +113,7 @@ class TestR9ErrorCodes(unittest.TestCase):
 
     def test_non_promotable_codes_excluded(self):
         """Non-promotable W-codes are NOT in PROMOTABLE_PAIRS."""
-        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W555", "W570", "W590", "W596", "W597"}
+        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W553", "W554", "W555", "W570", "W590", "W596", "W597", "W606"}
         for code in non_promotable:
             self.assertNotIn(code, PROMOTABLE_PAIRS,
                              f"{code} should not be promotable")

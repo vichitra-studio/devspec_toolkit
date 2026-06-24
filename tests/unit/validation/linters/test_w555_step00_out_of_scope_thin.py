@@ -231,6 +231,30 @@ _SEED_BOLD_LEAD_WITHOUT_COLON = """\
 - **Multi-region** deployment is not planned for MVP.
 """
 
+# Seed that proves cross-delimiter fence isolation (T1 fix).
+# A ```-opened fenced block contains a ~~~ line followed by two fake bullets that
+# look like out-of-scope items.  Without the T1 fix the ~~~ line prematurely
+# "closes" the ``` fence (old boolean toggle), the fake bullets are counted as
+# substantive, and W555 stays silent for the real out-of-scope section below (which
+# has only 1 genuine item → total 3 → no W555 — false-negative).
+# With the fix, the ~~~ line is fence CONTENT (delimiter mismatch), so the ``` block
+# is skipped in its entirety.  The single genuine bullet outside the fence is
+# counted correctly → total_substantive = 1 < 3 → W555 must fire.
+_SEED_CROSS_DELIMITER_FENCE = """\
+# Product Brief
+
+## 2. Examples
+
+```
+~~~ delimiter inside backtick fence — must NOT close it
+- Fake non-goal inside backtick fence (not substantive).
+- Another fake non-goal inside backtick fence (not substantive).
+```
+
+### 3.2 Out-of-Scope (Non-Goals)
+- Only one genuine non-goal is provided.
+"""
+
 # Seed with exactly three EMPTY bullets ("- " with no text after the dash+space).
 # An author who deletes the [Non-goal N] placeholder text but leaves the dash
 # gets 3 empty bullets.  Empty bullets are NOT substantive content → W555 must fire
@@ -702,6 +726,45 @@ class TestW555Step00OutOfScopeThin(unittest.TestCase):
                 len(w555) == 1,
                 f"Expected exactly 1 W555: empty bullets are not substantive content. "
                 f"Got: {w555}\nAll errors: {render_errors(errors)}",
+            )
+
+
+    # ------------------------------------------------------------------
+    # 18. Cross-delimiter fence isolation: ~~~ inside ``` fence is content,
+    #     not a toggle — bullets inside the ``` block are NOT counted
+    # ------------------------------------------------------------------
+
+    def test_fires_when_cross_delimiter_fence_contains_fake_bullets(self):
+        """A ```-opened fence containing a ~~~ line plus two fake out-of-scope
+        bullets must NOT have those bullets counted.  Only the one genuine bullet
+        OUTSIDE the fence is substantive → aggregate < 3 → W555 fires.
+
+        Discriminating (T1 fix):  Without the fix the ~~~ line inside the ```
+        block prematurely flips the old boolean ``in_fenced`` flag, the fake
+        bullets escape the fence filter and get counted, raising the aggregate to
+        3 → W555 stays silent (false-negative).  With the fix the ~~~ line is
+        treated as fence content (delimiter mismatch), the ``` block is skipped in
+        full, and only the 1 genuine bullet is counted → W555 fires.
+
+        Uses a real temp project; lint_seeds() and the parser are NOT mocked.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = _build_project(
+                tmpdir,
+                seeds=[
+                    _seed("seed-overview", "seed_overview.md", _SEED_CROSS_DELIMITER_FENCE)
+                ],
+                global_seed_order=["seed-overview"],
+                step_requirements={"00": ["seed-overview"]},
+            )
+            errors = lint_seeds(
+                repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir
+            )
+            w555 = _w555_errors(errors)
+            self.assertTrue(
+                len(w555) == 1,
+                f"Expected exactly 1 W555: cross-delimiter ~~~ inside ``` must not "
+                f"count fake bullets. Got: {w555}\nAll errors: {render_errors(errors)}",
             )
 
 
