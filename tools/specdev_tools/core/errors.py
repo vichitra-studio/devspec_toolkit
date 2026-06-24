@@ -98,6 +98,11 @@ ERROR_CODES = {
     "W552": "POTENTIAL_UNREGISTERED_PAIRING",
     "W553": "SEED_STEP_UNKNOWN",
     "W554": "HARDCODED_SEED_REFERENCE",
+    # W555 STEP00_SEED_OUT_OF_SCOPE_THIN — warn-only, non-promotable.
+    # E555 is SEMANTIC_COVERAGE_REGRESSION (different semantic); W555 is intentionally
+    # excluded from PROMOTABLE_PAIRS so neither SPECDEV_WARNINGS_AS_ERRORS nor
+    # SPECDEV_PROMOTE_CODES can escalate it.
+    "W555": "STEP00_SEED_OUT_OF_SCOPE_THIN",
     "W560": "TRACEABILITY_GAP",
     "W561": "UNCOVERED_FR",
     "W562": "ORPHAN_MILESTONE",
@@ -219,7 +224,7 @@ ERROR_CODES = {
 # Maps W-codes to their E-code counterparts for dynamic promotion.
 # Consumed by validate.py: SPECDEV_WARNINGS_AS_ERRORS=1 promotes all;
 # SPECDEV_PROMOTE_CODES=W571,W593 promotes selectively.
-# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W590/
+# Non-promotable codes are excluded: W110/W120/W130/W140/W552/W553/W554/W555/W590/
 # W596/W597/W606 have E-counterparts with different semantics; W570
 # (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
 # its name with the registered-but-unemitted E604 and stays advisory (see the

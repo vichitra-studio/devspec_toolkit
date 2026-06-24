@@ -4,6 +4,16 @@ source_of_truth: changelog/unreleased.yaml
 render_target: changelog/unreleased.md
 
 changes:
+  - type: add_constraint
+    description: >
+      Added W555 STEP00_SEED_OUT_OF_SCOPE_THIN to seed_lint.py: fires when seeds
+      routed to step "00" supply fewer than 3 substantive out-of-scope items combined.
+      The Step 00 charter schema requires out_of_scope minItems:3; without this warning,
+      thin seeds cause authors to hit a gate failure or hallucinate content at authoring
+      time. W555 is warn-only and non-promotable (E555 is the distinct
+      SEMANTIC_COVERAGE_REGRESSION code with different semantics).
+    migration:
+      action: none
   - type: change_schema
     description: >
       Relaxed the vc:core:canon JSON Schema entries.minItems constraint from 1

@@ -203,6 +203,14 @@
 
 **Warning-only and non-promotable**: W554 has no E-counterpart (E554 is `CANON_ENUM_DRIFT`) and is excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate it to an error.
 
+### W555 STEP00_SEED_OUT_OF_SCOPE_THIN
+
+**Trigger**: Seeds routed to step `"00"` in `seed_manifest.json` `step_requirements` supply fewer than 3 substantive out-of-scope items in aggregate. The Step 00 charter schema requires `out_of_scope minItems:3`, so thin seeds cause authors to hit a gate failure or to hallucinate content at authoring time. "Substantive" means a markdown bullet item under an out-of-scope / non-goals heading that is NOT a bracket-only placeholder (e.g. `[Non-goal 1]`) and NOT a template scaffold label (e.g. `- **Expectation**:`). Items are counted across ALL seeds routed to step 00 combined; W555 fires at most once per `lint_seeds()` invocation.
+
+**Resolution**: Add at least 3 real, project-specific out-of-scope items to the seed(s) routed to step 00. The heading must match one of the accepted variants (case-insensitive): `Out-of-Scope`, `Non-Goals`, or `Non-Goal`. A good out-of-scope item describes a concrete capability that is deliberately excluded from scope — for example "Multi-tenant support is deferred to Phase 2" or "Offline mode is not in scope for MVP".
+
+**Warning-only and non-promotable**: E555 already exists as `SEMANTIC_COVERAGE_REGRESSION` (a structurally different code with different semantics) and W555 is intentionally excluded from `PROMOTABLE_PAIRS`, so neither `SPECDEV_WARNINGS_AS_ERRORS` nor `SPECDEV_PROMOTE_CODES` can escalate W555 to an error.
+
 ### E581 / W581 MILESTONE_REF_MISSING
 
 **Trigger**: A non-deferred checklist item in step 16 lacks a `milestone_ref` field binding it to a step 14 milestone.

@@ -124,9 +124,14 @@ DEEP DIVE QUESTIONS:
   - [Goal 3]
 
 ### 3.2 Out-of-Scope (Non-Goals)
-- **Expectation**: Explicit list of "Phase 2" items to prevent scope creep.
+- **Expectation**: Explicit list of "Phase 2" items to prevent scope creep. Must list at
+  least 3 specific non-goals. Step 00 charter schema requires `out_of_scope minItems:3`;
+  the `seed-lint` gate (W555) will warn if fewer than 3 substantive items are supplied
+  across all seeds routed to step 00.
 - **Content**:
   - [Non-goal 1]
+  - [Non-goal 2]
+  - [Non-goal 3]
 
 ### 3.3 Assumptions & Constraints
 <!--
