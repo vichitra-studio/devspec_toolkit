@@ -25,6 +25,9 @@ Coverage:
  16. Fenced tilde (~~~) code blocks containing a fake out-of-scope heading are ignored.
  17. Empty bullets ("- " with no text) in out-of-scope section are NOT substantive
      → W555 fires (count is 0, not 3).
+ 18. Cross-delimiter fence discrimination: a ~~~ line inside a ```-opened fence is
+     fenced content, not a closing delimiter — fake bullets after the ~~~ are skipped;
+     only the genuine bullet outside the fence counts → W555 fires.
 
 The real lint_seeds(), manifest parsing, and markdown parsing are NOT mocked.
 """

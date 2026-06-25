@@ -1,7 +1,7 @@
 """Integration test: W555 surfaces through the spec-check aggregation path.
 
 DEVSPEC-107 added W555 STEP00_SEED_OUT_OF_SCOPE_THIN to seed_lint.py and proved
-it with 17 unit tests that call lint_seeds() directly.  This test exercises the
+it with 18 unit tests that call lint_seeds() directly.  This test exercises the
 *spec-check aggregation path* — run_spec_check_json → _run_checks → lint_seeds →
 _check_result — to confirm W555 is collected into the seed-lint check findings
 and returned in DEFAULT output (no extra verbosity flags required).

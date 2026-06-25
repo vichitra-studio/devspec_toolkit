@@ -167,6 +167,14 @@
 
 **Promotable**: W582 → E582.
 
+### E410 CANONICAL_ALIAS_COLLISION
+
+**Trigger**: Fired in two distinct contexts:
+- **Canon manifest** (`canonical/lint.py`): a canonical registry manifest contains a duplicate entry `id`, a duplicate `(kind, normalized)` alias pair, or a single alias that resolves to more than one target `id`.
+- **Seed manifest** (`seed_lint.py`): `spec/common/seed_manifest.json` declares two or more `seeds[]` entries sharing the same `seed_id` value.
+
+**Resolution**: For canon-manifest collisions, remove or rename the duplicate entry or alias in the relevant `canon/` manifest file. For seed-manifest collisions, ensure each entry in `seed_manifest.json` `seeds[]` has a unique `seed_id`; deduplicate or rename the conflicting entries.
+
 ### E150 / W150 SEED_MANIFEST_NOT_PROVIDED
 
 **Trigger**: A step listed in `seed_manifest.json`'s `step_requirements` has no corresponding seed documents available.
@@ -205,7 +213,7 @@
 
 ### W555 STEP00_SEED_OUT_OF_SCOPE_THIN
 
-**Trigger**: Seeds routed to step `"00"` in `seed_manifest.json` `step_requirements` supply fewer than 3 substantive out-of-scope items in aggregate. The Step 00 charter schema requires `out_of_scope minItems:3`, so thin seeds cause authors to hit a gate failure or to hallucinate content at authoring time. "Substantive" means a markdown bullet item under an out-of-scope / non-goals heading that is NOT a bracket-only placeholder (e.g. `[Non-goal 1]`), NOT a template scaffold label (e.g. `- **Expectation**:`), and NOT content inside a fenced code block (delimited by ` ``` ` or `~~~`). Items are counted across ALL seeds routed to step 00 combined; W555 fires at most once per `lint_seeds()` invocation.
+**Trigger**: Seeds routed to step `"00"` in `seed_manifest.json` `step_requirements` supply fewer than 3 substantive out-of-scope items in aggregate. The Step 00 charter schema requires `out_of_scope minItems:3`, so thin seeds cause authors to hit a gate failure or to hallucinate content at authoring time. "Substantive" means a markdown bullet item under an out-of-scope / non-goals heading that is NOT a bracket-only placeholder (e.g. `[Non-goal 1]`), NOT a template scaffold label (e.g. `- **Expectation**:`), and NOT content inside a fenced code block (delimited by ` ``` ` or `~~~`). Fence tracking matches the opening delimiter, so a `~~~` line inside a ` ``` `-opened fence (or vice-versa) is treated as fenced content, not a closing delimiter. Items are counted across ALL seeds routed to step 00 combined; W555 fires at most once per `lint_seeds()` invocation.
 
 **Resolution**: Add at least 3 real, project-specific out-of-scope items to the seed(s) routed to step 00. The heading must match one of the accepted variants (case-insensitive): `Out-of-Scope`, `Non-Goals`, or `Non-Goal`. A good out-of-scope item describes a concrete capability that is deliberately excluded from scope — for example "Multi-tenant support is deferred to Phase 2" or "Offline mode is not in scope for MVP".
 
