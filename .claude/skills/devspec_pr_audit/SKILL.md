@@ -683,6 +683,30 @@ Update `manifest.json` `phases_completed`, `phase_trace[]`, and `updated_at` usi
 `loop_iterations=<converged or capped ITER_N>`,
 `outcome="OK"` on normal convergence, `"DEGRADED"` on L2 cap.
 
+### P4→P5 gate: validate agent outputs
+
+Before entering P5, run the schema-validation hard gate across all consolidated
+artifacts.  This step corresponds to §9.6 of the audit protocol:
+
+```bash
+python3 .claude/skills/devspec_pr_audit/scripts/validate_agent_outputs.py \
+  --run-dir docs/audit/runs/$RUN_ID --strict
+```
+
+If this script exits non-zero, **P5 is skipped entirely**.  On schema failure the
+script merge-writes two keys into `<run-dir>/manifest.json`:
+
+```json
+{
+  "status": "blocked",
+  "blocked_reason": "<schema file> failed validation for <artifact>"
+}
+```
+
+`p5_finalize.py` reads this blocked status on startup (G3 guard) and exits 1,
+printing the `blocked_reason` to stderr so the caller knows which artifact caused
+the block.
+
 ---
 
 ## 9. P5 — Audit-of-Audit and Finalization
