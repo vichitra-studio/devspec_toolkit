@@ -758,6 +758,17 @@ Omit the "## Fix plan" section if `fix_plan.json` does not exist (no findings pa
 If `STATUS == "PARTIAL"`, open with `STATUS: PARTIAL — see manifest.json meta_findings[]
 for unresolved items` (protocol §11).
 
+When findings > 0, append the following section to `SUMMARY.md` (omit when findings
+total is zero — no `fix_plan.json` was produced):
+
+```markdown
+## Next steps
+
+After applying fix_plan.json tasks, run `p6_verify.py` to confirm each task's
+`acceptance_command` passes, then re-run `/devspec_pr_audit` to confirm findings are
+closed. See protocol §12 for the full post-fix verification workflow.
+```
+
 ### P5 completion
 
 The P5 completion sequence is **strictly ordered** — the SUMMARY.md render must read a
@@ -798,6 +809,30 @@ manifest that already reflects phase 5 completion, otherwise the first render sh
    Findings: docs/audit/runs/$RUN_ID/findings.json
    Fix plan: docs/audit/runs/$RUN_ID/fix_plan.json  (or "Fix plan: none (no findings)")
    ```
+
+### Post-fix pipeline (`--post-fix`)
+
+After applying all fix_plan.json tasks (manually or via the `pr-audit-fix-apply` agent),
+confirm all acceptance gates pass and produce a closing-loop re-audit.
+
+**Invocation:**
+```
+/devspec_pr_audit --post-fix <fix_plan_path>
+```
+
+This path does **not** re-run P0–P5 from scratch. Instead:
+
+1. Reads `fix_plan.json` tasks.
+2. Dispatches `pr-audit-fix-apply` per task in topological order, passing `file`,
+   `change_summary`, and `acceptance_command` from each task object.
+3. Gates all applied tasks via `p6_verify.py`:
+   ```bash
+   python3 .claude/skills/devspec_pr_audit/scripts/p6_verify.py <fix_plan_path>
+   ```
+   Exit 0 = all acceptance commands passed; exit 1 = one or more failed.
+4. If `p6_verify.py` exits 0, re-runs `/devspec_pr_audit` against the branch to
+   confirm findings are closed. The re-run is a full P0–P5 audit (see protocol §12.2
+   for note on file-scoping limitations — no `--only-files` primitive exists).
 
 ---
 
@@ -873,3 +908,4 @@ The orchestrator (this skill) may use: **Bash, Read, Write, Agent**.
 | discovery-semantic agent | `.claude/agents/pr-audit-discovery-semantic.md` |
 | cross-boundary agent | `.claude/agents/pr-audit-cross-boundary.md` |
 | consolidator agent | `.claude/agents/pr-audit-consolidator.md` |
+| fix-apply agent | `.claude/agents/pr-audit-fix-apply.md` |

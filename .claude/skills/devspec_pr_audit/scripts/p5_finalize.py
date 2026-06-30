@@ -518,6 +518,18 @@ def build_summary(
     parts.append(_artifacts_section(run_dir, n_findings, n_tasks))
     parts.append("")
 
+    # ------------------------------------------------------------------
+    # Next steps (only when findings > 0)
+    # ------------------------------------------------------------------
+    if n_findings > 0:
+        parts.append("## Next steps\n")
+        parts.append(
+            "After applying fix_plan.json tasks, run `p6_verify.py` to confirm each task's\n"
+            "`acceptance_command` passes, then re-run `/devspec_pr_audit` to confirm findings are\n"
+            "closed. See protocol §12 for the full post-fix verification workflow."
+        )
+        parts.append("")
+
     return "\n".join(parts)
 
 

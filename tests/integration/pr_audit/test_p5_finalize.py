@@ -4,6 +4,8 @@ AC1: Empty findings[] + no fix_plan.json → exit 0, SUMMARY.md written with "0 
 AC2: Real zero-findings run (20260625-112746-3423097, copy to tmp) → exit 0.
 AC3: Non-empty findings[] + no fix_plan.json → exit 1, clear error.
 AC4: Manifest status="blocked" → p5_finalize exits 1 (G3 guard).
+AC5: Non-empty findings[] + valid fix_plan.json → exit 0, SUMMARY.md has "## Next steps"
+     footer (WI-12 AC2); zero-findings run has NO "## Next steps" footer.
 """
 from __future__ import annotations
 
@@ -98,7 +100,7 @@ def _make_run_dir(tmp_path: Path, *, findings: dict, manifest: dict | None = Non
 # ---------------------------------------------------------------------------
 
 def test_ac1_empty_findings_no_fix_plan(tmp_path):
-    """AC1: empty findings[] + no fix_plan.json → exit 0, SUMMARY.md written."""
+    """AC1: empty findings[] + no fix_plan.json → exit 0, SUMMARY.md written without footer."""
     run_dir = _make_run_dir(tmp_path, findings=_EMPTY_FINDINGS)
 
     rc = _p5.main(["--run-dir", str(run_dir)])
@@ -108,6 +110,9 @@ def test_ac1_empty_findings_no_fix_plan(tmp_path):
     assert summary_path.exists(), "SUMMARY.md was not written"
     content = summary_path.read_text(encoding="utf-8")
     assert "0 tasks" in content, f"Expected '0 tasks' in SUMMARY.md, got:\n{content[:400]}"
+    assert "## Next steps" not in content, (
+        "SUMMARY.md must NOT contain '## Next steps' when findings == 0"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -173,3 +178,58 @@ def test_ac4_blocked_manifest_exits_1(tmp_path, capsys):
         f"Expected blocked reason in stderr; got:\n{captured.err}"
     )
     assert not (run_dir / "SUMMARY.md").exists(), "SUMMARY.md must NOT be written when run is blocked"
+
+
+# ---------------------------------------------------------------------------
+# AC5 — findings > 0 + valid fix_plan → footer present; zero-findings → absent
+# ---------------------------------------------------------------------------
+
+_ONE_TASK_FIX_PLAN = {
+    "round": 1,
+    "scope": "test",
+    "generated_at": 1700000000,
+    "tasks": [
+        {
+            "id": "T1",
+            "kind": "code",
+            "priority": "P1",
+            "file": "tools/specdev_tools/cli.py",
+            "change_summary": "Fix test bug.",
+            "acceptance_command": "python -m pytest tests/ -q",
+            "findings": ["test-sig-001"],
+        }
+    ],
+}
+
+
+def test_ac5_next_steps_footer_present_when_findings(tmp_path):
+    """AC5a (WI-12 AC2): findings > 0 + fix_plan.json → SUMMARY.md has '## Next steps' footer."""
+    run_dir = _make_run_dir(tmp_path, findings=_ONE_FINDING)
+    _write_json(run_dir / "fix_plan.json", _ONE_TASK_FIX_PLAN)
+
+    rc = _p5.main(["--run-dir", str(run_dir)])
+
+    assert rc == 0, f"Expected exit 0, got {rc}"
+    content = (run_dir / "SUMMARY.md").read_text(encoding="utf-8")
+    assert "## Next steps" in content, (
+        "SUMMARY.md must contain '## Next steps' when findings > 0"
+    )
+    assert "p6_verify.py" in content, (
+        "Next steps footer must reference p6_verify.py"
+    )
+    assert "/devspec_pr_audit" in content, (
+        "Next steps footer must reference /devspec_pr_audit re-run instruction"
+    )
+
+
+def test_ac5_next_steps_footer_absent_when_no_findings(tmp_path):
+    """AC5b (WI-12 AC2): findings == 0 → SUMMARY.md must NOT have '## Next steps' footer."""
+    run_dir = _make_run_dir(tmp_path, findings=_EMPTY_FINDINGS)
+
+    rc = _p5.main(["--run-dir", str(run_dir)])
+
+    assert rc == 0, f"Expected exit 0, got {rc}"
+    content = (run_dir / "SUMMARY.md").read_text(encoding="utf-8")
+    assert "## Next steps" not in content, (
+        "SUMMARY.md must NOT contain '## Next steps' when findings == 0"
+    )

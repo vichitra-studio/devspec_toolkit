@@ -96,11 +96,12 @@ All agents operate within the `devspec_pr_audit` skill. **Nested subagents are f
 | `pr-audit-discovery-semantic` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (finding fragments per bin) | semantic |
 | `pr-audit-cross-boundary` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (cross-boundary findings) + meta-findings in §9 | cross-boundary, meta-review |
 | `pr-audit-consolidator` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (`findings.json`, `fix_plan.json`, `iter_p4_*`) | compose, verify |
+| `pr-audit-fix-apply` | sonnet | Bash, Read, Edit, Write | Source file at `fix_plan.tasks[].file` (one file per invocation; post-fix class — see §12) | apply |
 
 Agent names in §1/§2 narrative use shortened forms (e.g. `context-author`); §3 is the canonical roster with the `pr-audit-` invocation prefix.
 
-**Write restriction:** Every agent may call Write only to its designated output path under `docs/audit/runs/<run-id>/`. No agent may edit source files.  
-**Edit tool:** Forbidden for all agents without exception. Agents use Write (never Edit) to their designated output paths.  
+**Write restriction:** Pipeline agents (P0–P5) may call Write only to their designated output path under `docs/audit/runs/<run-id>/` and may not edit source files. `pr-audit-fix-apply` (post-fix class) is the sole exception: it edits and may Write the source file at `fix_plan.tasks[].file` only — see §12.  
+**Edit tool:** Forbidden for all pipeline agents (P0–P5). `pr-audit-fix-apply` is a post-fix agent (outside P0–P5) permitted to use Edit; its write scope is limited to the source file at `fix_plan.tasks[].file` (one file per invocation) — see §12.  
 **Agent tool:** Forbidden for all agents (no nested subagent dispatch).
 
 ### Bin-packing (Tier-2 dispatch)
@@ -536,3 +537,48 @@ Findings total: P0=N, P1=N, P2=N
 Tasks total: N  (P0=N, P1=N, P2=N, P3=N)
 See fix_plan.json for full task list.
 ```
+
+---
+
+## §12. Post-fix verification
+
+After applying all `fix_plan.json` tasks (generated in P4), operators and the post-fix
+pipeline must confirm that every task's acceptance gate passes and that previously-found
+findings are closed.
+
+### §12.1 Per-task verification
+
+**Tool:** `scripts/p6_verify.py`
+
+**Invocation:**
+```bash
+python3 .claude/skills/devspec_pr_audit/scripts/p6_verify.py \
+  docs/audit/runs/$RUN_ID/fix_plan.json
+```
+
+The script reads `fix_plan.json`, executes each task's `acceptance_command` in
+topological order (respecting `deps`), and reports PASS/FAIL per task.
+
+Exit codes:
+- `0` — all acceptance commands passed
+- `1` — one or more acceptance commands failed
+- `2` — input missing, JSON parse error, or cycle detected in deps
+
+### §12.2 Closing-loop re-audit
+
+After `p6_verify.py` exits 0, re-run `/devspec_pr_audit` against the branch. The
+re-audit is a standard P0–P5 run that produces a new `run-id` directory with its own
+`findings.json` and `SUMMARY.md`. Confirm that findings previously addressed by
+`fix_plan.json` tasks are absent from the new run's findings.
+
+**Note on file scoping:** There is no file-scope filter (`--only-files` flag does not
+exist). The re-audit runs against the full branch diff. The fix_plan.json task list
+documents which files were edited, allowing the operator to cross-check targeted
+findings in the new run's output.
+
+### §12.3 Post-fix agent class
+
+`pr-audit-fix-apply` is a **post-fix agent** — it operates outside the P0–P5 pipeline
+and edits source files (not audit-run artifacts). This is the only agent class permitted
+to use the Edit tool; its write scope is limited to the file at `fix_plan.tasks[].file`
+(one file per invocation). See §3 roster table and `.claude/agents/pr-audit-fix-apply.md`.
