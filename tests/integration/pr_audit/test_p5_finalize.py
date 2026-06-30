@@ -233,3 +233,47 @@ def test_ac5_next_steps_footer_absent_when_no_findings(tmp_path):
     assert "## Next steps" not in content, (
         "SUMMARY.md must NOT contain '## Next steps' when findings == 0"
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-15: additional harness coverage
+# ---------------------------------------------------------------------------
+
+def test_malformed_findings_exits_2(tmp_path):
+    """Malformed (unparseable) JSON in findings.json → _load_json calls sys.exit(2).
+
+    This is distinct from schema-invalid (which exits 1): unparseable JSON is an
+    I/O-level error caught by json.JSONDecodeError in _load_json(), which calls
+    sys.exit(2) directly.  The try-block in main() re-raises SystemExit so the
+    exit code propagates to the caller.
+    """
+    run_dir = _make_run_dir(tmp_path, findings=_EMPTY_FINDINGS)
+    # Overwrite findings.json with unparseable content
+    (run_dir / "findings.json").write_text("NOT VALID JSON {{{{", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc_info:
+        _p5.main(["--run-dir", str(run_dir)])
+
+    assert exc_info.value.code == 2, (
+        f"Expected SystemExit(2) for malformed findings.json, got code={exc_info.value.code}"
+    )
+
+
+def test_missing_manifest_exits_1(tmp_path, capsys):
+    """Missing manifest.json → main returns 1 with an error message naming manifest.json.
+
+    findings.json is present; manifest.json is absent.  The pre-flight existence
+    check (before any JSON loading) catches this and returns 1 immediately.
+    """
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write_json(run_dir / "findings.json", _EMPTY_FINDINGS)
+    # manifest.json intentionally not written
+
+    rc = _p5.main(["--run-dir", str(run_dir)])
+
+    assert rc == 1, f"Expected exit 1 for missing manifest.json, got {rc}"
+    captured = capsys.readouterr()
+    assert "manifest.json" in captured.err, (
+        f"Expected 'manifest.json' in stderr; got:\n{captured.err}"
+    )
