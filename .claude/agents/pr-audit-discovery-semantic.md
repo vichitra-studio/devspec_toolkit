@@ -119,9 +119,9 @@ Conforms to `vc:infra:findings` (`schema/infra/findings.schema.json`).
 
       Use the bin's own files as the reference target. If the bin does NOT contain a docs
       file but the catalog reference is canonical (e.g. `docs/developers/reference.md`),
-      this check is out of scope for the bin agent — flag the cross-slice gap by emitting
-      a finding tagged for P3 cross-boundary review (set `forward_to_p3: true` if such a
-      flag exists, else just emit normally with `location` pointing to the reference).
+      this check is out of scope for the bin agent — emit a normal finding with `location`
+      pointing to the reference file path and `message` noting it is a within-bin
+      cross-slice gap; P3 will independently cover cross-bin instances.
 
 3. **Severity assignment** — use `severity_priors` from the bundle as priors; apply
    judgment. P0 = blocker (schema violation, broken reference, generator drift).

@@ -2,10 +2,10 @@
 name: specdev-trinity
 description: >
   Orchestrate trinity phases (16a plan, 16b code-write, 16c code-review) for a milestone batch
-  via --phase plan|impl|review. Plan phase reviews ms_<batch_id>_plan.json then gates on user
-  approval. Impl phase serially executes each group via specdev-trinity-impl + per-group review
-  loop. Review phase runs milestone-wide reviewer + milestone_fix loop. Filesystem-derived state;
-  no schema extensions.
+  via --phase plan|impl|review; orchestrates, does NOT author plan artifacts. Plan phase reviews
+  ms_<batch_id>_plan.json then gates on user approval. Impl phase serially executes each group
+  via specdev-trinity-impl + per-group review loop. Review phase runs milestone-wide reviewer +
+  milestone_fix loop. Filesystem-derived state; no schema extensions.
   Trigger on: "trinity plan", "trinity impl", "trinity review", "/specdev-trinity",
   any /specdev-trinity invocation, "16a", "16b", "16c", "batch <id> plan|impl|review".
 ---
@@ -16,6 +16,13 @@ Runs the three phases of the Trinity loop: 16a plan review, 16b code-write imple
 16c code-review. Select the phase with `--phase`. Default is `plan`.
 
 **Source spec:** K_agentification.md §11.3, §11.3.1, §11.3.2, §11.5, §11.7, §11.8.
+
+---
+
+## Prerequisites
+
+`--phase plan` requires `spec/impl_context/ms_<batch_id>_plan.json` to exist; author it first
+with `/specdev-step 16a`.
 
 ---
 
@@ -50,7 +57,8 @@ Verify that `spec/impl_context/ms_<batch_id>_plan.json` exists:
 specdev json structure spec/impl_context/ms_<batch_id>_plan.json
 ```
 
-If the file does not exist, return an error and stop.
+If the file does not exist, stop: `spec/impl_context/ms_<batch_id>_plan.json` not found —
+run `/specdev-step 16a <batch_id>` to author it first, then re-invoke this phase.
 
 ### Step 2 — Review-fix loop
 

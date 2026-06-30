@@ -77,6 +77,8 @@ Wait for the fan-out plan JSON:
 
 **2a. Dispatch reviewers in waves (wave loop).**
 
+Per-round invariant: Each round dispatches ALL reviewers against the FULL current artifact state. Do NOT narrow review to only changed content. Do NOT reuse or resume reviewer agents from a prior round — every Agent call in every round is stateless-fresh. This is not an optimisation opportunity.
+
 Resolve concurrency cap: `CONCURRENCY=${SPECDEV_REVIEW_CONCURRENCY:-6}`.
 
 All clusters returned by specdev-scope (the `fan_out[]` list) must be reviewed before fix-dispatch.
