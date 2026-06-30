@@ -165,8 +165,11 @@ This is a single-pass sanity check per protocol §9. No loop; does not block P5.
 
 1. **Load inputs** — read `findings.json` (consolidated findings); read `fix_plan.json`
    if present; enumerate and read all `p2/tier1_*_findings.json` and
-   `p2/tier2_*_findings.json` fragment files (skip silently if `p2/` is absent); read
-   `p3/cross_boundary_findings.json` if present.
+   `p2/tier2_*_findings.json` fragment files (if `p2/` is absent or empty, emit the
+   meta-finding `{"kind": "bug", "description": "p2/ fragment directory absent during
+   Mode B meta-review — P2 discovery may have been skipped or failed",
+   "affected_finding_signatures": []}` — see step 5 for the append mechanism — and skip
+   fragment enumeration); read `p3/cross_boundary_findings.json` if present.
 
 2. **Check contradictory deltas** — scan for pairs of findings that assert incompatible
    states for the same `location`. A contradiction is: finding F1 asserts "field X = V1"
@@ -271,6 +274,7 @@ object must contain only `kind`, `description`, and `affected_finding_signatures
 | `mode` field missing or unrecognized | Halt; print "missing or invalid mode field in invocation context" |
 | Digest file missing for a required slice pair | Log skipped pair to stdout; continue. Do NOT add fields to output JSON beyond the `vc:infra:findings` schema. If persistence is desired, emit a P2 finding into `findings[]` with `kind: "gap"` (no `catalog_tag`), evidence: `["Digest for <slice> missing during P3 dispatch — slice not analyzed cross-boundary"]`. |
 | `findings.json` not found (Mode B) | Write a single meta-finding: "consolidated findings.json not found at expected path" |
+| `p2/` fragment directory absent (Mode B) | Emit meta-finding `{"kind": "bug", "description": "p2/ fragment directory absent during Mode B meta-review — P2 discovery may have been skipped or failed", "affected_finding_signatures": []}` and skip fragment enumeration |
 | No cross-boundary pairs applicable (Mode A) | Write `findings: []` and exit normally |
 | `p3/` subdir missing | `mkdir -p docs/audit/runs/<run-id>/p3` via Bash |
 
@@ -306,7 +310,7 @@ The orchestrator (SKILL.md) substitutes the placeholders below when launching th
 >> Mode B (meta_review) additional inputs:
 >> - docs/audit/runs/{run_id}/findings.json
 >> - docs/audit/runs/{run_id}/fix_plan.json  (skip if absent — no-findings path)
->> - docs/audit/runs/{run_id}/p2/  (all tier1_* and tier2_* fragment files; skip if absent)
+>> - docs/audit/runs/{run_id}/p2/  (all tier1_* and tier2_* fragment files; if absent, emit the p2/-absent meta-finding per step 1 and skip fragment enumeration)
 >> - docs/audit/runs/{run_id}/p3/cross_boundary_findings.json  (skip if absent)
 >>
 >> Outputs:

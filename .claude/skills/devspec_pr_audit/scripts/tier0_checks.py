@@ -52,6 +52,10 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 # migration_versioning slice changed OR any schema change OR cli.py changed).
 # We detect these directly from the changed file lists rather than by slice flag.
 
+# T0-09: CLI-relevant file detection
+CLI_PATHS: set[str] = {"tools/specdev_tools/cli.py"}
+CLI_PREFIX: str = "tools/specdev_tools/commands/"
+
 # ---------------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------------
@@ -371,7 +375,7 @@ def check_t09_changelog_entry_present(
     # Determine if there are triggering changes
     migration_files = routing.get("migration_versioning", [])
     schema_files = [f for f in changed_files if f.endswith(".schema.json")]
-    cli_files = [f for f in changed_files if f == "tools/specdev_tools/cli.py"]
+    cli_files = [f for f in changed_files if f in CLI_PATHS or f.startswith(CLI_PREFIX)]
 
     # Filter out changelog files themselves from migration trigger
     non_changelog_migration = [

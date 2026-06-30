@@ -144,6 +144,10 @@ invocation prompt. This agent reads it and branches.
    Also run the group's test/verification command if one is present in `actions[]` with
    `type: run_command`. If neither is present, fall back to the project-level test command
    discoverable from CLAUDE.md or seed docs (see Gate semantics below).
+   When `run_command` exits non-zero, set `gate_status: "errors"` and place the exit code
+   and a truncated stderr excerpt into `errors_remaining`; do NOT add the test or gate
+   failure to `ambiguities_raised[]` — that array is for operator-input requests only,
+   not code-phase gate failures.
 6. Return structured summary (see Return contract). Do NOT write a convergence marker file.
    Convergence is determined by the next reviewer dispatch — this agent only reports gate
    cleanliness after its action batch (K2 §11.3.1: "Dispatch specdev-trinity-reviewer →
@@ -407,6 +411,7 @@ Return a structured JSON summary per mode. Do not print other text alongside the
   "actions_applied": 4,
   "edits": ["src/auth/jwt.py", "tests/unit/test_jwt.py"],
   "gate_status": "clean",
+  "errors_remaining": [],
   "ambiguities_raised": []
 }
 ```
@@ -424,6 +429,12 @@ Or on partial success:
   "actions_applied": 2,
   "edits": ["src/auth/jwt.py"],
   "gate_status": "errors",
+  "errors_remaining": [
+    {
+      "exit_code": 1,
+      "stderr": "FAILED tests/unit/test_jwt.py::test_validate_token - AssertionError: expected 401, got 200 ..."
+    }
+  ],
   "ambiguities_raised": [
     {
       "id": "amb-out-of-pattern-edit",
