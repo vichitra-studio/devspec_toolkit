@@ -25,6 +25,8 @@ the fix; no separate fix artifact is written (protocol §2).
 
 - `docs/audit/runs/<run-id>/manifest.json` — run metadata: run-id, head/base SHA, branch,
   slices in scope, out_of_scope_files, T0 overrides
+- `docs/audit/runs/<run-id>/p0/routing.json` — orchestrator's slice-assignment output from
+  `route_files.py`; authoritative file→slice mapping for this run
 - `docs/audit/runs/<run-id>/digests/` — all digest files produced in P0, organized by type:
   `digest_schema/`, `digest_prompt/`, `digest_validator/`, `digest_cli/`,
   `digest_canon/`, `digest_changelog/`
@@ -56,7 +58,7 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
    `iter_p1_<N-1>_review.json`; note every finding in the `findings[]` array; these are
    the specific defects that must be corrected in this bundle rewrite.
 
-3. **Route changed files to slices** — read `docs/audit/runs/<run-id>/routing.json` (the
+3. **Route changed files to slices** — read `docs/audit/runs/<run-id>/p0/routing.json` (the
    orchestrator's slice-assignment output from `route_files.py`). This file is the
    **single authoritative source** of file→slice mapping for this run. Do NOT re-run git
    commands and do NOT re-run slice glob matching against the diff file list — `routing.json`
@@ -218,6 +220,7 @@ The orchestrator (SKILL.md) substitutes the placeholders below when launching th
 >>
 >> Inputs:
 >> - docs/audit/runs/{run_id}/manifest.json
+>> - docs/audit/runs/{run_id}/p0/routing.json
 >> - docs/audit/runs/{run_id}/digests/  (all digest subdirs)
 >> - .claude/skills/devspec_pr_audit/slices.yaml
 >> - .claude/skills/devspec_pr_audit/catalogs.md

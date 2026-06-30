@@ -82,6 +82,39 @@ prompt. This agent reads it and branches.
 
 **Procedure:**
 1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` first (required baseline — §10 Tool Execution, §13 Namespace Resolution).
+1a. **Existence check (defense-in-depth):** Before reading seed context, probe for a pre-existing artifact:
+    ```bash
+    ls spec/<NN>_*.json 2>/dev/null
+    ```
+    Replace `<NN>` with the step number from the dispatch input. If a file is found, emit a
+    blocker immediately — do NOT proceed to step 1b, 2, or any Write:
+    ```json
+    {
+      "status": "blocker",
+      "mode": "author",
+      "questions": [
+        {
+          "id": "q1",
+          "question": "An artifact for this step already exists. What do you intend?",
+          "header": "Existing",
+          "multiSelect": false,
+          "options": [
+            {
+              "label": "Propagate upstream",
+              "description": "An upstream step changed; replay forward-validation with /specdev-review step-<NN> --with-replay"
+            },
+            {
+              "label": "Add new content",
+              "description": "Insert new content surgically with specdev json insert/patch, then validate with /specdev-review step-<NN>"
+            }
+          ],
+          "recommended_option_index": null
+        }
+      ],
+      "context": "Author mode dispatched for step <NN>, but spec/<NN>_*.json already exists. /specdev-step only creates new artifacts. User must clarify intent before any authoring proceeds."
+    }
+    ```
+    Do NOT proceed past this step if a file is found. Return the blocker immediately.
 1b. Read `spec/common/seed_manifest.json`. Enumerate the seed IDs to ingest: read all entries in
     `step_requirements[NN]` for the current step NN (this is the authoritative inclusion set;
     `global_seed_order` governs read order only — a step with empty or absent `step_requirements[NN]`
@@ -164,6 +197,9 @@ canonical contract; skill files cite this section by name.
 ### When to emit blocker
 
 **Triggers blocker:**
+- Author mode (step 1a): `spec/<NN>_*.json` already exists — emits existence blocker before any
+  seed or upstream read (defense-in-depth; protects direct agent-dispatch paths not routed
+  through `/specdev-step` skill).
 - Required upstream input missing AND not resolvable via `json read` / `Grep` probes.
 - Multiple valid interpretations where canon + seed + prompt do NOT disambiguate.
 - Architecture/threshold choice not constrained by any upstream artifact.

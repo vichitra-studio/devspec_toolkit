@@ -4,8 +4,13 @@ description: >
   Run the structured review-fix loop on a spec scope. Dispatches specdev-scope (Haiku) for
   fan-out planning, then runs specdev-reviewer instances in parallel per round, merges findings,
   dispatches specdev-impl (fix mode) for repairs, and returns CONVERGED or HALT with findings path.
+  NOT when spec/NN_*.json is absent (→ /specdev-step to author it first). NOT for
+  ms_*_plan.json trinity reviews (→ /specdev-trinity). NOT for PR or audit scopes
+  (→ /devspec_pr_audit). The artifact under review must already exist.
+  Sibling skills: specdev-step (author missing step first), specdev-trinity (ms_* plan reviews),
+  devspec_pr_audit (PR/branch audit scopes).
   Trigger on: "review step NN", "run review", "/specdev-review", review + any step reference,
-  "check step", "audit scope", or after any spec authoring or editing task.
+  "check step", "audit scope", or after any spec authoring or editing task (artifact must exist).
 ---
 
 # /specdev-review — Structured Review-Fix Loop
@@ -70,12 +75,27 @@ Wait for the fan-out plan JSON:
 
 **For each round from 1 to max_rounds:**
 
-**2a. Dispatch all reviewers in parallel.**
-Send ALL planned `specdev-reviewer` instances as multiple Agent tool calls in a single
-message. Do not dispatch them sequentially — parallel dispatch is the correctness guarantee
-that eliminates the session's 220-sequential-dispatch pattern.
+**2a. Dispatch reviewers in waves (wave loop).**
 
-Each reviewer receives its slice from the fan-out plan:
+Resolve concurrency cap: `CONCURRENCY=${SPECDEV_REVIEW_CONCURRENCY:-6}`.
+
+All clusters returned by specdev-scope (the `fan_out[]` list) must be reviewed before fix-dispatch.
+Dispatch in waves: send the first ≤`CONCURRENCY` clusters as parallel Agent tool calls in a
+single message; wait for ALL of them to return; then send the next wave of ≤`CONCURRENCY`
+clusters; repeat until all clusters in `fan_out[]` have been dispatched and returned. Do NOT
+dispatch clusters sequentially within a wave — all clusters in each wave are parallel.
+
+Intra-round consistency rule: ALL waves of reviewer dispatch for this round MUST complete
+before `specdev-impl` (fix mode, Step 2d) is dispatched. No fix dispatch between waves of the
+same round.
+
+This cap is per-wave (simultaneous clusters), NOT per-run (total). Large scopes may produce
+more clusters than `CONCURRENCY`; they are covered across multiple waves, never truncated.
+
+Note: the ≤`CONCURRENCY` wave limit is an LLM-compliance directive — the harness has no native
+wave-dispatch primitive. This is the same enforcement level as `max_rounds = 5`.
+
+Each reviewer receives its cluster slice from the fan-out plan:
 ```json
 {
   "steps": [...],

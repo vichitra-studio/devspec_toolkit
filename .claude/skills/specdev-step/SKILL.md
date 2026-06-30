@@ -4,8 +4,13 @@ description: >
   Author and review a single waterfall step. Dispatches specdev-impl (author mode) to emit
   a fresh spec/NN_*.json artifact from the step's prompt contract, then runs the full
   review-fix loop via the /specdev-review protocol. Returns CONVERGED or HALT.
-  Trigger on: "author step NN", "implement step NN", "run step NN", "/specdev-step NN",
-  or any request to produce a new spec artifact for a given step number.
+  NOT when spec/NN_*.json already exists (→ /specdev-review for fixes/propagation, or
+  specdev json insert/patch for new content). NOT for step 16 trinity phases (→ /specdev-trinity).
+  NOT for context-only or read-only questions about a step (→ /specdev-context).
+  Sibling skills: specdev-context (orientation/read), specdev-review (review existing artifact),
+  specdev-trinity (trinity phases 16a/16b/16c).
+  Trigger on: "author step NN", "implement step NN", "/specdev-step NN",
+  or any request to produce a new spec artifact for a step that does not yet exist.
 ---
 
 # /specdev-step — Waterfall Step Author + Review
@@ -30,6 +35,28 @@ Author mode: emits a fresh artifact. Review mode: uses the same review-fix loop 
 ## Protocol
 
 ### Step 1 — Author the artifact
+
+**Pre-dispatch existence check:** Before dispatching `specdev-impl`, probe for an existing artifact:
+```bash
+ls spec/<NN>_*.json 2>/dev/null
+```
+If a match is found, stop — do NOT dispatch `specdev-impl`. Print:
+```
+Artifact spec/<NN>_*.json already exists. /specdev-step only authors new artifacts.
+
+Choose a path based on your intent:
+
+  Sub-case A — Propagate an upstream change to this step:
+    /specdev-review step-<NN> --with-replay
+    (Replays forward-validation; surfaces downstream breakage from the upstream edit.)
+
+  Sub-case B — Insert or add new content to this step:
+    specdev json insert spec/<NN>_*.json '<path>' '<new-content-json>'
+    then /specdev-review step-<NN>
+    (Surgically adds the new field; /specdev-review then validates it.
+    Do NOT use /specdev-step — it would attempt to re-author the whole artifact.)
+```
+If no existing artifact is found, proceed to dispatch below.
 
 Dispatch `specdev-impl` with `mode: "author"`:
 
@@ -204,3 +231,7 @@ Never read `spec/*.json` directly.
 - Does not run reviewers sequentially within a round. Parallel dispatch is required.
 - Does not skip AskUserQuestion on a blocker payload. Blocker questions must be presented
   to the user via the harness before re-dispatching.
+- Does not author a step when `spec/<NN>_*.json` already exists (Step 1 pre-dispatch check
+  short-circuits before any Agent dispatch). For upstream propagation, use
+  `/specdev-review step-<NN> --with-replay`. For new content insertion, use
+  `specdev json insert/patch` then `/specdev-review step-<NN>`.

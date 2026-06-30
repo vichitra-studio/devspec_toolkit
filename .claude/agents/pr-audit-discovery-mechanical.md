@@ -72,9 +72,11 @@ docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json
    a. **D9 — generator drift (T0-10 complement):** For each changed file in
       `generated_artifacts`, run:
       ```bash
-      specdev registry-generate --repo-root . --dry-run 2>&1
+      TMPFILE=$(mktemp)
+      specdev registry-generate --repo-root . --out "$TMPFILE"
+      diff "$TMPFILE" tools/entry_key_registry.json
       ```
-      Diff the dry-run output against the committed file. Any delta → P0 finding
+      Any delta in the diff output → P0 finding
       `catalog_tag: "D9"`. Evidence: diff excerpt (first 20 lines).
       Note: T0-10 already checks this in P0; if T0-10 already produced a P0 finding and
       was not overridden, this step confirms rather than duplicates. If T0-10 was overridden
@@ -179,7 +181,7 @@ Example P0/P1 finding fragment:
   "message": "Generated registry diverges from schema-derived output",
   "severity": "P0",
   "catalog_tag": "D9",
-  "evidence": ["--- committed\n+++ dry-run\n@@ -1,3 +1,3 @@\n-foo\n+bar"],
+  "evidence": ["--- generated\n+++ tools/entry_key_registry.json\n@@ -1,3 +1,3 @@\n-foo\n+bar"],
   "upstream_refs": ["commit:5dc3aa1", "schema/core/atoms.schema.json:14"]
 }
 ```
@@ -194,7 +196,7 @@ Example P0/P1 finding fragment:
 - **Read**: raw source files for changed paths in scope; digest files for expansion neighbors
 - **Glob**: enumerate files under assigned slice paths
 - **Grep**: pattern checks (hardcoded paths, flag names, documented surface)
-- **Bash**: run `specdev registry-generate --dry-run`; JSON parse validation;
+- **Bash**: run `specdev registry-generate --out "$TMPFILE"` + `diff "$TMPFILE" tools/entry_key_registry.json`; JSON parse validation;
   `git show <base>:<file>` to retrieve the pre-PR version of a file for diff comparison
 - **Write**: ONLY to `docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json`
 - Do NOT call Edit; do NOT call any nested Agent tool
@@ -208,7 +210,8 @@ Example P0/P1 finding fragment:
 
 | Condition | Handling |
 |-----------|----------|
-| `specdev registry-generate --dry-run` unavailable | Emit P2 finding `catalog_tag: "I11"`, evidence: "dry-run not available; D9 check skipped" |
+| `specdev registry-generate --out` fails (non-zero exit) | Emit P2 finding `catalog_tag: "I11"`, evidence: "registry-generate failed; D9 check skipped" |
+| D1 — generated file content diverges from generator output with no generator-explainable cause | Emit P1 finding `catalog_tag: "D1"`, evidence: diverging lines; populate `upstream_refs[]` (required for P1) |
 | Changed file not readable | Emit P2 finding `kind: "gap"` (no `catalog_tag`), location: file path, evidence: `["File <path> unreadable during Tier-1 dispatch"]` |
 | Empty tier1_slices | Write `findings: []` and exit |
 | Output path parent dir does not exist | Create `p2/` subdir via `Bash: mkdir -p` before writing |

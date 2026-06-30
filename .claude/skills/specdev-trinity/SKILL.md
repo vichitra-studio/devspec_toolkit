@@ -13,8 +13,7 @@ description: >
 # /specdev-trinity — Trinity Phase Orchestrator
 
 Runs the three phases of the Trinity loop: 16a plan review, 16b code-write implementation,
-16c code-review. Select the phase with `--phase`. Default is `plan` (back-compat with the
-legacy `/specdev-trinity-plan` invocation).
+16c code-review. Select the phase with `--phase`. Default is `plan`.
 
 **Source spec:** K_agentification.md §11.3, §11.3.1, §11.3.2, §11.5, §11.7, §11.8.
 
@@ -34,9 +33,6 @@ legacy `/specdev-trinity-plan` invocation).
   loops. Each loop iteration checks `round >= --soft-warn-rounds` and pauses for human gating
   (E9). Compared with `>=` so soft-warn fires at N and every subsequent round, preventing
   unbounded looping.
-
-Note: legacy `/specdev-trinity-plan` name still works via the transitional delegation skill
-(K §11.3, scheduled K3 removal).
 
 ---
 
@@ -201,6 +197,13 @@ groups legitimately needing >5 rounds (K2 §11.3.1).
 2. Parse `groups[]` and `derived_phase_position` from the output.
 3. Identify unresolved groups: groups in state `{pending}` (and `executing` if observed).
    Groups in `{code_converged, blocked, verified, deferred}` are skipped.
+4. Compute `milestone_start_ref` once before the first group dispatch:
+   ```bash
+   milestone_start_ref=$(git rev-parse HEAD)
+   ```
+   This ref is injected into every reviewer dispatch for supplemental git diff context.
+   Git diff is typically empty in the normal uncommitted-work flow; `actions[].target` is
+   the primary code-discovery path (see reviewer steps 5 and 5b).
 
 ### Per-group serial loop (in plan order)
 
@@ -236,7 +239,8 @@ repeat:
     "scope": "<group_id>",
     "round": <round>,
     "reviewer_id": "r1",
-    "plan_path": "spec/impl_context/ms_<batch_id>_plan.json"
+    "plan_path": "spec/impl_context/ms_<batch_id>_plan.json",
+    "milestone_start_ref": "<milestone_start_ref>"
   }
   → writes .specdev/findings/findings_<group_id>_<round>_r1.json
 
@@ -320,6 +324,13 @@ successful run; prior files stay as audit trail.
    Action: Run /specdev-trinity <batch_id> --phase impl to completion first.
    ```
    Exit.
+4. Compute `milestone_start_ref` once before the first review round:
+   ```bash
+   milestone_start_ref=$(git rev-parse HEAD)
+   ```
+   This ref is injected into every reviewer dispatch for supplemental git diff context.
+   Git diff is typically empty in the normal uncommitted-work flow; `actions[].target` is
+   the primary code-discovery path (see reviewer steps 5 and 5b).
 
 ### Milestone-wide loop (no hard cap; soft-warn at `--soft-warn-rounds`, default 5)
 
@@ -336,7 +347,8 @@ repeat:
     "scope": "<batch_id>",
     "round": <round>,
     "reviewer_id": "r1",
-    "plan_path": "spec/impl_context/ms_<batch_id>_plan.json"
+    "plan_path": "spec/impl_context/ms_<batch_id>_plan.json",
+    "milestone_start_ref": "<milestone_start_ref>"
   }
   → writes .specdev/findings/findings_<batch_id>_review_<round>_r1.json
 
@@ -379,10 +391,108 @@ repeat:
 
 ### After convergence
 
+**On CONVERGED:** perform evidence synthesis and write the `review` block automatically
+(no gate before the verdict write). Then present the operator gate for anchor/roadmap sync.
+
+#### Step C1 — Read checklist evidence
+
+```bash
+specdev json read spec/impl_context/ms_<batch_id>_plan.json '.plan.spec_alignment.checklist[]'
+```
+
+Data source is `actions[].evidence` in the plan artifact — NOT the convergence findings file
+(which carries no schema data, only the empty-findings signal).
+
+#### Step C2 — Derive `review` fields
+
+**`fixture_status`** — `implemented_interfaces: []`, `test_results: []`, plus:
+- `ci_status: "green"` — derived from ANCHORED evidence signals in `actions[].evidence.content`
+  across all FR-linked checklist items. NOT a loose substring match.
+
+  **Anchored-match rule (AC7 invariant):**
+  1. Failure signals (any present in any FR-linked action ⇒ `ci_status: "red"`; HALT):
+     `FAIL`, `FAILED`, `ERROR`, non-zero-exit indicator.
+  2. Anchored success signal (required per FR-linked item; absence ⇒ HALT):
+     - `^(pytest|tests?|ci|suite)\b.*\bPASS(ED)?\b` — test-runner context + PASS/PASSED
+     - OR `\b[1-9]\d*\s+pass(ed)?\b` — explicit "N passed" counter (N ≥ 1; "0 passed" is not a success)
+     - OR `\bexit\s+0\b` — explicit exit-code token
+  3. Decoy evidence that must NOT satisfy the check: `"BYPASSED"` (no anchored signal),
+     `"PASSED 0 of 3 suites"` (0 tests actually passed), `"compile PASS / tests FAIL"`
+     (failure signal present). These are the exact AC7 regression cases.
+
+  HALT with a clear error naming the evidence gap if any FR-linked item lacks an anchored
+  success signal, shows a failure signal, or is ambiguous — do NOT fabricate green.
+
+  **Status-deviation note (RB-WI8-A2):** In the agentified trinity flow,
+  `implementation.status` remains `pending` (§11.5 — operator flips to `verified` after
+  deploy + live verification). Therefore prompt_16c §4b criterion 2
+  (`status == "verified"`) CANNOT be met literally for agentified runs. `satisfied: true`
+  and `ci_status: "green"` are derived from ANCHORED evidence signals in
+  `actions[].evidence.content`, NOT from `implementation.status`. A future reader must NOT
+  "fix" this back to a literal status check — `status: "pending"` is correct and deliberate
+  in the agentified flow.
+
+**`semantic_review.fr_coverage`** — one entry per distinct FR referenced in the checklist.
+  Two-branch filter (apply in order; HALT only if neither yields ≥1 entry):
+  - **PRIMARY:** `spec_ref.type == "fr"` → `fr_id = spec_ref.id`.
+    Real plans use `type="fr"` with kebab IDs (confirmed against fixtures); this is the
+    normal path.
+  - **DEFENSIVE:** `spec_ref.type == "doc" AND spec_ref.id == "vc:04-fr-list"` →
+    contribute an entry ONLY when a resolvable kebab fr_id is derivable from the item's
+    context (e.g., `description`, `milestone_ref`). If none is derivable, SKIP the item —
+    do NOT fabricate an fr_id. Schema requires `^[a-z0-9]+(?:-[a-z0-9]+)*$`; a
+    non-kebab or fabricated id is invalid and will fail spec-check.
+
+  Per entry: `fr_id`, `satisfied: true` iff an anchored success signal is present (same
+  rule as ci_status above), `evidence_summary` ≥20 chars from `actions[].evidence.content`,
+  `checklist_ids` from matched items.
+
+**`semantic_review.hallucinated_features`**: `[]` — empty asserts no untraced behavior.
+
+**`review.ratings`**: default all five scores to 3; adjust upward on strong PASS evidence.
+
+**`review.findings`**: `[]` (convergence = empty).
+
+**`review.verdict`**: `"verified"` (per D-VERDICT; do NOT use `code_review_complete` or
+  any invented value).
+
+Write the complete `review` object atomically:
+```bash
+specdev json patch spec/impl_context/ms_<batch_id>_plan.json '.review' '<review-json>'
+```
+Confirm with spec-check after write:
+```bash
+specdev spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+**On HALT (review non-convergence or evidence failure):** write non-empty `review.findings`
+(the HALT round's findings, or the named evidence gap) before exit:
+```bash
+specdev json patch spec/impl_context/ms_<batch_id>_plan.json '.review.findings' '<findings-json>'
+```
+Do NOT write `review.verdict`. Do NOT update anchor or roadmap files. Exit with HALT verdict.
+
+#### Step C3 — Operator gate (anchor/roadmap sync)
+
+After the `review.verdict` write, present AskUserQuestion:
+```
+Review converged. Update anchor and roadmap to done? (Y/N)
+```
+- On **Y**: patch three files:
+  - `spec/16_impl_context.json` → `plan.milestone_index[<this milestone>].status = "done"`
+  - `spec/14_roadmap.json` → corresponding milestone `status = "done"`
+  - `spec/09_impl_plan.json` → corresponding milestone `status = "done"`
+- On **N**: leave as-is.
+
+This gate is deliberate and distinct from the "no AskUserQuestion at phase boundary" note in
+--phase impl (which applies only to the impl→review phase transition). This AskUserQuestion
+appears within --phase review post-convergence and is a required operator checkpoint.
+
 - Do NOT write to `plan.trinity_review` — not a schema field this session.
 - Convergence marker is the empty-findings file at
   `.specdev/findings/findings_<batch_id>_review_<round>.json`.
-- `implementation.status` stays `pending` (operator phase pending — §11.5). Operator flips to `verified` after deploy + live verification.
+- `implementation.status` stays `pending` (operator phase pending — §11.5). Operator flips
+  to `verified` after deploy + live verification.
 - EXIT — return CONVERGED or HALT verdict.
 
 ### Re-runnability

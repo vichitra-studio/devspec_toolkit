@@ -164,7 +164,6 @@ def install_claude_symlinks(host_root, actual_toolkit_root, force=False):
         "specdev-step",
         "specdev-review",
         "specdev-trinity",
-        "specdev-trinity-plan",
         "devspec_pr_audit",
     }
     KNOWN_AGENT_PREFIXES = ("specdev-", "pr-audit-")

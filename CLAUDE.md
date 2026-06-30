@@ -157,6 +157,7 @@ Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema pat
 | `SPECDEV_REPLAY_BASE_REF=<ref>` | Override forward-replay base ref |
 | `SPECDEV_REPLAY_DIFF_ERROR_MODE=error` | Make replay diff failures fatal |
 | `SPECDEV_STALENESS_THRESHOLD=N` | Min new upstream tokens before W595 fires (default 3) |
+| `SPECDEV_REVIEW_CONCURRENCY=N` | Max simultaneous reviewer agents per wave in the `/specdev-review` loop (default 6); controls wave width, not total fan-out |
 
 Inspect active config: `specdev env-check --repo-root <toolkit>`.
 

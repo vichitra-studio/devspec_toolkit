@@ -81,11 +81,14 @@ Dispatcher (skill or orchestrator) provides:
 - `scope` is used verbatim in the output filename.
 - `flags.with_replay`: if true, run `forward-replay-check` and include regression/drift findings.
 - `flags.with_backlog`: if true, run `upstream-backlog` and include miss/assumption findings.
-- `scope_kind`: one of `step_range | single_step | cross_step_relational | plan_artifact`.
+- `scope_kind`: one of `step_range | single_step | cross_step_relational | plan_artifact | theme_group`.
   - `cross_step_relational`: focus exclusively on cross-step drift, replay, and backlog.
   - `plan_artifact`: the scope is a single plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`)
     dispatched by `/specdev-trinity` (K_agentification.md §5.3 branch 4). Step-counting
     rules do not apply; review the plan structure, milestone bindings, fixture refs, and canon refs.
+  - `theme_group`: a cluster of related steps or files assigned by specdev-scope's wave-model
+    clustering (branch 1 of the decision rule). Treat as equivalent to `step_range` covering all
+    steps in the cluster — apply all §4.1 taxonomy checks across every step in `steps[]`.
 - `artifact_path` (optional): explicit path to the artifact under review. When present, use it
   as the primary read target. Required for `plan_artifact` scope_kind dispatches (supplied by
   `/specdev-trinity --phase plan`); omitted for spec-step scopes where the path is derived from `steps[]`.
