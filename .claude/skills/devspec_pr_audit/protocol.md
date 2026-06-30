@@ -113,9 +113,16 @@ impact = type_weight(file) × max(1, |expansion_set(file)|) × |applies.drift_ty
 
 where `type_weight` and `applies` come from `slices.yaml` for the file's owning slice.
 
-Greedy bin-packing: assign files to bins in decreasing impact order; open a new bin when the current bin would exceed ~200 units. Each non-empty bin = one `discovery-semantic` invocation. Concurrency cap: 6 agents dispatched in parallel waves. Wave size ≤ 6; start the next wave only after the previous wave completes.
+**Theme-first greedy bin-packing.** Files are grouped by slice membership (the slice name is the theme identifier — it is the same taxonomy used by `routing.json` and `slices.yaml`). Within each theme group, files are sorted by descending impact and packed into bins subject to:
 
-**Worked example.** Three changed files in scope:
+- **Soft budget:** ~600 units per bin. Calibrated as approximately 3 typical ~200-unit files; this is why the per-theme bin count naturally satisfies `tier2_bin_count ≤ ⌈N/3⌉` for N same-theme changed files. This bound is a starting gate and should be re-evaluated after a measurement pass.
+- **Hard cap:** ~800 units per bin. Same-theme files that would push a bin past 800 start a new bin even if the cap forces a split within a single theme group (cross-theme cohesion above the cap is not permitted). Precedence: **hard cap > soft budget > ⌈N/3⌉ target.**
+- **Cross-theme co-location** is permitted only when a theme group produces a single file with no peer in the same group; such an orphan file may be co-located with another single-file orphan from a different theme, provided their combined impact stays ≤ ~800 units. This exception does not apply if a theme group has 2 or more files (OQ-13: traceability tag; rule stated here is authoritative).
+- **Multi-slice files** (files matched by more than one slice's globs) are assigned to a single primary theme for bin-packing: choose the slice whose glob pattern shares the longest common leading path prefix with the file's path; on a tie, choose the lexicographically earlier slice name.
+
+Each non-empty bin = one `discovery-semantic` invocation. Dispatch in waves of ≤ 6 bins simultaneously; start the next wave only after the previous wave completes. The concurrency limit for PR-audit is independent of `SPECDEV_REVIEW_CONCURRENCY` (which governs the spec-review loop, not PR audit).
+
+**Worked example — base case (3 files).** Compare old vs. new:
 
 ```
 schema/example_a.schema.json   type_weight=12, expansion_set=4, |applies|=10  → impact = 480
@@ -123,11 +130,28 @@ schema/example_b.schema.json   type_weight=8,  expansion_set=3, |applies|=10  �
 prompts/example_step.md        type_weight=6,  expansion_set=2, |applies|=9   → impact = 108
 ```
 
-Bin 1: `example_a.schema.json` (480 > 200 alone — single-file bins are permitted when impact > budget).
-Bin 2: `example_b.schema.json` (240 > 200 alone — same rule).
-Bin 3: `example_step.md` (108 fits).
+*Old algorithm (~200 budget, no theme grouping):* example_a alone (480>200), example_b alone (240>200), example_step alone (108) → **3 bins**.
 
-Result: 3 `discovery-semantic` agents dispatched in one wave. The ~200 unit budget is a starting heuristic; tune after a dry-run measurement pass.
+*New algorithm (theme-first, ~600 budget, ~800 cap):*
+- `schemas` theme (2 files, N=2, ⌈2/3⌉=1 target bin): sort descending 480, 240. Bin 1: 480+240=720 — within ~800 cap; same-theme cohesion keeps them together. 1 bin produced. Target met.
+- `prompts` theme (1 file = orphan). `schemas` has 2 changed files → NOT an orphan theme; cannot receive cross-theme co-location. `prompts` gets its own bin.
+- Bin 1: schemas (720). Bin 2: prompts (108). → **2 bins**, one wave.
+
+**Worked example — cap-forced split.** Add a third schema file:
+
+```
+schema/example_c.schema.json   type_weight=8,  expansion_set=4, |applies|=10  → impact = 320
+```
+
+`schemas` theme (N=3, ⌈3/3⌉=1 target bin): sort descending 480, 320, 240.
+- Bin 1: 480+320=800 — exactly at cap; close bin (cap is non-strict: ≤800 is OK, >800 splits).
+- Bin 2: 240.
+
+`schemas` now produces 2 bins (cap forced a split past the ⌈3/3⌉=1 target). Cap takes precedence. `prompts` orphan: `schemas` is not an orphan theme (3 changed files) → own bin.
+
+Result: Bin 1 schemas(800), Bin 2 schemas(240), Bin 3 prompts(108) → **3 bins**, one wave.
+
+The ~600 unit budget is a starting heuristic; tune after a dry-run measurement pass.
 
 ### `cross-boundary` dual mode
 

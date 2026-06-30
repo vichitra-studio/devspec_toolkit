@@ -78,10 +78,29 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
    Use `type_weight` overrides from `slices.yaml` where the path matches a specific-glob
    override (e.g., `schema/core/**` → 12).
 
-6. **Greedy bin-packing for Tier-2** — sort changed `semantic_work: true` files by
-   descending impact; assign to bins with budget ~200 units per bin. A single-file bin is
-   permitted when the file's impact exceeds 200 (protocol §3 worked example). Record each
-   bin as an array of `{file, slice, impact, digests_needed[]}`.
+6. **Theme-first greedy bin-packing for Tier-2** — group all `semantic_work: true` changed
+   files by their slice assignment from `routing.json` (slice name = theme identifier; do
+   NOT re-derive from globs). Within each theme group, sort by descending impact. Then pack
+   each theme group independently:
+   - **Within-theme packing:** keep adding same-theme files to the current bin until the
+     next file would push the total past ~800 units (hard cap). Only then open a new bin.
+     A single-file bin is always permitted regardless of impact. The soft budget (~600 units)
+     is a nominal calibration target — same-theme cohesion may exceed it up to the cap.
+   - **Hard cap ~800:** a file that would push a bin past 800 always starts a new bin,
+     even within the same theme group.
+   - **Cross-theme co-location:** a theme group that produces only 1 changed file is an
+     orphan; orphan files MAY be co-located with another orphan from a different theme,
+     but only if their combined impact stays ≤ ~800. A theme group with ≥ 2 changed files
+     never cross-pollinates with another theme (OQ-13: traceability tag; rule stated above
+     is authoritative).
+   - **Multi-slice files:** assign to the slice whose glob shares the longest common leading
+     path prefix with the file's path; break ties by choosing the lexicographically earlier
+     slice name.
+   - **Bin count target:** `tier2_bin_count ≤ ⌈N/3⌉` per theme group (starting gate, hard
+     cap takes precedence — see protocol §3).
+   Record each bin as an array of `{file, slice, impact, digests_needed[]}`.
+   Dispatch bins in waves of ≤ 6 simultaneously (protocol §3); do NOT cite
+   `SPECDEV_REVIEW_CONCURRENCY` — PR-audit concurrency is a separate limit.
 
 7. **Compute scope_footprint** — total impact units across all Tier-2 files; total changed
    file count per slice; Tier-1 file count (semantic_work=false slices).
