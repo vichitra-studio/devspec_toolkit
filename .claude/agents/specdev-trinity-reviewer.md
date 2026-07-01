@@ -91,8 +91,9 @@ Dispatcher (skill) provides:
 ```
 
 - `scope` is used verbatim in the output filename.
-- `scope_kind` enum (per-agent-prompt, NOT schema-enforced — `findings.schema.json` carries
-  `scope_kind` as a free string; the enum is documented per-agent only, per §11.1.2):
+- `scope_kind` enum (per-agent-prompt, NOT schema-enforced — it is a dispatch-context
+  field consumed by this agent's invocation prompt, not a property defined in
+  `findings.schema.json`; the enum is documented per-agent only, per §11.1.2):
   - `code_phase_group`: requires `group_id`; per-group review during `--phase impl` (§11.3.1).
   - `code_phase_milestone`: `group_id` omitted; milestone-wide sweep during `--phase review` (§11.3.2).
 - `plan_path`: path to the plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`).

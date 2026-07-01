@@ -57,19 +57,22 @@
 
 ### Added
 
-- Added a new script `.claude/skills/devspec_pr_audit/scripts/p6_verify.py` as part of
-  expanding the `devspec_pr_audit` skill's `--post-fix` closing-loop support (DEVSPEC-121):
-  `SKILL.md` and `protocol.md` were extended with the `--post-fix` scoped-audit contract, and
-  `validate_agent_outputs.py` was broadened to cover the new post-fix agent output shape,
-  including the `pr-audit-context-author` and `pr-audit-fix-apply` agents.
+- Added a new script `.claude/skills/devspec_pr_audit/scripts/p6_verify.py`, which reads
+  a `fix_plan.json` and executes each task's `acceptance_command` in topological order,
+  reporting PASS/FAIL per task as the post-fix verification gate. Also extended
+  `SKILL.md` and `protocol.md` with the `--post-fix` scoped-audit contract
+  (DEVSPEC-121). `validate_agent_outputs.py`'s scope is unchanged by this work; it
+  continues to validate only the standard P0-P5 pipeline artifacts (`findings.json`,
+  `fix_plan.json`, p2/p3 fragments, `manifest.json`).
 
 ### Changed
 
-- Added an "Agentified flow note" to `prompts/prompt_16c_impl_reviewer.md` clarifying that
-  when the Trinity loop is invoked via the agentified dispatch path (e.g. through
-  `specdev-trinity-impl` / `specdev-trinity-reviewer`), the dispatching agent -- not the
-  prompt itself -- is responsible for anchor/roadmap sync, whereas the standalone
-  (non-agentified) invocation path continues to perform anchor/roadmap sync inline.
+- Added an "Agentified flow note" to `prompts/prompt_16c_impl_reviewer.md` clarifying
+  that when the Trinity loop is invoked via `/specdev-trinity --phase review`, the
+  anchor/roadmap sync is performed by `.claude/skills/specdev-trinity/SKILL.md`'s
+  post-convergence Step C3 (operator gate) -- not by this prompt directly -- whereas
+  the standalone (non-agentified) invocation path continues to perform anchor/roadmap
+  sync inline per the prompt's own Crucial Side Effect section.
 
 ### Internal
 

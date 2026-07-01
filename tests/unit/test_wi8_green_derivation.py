@@ -164,3 +164,15 @@ class TestBoundaryCases:
         # a trailing non-zero exit code must still derive green=False.
         content = "pytest tests/test_auth.py PASS\nprocess exited with exit 1"
         assert _derive_ci_green(content) is False
+
+    def test_nonzero_exit_code_colon_signal(self):
+        # "exit code: 1" variant — colon-separated form documented in the
+        # _FAILURE_SIGNALS comment must also derive green=False.
+        content = "pytest tests/test_auth.py PASS\nprocess exited with exit code: 1"
+        assert _derive_ci_green(content) is False
+
+    def test_nonzero_exit_code_equals_signal(self):
+        # "exit code=2" variant — equals-separated form documented in the
+        # _FAILURE_SIGNALS comment must also derive green=False.
+        content = "pytest tests/test_auth.py PASS\nprocess exited with exit code=2"
+        assert _derive_ci_green(content) is False
