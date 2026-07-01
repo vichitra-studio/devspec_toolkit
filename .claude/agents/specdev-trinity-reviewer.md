@@ -292,8 +292,8 @@ A `code_phase_milestone` review round CONVERGES when ALL of:
 5. **Plan-vs-execution coherent** — no group with `actions[]` items unaccounted for in
    the filesystem state; no filesystem artifacts not traceable to plan actions.
 6. **Linked-fixture coverage rolled up** — for every FR bound in any group's `spec_ref`
-   (`plan.spec_alignment.checklist[i].spec_ref` where `spec_ref.type == 'doc'` and
-   `spec_ref.id == 'vc:04-fr-list'`), at least one fixture from `spec/08_fixtures.json`
+   (`plan.spec_alignment.checklist[i].spec_ref` where `spec_ref.type == 'fr'`, e.g.
+   `spec_ref.id == 'fr-user-login'`), at least one fixture from `spec/08_fixtures.json`
    must be exercised somewhere in the milestone. A coverage gap raises `kind: coverage`.
 
 ---
