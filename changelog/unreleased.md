@@ -76,10 +76,13 @@
 
 ### Internal
 
-- Rewrote 11 `.claude/agents/*.md` agent-contract files (DEVSPEC-100 Phase 3):
-  `specdev-trinity-impl`, `specdev-trinity-reviewer`, `specdev-impl` (new mode additions),
-  `pr-audit-cross-boundary`, and the remaining `pr-audit-*` agents touched by IU-11/12/15/16
-  (trinity `errors_remaining` handling, p2/-absent meta-finding, T0-09 CLI-prefix fix,
-  `validate_agent_outputs.py` blocked-status gating). Added corresponding test coverage:
+- Rewrote 11 `.claude/agents/*.md` agent-contract files across the DEVSPEC-100 fix arc:
+  Phase 1 (WI-1..WI-8: `pr-audit-discovery-mechanical`, `pr-audit-discovery-semantic` via
+  Wave B1, `specdev-reviewer`, `specdev-scope`, and initial passes on `specdev-impl`,
+  `specdev-trinity-reviewer`), Phase 2 (IU-11 `pr-audit-context-author` bin-packing,
+  IU-12 `pr-audit-fix-apply` post-fix automation, Wave B1 `pr-audit-context-verifier`),
+  Phase 3 (IU-17 `specdev-trinity-impl` `errors_remaining`, IU-18 `pr-audit-cross-boundary`
+  p2/-absent meta-finding, IU-20 `specdev-impl` author-extend mode), and follow-up F-1b
+  (`specdev-trinity-reviewer` FR-coverage gate fix). Added corresponding test coverage:
   `tests/integration/pr_audit/test_p5_finalize.py`, `test_tier0_checks.py`,
   `test_validate_agent_outputs.py`, and `tests/unit/test_wi8_green_derivation.py`.
