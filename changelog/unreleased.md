@@ -47,3 +47,10 @@
   project-canon flags (`--spec-root ./spec --git-root .`) on spec-validating commands, and
   switched the CI-gates and scaffold prompt examples to `spec-check`. Bare invocations
   previously emitted false E110s when followed in a host repo.
+
+### Removed
+
+- Removed the `/specdev-trinity-plan` skill; its plan-phase functionality is now invoked via
+  `/specdev-trinity --phase plan`. Host repos that vendor the toolkit as a git submodule must
+  re-run project init (`init_project.py`) after bumping to this version to refresh the now-stale
+  `specdev-trinity-plan` skill symlink. No spec-artifact migration is required.
