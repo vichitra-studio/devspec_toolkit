@@ -415,7 +415,7 @@ The agent reads these paths via the Read/Glob tools; it never writes to any of t
 - `literal_true` — `true` as the entire command
 - `hardcoded_pass` — `printf`/`echo` without any side-effect check
 
-**Cross-phase consistency.** Every `finding_id` referenced in a `fix_plan.json` task's `finding_ids[]` must exist as an `id` in `findings.json`. Every `catalog_tag` in any finding must be one of the canonical D1–D14 / I1–I13 values declared in `catalogs.md`. No invented `kind` enum values (permitted values per `vc:infra:findings`); no invented `severity` enum values.
+**Cross-phase consistency.** Every finding signature referenced in a `fix_plan.json` task's `findings[]` array must exist as a `signature` value in `findings.json`. Every `catalog_tag` in any finding must be one of the canonical D1–D14 / I1–I13 values declared in `catalogs.md`. No invented `kind` enum values (permitted values per `vc:infra:findings`); no invented `severity` enum values.
 
 **Hallucination check.** Every cited `location` (file path + optional `#/json-pointer` or `#Lstart-Lend` line range) in a finding must be verifiable: the file path must exist in the audit's changed-file set or the run artifacts; cited line ranges must fall within the file's actual line count (checked against the digest `line_count` field if available, or by stat).
 
@@ -425,12 +425,13 @@ The agent reads these paths via the Read/Glob tools; it never writes to any of t
 
 ```json
 {
-  "phase_observed": "P4",
-  "defect_class": "vacuous_acceptance | schema_nonconformance | cross_phase_inconsistency | hallucinated_citation",
+  "kind": "bug",
   "description": "<human-readable summary>",
-  "evidence": ["<artifact path>", "<specific field or line>"]
+  "affected_finding_signatures": ["<sig1>", ...]
 }
 ```
+
+This shape is skill-internal (no `$id` lock) — see `.claude/agents/pr-audit-cross-boundary.md` §Output schema constraints ("Mode B") for the authoritative field list. `kind` is a fixed literal (`"bug"`); `affected_finding_signatures` references `signature` values from `findings.json` and may be empty (`[]`) when the defect is not tied to a specific finding.
 
 No separate `audit_of_audit.json` file is written. The agent appends only to `manifest.json` `meta_findings[]`. It does **not** modify `findings.json` or `fix_plan.json` — meta-findings are framework defects, not PR defects, and `findings.json` must remain strictly conformant to `vc:infra:findings`.
 

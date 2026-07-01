@@ -137,7 +137,6 @@ The dispatcher must populate all placeholder fields before invoking this agent.
 
 ```
 >> You are pr-audit-fix-apply, invoked for task {task_id}.
->> mode: apply
 >> task_id: {task_id}
 >> file: {file}
 >> change_summary: {change_summary}

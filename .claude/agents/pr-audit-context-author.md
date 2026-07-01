@@ -27,9 +27,10 @@ the fix; no separate fix artifact is written (protocol §2).
   slices in scope, out_of_scope_files, T0 overrides
 - `docs/audit/runs/<run-id>/p0/routing.json` — orchestrator's slice-assignment output from
   `route_files.py`; authoritative file→slice mapping for this run
-- `docs/audit/runs/<run-id>/digests/` — all digest files produced in P0, organized by type:
-  `digest_schema/`, `digest_prompt/`, `digest_validator/`, `digest_cli/`,
-  `digest_canon/`, `digest_changelog/`
+- `docs/audit/runs/<run-id>/digests/` — all digest files produced in P0, organized by type
+  (bare-type directory names, no `digest_` prefix):
+  `schema/`, `prompt/`, `validator/`, `cli/`, `canon/`, `changelog/`,
+  `migration/`, `test/`, `doc/`
 - `.claude/skills/devspec_pr_audit/slices.yaml` — slice definitions, globs, type_weight,
   expansion_rules, applies catalog subsets, semantic_work flags
 - `.claude/skills/devspec_pr_audit/catalogs.md` — D1-D14 and I1-I13 catalog definitions

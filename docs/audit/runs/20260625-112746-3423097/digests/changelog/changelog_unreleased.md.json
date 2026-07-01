@@ -1,0 +1,35 @@
+{
+  "digest_type": "digest_changelog",
+  "source_file": "changelog/unreleased.md",
+  "source_sha": "b71b78ca5b37047d75b1f8bb556c6a480710eb9f",
+  "extractor_version": "1.0.7",
+  "extracted_at": 1782386866,
+  "payload": {
+    "version_label": "unreleased",
+    "release_date": "",
+    "is_unreleased": true,
+    "breaking": [],
+    "added": [
+      "Added W555 `STEP00_SEED_OUT_OF_SCOPE_THIN` to `seed_lint.py`: fires when seeds routed"
+    ],
+    "changed": [
+      "Relaxed the `vc:core:canon` JSON Schema `entries.minItems` constraint from 1 to 0.",
+      "Extended the changelog format schema (`changelog/format.yaml`) `optional_fields` with"
+    ],
+    "removed": [],
+    "deprecated": [],
+    "fixed": [
+      "Fixed the generated pre-commit hook configuration for macOS and submodule deployments.",
+      "The generated `devspec-governance` commit-msg hook now sets `pass_filenames: true` (was",
+      "The generated host CI workflow (`init_project.py` `_render_ci_workflow`) now runs",
+      "Corrected submodule-deployment documentation and prompt-contract examples to pass the"
+    ],
+    "section_headers": [
+      "Added",
+      "Changed",
+      "Fixed"
+    ],
+    "total_entries": 7,
+    "has_breaking_changes": false
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "digest_type": "digest_test",
+  "source_file": "tests/integration/test_w555_spec_check_aggregation.py",
+  "source_sha": "0be8844c4aa8bb03da04ea0720934c2ac0b54bcc",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "test_file_path": "tests/integration/test_w555_spec_check_aggregation.py",
+    "test_count": 2,
+    "test_names": [
+      "test_w555_present_in_seed_lint_findings_when_thin",
+      "test_w555_absent_in_seed_lint_findings_when_rich"
+    ],
+    "markers": [
+      "pytest.mark.parametrize"
+    ],
+    "imports": [
+      "__future__",
+      "json",
+      "os",
+      "pytest",
+      "specdev_tools.validation.spec_check"
+    ],
+    "fixtures_referenced": [],
+    "hardcoded_paths": [],
+    "is_fixture": false
+  }
+}

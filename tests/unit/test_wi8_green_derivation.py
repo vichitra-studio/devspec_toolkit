@@ -21,8 +21,14 @@ import re
 # ---------------------------------------------------------------------------
 
 # Failure signals — any present in evidence_content ⇒ not green
+#   1. FAIL/FAILED/ERROR as a word
+#   2. Non-zero-exit indicator (mirrors the "exit 0" success anchor's inverse):
+#      "exit 1", "exit code: 1", "exit code=2", etc. — any exit token followed
+#      by a non-zero integer. "exit 0" itself is a success signal, not a failure.
 _FAILURE_SIGNALS = re.compile(
-    r"\b(FAIL(?:ED)?|ERROR)\b",
+    r"\b(FAIL(?:ED)?|ERROR)\b"
+    r"|"
+    r"\bexit(?:\s+code)?\s*[:=]?\s*[1-9]\d*\b",
     re.IGNORECASE,
 )
 
@@ -151,3 +157,10 @@ class TestBoundaryCases:
         # Multi-line evidence where passing line appears after setup lines.
         content = "setting up fixtures...\npytest tests/test_auth.py PASS\ncleaning up"
         assert _derive_ci_green(content) is True
+
+    def test_nonzero_exit_signal(self):
+        # SKILL.md Step C2 lists a third failure signal alongside FAIL/FAILED/ERROR:
+        # a non-zero-exit indicator. Evidence with no FAIL/FAILED/ERROR substring but
+        # a trailing non-zero exit code must still derive green=False.
+        content = "pytest tests/test_auth.py PASS\nprocess exited with exit 1"
+        assert _derive_ci_green(content) is False

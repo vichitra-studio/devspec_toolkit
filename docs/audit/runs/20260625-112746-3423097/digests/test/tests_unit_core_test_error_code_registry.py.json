@@ -1,0 +1,28 @@
+{
+  "digest_type": "digest_test",
+  "source_file": "tests/unit/core/test_error_code_registry.py",
+  "source_sha": "77bdd02a5541f8c774d865aeb0976bb679895b73",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "test_file_path": "tests/unit/core/test_error_code_registry.py",
+    "test_count": 7,
+    "test_names": [
+      "test_all_r9_codes_registered",
+      "test_promotable_pairs_count",
+      "test_promotable_pairs_w_to_e",
+      "test_promotable_pairs_codes_registered",
+      "test_no_numeric_suffix_collision",
+      "test_e550_no_longer_overloaded",
+      "test_non_promotable_codes_excluded"
+    ],
+    "markers": [],
+    "imports": [
+      "unittest",
+      "specdev_tools.core.errors"
+    ],
+    "fixtures_referenced": [],
+    "hardcoded_paths": [],
+    "is_fixture": false
+  }
+}

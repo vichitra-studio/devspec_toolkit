@@ -140,9 +140,9 @@ Severity defaults:
 
 These are defaults. Reviewer may upgrade severity when impact is higher than default.
 
-Note: the `scope_kind` union is per-agent-prompt; `findings.schema.json` has `scope_kind` as a
-free string (verified). K1 §4.1 defines the structural finding-record enum. K2 inherited it
-unchanged. K2.1 β extended it with `seed-grounding` (P0); the trinity-reviewer applies the
+Note: the `scope_kind` union is per-agent-prompt; it is a dispatch-context field consumed by
+this agent's invocation prompt and is not a property defined in `findings.schema.json`. K1
+§4.1 defines the structural finding-record enum. K2 inherited it unchanged. K2.1 β extended it with `seed-grounding` (P0); the trinity-reviewer applies the
 same taxonomy as the spec-phase reviewer (§11.4 E2 note).
 
 ---

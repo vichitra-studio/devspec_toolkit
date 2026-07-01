@@ -1,0 +1,25 @@
+{
+  "digest_type": "digest_test",
+  "source_file": "tests/unit/core/test_error_code_coverage.py",
+  "source_sha": "bd1fefff610570d744df7effbfe9f762ef90e6aa",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "test_file_path": "tests/unit/core/test_error_code_coverage.py",
+    "test_count": 2,
+    "test_names": [
+      "test_expected_codes_present",
+      "test_all_emitted_codes_registered"
+    ],
+    "markers": [],
+    "imports": [
+      "re",
+      "unittest",
+      "pathlib",
+      "specdev_tools.core.errors"
+    ],
+    "fixtures_referenced": [],
+    "hardcoded_paths": [],
+    "is_fixture": false
+  }
+}

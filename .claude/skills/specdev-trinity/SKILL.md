@@ -17,6 +17,11 @@ Runs the three phases of the Trinity loop: 16a plan review, 16b code-write imple
 
 **Source spec:** K_agentification.md §11.3, §11.3.1, §11.3.2, §11.5, §11.7, §11.8.
 
+> **Note:** The former `/specdev-trinity-plan` skill has been removed; its plan-phase
+> functionality is now invoked via `/specdev-trinity --phase plan` (this skill). Host repos
+> that vendor the toolkit as a submodule must re-run `init_project.py` after bumping versions
+> to refresh the now-stale `specdev-trinity-plan` skill symlink.
+
 ---
 
 ## Prerequisites

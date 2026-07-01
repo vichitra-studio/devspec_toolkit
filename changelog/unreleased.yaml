@@ -82,3 +82,34 @@ changes:
       operator step).
     migration:
       action: none
+  - type: add_constraint
+    description: >
+      Added an "Agentified flow note" to prompts/prompt_16c_impl_reviewer.md clarifying
+      that when the Trinity loop is invoked via the agentified dispatch path (e.g. through
+      specdev-trinity-impl / specdev-trinity-reviewer), the dispatching agent -- not the
+      prompt itself -- is responsible for anchor/roadmap sync, whereas the standalone
+      (non-agentified) invocation path continues to perform anchor/roadmap sync inline.
+      This documents which invocation path owns sync responsibility to avoid duplicate
+      or missed anchor/roadmap syncs.
+    migration:
+      action: none
+  - type: add_script
+    description: >
+      Expanded the devspec_pr_audit skill's --post-fix closing-loop support (DEVSPEC-121):
+      added .claude/skills/devspec_pr_audit/scripts/p6_verify.py (post-fix verification
+      gate), extended SKILL.md and protocol.md with the --post-fix scoped-audit contract,
+      and broadened validate_agent_outputs.py to cover the new post-fix agent output shape,
+      including the pr-audit-context-author and pr-audit-fix-apply agents.
+    migration:
+      action: none
+  - type: internal_restructure
+    description: >
+      Rewrote 11 .claude/agents/*.md agent-contract files (DEVSPEC-100 Phase 3):
+      specdev-trinity-impl, specdev-trinity-reviewer, specdev-impl (new mode additions),
+      pr-audit-cross-boundary, and the remaining pr-audit-* agents touched by IU-11/12/15/16
+      (trinity errors_remaining handling, p2/-absent meta-finding, T0-09 CLI-prefix fix,
+      validate_agent_outputs.py blocked-status gating). Added corresponding test coverage:
+      tests/integration/pr_audit/test_p5_finalize.py, test_tier0_checks.py,
+      test_validate_agent_outputs.py, and tests/unit/test_wi8_green_derivation.py.
+    migration:
+      action: none

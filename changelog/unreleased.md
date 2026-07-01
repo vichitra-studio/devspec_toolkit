@@ -54,3 +54,29 @@
   `/specdev-trinity --phase plan`. Host repos that vendor the toolkit as a git submodule must
   re-run project init (`init_project.py`) after bumping to this version to refresh the now-stale
   `specdev-trinity-plan` skill symlink. No spec-artifact migration is required.
+
+### Added
+
+- Added a new script `.claude/skills/devspec_pr_audit/scripts/p6_verify.py` as part of
+  expanding the `devspec_pr_audit` skill's `--post-fix` closing-loop support (DEVSPEC-121):
+  `SKILL.md` and `protocol.md` were extended with the `--post-fix` scoped-audit contract, and
+  `validate_agent_outputs.py` was broadened to cover the new post-fix agent output shape,
+  including the `pr-audit-context-author` and `pr-audit-fix-apply` agents.
+
+### Changed
+
+- Added an "Agentified flow note" to `prompts/prompt_16c_impl_reviewer.md` clarifying that
+  when the Trinity loop is invoked via the agentified dispatch path (e.g. through
+  `specdev-trinity-impl` / `specdev-trinity-reviewer`), the dispatching agent -- not the
+  prompt itself -- is responsible for anchor/roadmap sync, whereas the standalone
+  (non-agentified) invocation path continues to perform anchor/roadmap sync inline.
+
+### Internal
+
+- Rewrote 11 `.claude/agents/*.md` agent-contract files (DEVSPEC-100 Phase 3):
+  `specdev-trinity-impl`, `specdev-trinity-reviewer`, `specdev-impl` (new mode additions),
+  `pr-audit-cross-boundary`, and the remaining `pr-audit-*` agents touched by IU-11/12/15/16
+  (trinity `errors_remaining` handling, p2/-absent meta-finding, T0-09 CLI-prefix fix,
+  `validate_agent_outputs.py` blocked-status gating). Added corresponding test coverage:
+  `tests/integration/pr_audit/test_p5_finalize.py`, `test_tier0_checks.py`,
+  `test_validate_agent_outputs.py`, and `tests/unit/test_wi8_green_derivation.py`.

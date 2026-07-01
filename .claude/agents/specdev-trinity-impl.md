@@ -340,7 +340,7 @@ Per-group state is encoded entirely by the existence and contents of files under
 artifacts at query time — it is never stored in the plan artifact.
 
 `implementation.status` (verified schema field at
-`devspec_toolkit/schema/16_impl_context.schema.json` L423–L432, enum
+`devspec_toolkit/schema/16_impl_context.schema.json` L408-L416, enum
 `{pending, in_progress, verified, deferred}`) **stays at `pending`** throughout impl + review
 phases per E11 / §11.5. Operator flips to `verified` after deploy + live verification, by
 applying a single patch:
