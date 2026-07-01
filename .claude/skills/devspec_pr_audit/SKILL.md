@@ -837,7 +837,8 @@ manifest that already reflects phase 5 completion, otherwise the first render sh
 ### Post-fix pipeline (`--post-fix`)
 
 After applying all fix_plan.json tasks (manually or via the `pr-audit-fix-apply` agent),
-confirm all acceptance gates pass and produce a closing-loop re-audit.
+confirm all acceptance gates pass, commit the verified fixes, and produce a
+closing-loop re-audit scoped to just those fixes.
 
 **Invocation:**
 ```
@@ -846,17 +847,46 @@ confirm all acceptance gates pass and produce a closing-loop re-audit.
 
 This path does **not** re-run P0–P5 from scratch. Instead:
 
-1. Reads `fix_plan.json` tasks.
-2. Dispatches `pr-audit-fix-apply` per task in topological order, passing `file`,
-   `change_summary`, and `acceptance_command` from each task object.
+1. **Capture the pre-fix ref**, before applying any task:
+   ```bash
+   PRE_FIX_SHA=$(git rev-parse HEAD)
+   ```
+2. Reads `fix_plan.json` tasks. Dispatches `pr-audit-fix-apply` per task in
+   topological order, passing `file`, `change_summary`, and `acceptance_command`
+   from each task object.
 3. Gates all applied tasks via `p6_verify.py`:
    ```bash
    python3 .claude/skills/devspec_pr_audit/scripts/p6_verify.py <fix_plan_path>
    ```
-   Exit 0 = all acceptance commands passed; exit 1 = one or more failed.
-4. If `p6_verify.py` exits 0, re-runs `/devspec_pr_audit` against the branch to
-   confirm findings are closed. The re-run is a full P0–P5 audit (see protocol §12.2
-   for note on file-scoping limitations — no `--only-files` primitive exists).
+   Exit 0 = all acceptance commands passed; exit 1 = one or more failed. On
+   failure, halt here — do not commit and do not re-audit (see protocol §12.2).
+4. **Commit the verified fixes.** On `p6_verify.py` exit 0, stage only the files
+   touched by the fix plan (the union of `fix_plan.tasks[].file`) and make a
+   single commit referencing the run-id, e.g.:
+   ```bash
+   git add <fix_plan.tasks[].file, deduplicated>
+   git commit -m "fix(pr-audit): apply <run-id> fix_plan (<N> tasks)"
+   ```
+   `--post-fix` now commits the verified fixes (previously they were left
+   uncommitted in the working tree) — this is required so the scoped diff in the
+   next step can see them. If nothing is staged (e.g. a no-op fix whose
+   `acceptance_command` already passed without any edit), skip the commit and the
+   scoped re-audit in step 5 and report those tasks as already-satisfied — an
+   empty commit must not be created.
+5. **Scoped closing re-audit.** Re-run `/devspec_pr_audit --base <PRE_FIX_SHA>`.
+   Because the audit computes its changed-file set as
+   `git diff --name-only "${BASE_REF}...HEAD"` (Step 0d above), passing
+   `--base <PRE_FIX_SHA>` scopes the entire re-audit to exactly the fix commit's
+   changes. If the original run used `--allow-tier0-failure=<check-name>`
+   overrides, pass them again on the scoped re-run. Confirm findings previously
+   addressed by `fix_plan.json` are absent, and check for any new findings
+   introduced by the fixes themselves (see protocol §12.2).
+
+This scoped loop is deliberately narrow: `p6_verify.py` already confirms each
+fix's `acceptance_command`, so the closing re-audit's job is only to catch
+fix-introduced side effects in the changed files — not to re-check cross-boundary
+drift against untouched neighbors. A full branch-vs-main audit remains available
+by running `/devspec_pr_audit` normally (no `--base` override) before merge.
 
 ---
 

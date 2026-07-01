@@ -542,9 +542,11 @@ See fix_plan.json for full task list.
 
 ## §12. Post-fix verification
 
-After applying all `fix_plan.json` tasks (generated in P4), operators and the post-fix
-pipeline must confirm that every task's acceptance gate passes and that previously-found
-findings are closed.
+Before applying any `fix_plan.json` (generated in P4) task, the post-fix pipeline
+captures `PRE_FIX_SHA=$(git rev-parse HEAD)` — see SKILL.md `--post-fix` step 1.
+After applying all tasks, operators and the post-fix pipeline must confirm that
+every task's acceptance gate passes, commit the verified fixes, and that
+previously-found findings are closed via a re-audit scoped to `PRE_FIX_SHA`.
 
 ### §12.1 Per-task verification
 
@@ -566,15 +568,38 @@ Exit codes:
 
 ### §12.2 Closing-loop re-audit
 
-After `p6_verify.py` exits 0, re-run `/devspec_pr_audit` against the branch. The
-re-audit is a standard P0–P5 run that produces a new `run-id` directory with its own
-`findings.json` and `SUMMARY.md`. Confirm that findings previously addressed by
-`fix_plan.json` tasks are absent from the new run's findings.
+If `p6_verify.py` exits non-zero, halt: do not commit and do not re-audit — fix
+the failing task(s) and re-run `p6_verify.py`. On exit 0, proceed:
 
-**Note on file scoping:** There is no file-scope filter (`--only-files` flag does not
-exist). The re-audit runs against the full branch diff. The fix_plan.json task list
-documents which files were edited, allowing the operator to cross-check targeted
-findings in the new run's output.
+1. **Commit the verified fixes first.** Stage the union of `fix_plan.tasks[].file`
+   and commit as a single change referencing the run-id (e.g.
+   `fix(pr-audit): apply <run-id> fix_plan (<N> tasks)`). This is a change from
+   prior behavior — fixes used to be left uncommitted in the working tree. The
+   commit is required so that step 2's `--base` diff has something to see. If
+   nothing is staged (a no-op fix whose `acceptance_command` already passed
+   without an edit), do not create an empty commit — skip the commit and the
+   step-2 re-audit and report those tasks as already-satisfied.
+2. **Re-run `/devspec_pr_audit --base <PRE_FIX_SHA>`**, where `PRE_FIX_SHA` is the
+   `HEAD` sha captured before any fix task was applied (§12 preamble / SKILL.md
+   `--post-fix` step 1). The audit computes its changed-file set as
+   `git diff --name-only "${BASE_REF}...HEAD"` (SKILL.md Step 0d), so this reuses
+   the existing `--base` flag to scope the entire re-audit — routing, Tier-0
+   checks, P2/P3 discovery, everything — to exactly the fix commit's diff. This
+   produces a new `run-id` directory with its own `findings.json` and
+   `SUMMARY.md`, but the diff underlying it is just the fix changes.
+   If the original run used `--allow-tier0-failure=<check-name>` overrides, pass
+   them again on this re-run.
+3. Confirm that findings previously addressed by `fix_plan.json` tasks are absent
+   from the new run's findings, and inspect the new run's findings for anything
+   newly introduced by the fixes.
+
+**Why scoping to `--base <PRE_FIX_SHA>` is sufficient:** `p6_verify.py` (§12.1)
+already confirms each individual fix via its `acceptance_command`; the closing
+re-audit's remaining job is to catch side effects the fixes introduced in the
+changed files, which a diff scoped to the fix commit fully covers. What this
+scoped loop deliberately does **not** do is re-check cross-boundary drift against
+files the fixes didn't touch — for that, run `/devspec_pr_audit` normally (no
+`--base` override) as a full branch-vs-main audit before merge.
 
 ### §12.3 Post-fix agent class
 
