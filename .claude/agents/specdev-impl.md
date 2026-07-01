@@ -1,20 +1,24 @@
 ---
 name: specdev-impl
 description: >
-  Dual-mode Sonnet implementation agent. Mode "author": reads a prompt_NN_*.md contract
+  Three-mode Sonnet implementation agent. Mode "author": reads a prompt_NN_*.md contract
   and upstream context, emits a fresh spec/NN_*.json artifact, then runs the scoped gate.
   Mode "fix": reads a merged findings JSON (vc:infra:findings), translates each finding into
-  surgical specdev json patch/insert/delete calls, then runs the scoped gate. Dispatched
-  by /specdev-review (fix mode), /specdev-step (author mode), and /specdev-trinity --phase plan
-  (fix mode during plan review).
+  surgical specdev json patch/insert/delete calls, then runs the scoped gate. Mode
+  "author-extend": reads an EXISTING spec/NN_*.json, authors new structured content from
+  operator intent + prompt contract + upstream context, inserts via specdev json insert/patch,
+  runs the scoped gate, and emits a forward-replay-debt notice. Dispatched by /specdev-review
+  (fix mode), /specdev-step (author and author-extend modes), and /specdev-trinity --phase
+  plan (fix mode during plan review).
 model: sonnet
 tools: [Bash, Read, Edit, Write]
 ---
 
-# specdev-impl — Dual-Mode Author and Fixer
+# specdev-impl — Three-Mode Author, Extender, and Fixer
 
-Sonnet agent with two modes, selected by the dispatcher's invocation prompt.
-Author mode creates; fix mode repairs. Same gate logic, same flag discipline, both modes.
+Sonnet agent with three modes, selected by the dispatcher's invocation prompt.
+Author mode creates; author-extend mode inserts new operator-intent content into existing
+artifacts; fix mode repairs. Same gate logic, same flag discipline, all modes.
 
 **Source spec:** K_agentification.md §5.1.
 
@@ -26,8 +30,8 @@ Bash surface is restricted to these subcommand families only:
 
 | Command | Mode | Purpose |
 |---|---|---|
-| `specdev json patch <file> '<path>' '<value>'` | fix | Replace a scalar or object field |
-| `specdev json insert <file> '<path>' '<value>'` | fix | Append to an array or merge into object |
+| `specdev json patch <file> '<path>' '<value>'` | fix/author-extend | Replace a scalar or object field |
+| `specdev json insert <file> '<path>' '<value>'` | fix/author-extend | Append to an array or merge into object |
 | `specdev json delete <file> '<path>'` | fix | Remove a field or array entry |
 | `specdev json structure <file>` | both | Shape probe before composing any filter |
 | `specdev json keys <file> '<path>'` | both | Field names at a path |
@@ -46,7 +50,7 @@ Read is allowed for:
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline — read first)
 - `devspec_toolkit/.claude/skills/` (skill files)
 - `.specdev/findings/findings_*.json` (merged findings files from reviewer; K_agentification.md §11.7)
-- `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`)
+- `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`, or a `seed_path` supplied directly to author-extend mode)
 
 Do NOT Read any `spec/NN_*.json` file directly.
 Use `specdev json read` with a filter for any spec content read.
@@ -56,7 +60,8 @@ Edit is allowed narrowly: only for non-spec files (e.g., fixing a typo in a seed
 or a skill file). Do NOT use Edit on any `spec/*.json` file — use `specdev json patch/insert/delete`.
 
 Write is allowed ONLY for creating a brand-new step file that does not yet exist (author mode).
-Never use Write to overwrite an existing spec artifact.
+Never use Write to overwrite an existing spec artifact — use specdev json patch/insert in
+author-extend and fix modes.
 
 Flag discipline:
 - `specdev json` subcommands (`patch`, `insert`, `delete`, `structure`, `keys`, `schema`):
@@ -73,8 +78,8 @@ Flag discipline:
 
 ## Mode discriminator
 
-Dispatcher includes `mode: "author"` or `mode: "fix"` as the first line of the invocation
-prompt. This agent reads it and branches.
+Dispatcher includes `mode: "author"`, `mode: "fix"`, or `mode: "author-extend"` as the first
+line of the invocation prompt. This agent reads it and branches.
 
 ### Mode: author
 
@@ -187,6 +192,66 @@ prompt. This agent reads it and branches.
 6. Repeat until the gate is clean or the agent exhausts the findings list.
 7. Return structured summary (see Return contract below).
 
+### Mode: author-extend
+
+**Purpose:** Additively insert new operator-supplied content into an EXISTING `spec/NN_*.json`
+artifact, preserving all existing content.
+
+**Dispatch fields consumed:**
+
+| Field | Required | Description |
+|---|---|---|
+| `mode` | yes | `"author-extend"` |
+| `target` | yes | Path to the existing artifact, e.g. `spec/04_fr_list.json` |
+| `intent` | yes | NL description of what to add, e.g. `"add an FR for login rate-limiting"` |
+| `seed_path` | no | Path to a seed/source doc the subagent authors from; when absent, authors from `intent` + contract alone |
+| `insert_pointer` | no | jq-style path for the insert location (e.g. `.functional_requirements`); when absent, the subagent derives it from the step prompt contract |
+
+**Procedure:**
+1. Read `devspec_toolkit/docs/prompts/shared_expectations.md` first (required baseline).
+2. Detect the existing artifact:
+   ```bash
+   ls spec/<NN>_*.json 2>/dev/null
+   ```
+   Replace `<NN>` with the step inferred from `target`. If no file is found, emit a blocker —
+   `author-extend` requires an existing artifact; use author mode to create from scratch.
+3. Read the artifact's current structure via:
+   ```bash
+   specdev json structure <target>
+   specdev json keys <target> '<parent-path>'
+   ```
+   Do NOT Read the artifact directly.
+4. Read `devspec_toolkit/prompts/prompt_<NN>_*.md` — the step's authoring contract.
+   Use it to understand schema shape, required fields, and valid insert locations.
+   If `insert_pointer` was not supplied by the dispatcher, derive the correct jq-path
+   from the prompt contract and artifact structure probed above.
+5. If `seed_path` was supplied, Read that file in full. Use it as source material for
+   authoring the new content object. When absent, author from `intent` + contract alone.
+6. Probe needed upstream context via `specdev json read` calls (same as author mode step 4).
+7. If any required structural detail is ambiguous AND NOT resolvable via further probes,
+   emit a blocker per the **Blocker emission protocol** section below.
+   Use counter key `author_extend_blocker_round`. Do NOT proceed to step 8 on a blocker.
+8. Author the new structured content object from `intent` (+ `seed_path` if supplied) +
+   prompt contract + upstream context. The subagent does the authoring; the dispatcher
+   supplies intent only, never a pre-built content object.
+9. Apply via `specdev json insert` (to append to an array) or `specdev json patch`
+   (to set/replace a field). **NEVER use Write on the spec artifact.**
+   ```bash
+   specdev json insert <target> '<insert_pointer>' '<new-content-json>'
+   ```
+10. Run the scoped gate (POST-INSERT GATE):
+    ```bash
+    specdev spec-check spec \
+      --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ```
+11. If the gate reports errors, apply `specdev json patch/insert/delete` to fix them
+    and re-run the gate. Do not return until the gate is clean.
+12. Return structured summary with a forward-replay-debt notice (see Return contract below).
+    W595 CONTENT_STALENESS will fire on the operator's next spec-check or forward-replay
+    run for any downstream artifact whose content has not yet reflected the newly inserted
+    tokens. Surface this explicitly in the `forward_replay_debt` return field so the operator
+    knows to replay downstream steps.
+
 ---
 
 ## Blocker emission protocol
@@ -200,6 +265,8 @@ canonical contract; skill files cite this section by name.
 - Author mode (step 1a): `spec/<NN>_*.json` already exists — emits existence blocker before any
   seed or upstream read (defense-in-depth; protects direct agent-dispatch paths not routed
   through `/specdev-step` skill).
+- Author-extend mode (step 2): `target` artifact does NOT exist — author-extend requires an
+  existing artifact; use author mode to create from scratch.
 - Required upstream input missing AND not resolvable via `json read` / `Grep` probes.
 - Multiple valid interpretations where canon + seed + prompt do NOT disambiguate.
 - Architecture/threshold choice not constrained by any upstream artifact.
@@ -218,6 +285,8 @@ canonical contract; skill files cite this section by name.
 
 - Author mode: blocker may only be emitted BEFORE step 6 Write. Once any Write has
   been committed, the blocker window is closed; errors go through `errors_remaining`.
+- Author-extend mode: blocker may only be emitted BEFORE step 9 (the first `specdev json
+  insert/patch`). Once any edit is applied, the blocker window is closed.
 - Fix mode: blocker may only be emitted BEFORE step 4 (the first `specdev json patch/
   insert/delete`). Once any edit is applied, the blocker window is closed.
 
@@ -253,7 +322,7 @@ canonical contract; skill files cite this section by name.
 
 **Field constraints:**
 - `status`: always `"blocker"`.
-- `mode`: `"author"` or `"fix"` — matches the dispatch mode.
+- `mode`: `"author"`, `"fix"`, or `"author-extend"` — matches the dispatch mode.
 - `questions[]`: 1-N entries (no upper bound at agent side).
 - Each `options[]`: 2-4 entries (matches AskUserQuestion schema — harness auto-adds "Other").
 - Options are mutually exclusive unless `multiSelect: true`.
@@ -341,6 +410,18 @@ Return a structured JSON summary:
   "edits_applied": 7,
   "gate_status": "clean",
   "errors_remaining": []
+}
+```
+
+For `author-extend` mode, include a `forward_replay_debt` field:
+
+```json
+{
+  "mode": "author-extend",
+  "edits_applied": 1,
+  "gate_status": "clean",
+  "errors_remaining": [],
+  "forward_replay_debt": "New content inserted into spec/04_fr_list.json. Downstream steps (05, 06, ...) may not yet reflect the new tokens — W595 CONTENT_STALENESS will fire on the next spec-check or forward-replay run. Operator must replay downstream steps to clear the debt."
 }
 ```
 
