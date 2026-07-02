@@ -248,6 +248,15 @@
   Step-16 anchor validation, tech-stack coherence, and registry-generator
   checks (pr-audit round, `T1`/`T2`/`T9`). Doc-only, no schema or code change.
 
+- Documented 17 previously-undocumented `specdev` subcommands in
+  `docs/developers/reference.md` (pr-audit round), adding a `specdev context`
+  command table (`structure`/`scope`/`canon`/`freshness`/`review`/`extract`)
+  covering the `/specdev-context` skill's Orientation flow, and a "Registry,
+  Canon & Prompt Maintenance Commands" table (`seed-index`, `prompt-sync`,
+  `canonical-autofix`, `glossary-drift-check`, `completeness-check`,
+  `registry-check`, `registry-generate`, `guide`, `hardcoded-seed-check`,
+  `upstream-backlog`, `canon-accept`). Doc-only, no schema or code change.
+
 ### Removed
 
 - Removed the `/specdev-trinity-plan` skill; its plan-phase functionality is now invoked via

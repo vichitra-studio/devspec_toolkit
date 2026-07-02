@@ -211,7 +211,9 @@ class TestStep16aFeedbackLoop(unittest.TestCase):
         data = _make_minimal_16a()
         data["review"] = _review_with_remediation(["task-only-in-review"])
         errors_no_path = validate_step_16a(data, ".", spec_path=None)
-        errors_with_path = validate_step_16a(data, ".", spec_path="/tmp/any/path.json")
+        with tempfile.TemporaryDirectory() as td:
+            spec_path = str(Path(td) / "16_impl_context.json")
+            errors_with_path = validate_step_16a(data, ".", spec_path=spec_path)
         codes_no_path = {e.code for e in errors_no_path}
         codes_with_path = {e.code for e in errors_with_path}
         self.assertIn("W584", codes_no_path)

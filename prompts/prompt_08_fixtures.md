@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes for Step 08 (fr/api/nfr/inv only) are defined by `schema/08_fixtures.schema.json` as the step-specific authority; MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
+- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes for Step 08 (fr/api/nfr/inv only) are defined by `schema/08_fixtures.schema.json` as the step-specific authority; MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tags` and `tag_ref` are write-only fields — they are not validated by `step_08.py` or `fixtures_lint.py`; populate them correctly by hand since no automated gate checks their content.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -68,6 +68,8 @@ Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
 - Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
+
+These four coverage rules (FR acceptance criteria, API contract coverage, invariant negative-case coverage, NFR benchmark/load coverage) are manual authoring checks performed during Map → Generate → Validate — they are not automatically enforced by `step_08.py` or `fixtures_lint.py`, so the author is responsible for verifying them before emitting the artifact.
 - All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
 - [ ] Every upstream ID from ingested context has been consumed
@@ -86,7 +88,7 @@ Before emitting, verify:
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
 
 ## Cross-Step Synthesis Notes
-- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`.
+- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`. Note: `expected.body` is not actually required by the linter — `fixtures_lint.py` only enforces a valid HTTP `status` (100-599) for `mode: contract`; `body`, if present, is merely checked to be JSON-serializable. Author `body` anyway per the authoring contract above; the gate will not catch its absence.
 - **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 
 ## Best Practices

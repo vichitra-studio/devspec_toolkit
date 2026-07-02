@@ -95,6 +95,11 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
 ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
+# Traceability closure — verifies the full charter-goal -> capability -> FR -> API/fixture
+# chain has no dangling links (capability/FR/API/fixture trace-type checks); add --json
+# for a machine-readable report
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
 # Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
@@ -345,9 +350,14 @@ specdev align prompts spec --output prompts/migration/ --mode upgrade --repo-roo
 
 # Finalize: full post-migration validation + version stamp (with migration history)
 specdev align validate spec --repo-root ./devspec_toolkit
+
+# Restore spec/ from a migration backup (non-interactive)
+specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-name> --yes
 ```
 
 > Finalize a migration with `align validate`, not by re-running `specdev update`. `validate` stamps `spec/specdev_version` only after schema + trace-integrity checks pass and records a `migration_history` entry; `update` re-stamps after a weaker structural-diff check and omits the audit trail.
+
+> `align rollback` restores `spec/` from a backup in `spec/migration_backups/`. Without `--backup-dir` it lists available backups and prompts interactively (requires a TTY unless `--yes` is also passed); with `--backup-dir <name>` it restores that backup directly. `--yes` skips the confirmation prompt. `--json` is not yet supported for this action.
 
 
 
@@ -403,7 +413,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - **Scaffold (Step 15) failures**:
   - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
   - `duplicate api_ref`: Each API Contract can only be mapped once.
-- **Canon/schema alignment failures** (`canon-schema-alignment`):
+- **Canon/schema alignment failures** (`canon-schema-alignment`); see [error-codes.md](error-codes.md#canonschema-alignment-55x) for the authoritative E551-E554 definitions:
   - `E554 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
   - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
   - `E552 MISSING_PAIRED_SCHEMA`: Schema file referenced in pairing config not found.

@@ -51,7 +51,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 7.  **Emit**: Generate the JSON.
 
 ### Roadmap-to-Checklist Coverage
-Every `tasks[].task_id` from `14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
+Every `tasks[].task_id` from `spec/14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -77,7 +77,7 @@ Before emitting, verify:
 - [ ] Every `checklist[].id` is prefixed with the `checklist_id_prefix` declared in the Trinity Anchor's `milestone_index[]` entry for this milestone.
 
 **Extraction Mandate**:
-- Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
+- Every milestone from `spec/14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
 
 ## Negative Constraints
 
@@ -154,7 +154,7 @@ A Step 14 task itself marked `status: "deferred"` or `"wont_do"` (with its own `
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
     *   `type`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item type enum).
     *   `layer`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item layer enum).
-    *   `checklist_status`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item status enum): `active`, `deferred`, or `wont_do`.
+    *   `checklist_status`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item status enum).
         *   *Rule*: When `deferred`, `deferred_reason` is MANDATORY on this item — name the blocker and the condition required to undefer (e.g. "Waiting for auth service API contract finalisation. Unblock: auth-service publishes OpenAPI 3.0 spec."). This is per-item and independent of `plan.deferred_reason` (which documents deferring the whole plan) — deferring one item does not require deferring the plan.
         *   *Rule*: When `wont_do`, `wont_do_reason` is MANDATORY on this item — name the decision and, if applicable, what supersedes it (e.g. "Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow."). Use `wont_do` for work that will *permanently* never be built (distinct from `deferred`, which implies resuming later) — this keeps the item's history documented instead of forcing deletion to satisfy coverage checks.
     *   `linked_test_expectation`: **CRITICAL** for `active` items. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`). Optional when `checklist_status` is `deferred` or `wont_do` — the eventual test contract isn't always known before work starts, or will never be needed.
@@ -250,7 +250,7 @@ The `plan.docs` field is distinct from `plan.docs_impact` — it carries a **str
 - Set `status: "not_applicable"` with a concrete `reason` only for test-only changes, internal refactors with no external interface change, or documentation-only updates that are themselves the deliverable.
 - When in doubt, prefer `"planned"` — it is safer to over-declare than to miss a documentation gap.
 
-**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level; `plan.docs_impact.docs_touched` is what the coding agent (16b) actually reads to determine its file list. `plan.docs` is a separate, structured documentation update plan for human/downstream doc-authoring use — 16b does not consume it. Both may be present; they are not redundant, but only `docs_impact.docs_touched` drives 16b's file list.
+**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level; `plan.docs_impact.docs_touched` is what the coding agent (16b) actually reads to determine its file list. `plan.docs` is a separate, structured documentation update plan for human/downstream doc-authoring use — 16b does not consume it. Both may be present; they are not redundant, but only `docs_impact.docs_touched` drives 16b's file list. Note: unlike `docs_impact.docs_touched`, `plan.docs.required_updates` has no downstream validator consumer — it is advisory only, informing human/downstream doc authoring, and is not enforced or read by any pipeline check.
 
 **Example (planned)**:
 ```json

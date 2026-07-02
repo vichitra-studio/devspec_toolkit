@@ -714,6 +714,14 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No dedicated pairing in `PROMOTABLE_PAIRS` under this name; `E130` (`CANONICAL_VERSION_MISMATCH`) is a structurally different condition (version present but wrong, not omitted).
 
+### E420 INVALID_DEPRECATION_LIFECYCLE
+
+**Trigger**: Fired by `lint_canon_dir()` in `tools/specdev_tools/canonical/lint.py` for two distinct shapes: (1) a canon manifest entry (`_validate_lifecycle`) whose `lifecycle` block is missing `introduced_at` (always required), or is missing `deprecated_since` when `status` is `"deprecated"`/`"sunset"`, or is missing `sunset_after` when `status` is `"sunset"`, or is missing `retired_at` when `status` is `"retired"`; (2) a manifest alias with `status: "deprecated"` that has no `deprecated_since` on the alias itself or on its nested `lifecycle` block.
+
+**Resolution**: Add the missing lifecycle field(s) to the canon entry (or alias) matching its current `status` — `introduced_at` is always required, and `deprecated_since` / `sunset_after` / `retired_at` become required once the entry transitions to the corresponding `status` value. See the canon manifest schema for the expected `lifecycle` shape.
+
+**Promotable**: No (error only; no `W420` counterpart).
+
 ### W421 CANON_ID_COLLISION_PROJECT_WINS
 
 **Trigger**: During two-tier canon loading (`CanonicalRegistry.load`), a project-canon entry `id` collides with a core-canon entry `id`. The project entry silently overrides the core entry; W421 surfaces that override so it isn't invisible.

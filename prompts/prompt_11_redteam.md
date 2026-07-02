@@ -50,7 +50,7 @@ For each upstream artifact ingested, extract the following:
 1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — consult the atom for the authoritative, current set of valid categories (see Taxonomy of Threats above for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to the schema-defined categories.
 2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
 3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST use `type: doc` with a concrete action description in `note` (`doc` is exempt from upstream cross-reference). Use `type: capability` ONLY to reference an EXISTING `cap-*` ID from Step 01.
-4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
+4.  **Emit**: Write the artifact once mitigations are required for every threat and every threat has at least one mitigation defined, regardless of severity.
 
 ## Examples: Weak vs. Strong
 | Quality | Threat Description | Vector | Linking |
@@ -93,7 +93,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
 - [ ] All mitigations are structured objects (not plain strings)
-- [ ] High-severity threats have ≥1 mitigation each
+- [ ] Every threat has ≥1 mitigation each — mitigations are required for every threat, not only high-severity ones
 - [ ] Every high-priority FR has at least one threat scenario modeled
 - [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch

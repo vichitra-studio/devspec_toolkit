@@ -169,13 +169,18 @@ Before emitting, verify:
 ### milestones[].fr_refs
 - List FR IDs from `spec/04_fr_list.json` that this milestone delivers.
 - Must use exact IDs (e.g., `fr-user-login`). Every ID must exist in Step 04.
-- **If this milestone has deliverables, `fr_refs` MUST be non-empty.** Omit or use `[]` only if the milestone is purely infrastructure with no user-facing functional requirements (e.g., CI pipeline setup, dependency upgrades). A milestone with deliverables but no `fr_refs` is a traceability gap and a red flag.
-- Note: `fr_refs` and `capability_refs` belong on milestones, not on individual tasks. Tasks within a milestone inherit traceability through the milestone's refs.
+- **If this milestone has deliverables, `fr_refs` MUST be non-empty.** Use `[]` only if the milestone is purely infrastructure with no user-facing functional requirements (e.g., CI pipeline setup, dependency upgrades). A milestone with deliverables but no `fr_refs` is a traceability gap and a red flag.
+- Note: Tasks within a milestone also carry their own `fr_refs`. The task-level `fr_refs` across all tasks in a milestone must collectively cover every FR listed in that milestone's `fr_refs`.
+
+### tasks[].invariant_refs
+- List invariant IDs from `spec/06_invariants.json` that this task enforces or tests.
+- Must use exact IDs. Add all invariants this task validates, even partially.
+- Omit or use `[]` if the task has no direct invariant enforcement responsibility.
 
 ### milestones[].capability_refs
 - Bind to capability IDs from `spec/01_capabilities.json` that this milestone implements.
 - Must use exact IDs (e.g., `cap-authentication`). Every ID must exist in Step 01.
-- Omit or use `[]` if the milestone does not map to a specific capability.
+- Use `[]` if the milestone does not map to a specific capability.
 
 ### milestones[].risks
 - List only risks that are directly related to the milestone.
@@ -232,10 +237,10 @@ The `$schema` field is required in the output and is stripped before validation 
   },
   "milestones": [
     {
-      "milestone_id": "m1-core-foundation",
+      "milestone_id": "ms-core-foundation",
       "name": "Core Foundation",
       "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
-      "source_milestones": ["m1-core-foundation"],
+      "source_milestones": ["ms-core-foundation"],
       "tasks": [
         {
           "task_id": "init-fastapi-project",
