@@ -136,10 +136,12 @@ For every `task_id` in the active milestone's `tasks[]` array from `spec/14_road
 - If a task has N `acceptance_criteria`, create ≥N checklist items, one per criterion, to preserve full traceability
 - Document the mapping in your blocker report if any task is ambiguous
 
-Every checklist item MUST include a `milestone_ref` field containing the `milestone_id` from Step 14 that owns the referenced task. Deferred items inherit the milestone_ref of their parent scope.
+Every checklist item MUST include a `milestone_ref` field containing the `milestone_id` from Step 14 that owns the referenced task. Deferred/wont_do items inherit the milestone_ref of their parent scope.
+
+A Step 14 task itself marked `status: "deferred"` or `"wont_do"` (with its own `status_reason`) is already the authored acknowledgment that it's paused/cancelled — it does NOT need a checklist item to "cover" it.
 
 **FORBIDDEN:**
-- Checklist that does not cover every non-deferred roadmap task
+- Checklist that does not cover every roadmap task whose own `status` is not `deferred`/`wont_do`
 - Using `spec_ref.id` values not present in the active milestone's `tasks[]`
 
 *   `checklist`: A list of **Atomic Requirements**.
@@ -153,8 +155,10 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
     *   `type`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item type enum).
     *   `layer`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item layer enum).
-    *   `checklist_status`: `active` or `deferred`.
-    *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
+    *   `checklist_status`: `active`, `deferred`, or `wont_do`.
+        *   *Rule*: When `deferred`, `deferred_reason` is MANDATORY on this item — name the blocker and the condition required to undefer (e.g. "Waiting for auth service API contract finalisation. Unblock: auth-service publishes OpenAPI 3.0 spec."). This is per-item and independent of `plan.deferred_reason` (which documents deferring the whole plan) — deferring one item does not require deferring the plan.
+        *   *Rule*: When `wont_do`, `wont_do_reason` is MANDATORY on this item — name the decision and, if applicable, what supersedes it (e.g. "Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow."). Use `wont_do` for work that will *permanently* never be built (distinct from `deferred`, which implies resuming later) — this keeps the item's history documented instead of forcing deletion to satisfy coverage checks.
+    *   `linked_test_expectation`: **CRITICAL** for `active` items. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`). Optional when `checklist_status` is `deferred` or `wont_do` — the eventual test contract isn't always known before work starts, or will never be needed.
         *   *Expectation*: This serves as the "contract" for verification. Use specific test names, not just file paths.
     *   `nfr_refs`: Array of NFR IDs this checklist item relates to.
     *   `fixture_ref`: Reference to the test fixture for this checklist item.

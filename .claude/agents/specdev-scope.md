@@ -227,7 +227,7 @@ The CLI computes the full output contract deterministically: per-group state (us
   "groups": [
     {
       "group_id": "...",
-      "state": "pending|code_converged|blocked|verified|deferred",
+      "state": "pending|code_converged|blocked|verified|deferred|wont_do",
       "implementation_converged_at": "<ISO timestamp or null>",
       "reviewer_rounds": 0,
       "findings_resolved_path": "<path or null>",
@@ -245,7 +245,7 @@ The CLI computes the full output contract deterministically: per-group state (us
 }
 ```
 
-> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, and `deferred`.
+> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, `deferred`, and `wont_do` (DEVSPEC-122 follow-up). `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled".
 
 Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` excludes them. When schema lands them, the CLI will be updated.
 

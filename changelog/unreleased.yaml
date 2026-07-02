@@ -1,9 +1,262 @@
 version: "unreleased"
-breaking: false
+breaking: true
 source_of_truth: changelog/unreleased.yaml
 render_target: changelog/unreleased.md
 
 changes:
+  - type: add_constraint
+    description: >
+      schema/14_roadmap.schema.json roadmap task status enum now accepts "deferred"
+      and "wont_do" alongside pending/in_progress/done, each requiring a new
+      task-level status_reason field (DEVSPEC-122 follow-up). Previously a task had
+      no way to express "paused" or "permanently cancelled" -- the only escape
+      hatch was deleting the task outright, which is what forced a real production
+      incident (a payment-wallet routing task had to be deleted rather than
+      deferred because deferring its checklist item tripped E304
+      ROADMAP_TASK_UNCOVERED). status_reason is required when status is deferred
+      or wont_do, mirroring the enforced deferred_reason pattern already used at
+      the checklist-item level. Existing artifacts with a task in a status other
+      than pending/in_progress/done, or missing status_reason where required, will
+      now fail spec-check/validate (the former case was already invalid against
+      the prior enum; this only adds new valid states plus their own gate).
+    migration:
+      action: ai_assisted
+      note: >
+        For each roadmap task that should be paused or permanently cancelled
+        instead of deleted, set status to "deferred" or "wont_do" and author a
+        status_reason string naming the blocker/decision and, for deferred, the
+        condition required to resume.
+  - type: add_constraint
+    description: >
+      schema/16_impl_context.schema.json checklist items now require their own
+      deferred_reason when checklist_status == "deferred" (DEVSPEC-122). Previously
+      a single checklist item could be marked deferred with zero documentation --
+      the only enforced deferred_reason requirement was at the whole-plan level
+      (plan.status == "deferred"), which does not apply when the rest of the
+      milestone is still active. Existing artifacts with a deferred checklist item
+      and no deferred_reason will now fail spec-check/validate.
+    migration:
+      action: ai_assisted
+      note: >
+        For each checklist item with checklist_status == "deferred" and no
+        deferred_reason, author a deferred_reason string naming the blocker and
+        the condition required to undefer. This is independent of
+        plan.deferred_reason and does not require deferring the whole plan.
+  - type: fix
+    description: >
+      Fixed E304 ROADMAP_TASK_UNCOVERED excluding deferred checklist items from
+      counting as coverage for their roadmap task (DEVSPEC-122 follow-up). A
+      checklist item with checklist_status == "deferred" whose spec_ref.id
+      matches a roadmap task_id previously did not count, making the task look
+      abandoned and forcing deletion (rather than deferral) to pass validation --
+      the exact incident that triggered this follow-up investigation. Also fixed
+      E304's milestone-status fallback branch (used when no checklist item
+      declares milestone_ref) to skip "deferred" milestones alongside "done"/
+      "completed", matching the already-correct treatment of finished milestones.
+      Also fixed (found in post-rollout review): E304's roadmap_task_ids
+      collection ignored the new task-level status field entirely, so a task
+      marked status:"deferred"/"wont_do" at the roadmap layer (with its own
+      status_reason, no checklist item required) still demanded a checklist
+      item to avoid E304 -- defeating the point of adding task-level status in
+      the first place. Now skips tasks whose own status is deferred/wont_do.
+      Purely relaxing: no previously-passing spec is affected; some
+      previously-failing deferred-item/deferred-milestone/deferred-task
+      artifacts now pass.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed E307 BEHAVIOR_VALIDATION_PAIRING excluding deferred checklist items
+      when grouping items by spec_ref.id to check for a behavior+validation pair
+      (DEVSPEC-122 follow-up). A deferred "validation" item previously did not
+      count toward its spec_ref's pairing requirement, so deferring the
+      validation half of a pair falsely demanded it be re-added as active. A
+      deferred item's own proof-of-work fields (implementation,
+      linked_test_expectation) remain exempt elsewhere -- only the
+      type-pairing computation changed. Purely relaxing: no previously-passing
+      spec is affected.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed W576 TASK_EXECUTION_MISSING never recognizing a roadmap task as
+      paused or cancelled (DEVSPEC-122 follow-up). Now skips tasks whose status
+      is "deferred" or "wont_do" (the new statuses added by this same follow-up),
+      the primary fix. As defense-in-depth for the transitional case where a
+      task's own status field hasn't been updated yet but every checklist item
+      covering it (by spec_ref.id) has already been marked deferred/wont_do,
+      also skips the task in that case -- mirrors the coverage-counting logic in
+      step_16.py's E304 fix. A task with a mix of deferred and still-active
+      covering checklist items still requires execution evidence, since real
+      active work remains uncovered. Purely relaxing: no previously-passing spec
+      is affected.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed W568 UNCOVERED_CAPABILITY never being exempted by capability-level
+      scope:"out" (DEVSPEC-122 follow-up). scope:"out" is the capability-level
+      analog of FR priority:"wont-have" -- a permanently excluded capability that
+      by design will never have an FR tracing to it. The existing wont-have FR
+      exclusion did not help here: it only suppresses W568 when a wont-have FR
+      happens to exist and trace to the capability, which does not apply to a
+      capability with no FR at all. traceability_closure.py now excludes
+      scope:"out" capabilities from the set W568 compares against directly.
+      Extended in post-rollout review: scope:"future" capabilities (acknowledged,
+      deferred to a later release -- the capability-level analog of a "deferred"
+      task/milestone) are exempt too, for the same "parked by design, not
+      expected to have an FR trace yet" reasoning that exempts every other
+      deferred/wont-have/wont-do entity in this rollout. Both scope values are
+      now collected into a single capability_parked_ids set (renamed from
+      capability_scope_out_ids). Purely relaxing: no previously-passing spec is
+      affected; some previously-failing scope:"future" artifacts now pass.
+    migration:
+      action: none
+  - type: add_constraint
+    description: >
+      Added W616 PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED to step_16.py: fires
+      when a checklist item has checklist_status == "deferred" or "wont_do"
+      while its implementation.status still says "verified"
+      (DEVSPEC-122 follow-up, found by adversarial testing rather than
+      static reading -- nothing previously flagged this contradiction). The
+      wont_do case was added during this same review pass for parity with
+      every other deferred-only guard extended to wont_do. Advisory only,
+      non-promotable (no E616 counterpart): a human-reconcile nudge, not a hard
+      correctness failure, since either the item isn't really paused/cancelled
+      or the implementation record needs its own note.
+    migration:
+      action: none
+  - type: internal_restructure
+    description: >
+      Documented the E308 FR-release workflow in prompt_16_impl_context.md
+      (DEVSPEC-122 follow-up). E308's ownership check correctly treats a
+      deferred milestone as still owning every FR/API in its fr_refs (releasing
+      the claim automatically would risk silent duplicate work) -- but no
+      workflow previously existed for how to free an FR from a deferred
+      milestone for reassignment. Documented: remove the ID from the deferred
+      milestone's fr_refs explicitly; there is no automatic release on
+      deferral. Doc-only, no code or schema change.
+    migration:
+      action: none
+  - type: internal_restructure
+    description: >
+      Corrected stale E520 message text in step_16.py (found in a second
+      fresh-review round): the guard already exempted both deferred and
+      wont_do checklist items from the nfr_refs/fixture_ref proof requirement,
+      but the two error messages still said "is not deferred" without
+      mentioning wont_do. Message text now reads "is not deferred/wont_do".
+      No behavior change -- the messages only ever fire for genuinely active
+      items either way.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed matrix.py's fr_coverage threshold check (SPECDEV_MATRIX_STRICT=1)
+      having zero exclusion logic for FRs that will never be built (DEVSPEC-122
+      follow-up). priority:"wont-have" FRs and Step-05 out_of_scope[] FRs are
+      now excluded from both fr_total (the shared denominator feeding every
+      fr_with_* ratio) and the fr_with_* numerators, mirroring the equivalent
+      exclusions already applied in traceability_closure.py's W561/W564/W565/
+      W566 checks. Without this, either category silently dragged down
+      fr_coverage and could fail CI even though neither was ever expected to
+      have an API/fixture/threat by design. Purely relaxing: no
+      previously-passing spec is affected; some previously-failing specs with
+      wont-have or out-of-scope FRs now pass the coverage threshold.
+      Refined further in a second fresh-review round: fr_with_fixture was
+      still sharing fr_total/excluded_fr_ids with fr_with_api/fr_with_nfr/
+      fr_with_threat, which only ever excluded Step-05 (API) out_of_scope[]
+      FRs -- never Step-08's independent fixture out_of_scope[] set. A
+      Step-08-exempted FR was counted in the shared denominator but could
+      never contribute to the fr_with_fixture numerator, silently
+      understating fixture coverage. fr_with_fixture now has its own
+      exclusion set and denominator (fr_total_fixture), matching the
+      Step-05-vs-Step-08 split already applied in cli.py's completeness-check
+      and traceability_closure.py's W564/W566-vs-W565 split.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed step_11.py's W583 API_UNCOVERED_BY_THREAT and W615
+      INVARIANT_UNEXERCISED_BY_THREAT falsely demanding threat coverage for an
+      API/invariant whose only tracing FR is priority:"wont-have" (DEVSPEC-122
+      follow-up). Previously these checks only extracted bare API/invariant ID
+      sets, discarding which FR each one traces to. Now each API's/invariant's
+      trace[] is walked back to its FR(s); an entity is exempt only when it has
+      at least one FR trace and every traced FR is wont-have -- an entity with
+      a mix of wont-have and still-active FR traces, or with no FR trace at
+      all, is unaffected and still requires coverage. Purely relaxing: no
+      previously-passing spec is affected.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed cli.py's completeness-check command computing its own total_frs and
+      total_caps denominators without excluding parked entities (DEVSPEC-122
+      follow-up), compounding the equivalent matrix.py/traceability_closure.py
+      gaps rather than duplicating them (this command re-reads the raw spec
+      files independently for its ratio computation). Refined further in
+      post-rollout review: a single shared total_frs desynced from the actual
+      uncovered-sets it's divided into, since W564/W566 exempt Step-05
+      out_of_scope[] FRs while W565 exempts the independent Step-08
+      out_of_scope[] set -- total_frs now splits into two denominators
+      (api/milestone vs. fixture) matching each check's real exemption set,
+      on top of the existing priority:"wont-have" exclusion shared by both.
+      total_caps continues to exclude both scope:"out" and scope:"future"
+      capabilities, now consistent by construction: W568 UNCOVERED_CAPABILITY
+      itself was extended in this same review round to exempt scope:"future"
+      too (see the W568 fix entry above), so total_caps' exclusion set matches
+      exactly what W568 actually treats as parked. Purely relaxing: no
+      previously-passing spec is affected.
+    migration:
+      action: none
+  - type: add_constraint
+    description: >
+      Added "wont_do" checklist_status to schema/16_impl_context.schema.json,
+      alongside a required wont_do_reason field (enforced via allOf if/then,
+      matching the deferred_reason pattern -- not the unenforced prose pattern
+      wont-have/scope:"out" use) (DEVSPEC-122 follow-up). "wont_do" means
+      permanently cancelled, distinct from "deferred" (paused, resumable
+      later). wont_do items get the same treatment as deferred items
+      throughout the pipeline: they count as roadmap/checklist coverage
+      (E304/E307/W576), are exempt from proof-of-work requirements
+      (implementation, linked_test_expectation, nfr_refs/fixture_ref), are
+      exempt from milestone_ref requirement (W581), are excluded from the
+      planned-vs-executed diff (E305), are excluded from spec_ref.id
+      requirement in 16a (E590), and are excluded from milestone
+      phase-position roll-up computations in milestone_state.py (kept as a
+      distinct state literal from "deferred" so callers can tell "paused"
+      from "cancelled"). This closes the exact trap that forced a real
+      production incident: a task had to be deleted rather than marked as
+      permanently cancelled because no such status existed. Existing
+      artifacts are unaffected (purely additive enum value); the only
+      Breaking surface is that a new checklist item using checklist_status
+      "wont_do" without wont_do_reason will fail validation.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed linked_test_expectation being unconditionally required on every Step 16
+      checklist item, including deferred ones (DEVSPEC-122). A deferred item's
+      eventual test contract isn't always known before work starts, so it is now
+      required only when checklist_status is active (matching the existing
+      exemption pattern for implementation and fixture_ref). Purely relaxing: no
+      previously-passing spec is affected; some previously-failing deferred-item
+      artifacts now pass.
+    migration:
+      action: none
+  - type: fix
+    description: >
+      Fixed W565 UNCOVERED_FR_FIXTURE never being exempted by any out-of-scope
+      declaration, unlike its sibling checks W561/W564/W566 (DEVSPEC-122). Added a
+      new out_of_scope[] array to schema/08_fixtures.schema.json (same shape as
+      05_interface_contracts.json's: fr_id + rationale), and
+      traceability_closure.py now subtracts FRs listed there from W565's FR set.
+      Deliberately a separate exemption list from Step 05's out_of_scope[] -- "no
+      API surface" and "no fixture" are independent scoping decisions -- so Step
+      05's out_of_scope[] does not exempt W565 and vice versa. Purely additive: no
+      previously-passing spec is affected.
+    migration:
+      action: none
   - type: add_constraint
     description: >
       Added W555 STEP00_SEED_OUT_OF_SCOPE_THIN to seed_lint.py: fires when seeds
@@ -118,5 +371,16 @@ changes:
       (specdev-trinity-reviewer FR-coverage gate fix). Added corresponding test coverage:
       tests/integration/pr_audit/test_p5_finalize.py, test_tier0_checks.py,
       test_validate_agent_outputs.py, and tests/unit/test_wi8_green_derivation.py.
+    migration:
+      action: none
+  - type: internal_restructure
+    description: >
+      Consolidated the four `checklist_status not in/in ("deferred", "wont_do")`
+      literal-tuple checks in step_16.py and step_16a.py into one shared constant,
+      PAUSED_OR_CANCELLED_CHECKLIST_STATUSES (DEVSPEC-122 follow-up review pass).
+      No behavior change -- full suite green before and after. Found while
+      auditing the wont_do rollout for DRY: the repeated literal is exactly the
+      kind of site a future third status value could silently miss (per the
+      enum-value-rollout-sweep lesson from this same investigation).
     migration:
       action: none

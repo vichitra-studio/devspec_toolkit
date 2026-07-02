@@ -129,7 +129,7 @@
 
 **Trigger**: A functional requirement defined in step 04 has no fixture coverage — no fixture in step 08 has a target with type "fr" pointing to this FR.
 
-**Resolution**: Add a fixture in `08_fixtures.json` with a target referencing the FR, or document why the FR requires no fixture.
+**Resolution**: Add a fixture in `08_fixtures.json` with a target referencing the FR, or add it to `out_of_scope[]` in `08_fixtures.json` with a non-empty rationale — that suppresses W565 for that FR. This is a separate exemption list from `05_interface_contracts.json`'s `out_of_scope[]`: an FR with no API surface can still need a fixture (e.g. a background job), so the two are not interchangeable — populate whichever step's `out_of_scope[]` actually applies to the FR.
 
 **Promotable**: W565 → E565.
 
@@ -472,6 +472,14 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 **Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 
 **Promotable**: W615 → E615 (via `SPECDEV_WARNINGS_AS_ERRORS=1` or `SPECDEV_PROMOTE_CODES=W615`).
+
+### W616 PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED
+
+**Trigger**: A Step 16 checklist item has `checklist_status == "deferred"` or `"wont_do"` while its `implementation.status` still says `"verified"`. This combination is a stale contradiction: work was verified, then the item was marked paused or permanently cancelled, without ever clearing or annotating the implementation record. (This check does not itself validate evidence quality — that's E301/W600/W601's job — it only compares these two status fields.)
+
+**Resolution**: Reconcile which state is accurate. If the item is genuinely paused/cancelled, reset `implementation.status` to something other than `verified` (e.g. `deferred`) or note in `deferred_reason`/`wont_do_reason` why verified work is being shelved. If the work is actually done, set `checklist_status` back to `active`.
+
+**Promotable**: No. This is a human-reconcile nudge, not a correctness failure with a single unambiguous fix direction — there is no `E616` counterpart.
 
 ### Step-16 Anchor Validation (W611 / W612)
 

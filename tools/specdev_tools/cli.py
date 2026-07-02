@@ -1044,11 +1044,46 @@ def main():
             except (OSError, ValueError):
                 return {}
 
+        # Exclude FRs that will never be built (priority:"wont-have") from
+        # every FR-based denominator below. W564 (API coverage) and W566
+        # (milestone coverage) additionally exempt FRs listed in Step 05's
+        # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
+        # set -- FRs listed in Step 08's fixtures.out_of_scope[] -- per
+        # traceability_closure.py's deliberate separation (DEVSPEC-122: "no
+        # API surface" and "no fixture" are independent scoping decisions).
+        # A single shared denominator for all three would desync from what
+        # each W-code's own uncovered-set actually excludes.
         frs_data = _load_spec_json("04_fr_list.json")
-        total_frs = len(frs_data.get("functional_requirements", [])) if frs_data else 0
+        all_fr_ids = {
+            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
+            if fr.get("fr_id")
+        }
+        wont_have_fr_ids = {
+            fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
+            if fr.get("priority") == "wont-have" and fr.get("fr_id")
+        }
+        apis_data = _load_spec_json("05_interface_contracts.json")
+        step05_oos_fr_ids = {
+            entry["fr_id"] for entry in apis_data.get("out_of_scope", [])
+            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
+        }
+        fixtures_data = _load_spec_json("08_fixtures.json")
+        step08_oos_fr_ids = {
+            entry["fr_id"] for entry in fixtures_data.get("out_of_scope", [])
+            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
+        }
+        total_frs_api_milestone = len(all_fr_ids - wont_have_fr_ids - step05_oos_fr_ids)
+        total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
 
+        # Capabilities marked scope:"out" (permanently excluded) or scope:"future"
+        # (acknowledged, deferred to a later release) are both exempt from W568
+        # (mirrors traceability_closure.py's capability_parked_ids exactly) --
+        # neither is expected to have an FR trace yet.
         caps_data = _load_spec_json("01_capabilities.json")
-        total_caps = len(caps_data.get("capabilities", [])) if caps_data else 0
+        total_caps = sum(
+            1 for cap in caps_data.get("capabilities", [])
+            if cap.get("scope") not in ("out", "future")
+        )
 
         roadmap_data = _load_spec_json("14_roadmap.json")
         total_milestones = len(roadmap_data.get("milestones", [])) if roadmap_data else 0
@@ -1074,11 +1109,11 @@ def main():
             }
 
         coverage = {
-            "fr_api_coverage":               _dim(total_frs,        uncovered_w564),
-            "fr_fixture_coverage":           _dim(total_frs,        uncovered_w565),
-            "fr_milestone_coverage":         _dim(total_frs,        uncovered_w566),
-            "milestone_decomp_completeness": _dim(total_milestones, uncovered_w567),
-            "capability_fr_coverage":        _dim(total_caps,       uncovered_w568),
+            "fr_api_coverage":               _dim(total_frs_api_milestone, uncovered_w564),
+            "fr_fixture_coverage":           _dim(total_frs_fixture,       uncovered_w565),
+            "fr_milestone_coverage":         _dim(total_frs_api_milestone, uncovered_w566),
+            "milestone_decomp_completeness": _dim(total_milestones,        uncovered_w567),
+            "capability_fr_coverage":        _dim(total_caps,              uncovered_w568),
         }
 
         if getattr(args, "json_output", False):

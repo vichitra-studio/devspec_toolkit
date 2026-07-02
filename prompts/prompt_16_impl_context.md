@@ -58,7 +58,7 @@ Generate a **machine-checkable JSON artifact** conforming to `vc:16-anchor` that
 ## Coverage Closure
 Before emitting, verify:
 - Every milestone in `14_roadmap.json` appears in `plan.milestone_index`, OR is explicitly listed in `scope_out` with a rationale in `plan.ambiguities`. The anchor is the cumulative ledger — `done` milestones must remain indexed so traceability stays enforceable.
-- No FR/API ID appears in `fr_refs` of two milestones whose status is not `done` — a delivered ID may be revisited, but two active milestones cannot own the same FR simultaneously.
+- No FR/API ID appears in `fr_refs` of two milestones whose status is not `done` — a delivered ID may be revisited, but two active milestones cannot own the same FR simultaneously. This ownership check treats `deferred` the same as `in_progress`/`pending`: a deferred milestone still owns every FR/API ID in its `fr_refs` (intentional — releasing the claim automatically risks silent duplicate work by whichever milestone picks it up next). **To release an FR/API from a deferred milestone** so another milestone can claim it, explicitly remove that ID from the deferred milestone's `fr_refs` — there is no automatic release on deferral.
 - No entry in `plan.summary.scope_in` also appears in `plan.summary.scope_out` — and neither contradicts any milestone's scope.
 - Each `checklist_id_prefix` is unique across `plan.milestone_index` — 16a plans allocate checklist IDs from this namespace.
 - All `canonical_refs_used` entries reference valid IDs from `canon/manifest.json`.

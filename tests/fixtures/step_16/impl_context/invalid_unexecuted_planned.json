@@ -58,7 +58,8 @@
             "nfr-availability-uptime"
           ],
           "fixture_ref": "fixture-auth-logout",
-          "checklist_status": "deferred"
+          "checklist_status": "deferred",
+          "deferred_reason": "Waiting for session-store team to finalise the token revocation contract. Unblock: revocation API published."
         }
       ]
     },

@@ -219,6 +219,14 @@ ERROR_CODES = {
     # E615 is its promotable counterpart (SPECDEV_WARNINGS_AS_ERRORS or SPECDEV_PROMOTE_CODES=W615).
     "W615": "INVARIANT_UNEXERCISED_BY_THREAT",
     "E615": "INVARIANT_UNEXERCISED_BY_THREAT",
+    # DEVSPEC-122 follow-up: a checklist item marked checklist_status="deferred"
+    # or "wont_do" while its implementation.status still says "verified" (with
+    # full evidence) is a stale contradiction -- either the item isn't really
+    # paused/cancelled, or the implementation record needs its own reconciling
+    # note. Advisory only, no promotable E-counterpart (deliberately excluded
+    # from PROMOTABLE_PAIRS, like W570/W590/W597): this is a human-reconcile
+    # nudge, not a correctness failure with a single unambiguous fix direction.
+    "W616": "PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
@@ -228,7 +236,8 @@ ERROR_CODES = {
 # W596/W597/W606 have E-counterparts with different semantics; W570
 # (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
 # its name with the registered-but-unemitted E604 and stays advisory (see the
-# inline W604 note below).
+# inline W604 note below). W616 (PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED) has
+# no E-counterpart at all -- it is a human-reconcile nudge, not a hard failure.
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the

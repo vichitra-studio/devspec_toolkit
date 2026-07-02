@@ -381,7 +381,7 @@ Before emitting, verify:
 - Every `checklist` item in `spec/impl_context/{milestone_snake}_plan.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
 - All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
-- No checklist item is silently skipped — each must reach `complete`, `blocked`, or `deferred` status with documented rationale.
+- No checklist item is silently skipped — each must reach `complete`, `blocked`, `deferred`, or `wont_do` status with documented rationale. Setting `checklist_status: "deferred"` on an item requires populating that item's own `deferred_reason` (name the blocker and the undefer condition) — this does NOT require deferring the whole plan. If work is discovered mid-implementation to be permanently unnecessary (not just blocked or postponed), set `checklist_status: "wont_do"` and populate `wont_do_reason` instead — do NOT delete the checklist item to work around coverage validation; deletion loses the record that the work was considered and explicitly cancelled.
 - If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
 - All checklist items with `status: active` have a non-empty `linked_test_expectation` pointing to a specific test identifier.
 - [ ] All code references include file paths and function signatures (no ambiguous references)

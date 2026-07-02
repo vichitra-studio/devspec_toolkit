@@ -35,7 +35,8 @@ def _write_spec_file(spec_dir: str, filename: str, data: dict) -> str:
     return path
 
 
-def _run_matrix(*, frs=None, apis=None, fixtures=None, threats=None, nfrs=None) -> dict:
+def _run_matrix(*, frs=None, apis=None, fixtures=None, threats=None, nfrs=None, out_of_scope=None,
+                 fixture_out_of_scope=None) -> dict:
     """Write minimal spec files into a temp dir and run build_trace_matrix.
 
     Only files whose argument is not None are written, so callers can compose
@@ -49,16 +50,16 @@ def _run_matrix(*, frs=None, apis=None, fixtures=None, threats=None, nfrs=None) 
                 "$schema": "vc:step:04",
                 "functional_requirements": frs,
             })
-        if apis is not None:
-            _write_spec_file(spec_dir, "05_interface_contracts.json", {
-                "$schema": "vc:step:05",
-                "apis": apis,
-            })
-        if fixtures is not None:
-            _write_spec_file(spec_dir, "08_fixtures.json", {
-                "$schema": "vc:step:08",
-                "fixtures": fixtures,
-            })
+        if apis is not None or out_of_scope is not None:
+            step05: dict = {"$schema": "vc:step:05", "apis": apis if apis is not None else []}
+            if out_of_scope is not None:
+                step05["out_of_scope"] = out_of_scope
+            _write_spec_file(spec_dir, "05_interface_contracts.json", step05)
+        if fixtures is not None or fixture_out_of_scope is not None:
+            step08: dict = {"$schema": "vc:step:08", "fixtures": fixtures if fixtures is not None else []}
+            if fixture_out_of_scope is not None:
+                step08["out_of_scope"] = fixture_out_of_scope
+            _write_spec_file(spec_dir, "08_fixtures.json", step08)
         if threats is not None:
             _write_spec_file(spec_dir, "11_redteam.json", {
                 "$schema": "vc:step:11",
@@ -563,6 +564,98 @@ class TestEntityDedup(unittest.TestCase):
             fr_ids_in_matrix = [row["fr_id"] for row in result.get("matrix", [])]
             self.assertIn("fr-login", fr_ids_in_matrix)
             self.assertIn("fr-logout", fr_ids_in_matrix)
+
+
+# ===========================================================================
+# fr_coverage denominator exclusions (DEVSPEC-122 follow-up)
+# ===========================================================================
+
+class TestFrCoverageDenominatorExclusions(unittest.TestCase):
+    """wont-have FRs and Step-05 out-of-scope FRs are excluded from fr_total and
+    the fr_with_* numerators -- otherwise either category silently drags down
+    fr_coverage and can fail SPECDEV_MATRIX_STRICT=1 CI, even though they were
+    never expected to have an API/fixture/threat by design."""
+
+    def test_wont_have_fr_excluded_from_fr_total(self):
+        result = _run_matrix(frs=[
+            {"fr_id": "fr-must", "priority": "must-have"},
+            {"fr_id": "fr-parked", "priority": "wont-have"},
+        ])
+        self.assertEqual(result["coverage"]["fr_total"], 1)
+
+    def test_wont_have_fr_excluded_from_fr_with_api_numerator(self):
+        """A wont-have FR that (unusually) still has an API trace must not
+        inflate fr_with_api once it's excluded from the denominator."""
+        result = _run_matrix(
+            frs=[
+                {"fr_id": "fr-must", "priority": "must-have"},
+                {"fr_id": "fr-parked", "priority": "wont-have"},
+            ],
+            apis=[_api("api-legacy", ["fr-parked"])],
+        )
+        self.assertEqual(result["coverage"]["fr_total"], 1)
+        self.assertEqual(result["coverage"]["fr_with_api"], 0)
+
+    def test_step05_out_of_scope_fr_excluded_from_fr_total(self):
+        result = _run_matrix(
+            frs=[
+                {"fr_id": "fr-must", "priority": "must-have"},
+                {"fr_id": "fr-infra", "priority": "must-have"},
+            ],
+            out_of_scope=[{"fr_id": "fr-infra", "rationale": "Background job — no HTTP API surface."}],
+        )
+        self.assertEqual(result["coverage"]["fr_total"], 1)
+
+    def test_out_of_scope_entry_without_rationale_does_not_exclude(self):
+        """An out_of_scope entry missing rationale is not an acknowledged
+        exemption -- must not exclude the FR (mirrors traceability_closure.py's
+        own requirement that rationale be present)."""
+        result = _run_matrix(
+            frs=[{"fr_id": "fr-infra", "priority": "must-have"}],
+            out_of_scope=[{"fr_id": "fr-infra"}],
+        )
+        self.assertEqual(result["coverage"]["fr_total"], 1)
+
+    def test_control_normal_frs_all_counted(self):
+        """Control: with no wont-have or out-of-scope FRs, fr_total counts everything."""
+        result = _run_matrix(frs=[
+            {"fr_id": "fr-a", "priority": "must-have"},
+            {"fr_id": "fr-b", "priority": "should-have"},
+        ])
+        self.assertEqual(result["coverage"]["fr_total"], 2)
+
+    def test_step08_fixture_out_of_scope_excluded_from_fixture_total_not_api_total(self):
+        """Step 08's out_of_scope[] is a separate exemption from Step 05's -- an
+        FR with no fixture expected must not drag down fr_with_fixture's ratio,
+        but it still needs an API, so fr_total (the fr_with_api denominator)
+        must NOT exclude it."""
+        result = _run_matrix(
+            frs=[
+                {"fr_id": "fr-must", "priority": "must-have"},
+                {"fr_id": "fr-no-fixture", "priority": "must-have"},
+            ],
+            fixture_out_of_scope=[
+                {"fr_id": "fr-no-fixture", "rationale": "Pure computation -- no test fixture needed."}
+            ],
+        )
+        self.assertEqual(result["coverage"]["fr_total"], 2)
+        self.assertEqual(result["coverage"]["fr_total_fixture"], 1)
+
+    def test_step05_out_of_scope_excluded_from_api_total_not_fixture_total(self):
+        """Mirror-image control: a Step 05 API exemption must not exclude the FR
+        from fr_total_fixture (fr_with_fixture's denominator) -- it may still
+        need a fixture even with no HTTP API surface."""
+        result = _run_matrix(
+            frs=[
+                {"fr_id": "fr-must", "priority": "must-have"},
+                {"fr_id": "fr-no-api", "priority": "must-have"},
+            ],
+            out_of_scope=[
+                {"fr_id": "fr-no-api", "rationale": "Background job -- no HTTP API surface."}
+            ],
+        )
+        self.assertEqual(result["coverage"]["fr_total"], 1)
+        self.assertEqual(result["coverage"]["fr_total_fixture"], 2)
 
 
 # ===========================================================================

@@ -69,6 +69,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W614",
             # DEVSPEC-89: invariant↔threat drift detection
             "W615", "E615",
+            # DEVSPEC-122 follow-up: deferred-item/verified-implementation contradiction
+            "W616",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

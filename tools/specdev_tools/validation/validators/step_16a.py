@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ...core.errors import make_error, SpecError
-from .step_16 import validate_step_16
+from .step_16 import PAUSED_OR_CANCELLED_CHECKLIST_STATUSES, validate_step_16
 
 
 def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Optional[str] = None, spec_root: Optional[str] = None, nfrs_data: Optional[dict[str, Any]] = None) -> list[SpecError]:
@@ -39,7 +39,7 @@ def validate_step_16a(data: dict[str, Any], toolkit_root: str, spec_path: Option
         # Plan phase items should have spec_ref
         spec_ref = item.get("spec_ref")
         if not isinstance(spec_ref, dict) or not spec_ref.get("id"):
-            if item.get("checklist_status") != "deferred":
+            if item.get("checklist_status") not in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES:
                 errors.append(
                     make_error("E590", f"Step 16a: checklist item '{item_id or i}' is active but missing spec_ref.id")
                 )

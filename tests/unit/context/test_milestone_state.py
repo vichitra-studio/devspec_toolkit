@@ -283,6 +283,28 @@ class TestGroupStateDeferred:
 
 
 # ---------------------------------------------------------------------------
+# Per-group state: wont_do (DEVSPEC-122 follow-up)
+# ---------------------------------------------------------------------------
+
+class TestGroupStateWontDo:
+    def test_wont_do_status(self, tmp_path: Path) -> None:
+        """checklist_status=='wont_do' => state 'wont_do' regardless of impl status."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        group = _make_group("GRP_WONT", impl_status="pending", checklist_status="wont_do")
+        result = derive_group_state(group, str(findings_dir), [])
+        assert result["state"] == "wont_do"
+
+    def test_wont_do_status_outranks_verified_impl(self, tmp_path: Path) -> None:
+        """wont_do takes precedence even when implementation.status=='verified'."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        group = _make_group("GRP_WONT_V", impl_status="verified", checklist_status="wont_do")
+        result = derive_group_state(group, str(findings_dir), [])
+        assert result["state"] == "wont_do"
+
+
+# ---------------------------------------------------------------------------
 # well_formed predicate
 # ---------------------------------------------------------------------------
 
@@ -400,6 +422,36 @@ class TestDerivePhasePosition:
         findings_dir.mkdir(parents=True)
         groups = [self._make_group_state("D", "deferred")]
         assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+
+    def test_pending_all_wont_do(self, tmp_path: Path) -> None:
+        """All-wont_do milestone → pending (nothing to track), same as all-deferred."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        groups = [self._make_group_state("W", "wont_do")]
+        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+
+    def test_pending_mixed_deferred_and_wont_do(self, tmp_path: Path) -> None:
+        """All groups either deferred or wont_do → pending (nothing active to track)."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        groups = [
+            self._make_group_state("D", "deferred"),
+            self._make_group_state("W", "wont_do"),
+        ]
+        assert derive_phase_position(groups, str(findings_dir), "batch1") == "pending"
+
+    def test_closed_excludes_wont_do_group_regression(self, tmp_path: Path) -> None:
+        """REGRESSION GUARD: a wont_do group must not block 'closed' the way an
+        unhandled non-excluded status would -- without the wont_do exclusion, this
+        milestone would incorrectly report impl_in_progress/pending forever since
+        the wont_do group would never reach 'verified'."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        groups = [
+            self._make_group_state("V", "verified"),
+            self._make_group_state("W", "wont_do"),  # excluded from roll-up
+        ]
+        assert derive_phase_position(groups, str(findings_dir), "batch1") == "closed"
 
     def test_impl_in_progress_mixed(self, tmp_path: Path) -> None:
         """≥1 code_converged AND ≥1 pending → impl_in_progress."""
@@ -561,6 +613,22 @@ class TestComputeMilestoneState:
         ])
         result = compute_milestone_state(plan, str(findings_dir), "batchX")
         assert result["groups"][1]["state"] == "deferred"
+        assert result["derived_phase_position"] == "closed"
+
+    def test_wont_do_excluded_from_rollup(self, tmp_path: Path) -> None:
+        """REGRESSION GUARD (DEVSPEC-122 follow-up): wont_do groups do not
+        participate in the roll-up, same as deferred. Without this, a wont_do
+        checklist item (which the schema does not require an 'implementation'
+        object for) would derive state 'pending' and the milestone would never
+        reach 'closed' even after all real work is verified."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        plan = _make_plan([
+            _make_group("G1", impl_status="verified"),
+            _make_group("G2", checklist_status="wont_do"),
+        ])
+        result = compute_milestone_state(plan, str(findings_dir), "batchX")
+        assert result["groups"][1]["state"] == "wont_do"
         assert result["derived_phase_position"] == "closed"
 
     def test_blockers_populated(self, tmp_path: Path) -> None:

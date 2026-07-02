@@ -59,6 +59,51 @@ def _review_with_remediation(
     return {"verdict": "needs_work", "findings": findings}
 
 
+class TestStep16aMissingSpecRefId(unittest.TestCase):
+    """E590 fires when a non-deferred, non-wont_do checklist item is missing
+    spec_ref.id; deferred and wont_do items are exempt (DEVSPEC-122 follow-up:
+    extended the pre-existing deferred exemption to wont_do for consistency)."""
+
+    def test_active_item_missing_spec_ref_id_fires_e590(self):
+        data = _make_minimal_16a()
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {"id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api"},
+        ]
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertTrue(
+            any(e.code == "E590" and "chk-1" in e.message for e in errors),
+            f"Expected E590 for active item missing spec_ref.id. Got: {errors}"
+        )
+
+    def test_deferred_item_missing_spec_ref_id_does_not_fire_e590(self):
+        data = _make_minimal_16a()
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api",
+                "checklist_status": "deferred", "deferred_reason": "Not yet linked to a spec artifact.",
+            },
+        ]
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertFalse(
+            any(e.code == "E590" and "chk-1" in e.message for e in errors),
+            f"Did not expect E590 for deferred item. Got: {errors}"
+        )
+
+    def test_wont_do_item_missing_spec_ref_id_does_not_fire_e590(self):
+        data = _make_minimal_16a()
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "chk-1", "description": "Do something", "type": "behavior", "layer": "api",
+                "checklist_status": "wont_do", "wont_do_reason": "Cancelled before a spec artifact was chosen.",
+            },
+        ]
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertFalse(
+            any(e.code == "E590" and "chk-1" in e.message for e in errors),
+            f"Did not expect E590 for wont_do item. Got: {errors}"
+        )
+
+
 class TestStep16aFeedbackLoop(unittest.TestCase):
     """W584 fires when the review on this artifact surfaces a remediation_task
     that is not represented as a checklist item."""

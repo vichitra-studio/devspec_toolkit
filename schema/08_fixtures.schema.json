@@ -73,6 +73,25 @@
               "tag_ref"
             ]
           }
+        },
+        "out_of_scope": {
+          "description": "Functional requirements explicitly excluded from fixture coverage, with rationale. Use when an FR needs no executable fixture — e.g., not yet implemented, purely declarative/config-only, or covered by a different verification mechanism than fixtures. Independent of 05_interface_contracts's apis.out_of_scope[]: an FR with no API surface can still require a fixture (e.g. a background job), and an FR with an API can still legitimately have no fixture yet. Every FR with no fixture coverage must appear here or be targeted by an existing fixture.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "fr_id": {
+                "description": "The FR identifier excluded from fixture coverage.",
+                "type": "string"
+              },
+              "rationale": {
+                "description": "Why this FR has no fixture — e.g., not yet implemented, phase deferral, config-only requirement with no observable behavior to fixture-test.",
+                "type": "string"
+              }
+            },
+            "required": ["fr_id", "rationale"]
+          }
         }
       },
       "required": [

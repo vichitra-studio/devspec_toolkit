@@ -209,7 +209,7 @@ groups legitimately needing >5 rounds (K2 §11.3.1).
 1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`.
 2. Parse `groups[]` and `derived_phase_position` from the output.
 3. Identify unresolved groups: groups in state `{pending}` (and `executing` if observed).
-   Groups in `{code_converged, blocked, verified, deferred}` are skipped.
+   Groups in `{code_converged, blocked, verified, deferred, wont_do}` are skipped.
 4. Compute `milestone_start_ref` once before the first group dispatch:
    ```bash
    milestone_start_ref=$(git rev-parse HEAD)
@@ -327,7 +327,7 @@ successful run; prior files stay as audit trail.
 1. Dispatch `specdev-scope` with `{ "mode": "milestone_state", "batch_id": "<batch_id>" }`.
 2. Check `derived_phase_position`.
 3. Refuse if `derived_phase_position` is not in `{impl_complete, review_pending, review_complete}`.
-   (Refuse if any non-deferred group is in `pending` state — impl must complete first.)
+   (Refuse if any active (non-deferred, non-wont_do) group is in `pending` state — impl must complete first.)
 
    Print refusal:
    ```

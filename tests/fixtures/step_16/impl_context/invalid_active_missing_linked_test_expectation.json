@@ -72,7 +72,6 @@
           "description": "Implement GET /profile endpoint",
           "type": "behavior",
           "layer": "api",
-          "linked_test_expectation": "returns 200 OK",
           "nfr_refs": [
             "nfr-availability-uptime",
             "nfr-latency-page-load"
