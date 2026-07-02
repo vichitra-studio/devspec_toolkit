@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds 2 downstream steps.
+Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds downstream steps (see `specdev prompt-context 08` for the current consumer list).
 
 ## Role
 You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data covering every high-priority FR acceptance criterion. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes are defined by `vc:core:collections#traceRef` (see schema/core/collections.schema.json for the full authoritative prefix list); MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
+- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes for Step 08 (fr/api/nfr/inv only) are defined by `schema/08_fixtures.schema.json` as the step-specific authority; MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -75,7 +75,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
 - [ ] Every FR with error conditions has at least one fixture covering the failure path
-- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `vc:core:collections#traceRef` for the full authoritative prefix vocabulary)
+- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `schema/08_fixtures.schema.json` for the step-specific target ID prefix vocabulary: fr/api/nfr/inv only)
 - [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist

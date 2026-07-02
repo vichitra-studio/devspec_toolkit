@@ -183,6 +183,36 @@ seeds a missing target file with `{"$schema": "<uri>"}` and bootstraps the
 array-valued field before validating — enabling first-use creation of an artifact
 (e.g. `spec/canon/command_prefixes.json`) without a separate file-creation step.
 
+### `specdev context` — context preparation family
+
+Drives the `/specdev-context` skill's Orientation flow (scoped structure/canon reads
+that feed targeted `specdev json` calls, rather than reading `spec/*.json` directly).
+
+| Subcommand | Required flags | Purpose |
+|------------|-----------------|---------|
+| `specdev context structure <spec_dir> --step STEP` | `--step` | Print the artifact shape (keys/types) scoped to one step, for Orientation reads |
+| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | Resolve the scoped read/jq plan for one canon or spec entry |
+| `specdev context canon --step STEP [--spec-root SPEC_ROOT]` | `--step` | List canon entries relevant to a step; `--spec-root` optionally includes project-tier canon alongside toolkit canon |
+| `specdev context freshness <spec_dir> [--git-root GIT_ROOT]` | none | Report staleness of loaded context relative to upstream step edits |
+| `specdev context review <artifact_path> --step STEP [--entry ENTRY] [--spec-dir SPEC_DIR] [--git-root GIT_ROOT]` | `--step` | Prepare review context for one artifact ahead of a review pass |
+| `specdev context extract` | — | **Removed.** Errors with a message directing to `specdev json read <file> '<jq>'`, scoped via `specdev context structure` + `specdev json schema` |
+
+### Registry, Canon & Prompt Maintenance Commands
+
+| Subcommand | Purpose |
+|------------|---------|
+| `specdev seed-index spec_dir [--git-root GIT_ROOT] [--json]` | Report seed-doc reference index/coverage across spec artifacts |
+| `specdev prompt-sync [spec_dir] [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Check prompt files are in sync with their canonical templates |
+| `specdev canonical-autofix spec_dir [--canon-dir CANON_DIR] [--write \| --dry-run] [--json]` | Auto-fix canonical-reference issues; defaults to reporting only — pass `--write` to persist |
+| `specdev glossary-drift-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Validate definition parity across glossary terms, canonical proposals, and the canon registry |
+| `specdev completeness-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Run pairwise completeness checks (W564–W568) and report coverage ratios |
+| `specdev registry-check --spec-root SPEC_ROOT [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Validate `entry_key_registry.json`: coverage, phantom basenames, and drift against live spec files (R003) |
+| `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` from toolkit schemas (byte-deterministic; run after any schema change — see CLAUDE.md) |
+| `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
+| `specdev hardcoded-seed-check [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Detect literal seed-doc filenames hardcoded in prompts (W554 regression guard); with `--git-root` also scans `<git-root>/prompts/` for submodule deployments |
+| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate `emergent_ambiguities` across `impl_context` plans by implicated upstream step (read-only) |
+| `specdev canon-accept --from SPEC_FILE [--namespace NAMESPACE] [--owner OWNER] [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--dry-run] [--json]` | Promote `canonical_proposals` from a spec file into `canon/manifest.json`; with `--git-root`, writes project canon to `<git-root>/spec/canon/` instead (accepts `--git-root`, not `--spec-root` — see CLAUDE.md exception list) |
+
 ### DAG & Extraction Intent Commands
 
 #### `dag-lint`

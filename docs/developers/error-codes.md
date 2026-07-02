@@ -25,11 +25,12 @@
 
 ### E520 UNRESOLVED_INPUT / SCHEMA_NOT_FOUND
 
-**Trigger**: A validator could not resolve a required input and fails closed rather than crashing. Two message families share this code:
+**Trigger**: A validator could not resolve a required input and fails closed rather than crashing. Three message families share this code:
 - `UNRESOLVED_INPUT` — a required directory, file, or spec input was missing or unreadable (e.g. `missing_spec_dir`, `missing_canon_dir`, `invalid_json`), or a CLI input precondition was not met.
 - `schema_not_found` — the schema registry could not load the schema for a `$schema` URI. As of 1.1.0, `specdev validate` / `spec-check` fail closed on **all** registry I/O errors (previously only `FileNotFoundError` was caught; `PermissionError` and other `OSError`s now route here instead of escaping uncaught). The step-11 validator likewise emits a structured `E520` for malformed `threats[]` / `target_ids[]` entries that previously raised an unhandled `AttributeError`.
+- `checklist-proof` / `docs_impact` content validation — the step-16 checklist validator (`step_16.py`) emits `E520` when a proof-required checklist item (a non-deferred, non-`wont_do` item whose `type` is not in the docs/metadata/logging/config exemption set) has no `nfr_refs` while its FR has NFRs traced in `07_nfrs.json`, or has no `fixture_ref`; and separately when a milestone plan has code-change actions (non-doc `file_create`/`file_edit` targets) but `plan.docs_impact` is missing, its `status` is not `"required"`, `docs_touched` is empty, or a `docs_touched` entry does not match a `doc_paths` pattern from `seed_manifest.json`.
 
-**Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable.
+**Resolution**: Supply the missing input (pass the correct `--spec-root` / `--git-root`, create the expected `spec_dir`, or fix the malformed JSON). For `schema_not_found`, confirm the `$schema` URI is registered in `tools/schema_registry.json` and that the target schema file exists and is readable. For `checklist-proof` failures, add the missing `nfr_refs` / `fixture_ref` to the checklist item (or mark it `deferred`/`wont_do` if genuinely out of scope). For `docs_impact` failures, set `plan.docs_impact.status` to `"required"` and list the touched doc paths in `docs_touched`, matching a pattern in `seed_manifest.json`'s `doc_paths`.
 
 ### E530 INVENTED_ENUM_OR_ID
 
@@ -599,6 +600,14 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (error only; no `W307` counterpart).
 
+### E308 ANCHOR_SCOPE_DRIFT
+
+**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor's cross-milestone drift check) in two shapes: (1) `[ownership]` — the same FR/API `ref_id` appears in `fr_refs` of two non-done `milestone_index` entries, i.e. two active milestones both claim the same requirement; (2) `[scope]` — a milestone's `plan.summary.scope_in` item (case-insensitive) appears in the anchor's own `plan.summary.scope_out`, or a milestone's `scope_out` item appears in the anchor's `scope_in` — a bidirectional scope contradiction. The `[scope]` shape only runs when `spec_path` is provided and at least one milestone context file survives the W588/W589 filtering (see W611); the `[ownership]` shape runs purely in-memory off `milestone_index` regardless of `spec_path`.
+
+**Resolution**: For `[ownership]` conflicts, ensure at most one non-done milestone claims a given FR/API in its `fr_refs` (mark the stale milestone `done` or remove the duplicate ref). For `[scope]` conflicts, reconcile the milestone's `scope_in`/`scope_out` against the anchor's `plan.summary.scope_in`/`scope_out` so the same category is not declared in-scope by one and out-of-scope by the other.
+
+**Promotable**: No (error only; no `W308` counterpart).
+
 ### W599 EVIDENCE_TOO_SHORT
 
 **Trigger**: A verified action's `evidence.content` is a string shorter than 50 characters — too short to plausibly contain a meaningful proof of work.
@@ -631,7 +640,15 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 **Promotable**: No (warning only; no `E603` counterpart).
 
-### Step-16 Anchor Validation (W611 / W612)
+### Step-16 Anchor Validation (W587 / W611 / W612)
+
+### W587 ANCHOR_DRIFT_CHECKS_STALE
+
+**Trigger**: Fired by `step_16_anchor.py` (the Trinity Anchor validator) when `plan.milestone_index` has one or more entries but `plan.drift.checks` is empty — the anchor is tracking milestones without recording any drift-check evidence for a Trinity cycle. Fires purely in-memory off the anchor's own `plan` data, regardless of whether `spec_path` is provided or `impl_context/` exists on disk.
+
+**Resolution**: Record at least one entry in `plan.drift.checks` per Trinity cycle documenting a drift observation (even a "no drift found" entry satisfies the check).
+
+**Promotable**: No. W587 has no `E587` counterpart — stale drift-check bookkeeping is advisory, not a hard defect.
 
 #### W588 ANCHOR_MILESTONE_UNREADABLE
 
@@ -656,6 +673,318 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 **Resolution**: Verify the `milestone_id` is not a typo. Either correct it to reference an existing roadmap milestone, or add the milestone to `14_roadmap.json` if it is legitimately new (replaying the step-14 roadmap step).
 
 **Promotable**: No. W612 has no `E612` counterpart — a phantom-milestone reference is advisory because the roadmap may legitimately lag a freshly-scaffolded anchor.
+
+## Canonical Integrity Extensions (1xx / 4xx)
+
+### E130 CANONICAL_VERSION_MISMATCH
+
+**Trigger**: A canonical reference (`{id, kind, version}`) names a `version` that does not match the registered entry's version, via `CanonicalRegistry.validate_ref` in `tools/specdev_tools/canonical/registry.py`.
+
+**Resolution**: Update the reference's `version` field to match the canon entry's current version, or bump the canon entry if the reference is intentionally targeting a newer version.
+
+**See also**: E110, E120, W130.
+
+### E140 AMBIGUOUS_ALIAS
+
+**Trigger**: A canonical reference supplies an `alias_used` value that, for the given `kind`, resolves to more than one candidate canonical ID (`CanonicalRegistry.validate_ref`).
+
+**Resolution**: Replace the ambiguous alias with the specific canonical `id` it should resolve to, or deduplicate the conflicting alias registrations in the canon manifest.
+
+### W110 DEPRECATED_CANONICAL_USED
+
+**Trigger**: A canonical reference resolves to an entry whose `status` is `"deprecated"` (`CanonicalRegistry.validate_ref`).
+
+**Resolution**: Migrate the reference to the entry's replacement canonical ID (see the entry's lifecycle `replaced_by`), or confirm continued use of the deprecated entry is intentional.
+
+**Promotable**: No. W110 has no `E110`-shared promotion path — `E110` is `UNKNOWN_CANONICAL_ID`, a different condition (missing vs. deprecated-but-present).
+
+### W120 ALIAS_DEPRECATED
+
+**Trigger**: A canonical reference's `alias_used` resolves via an alias whose lifecycle marks it deprecated (but not yet sunset — see E125 for the sunset-expired case), via `CanonicalRegistry.validate_ref`.
+
+**Resolution**: Replace the deprecated alias with the `replaced_by` alias or the canonical `id` directly.
+
+**See also**: E125 ALIAS_SUNSET_EXPIRED (the fatal counterpart once the alias's `sunset_date` has passed).
+
+### W130 CANONICAL_REF_VERSION_OMITTED
+
+**Trigger**: A canonical reference omits the `version` field entirely (`CanonicalRegistry.validate_ref`).
+
+**Resolution**: Add an explicit `version` field to the reference pinning it to the canon entry's current version.
+
+**Promotable**: No dedicated pairing in `PROMOTABLE_PAIRS` under this name; `E130` (`CANONICAL_VERSION_MISMATCH`) is a structurally different condition (version present but wrong, not omitted).
+
+### W421 CANON_ID_COLLISION_PROJECT_WINS
+
+**Trigger**: During two-tier canon loading (`CanonicalRegistry.load`), a project-canon entry `id` collides with a core-canon entry `id`. The project entry silently overrides the core entry; W421 surfaces that override so it isn't invisible.
+
+**Resolution**: Rename the project-canon entry's `id` if the collision is accidental, or leave it if the override is intentional (the warning is informational once acknowledged).
+
+**Promotable**: No (warning only).
+
+### E422 CORE_ENTRY_IN_PROJECT_CANON
+
+**Trigger**: `specdev canon-accept` is invoked with a `--namespace` under `cn:core:` while writing to project canon (`canonical/accept.py`). Project canon may not declare entries in the `cn:core:` namespace — that namespace is toolkit-owned.
+
+**Resolution**: Use a `cn:project:`-prefixed (or other non-core) namespace for `canon-accept`, or promote the entry through the toolkit's own core-canon process if it genuinely belongs in `cn:core:`.
+
+**Promotable**: No (error only).
+
+### E141 TASK_DEPENDENCY_CYCLE / Circular job-requires dependency
+
+**Trigger**: Two independent emitters share this code: (1) `step_12.py` — a CI job's `requires[]` graph in `12_ci_gates.json` contains a cycle; (2) `step_14.py` — a step 14 roadmap task's dependency graph (task-to-task, via `dfs`) contains a cycle involving a named milestone.
+
+**Resolution**: Break the cycle by removing or reordering the offending `requires`/task-dependency edge so the graph is acyclic.
+
+**Promotable**: No (error only).
+
+### E142 TECH_STACK_MISMATCH
+
+**Trigger**: Fired by `step_14.py` when a `tech_stack` entry used in `14_roadmap.json` is not present in the corresponding Step 09 (`09_impl_plan.json`) `tech_stack`.
+
+**Resolution**: Add the technology to Step 09's `tech_stack`, or remove it from the roadmap's `tech_stack` if it is not actually part of the approved stack.
+
+**See also**: W602 / W605 (the equivalent Step 02 ↔ Step 14 tech-stack consistency checks).
+
+## Prompt / Schema / Dependency-Order Drift (31x / 54x)
+
+### E310 PROMPT_SCHEMA_DRIFT
+
+**Trigger**: Fired by `prompt_schema_sync.py` when a `prompt_NN_*.md` file's documented output contract drifts from its paired JSON Schema — missing/extra required fields, a missing schema-reference section, a missing or malformed schema URI/file reference, a missing property, or a property-level mismatch (type/description drift) between the prompt's documented fields and the schema.
+
+**Resolution**: Update the prompt's output-contract section to match the paired schema (or vice versa, if the schema is stale) — align required fields, the `$schema` URI reference, and per-property descriptions.
+
+**Promotable**: No (error only).
+
+### E311 MISSING_ENUM_PROVENANCE
+
+**Trigger**: Fired by `step_05.py` when an API entry in `05_interface_contracts.json` declares enum values (in request/response fields) but has no `enum_provenance` field recording where those enum values originated, for reproducibility tracking.
+
+**Resolution**: Add an `enum_provenance` field to the API entry documenting the source of the enum values (e.g. a canonical registry entry or an upstream spec artifact).
+
+**Promotable**: No (error only).
+
+### E320 STEP13_EXTENSION_ERROR
+
+**Trigger**: Fired by `step_13.py` for a malformed extension entry in `13_impl.json`: either a `required_schema_sections[]` item that is not a valid identifier (must start alphanumeric; only alphanumeric/underscore/hyphen allowed), or a missing/empty `justification` field on the extension.
+
+**Resolution**: Fix the malformed `required_schema_sections[]` entry to a valid identifier, or supply a non-empty `justification` for the extension.
+
+**Promotable**: No (error only).
+
+### E540 SELF_OR_FORWARD_DEPENDENCY
+
+**Trigger**: Fired by `dependency_order_lint.py` when a prompt file references (via a `spec/NN_*` path mention) either itself (self-dependency) or a step that comes later in the waterfall (forward dependency) — both violate the forward-only ordering.
+
+**Resolution**: Remove the self-reference, or move the referenced content to a step that precedes the current one in `tools/step_order.json`'s `steps` ordering.
+
+**Promotable**: No (error only).
+
+### E543 STEP_METADATA_INCONSISTENT
+
+**Trigger**: Fired by `dependency_order_lint.py` (M4 check) in three shapes, all comparing `tools/step_order.json`'s `step_metadata[].required_spec_inputs` against the `downstream_consumers`-derived inverse graph: (1) a `step_metadata` key references a step not declared in the top-level `steps` array (phantom key); (2) a step's `required_spec_inputs` is missing an entry implied by another step's `downstream_consumers`; (3) a step's `required_spec_inputs` has an extra entry not implied by any `downstream_consumers`.
+
+**Resolution**: Remove the phantom `step_metadata` key, or reconcile `required_spec_inputs` with the corresponding `downstream_consumers` entries so the two stay consistent.
+
+**Promotable**: No (error only).
+
+## Spec Quality Extras (51x / 52x / 57x)
+
+### E510 PLACEHOLDER_VALUE_FOUND
+
+**Trigger**: Fired by `spec_quality_lint.py`'s independent placeholder scan when any string value in a spec artifact matches the placeholder pattern (e.g. bracket-wrapped tokens like `[TBD]`, `[FIXME]`).
+
+**Resolution**: Replace the placeholder text with real, project-specific content.
+
+**See also**: E511 (removed — was redundant with this independent scan).
+
+### E512 ASSUMPTION_HAS_PLACEHOLDER
+
+**Trigger**: Fired by `spec_quality_lint.py` when a value inside an `assumptions[]` entry matches the placeholder pattern.
+
+**Resolution**: Replace the placeholder text in the assumption with a concrete, project-specific statement.
+
+**See also**: E571/W571 ASSUMPTION_VAGUE_QUANTIFIER, W573 ASSUMPTION_UNBOUND_ID (the other assumption-content checks).
+
+### E521 VALIDATOR_RUNTIME
+
+**Trigger**: A validator's own execution fails unexpectedly and is caught rather than propagating an unhandled exception — emitted from several sites (`canonical/lint.py` schema-validation runtime errors, `validation/validate.py` deep-validation critical errors, `glossary_drift_lint.py` runtime errors). Also used as the fallback code in `ensure_spec_errors()` when a raw string error cannot be parsed into a structured `SpecError`.
+
+**Resolution**: Inspect the embedded exception type/message in the error text to diagnose the underlying failure (malformed input, missing file, bad schema); fix the root cause and re-run.
+
+**Promotable**: No (error only).
+
+### W574 TECH_STACK_COHERENCE_MISMATCH
+
+**Trigger**: Fired by `spec_quality_lint.py` when `09_impl_plan.json`'s `tech_stack` and `14_roadmap.json`'s `tech_stack` are both present but not identical.
+
+**Resolution**: Reconcile the two `tech_stack` objects so Step 09 and Step 14 declare the same technology choices.
+
+**Promotable**: No (warning only).
+
+## Step 02 ↔ Step 14 Tech Stack Consistency (60x)
+
+### W602 / W605 TECH_STACK_02_MISMATCH / TECH_STACK_02_MISSING
+
+**Trigger (W602)**: `step_14.py` (AUDIT-034) fires when a `tech_stack` entry used in `14_roadmap.json` is not found in Step 02's (`02_system_sketch.json`) `tech_stack`.
+
+**Trigger (W605)**: Fires when a technology declared in Step 02's `tech_stack` is absent from `14_roadmap.json`'s `tech_stack` — the roadmap dropped a technology the system sketch declared.
+
+**Resolution**: Add the missing technology to whichever artifact is missing it (Step 02 system sketch or Step 14 roadmap) so the two `tech_stack` sets agree.
+
+**Promotable**: No (warning only). This is a separate check from E142 (which compares Step 09 vs. Step 14 tech stacks).
+
+## Forward Replay & ID Stability (55x / 59x)
+
+### E550 / W550 FORWARD_REPLAY_MISSING / SEMANTIC_COVERAGE_SKIP
+
+**Trigger (E550)**: Fired by `forward_replay_check.py` in three shapes: (1) `SPECDEV_REPLAY_DIFF_ERROR_MODE` is set to an invalid value (must be `error` or `ignore`); (2) the diff against the base ref could not be computed at all; (3) a changed step's downstream consumers (per `tools/step_order.json`) were not also replayed.
+
+**Trigger (W550)**: Fired when semantic coverage checking could not read the base-ref version of an artifact (e.g. the file didn't exist at the base ref), so the coverage-regression check for that artifact is skipped rather than failing closed.
+
+**Resolution (E550)**: Fix the `SPECDEV_REPLAY_DIFF_ERROR_MODE` value, ensure the base ref is reachable and diffable, or replay the missing downstream artifacts.
+
+**Resolution (W550)**: Confirm the base ref genuinely predates the artifact (expected for newly-added files); no action needed if so.
+
+**Promotable**: `PROMOTABLE_PAIRS` registers `W550 → E550`, though the two are emitted by structurally different conditions (skip vs. hard failure) — promotion escalates the skip to a hard failure under `SPECDEV_WARNINGS_AS_ERRORS`/`SPECDEV_PROMOTE_CODES=W550`.
+
+### W598 ID_STABILITY_REMOVAL
+
+**Trigger**: Fired by `forward_replay_check.py` alongside an E555 `SEMANTIC_COVERAGE_REGRESSION` finding — for each individual ID that was present in the base-ref version of an artifact and is now absent, W598 fires once per removed ID (in addition to the aggregate E555), to surface likely ID renames early.
+
+**Resolution**: If the ID was renamed, update all downstream references to the new ID. If it was genuinely removed, confirm no downstream artifact still depends on it.
+
+**Promotable**: No (warning only; co-fires with E555 rather than promoting to it).
+
+## Glossary Parity (60x)
+
+### E606 GLOSSARY_PROPOSAL_DRIFT
+
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` `terms[]` entry's `definition` differs from the `definition` on its matching `canonical_proposals` entry (matched by `term-{temp_id}`, `kind == "term"` proposals only — acronym proposals are excluded since acronyms have no `terms[]` counterpart).
+
+**Resolution**: Reconcile the term's `definition` in `terms[]` with the corresponding `canonical_proposals` entry so both describe the same definition.
+
+### E607 GLOSSARY_CANON_DRIFT
+
+**Trigger**: Fired by `glossary_drift_lint.py` when a `03_glossary.json` term's `definition` differs from the `definition` of the already-accepted `cn:project:` canon entry it's bound to via `term_ref`.
+
+**Resolution**: Update the glossary term's `definition` to match the canon entry (the source of truth once accepted), or re-run `canon-accept` if the glossary's definition is the intended update.
+
+### W606 GLOSSARY_CANON_ORPHAN
+
+**Trigger**: Fired by `glossary_drift_lint.py` when a `cn:project:` canon entry whose lifecycle records `accepted_from: 03_glossary.json` is neither referenced in `canonical_refs_used[]` nor still present as a `canonical_proposals` entry — it was accepted from the glossary but the glossary no longer names it anywhere.
+
+**Resolution**: Either re-add a reference to the canon ID in the glossary (if it's still a valid term), or leave the canon entry in place as an intentionally-retained but currently-unused registration.
+
+**Promotable**: No (warning only).
+
+## Step-16 Anchor Validation Extras (E309 / W585–W610)
+
+### E309 ANCHOR_CHECKLIST_DRIFT
+
+**Trigger**: Fired by `step_16_anchor.py` in two shapes: (1) `[prefix]` — two `milestone_index` entries declare the same `checklist_id_prefix`, so two milestones would allocate checklist IDs from the same namespace; (2) `[mapping]` — the same checklist item `id` appears in two different milestone plan files but maps to a different `spec_ref.id` in each, i.e. the same ID is bound to two different requirements.
+
+**Resolution**: For `[prefix]`, give each milestone a unique `checklist_id_prefix`. For `[mapping]`, rename the colliding checklist `id` in one of the milestone plans so each ID maps to exactly one `spec_ref.id`.
+
+**Promotable**: No (error only; no `W309` counterpart).
+
+### W585 ANCHOR_DRIFT_SKIP
+
+**Trigger**: Fired by `step_16_anchor.py` when `spec_path` is not provided to `validate_step_16_anchor`, so all filesystem-dependent drift checks (W607, the `[scope]` shape of E308, the `[mapping]` shape of E309, W610) are skipped — only the in-memory `milestone_index` checks still run.
+
+**Resolution**: Pass `spec_path` when invoking the anchor validator so the filesystem-dependent checks can run.
+
+**Promotable**: No (warning only).
+
+### W586 ANCHOR_VALIDATOR_WRONG_ARTIFACT
+
+**Trigger**: `validate_step_16_anchor` is called on an artifact that is neither field-marked (`artifact_role == "anchor"`) nor path-marked (`spec/16_impl_context.json` outside `impl_context/`) — indicating a routing bug in `validate.py`'s dispatch, or a mis-authored artifact that should not have reached the anchor validator.
+
+**Resolution**: Fix the routing logic in `validate.py`, or correct the artifact's `artifact_role`/file location so it is unambiguously an anchor or a milestone plan.
+
+**Promotable**: No (warning only).
+
+### W589 ANCHOR_MILESTONE_MISSCHEMAED
+
+**Trigger**: A JSON file under `impl_context/` parses successfully but declares a `$schema` other than `vc:16-impl-context` — it isn't recognized as a milestone plan, so it's excluded from every cross-milestone drift check (E308/E309).
+
+**Resolution**: Correct the file's `$schema` to `vc:16-impl-context`, or move the file out of `impl_context/` if it isn't meant to be a milestone plan.
+
+**See also**: W611 ANCHOR_DRIFT_SUPPRESSED (fires when W589/W588 filter out every milestone plan, suppressing drift detection entirely).
+
+### W607 ANCHOR_CONTEXT_PATH_MISSING
+
+**Trigger**: A `milestone_index[]` entry declares a `context_path` pointing to a milestone plan file, but no file exists at the resolved path — drift detection silently skips that milestone until the plan is authored.
+
+**Resolution**: Author the missing milestone plan file at the declared `context_path`, or correct the `context_path` to point to the existing plan file.
+
+**See also**: W588 ANCHOR_MILESTONE_UNREADABLE (the file exists but can't be parsed — a distinct condition from W607's file-absent case).
+
+### W608 ANCHOR_LEGACY_SCHEMA
+
+**Trigger**: The artifact at the anchor path (`spec/16_impl_context.json`) declares `$schema='vc:16-impl-context'` — the pre-Trinity-split, per-milestone schema — instead of the anchor's own `vc:16-anchor` schema. Schema validation against `vc:16-impl-context` still passes, but the file is contributing nothing to cross-milestone drift detection.
+
+**Resolution**: Migrate: move per-milestone checklist content to `spec/impl_context/<milestone>_plan.json`, rewrite the anchor file against `vc:16-anchor` (with `plan.summary`, `plan.ambiguities`, `plan.drift`, `plan.milestone_index`), and set `artifact_role='anchor'`. See `prompts/prompt_16_impl_context.md`.
+
+**Promotable**: No (warning only).
+
+### W609 ANCHOR_MISFILED
+
+**Trigger**: A file with `artifact_role='anchor'` lives inside `spec/impl_context/` instead of at `spec/16_impl_context.json`. The routing logic demotes the dispatch, so every drift check resolves `impl_context_dir` to a nonexistent nested path and silently no-ops.
+
+**Resolution**: Move the file to `spec/16_impl_context.json` (one level up from `impl_context/`) so cross-milestone drift checks can resolve the `impl_context/` sibling directory correctly.
+
+### W610 ANCHOR_PREFIX_VIOLATION
+
+**Trigger**: A checklist item `id` in a milestone plan does not start with the `checklist_id_prefix` declared for that milestone in the anchor's `milestone_index`.
+
+**Resolution**: Rename the checklist item `id` to start with the declared prefix (`{prefix}_`), or correct the `checklist_id_prefix` in `milestone_index` if the item's ID is actually correct.
+
+**See also**: E309 `[prefix]` shape (a prefix collision between two milestones, vs. W610's single-milestone prefix mismatch).
+
+## Upstream Backlog (61x)
+
+### W613 UPSTREAM_BACKLOG_UNCLASSIFIED
+
+**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an `emergent_ambiguities` record's `impact[]` matches none of the four classifier rules used to bucket ambiguities by upstream step.
+
+**Resolution**: Informational only — review the flagged ambiguity's `impact[]` text and, if appropriate, extend the classifier rules in `upstream_backlog.py` to recognize the pattern; no per-artifact fix is required.
+
+**Promotable**: No. Deliberately excluded from `PROMOTABLE_PAIRS` — informational only, never promoted.
+
+## Registry Checks (62x)
+
+### E620 REGISTRY_MISSING_STEP
+
+**Trigger**: Historical/registered code for "a step in `tools/step_order.json` is not registered in `entry_key_registry.json`" (R001). As of the registry-generator hardening (W3), this check moved to the toolkit's own unit test suite (`tests/unit/toolkit_invariants/test_step_registry_coverage.py`, `T-step-registry-coverage`) since the generator now enforces step coverage as an internal contract, making a host-runtime check redundant. E620 is retained in `ERROR_CODES` for historical reference and backward compatibility with external tooling that parses it, but `specdev registry-check` no longer emits it.
+
+**Resolution**: Not applicable at host-runtime (the check no longer fires there). If a step is missing from the registry, run `specdev registry-generate` and confirm `pytest tests/unit/toolkit_invariants/test_step_registry_coverage.py` passes.
+
+**Promotable**: No (error only).
+
+### E621 REGISTRY_PHANTOM_BASENAME
+
+**Trigger**: R002 — `specdev registry-check`'s `_check_phantom_basenames` finds a basename registered in `tools/entry_key_registry.json` that does not appear in `tools/extraction_paths.json`.
+
+**Resolution**: Remove or rename the orphaned entry in `entry_key_registry.json`, or add the corresponding entry to `extraction_paths.json`. Run `specdev registry-generate` to regenerate both files consistently.
+
+**Promotable**: No (error only).
+
+### E622 REGISTRY_DRIFT
+
+**Trigger**: R003 — `specdev registry-check` finds that a registered `(array_path, id_field)` pair no longer matches the live spec file's structure: the declared array path is missing, is not an array, or its entries lack the registered `id_field` (checked for both top-level and nested arrays).
+
+**Resolution**: Run `specdev registry-generate` to regenerate `entry_key_registry.json`/`extraction_paths.json` from the current schemas, or fix the schema/spec structure if the drift indicates an unintended shape change.
+
+**Promotable**: No (error only).
+
+### W614 UNREGISTERED_ARRAY
+
+**Trigger**: R004 — a host spec file has an array of dict items bearing an `*_id` (or `id`) field that is not declared in the registry as a known `(basename, array_path)` pair — a novel array the generator doesn't yet know about.
+
+**Resolution**: If the array should be tracked (e.g. for cross-step ID validation), add it to the registry source and run `specdev registry-generate`. If it's intentionally untracked free-form data, no action is required — R004 is advisory (WARNING, not ERROR) precisely because the generator may not yet cover every new array shape.
+
+**Promotable**: No (warning only).
 
 ## Exception Classes
 

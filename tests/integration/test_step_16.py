@@ -3367,6 +3367,21 @@ class TestStep16(unittest.TestCase):
                     f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
                 )
 
+    def test_invalid_fixture_step_08_no_phantom_unevaluated_companion(self):
+        """Step 08 shares the same schema restructure as 09/13/15/16 — its invalid fixture must
+        surface its real error without triggering a phantom 'Unevaluated properties' companion."""
+        rel = "tests/fixtures/step_08/invalid/invalid_out_of_scope_missing_rationale.json"
+        errors = validate_file(self.repo_root, rel)
+        unevaluated = [e for e in errors if "Unevaluated properties" in e.message]
+        self.assertEqual(
+            unevaluated, [],
+            f"Phantom unevaluated companion on {rel}: {[e.message for e in errors]}",
+        )
+        self.assertTrue(
+            any(e.code == "E520" for e in errors),
+            f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
+        )
+
     # --- crossCycleAmbiguityItem accepts optional resolved/decision ---
 
     def test_emergent_ambiguity_with_resolved_and_decision(self):
@@ -3569,6 +3584,52 @@ class TestStep16(unittest.TestCase):
         data = self._w603_data(milestone_supporting_files=[])
         w603 = [e for e in self._run_w603(data) if e.code == "W603" and "tests/README.md" in e.message]
         self.assertTrue(w603, "W603 must still fire for undeclared file not in milestone_supporting_files.")
+
+    # --- W570: seed_manifest.json missing / unreadable / missing doc_paths ---
+
+    def _run_w570(self, write_manifest=True, manifest_text=None):
+        """Run validate_step_16 over valid_minimal.json with a controllable
+        common/seed_manifest.json: absent (write_manifest=False), malformed
+        (manifest_text is invalid JSON), or well-formed (manifest_text is a
+        dict serialized as-is, e.g. missing/empty doc_paths)."""
+        base_path = os.path.join(self.fixtures_dir, "valid_minimal.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            if write_manifest:
+                common_dir = tmp_dir / "common"
+                common_dir.mkdir()
+                text = manifest_text if isinstance(manifest_text, str) else json.dumps(manifest_text or {})
+                (common_dir / "seed_manifest.json").write_text(text, encoding="utf-8")
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            return validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+    def test_w570_fires_when_manifest_missing(self):
+        # Branch 1: manifest_path is None (no common/seed_manifest.json at all).
+        errors = self._run_w570(write_manifest=False)
+        w570 = [e for e in errors if e.code == "W570" and "not found" in e.message]
+        self.assertTrue(w570, f"Expected W570 for missing seed_manifest.json. Got: {errors}")
+
+    def test_w570_fires_when_manifest_malformed(self):
+        # Branch 2: manifest exists but is unreadable/malformed (json.load raises).
+        errors = self._run_w570(write_manifest=True, manifest_text="{not valid json")
+        w570 = [e for e in errors if e.code == "W570" and "Failed to read seed_manifest.json" in e.message]
+        self.assertTrue(w570, f"Expected W570 for malformed seed_manifest.json. Got: {errors}")
+
+    def test_w570_fires_when_doc_paths_missing(self):
+        # Branch 3: manifest is valid JSON but has no (or empty) doc_paths.
+        errors = self._run_w570(write_manifest=True, manifest_text={"other_field": "x"})
+        w570 = [e for e in errors if e.code == "W570" and "missing doc_paths" in e.message]
+        self.assertTrue(w570, f"Expected W570 for missing doc_paths. Got: {errors}")
+
+    def test_w570_does_not_fire_with_valid_manifest(self):
+        # Control: a well-formed manifest with non-empty doc_paths must not fire W570.
+        errors = self._run_w570(write_manifest=True, manifest_text={"doc_paths": ["README.md", "docs/**"]})
+        w570 = [e for e in errors if e.code == "W570"]
+        self.assertEqual(w570, [], f"Did not expect W570 with a valid seed_manifest.json. Got: {w570}")
 
 
 if __name__ == '__main__':

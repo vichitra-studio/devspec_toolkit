@@ -107,21 +107,15 @@ class TestStep16aMissingSpecRefId(unittest.TestCase):
 class TestStep16aPlanObjectRequired(unittest.TestCase):
     """E520 fires when 'plan' is missing/not-a-dict, and when plan.status is falsy.
 
-    KNOWN BLOCKER (documented, not fixed here — out of scope for this test file):
-    ``validate_step_16a`` calls the base ``validate_step_16`` *before* its own
-    ``isinstance(plan, dict)`` guard (step_16a.py lines 16-21). The base validator
-    dereferences ``plan.get(...)`` unconditionally (step_16.py line 261) with no
-    isinstance check of its own, so a non-dict ``plan`` value raises AttributeError
-    instead of ever reaching step_16a's "Step 16a requires a 'plan' object" E520.
-    That means the E520 "requires a 'plan' object" branch is currently unreachable
-    through the public ``validate_step_16a`` entry point for BOTH a missing "plan"
-    key (which defaults to ``{}`` via ``data.get("plan", {})`` and so is a valid
-    dict — it falls through to the plan.status branch instead) and an explicit
-    non-dict "plan" value (which crashes upstream). Fixing this requires an edit
-    to tools/specdev_tools/validation/validators/step_16.py (add an isinstance
-    guard, or reorder step_16a's guard ahead of the base call) — a source-file
-    change outside this test file's scope; see pr-audit fix_plan for a companion
-    task on that file.
+    ``validate_step_16a`` calls the base ``validate_step_16`` before its own
+    ``isinstance(plan, dict)`` guard (step_16a.py lines 16-21). The base
+    validator now guards its own ``plan.get(...)`` dereference with an
+    ``isinstance(plan, dict)`` check (step_16.py line 261), coercing a
+    non-dict ``plan`` to ``{}`` before use instead of raising AttributeError.
+    That means a non-dict "plan" value safely reaches step_16a's own guard,
+    which fires E520 ("Step 16a requires a 'plan' object"). A missing "plan"
+    key still defaults to ``{}`` (a valid dict) via ``data.get("plan", {})``
+    and so falls through to the plan.status-required branch instead.
     """
 
     def test_missing_plan_fires_e520_plan_object_required(self):
@@ -136,11 +130,10 @@ class TestStep16aPlanObjectRequired(unittest.TestCase):
         )
 
     def test_plan_not_a_dict_fires_e520_plan_object_required(self):
-        """Documents the KNOWN BLOCKER above: a non-dict 'plan' should fire E520
-        ("Step 16a requires a 'plan' object") but currently raises AttributeError
-        in the base validate_step_16 before step_16a's own isinstance guard runs.
-        This assertion reflects the intended/target behavior and will fail until
-        the companion source fix (see class docstring) lands."""
+        """A non-dict 'plan' fires E520 ("Step 16a requires a 'plan' object").
+        The base validate_step_16 guards its own plan dereference (see class
+        docstring), so a non-dict plan safely reaches step_16a's own
+        isinstance guard instead of raising AttributeError."""
         data = _make_minimal_16a()
         data["plan"] = "not-a-dict"
         errors = validate_step_16a(data, ".", spec_path=None)

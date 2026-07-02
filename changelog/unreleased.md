@@ -170,7 +170,17 @@
   exemption list from Step 05's out_of_scope[] — "no API surface" and "no fixture" are
   independent scoping decisions (e.g. a background job can lack an API but still need a
   fixture), so Step 05's out_of_scope[] does not exempt W565 and vice versa. Purely
-  additive: no previously-passing spec is affected.
+  additive: no previously-passing spec is affected. `step_08.py` also gained a new
+  `E590` `CROSS_STEP_ID_NOT_FOUND` check validating that each `out_of_scope[].fr_id`
+  references an `fr_id` that actually exists in `04_fr_list.json`, preventing a typo'd
+  or invented `fr_id` from silently exempting the wrong (or no) FR from W565.
+
+- Added E536 `CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE` to `traceability_closure.py`
+  (companion promoted check to W565, mirroring E535's relationship to W564): fires when
+  an FR appears in Step 08's fixture `out_of_scope[]` array (declared "no fixture
+  needed") but is also referenced by a fixture's `targets[]` — the two claims
+  contradict, and without this check the out_of_scope[] exemption would silently mask
+  the contradictory fixture reference by suppressing W565 for that FR.
 
 - Fixed the generated pre-commit hook configuration for macOS and submodule deployments.
   All hook entry points are now invoked via `devspec_env/bin/python` instead of the ambient
@@ -232,6 +242,12 @@
   without mentioning `wont_do`. No behavior change — the messages only ever
   fire for genuinely active items either way.
 
+- Backfilled Trigger/Resolution documentation in `docs/developers/error-codes.md`
+  for at least 36 previously-undocumented error and warning codes spanning
+  canonical/canon-registry drift, prompt/roadmap/glossary consistency,
+  Step-16 anchor validation, tech-stack coherence, and registry-generator
+  checks (pr-audit round, `T1`/`T2`/`T9`). Doc-only, no schema or code change.
+
 ### Removed
 
 - Removed the `/specdev-trinity-plan` skill; its plan-phase functionality is now invoked via
@@ -277,3 +293,12 @@
   for DRY: the repeated literal is exactly the kind of site a future third status value
   could silently miss (per the enum-value-rollout-sweep lesson from this same
   investigation).
+
+### Fixed
+
+- Fixed `step_16.py` crashing with an `AttributeError` when a Step 16 artifact's
+  top-level `plan` field is not a dict (e.g. `null`, a list, or a scalar). An
+  `isinstance(plan, dict)` guard now falls back to an empty dict (`plan = {}`)
+  before any `.get()` calls run against it, so malformed `plan` values are
+  treated as an empty plan instead of crashing the validator. Defensive-only:
+  no previously-passing spec is affected.
