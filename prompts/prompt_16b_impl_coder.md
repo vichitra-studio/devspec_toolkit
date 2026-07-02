@@ -296,6 +296,7 @@ Amplified `impact[]` (9 entries vs. original 1):
 
 ## 5. `execution.config_validation` (Ops Rigor)
 *   Applies when implementing `plan.delivery`, `plan.drift`, or `plan.security`.
+*   *Note*: These fields are self-reported, unverified metadata — you populate them from your own implementation work; no independent system validates them, so record only what you have actually checked.
 *   *Rule*: **Dashboard Links**: Dashboard URLs must be valid/reachable or follow the known URI pattern.
 *   *Rule*: **Alert Logic**: Alert rules must be syntactically valid for the monitoring system.
 *   *Rule*: **Drift Schedules**: Schedules must be valid cron strings or ISO 8601 intervals.
@@ -356,7 +357,7 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
     e. Update `implementation.status` to `in_progress` then `verified`
     f. **REVIEW LOOP**: Review the item implementation for gaps/bugs. If findings exist, fix them and re-review until no findings remain, then proceed to the next checklist item.
 3.  **STOP Conditions**:
-    a. Any action fails → Set `status: blocked`, log `emergent_ambiguity`
+    a. Any action fails → Set `implementation.status: deferred`, log `emergent_ambiguity` (with its `status` field set to `blocked`)
     b. Plan contains `blocking` ambiguity → STOP immediately
     c. Required file outside `target_file_patterns` → STOP, log scope violation
 4.  **Log**: Populate `execution` fields as defined above.
@@ -378,10 +379,10 @@ Read Checklist → For Each Requirement → Fill Implementation Slots → Verify
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `checklist` item in `spec/impl_context/{milestone_snake}_plan.json` with `status: planned` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
+- Every `checklist` item in `spec/impl_context/{milestone_snake}_plan.json` with `implementation.status` of `pending` is either implemented (with `linked_test_expectation` evidence populated) or escalated as a `blocker` with rationale.
 - All file paths listed in `existing_structures` are verified to exist before modification — no phantom file references.
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
-- No checklist item is silently skipped — each must reach `complete`, `blocked`, `deferred`, or `wont_do` status with documented rationale. Setting `checklist_status: "deferred"` on an item requires populating that item's own `deferred_reason` (name the blocker and the undefer condition) — this does NOT require deferring the whole plan. If work is discovered mid-implementation to be permanently unnecessary (not just blocked or postponed), set `checklist_status: "wont_do"` and populate `wont_do_reason` instead — do NOT delete the checklist item to work around coverage validation; deletion loses the record that the work was considered and explicitly cancelled.
+- No checklist item is silently skipped — each must reach `implementation.status: verified`, `checklist_status: deferred`, or `checklist_status: wont_do`, or be logged as a `blocked` emergent_ambiguity, with documented rationale. Setting `checklist_status: "deferred"` on an item requires populating that item's own `deferred_reason` (name the blocker and the undefer condition) — this does NOT require deferring the whole plan. If work is discovered mid-implementation to be permanently unnecessary (not just blocked or postponed), set `checklist_status: "wont_do"` and populate `wont_do_reason` instead — do NOT delete the checklist item to work around coverage validation; deletion loses the record that the work was considered and explicitly cancelled.
 - If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
 - All checklist items with `status: active` have a non-empty `linked_test_expectation` pointing to a specific test identifier.
 - [ ] All code references include file paths and function signatures (no ambiguous references)

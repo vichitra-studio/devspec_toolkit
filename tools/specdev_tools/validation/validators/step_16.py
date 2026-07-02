@@ -258,6 +258,8 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     fr_ids_with_nfrs = _build_fr_ids_with_nfrs(nfrs_data)
 
     plan = data.get("plan", {})
+    if not isinstance(plan, dict):
+        plan = {}
     checklist = plan.get("spec_alignment", {}).get("checklist", [])
     docs_impact = plan.get("docs_impact")
 

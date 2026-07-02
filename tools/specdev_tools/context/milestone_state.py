@@ -440,7 +440,7 @@ def compute_milestone_state(
     (first match wins).  Operator verification (``impl_status == "verified"``)
     is the terminal override — it cannot be downgraded by an unresolved amb.
     """
-    # Use batch_id directly per the output contract (specdev-scope.md:238: "milestone_id": "<batch_id>").
+    # Use batch_id directly per the output contract (specdev-scope.md:226: "milestone_id": "<batch_id>").
     # SKILL.md:201 confirms the consumer only parses groups[] and derived_phase_position;
     # milestone_id in the output is not gate-critical for downstream consumers.
     milestone_id: str = batch_id

@@ -61,7 +61,7 @@ For each upstream artifact ingested, extract the following:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `target_ids: [{type: api, id: api-user-profile}]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector).
+- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). Exception (enforced by `step_11.py`, W583): an API is exempt ONLY when it has at least one Step-04 FR trace AND every traced FR is `priority: "wont-have"` — an API with no FR trace at all is NOT exempt and still requires threat coverage.
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If you list a mitigation "Enforce Role Check", link it to the actual invariant `inv-authz-admin-only`.
 
@@ -83,9 +83,9 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`. For low-risk internal-only endpoints with no viable threat, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
+- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids` (enforced by W583). The only schema-recognized wont-have-FR exemption (`step_11.py`): an `api_id` is skipped ONLY when it has at least one Step-04 FR trace and every traced FR is `priority: "wont-have"`; an `api_id` with no FR trace at all is still required to have coverage. For low-risk internal-only endpoints that don't qualify for this exemption, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
-- Every step-06 invariant that carries a `risk_category_ref` must be referenced by at least one threat mitigation of `type: inv` (enforced by W615).
+- Every step-06 invariant that carries a `risk_category_ref` must be referenced by at least one threat mitigation of `type: inv` (enforced by W615), unless it qualifies for the same wont-have-FR exemption (all of its Step-04 FR traces, and at least one exists, are `priority: "wont-have"`).
 - All `target_ids[*].id` values resolve to existing `api_id` or `component_id` values in their referenced spec files (steps 05 and 02 respectively).
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
 - [ ] Every upstream ID from ingested context has been consumed

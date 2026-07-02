@@ -407,7 +407,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         for fr_id in sorted(fr_ids - api_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W564", f"UNCOVERED_FR_API {fr_id}"))
 
-    # W565: FR→fixture coverage — each FR should be referenced by at least one fixture's targets.
+    # W565 / E536: FR→fixture coverage and out_of_scope[] contradiction check.
+    # step08_oos_fr_ids (computed above) carries the Step 08 out_of_scope[] exemption.
     if "frs" in data and "fixtures" in data:
         fixture_fr_refs: set[str] = set()
         for fixture in data["fixtures"].get("fixtures", []):
@@ -415,6 +416,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 # "type" field confirmed by 08_fixtures.schema.json targets[].type (via vc:core:collections#traceRef)
                 if isinstance(target, dict) and normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and "id" in target:
                     fixture_fr_refs.add(target["id"])
+        # E536: FR declared in out_of_scope[] ("no fixture needed") but also referenced by
+        # a fixture's targets[] — the two claims contradict. out_of_scope[] suppresses W565,
+        # so without this check the target reference would be silently masked.
+        for fr_id in sorted(step08_oos_fr_ids & fixture_fr_refs):
+            errors.append(make_error("E536", f"CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE {fr_id} appears in out_of_scope[] but is also referenced by a fixture target"))
         for fr_id in sorted(fr_ids - fixture_fr_refs - step08_oos_fr_ids):
             errors.append(make_error("W565", f"UNCOVERED_FR_FIXTURE {fr_id}"))
 

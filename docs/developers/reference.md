@@ -248,7 +248,7 @@ output through unchanged, so the output contract is identical for skills that pa
   "groups": [
     {
       "group_id": "<string>",
-      "state": "<pending|code_converged|blocked|verified|deferred>",
+      "state": "<pending|code_converged|blocked|verified|deferred|wont_do>",
       "implementation_converged_at": "<ISO8601 or null>",
       "reviewer_rounds": "<integer>",
       "findings_resolved_path": "<path or null>",

@@ -78,7 +78,7 @@
         "deferred"
       ],
       "default": "pending",
-      "description": "Progress status for milestones and tasks. Decision rules: 'pending' — not yet started (default); 'in_progress' — actively being worked, assigned developer exists; 'done' — all deliverables completed and verified against acceptance criteria; 'deferred' — explicitly postponed to a future milestone. Anti-pattern: using 'deferred' as a synonym for 'not yet started' — only defer items that were previously planned and consciously deprioritised."
+      "description": "Progress status for milestones. Decision rules: 'pending' — not yet started (default); 'in_progress' — actively being worked, assigned developer exists; 'done' — all deliverables completed and verified against acceptance criteria; 'deferred' — explicitly postponed to a future milestone. Anti-pattern: using 'deferred' as a synonym for 'not yet started' — only defer items that were previously planned and consciously deprioritised. Note: task-level status is a separate, wider enum (see 14_roadmap's tasks[].status, which adds 'wont_do') and is not backed by this atom."
     },
     "severityLevel": {
       "$anchor": "severityLevel",

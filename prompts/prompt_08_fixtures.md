@@ -34,7 +34,7 @@ For each upstream artifact ingested, extract the following:
 - **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `targets` entry.
 - **Emit**: Write the artifact only when coverage is complete.
 
-**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why.
+**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why: add an `out_of_scope` entry (`fr_id`, `rationale`) for any FR that needs no executable fixture, OR ensure the FR is targeted by an existing fixture.
 
 ### Weak-vs-Strong Fixture Examples
 

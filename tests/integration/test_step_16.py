@@ -405,6 +405,71 @@ class TestStep16(unittest.TestCase):
         self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")
         self.assertFalse(any(e.code == "E520" for e in errors), f"Metadata item must not trigger E520. Got: {errors}")
 
+    def test_types_requiring_proof_exemption_deferred_and_wont_do_zero_e520(self):
+        # DEVSPEC-122 follow-up regression guard: a TYPES_REQUIRING_PROOF item
+        # (behavior/constraint/validation/perf/security) that is deferred or
+        # wont_do is exempt from both the nfr_refs and fixture_ref proof-of-work
+        # gates (see PAUSED_OR_CANCELLED_CHECKLIST_STATUSES in step_16.py). This
+        # must hold even when both fields are entirely absent -- not just when
+        # one of them is present.
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "REQ_DEFERRED_PROOF_TYPE",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Implement login endpoint (paused)",
+                "type": "behavior",
+                "layer": "api",
+                "checklist_status": "deferred",
+                "deferred_reason": "Blocked on upstream auth contract; resume once finalised."
+            },
+            {
+                "id": "REQ_WONT_DO_PROOF_TYPE",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Validate login endpoint edge cases (cancelled)",
+                "type": "validation",
+                "layer": "tests",
+                "checklist_status": "wont_do",
+                "wont_do_reason": "Superseded by unified-auth validation suite; this path will never be built."
+            }
+        ]
+        data.pop("execution", None)
+        data["review"] = {}
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e520_errors = [e for e in errors if e.code == "E520"]
+        self.assertEqual(
+            [], e520_errors,
+            f"Deferred/wont_do TYPES_REQUIRING_PROOF items must not trigger E520 "
+            f"even with nfr_refs and fixture_ref both absent. Got: {e520_errors}"
+        )
+
     def test_invalid_invalid_type(self):
         # Expect failure due to invalid type
         path = os.path.join(self.fixtures_dir, "invalid_invalid_type.json")

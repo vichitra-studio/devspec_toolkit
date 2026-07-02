@@ -104,6 +104,61 @@ class TestStep16aMissingSpecRefId(unittest.TestCase):
         )
 
 
+class TestStep16aPlanObjectRequired(unittest.TestCase):
+    """E520 fires when 'plan' is missing/not-a-dict, and when plan.status is falsy.
+
+    KNOWN BLOCKER (documented, not fixed here — out of scope for this test file):
+    ``validate_step_16a`` calls the base ``validate_step_16`` *before* its own
+    ``isinstance(plan, dict)`` guard (step_16a.py lines 16-21). The base validator
+    dereferences ``plan.get(...)`` unconditionally (step_16.py line 261) with no
+    isinstance check of its own, so a non-dict ``plan`` value raises AttributeError
+    instead of ever reaching step_16a's "Step 16a requires a 'plan' object" E520.
+    That means the E520 "requires a 'plan' object" branch is currently unreachable
+    through the public ``validate_step_16a`` entry point for BOTH a missing "plan"
+    key (which defaults to ``{}`` via ``data.get("plan", {})`` and so is a valid
+    dict — it falls through to the plan.status branch instead) and an explicit
+    non-dict "plan" value (which crashes upstream). Fixing this requires an edit
+    to tools/specdev_tools/validation/validators/step_16.py (add an isinstance
+    guard, or reorder step_16a's guard ahead of the base call) — a source-file
+    change outside this test file's scope; see pr-audit fix_plan for a companion
+    task on that file.
+    """
+
+    def test_missing_plan_fires_e520_plan_object_required(self):
+        """A missing 'plan' key defaults to {} (a valid dict) and so falls through
+        to the plan.status-required branch — E520 still fires, just via that path."""
+        data = _make_minimal_16a()
+        del data["plan"]
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertTrue(
+            any(e.code == "E520" for e in errors),
+            f"Expected E520 for missing plan. Got: {errors}"
+        )
+
+    def test_plan_not_a_dict_fires_e520_plan_object_required(self):
+        """Documents the KNOWN BLOCKER above: a non-dict 'plan' should fire E520
+        ("Step 16a requires a 'plan' object") but currently raises AttributeError
+        in the base validate_step_16 before step_16a's own isinstance guard runs.
+        This assertion reflects the intended/target behavior and will fail until
+        the companion source fix (see class docstring) lands."""
+        data = _make_minimal_16a()
+        data["plan"] = "not-a-dict"
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertTrue(
+            any(e.code == "E520" and "plan" in e.message for e in errors),
+            f"Expected E520 for non-dict plan. Got: {errors}"
+        )
+
+    def test_plan_status_falsy_fires_e520_plan_object_required(self):
+        data = _make_minimal_16a()
+        data["plan"]["status"] = ""
+        errors = validate_step_16a(data, ".", spec_path=None)
+        self.assertTrue(
+            any(e.code == "E520" and "status" in e.message for e in errors),
+            f"Expected E520 for falsy plan.status. Got: {errors}"
+        )
+
+
 class TestStep16aFeedbackLoop(unittest.TestCase):
     """W584 fires when the review on this artifact surfaces a remediation_task
     that is not represented as a checklist item."""

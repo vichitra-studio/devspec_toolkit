@@ -73,7 +73,6 @@ Before emitting, verify:
 - [ ] The plan covers all `fr_refs` listed on the active Step 14 milestone — no FR is left without an implementation task
 - [ ] The generated plan does not contradict or expand scope beyond what is defined in the Step 16 anchor (spec/16_impl_context.json)
 - [ ] Every roadmap task_id from the active milestone maps to ≥1 checklist item in the plan (no roadmap task left without implementation steps)
-- [ ] Every roadmap `task_id` in the active milestone maps to at least one checklist item in this plan.
 - [ ] All `spec_ref.commit_hash` values are valid 40-char SHAs (not zeros or placeholders).
 - [ ] Every `checklist[].id` is prefixed with the `checklist_id_prefix` declared in the Trinity Anchor's `milestone_index[]` entry for this milestone.
 
@@ -251,7 +250,7 @@ The `plan.docs` field is distinct from `plan.docs_impact` — it carries a **str
 - Set `status: "not_applicable"` with a concrete `reason` only for test-only changes, internal refactors with no external interface change, or documentation-only updates that are themselves the deliverable.
 - When in doubt, prefer `"planned"` — it is safer to over-declare than to miss a documentation gap.
 
-**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level. `plan.docs` is the *actionable update plan* consumed by the coding agent. Both may be present; they are not redundant — `docs_impact` gates governance approval, `docs` drives the coder's file list.
+**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level; `plan.docs_impact.docs_touched` is what the coding agent (16b) actually reads to determine its file list. `plan.docs` is a separate, structured documentation update plan for human/downstream doc-authoring use — 16b does not consume it. Both may be present; they are not redundant, but only `docs_impact.docs_touched` drives 16b's file list.
 
 **Example (planned)**:
 ```json

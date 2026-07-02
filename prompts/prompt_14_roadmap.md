@@ -80,6 +80,7 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - **NO Ambiguous Task Scope**: Task `description` must name the specific deliverable artifact (endpoint, template, table, config, module) being created or modified. "Configure dependencies" is too vague — "Configure OAuth2 client credentials in session middleware settings" is specific.
 - If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
 - If task `status` is 'done', the task MUST have >=1 acceptance criterion documenting what was verified.
+- If task `status` is 'deferred' or 'wont_do', the task MUST have a `status_reason` explaining why the task was postponed or cancelled.
 
 ## Coverage Closure
 Before emitting, verify:

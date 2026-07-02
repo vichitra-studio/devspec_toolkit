@@ -1,0 +1,38 @@
+{
+  "$schema": "vc:08-fixtures",
+  "id": "fixtures-invalid-out-of-scope",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "fixtures": [
+    {
+      "fixture_id": "fixture-generic-success",
+      "description": "Generic unit test for data processing",
+      "targets": [
+        {
+          "type": "fr",
+          "id": "fr-data-processing"
+        }
+      ],
+      "mode": "unit",
+      "input": {
+        "data": "test input"
+      },
+      "expected": "processed result",
+      "tag_ref": {
+        "id": "cn:core:tag:critical-path",
+        "kind": "tag"
+      }
+    }
+  ],
+  "out_of_scope": [
+    {
+      "fr_id": "fr-legacy-report-export"
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:core:tag:critical-path",
+      "kind": "tag"
+    }
+  ]
+}

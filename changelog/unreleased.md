@@ -73,7 +73,10 @@
   distinct state literal in `milestone_state.py` so callers can tell "paused"
   from "cancelled"). This closes the exact trap that forced a real production
   incident: a task had to be deleted rather than marked permanently cancelled
-  because no such status existed.
+  because no such status existed. Existing artifacts are unaffected (purely
+  additive enum value); the only Breaking surface is that a new checklist item
+  using checklist_status "wont_do"
+  without wont_do_reason will fail validation.
 
 ### Fixed
 
@@ -200,6 +203,27 @@
   reassignment. Documented: remove the ID from the deferred milestone's
   `fr_refs` explicitly; there is no automatic release on deferral. Doc-only, no
   code or schema change.
+
+- Documented the `checklist_status` enum (`active`/`deferred`/`wont_do`), the
+  mandatory per-item `deferred_reason`/`wont_do_reason` rules, and the roadmap
+  task-skip rule (a Step 14 task already marked `deferred`/`wont_do` with its
+  own `status_reason` needs no checklist item to satisfy roadmap coverage) in
+  `prompt_16a_impl_planner.md` (DEVSPEC-122 follow-up). These contract clauses
+  mirror the schema/`step_16.py`/`step_16a.py` guards added earlier in the same
+  rollout; the prompt previously gave planners no guidance on when reasons are
+  mandatory or when a roadmap task can be skipped. Doc-only, no schema or code
+  change.
+
+- Documented that `checklist_status: "wont_do"` is an accepted terminal state in
+  `prompt_16b_impl_coder.md` (DEVSPEC-122 follow-up), alongside `deferred` and
+  `verified`: a coder discovering mid-implementation that a checklist item is
+  permanently unnecessary (not just blocked or postponed) sets
+  `checklist_status: "wont_do"` and populates the mandatory `wont_do_reason`
+  (mirroring the existing `deferred_reason` requirement for `deferred` items).
+  The prompt now explicitly states the no-delete rule: do NOT delete the
+  checklist item to work around coverage validation, since deletion loses the
+  record that the work was considered and explicitly cancelled. Doc-only, no
+  schema or code change.
 
 - Corrected stale E520 message text in `step_16.py` (found in a second
   fresh-review round): the guard already exempted both `deferred` and
