@@ -257,6 +257,41 @@
   `registry-check`, `registry-generate`, `guide`, `hardcoded-seed-check`,
   `upstream-backlog`, `canon-accept`). Doc-only, no schema or code change.
 
+### Fixed
+
+- Fixed `prompts/migration/template_fixtures.md` describing two schema anti-patterns as
+  correct usage (pr-audit round): fixture `targets[]` entries were documented with
+  `type: validates`, but `validates` is a relationship verb, not a canonical kind — the
+  doc now specifies `type` must be the target's canonical kind (`fr`/`api`/`nfr`/
+  `invariant`) with the validates relationship captured in a `note` field instead.
+  Also corrected `tag_ref`'s documented kind from `term` to the canonical `tag` kind.
+  Doc-only, no schema or code change.
+
+- Added E420 `INVALID_DEPRECATION_LIFECYCLE` documentation to
+  `docs/developers/error-codes.md` (pr-audit round): covers both shapes fired by
+  `lint_canon_dir()` in `tools/specdev_tools/canonical/lint.py` — a canon manifest
+  entry's `lifecycle` block missing a status-required field
+  (`introduced_at`/`deprecated_since`/`sunset_after`/`retired_at`), and a deprecated
+  alias missing `deprecated_since`. Doc-only backfill for a previously-undocumented
+  error code.
+
+- Tightened `prompts/prompt_11_redteam.md`'s mitigation-coverage requirement (pr-audit
+  round): the emit gate and pre-emit checklist previously only required mitigations for
+  high-severity threats; both now require every threat, regardless of severity, to have
+  at least one mitigation defined. Doc-only, no schema or code change.
+
+- Added a `tasks[].invariant_refs` Cross-Step Synthesis Notes entry to
+  `prompts/prompt_14_roadmap.md` (pr-audit round), documenting that tasks should list
+  the `spec/06_invariants.json` IDs they enforce or test, distinct from the existing
+  milestone-level `fr_refs`/`capability_refs` guidance. Doc-only, no schema or code
+  change.
+
+- Replaced a hardcoded `/tmp/any/path.json` string with
+  `tempfile.TemporaryDirectory()` in `tests/unit/validation/validators/test_step_16a_deep.py`'s
+  `spec_path`-present branch of `TestStep16aFeedbackLoop` (pr-audit round), for
+  portability across environments without a writable `/tmp`. Test-only, no behavior
+  change.
+
 ### Removed
 
 - Removed the `/specdev-trinity-plan` skill; its plan-phase functionality is now invoked via

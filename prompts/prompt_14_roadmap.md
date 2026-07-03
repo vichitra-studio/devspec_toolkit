@@ -174,8 +174,9 @@ Before emitting, verify:
 
 ### tasks[].invariant_refs
 - List invariant IDs from `spec/06_invariants.json` that this task enforces or tests.
-- Must use exact IDs. Add all invariants this task validates, even partially.
+- Must use exact IDs.
 - Omit or use `[]` if the task has no direct invariant enforcement responsibility.
+- Note: no validator currently consumes this field — it is informational/best-effort documentation, not enforced by any check.
 
 ### milestones[].capability_refs
 - Bind to capability IDs from `spec/01_capabilities.json` that this milestone implements.

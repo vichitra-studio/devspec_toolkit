@@ -5,12 +5,13 @@
 The following flags are available on most spec-operating commands, including
 `validate`, `validate-all`, `spec-check`, `matrix`, `seed-lint`, `fixtures-lint`,
 `invariants-check`, `governance-check`, `canonical-lint`, `canonical-integrity`,
-`spec-quality-lint`, `hallucination-lint`, `traceability-check`, `forward-replay-check`,
+`spec-quality-lint`, `hallucination-lint`, `forward-replay-check`,
 `milestone-state`, and `canon-schema-alignment`. Per-command exceptions (per
 CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
 `--spec-root`; most `specdev json` subcommands take `--repo-root` only; and
 diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
-`dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root` only.
+`dag-lint`, `extraction-intent-check`, `prompt-context`, `traceability-check`)
+take `--repo-root` only.
 Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |
@@ -97,8 +98,8 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Traceability closure — verifies the full charter-goal -> capability -> FR -> API/fixture
 # chain has no dangling links (capability/FR/API/fixture trace-type checks); add --json
-# for a machine-readable report
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+# for a machine-readable report; diagnostic/utility command — takes --repo-root only
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
 
 # Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
@@ -357,7 +358,7 @@ specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-n
 
 > Finalize a migration with `align validate`, not by re-running `specdev update`. `validate` stamps `spec/specdev_version` only after schema + trace-integrity checks pass and records a `migration_history` entry; `update` re-stamps after a weaker structural-diff check and omits the audit trail.
 
-> `align rollback` restores `spec/` from a backup in `spec/migration_backups/`. Without `--backup-dir` it lists available backups and prompts interactively (requires a TTY unless `--yes` is also passed); with `--backup-dir <name>` it restores that backup directly. `--yes` skips the confirmation prompt. `--json` is not yet supported for this action.
+> `align rollback` restores `spec/` from a backup in `spec/migration_backups/`. Without `--backup-dir` it lists available backups and prompts interactively for a selection — `--yes` alone does **not** make this non-interactive-safe; it only skips the early guard and the final confirmation prompt, not the backup-selection `input()` call, which still raises on non-interactive stdin. Pass `--backup-dir <name>` as well to bypass interactive backup selection entirely and restore that backup directly. `--json` is not yet supported for this action.
 
 
 
