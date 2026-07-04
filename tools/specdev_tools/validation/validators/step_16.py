@@ -322,8 +322,11 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
                     elif not has_structured:
                         # Evidence dict present but missing both content and stdout/stderr
                         errors.append(make_error("W600", f"EVIDENCE_NO_CONTENT: verified action in checklist item '{item_id}' has evidence dict but no 'content', 'stdout', or 'stderr' field"))
-                    # AUDIT-032: check that evidence content references at least one spec artifact ID
-                    if isinstance(evidence, dict):
+                    # AUDIT-032: check that evidence content references at least one spec artifact ID.
+                    # Only proof-types (TYPES_REQUIRING_PROOF) have an honest fr-/nfr-/inv- tie to
+                    # cite; non-proof types (metadata, docs, logging, config) legitimately have none
+                    # — same rationale as the nfr_refs/fixture_ref exemption above (E520).
+                    if isinstance(evidence, dict) and item_type in TYPES_REQUIRING_PROOF:
                         combined = " ".join(filter(None, [
                             evidence.get("content") if isinstance(evidence.get("content"), str) else "",
                             evidence.get("stdout") if isinstance(evidence.get("stdout"), str) else "",

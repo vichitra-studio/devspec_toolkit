@@ -2080,6 +2080,39 @@ class TestStep16(unittest.TestCase):
             f"W601 must not fire when evidence references a spec artifact ID. Got: {w601_errors}"
         )
 
+    def test_w601_does_not_fire_for_metadata_type_item_without_artifact_ref(self):
+        """W601 must not fire for type:metadata items — same exemption rationale as E520
+        (infra/setup checklist items, e.g. CI config or wrangler routes, legitimately have
+        no fr-/nfr-/inv- artifact to cite in evidence, mirroring TYPES_REQUIRING_PROOF)."""
+        data = self._make_evidence_test_data("CHK_W601_METADATA", [
+            {
+                "type": "run_command",
+                "description": "Action with evidence lacking artifact refs on a metadata-type item",
+                "evidence": {"type": "log", "content": "All tests passed successfully, no issues found in the output logs"}
+            }
+        ])
+        data["plan"]["spec_alignment"]["checklist"][0]["type"] = "metadata"
+        del data["plan"]["spec_alignment"]["checklist"][0]["nfr_refs"]
+        del data["plan"]["spec_alignment"]["checklist"][0]["fixture_ref"]
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w601_errors = [e for e in errors if e.code == "W601"]
+        self.assertEqual(
+            w601_errors, [],
+            f"W601 must not fire for type:metadata items without artifact refs. Got: {w601_errors}"
+        )
+
     # --- W603 tests ---
 
     def test_w603_fires_for_execution_file_outside_task_scope(self):
