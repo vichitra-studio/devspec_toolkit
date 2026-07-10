@@ -28,7 +28,7 @@ Agents cite this document by section number (§1, §2, …). Do not paraphrase; 
 
 **P2 — Discovery.**  
 - *Tier-1 (mechanical):* `discovery-mechanical` (haiku) handles only slices where `semantic_work: false` (`generated_artifacts`, `host_integration`). Runs deterministic diff-and-compare checks. Emits findings to its designated output path.  
-- *Tier-2 (semantic):* `discovery-semantic` (sonnet) instances are dispatched via greedy bin-packing (see §3). Each instance receives: its slice's changed files in full, digests of cross-slice neighbor files, and the applicable D/I subset from `slices.yaml`. Emits findings with `catalog_tag` populated for every item.  
+- *Tier-2 (semantic):* `discovery-semantic` (sonnet) instances are dispatched one per theme (see §3). Each instance receives: its slice's changed files in full, digests of cross-slice neighbor files, and the applicable D/I subset from `slices.yaml`. Emits findings with `catalog_tag` populated for every item.  
 
 Tier-1 is only dispatched if `generated_artifacts` or `host_integration` slices have changed files. If neither is in scope, skip Tier-1.
 
@@ -104,55 +104,32 @@ Agent names in §1/§2 narrative use shortened forms (e.g. `context-author`); §
 **Edit tool:** Forbidden for all pipeline agents (P0–P5). `pr-audit-fix-apply` is a post-fix agent (outside P0–P5) permitted to use Edit; its write scope is limited to the source file at `fix_plan.tasks[].file` (one file per invocation) — see §12.  
 **Agent tool:** Forbidden for all agents (no nested subagent dispatch).
 
-### Bin-packing (Tier-2 dispatch)
+### Theme-based dispatch (Tier-2)
 
-Impact score per changed file:
+**One `discovery-semantic` bin per theme, by default.** A theme is a `slices.yaml` slice — the same taxonomy used by `routing.json` — and each slice already represents a coherent code area (schemas, prompts, validators, canon, cli_surface, tests_fixtures, docs, ...). Group all `semantic_work: true` changed files by slice; every non-empty theme group becomes exactly one bin, containing all of that theme's changed files. No file-level scoring and no cross-theme merging — a PR touching 4 themes dispatches 4 agents, touching 8 themes dispatches 8. This puts a natural, low ceiling on Tier-2 agent count: the total number of `semantic_work: true` slices (currently 11).
 
-```
-impact = type_weight(file) × max(1, |expansion_set(file)|) × |applies.drift_types ∪ applies.invariants|
-```
+Each bin's agent receives the full `applies.drift_types ∪ invariants` set for its theme — review of a theme is never split by aspect (e.g. drift checks vs. invariant checks); the only thing that can fragment a theme is the overflow rule below.
 
-where `type_weight` and `applies` come from `slices.yaml` for the file's owning slice.
+- **Multi-slice files** (matched by more than one slice's globs) are assigned to a single theme: choose the slice whose glob pattern shares the longest common leading path prefix with the file's path; on a tie, choose the lexicographically earlier slice name.
 
-**Theme-first greedy bin-packing.** Files are grouped by slice membership (the slice name is the theme identifier — it is the same taxonomy used by `routing.json` and `slices.yaml`). Within each theme group, files are sorted by descending impact and packed into bins subject to:
+**Overflow split (rare).** If a single theme's file count (changed files + deduped `expansion_set` neighbors) exceeds ~15 files, split that theme into sub-bins along a coherent sub-axis — never by an arbitrary score or fill order:
+- If the slice's `expansion_rules` capture a `{step}` token, group by that step number (files touching the same pipeline step stay together).
+- Otherwise, group by shared parent directory.
 
-- **Soft budget:** ~600 units per bin. Calibrated as approximately 3 typical ~200-unit files; this is why the per-theme bin count naturally satisfies `tier2_bin_count ≤ ⌈N/3⌉` for N same-theme changed files. This bound is a starting gate and should be re-evaluated after a measurement pass.
-- **Hard cap:** ~800 units per bin. Same-theme files that would push a bin past 800 start a new bin even if the cap forces a split within a single theme group (cross-theme cohesion above the cap is not permitted). Precedence: **hard cap > soft budget > ⌈N/3⌉ target.**
-- **Cross-theme co-location** is permitted only when a theme group produces a single file with no peer in the same group; such an orphan file may be co-located with another single-file orphan from a different theme, provided their combined impact stays ≤ ~800 units. This exception does not apply if a theme group has 2 or more files (OQ-13: traceability tag; rule stated here is authoritative).
-- **Multi-slice files** (files matched by more than one slice's globs) are assigned to a single primary theme for bin-packing: choose the slice whose glob pattern shares the longest common leading path prefix with the file's path; on a tie, choose the lexicographically earlier slice name.
+Each sub-bin still receives the theme's full `applies` set — overflow splitting divides files, not review aspects.
 
 Each non-empty bin = one `discovery-semantic` invocation. Dispatch in waves of ≤ 6 bins simultaneously; start the next wave only after the previous wave completes. The concurrency limit for PR-audit is independent of `SPECDEV_REVIEW_CONCURRENCY` (which governs the spec-review loop, not PR audit).
 
-**Worked example — base case (3 files).** Compare old vs. new:
+**Worked example.** A PR changes 2 schema files, 1 prompt file:
+- `schemas` theme: 2 changed files → 1 bin (both files, one agent).
+- `prompts` theme: 1 changed file → 1 bin.
+- Total: **2 bins**, one wave — one agent per code area touched, regardless of per-file weight.
 
-```
-schema/example_a.schema.json   type_weight=12, expansion_set=4, |applies|=10  → impact = 480
-schema/example_b.schema.json   type_weight=8,  expansion_set=3, |applies|=10  → impact = 240
-prompts/example_step.md        type_weight=6,  expansion_set=2, |applies|=9   → impact = 108
-```
+**Worked example — overflow.** A PR changes 17 files under `tests_fixtures` (observed in run `20260702-100406-04dda8d`) plus a handful of files in other themes:
+- `tests_fixtures` exceeds the ~15-file overflow threshold → split by shared parent directory (or `{step}` capture group) into 2 coherent sub-bins, each still carrying the full `tests_fixtures` `applies` set.
+- Every other touched theme stays a single bin.
 
-*Old algorithm (~200 budget, no theme grouping):* example_a alone (480>200), example_b alone (240>200), example_step alone (108) → **3 bins**.
-
-*New algorithm (theme-first, ~600 budget, ~800 cap):*
-- `schemas` theme (2 files, N=2, ⌈2/3⌉=1 target bin): sort descending 480, 240. Bin 1: 480+240=720 — within ~800 cap; same-theme cohesion keeps them together. 1 bin produced. Target met.
-- `prompts` theme (1 file = orphan). `schemas` has 2 changed files → NOT an orphan theme; cannot receive cross-theme co-location. `prompts` gets its own bin.
-- Bin 1: schemas (720). Bin 2: prompts (108). → **2 bins**, one wave.
-
-**Worked example — cap-forced split.** Add a third schema file:
-
-```
-schema/example_c.schema.json   type_weight=8,  expansion_set=4, |applies|=10  → impact = 320
-```
-
-`schemas` theme (N=3, ⌈3/3⌉=1 target bin): sort descending 480, 320, 240.
-- Bin 1: 480+320=800 — exactly at cap; close bin (cap is non-strict: ≤800 is OK, >800 splits).
-- Bin 2: 240.
-
-`schemas` now produces 2 bins (cap forced a split past the ⌈3/3⌉=1 target). Cap takes precedence. `prompts` orphan: `schemas` is not an orphan theme (3 changed files) → own bin.
-
-Result: Bin 1 schemas(800), Bin 2 schemas(240), Bin 3 prompts(108) → **3 bins**, one wave.
-
-The ~600 unit budget is a starting heuristic; tune after a dry-run measurement pass.
+This replaces the prior impact-score/greedy-bin-packing model (`type_weight × expansion_set × |applies|`, ~600/800 unit budgets, orphan-only cross-theme merge), which fragmented themes independently of the file count driving actual reviewer workload — see the `20260702-100406-04dda8d` and `20260702-152521-64cd062` runs, where 8 and 7 touched themes produced 15 and 14 bins respectively under the old model.
 
 ### `cross-boundary` dual mode
 

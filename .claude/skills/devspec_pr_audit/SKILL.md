@@ -464,14 +464,15 @@ If both Tier-1 slices have changed files, the two agents can be dispatched in pa
 ### Tier-2 (semantic, sonnet)
 
 Read `context_bundle.json` `.tier2_bins[]`. Each bin is an array of
-`{file, slice, impact, digests_needed[]}` objects, already bin-packed by the
-context-author using the impact formula from protocol §3 (~200 units per bin).
+`{file, slice, digests_needed[]}` objects, already grouped by the context-author using
+the theme-based dispatch rule from protocol §3: one bin per theme (slice) with changed
+files, split only on the rare ~15-file-per-theme overflow.
 
 Dispatch bins in waves of up to 6 agents in parallel. Wait for all agents in a wave
 to complete before dispatching the next wave.
 
-**Example:** 14 bins → wave 1 dispatches bins 1-6, wave 2 dispatches bins 7-12, wave 3
-dispatches bins 13-14.
+**Example:** a PR touching 8 code areas produces 8 bins → wave 1 dispatches bins 1-6,
+wave 2 dispatches bins 7-8.
 
 <!-- Constraints: keep in sync with §Invocation template in .claude/agents/pr-audit-discovery-semantic.md -->
 For each bin, invoke (substituting `$RUN_ID`, `$BIN_ID`, and inlining `$BIN_FILES_JSON`):
@@ -481,7 +482,7 @@ You are pr-audit-discovery-semantic, invoked for run 20260520-143201-a3f9b2c, bi
 
 Inputs:
 - bin_id: 3
-- bin_files: [{"file":"schema/core/canon.schema.json","slice":"schemas","impact":480,"digests_needed":["digests/digest_schema/canon.schema.json"]}]  (sourced from context_bundle.json tier2_bins[2])
+- bin_files: [{"file":"schema/core/canon.schema.json","slice":"schemas","digests_needed":["digests/digest_schema/canon.schema.json"]}]  (sourced from context_bundle.json tier2_bins[2])
 - docs/audit/runs/20260520-143201-a3f9b2c/context_bundle.json
 - docs/audit/runs/20260520-143201-a3f9b2c/digests/<type>/<slug>.json  (paths listed in each file's digests_needed[])
 - Raw source files for each file in bin_files (escape hatch — prefer digests)

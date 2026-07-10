@@ -28,7 +28,7 @@ is independent and writes only to its own output path.
 Received via invocation context (passed by the orchestrating skill):
 
 - `bin_id` — integer bin number (1-based), determines output path
-- `bin_files[]` — array of `{file, slice, impact, digests_needed[]}` for this bin
+- `bin_files[]` — array of `{file, slice, digests_needed[]}` for this bin
 - `docs/audit/runs/<run-id>/context_bundle.json` — full bundle for cross-slice neighbor
   context and severity priors
 - `docs/audit/runs/<run-id>/digests/<type>/<slug>.json` — digests listed in
@@ -228,11 +228,11 @@ Log in `evidence[]` which source was used so the consolidator can assess confide
 
 ## References
 
-- Protocol §1 (P2 Tier-2 description), §3 (bin-packing, concurrency cap 6,
+- Protocol §1 (P2 Tier-2 description), §3 (theme-based dispatch, concurrency cap 6,
   digest as primary evidence surface)
 - `catalogs.md` — D1-D14 definitions with `cross_boundary_candidate` annotations;
   I1-I13 invariant definitions
-- `slices.yaml` — per-slice `applies` lists, `type_weight`, `semantic_work`
+- `slices.yaml` — per-slice `applies` lists, `semantic_work`
 - `schema/infra/findings.schema.json` (`vc:infra:findings`) — output schema
 
 ---
@@ -246,7 +246,7 @@ The orchestrator (SKILL.md) substitutes the placeholders below when launching th
 >>
 >> Inputs:
 >> - bin_id: {bin_id}
->> - bin_files: {bin_files_json}  (array of {file, slice, impact, digests_needed[]} for this bin,
+>> - bin_files: {bin_files_json}  (array of {file, slice, digests_needed[]} for this bin,
 >>   sourced from context_bundle.json tier2_bins[{bin_id}-1])
 >> - docs/audit/runs/{run_id}/context_bundle.json
 >> - docs/audit/runs/{run_id}/digests/<type>/<slug>.json  (paths listed in each file's digests_needed[])
@@ -277,4 +277,4 @@ The orchestrator (SKILL.md) substitutes the placeholders below when launching th
 
 - `{run_id}` — the run identifier (format: `<YYYYMMDD>-<HHMMSS>-<head-short-sha>`, per protocol §6)
 - `{bin_id}` — integer bin number (1-based), sourced from `context_bundle.json` `tier2_bins[]`; determines the output file name
-- `{bin_files_json}` — JSON array of `{file, slice, impact, digests_needed[]}` objects for this bin, inlined by the orchestrator at dispatch time
+- `{bin_files_json}` — JSON array of `{file, slice, digests_needed[]}` objects for this bin, inlined by the orchestrator at dispatch time

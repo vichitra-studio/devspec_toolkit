@@ -31,7 +31,7 @@ the fix; no separate fix artifact is written (protocol §2).
   (bare-type directory names, no `digest_` prefix):
   `schema/`, `prompt/`, `validator/`, `cli/`, `canon/`, `changelog/`,
   `migration/`, `test/`, `doc/`
-- `.claude/skills/devspec_pr_audit/slices.yaml` — slice definitions, globs, type_weight,
+- `.claude/skills/devspec_pr_audit/slices.yaml` — slice definitions, globs,
   expansion_rules, applies catalog subsets, semantic_work flags
 - `.claude/skills/devspec_pr_audit/catalogs.md` — D1-D14 and I1-I13 catalog definitions
 - `.claude/skills/devspec_pr_audit/protocol.md` — authoritative operational protocol
@@ -72,45 +72,30 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
    from `slices.yaml` to identify neighbor files pulled into scope (these are context
    files, not primary changed files). Record as `expansion_set` per file.
 
-5. **Compute impact scores** — per protocol §3 formula:
-   ```
-   impact = type_weight(file) × max(1, |expansion_set(file)|) × |applies.drift_types ∪ applies.invariants|
-   ```
-   Use `type_weight` overrides from `slices.yaml` where the path matches a specific-glob
-   override (e.g., `schema/core/**` → 12).
-
-6. **Theme-first greedy bin-packing for Tier-2** — group all `semantic_work: true` changed
+5. **Theme-based bin assignment for Tier-2** — group all `semantic_work: true` changed
    files by their slice assignment from `routing.json` (slice name = theme identifier; do
-   NOT re-derive from globs). Within each theme group, sort by descending impact. Then pack
-   each theme group independently:
-   - **Within-theme packing:** keep adding same-theme files to the current bin until the
-     next file would push the total past ~800 units (hard cap). Only then open a new bin.
-     A single-file bin is always permitted regardless of impact. The soft budget (~600 units)
-     is a nominal calibration target — same-theme cohesion may exceed it up to the cap.
-   - **Hard cap ~800:** a file that would push a bin past 800 always starts a new bin,
-     even within the same theme group.
-   - **Cross-theme co-location:** a theme group that produces only 1 changed file is an
-     orphan; orphan files MAY be co-located with another orphan from a different theme,
-     but only if their combined impact stays ≤ ~800. A theme group with ≥ 2 changed files
-     never cross-pollinates with another theme (OQ-13: traceability tag; rule stated above
-     is authoritative).
+   NOT re-derive from globs). Each non-empty theme group becomes exactly one bin containing
+   all of that theme's changed files — no scoring, no cross-theme merging.
    - **Multi-slice files:** assign to the slice whose glob shares the longest common leading
      path prefix with the file's path; break ties by choosing the lexicographically earlier
      slice name.
-   - **Bin count target:** `tier2_bin_count ≤ ⌈N/3⌉` per theme group (starting gate, hard
-     cap takes precedence — see protocol §3).
-   Record each bin as an array of `{file, slice, impact, digests_needed[]}`.
+   - **Overflow split (rare):** if a theme's file count (changed files + deduped
+     `expansion_set` neighbors) exceeds ~15 files, split it into sub-bins along a coherent
+     sub-axis: group by `{step}` capture if the slice's `expansion_rules` use one, otherwise
+     by shared parent directory. Never split by arbitrary sort-and-fill. Each sub-bin still
+     carries the theme's full `applies` set.
+   Record each bin as an array of `{file, slice, digests_needed[]}`.
    Dispatch bins in waves of ≤ 6 simultaneously (protocol §3); do NOT cite
    `SPECDEV_REVIEW_CONCURRENCY` — PR-audit concurrency is a separate limit.
 
-7. **Compute scope_footprint** — total impact units across all Tier-2 files; total changed
-   file count per slice; Tier-1 file count (semantic_work=false slices).
+6. **Compute scope_footprint** — total changed file count; changed file count per slice;
+   Tier-1 file count (semantic_work=false slices); tier2_bin_count.
 
-8. **Populate severity priors** — for each slice, record which D/I items from its `applies`
+7. **Populate severity priors** — for each slice, record which D/I items from its `applies`
    list have historically produced P0 findings (use catalog annotations as heuristic;
    record as `severity_priors: {D5: "P0", I3: "P0", ...}`).
 
-9. **Populate `per_slice[*].changed_files[]` from `routing.json`** — for every slice in
+8. **Populate `per_slice[*].changed_files[]` from `routing.json`** — for every slice in
    `slices_in_scope`, derive `changed_files[]` by iterating `routing.json` and grouping
    files by slice membership. `routing.json` is authoritative; never substitute a locally
    re-computed glob match.
@@ -129,7 +114,7 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
    matched by `route_files.py` is silently dropped here (observed in run
    `20260522-130551`).
 
-10. **Self-check: verify per_slice file count matches routing.json** — before writing the
+9. **Self-check: verify per_slice file count matches routing.json** — before writing the
     bundle, compute the total unique file count across all `per_slice[*].changed_files[]`
     (dedup files that appear in multiple slices) and confirm it equals
     `len(routing["routed_files"])` (or the equivalent unique-file count derived from
@@ -137,7 +122,7 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
     halt, re-derive `per_slice` strictly from `routing.json`, and only then proceed. Never
     emit a bundle where the per_slice file count disagrees with `routing.json`.
 
-11. **Assemble and write bundle** — write `context_bundle.json` with at minimum:
+10. **Assemble and write bundle** — write `context_bundle.json` with at minimum:
    ```json
    {
      "run_id": "<run-id>",
@@ -154,20 +139,20 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
      },
      "tier1_slices": ["generated_artifacts", "host_integration"],
      "tier2_bins": [
-       {"bin_id": 1, "total_impact": N, "files": [{"file": "...", "slice": "...", "impact": N, "digests_needed": [...]}]},
+       {"bin_id": 1, "theme": "schemas", "files": [{"file": "...", "slice": "...", "digests_needed": [...]}]},
        ...
      ],
-     "scope_footprint": {"total_impact": N, "changed_file_count": N, "tier2_bin_count": N},
+     "scope_footprint": {"changed_file_count": N, "tier2_bin_count": N},
      "generated_at": <unix-epoch>
    }
    ```
 
-12. **Validate output** — confirm the bundle is valid JSON and all referenced digest paths
+11. **Validate output** — confirm the bundle is valid JSON and all referenced digest paths
     exist under `docs/audit/runs/<run-id>/digests/`. If any digest path is missing, emit
     a note in a top-level `bundle_warnings[]` field rather than halting; the verifier will
     flag it.
 
-13. **Self-validate before declaring done** — confirm the bundle parses as valid JSON:
+12. **Self-validate before declaring done** — confirm the bundle parses as valid JSON:
     ```bash
     python3 -c "import json; json.load(open('docs/audit/runs/<run-id>/context_bundle.json'))"
     ```
@@ -201,7 +186,7 @@ N/A — context_bundle.json has no evidence fields. If structured evidence-like 
 
 - **Read**: load manifest, digest files, slices.yaml, prior review JSON
 - **Glob**: enumerate digest files under `docs/audit/runs/<run-id>/digests/`
-- **Grep**: extract slice names, expansion rule targets, type_weight overrides from slices.yaml
+- **Grep**: extract slice names, expansion rule targets, applies catalog subsets from slices.yaml
 - **Bash**: compute `date +%s` for `generated_at`; validate output JSON with
   `python3 -c "import json,sys; json.load(open(sys.argv[1]))" context_bundle.json`
 - **Write**: ONLY to `docs/audit/runs/<run-id>/context_bundle.json`
@@ -216,7 +201,7 @@ N/A — context_bundle.json has no evidence fields. If structured evidence-like 
 |-----------|----------|
 | Missing manifest.json | Halt; print "P0: manifest.json not found — P0 may not have completed". Do not write bundle. |
 | Digest file not found for a changed file | Add to `bundle_warnings[]`; continue |
-| Bin-packing produces 0 Tier-2 bins | Write bundle with `tier2_bins: []` and `bundle_warnings: ["No semantic_work=true files in scope; Tier-2 will be skipped"]` |
+| Theme grouping produces 0 Tier-2 bins | Write bundle with `tier2_bins: []` and `bundle_warnings: ["No semantic_work=true files in scope; Tier-2 will be skipped"]` |
 | L1 cap reached (iteration N=4 was rejected) | This agent does not enforce the cap; the orchestrating skill does. Agent always rewrites and writes a new bundle. |
 | Invalid JSON in prior review file | Halt; print error with path; do not write bundle |
 
@@ -224,8 +209,8 @@ N/A — context_bundle.json has no evidence fields. If structured evidence-like 
 
 ## References
 
-- Protocol §1 (phase flow), §2 (L1 loop semantics, iteration file naming), §3 (bin-packing formula)
-- `slices.yaml` — type_weight, expansion_rules, applies, semantic_work per slice
+- Protocol §1 (phase flow), §2 (L1 loop semantics, iteration file naming), §3 (theme-based dispatch)
+- `slices.yaml` — expansion_rules, applies, semantic_work per slice
 - `catalogs.md` — D1-D14 and I1-I13 definitions (for severity priors)
 - `schema/infra/findings.schema.json` (`vc:infra:findings`) — used to read prior review
 

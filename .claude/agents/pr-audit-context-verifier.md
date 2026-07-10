@@ -14,7 +14,7 @@ tools:
 # pr-audit-context-verifier — P1 Context Bundle Verifier (L1 loop)
 
 Reviews `context_bundle.json` produced by `pr-audit-context-author` for completeness,
-slice-routing correctness, impact-math sanity, and bin-packing integrity. Participates
+slice-routing correctness, and theme-bin assignment integrity. Participates
 in loop L1 as the review participant (protocol §2). Emits `iter_p1_<N>_review.json`
 conforming to `vc:infra:findings`. Zero findings = VERIFIED; any findings = NEEDS_REVISION
 (context-author re-runs with a new iteration).
@@ -32,7 +32,7 @@ L1 cap is 4. On cap hit, the skill halts — this agent does not manage the cap 
   in the bundle actually exist
 - `.claude/skills/devspec_pr_audit/slices.yaml` — authoritative glob definitions and
   expansion_rules for routing correctness checks
-- `.claude/skills/devspec_pr_audit/protocol.md` — §2 (L1 semantics), §3 (bin-packing)
+- `.claude/skills/devspec_pr_audit/protocol.md` — §2 (L1 semantics), §3 (theme-based dispatch)
 
 ---
 
@@ -66,16 +66,21 @@ Conforms to `vc:infra:findings` (`schema/infra/findings.schema.json`). `scope` f
 
 5. **Check expansion sets** — for each changed file in the bundle, verify its
    `expansion_files[]` are consistent with the slice's `expansion_rules` in slices.yaml.
-   Expansion overshoot or undershoot that would affect bin impact > 10% → P2 finding
-   (kind: `drift`).
+   Missing or spurious expansion entries → P2 finding (kind: `drift`).
 
-6. **Validate impact math** — for a sample of ≥3 files (or all if ≤10 total), recompute
-   impact score using the protocol §3 formula and compare to the bundle's recorded impact.
-   Discrepancy > 10% → P1 finding (kind: `bug`); include the recomputed value in evidence.
+6. **Check theme-bin assignment** — per protocol §3: every theme (slice) with
+   `semantic_work: true` changed files must appear in exactly one bin in `tier2_bins[]`,
+   UNLESS its file count (changed files + deduped expansion neighbors) exceeds ~15, in
+   which case it may be split into sub-bins grouped by `{step}` capture or shared parent
+   directory. A theme missing entirely from `tier2_bins[]`, a theme split without exceeding
+   the overflow threshold, a theme split by anything other than step/directory grouping, or
+   a file appearing in more than one bin → P1 finding (kind: `bug`).
 
-7. **Check bin-packing constraint** — no bin (except single-file oversized bins) should
-   exceed ~200 units. An oversized multi-file bin → P1 finding (kind: `bug`). Confirm
-   `tier2_bin_count` equals the length of `tier2_bins[]`.
+7. **Check bin count sanity** — `tier2_bin_count` must equal the length of `tier2_bins[]`,
+   and must not exceed the number of `semantic_work: true` slices with changed files by
+   more than the number of overflow-split themes (each overflow split adds at most a few
+   extra bins for that one theme). A bin count far exceeding the touched-theme count with no
+   overflow justification → P1 finding (kind: `bug`).
 
 8. **Check digest path existence** — for each `digests_needed[]` entry in every bin,
    confirm the path exists under `docs/audit/runs/<run-id>/digests/`. Missing digest →
@@ -103,7 +108,7 @@ Conforms to `vc:infra:findings` (`schema/infra/findings.schema.json`). `scope` f
 **upstream_refs[] requirement (P0/P1):** For each emitted review finding with severity P0 or P1, populate `upstream_refs[]` with at least one entry. Acceptable entries:
 - A path:json-pointer into context_bundle.json identifying the defective slice/bin/file entry (e.g. `context_bundle.json#/tier2_bins/3/files/0`)
 - A path:json-pointer into manifest.json (e.g. `manifest.json#/slices_in_scope`)
-- A specific impact-formula discrepancy (e.g. `impact-formula:prompt_14_roadmap.md:expected=630,got=420`)
+- A specific theme-assignment discrepancy (e.g. `theme-assignment:prompt_14_roadmap.md:expected_bin=prompts,got=missing`)
 
 Empty `upstream_refs[]` on a P0/P1 review finding fails `self_validate.py`. The orchestrator MAY pass `--skip-upstream-refs-check` for iter review files; check the current SKILL.md invocation template. If the orchestrator passes the skip flag, this rule becomes advisory — still populate refs for operator usability.
 
@@ -160,7 +165,7 @@ There is no separate verdict field; the findings array IS the verdict.
 - **Glob**: enumerate digest files under `docs/audit/runs/<run-id>/digests/` to verify existence
 - **Grep**: extract glob patterns and expansion_rules from slices.yaml for routing checks
 - **Bash**: `python3 -c "import json,sys; json.load(open(sys.argv[1]))"` to validate JSON;
-  arithmetic for impact-math sanity checks
+  file-count arithmetic for theme-bin and overflow-split sanity checks
 - **Write**: ONLY to `docs/audit/runs/<run-id>/iter_p1_<N>_review.json`
 - Do NOT call Edit; do NOT call any nested Agent tool
 - Do NOT modify `context_bundle.json` — this agent is read-only with respect to bundle
@@ -182,7 +187,7 @@ There is no separate verdict field; the findings array IS the verdict.
 
 - Protocol §2 (L1 semantics, convergence predicate, cap=4 halt, full-review rule,
   iteration file naming)
-- Protocol §3 (bin-packing formula, budget ~200 units, single-file oversized-bin rule)
+- Protocol §3 (theme-based dispatch: one bin per theme, ~15-file overflow-split rule)
 - `slices.yaml` — authoritative routing globs and expansion_rules
 - `schema/infra/findings.schema.json` (`vc:infra:findings`) — output schema
 
