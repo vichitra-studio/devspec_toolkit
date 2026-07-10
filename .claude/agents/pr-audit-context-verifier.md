@@ -90,14 +90,24 @@ Conforms to `vc:infra:findings` (`schema/infra/findings.schema.json`). `scope` f
    where `semantic_work: false` in slices.yaml. Any Tier-2 bin must contain only files
    from slices where `semantic_work: true`. Violations → P1 finding (kind: `bug`).
 
-10. **Full-review rule** — this is always a full review per protocol §2; no spot-checking.
+10. **Check bundle_warnings resolution** — for each entry in `bundle.bundle_warnings[]`
+    (if the field is present and non-empty), confirm the condition it describes is either
+    resolved or intentional. A warning about a missing digest for a file that does NOT
+    appear in any `tier2_bins[].digests_needed[]` list (e.g. a Tier-1 or
+    `semantic_work: false` file whose digest was correctly skipped) is expected and not an
+    error. A warning that instead indicates a genuine unresolved gap — e.g. a missing
+    digest for a file that DOES appear in a `tier2_bins[].digests_needed[]` list — is not
+    covered by the step 8 check above (which only walks `digests_needed[]` entries) and
+    must be flagged here: emit a P1 finding (kind: `gap`).
+
+11. **Full-review rule** — this is always a full review per protocol §2; no spot-checking.
     Apply every check on every round (including the final round before cap).
 
-11. **Assemble and write review file** — write `iter_p1_<N>_review.json` conforming to
+12. **Assemble and write review file** — write `iter_p1_<N>_review.json` conforming to
     `vc:infra:findings`. Include `catalog_tag` where applicable. Every finding must have
     `evidence[]` with the specific value that triggered it.
 
-12. **Self-validate before declaring done:**
+13. **Self-validate before declaring done:**
     ```bash
     python3 .claude/skills/devspec_pr_audit/scripts/self_validate.py \
         --schema schema/infra/findings.schema.json \
@@ -114,6 +124,7 @@ Empty `upstream_refs[]` on a P0/P1 review finding fails `self_validate.py`. The 
 
 ---
 
+<!-- Constraints: keep in sync with the identical '## Output schema constraints' block in .claude/agents/pr-audit-discovery-semantic.md -->
 ## Output schema constraints
 
 Schema: `vc:infra:findings` (`schema/infra/findings.schema.json`).

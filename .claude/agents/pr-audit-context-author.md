@@ -91,9 +91,12 @@ Schema: skill-internal (no `$id` lock). All downstream agents treat this file as
 6. **Compute scope_footprint** — total changed file count; changed file count per slice;
    Tier-1 file count (semantic_work=false slices); tier2_bin_count.
 
-7. **Populate severity priors** — for each slice, record which D/I items from its `applies`
-   list have historically produced P0 findings (use catalog annotations as heuristic;
-   record as `severity_priors: {D5: "P0", I3: "P0", ...}`).
+7. **Populate severity priors** — for each slice, judge which D/I items from its `applies`
+   list are most likely to produce P0 findings for this run, using the general P0/P1/P2
+   severity meaning from catalogs.md's "How catalogs are applied" section (P0 = blocker,
+   P1 = high, P2 = medium-or-low) as your guide. Catalogs.md carries no per-item severity
+   annotations to read — `severity_priors` is this agent's own judgment call, not a lookup;
+   record as `severity_priors: {D5: "P0", I3: "P0", ...}`.
 
 8. **Populate `per_slice[*].changed_files[]` from `routing.json`** — for every slice in
    `slices_in_scope`, derive `changed_files[]` by iterating `routing.json` and grouping
