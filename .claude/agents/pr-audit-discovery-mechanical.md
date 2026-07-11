@@ -168,6 +168,7 @@ Any other value (e.g., `"invariant"`, `"schema_violation"`) is invalid.
 **`upstream_refs[]` requirement (P0/P1):** For each emitted finding with severity `P0` or `P1`, populate `upstream_refs[]` with at least one entry. Acceptable entries:
 - A commit SHA from the audited diff (e.g. `commit:5dc3aa1`)
 - A source-line ref anchoring the evidence (e.g. `schema/foo.json:42`)
+- A digest-path reference (e.g. `digests/schema/foo.schema.json.json#/payload/required`)
 - A finding signature from an upstream fragment that motivated this finding (e.g. `tier0:0e0323f5d557`)
 
 Empty `upstream_refs[]` on a P0/P1 finding will fail `self_validate.py`. Use `--skip-upstream-refs-check` only for observational/review outputs (this agent produces discovery findings, so the rule applies). P2 findings are exempt from this requirement.

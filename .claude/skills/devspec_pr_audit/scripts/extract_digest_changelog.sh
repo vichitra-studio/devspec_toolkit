@@ -108,11 +108,27 @@ if basename.endswith(".yaml") or basename.endswith(".yml"):
         if cat and desc:
             categorized[cat].append(desc)
 
+    # The changelog yaml format has no per-entry breaking-rationale field
+    # (see changelog/format.yaml optional_fields) — only a top-level
+    # `breaking: bool`. Rather than inventing rationale text, extract the
+    # first line of any change entry whose own description explicitly
+    # mentions "breaking" (real content, not fabricated).
+    breaking_entries = []
+    if breaking_flag:
+        for ch in changes_list:
+            if not isinstance(ch, dict):
+                continue
+            desc = str(ch.get("description", "")).strip()
+            if desc and "breaking" in desc.lower():
+                first_line = " ".join(desc.split("\n")[0].split())
+                if first_line:
+                    breaking_entries.append(first_line)
+
     payload = {
         "version_label": version_label,
         "release_date": "",
         "is_unreleased": is_unreleased,
-        "breaking": [f"breaking: true (DEVSPEC-38 schema field removal)"] if breaking_flag else [],
+        "breaking": breaking_entries,
         "added": categorized["added"],
         "changed": categorized["changed"],
         "removed": categorized["removed"],

@@ -54,7 +54,12 @@
               },
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
-                "description": "Current progress status of the milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release. Use 'pending' for newly created milestones."
+                "description": "Current progress status of the milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release, requires this milestone's own `milestone_status_reason`. Use 'pending' for newly created milestones."
+              },
+              "milestone_status_reason": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Required when status is 'deferred' or 'wont_do'. Explanation for why this milestone was postponed or cancelled. Format: name the blocker/decision and, for 'deferred', the condition required to resume. Example (deferred): 'Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.' Example (wont_do): 'Superseded by ms-unified-checkout; wallet routing folded into that milestone.' Anti-pattern: 'TBD' or 'not doing this' (provides no actionable context)."
               },
               "risk_status": {
                 "$ref": "vc:core:atoms#severityLevel",
@@ -265,6 +270,28 @@
               "deliverables",
               "fr_refs",
               "capability_refs"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "deferred",
+                        "wont_do"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "milestone_status_reason"
+                  ]
+                }
+              }
             ],
             "description": "A single roadmap milestone with user story, tasks, and deliverables."
           }

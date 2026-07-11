@@ -10,8 +10,9 @@ The following flags are available on most spec-operating commands, including
 CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
 `--spec-root`; most `specdev json` subcommands take `--repo-root` only; and
 diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
-`dag-lint`, `extraction-intent-check`, `prompt-context`, `traceability-check`)
-take `--repo-root` only.
+`dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root`
+only; `traceability-check` accepts all three submodule-aware flags
+(`--repo-root`, `--spec-root`, `--git-root`).
 Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |
@@ -58,7 +59,7 @@ This reference collects recurring facts that developers need while authoring or 
 
 ## Naming & Schema Conventions
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).
-- **Owner enum**: one of `{api, ui, system, ops, data, product, business, engineering}`.
+- **Owner enum**: one of `{api, ui, system, ops, data, product, business, engineering}` (source of truth: `schema/core/atoms.schema.json#owner`).
 - **Artifacts**: include the canonical `$schema` URI exactly as emitted in the prompt.
 - **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from [schema/core/](../../schema/core/).
@@ -98,13 +99,15 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 
 # Traceability closure — verifies the full charter-goal -> capability -> FR -> API/fixture
 # chain has no dangling links (capability/FR/API/fixture trace-type checks); add --json
-# for a machine-readable report; diagnostic/utility command — takes --repo-root only
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
+# for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Seed enforcement
 ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Invariants & Governance
+# SPECDEV_INVARIANTS_STRICT=1 is equivalent to passing --strict: promotes unevaluable
+# rules (W_INVARIANT_UNEVALUABLE) to fatal errors (E_INVARIANT_UNEVALUABLE)
 ./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --sample ./path/to/sample.json
 ./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --message "feat(spec): add login [fr-initial-login]"
 
@@ -312,6 +315,10 @@ specdev milestone-state \
 
 **When to run:** When debugging Trinity loop state, verifying phase-position transitions, or
 smoke-testing the `specdev-trinity` skill's milestone dispatch.
+
+> **Note:** The former `specdev-trinity-plan` skill no longer exists as a separate skill;
+> its plan-phase functionality is now `/specdev-trinity <batch_id> --phase plan` (the default
+> phase — see `.claude/skills/specdev-trinity/SKILL.md`).
 
 ### Version Update & Migration
 

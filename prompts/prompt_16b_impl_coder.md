@@ -384,7 +384,7 @@ Before emitting, verify:
 - Every `spec_ref.id` in the checklist that references a `fr_id`, `api_id`, or `inv_id` has observable test coverage in the codebase.
 - No checklist item is silently skipped — each must reach `implementation.status: verified`, `checklist_status: deferred`, or `checklist_status: wont_do`, or be logged as a `blocked` emergent_ambiguity, with documented rationale. Setting `checklist_status: "deferred"` on an item requires populating that item's own `deferred_reason` (name the blocker and the undefer condition) — this does NOT require deferring the whole plan. If work is discovered mid-implementation to be permanently unnecessary (not just blocked or postponed), set `checklist_status: "wont_do"` and populate `wont_do_reason` instead — do NOT delete the checklist item to work around coverage validation; deletion loses the record that the work was considered and explicitly cancelled.
 - If any checklist item has an unresolvable ambiguity: surface it in `emergent_ambiguities` rather than making a silent assumption.
-- All checklist items with `status: active` have a non-empty `linked_test_expectation` pointing to a specific test identifier.
+- All checklist items with `checklist_status: active` have a non-empty `linked_test_expectation` pointing to a specific test identifier.
 - [ ] All code references include file paths and function signatures (no ambiguous references)
 - [ ] Error handling covers all failure modes identified in FR acceptance criteria
 - [ ] Implementation contracts match the interfaces defined in Step 05 API spec

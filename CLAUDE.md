@@ -127,7 +127,7 @@ specdev registry-generate --repo-root .
 
 **Naming:**
 - IDs: kebab-case (`fr-user-login`, `api-session-create`)
-- Owner enum: `api | ui | system | ops | data | product | business | engineering`
+- Owner enum: `api | ui | system | ops | data | product | business | engineering` (source of truth: `schema/core/atoms.schema.json#owner`)
 - Reuse primitives from `schema/core/` (atoms, collections, errors, etc.); never redefine
 - Artifacts must include the canonical `$schema` URI from the matching prompt
 
@@ -154,6 +154,7 @@ Full E/W code catalog: `docs/developers/error-codes.md`. Generic step/schema pat
 | `SPECDEV_WARNINGS_AS_ERRORS=1` | Promote all W-codes with E-counterparts to errors |
 | `SPECDEV_PROMOTE_CODES=W571,W593` | Selective promotion of listed W-codes. A listed code that is not promotable (absent from `PROMOTABLE_PAIRS`, e.g. `W590`/`W597`) or unrecognised is **ignored with a one-time stderr warning** naming the code (emitted by `validate-all` and `spec-check`), rather than silently dropped. |
 | `SPECDEV_MATRIX_STRICT=1` | Make matrix coverage errors fatal |
+| `SPECDEV_INVARIANTS_STRICT=1` | Promote `invariants-check` unevaluable rules (`W_INVARIANT_UNEVALUABLE`) to fatal errors (`E_INVARIANT_UNEVALUABLE`); equivalent to `invariants-check --strict` |
 | `SPECDEV_REPLAY_BASE_REF=<ref>` | Override forward-replay base ref |
 | `SPECDEV_REPLAY_DIFF_ERROR_MODE=error` | Make replay diff failures fatal |
 | `SPECDEV_STALENESS_THRESHOLD=N` | Min new upstream tokens before W595 fires (default 3) |

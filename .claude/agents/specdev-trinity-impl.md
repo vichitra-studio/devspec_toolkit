@@ -119,10 +119,11 @@ invocation prompt. This agent reads it and branches.
    ```
 3. Extract `target_file_patterns` from `plan.summary.target_file_patterns`. This is the
    only location where this field exists — no per-group override is defined in the schema
-   (confirmed: checklist item properties are `[checklist_status, description, fixture_ref,
-   id, implementation, layer, linked_test_expectation, milestone_ref, nfr_refs, spec_ref,
-   type]`; `target_file_patterns` is absent). These patterns are the exclusive boundary
-   for Edit/Write (E6).
+   (confirmed via `devspec_toolkit/schema/16_impl_context.schema.json` L320-L413: checklist
+   item properties are `[checklist_status, deferred_reason, description, fixture_ref, id,
+   implementation, layer, linked_test_expectation, milestone_ref, nfr_refs, spec_ref, type,
+   wont_do_reason]`; `target_file_patterns` is absent). These patterns are the exclusive
+   boundary for Edit/Write (E6).
 4. Iterate over `implementation.actions[]` in order. Each action has verified schema shape
    `{type, description, target, command, evidence, command_ref}` where `type` is enum
    `{file_create, file_edit, run_command, manual_verification}` (per the action object at

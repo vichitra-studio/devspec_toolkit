@@ -121,10 +121,10 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
         FileNotFoundError: If version YAML doesn't exist
         ValueError: If YAML is invalid or missing required fields
     """
-    yaml_path = changelog_dir / f"v{version}.yaml"
+    yaml_path = changelog_dir / "unreleased.yaml" if version == "unreleased" else changelog_dir / f"v{version}.yaml"
     if not yaml_path.exists():
         raise FileNotFoundError(f"Changelog not found for version {version}: {yaml_path}")
-    
+
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     
@@ -293,7 +293,7 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     # Raw-dict structural checks (run before load_version so type/key
     # problems are visible even when the parsed dataclass would succeed).
     # ------------------------------------------------------------------
-    yaml_path = changelog_dir / f"v{version}.yaml"
+    yaml_path = changelog_dir / "unreleased.yaml" if version == "unreleased" else changelog_dir / f"v{version}.yaml"
     try:
         with open(yaml_path, "r", encoding="utf-8") as _f:
             raw = yaml.safe_load(_f)
@@ -335,7 +335,8 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     # Check 3: `version` field must be valid semver and match filename argument.
     if "version" in raw:
         file_version = raw["version"]
-        if not isinstance(file_version, str) or not _is_valid_semver(file_version):
+        is_unreleased_sentinel = version == "unreleased" and file_version == "unreleased"
+        if not isinstance(file_version, str) or not (is_unreleased_sentinel or _is_valid_semver(file_version)):
             errors.append(
                 make_error(
                     "E520",
@@ -347,6 +348,42 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
                 make_error(
                     "E520",
                     f"Field 'version' value {file_version!r} does not match filename version {version!r}.",
+                )
+            )
+
+    # Check 4: when `source_of_truth`/`render_target` are declared (per
+    # format.yaml's optional_fields), the files they point to must exist and
+    # be non-empty. This is a structural existence check only — it does not
+    # attempt to verify content-level parity (e.g. entry-for-entry sync
+    # between the YAML source and its rendered Markdown), which would need a
+    # dedicated warning-level error code to stay non-fatal on legitimate
+    # pre-existing content.
+    repo_root = changelog_dir.parent
+    for _field_name in ("source_of_truth", "render_target"):
+        if _field_name not in raw or _field_name not in allowed_keys:
+            continue
+        _value = raw[_field_name]
+        if not isinstance(_value, str) or not _value.strip():
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field '{_field_name}' must be a non-empty string path, got {_value!r} in {yaml_path.name}.",
+                )
+            )
+            continue
+        _target_path = repo_root / _value
+        if not _target_path.exists():
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field '{_field_name}' in {yaml_path.name} points to a missing file: {_value}",
+                )
+            )
+        elif _target_path.is_file() and _target_path.stat().st_size == 0:
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field '{_field_name}' in {yaml_path.name} points to an empty file: {_value}",
                 )
             )
 

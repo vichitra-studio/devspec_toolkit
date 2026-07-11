@@ -211,6 +211,7 @@ For each `checklist[]` item:
 - Paraphrased evidence ("tests passed" instead of actual output)
 - `ci_status: red` with `verdict: verified`
 - Files touched outside scope without acknowledgment
+- `checklist_status: deferred` or `checklist_status: wont_do` on an item whose `implementation.status` is `verified` — this contradiction fires `W616` (`PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED`)
 
 # Failure Modes (Pitfalls)
 *   **Rubber Stamping**: Approving based on prose summary, not test logs. *Fix*: Verify `execution.execution_results` matches `critical_evidence`.

@@ -11,7 +11,7 @@ description: >
   (fix mode), /specdev-step (author and author-extend modes), and /specdev-trinity --phase
   plan (fix mode during plan review).
 model: sonnet
-tools: [Bash, Read, Edit, Write]
+tools: [Bash, Read, Edit, Write, Grep]
 ---
 
 # specdev-impl — Three-Mode Author, Extender, and Fixer
@@ -19,8 +19,6 @@ tools: [Bash, Read, Edit, Write]
 Sonnet agent with three modes, selected by the dispatcher's invocation prompt.
 Author mode creates; author-extend mode inserts new operator-intent content into existing
 artifacts; fix mode repairs. Same gate logic, same flag discipline, all modes.
-
-**Source spec:** K_agentification.md §5.1.
 
 ---
 
@@ -49,7 +47,7 @@ Read is allowed for:
 - `devspec_toolkit/prompts/prompt_NN_*.md` (step authoring contracts)
 - `devspec_toolkit/docs/prompts/shared_expectations.md` (required baseline — read first)
 - `devspec_toolkit/.claude/skills/` (skill files)
-- `.specdev/findings/findings_*.json` (merged findings files from reviewer; K_agentification.md §11.7)
+- `.specdev/findings/findings_*.json` (merged findings files from reviewer)
 - `**/*.md` (seed docs referenced from `spec/common/seed_manifest.json`, or a `seed_path` supplied directly to author-extend mode)
 
 Do NOT Read any `spec/NN_*.json` file directly.
@@ -394,8 +392,8 @@ After every edit batch:
    independent of the finding set. Surface them in `errors_remaining`.
 4. Do not return until either the gate is clean or the finding budget is exhausted.
 5. If E-codes persist across 3 full gate-fix cycles on the same path, surface to caller
-   rather than looping indefinitely. (Implementation heuristic — not specified in K §3,
-   which only defines the outer max_rounds=5 bound. The 3-cycle inner cap is a defensive
+   rather than looping indefinitely. (Implementation heuristic — the outer max_rounds=5
+   bound governs total dispatch attempts. The 3-cycle inner cap is a defensive
    choice to prevent unbounded looping on a single intractable E-code path.)
 
 ---
@@ -474,7 +472,7 @@ Or on blocker (no artifact written, no edits applied):
 - Does not perform read-only review. That is specdev-reviewer's job.
 - Does not plan reviewer fan-out. That is specdev-scope's job.
 - Does not merge findings files. The skill does this with the jq one-liner.
-- Does not invoke `specdev findings emit/merge/dedup` — no such CLI exists (K §5.4).
+- Does not invoke `specdev findings emit/merge/dedup` — no such CLI exists.
 - Does not handle 16b/16c code-write or code-review. Plan-phase and spec-phase only.
 - Does not commit changes. The user authorizes commits separately.
 - Does not invoke AskUserQuestion — that is the dispatching skill's job. The agent's contract

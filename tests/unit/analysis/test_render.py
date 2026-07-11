@@ -73,6 +73,22 @@ def test_plain_w613_header_when_unclassified():
     assert "[1 x W613 — see stderr]" in out
 
 
+def test_plain_origin_tag_plan_renders_16a():
+    r = _rec(bucket="plan_level", impact=["plan.x"], origin="plan")
+    out = render_plain([r], status_filter="open", total_records=1,
+                       open_count=1, resolved_count=0, milestones_scanned=1,
+                       unclassified_w613_count=0)
+    assert "[16a]" in out
+
+
+def test_plain_origin_tag_execution_renders_16b_plus():
+    r = _rec(bucket="plan_level", impact=["plan.x"], origin="execution")
+    out = render_plain([r], status_filter="open", total_records=1,
+                       open_count=1, resolved_count=0, milestones_scanned=1,
+                       unclassified_w613_count=0)
+    assert "[16b+]" in out
+
+
 def test_plain_totals_line():
     out = render_plain([], status_filter="open", total_records=0,
                        open_count=0, resolved_count=0, milestones_scanned=0,
