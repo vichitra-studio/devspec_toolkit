@@ -13,7 +13,11 @@ because the registry generator (W3) guarantees coverage as an internal contract.
       read ``<spec_root>/<spec_file>`` and verify:
       - The array_path resolves to a non-null array in the file.
       - The first entry of the array contains the registered ``id_field``.
-      - For nested arrays, the same two checks apply.
+      - Nested arrays are checked only when present: a present-but-wrong-shape
+        nested array (wrong id_field or not an array) still fires E622, but a
+        missing nested array is not drift (nested arrays may be optional per
+        schema; a missing *required* nested array is caught by schema
+        validation in ``spec-check`` instead).
 
   R004 / W614 UNREGISTERED_ARRAY
       For every ``.json`` file in ``<spec_root>/``, scan top-level arrays

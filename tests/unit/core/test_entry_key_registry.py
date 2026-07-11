@@ -1,7 +1,7 @@
 """Unit tests for the entry_key_registry module.
 
 All tests use the minimal fixture registry at
-``tests/fixtures/entry_key_registry/entry_key_registry.json``.  No real
+``tests/fixtures/entry_key_registry/tools/entry_key_registry.json``.  No real
 project data is used.  Every public API call passes ``repo_root`` explicitly
 pointing at that fixture directory.
 
