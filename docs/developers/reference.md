@@ -12,7 +12,10 @@ CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
 diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
 `dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root`
 only; `update` takes `spec_dir` (positional) + `--repo-root` only and does
-**not** accept `--spec-root` or `--git-root`.
+**not** accept `--spec-root` or `--git-root`; `seed-index` takes `spec_dir`
+(positional) + `--repo-root` + `--git-root` but **not** `--spec-root`, and
+`hardcoded-seed-check` takes `--repo-root` + `--git-root` only (no
+positional, no `--spec-root`).
 Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |

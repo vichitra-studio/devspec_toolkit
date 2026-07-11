@@ -372,25 +372,33 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
             )
             continue
         _target_path = repo_root / _value
-        if not _target_path.exists():
-            errors.append(
-                make_error(
-                    "E520",
-                    f"Field '{_field_name}' in {yaml_path.name} points to a missing file: {_value}",
+        try:
+            if not _target_path.exists():
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to a missing file: {_value}",
+                    )
                 )
-            )
-        elif not _target_path.is_file():
-            errors.append(
-                make_error(
-                    "E520",
-                    f"Field '{_field_name}' in {yaml_path.name} points to a non-file path: {_value}",
+            elif not _target_path.is_file():
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to a non-file path: {_value}",
+                    )
                 )
-            )
-        elif _target_path.stat().st_size == 0:
+            elif _target_path.stat().st_size == 0:
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to an empty file: {_value}",
+                    )
+                )
+        except OSError as e:
             errors.append(
                 make_error(
                     "E520",
-                    f"Field '{_field_name}' in {yaml_path.name} points to an empty file: {_value}",
+                    f"Cannot check field '{_field_name}' in {yaml_path.name}: {e}",
                 )
             )
 
