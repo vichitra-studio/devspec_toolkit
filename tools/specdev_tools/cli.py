@@ -424,7 +424,7 @@ def main():
 
     ub = sub.add_parser(
         "upstream-backlog",
-        help="Aggregate emergent_ambiguities across impl_context plans by implicated upstream step (read-only)",
+        help="Aggregate both plan.ambiguities[] (16a) and execution.emergent_ambiguities[] (16b/16c) across impl_context plans by implicated upstream step (read-only)",
     )
     ub.add_argument("spec_dir")
     ub.add_argument("--repo-root", default=".")

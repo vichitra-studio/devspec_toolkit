@@ -346,3 +346,33 @@
   before any `.get()` calls run against it, so malformed `plan` values are
   treated as an empty plan instead of crashing the validator. Defensive-only:
   no previously-passing spec is affected.
+- **DEVSPEC-123**: `specdev upstream-backlog` now also scans `plan.ambiguities[]` (16a,
+  planning-phase) alongside `execution.emergent_ambiguities[]` (16b/16c) — previously
+  `plan.ambiguities[]` was never read at all, despite the specdev-context `SKILL.md`
+  "Upstream drift recording" section documenting both arrays as valid places to log an
+  ambiguity and instructing agents to verify routing via this tool. Each record now
+  carries an `origin` field (`"plan"` or `"execution"`) in `--json` output and a
+  `[16a]`/`[16b+]` tag in plain-text output. `plan.ambiguities[]`'s binary
+  blocking/non_blocking severity scale is mapped onto the shared low/medium/high/critical
+  rank for `--severity` filtering and sort order (`blocking` → `critical`, `non_blocking`
+  → `low`); the raw authored severity string is preserved verbatim in rendered output.
+- **DEVSPEC-123**: Added `W617 UPSTREAM_BACKLOG_STATUS_FILTERED`, fired by `specdev
+  upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one
+  record that otherwise satisfies the `--severity` threshold. This was the actual root
+  cause of the reported symptom — a real 87-entry `execution.emergent_ambiguities[]` array
+  looked completely invisible because 71 of those entries were resolved and the default
+  `--status open` view silently dropped them from the per-bucket detail (only the totals
+  line disclosed the resolved count). The JSON payload also gained
+  `summary.hidden_by_status_count` (always present, `0` when nothing is hidden) for
+  programmatic consumers. Informational only, non-promotable (same as W613).
+- **DEVSPEC-123 follow-up**: `specdev upstream-backlog` now skips a Trinity Anchor
+  (`artifact_role == "anchor"`) that has been misfiled inside `impl_context/` (the
+  `W609 ANCHOR_MISFILED` condition) instead of misreading it as a milestone plan. The
+  anchor's `plan.ambiguities[]` shares a path name with the milestone plan's 16a array
+  added above, but uses the shared `crossCycleAmbiguityItem` low/medium/high/critical
+  severity scale, not the 16a binary blocking/non_blocking scale; without this guard
+  every anchor ambiguity would have spuriously failed as `E520 invalid_severity`.
+  `artifact_role` is a required const on the anchor schema and absent from the
+  milestone-plan schema, so it is an unambiguous discriminator (matches `validate.py`'s
+  existing `artifact_role.strip() == "anchor"` routing check, including its tolerance of
+  whitespace padding).

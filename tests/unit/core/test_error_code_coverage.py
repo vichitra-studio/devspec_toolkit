@@ -71,6 +71,8 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W615", "E615",
             # DEVSPEC-122 follow-up: deferred-item/verified-implementation contradiction
             "W616",
+            # DEVSPEC-123: upstream-backlog discloses records hidden by --status filtering
+            "W617",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

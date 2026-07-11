@@ -1,5 +1,10 @@
-"""Upstream-backlog rollup: aggregate execution.emergent_ambiguities across
-milestone plans under ``spec/impl_context/*.json``.
+"""Upstream-backlog rollup: aggregate ambiguities across milestone plans
+under ``spec/impl_context/*.json`` — both ``plan.ambiguities[]`` (16a,
+planning-phase) and ``execution.emergent_ambiguities[]`` (16b/16c,
+discovered during live execution/verification). Both arrays are
+documented drift-recording targets (specdev-context SKILL.md "Upstream
+drift recording") and must be equally visible to backlog routing —
+DEVSPEC-123 found `plan.ambiguities[]` silently invisible to this tool.
 
 Read-only reporter. Four pure layers with one-way deps:
   Loader     -> iter_spec_artifacts + load_json_artifact (FS)
@@ -16,6 +21,11 @@ places the path between code and message.
 Path-separator non-goal: the ``/impl_context/`` path filter hard-codes
 forward slashes. The toolkit is darwin/linux-targeted; Windows is not
 supported.
+
+Anchor exclusion: a Trinity Anchor (``artifact_role == "anchor"``) misfiled
+inside ``impl_context/`` (the W609 condition) is skipped, not treated as a
+milestone plan — see ``_iter_plans``. Its ``plan.ambiguities[]`` shares a
+path name with the milestone plan's 16a array but not its shape.
 """
 from __future__ import annotations
 
@@ -28,6 +38,24 @@ from ..core.loaders import iter_spec_artifacts, load_json_artifact
 
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+# plan.ambiguities[] (16a) uses a binary blocking/non_blocking severity scale
+# instead of low/medium/high/critical (schema/16_impl_context.schema.json).
+# Mapped onto the shared rank so --severity filtering/sorting treats both
+# origins uniformly: "blocking" (implementation cannot proceed) is the most
+# urgent case -> critical; "non_blocking" (can proceed on a documented
+# assumption) is the least urgent -> low. The raw authored value is still
+# preserved verbatim on the record/JSON output — this mapping is only used
+# for ranking, never for display.
+PLAN_SEVERITY_RANK = {
+    "blocking": SEVERITY_ORDER["critical"],
+    "non_blocking": SEVERITY_ORDER["low"],
+}
+
+_VALID_SEVERITIES = {
+    "execution": frozenset(SEVERITY_ORDER),
+    "plan": frozenset(PLAN_SEVERITY_RANK),
+}
 
 RULE1_RE = re.compile(r"^spec/([0-9]{2}[a-z]?)_[a-z0-9_]+\.json(?::.+)?$")
 RULE2_CODE_RE = re.compile(r"\b[EW][0-9]{3}\b")
@@ -67,8 +95,24 @@ def classify(record: dict) -> tuple[str, int, Optional[str]]:
 
 def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[str]]]:
     """Yield ``(path, data_or_None, malformed_reason_or_None)`` for every
-    ``impl_context/*.json`` plan under *spec_dir*. Nested directories below
-    ``impl_context/`` are not scanned (only immediate children, no subdirectories).
+    ``impl_context/*.json`` milestone plan under *spec_dir*. Nested directories
+    below ``impl_context/`` are not scanned (only immediate children, no
+    subdirectories).
+
+    Files with ``artifact_role == "anchor"`` are skipped: a Trinity Anchor
+    (``schema/16_anchor.schema.json``) sometimes ends up misfiled inside
+    ``impl_context/`` instead of at the spec root (the ``W609
+    ANCHOR_MISFILED`` condition validate.py already detects). The anchor's
+    ``plan.ambiguities[]`` reuses the *path name* ``plan.ambiguities`` but not
+    the 16a shape -- it carries the shared ``crossCycleAmbiguityItem`` low/
+    medium/high/critical severity scale (cross-Trinity-cycle rollup), not the
+    milestone plan's binary blocking/non_blocking scale. Treating a misfiled
+    anchor as a milestone plan would run its (valid) severities through the
+    wrong vocabulary and spuriously fail every entry as E520 invalid_severity.
+    ``artifact_role`` is a required const on the anchor schema and absent
+    entirely from the milestone-plan schema, so it's an unambiguous
+    discriminator (matches validate.py's ``artifact_role.strip() == "anchor"``
+    check, including its tolerance of whitespace padding).
     """
     for path in iter_spec_artifacts(spec_dir):
         if not _IMPL_CONTEXT_RE.search(path):
@@ -81,6 +125,9 @@ def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[s
         except UnicodeDecodeError:
             yield (path, None, f"unicode_decode_error={path}")
             continue
+        artifact_role = data.get("artifact_role") if isinstance(data, dict) else None
+        if isinstance(artifact_role, str) and artifact_role.strip() == "anchor":
+            continue
         yield (path, data, None)
 
 
@@ -88,43 +135,54 @@ def _iter_plans(spec_dir: str) -> Iterator[tuple[str, Optional[dict], Optional[s
 # Record extraction + coercion
 # ---------------------------------------------------------------------------
 
-def _coerce_records(
-    plan: dict, path: str
-) -> tuple[list[dict], list[str]]:
-    """Return ``(records, e520_stderr_lines)`` extracted from one plan.
+def _severity_rank(record: dict) -> int:
+    """Return the shared 0-3 severity rank for a record.
 
-    Applies the null/missing collapse on ``execution`` and
-    ``emergent_ambiguities`` uniformly (both ``missing`` and explicit
-    ``null`` become an empty list). Skips records with missing/invalid
-    ``id`` or ``severity`` and emits E520 per skip.
+    Dispatches on ``record["origin"]`` ("plan" uses the binary
+    blocking/non_blocking scale via ``PLAN_SEVERITY_RANK``; anything else,
+    including records with no ``origin`` key at all, uses the
+    low/medium/high/critical ``SEVERITY_ORDER`` scale). The ``.get`` default
+    keeps this backward-compatible with record dicts built before origin
+    tagging existed (e.g. hand-built fixtures in unit tests).
+    """
+    if record.get("origin") == "plan":
+        return PLAN_SEVERITY_RANK[record["severity"]]
+    return SEVERITY_ORDER[record["severity"]]
+
+
+def _extract_one_array(
+    items: list, *, origin: str, milestone_id: str, path: str
+) -> tuple[list[dict], list[str]]:
+    """Coerce one raw ambiguities array into unified records.
+
+    Shared by both ``plan.ambiguities[]`` (origin="plan") and
+    ``execution.emergent_ambiguities[]`` (origin="execution") — the two
+    differ only in their valid severity vocabulary; status collapse,
+    description/impact coercion, and classify() are identical.
     """
     records: list[dict] = []
     errors: list[str] = []
-    milestone_id = plan.get("id") if isinstance(plan.get("id"), str) else ""
-    execution = plan.get("execution") or {}
-    if not isinstance(execution, dict):
-        return records, errors
-    ambiguities = execution.get("emergent_ambiguities") or []
-    if not isinstance(ambiguities, list):
-        return records, errors
+    valid_severities = _VALID_SEVERITIES[origin]
 
     e520 = ERROR_CODES["E520"]
-    for amb in ambiguities:
+    for amb in items:
         if not isinstance(amb, dict):
-            errors.append(f"E520 {e520} non_dict_ambiguity in {path}")
+            errors.append(
+                f"E520 {e520} non_dict_ambiguity in {path} (origin={origin})"
+            )
             continue
         amb_id = amb.get("id")
         if not isinstance(amb_id, str) or not amb_id:
             errors.append(
                 f"E520 {e520} missing_id in {path} "
-                f"(milestone={milestone_id or '?'})"
+                f"(origin={origin}, milestone={milestone_id or '?'})"
             )
             continue
         severity = amb.get("severity")
-        if not isinstance(severity, str) or severity not in SEVERITY_ORDER:
+        if not isinstance(severity, str) or severity not in valid_severities:
             errors.append(
                 f"E520 {e520} invalid_severity={severity!r} in {path} "
-                f"(milestone={milestone_id or '?'}, ambiguity={amb_id})"
+                f"(origin={origin}, milestone={milestone_id or '?'}, ambiguity={amb_id})"
             )
             continue
 
@@ -150,7 +208,48 @@ def _coerce_records(
             "bucket": bucket,
             "matched_rule": matched_rule,
             "matched_impact_entry": matched_entry,
+            "origin": origin,
         })
+    return records, errors
+
+
+def _coerce_records(
+    plan: dict, path: str
+) -> tuple[list[dict], list[str]]:
+    """Return ``(records, e520_stderr_lines)`` extracted from one plan.
+
+    Scans both ``plan.ambiguities[]`` (16a) and
+    ``execution.emergent_ambiguities[]`` (16b/16c) — see DEVSPEC-123.
+    Applies the null/missing collapse on ``plan``/``ambiguities`` and
+    ``execution``/``emergent_ambiguities`` uniformly (both ``missing`` and
+    explicit ``null`` become an empty list). Skips records with
+    missing/invalid ``id`` or ``severity`` and emits E520 per skip.
+    """
+    raw_milestone_id = plan.get("id")
+    milestone_id: str = raw_milestone_id if isinstance(raw_milestone_id, str) else ""
+    records: list[dict] = []
+    errors: list[str] = []
+
+    plan_section = plan.get("plan") or {}
+    if isinstance(plan_section, dict):
+        plan_ambiguities = plan_section.get("ambiguities") or []
+        if isinstance(plan_ambiguities, list):
+            recs, errs = _extract_one_array(
+                plan_ambiguities, origin="plan", milestone_id=milestone_id, path=path
+            )
+            records.extend(recs)
+            errors.extend(errs)
+
+    execution = plan.get("execution") or {}
+    if isinstance(execution, dict):
+        emergent = execution.get("emergent_ambiguities") or []
+        if isinstance(emergent, list):
+            recs, errs = _extract_one_array(
+                emergent, origin="execution", milestone_id=milestone_id, path=path
+            )
+            records.extend(recs)
+            errors.extend(errs)
+
     return records, errors
 
 
@@ -164,7 +263,7 @@ def filter_records(
     min_rank = SEVERITY_ORDER[severity_min]
     out: list[dict] = []
     for r in records:
-        if SEVERITY_ORDER[r["severity"]] < min_rank:
+        if _severity_rank(r) < min_rank:
             continue
         if status_filter == "open" and r["status"] == "resolved":
             continue
@@ -191,7 +290,7 @@ def _bucket_sort_key(bucket: str) -> tuple:
 def _record_sort_key(r: dict) -> tuple:
     return (
         _bucket_sort_key(r["bucket"]),
-        -SEVERITY_ORDER[r["severity"]],
+        -_severity_rank(r),
         r["milestone_id"],
         r["ambiguity_id"],
     )
@@ -282,8 +381,9 @@ def render_plain(
         for r in recs:
             sev = r["severity"]
             pad = " " * max(1, 9 - len(sev))
+            origin_tag = "16a" if r.get("origin") == "plan" else "16b+"
             lines.append(
-                f"  [{sev}]{pad}{r['milestone_id']} / {r['ambiguity_id']} — "
+                f"  [{sev}]{pad}[{origin_tag}] {r['milestone_id']} / {r['ambiguity_id']} — "
                 f"{_status_display(r)}"
             )
             desc = r["description"]
@@ -315,6 +415,7 @@ def render_json(
     milestones_scanned: int,
     unclassified_count: int,
     warnings: list[dict],
+    hidden_by_status_count: int = 0,
 ) -> str:
     payload = {
         "schema_version": "1",
@@ -324,10 +425,12 @@ def render_json(
             "resolved_count": resolved_count,
             "milestones_scanned": milestones_scanned,
             "unclassified_count": unclassified_count,
+            "hidden_by_status_count": hidden_by_status_count,
         },
         "records": [
             {
                 "bucket": r["bucket"],
+                "origin": r.get("origin", "execution"),
                 "milestone_id": r["milestone_id"],
                 "ambiguity_id": r["ambiguity_id"],
                 "severity": r["severity"],
@@ -393,8 +496,25 @@ def run(
         1 for r in all_records if r["bucket"] == "unclassified"
     )
 
+    min_rank = SEVERITY_ORDER[severity]
+    severity_only_count = sum(
+        1 for r in all_records if _severity_rank(r) >= min_rank
+    )
+
     filtered = filter_records(all_records, severity, status)
     filtered.sort(key=_record_sort_key)
+
+    # DEVSPEC-123: the exact failure mode that made execution.emergent_ambiguities
+    # records look "invisible" was --status open (the default) silently dropping
+    # resolved records from the per-bucket detail view -- only the totals line
+    # disclosed the resolved count. Surface it explicitly so a bare invocation
+    # can't be mistaken for a full scan.
+    hidden_by_status_count = severity_only_count - len(filtered)
+    if hidden_by_status_count > 0:
+        stderr_lines.append(
+            f"W617 {ERROR_CODES['W617']} {hidden_by_status_count} record(s) "
+            f"hidden by --status {status} (pass --status all to include)"
+        )
 
     w613_targets: list[str] = []
     for r in filtered:
@@ -417,6 +537,7 @@ def run(
             milestones_scanned=len(milestones),
             unclassified_count=unclassified_count,
             warnings=warnings_payload,
+            hidden_by_status_count=hidden_by_status_count,
         )
     else:
         stdout = render_plain(

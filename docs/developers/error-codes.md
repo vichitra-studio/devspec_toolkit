@@ -954,9 +954,17 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W613 UPSTREAM_BACKLOG_UNCLASSIFIED
 
-**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an `emergent_ambiguities` record's `impact[]` matches none of the four classifier rules used to bucket ambiguities by upstream step.
+**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the four classifier rules used to bucket ambiguities by upstream step. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records.
 
 **Resolution**: Informational only — review the flagged ambiguity's `impact[]` text and, if appropriate, extend the classifier rules in `upstream_backlog.py` to recognize the pattern; no per-artifact fix is required.
+
+**Promotable**: No. Deliberately excluded from `PROMOTABLE_PAIRS` — informational only, never promoted.
+
+### W617 UPSTREAM_BACKLOG_STATUS_FILTERED
+
+**Trigger**: Fired by `specdev upstream-backlog` whenever its `--status` filter (default `open`) excludes at least one record that otherwise satisfies the `--severity` threshold. DEVSPEC-123: a bare invocation against a milestone plan where most ambiguities had already been resolved looked like the tool was scanning nothing, when in fact `execution.emergent_ambiguities[]` was being scanned correctly — the resolved records were just silently outside the default view.
+
+**Resolution**: Informational only — re-run with `--status all` (or `--status resolved`) to see the hidden records. The JSON payload also carries this count as `summary.hidden_by_status_count`, which is always present (0 when nothing is hidden) for programmatic consumers.
 
 **Promotable**: No. Deliberately excluded from `PROMOTABLE_PAIRS` — informational only, never promoted.
 

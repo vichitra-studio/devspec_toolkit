@@ -216,7 +216,7 @@ that feed targeted `specdev json` calls, rather than reading `spec/*.json` direc
 | `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` from toolkit schemas (byte-deterministic; run after any schema change — see CLAUDE.md) |
 | `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
 | `specdev hardcoded-seed-check [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Detect literal seed-doc filenames hardcoded in prompts (W554 regression guard); with `--git-root` also scans `<git-root>/prompts/` for submodule deployments |
-| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate `emergent_ambiguities` across `impl_context` plans by implicated upstream step (read-only) |
+| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate both `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) across `impl_context` plans by implicated upstream step (read-only) |
 | `specdev canon-accept --from SPEC_FILE [--namespace NAMESPACE] [--owner OWNER] [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--dry-run] [--json]` | Promote `canonical_proposals` from a spec file into `canon/manifest.json`; with `--git-root`, writes project canon to `<git-root>/spec/canon/` instead (accepts `--git-root`, not `--spec-root` — see CLAUDE.md exception list) |
 
 ### DAG & Extraction Intent Commands

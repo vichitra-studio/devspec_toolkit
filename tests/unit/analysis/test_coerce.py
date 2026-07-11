@@ -106,3 +106,100 @@ def test_non_string_description_coerced_to_empty():
     }
     records, _ = _coerce_records(plan, "p.json")
     assert records[0]["description"] == ""
+
+
+# ---------------------------------------------------------------------------
+# DEVSPEC-123: plan.ambiguities[] (16a) must be scanned alongside
+# execution.emergent_ambiguities[] (16b/16c) — previously it was never read.
+# ---------------------------------------------------------------------------
+
+def test_plan_ambiguities_are_extracted_and_tagged_with_origin():
+    plan = {
+        "id": "ms-x",
+        "plan": {"ambiguities": [
+            {"id": "amb-1", "severity": "blocking", "impact": []},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    assert len(records) == 1
+    assert records[0]["origin"] == "plan"
+    assert records[0]["severity"] == "blocking"
+
+
+def test_execution_records_are_tagged_with_origin():
+    plan = {
+        "id": "ms-x",
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-1", "severity": "low", "impact": []},
+        ]},
+    }
+    records, _ = _coerce_records(plan, "p.json")
+    assert records[0]["origin"] == "execution"
+
+
+def test_both_arrays_combine_in_one_pass():
+    plan = {
+        "id": "ms-x",
+        "plan": {"ambiguities": [
+            {"id": "amb-plan", "severity": "non_blocking", "impact": []},
+        ]},
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-exec", "severity": "low", "impact": []},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    ids = {r["ambiguity_id"]: r["origin"] for r in records}
+    assert ids == {"amb-plan": "plan", "amb-exec": "execution"}
+
+
+def test_plan_ambiguity_invalid_severity_for_its_scale_emits_e520():
+    # "low" is valid for execution but not for the plan's blocking/non_blocking scale.
+    plan = {
+        "id": "ms-x",
+        "plan": {"ambiguities": [
+            {"id": "amb-1", "severity": "low", "impact": []},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert records == []
+    assert len(errors) == 1
+    assert "invalid_severity" in errors[0]
+    assert "origin=plan" in errors[0]
+
+
+def test_duplicate_id_across_origins_yields_two_independent_records():
+    # The same ambiguity id can legitimately appear in both plan.ambiguities[]
+    # (16a) and execution.emergent_ambiguities[] (16b/16c) -- e.g. a 16a
+    # ambiguity re-surfaced during execution under the same id. Origin, not
+    # id, differentiates the two records; neither should be dropped/merged.
+    plan = {
+        "id": "ms-x",
+        "plan": {"ambiguities": [
+            {"id": "amb-shared", "severity": "blocking", "impact": []},
+        ]},
+        "execution": {"emergent_ambiguities": [
+            {"id": "amb-shared", "severity": "high", "impact": []},
+        ]},
+    }
+    records, errors = _coerce_records(plan, "p.json")
+    assert errors == []
+    assert len(records) == 2
+    origins = {r["origin"] for r in records}
+    assert origins == {"plan", "execution"}
+    assert all(r["ambiguity_id"] == "amb-shared" for r in records)
+
+
+def test_null_plan_section_yields_empty_no_error():
+    plan = {"id": "ms-x", "plan": None}
+    records, errors = _coerce_records(plan, "p.json")
+    assert records == []
+    assert errors == []
+
+
+def test_null_plan_ambiguities_yields_empty_no_error():
+    plan = {"id": "ms-x", "plan": {"ambiguities": None}}
+    records, errors = _coerce_records(plan, "p.json")
+    assert records == []
+    assert errors == []

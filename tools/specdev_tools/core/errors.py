@@ -228,6 +228,14 @@ ERROR_CODES = {
     # from PROMOTABLE_PAIRS, like W570/W590/W597): this is a human-reconcile
     # nudge, not a correctness failure with a single unambiguous fix direction.
     "W616": "PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED",
+    # DEVSPEC-123: upstream-backlog's --status filter (default "open") drops
+    # resolved records from the per-bucket detail view without any indication
+    # that anything was hidden -- the exact condition that made a real
+    # 87-entry execution.emergent_ambiguities[] array look completely empty
+    # to a caller who ran the bare command. Informational only (never
+    # promoted, like W613): the filtering itself is correct behavior, this
+    # just discloses that it happened.
+    "W617": "UPSTREAM_BACKLOG_STATUS_FILTERED",
 }
 
 # Maps W-codes to their E-code counterparts for dynamic promotion.
@@ -237,8 +245,9 @@ ERROR_CODES = {
 # W596/W597/W606 have E-counterparts with different semantics; W570
 # (GRACEFUL_SKIP) has no E-counterpart at all; W604 (TRACE_MATRIX_STALE) shares
 # its name with the registered-but-unemitted E604 and stays advisory (see the
-# inline W604 note below). W616 (PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED) has
-# no E-counterpart at all -- it is a human-reconcile nudge, not a hard failure.
+# inline W604 note below). W616 (PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED) and
+# W617 (UPSTREAM_BACKLOG_STATUS_FILTERED) have no E-counterpart at all -- both
+# are informational nudges, not hard failures.
 PROMOTABLE_PAIRS = {
     # W550 SEMANTIC_COVERAGE_SKIP → E550 FORWARD_REPLAY_MISSING: both gate
     # on semantic coverage; the warning fires when coverage is skipped, the

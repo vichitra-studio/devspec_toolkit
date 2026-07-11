@@ -1,0 +1,43 @@
+{
+  "id": "ms-dual-origin",
+  "summary": "16a plan.ambiguities and 16b/16c execution.emergent_ambiguities side by side",
+  "plan": {
+    "ambiguities": [
+      {
+        "id": "amb-16a-open-blocking",
+        "description": "16a blocking ambiguity, still tracking",
+        "source": "spec",
+        "severity": "blocking",
+        "status": "tracking",
+        "impact": ["spec/09_impl_plan.json:task-16a-blocker"]
+      },
+      {
+        "id": "amb-16a-resolved-non-blocking",
+        "description": "16a non-blocking ambiguity, resolved",
+        "source": "spec",
+        "severity": "non_blocking",
+        "mitigation": "Documented assumption applied; no code change required.",
+        "status": "resolved",
+        "impact": ["PLAN_CHECKLIST_ITEM_01"]
+      }
+    ]
+  },
+  "execution": {
+    "emergent_ambiguities": [
+      {
+        "id": "amb-16b-open-high",
+        "description": "16b/16c emergent ambiguity, still tracking",
+        "severity": "high",
+        "status": "tracking",
+        "impact": ["spec/09_impl_plan.json:task-16b-open"]
+      },
+      {
+        "id": "amb-16c-resolved-critical",
+        "description": "16c emergent ambiguity, resolved",
+        "severity": "critical",
+        "status": "resolved",
+        "impact": ["EXEC_CHECKLIST_ITEM_02"]
+      }
+    ]
+  }
+}

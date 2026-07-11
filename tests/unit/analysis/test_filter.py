@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from specdev_tools.analysis.upstream_backlog import (
     SEVERITY_ORDER,
+    _severity_rank,
     filter_records,
 )
 
@@ -79,3 +80,32 @@ def test_null_status_coerced_survives_open():
 def test_blocked_excluded_under_resolved_filter():
     r = _rec(ambiguity_id="a1", status="blocked")
     assert filter_records([r], "low", "resolved") == []
+
+
+# ---------------------------------------------------------------------------
+# DEVSPEC-123: plan.ambiguities[] (origin="plan") uses a binary
+# blocking/non_blocking severity scale, mapped onto the shared rank.
+# ---------------------------------------------------------------------------
+
+def test_severity_rank_defaults_to_execution_scale_without_origin():
+    r = _rec(severity="high")
+    assert _severity_rank(r) == SEVERITY_ORDER["high"]
+
+
+def test_severity_rank_plan_blocking_maps_to_critical():
+    r = _rec(origin="plan", severity="blocking")
+    assert _severity_rank(r) == SEVERITY_ORDER["critical"]
+
+
+def test_severity_rank_plan_non_blocking_maps_to_low():
+    r = _rec(origin="plan", severity="non_blocking")
+    assert _severity_rank(r) == SEVERITY_ORDER["low"]
+
+
+def test_severity_filter_high_keeps_plan_blocking_drops_plan_non_blocking():
+    records = [
+        _rec(ambiguity_id="a1", origin="plan", severity="blocking"),
+        _rec(ambiguity_id="a2", origin="plan", severity="non_blocking"),
+    ]
+    out = filter_records(records, "high", "all")
+    assert {r["ambiguity_id"] for r in out} == {"a1"}

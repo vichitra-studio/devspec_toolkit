@@ -1,0 +1,18 @@
+{
+  "id": "trinity-anchor",
+  "artifact_role": "anchor",
+  "plan": {
+    "summary": "Trinity Anchor misfiled inside impl_context/ (W609 condition)",
+    "ambiguities": [
+      {
+        "id": "amb-anchor-cross-cycle",
+        "description": "Cross-Trinity-cycle ambiguity using the shared crossCycleAmbiguityItem severity scale, not the 16a binary scale.",
+        "severity": "high",
+        "status": "tracking",
+        "impact": ["spec/09_impl_plan.json:task-anchor"]
+      }
+    ],
+    "drift": [],
+    "milestone_index": []
+  }
+}
