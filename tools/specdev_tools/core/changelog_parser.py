@@ -89,9 +89,13 @@ def load_format(changelog_dir: Path) -> ChangelogFormat:
         ValueError: If format.yaml is invalid
     """
     format_path = changelog_dir / "format.yaml"
-    if not format_path.exists():
+    try:
+        exists = format_path.exists()
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot access changelog format {format_path}: {e}") from e
+    if not exists:
         raise FileNotFoundError(f"Changelog format not found: {format_path}")
-    
+
     with open(format_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     
@@ -122,7 +126,11 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
         ValueError: If YAML is invalid or missing required fields
     """
     yaml_path = changelog_dir / "unreleased.yaml" if version == "unreleased" else changelog_dir / f"v{version}.yaml"
-    if not yaml_path.exists():
+    try:
+        exists = yaml_path.exists()
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot access changelog for version {version} at {yaml_path}: {e}") from e
+    if not exists:
         raise FileNotFoundError(f"Changelog not found for version {version}: {yaml_path}")
 
     with open(yaml_path, "r", encoding="utf-8") as f:
@@ -190,17 +198,20 @@ def list_versions(changelog_dir: Path) -> List[str]:
         List of version strings, sorted by semantic version (oldest first)
     """
     versions = []
-    
-    if not changelog_dir.exists():
-        return versions
-    
-    for f in changelog_dir.iterdir():
-        if f.is_file() and f.suffix == ".yaml" and f.name.startswith("v"):
-            # Extract version from filename (v0.1.0.yaml -> 0.1.0)
-            version = f.stem[1:]  # Remove leading 'v'
-            if _is_valid_semver(version):
-                versions.append(version)
-    
+
+    try:
+        if not changelog_dir.exists():
+            return versions
+
+        for f in changelog_dir.iterdir():
+            if f.is_file() and f.suffix == ".yaml" and f.name.startswith("v"):
+                # Extract version from filename (v0.1.0.yaml -> 0.1.0)
+                version = f.stem[1:]  # Remove leading 'v'
+                if _is_valid_semver(version):
+                    versions.append(version)
+    except OSError:
+        return []
+
     return sorted(versions, key=_parse_semver)
 
 
@@ -285,7 +296,7 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
 
     try:
         fmt = load_format(changelog_dir)
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError, OSError) as e:
         errors.append(make_error("E520", f"Cannot load format: {e}"))
         return errors
 
@@ -407,7 +418,7 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     # ------------------------------------------------------------------
     try:
         changelog = load_version(changelog_dir, version)
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError, OSError) as e:
         errors.append(make_error("E520", f"Cannot load changelog: {e}"))
         return errors
 
@@ -445,9 +456,12 @@ def get_toolkit_version(repo_root: Path) -> Optional[str]:
         Version string, or None if not found
     """
     pyproject = repo_root / "tools" / "pyproject.toml"
-    if not pyproject.exists():
+    try:
+        if not pyproject.exists():
+            return None
+    except OSError:
         return None
-    
+
     # Try using tomllib (Python 3.11+) for robust parsing
     try:
         import tomllib  # type: ignore[import-not-found]

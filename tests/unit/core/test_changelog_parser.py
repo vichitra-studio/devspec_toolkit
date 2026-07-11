@@ -16,7 +16,11 @@ from pathlib import Path
 
 import yaml
 
-from specdev_tools.core.changelog_parser import validate_changelog
+from specdev_tools.core.changelog_parser import (
+    get_toolkit_version,
+    list_versions,
+    validate_changelog,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -390,3 +394,116 @@ class TestSourceOfTruthRenderTarget:
         non_file_errors = [e for e in errors if "points to a non-file path" in e.message]
         assert len(non_file_errors) == 1
         assert "source_of_truth" in non_file_errors[0].message
+
+    def test_check4_oserror_appends_e520(self, tmp_path, monkeypatch):
+        """An OSError raised mid-check (not just a bare missing/empty/non-file
+        condition) must be converted to a structured E520, not propagate."""
+        _write_format_with_targets(tmp_path)
+        (tmp_path / "source.yaml").write_text("source: data\n", encoding="utf-8")
+        data = _valid_base()
+        data["source_of_truth"] = f"{tmp_path.name}/source.yaml"
+        _write_version(tmp_path, "1.0.0", data)
+
+        real_exists = Path.exists
+
+        def flaky_exists(self):
+            if self.name == "source.yaml":
+                raise OSError(13, "Permission denied")
+            return real_exists(self)
+
+        monkeypatch.setattr(Path, "exists", flaky_exists)
+        errors = validate_changelog(tmp_path, "1.0.0")
+        assert any(e.code == "E520" and "source_of_truth" in e.message for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# OSError hardening — exists()/iterdir()/stat() calls across the module must
+# degrade to each function's already-documented failure mode (raise
+# FileNotFoundError, or return None/[]) instead of letting a bare OSError
+# (e.g. PermissionError from an unreadable parent directory) propagate.
+# ---------------------------------------------------------------------------
+
+class TestOSErrorHardening:
+    def test_load_format_oserror_becomes_filenotfounderror_via_validate(self, tmp_path, monkeypatch):
+        """load_format()'s internal exists() OSError must surface as a
+        structured E520 through validate_changelog(), not crash."""
+        _write_format(tmp_path)
+        _write_version(tmp_path, "1.0.0", _valid_base())
+
+        real_exists = Path.exists
+
+        def flaky_exists(self):
+            if self.name == "format.yaml":
+                raise OSError(13, "Permission denied")
+            return real_exists(self)
+
+        monkeypatch.setattr(Path, "exists", flaky_exists)
+        errors = validate_changelog(tmp_path, "1.0.0")
+        assert any(e.code == "E520" and "format" in e.message.lower() for e in errors)
+
+    def test_load_format_raises_filenotfounderror_not_oserror(self, tmp_path, monkeypatch):
+        """Direct callers of load_format() (not just validate_changelog) must
+        see the documented FileNotFoundError, not a raw OSError."""
+        from specdev_tools.core.changelog_parser import load_format
+
+        real_exists = Path.exists
+
+        def flaky_exists(self):
+            if self.name == "format.yaml":
+                raise OSError(13, "Permission denied")
+            return real_exists(self)
+
+        monkeypatch.setattr(Path, "exists", flaky_exists)
+        try:
+            load_format(tmp_path)
+            assert False, "expected FileNotFoundError"
+        except FileNotFoundError:
+            pass
+
+    def test_load_version_raises_filenotfounderror_not_oserror(self, tmp_path, monkeypatch):
+        """Direct callers of load_version() (e.g. get_changes_between) must
+        see the documented FileNotFoundError, not a raw OSError."""
+        from specdev_tools.core.changelog_parser import load_version
+
+        real_exists = Path.exists
+
+        def flaky_exists(self):
+            if self.name == "v1.0.0.yaml":
+                raise OSError(13, "Permission denied")
+            return real_exists(self)
+
+        monkeypatch.setattr(Path, "exists", flaky_exists)
+        try:
+            load_version(tmp_path, "1.0.0")
+            assert False, "expected FileNotFoundError"
+        except FileNotFoundError:
+            pass
+
+    def test_list_versions_oserror_returns_empty_list(self, tmp_path, monkeypatch):
+        """list_versions() already returns [] when the directory doesn't
+        exist; an OSError mid-scan must degrade the same way, not crash."""
+        (tmp_path / "v1.0.0.yaml").write_text("version: '1.0.0'\nbreaking: false\n", encoding="utf-8")
+
+        real_iterdir = Path.iterdir
+
+        def flaky_iterdir(self):
+            if self == tmp_path:
+                raise OSError(13, "Permission denied")
+            return real_iterdir(self)
+
+        monkeypatch.setattr(Path, "iterdir", flaky_iterdir)
+        assert list_versions(tmp_path) == []
+
+    def test_get_toolkit_version_oserror_returns_none(self, tmp_path, monkeypatch):
+        """get_toolkit_version() already returns None when pyproject.toml is
+        missing; an OSError on the existence check must degrade the same
+        way, not crash."""
+        real_exists = Path.exists
+
+        def flaky_exists(self):
+            if self.name == "pyproject.toml":
+                raise OSError(13, "Permission denied")
+            return real_exists(self)
+
+        monkeypatch.setattr(Path, "exists", flaky_exists)
+        assert get_toolkit_version(tmp_path) is None
