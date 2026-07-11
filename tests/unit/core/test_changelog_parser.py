@@ -507,3 +507,48 @@ class TestOSErrorHardening:
 
         monkeypatch.setattr(Path, "exists", flaky_exists)
         assert get_toolkit_version(tmp_path) is None
+
+    def test_load_format_open_oserror_becomes_filenotfounderror(self, tmp_path, monkeypatch):
+        """load_format()'s exists() check can pass (file present) while the
+        subsequent open() still raises OSError (e.g. a race, or a file that
+        becomes unreadable between the check and the read) — that must also
+        surface as the documented FileNotFoundError, not a raw OSError."""
+        from specdev_tools.core.changelog_parser import load_format
+
+        _write_format(tmp_path)
+        real_open = open
+
+        def flaky_open(path, *args, **kwargs):
+            if str(path).endswith("format.yaml"):
+                raise PermissionError(13, "Permission denied")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", flaky_open)
+        try:
+            load_format(tmp_path)
+            assert False, "expected FileNotFoundError"
+        except FileNotFoundError:
+            pass
+
+    def test_load_version_open_oserror_becomes_filenotfounderror(self, tmp_path, monkeypatch):
+        """load_version()'s exists() check can pass while the subsequent
+        open() still raises OSError — must surface as FileNotFoundError,
+        not a raw OSError, since external callers (cli.py, schema_differ.py)
+        only catch (FileNotFoundError, ValueError) around load_version()."""
+        from specdev_tools.core.changelog_parser import load_version
+
+        _write_format(tmp_path)
+        _write_version(tmp_path, "1.0.0", _valid_base())
+        real_open = open
+
+        def flaky_open(path, *args, **kwargs):
+            if str(path).endswith("v1.0.0.yaml"):
+                raise PermissionError(13, "Permission denied")
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", flaky_open)
+        try:
+            load_version(tmp_path, "1.0.0")
+            assert False, "expected FileNotFoundError"
+        except FileNotFoundError:
+            pass

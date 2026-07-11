@@ -96,8 +96,11 @@ def load_format(changelog_dir: Path) -> ChangelogFormat:
     if not exists:
         raise FileNotFoundError(f"Changelog format not found: {format_path}")
 
-    with open(format_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(format_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot read changelog format {format_path}: {e}") from e
     
     if not data:
         raise ValueError(f"Empty format file: {format_path}")
@@ -133,8 +136,11 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
     if not exists:
         raise FileNotFoundError(f"Changelog not found for version {version}: {yaml_path}")
 
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot read changelog for version {version} at {yaml_path}: {e}") from e
     
     if not data:
         raise ValueError(f"Empty changelog file: {yaml_path}")
