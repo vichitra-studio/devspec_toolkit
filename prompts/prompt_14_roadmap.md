@@ -81,6 +81,7 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
 - If task `status` is 'done', the task MUST have >=1 acceptance criterion documenting what was verified.
 - If task `status` is 'deferred' or 'wont_do', the task MUST have a `status_reason` explaining why the task was postponed or cancelled.
+- If milestone `status` is 'deferred', the milestone MUST have a `milestone_status_reason` explaining why the milestone was postponed.
 
 ## Coverage Closure
 Before emitting, verify:
@@ -139,6 +140,7 @@ Before emitting, verify:
 ### milestones[].status / milestones[].risk_status
 - Use only the enum values from the schema.
 - Omit if you want defaults (`pending`, `low`).
+- If `status` is `deferred`, the milestone MUST have a `milestone_status_reason` explaining why: name the blocker/decision and the condition required to resume (e.g., "Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.").
 
 ### milestones[].tasks
 - Use objects with `task_id` and `description` (optional `status`).

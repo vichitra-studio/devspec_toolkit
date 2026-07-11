@@ -1,7 +1,7 @@
 """Changelog parser for DevSpec Toolkit migration system.
 
 Parses and validates YAML changelog files for version tracking and migration.
-See: docs/developers/workflows/migration_system_spec.md
+See: docs/developers/design/migration_system_spec.md
 """
 from __future__ import annotations
 

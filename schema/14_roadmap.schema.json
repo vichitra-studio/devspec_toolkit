@@ -59,7 +59,7 @@
               "milestone_status_reason": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Required when status is 'deferred' or 'wont_do'. Explanation for why this milestone was postponed or cancelled. Format: name the blocker/decision and, for 'deferred', the condition required to resume. Example (deferred): 'Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.' Example (wont_do): 'Superseded by ms-unified-checkout; wallet routing folded into that milestone.' Anti-pattern: 'TBD' or 'not doing this' (provides no actionable context)."
+                "description": "Required when status is 'deferred'. Explanation for why this milestone was postponed. Format: name the blocker/decision and the condition required to resume. Example: 'Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.' Anti-pattern: 'TBD' or 'not doing this' (provides no actionable context)."
               },
               "risk_status": {
                 "$ref": "vc:core:atoms#severityLevel",
@@ -277,8 +277,7 @@
                   "properties": {
                     "status": {
                       "enum": [
-                        "deferred",
-                        "wont_do"
+                        "deferred"
                       ]
                     }
                   },
