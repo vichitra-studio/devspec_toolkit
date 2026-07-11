@@ -12,8 +12,7 @@ CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
 diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
 `dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root`
 only; `update` takes `spec_dir` (positional) + `--repo-root` only and does
-**not** accept `--spec-root` or `--git-root`; `traceability-check` accepts
-all three submodule-aware flags (`--repo-root`, `--spec-root`, `--git-root`).
+**not** accept `--spec-root` or `--git-root`.
 Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |

@@ -352,3 +352,41 @@ class TestSourceOfTruthRenderTarget:
         missing_errors = [e for e in errors if "points to a missing file" in e.message]
         assert len(unknown_errors) == 1
         assert missing_errors == []
+
+    def test_failing_case_source_of_truth_not_a_string(self, tmp_path):
+        """A non-string value (e.g. an int) trips the 'must be a non-empty string path' branch."""
+        _write_format_with_targets(tmp_path)
+        data = _valid_base()
+        data["source_of_truth"] = 123
+        _write_version(tmp_path, "1.0.0", data)
+        errors = validate_changelog(tmp_path, "1.0.0")
+        shape_errors = [e for e in errors if "must be a non-empty string path" in e.message]
+        assert len(shape_errors) == 1
+        assert "source_of_truth" in shape_errors[0].message
+        # Must not also fall through to the missing/non-file/empty branches
+        missing_errors = [e for e in errors if "points to a missing file" in e.message]
+        assert missing_errors == []
+
+    def test_failing_case_render_target_blank_string(self, tmp_path):
+        """A whitespace-only string trips the 'must be a non-empty string path' branch."""
+        _write_format_with_targets(tmp_path)
+        data = _valid_base()
+        data["render_target"] = "   "
+        _write_version(tmp_path, "1.0.0", data)
+        errors = validate_changelog(tmp_path, "1.0.0")
+        shape_errors = [e for e in errors if "must be a non-empty string path" in e.message]
+        assert len(shape_errors) == 1
+        assert "render_target" in shape_errors[0].message
+
+    def test_failing_case_source_of_truth_points_to_directory(self, tmp_path):
+        """A target path that exists but is a directory (not a regular file) trips the
+        'points to a non-file path' branch."""
+        _write_format_with_targets(tmp_path)
+        (tmp_path / "a_directory").mkdir()
+        data = _valid_base()
+        data["source_of_truth"] = f"{tmp_path.name}/a_directory"
+        _write_version(tmp_path, "1.0.0", data)
+        errors = validate_changelog(tmp_path, "1.0.0")
+        non_file_errors = [e for e in errors if "points to a non-file path" in e.message]
+        assert len(non_file_errors) == 1
+        assert "source_of_truth" in non_file_errors[0].message
