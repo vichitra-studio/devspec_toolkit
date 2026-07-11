@@ -992,7 +992,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E622 REGISTRY_DRIFT
 
-**Trigger**: R003 — `specdev registry-check` finds that a registered `(array_path, id_field)` pair no longer matches the live spec file's structure: is not an array, or its entries lack the registered `id_field`. A missing array path is drift only at the top level; a missing *nested* array path (e.g. a task's `acceptance_criteria`) is not flagged here, since nested arrays may be legitimately optional per schema — a present-but-wrong-shape nested array still fires E622.
+**Trigger**: R003 — `specdev registry-check` finds that a registered `(array_path, id_field)` pair no longer matches the live spec file's structure: the declared array path is not an array, or its entries lack the registered `id_field`. A missing array path is drift only at the top level; a missing *nested* array path (e.g. a task's `acceptance_criteria`) is not flagged here, since nested arrays may be legitimately optional per schema — a present-but-wrong-shape nested array still fires E622.
 
 **Resolution**: Run `specdev registry-generate` to regenerate `entry_key_registry.json`/`extraction_paths.json` from the current schemas, or fix the schema/spec structure if the drift indicates an unintended shape change.
 
