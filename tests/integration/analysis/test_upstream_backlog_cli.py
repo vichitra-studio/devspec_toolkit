@@ -90,6 +90,20 @@ def test_malformed_plan_triggers_exit_two(broken_spec: Path):
     assert "E520" in r.stderr
 
 
+def test_unicode_decode_error_triggers_exit_two(tmp_path: Path):
+    """_iter_plans' UnicodeDecodeError branch (an impl_context/*.json file
+    containing bytes that are not valid UTF-8) must exit 2 and surface a
+    stderr line naming the offending path via 'unicode_decode_error='."""
+    spec_dir = tmp_path / "spec"
+    impl = spec_dir / "impl_context"
+    impl.mkdir(parents=True)
+    bad_file = impl / "plan_invalid_utf8.json"
+    bad_file.write_bytes(b'{"id": "ms-bad", "execution": \xff\xfe}')
+    r = _run_cli(spec_dir)
+    assert r.returncode == 2
+    assert "unicode_decode_error=" in r.stderr
+
+
 def test_severity_high_filters_out_lower(clean_spec: Path):
     r = _run_cli(clean_spec, "--severity", "high")
     assert r.returncode == 0

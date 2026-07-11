@@ -76,8 +76,8 @@ specdev canon-accept --from spec/03_glossary.json \
   --repo-root ./devspec_toolkit --git-root . \
   --namespace cn:project: --owner product
 
-# Aggregate emergent_ambiguities across impl_context plans by upstream step
-# (does not accept --git-root)
+# Aggregate both plan.ambiguities[] (16a) and execution.emergent_ambiguities[] (16b/16c)
+# across impl_context plans by upstream step (does not accept --git-root)
 specdev upstream-backlog spec --repo-root ./devspec_toolkit
 
 # Pre-push commit-message check

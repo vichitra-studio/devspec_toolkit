@@ -184,7 +184,7 @@
 
 **Promotable**: W568 → E568.
 
-### W569 GOVERNANCE_PR_RULE_UNCOVERED
+### E569 / W569 GOVERNANCE_PR_RULE_UNCOVERED
 
 **Trigger**: Fired by the traceability-closure check when a Step 10 governance `pr_rules[]` entry (a rule-name string) is not a substring of any CI job step's `command` field across all jobs in `12_ci_gates.json`. Only fires when both `10_governance.json` and `12_ci_gates.json` are present.
 
@@ -192,7 +192,7 @@
 
 **Promotable**: W569 → E569.
 
-### W575 IMPL_PLAN_DELIVERABLE_UNCOVERED
+### E575 / W575 IMPL_PLAN_DELIVERABLE_UNCOVERED
 
 **Trigger**: Fired by the traceability-closure check for Step 09 impl-plan deliverable → Step 14 roadmap pairwise completeness. For each Step 09 milestone `deliverables[].id`, the ID must be referenced by at least one Step 14 task's `fr_refs[]` or appear in any Step 14 milestone's `deliverables[].id`. Only fires when both `09_impl_plan.json` and `14_roadmap.json` are present.
 
@@ -200,7 +200,7 @@
 
 **Promotable**: W575 → E575.
 
-### W576 TASK_EXECUTION_MISSING
+### E576 / W576 TASK_EXECUTION_MISSING
 
 **Trigger**: Fired by the traceability-closure check for Step 14 task → Step 16b execution pairwise completeness. For each Step 14 task with `status` not in (`done`, `deferred`, `wont_do`), verify the task_id appears in the executed-task set derived from `execution.critical_evidence.satisfied_checklist_ids` on each Trinity Anchor milestone plan, resolved through that plan's checklist `spec_ref.id`. A task is also exempt if every checklist item covering it already has `checklist_status` `deferred` or `wont_do` (a transitional-pause allowance mirroring E304). Only fires when execution data was loaded from at least one milestone plan and `14_roadmap.json` is present.
 
@@ -954,7 +954,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### W613 UPSTREAM_BACKLOG_UNCLASSIFIED
 
-**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the four classifier rules used to bucket ambiguities by upstream step. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records.
+**Trigger**: Fired by `specdev upstream-backlog` (`analysis/upstream_backlog.py`) when an ambiguity record's `impact[]` matches none of the three classifier rules used to bucket ambiguities by upstream step, falling through to the `unclassified` bucket. Applies equally to `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) records.
 
 **Resolution**: Informational only — review the flagged ambiguity's `impact[]` text and, if appropriate, extend the classifier rules in `upstream_backlog.py` to recognize the pattern; no per-artifact fix is required.
 
