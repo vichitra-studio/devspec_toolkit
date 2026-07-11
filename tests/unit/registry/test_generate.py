@@ -45,6 +45,23 @@ def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:
     return generate_registry(str(_TOOLKIT_ROOT))
 
 
+def _iter_all_arrays(entry: dict[str, Any]):
+    """Yield every array-entry dict in a registry *entry*, at any nesting depth.
+
+    The registry's ``arrayEntry.nested`` shape is recursive (DEVSPEC-125: step
+    14 nests ``criterion`` three levels under ``milestones``), so invariants
+    that must hold for *every* array — regardless of depth — walk with this
+    helper rather than iterating a single ``nested`` level.
+    """
+    def _walk(node: dict[str, Any]):
+        yield node
+        for nested in node.get("nested", []):
+            yield from _walk(nested)
+
+    for arr in entry.get("arrays", []):
+        yield from _walk(arr)
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Byte-determinism
 # ---------------------------------------------------------------------------
@@ -125,20 +142,14 @@ class TestSentinelsPresent:
         reg_doc, _ = _run_generator()
         sentinels = set(reg_doc["_sentinels"])
         for basename, entry in reg_doc["registry"].items():
-            for arr in entry.get("arrays", []):
-                # array_path looks like ".some_name"; strip leading dot
+            # Every array at any depth (top-level or nested) must not name a sentinel.
+            for arr in _iter_all_arrays(entry):
                 arr_name = arr["array_path"].lstrip(".")
                 assert arr_name not in sentinels, (
                     f"{basename}: sentinel '{arr_name}' must not appear as a "
-                    "per-file array_path — it belongs only in _sentinels."
+                    "per-file array_path (at any nesting depth) — it belongs "
+                    "only in _sentinels."
                 )
-                # Also check nested arrays
-                for nested in arr.get("nested", []):
-                    nested_name = nested["array_path"].lstrip(".")
-                    assert nested_name not in sentinels, (
-                        f"{basename}: sentinel '{nested_name}' found in nested "
-                        "arrays — must only be in _sentinels."
-                    )
 
 
 # ---------------------------------------------------------------------------
@@ -356,15 +367,12 @@ class TestTraceRefExclusion:
         """No entry in the registry (top-level or nested) should have kind == 'trace'."""
         reg_doc, _ = _run_generator()
         for basename, entry in reg_doc["registry"].items():
-            for arr in entry.get("arrays", []):
+            # No array at any depth may carry kind='trace' (traceRef leak).
+            for arr in _iter_all_arrays(entry):
                 assert arr.get("kind") != "trace", (
                     f"{basename}: array {arr['array_path']} has kind='trace', "
                     "which indicates a traceRef array leaked into the registry."
                 )
-                for nested in arr.get("nested", []):
-                    assert nested.get("kind") != "trace", (
-                        f"{basename}: nested array {nested['array_path']} has kind='trace'."
-                    )
 
     def test_traceref_files_have_no_trace_array_path(self) -> None:
         """Files that have .trace[] (a traceRef array) must not include it in their registry entry."""

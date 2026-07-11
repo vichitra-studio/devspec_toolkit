@@ -186,6 +186,28 @@ class TestListEntriesKnownFiles:
         assert del_entry.id_field == "id"
         assert del_entry.kind == "deliverable"
 
+    def test_14_roadmap_includes_deep_nested_criterion(self) -> None:
+        """Three-deep milestones[].tasks[].acceptance_criteria is flattened (DEVSPEC-125).
+
+        The registry schema defines ``arrayEntry.nested`` recursively, so an
+        acceptance-criterion nested two levels under a milestone must appear in
+        the flat list with its full ``[].``-joined path.  Regression guard for
+        the single-level nesting cap that previously dropped it.
+        """
+        entries = list_entries("14_roadmap.json", _FIXTURE_DIR)
+        assert entries is not None
+        crit = next(
+            (e for e in entries
+             if e.array_path == ".milestones[].tasks[].acceptance_criteria"),
+            None,
+        )
+        assert crit is not None, (
+            "deep-nested acceptance_criteria not flattened; got paths "
+            f"{[e.array_path for e in entries]}"
+        )
+        assert crit.id_field == "criterion_id"
+        assert crit.kind == "criterion"
+
     def test_13_extension_manifest_has_extensions_array(self) -> None:
         """13_extension_manifest.json registers extensions[] with extension_id."""
         entries = list_entries("13_extension_manifest.json", _FIXTURE_DIR)
@@ -504,6 +526,35 @@ class TestCollectIdsWithRegistry:
         kind_d, jq_path_d, _ = id_map["fr-post-publish"]
         assert kind_d == "deliverable"
         assert jq_path_d == ".milestones[0].deliverables[0]"
+
+    def test_deep_nested_criteria_collected_from_14_roadmap(self) -> None:
+        """14_roadmap.json: criteria 3-deep (milestones[].tasks[].acceptance_criteria)
+        are indexed with the correct kind and concrete jq index path (DEVSPEC-125)."""
+        spec = {
+            "milestones": [
+                {
+                    "milestone_id": "ms-1",
+                    "tasks": [
+                        {
+                            "task_id": "task-verify-e2e",
+                            "acceptance_criteria": [
+                                {"criterion_id": "ac-e2e-1", "text": "first"},
+                                {"criterion_id": "ac-e2e-2", "text": "second"},
+                            ],
+                        },
+                    ],
+                }
+            ],
+            "dependencies": [],
+        }
+        all_ids, id_map = _collect_ids_from_file(
+            spec, spec_file="14_roadmap.json", repo_root=_FIXTURE_DIR
+        )
+        assert "ac-e2e-1" in all_ids
+        assert "ac-e2e-2" in all_ids
+        kind, jq_path, _ = id_map["ac-e2e-2"]
+        assert kind == "criterion"
+        assert jq_path == ".milestones[0].tasks[0].acceptance_criteria[1]"
 
     def test_registered_empty_file_returns_no_ids(self) -> None:
         """Files registered with arrays:[] (e.g. 13a) return empty ids and map."""

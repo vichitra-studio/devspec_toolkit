@@ -418,6 +418,10 @@
 
 **Promotable**: W595 → E595.
 
+**Sub-reasons** (emitted by `specdev context freshness`):
+- `CONTENT_STALENESS` — a seed's on-disk hash differs from its hash in `seed_requirements.json` (seed edited since last index). Re-index with `/specdev-step`.
+- `SEED_UNTRACKED` — a seed listed in `seed_manifest.json` (with a path) is **absent** from `seed_requirements.json`, so edits to it trip no drift signal. `build_seed_index` hashes every manifest seed, so an untracked seed means the index is stale-by-omission — re-index with `/specdev-step` to bring it under drift detection.
+
 ### E596 DAG_DEAD_END_PRODUCER
 
 **Trigger**: A non-terminal step has zero entries in `downstream_consumers` in step_order.json.

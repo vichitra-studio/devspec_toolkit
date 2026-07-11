@@ -182,98 +182,103 @@ def _check_drift(
             continue
 
         for arr in arrays:
-            array_path = arr["array_path"]  # e.g. ".functional_requirements"
-            id_field = arr["id_field"]
-            array_key = array_path.lstrip(".")
-
-            # Check top-level array exists
-            top_val = data.get(array_key)
-            if top_val is None:
-                errs.append(SpecError(
-                    code="E622",
-                    message=(
-                        f"R003 REGISTRY_DRIFT: '{basename}': array_path '{array_path}' "
-                        f"not found in file (key '{array_key}' missing)."
-                    ),
-                    path=basename,
-                ))
-                continue
-
-            if not isinstance(top_val, list):
-                errs.append(SpecError(
-                    code="E622",
-                    message=(
-                        f"R003 REGISTRY_DRIFT: '{basename}': array_path '{array_path}' "
-                        f"exists but is not an array (got {type(top_val).__name__})."
-                    ),
-                    path=basename,
-                ))
-                continue
-
-            if top_val:
-                first_entry = top_val[0]
-                if isinstance(first_entry, dict) and id_field not in first_entry:
-                    actual = list(first_entry.keys())[:6]
-                    errs.append(SpecError(
-                        code="E622",
-                        message=(
-                            f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
-                            f"registered id_field='{id_field}' but first entry has "
-                            f"fields {actual!r}. Rename id_field in the registry or update the spec."
-                        ),
-                        path=basename,
-                    ))
-
-            # Check nested arrays
-            for nested in arr.get("nested", []):
-                nested_path = nested["array_path"].lstrip(".")  # e.g. ".tasks" → "tasks"
-                nested_id_field = nested["id_field"]
-
-                if not top_val:
-                    continue  # empty top-level array — can't check nested
-                first_parent = top_val[0]
-                if not isinstance(first_parent, dict):
-                    continue
-
-                nested_val = first_parent.get(nested_path)
-                if nested_val is None:
-                    errs.append(SpecError(
-                        code="E622",
-                        message=(
-                            f"R003 REGISTRY_DRIFT: '{basename}': nested array_path "
-                            f"'{array_path}[].{nested_path}' not found under first "
-                            f"parent entry (key '{nested_path}' missing)."
-                        ),
-                        path=basename,
-                    ))
-                    continue
-
-                if not isinstance(nested_val, list):
-                    errs.append(SpecError(
-                        code="E622",
-                        message=(
-                            f"R003 REGISTRY_DRIFT: '{basename}': nested '{nested_path}' "
-                            f"exists but is not an array (got {type(nested_val).__name__})."
-                        ),
-                        path=basename,
-                    ))
-                    continue
-
-                if nested_val:
-                    first_nested = nested_val[0]
-                    if isinstance(first_nested, dict) and nested_id_field not in first_nested:
-                        actual = list(first_nested.keys())[:6]
-                        errs.append(SpecError(
-                            code="E622",
-                            message=(
-                                f"R003 REGISTRY_DRIFT: '{basename}': nested array "
-                                f"'{nested_path}' registered id_field='{nested_id_field}' "
-                                f"but first entry has fields {actual!r}."
-                            ),
-                            path=basename,
-                        ))
+            _check_array_entry(arr, data, basename, "", errs, is_root=True)
 
     return errs
+
+
+def _check_array_entry(
+    entry: dict,
+    container,
+    basename: str,
+    display_prefix: str,
+    errs: list,
+    *,
+    is_root: bool,
+) -> None:
+    """Recursively validate one registry array entry against spec *container*.
+
+    ``container`` is the object holding this entry's array — the root document
+    at the top level, or the first item of the parent array one level down.
+    Validation descends through ``entry["nested"]`` to arbitrary depth (e.g.
+    step 14's ``milestones[].tasks[].acceptance_criteria``), checking against
+    the *first* element at each level (a representative-sample drift check, as
+    the original single-level implementation did).
+
+    ``display_prefix`` accumulates the human-readable path used in messages,
+    e.g. ``.milestones[]`` when validating a nested entry under milestones.
+    ``is_root`` distinguishes the top-level "not found in file" wording from
+    the nested "not found under first parent entry" wording, preserving the
+    original R003 message text for existing (one-level) cases.
+    """
+    array_key = entry["array_path"].lstrip(".")
+    id_field = entry["id_field"]
+    full_display = f"{display_prefix}{entry['array_path']}"
+
+    val = container.get(array_key) if isinstance(container, dict) else None
+
+    if val is None:
+        # Top-level registered arrays are the file's primary entries — an absent
+        # one is genuine drift.  Nested arrays, however, may be OPTIONAL per
+        # schema (e.g. a roadmap task's ``acceptance_criteria``); their required
+        # presence is owned by schema validation and the registry-generate
+        # byte-exact gate, so a missing nested key is NOT drift here — only a
+        # present-but-wrong-shape nested array is (checked below).  Flagging
+        # missing optional nested arrays would false-positive on schema-valid
+        # host specs (DEVSPEC-125).
+        #
+        # DECISION (DEVSPEC-125): this deliberately narrows standalone
+        # ``registry-check`` — a missing *required* nested array is no longer
+        # flagged here.  registry_check cannot read the schema's ``required``, so
+        # it cannot tell required from optional; the canonical ``spec-check`` gate
+        # runs schema validation alongside this check and catches a missing
+        # required array (e.g. milestone.tasks) with its own E-code, so the
+        # signal is preserved end-to-end without the false-positive.
+        if is_root:
+            errs.append(SpecError(
+                code="E622",
+                message=(
+                    f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
+                    f"not found in file (key '{array_key}' missing)."
+                ),
+                path=basename,
+            ))
+        return
+
+    if not isinstance(val, list):
+        errs.append(SpecError(
+            code="E622",
+            message=(
+                f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
+                f"exists but is not an array (got {type(val).__name__})."
+            ),
+            path=basename,
+        ))
+        return
+
+    if not val:
+        return  # empty array — can't sample the first element or descend
+
+    first_entry = val[0]
+    if isinstance(first_entry, dict) and id_field not in first_entry:
+        actual = list(first_entry.keys())[:6]
+        errs.append(SpecError(
+            code="E622",
+            message=(
+                f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
+                f"registered id_field='{id_field}' but first entry has "
+                f"fields {actual!r}. Rename id_field in the registry or update the spec."
+            ),
+            path=basename,
+        ))
+
+    # Recurse into deeper nested arrays using the first element as the container.
+    if not isinstance(first_entry, dict):
+        return
+    for nested in entry.get("nested", []):
+        _check_array_entry(
+            nested, first_entry, basename, f"{full_display}[]", errs, is_root=False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +296,18 @@ def _check_unregistered_arrays(
     item contains a field matching ``^[a-z][a-z0-9_]*_id$`` or bare ``id``.
     If the ``(basename, array_path)`` pair is not declared in the toolkit
     registry, emits W614 UNREGISTERED_ARRAY (warning severity).
+
+    Scope note (DEVSPEC-125): this novelty scan is intentionally TOP-LEVEL only
+    and must stay that way.  R004 inspects spec DATA, not schema, so it cannot
+    recurse correctly: a nested traceRef array (e.g. milestones[].deliverables,
+    items {type, id, note}) is data-indistinguishable from a real nested entry
+    like dependencyItem ({type, id}) — the only discriminator is the items'
+    ``$ref`` URI, which lives in the schema.  A recursive R004 would therefore
+    false-positive W614 on every nested traceRef array; suppressing that would
+    require resolving $refs, i.e. re-implementing the generator.  Deep-nested
+    entry coverage is instead owned by the schema-driven generator, its
+    byte-exact golden gate, and the explicit 3-deep unit tests — no host-side
+    signal is lost by keeping this scan top-level.
 
     Exclusions:
     - Sentinel arrays listed in ``registry["_sentinels"]`` (e.g.

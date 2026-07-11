@@ -6,7 +6,7 @@ import os, json, warnings
 from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
-from ..core.entry_key_registry import list_entries, _ALWAYS_EXCLUDED
+from ..core.entry_key_registry import list_entries, iter_array_path, _ALWAYS_EXCLUDED
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -201,36 +201,22 @@ def _legacy_scan_data(
 
 
 def _extract_array_items(data: dict, array_path: str) -> list:
-    """Extract items from *data* at *array_path* (supports nested paths like `.foo[].bar`).
+    """Extract items from *data* at *array_path* (supports nested paths of any depth).
 
-    *array_path* uses dot-notation with an optional ``[]`` segment for nested arrays,
-    e.g. ``.milestones[].tasks``.  A leading dot is stripped.  ``[]`` signals
-    "iterate all list items and collect the sub-array from each".
+    *array_path* uses dot-notation with ``[].`` separating each array level,
+    e.g. ``.milestones[].tasks`` or ``.milestones[].tasks[].acceptance_criteria``.
+    A leading dot is optional.  Every ``[].`` level is walked (arbitrary depth),
+    iterating all items at each level and collecting the leaf-array items.
 
     Examples::
 
-        .functional_requirements           → data["functional_requirements"]
-        .milestones[].tasks                → [t for m in data["milestones"] for t in m.get("tasks", [])]
+        .functional_requirements                       → data["functional_requirements"]
+        .milestones[].tasks                            → [t for m in ... for t in m.get("tasks", [])]
+        .milestones[].tasks[].acceptance_criteria      → all criteria across all tasks of all milestones
 
     Returns an empty list if any key is missing or the value is not a list.
     """
-    path = array_path.lstrip(".")
-    # Split on "[]." to separate the parent path from the nested key
-    if "[]." in path:
-        parent_key, _, nested_key = path.partition("[].")
-        parent_items = data.get(parent_key, [])
-        if not isinstance(parent_items, list):
-            return []
-        result = []
-        for parent_item in parent_items:
-            if isinstance(parent_item, dict):
-                sub = parent_item.get(nested_key, [])
-                if isinstance(sub, list):
-                    result.extend(sub)
-        return result
-    # Simple top-level array
-    items = data.get(path, [])
-    return items if isinstance(items, list) else []
+    return [item for item, _ in iter_array_path(data, array_path)]
 
 
 def build_trace_matrix(

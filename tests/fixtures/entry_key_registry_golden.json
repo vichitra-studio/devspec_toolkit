@@ -172,7 +172,14 @@
             {
               "array_path": ".tasks",
               "id_field": "task_id",
-              "kind": "task"
+              "kind": "task",
+              "nested": [
+                {
+                  "array_path": ".acceptance_criteria",
+                  "id_field": "criterion_id",
+                  "kind": "criterion"
+                }
+              ]
             }
           ]
         },

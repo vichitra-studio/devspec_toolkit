@@ -261,6 +261,13 @@ def _scan_nested_arrays(
 ) -> list[dict[str, Any]]:
     """Scan item_props for nested arrays of objects with id fields.
 
+    Recurses to arbitrary depth: each discovered nested entry is itself scanned
+    for deeper entry-bearing arrays, whose entries are attached under a further
+    ``nested`` key.  This mirrors the recursive ``arrayEntry.nested`` shape in
+    ``schema/entry_key_registry.schema.json``.  Example: step 14's
+    ``milestones[].tasks[].acceptance_criteria`` is 3-deep — the ``criterion``
+    entry is nested under the ``task`` entry, which is nested under ``milestone``.
+
     Returns a list of arrayEntry dicts (without 'corpus_excluded').
     """
     nested: list[dict[str, Any]] = []
@@ -292,6 +299,12 @@ def _scan_nested_arrays(
             "id_field": id_field,
             "kind": kind,
         }
+        # Recurse: attach any deeper entry-bearing arrays under this entry.
+        deeper = _scan_nested_arrays(
+            nested_item_props, items_resolver, parent_schema_basename
+        )
+        if deeper:
+            entry["nested"] = deeper
         nested.append(entry)
     return nested
 

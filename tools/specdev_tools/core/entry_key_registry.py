@@ -180,23 +180,32 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
 
     arrays: List[RegistryEntry] = []
     for arr in entry.get("arrays", []):
-        arrays.append(RegistryEntry(
-            array_path=arr["array_path"],
-            id_field=arr["id_field"],
-            kind=arr["kind"],
-        ))
-        # Nested arrays: each element of ``arr["nested"]`` describes a
-        # sub-array within the parent.  The path convention uses ``[]`` to
-        # signal "iterate all elements", e.g. ``.milestones[].tasks``.
-        parent_path = arr["array_path"]  # e.g. ".milestones"
-        for nested in arr.get("nested", []):
-            nested_path = f"{parent_path}[].{nested['array_path'].lstrip('.')}"
-            arrays.append(RegistryEntry(
-                array_path=nested_path,
-                id_field=nested["id_field"],
-                kind=nested["kind"],
-            ))
+        _flatten_entry(arr, arr["array_path"], arrays)
     return arrays
+
+
+def _flatten_entry(
+    node: Dict[str, Any],
+    full_path: str,
+    out: List[RegistryEntry],
+) -> None:
+    """Append *node* (and its ``nested`` descendants, recursively) to *out*.
+
+    ``full_path`` is the resolved jq-style path to *node*'s array, with ``[]``
+    separating each array level, e.g. ``.milestones`` at the top level and
+    ``.milestones[].tasks[].acceptance_criteria`` three levels deep.  Each
+    nested entry's own ``array_path`` is relative to a parent item, so the
+    convention is ``<full_path>[].<child.array_path>``.  Recursion handles
+    arbitrary depth (schema ``arrayEntry.nested`` is defined recursively).
+    """
+    out.append(RegistryEntry(
+        array_path=full_path,
+        id_field=node["id_field"],
+        kind=node["kind"],
+    ))
+    for nested in node.get("nested", []):
+        child_path = f"{full_path}[].{nested['array_path'].lstrip('.')}"
+        _flatten_entry(nested, child_path, out)
 
 
 def find_entry(
@@ -279,6 +288,53 @@ def is_corpus_excluded(array_key: str, repo_root: str) -> bool:
     """
     _, excluded_keys = _load(repo_root)
     return array_key in excluded_keys
+
+
+# ---------------------------------------------------------------------------
+# array_path walking (shared by json_utils, matrix, and any consumer that
+# resolves a registry array_path against actual spec data)
+# ---------------------------------------------------------------------------
+
+def iter_array_path(data: Any, array_path: str):
+    """Yield ``(item, jq_index_path)`` for every leaf item at *array_path*.
+
+    *array_path* is a registry-style jq path where ``[].`` separates each array
+    level, e.g. ``.milestones``, ``.milestones[].tasks``, or
+    ``.milestones[].tasks[].acceptance_criteria``.  A leading dot is optional.
+    The walker descends through **all** array segments (arbitrary depth),
+    iterating every element at each level, and yields each leaf-array item
+    together with its concrete index path
+    (e.g. ``.milestones[0].tasks[2].acceptance_criteria[1]``).
+
+    Non-dict containers, missing keys, and non-list values are skipped silently
+    — the same lenient contract the previous single-level implementations used.
+    Only dict leaf items are yielded (callers read an id field off them).
+
+    This replaces three separate ``partition("[].")`` reimplementations that
+    each split on only the first array level and therefore silently dropped
+    entries nested two-or-more levels deep.
+    """
+    if not isinstance(data, dict):
+        return
+    segments = array_path.lstrip(".").split("[].")
+
+    def _descend(node: Any, seg_index: int, prefix: str):
+        key = segments[seg_index]
+        is_last = seg_index == len(segments) - 1
+        if not isinstance(node, dict):
+            return
+        val = node.get(key)
+        if not isinstance(val, list):
+            return
+        for idx, item in enumerate(val):
+            item_path = f"{prefix}.{key}[{idx}]"
+            if is_last:
+                if isinstance(item, dict):
+                    yield item, item_path
+            elif isinstance(item, dict):
+                yield from _descend(item, seg_index + 1, item_path)
+
+    yield from _descend(data, 0, "")
 
 
 def all_registered_basenames(repo_root: str) -> List[str]:

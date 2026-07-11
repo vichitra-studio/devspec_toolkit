@@ -2012,13 +2012,26 @@ def main():
                     sid for sid, info in result.items()
                     if isinstance(info, dict) and info.get("stale")
                 ]
-                if stale_seeds:
+                # Emit W595 (SEED_UNTRACKED) for manifest seeds missing from the
+                # index — they escape drift detection until re-indexed.
+                untracked_seeds = [
+                    sid for sid, info in result.items()
+                    if isinstance(info, dict) and info.get("untracked")
+                ]
+                if stale_seeds or untracked_seeds:
                     cfg = get_config()
                     warn_or_error = "error" if cfg.warnings_as_errors else "warning"
                     for sid in stale_seeds:
                         print(
                             f"specdev: {warn_or_error} W595: seed '{sid}' is stale — "
                             "re-index with /specdev-step (CONTENT_STALENESS)",
+                            file=sys.stderr,
+                        )
+                    for sid in untracked_seeds:
+                        print(
+                            f"specdev: {warn_or_error} W595: seed '{sid}' is in the "
+                            "manifest but not hash-tracked in seed_requirements.json — "
+                            "re-index with /specdev-step (SEED_UNTRACKED)",
                             file=sys.stderr,
                         )
                     if cfg.warnings_as_errors:
