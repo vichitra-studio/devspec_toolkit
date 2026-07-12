@@ -1037,69 +1037,38 @@ def _collect_ids_from_file(
         return all_ids, id_map
 
     # --- Registry path (known spec file) ---
-    # Split registry entries into top-level and nested.
-    # Nested entries have paths like ".milestones[].tasks".
-    top_level_lookup: Dict[str, Tuple[str, str]] = {}
-    # nested_lookup: parent_key → list of (sub_array_key, id_field, kind)
-    nested_lookup: Dict[str, List[Tuple[str, str, str]]] = {}
-
+    # Group registered entries by their top-level array key (the first path
+    # segment).  ``list_entries`` emits a parent entry before its descendants,
+    # so registry order within each group is parent-first.  Each entry's
+    # ``array_path`` (e.g. ".milestones[].tasks[].acceptance_criteria") is
+    # walked to arbitrary depth by ``iter_array_path`` — no single-level cap.
+    by_top: Dict[str, List[Any]] = {}
     for entry in reg_entries:
-        path = entry.array_path  # e.g. ".milestones" or ".milestones[].tasks"
-        if "[]." in path:
-            # Nested: ".parent[].child" → parent="parent", child="child"
-            parent_part, _, child_part = path.partition("[].")
-            parent_key = parent_part.lstrip(".")
-            nested_lookup.setdefault(parent_key, []).append(
-                (child_part, entry.id_field, entry.kind)
-            )
-        else:
-            arr_key = path.lstrip(".")
-            top_level_lookup[arr_key] = (entry.id_field, entry.kind)
+        top_key = entry.array_path.lstrip(".").split("[")[0]
+        by_top.setdefault(top_key, []).append(entry)
 
+    # Outer iteration follows the spec document's key order (as before) so id
+    # collection order is data-driven and deterministic; inner iteration follows
+    # registry order (top-level array, then each deeper nested array).
     for top_key, top_val in data.items():
         if not isinstance(top_val, list):
             continue
         # Skip corpus-excluded keys.
         if _ekreg.is_corpus_excluded(top_key, repo_root):
             continue
-        if top_key not in top_level_lookup and top_key not in nested_lookup:
+        if top_key not in by_top:
             # Array not registered for this file — skip deliberately.
             continue
 
-        if top_key in top_level_lookup:
-            id_field, kind = top_level_lookup[top_key]
-            for idx, item in enumerate(top_val):
-                if not isinstance(item, dict):
-                    continue
-                # Use the registered id field exclusively (deterministic).
-                found_id = item.get(id_field)
+        for entry in by_top[top_key]:
+            for item, jq_path in _ekreg.iter_array_path(data, entry.array_path):
+                found_id = item.get(entry.id_field)
                 if not isinstance(found_id, str) or not found_id:
                     continue
-                jq_path = f".{top_key}[{idx}]"
                 all_ids.append(found_id)
                 # On id collision, keep first occurrence (deterministic).
                 if found_id not in id_map:
-                    id_map[found_id] = (kind, jq_path, item)
-
-        # Walk nested sub-arrays for entries registered under this parent.
-        if top_key in nested_lookup:
-            for parent_idx, parent_item in enumerate(top_val):
-                if not isinstance(parent_item, dict):
-                    continue
-                for sub_key, id_field, kind in nested_lookup[top_key]:
-                    sub_val = parent_item.get(sub_key)
-                    if not isinstance(sub_val, list):
-                        continue
-                    for sub_idx, sub_item in enumerate(sub_val):
-                        if not isinstance(sub_item, dict):
-                            continue
-                        found_id = sub_item.get(id_field)
-                        if not isinstance(found_id, str) or not found_id:
-                            continue
-                        jq_path = f".{top_key}[{parent_idx}].{sub_key}[{sub_idx}]"
-                        all_ids.append(found_id)
-                        if found_id not in id_map:
-                            id_map[found_id] = (kind, jq_path, sub_item)
+                    id_map[found_id] = (entry.kind, jq_path, item)
 
     return all_ids, id_map
 

@@ -85,17 +85,22 @@ Dispatcher (skill) provides:
   "scope": "AUTH_TOKEN_REFRESH",
   "round": 1,
   "reviewer_id": "r1",
-  "plan_path": "spec/impl_context/ms_phase2_newsletter_send_plan.json"
+  "plan_path": "spec/impl_context/ms_phase2_newsletter_send_plan.json",
+  "milestone_start_ref": "abc1234def5678901234567890abcdef12345678"
 }
 ```
 
 - `scope` is used verbatim in the output filename.
-- `scope_kind` enum (per-agent-prompt, NOT schema-enforced — `findings.schema.json` carries
-  `scope_kind` as a free string; the enum is documented per-agent only, per §11.1.2):
+- `scope_kind` enum (per-agent-prompt, NOT schema-enforced — it is a dispatch-context
+  field consumed by this agent's invocation prompt, not a property defined in
+  `findings.schema.json`; the enum is documented per-agent only, per §11.1.2):
   - `code_phase_group`: requires `group_id`; per-group review during `--phase impl` (§11.3.1).
   - `code_phase_milestone`: `group_id` omitted; milestone-wide sweep during `--phase review` (§11.3.2).
 - `plan_path`: path to the plan artifact (`spec/impl_context/ms_<batch_id>_plan.json`).
 - `reviewer_id`: string identifier, used in the output filename suffix.
+- `milestone_start_ref`: the git commit SHA computed by the skill via `git rev-parse HEAD`
+  before the first group/round dispatch. Used in step 6 for supplemental git diff context
+  (informational — git diff is typically empty in the normal uncommitted-work flow).
 
 The dispatcher also provides resolved absolute paths for `--repo-root`, `--spec-root`,
 and `--git-root`. Use them verbatim in every specdev call.
@@ -136,9 +141,9 @@ Severity defaults:
 
 These are defaults. Reviewer may upgrade severity when impact is higher than default.
 
-Note: the `scope_kind` union is per-agent-prompt; `findings.schema.json` has `scope_kind` as a
-free string (verified). K1 §4.1 defines the structural finding-record enum. K2 inherited it
-unchanged. K2.1 β extended it with `seed-grounding` (P0); the trinity-reviewer applies the
+Note: the `scope_kind` union is per-agent-prompt; it is a dispatch-context field consumed by
+this agent's invocation prompt and is not a property defined in `findings.schema.json`. K1
+§4.1 defines the structural finding-record enum. K2 inherited it unchanged. K2.1 β extended it with `seed-grounding` (P0); the trinity-reviewer applies the
 same taxonomy as the spec-phase reviewer (§11.4 E2 note).
 
 ---
@@ -288,8 +293,8 @@ A `code_phase_milestone` review round CONVERGES when ALL of:
 5. **Plan-vs-execution coherent** — no group with `actions[]` items unaccounted for in
    the filesystem state; no filesystem artifacts not traceable to plan actions.
 6. **Linked-fixture coverage rolled up** — for every FR bound in any group's `spec_ref`
-   (`plan.spec_alignment.checklist[i].spec_ref` where `spec_ref.type == 'doc'` and
-   `spec_ref.id == 'vc:04-fr-list'`), at least one fixture from `spec/08_fixtures.json`
+   (`plan.spec_alignment.checklist[i].spec_ref` where `spec_ref.type == 'fr'`, e.g.
+   `spec_ref.id == 'fr-user-login'`), at least one fixture from `spec/08_fixtures.json`
    must be exercised somewhere in the milestone. A coverage gap raises `kind: coverage`.
 
 ---
@@ -387,19 +392,42 @@ If validation fails, fix the output before returning. Do not return an invalid f
    ```bash
    specdev json read <plan_path> '.plan.summary.target_file_patterns'
    ```
-5. **If `code_phase_group`**: also read the group's checklist entry to identify
-   `actions[].target` paths:
+5. **If `code_phase_group`**: read the group's checklist entry to identify `actions[].target`
+   paths — this is the **primary code-discovery path**; read these files unconditionally in
+   step 7 regardless of whether git diff is empty:
    ```bash
    specdev json read <plan_path> \
      '.plan.spec_alignment.checklist[] | select(.id == "<group_id>")'
    ```
-6. Run `git diff` and `git log` to enumerate changed files since milestone-start:
+   Extract `implementation.actions[].target` from the result and store as `group_code_files`.
+   If git diff (step 6) is also empty, use `group_code_files` exclusively — do NOT skip code
+   review because git diff is empty.
+
+5b. **If `code_phase_milestone`**: enumerate `actions[].target` across ALL groups in the plan —
+    this is the **primary code-discovery path** for milestone scope:
+    ```bash
+    specdev json read <plan_path> \
+      '.plan.spec_alignment.checklist[].implementation.actions[].target // empty' | sort -u
+    ```
+    Store as `milestone_code_files`. Do NOT skip code review because git diff is empty — git
+    diff is empty by construction in the normal uncommitted-work flow. `milestone_code_files`
+    is the definitive code enumeration for this scope.
+
+6. Run `git diff` and `git log` for supplemental file-change context (informational — git diff
+   is typically empty in the normal uncommitted-work flow; `actions[].target` from step 5/5b
+   is the primary code-discovery path):
    ```bash
-   git log --oneline <milestone-start>..HEAD
-   git diff --name-only <milestone-start>..HEAD
+   git log --oneline <milestone_start_ref>..HEAD
+   git diff --name-only <milestone_start_ref>..HEAD
    ```
+   If git diff is empty, log an informational message and proceed — do NOT treat an empty diff
+   as a review failure. The primary code-discovery path (step 5 / 5b) is unaffected.
+
 7. For code files in scope: use Read or `cat`/`head` to inspect changed content. Stay
-   within `target_file_patterns`. Do NOT Read `spec/*.json` directly.
+   within `target_file_patterns`. Read all files in `group_code_files` (code_phase_group) or
+   `milestone_code_files` (code_phase_milestone) unconditionally as the primary review surface,
+   then supplement with any additional files identified by git diff in step 6. Do NOT Read
+   `spec/*.json` directly.
 8. Run `specdev spec-check spec --json ...`, filter to in-scope paths.
 9. **If `code_phase_milestone`**:
    - Run `specdev forward-replay-check --json ...` and parse results.

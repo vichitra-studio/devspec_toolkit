@@ -1,0 +1,107 @@
+{
+  "digest_type": "digest_doc",
+  "source_file": "seed_templates/seed_overview.md",
+  "source_sha": "996c586f0a0c88a5a03471c2bbdc3385cf1408a5",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "doc_path": "seed_templates/seed_overview.md",
+    "headings": [
+      {
+        "depth": 1,
+        "text": "Product Brief: [Project Name]"
+      },
+      {
+        "depth": 2,
+        "text": "0. Metadata"
+      },
+      {
+        "depth": 2,
+        "text": "1. About This Document"
+      },
+      {
+        "depth": 2,
+        "text": "2. Problem & Users"
+      },
+      {
+        "depth": 3,
+        "text": "2.1 Problem Statement"
+      },
+      {
+        "depth": 3,
+        "text": "2.2 Target Users / Personas"
+      },
+      {
+        "depth": 3,
+        "text": "2.3 Core Scenarios (Jobs-to-be-Done)"
+      },
+      {
+        "depth": 3,
+        "text": "2.4 Success Metrics (KPIs)"
+      },
+      {
+        "depth": 2,
+        "text": "3. Scope (MVP Definition)"
+      },
+      {
+        "depth": 3,
+        "text": "3.1 In-Scope Goals (Must-Haves)"
+      },
+      {
+        "depth": 3,
+        "text": "3.2 Out-of-Scope (Non-Goals)"
+      },
+      {
+        "depth": 3,
+        "text": "3.3 Assumptions & Constraints"
+      },
+      {
+        "depth": 2,
+        "text": "4. Expected Capabilities"
+      },
+      {
+        "depth": 2,
+        "text": "5. Domain Model (Data & Concepts)"
+      },
+      {
+        "depth": 3,
+        "text": "5.1 Data Sources"
+      },
+      {
+        "depth": 3,
+        "text": "5.2 Key Entities & Relationships"
+      },
+      {
+        "depth": 3,
+        "text": "5.3 Update Strategy"
+      },
+      {
+        "depth": 2,
+        "text": "6. Timeline & Milestones"
+      },
+      {
+        "depth": 3,
+        "text": "6.1 Milestones"
+      },
+      {
+        "depth": 3,
+        "text": "6.2 Risks & Mitigations"
+      },
+      {
+        "depth": 2,
+        "text": "7. Team & Process"
+      },
+      {
+        "depth": 3,
+        "text": "7.1 Owners"
+      },
+      {
+        "depth": 3,
+        "text": "7.2 Process"
+      }
+    ],
+    "code_blocks": [],
+    "referenced_commands": [],
+    "referenced_files": []
+  }
+}

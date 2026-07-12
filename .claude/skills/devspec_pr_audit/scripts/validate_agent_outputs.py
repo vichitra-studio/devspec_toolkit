@@ -426,6 +426,34 @@ def _build_report(
 
 
 # ---------------------------------------------------------------------------
+# Manifest helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_blocked_manifest(manifest_path: Path, blocked_reason: str) -> None:
+    """Merge-write status=blocked and blocked_reason into manifest.json.
+
+    Reads the existing manifest (if any), updates only 'status' and
+    'blocked_reason', and writes it back.  Never clobbers other keys.
+    """
+    data: dict[str, Any] = {}
+    if manifest_path.exists():
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pass  # Start with an empty dict; the merge-write still records the block.
+    data["status"] = "blocked"
+    data["blocked_reason"] = blocked_reason
+    try:
+        manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except OSError as exc:
+        print(
+            f"WARNING: could not write blocked status to {manifest_path}: {exc}",
+            file=sys.stderr,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -484,6 +512,9 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = [r for r in results if r.status == "fail"]
     if failed:
+        first = failed[0]
+        blocked_reason = f"{first.schema} failed validation for {first.artifact}"
+        _write_blocked_manifest(run_dir / "manifest.json", blocked_reason)
         return 1
     if args.strict:
         warned = [r for r in results if r.is_warning]

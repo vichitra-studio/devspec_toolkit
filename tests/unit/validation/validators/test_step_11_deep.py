@@ -418,6 +418,60 @@ class TestApiCoverageCheck:
         assert not any("W583" in e for e in rendered)
 
 
+class TestApiCoverageWontHaveFrExclusion:
+    """W583 must not demand threat coverage for an API whose only tracing FR
+    is priority:"wont-have" -- it will never be built (DEVSPEC-122 follow-up)."""
+
+    def _write_step04(self, toolkit_root, frs):
+        spec_dir = os.path.join(toolkit_root, "spec")
+        with open(os.path.join(spec_dir, "04_fr_list.json"), "w") as f:
+            json.dump({"functional_requirements": frs}, f)
+
+    def _write_step05(self, toolkit_root, apis):
+        spec_dir = os.path.join(toolkit_root, "spec")
+        with open(os.path.join(spec_dir, "05_interface_contracts.json"), "w") as f:
+            json.dump({"apis": apis}, f)
+
+    def test_api_tracing_only_to_wont_have_fr_does_not_fire_w583(self, toolkit_root):
+        self._write_step04(toolkit_root, [{"fr_id": "fr-legacy-export", "priority": "wont-have"}])
+        self._write_step05(toolkit_root, [
+            {"api_id": "api-legacy-export", "trace": [{"type": "fr", "id": "fr-legacy-export"}]}
+        ])
+        errors = validate_step_11({"threats": []}, toolkit_root)
+        rendered = _render(errors)
+        assert not any("W583" in e and "api-legacy-export" in e for e in rendered), rendered
+
+    def test_control_api_tracing_to_must_have_fr_still_fires_w583(self, toolkit_root):
+        """Control: an API tracing only to a must-have FR must still fire W583."""
+        self._write_step04(toolkit_root, [{"fr_id": "fr-login", "priority": "must-have"}])
+        self._write_step05(toolkit_root, [
+            {"api_id": "api-login", "trace": [{"type": "fr", "id": "fr-login"}]}
+        ])
+        errors = validate_step_11({"threats": []}, toolkit_root)
+        rendered = _render(errors)
+        assert any("W583" in e and "api-login" in e for e in rendered), rendered
+
+    def test_api_tracing_to_mixed_fr_priorities_still_fires_w583(self, toolkit_root):
+        """Control: an API tracing to BOTH a wont-have and a must-have FR must
+        still fire W583 -- not every tracing FR is wont-have."""
+        self._write_step04(toolkit_root, [
+            {"fr_id": "fr-legacy-export", "priority": "wont-have"},
+            {"fr_id": "fr-login", "priority": "must-have"},
+        ])
+        self._write_step05(toolkit_root, [
+            {
+                "api_id": "api-mixed",
+                "trace": [
+                    {"type": "fr", "id": "fr-legacy-export"},
+                    {"type": "fr", "id": "fr-login"},
+                ],
+            }
+        ])
+        errors = validate_step_11({"threats": []}, toolkit_root)
+        rendered = _render(errors)
+        assert any("W583" in e and "api-mixed" in e for e in rendered), rendered
+
+
 class TestMitigationCrossRef:
     """DEVSPEC-89: mitigation IDs are cross-referenced against upstream specs."""
 
@@ -938,6 +992,50 @@ class TestInvariantCoverageW615:
         errors = validate_step_11(instance, str(tmp_path), artifact_path)
         rendered = _render(errors)
         assert not any("W615" in e for e in rendered), rendered
+
+
+class TestInvariantCoverageWontHaveFrExclusion:
+    """W615 must not demand threat coverage for an invariant whose only
+    tracing FR is priority:"wont-have" (DEVSPEC-122 follow-up)."""
+
+    def test_invariant_tracing_only_to_wont_have_fr_does_not_fire_w615(self, tmp_path):
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({
+            "functional_requirements": [{"fr_id": "fr-legacy-export", "priority": "wont-have"}]
+        }))
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{
+                "inv_id": "inv-legacy-export-integrity",
+                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
+                "trace": [{"type": "fr", "id": "fr-legacy-export"}],
+            }]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {"threats": []}
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert not any("W615" in e and "inv-legacy-export-integrity" in e for e in rendered), rendered
+
+    def test_control_invariant_tracing_to_must_have_fr_still_fires_w615(self, tmp_path):
+        """Control: an invariant tracing only to a must-have FR must still fire W615."""
+        spec_dir = tmp_path / "spec"
+        spec_dir.mkdir()
+        (spec_dir / "04_fr_list.json").write_text(json.dumps({
+            "functional_requirements": [{"fr_id": "fr-login", "priority": "must-have"}]
+        }))
+        (spec_dir / "06_invariants.json").write_text(json.dumps({
+            "rules": [{
+                "inv_id": "inv-auth-required",
+                "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
+                "trace": [{"type": "fr", "id": "fr-login"}],
+            }]
+        }))
+        artifact_path = str(spec_dir / "11_redteam.json")
+        instance = {"threats": []}
+        errors = validate_step_11(instance, str(tmp_path), artifact_path)
+        rendered = _render(errors)
+        assert any("W615" in e and "inv-auth-required" in e for e in rendered), rendered
 
 
 class TestHostSpecSiblingResolution:

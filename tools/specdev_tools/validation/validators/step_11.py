@@ -105,6 +105,14 @@ def validate_step_11(
     # for the W615 coverage check.  Derived from step-06 full objects, not just IDs.
     security_invariant_ids: set[str] = _load_security_invariant_ids(toolkit_root, artifact_path)
 
+    # An API/invariant whose only tracing FR(s) are priority:"wont-have" will
+    # never be built, so it shouldn't be falsely demanded to have threat
+    # coverage either (DEVSPEC-122 follow-up, mirrors the equivalent exclusion
+    # already applied in matrix.py/traceability_closure.py).
+    wont_have_fr_ids = _load_wont_have_fr_ids(toolkit_root, artifact_path)
+    api_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "05", "apis", "api_id")
+    invariant_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "06", "rules", "inv_id")
+
     for i, threat in enumerate(instance.get("threats", [])):
         if not isinstance(threat, dict):
             errors.append(make_error("E520", f"threats[{i}] is not an object: {threat!r}"))
@@ -191,10 +199,13 @@ def validate_step_11(
                     if tid:
                         threatened_api_ids.add(tid)
         for api_id in sorted(api_ids):
-            if api_id not in threatened_api_ids:
-                errors.append(
-                    make_error("W583", f"API_UNCOVERED_BY_THREAT {api_id} has no corresponding threat in Step 11")
-                )
+            if api_id in threatened_api_ids:
+                continue
+            if _only_traces_wont_have_frs(api_fr_traces.get(api_id, set()), wont_have_fr_ids):
+                continue
+            errors.append(
+                make_error("W583", f"API_UNCOVERED_BY_THREAT {api_id} has no corresponding threat in Step 11")
+            )
 
     # W615: Invariant coverage — each step-06 invariant with a risk_category_ref
     # should be referenced by at least one threat's mitigation of type 'inv'.
@@ -215,14 +226,17 @@ def validate_step_11(
                     if mid:
                         mitigated_invariant_ids.add(mid)
         for inv_id in sorted(security_invariant_ids):
-            if inv_id not in mitigated_invariant_ids:
-                errors.append(
-                    make_error(
-                        "W615",
-                        f"INVARIANT_UNEXERCISED_BY_THREAT {inv_id} has a risk_category_ref "
-                        "but no threat mitigation references it",
-                    )
+            if inv_id in mitigated_invariant_ids:
+                continue
+            if _only_traces_wont_have_frs(invariant_fr_traces.get(inv_id, set()), wont_have_fr_ids):
+                continue
+            errors.append(
+                make_error(
+                    "W615",
+                    f"INVARIANT_UNEXERCISED_BY_THREAT {inv_id} has a risk_category_ref "
+                    "but no threat mitigation references it",
                 )
+            )
 
     return errors
 
@@ -358,6 +372,98 @@ def _load_security_invariant_ids(
         return result
 
     return set()
+
+
+def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
+    """Load the set of step-04 fr_ids marked priority:"wont-have".
+
+    Mirrors ``_load_security_invariant_ids``'s sibling-first / fallback
+    resolution. Returns an empty set when step 04 is absent or contains no
+    such FRs.
+    """
+    candidates: list[Path] = []
+    if artifact_path:
+        artifact_dir = Path(artifact_path).resolve().parent
+        for fn in _iter_step_files(artifact_dir, "04"):
+            candidates.append(artifact_dir / fn)
+    fallback_spec = Path(toolkit_root).resolve() / "spec"
+    for fn in _iter_step_files(fallback_spec, "04"):
+        candidates.append(fallback_spec / fn)
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            with candidate.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            return set()
+        result: set[str] = set()
+        for fr in data.get("functional_requirements", []):
+            if not isinstance(fr, dict):
+                continue
+            fr_id = fr.get("fr_id")
+            if fr_id and fr.get("priority") == "wont-have":
+                result.add(str(fr_id))
+        return result
+
+    return set()
+
+
+def _load_fr_traces_by_id(
+    toolkit_root: str, artifact_path: str | None, step_prefix: str, array_key: str, id_field: str
+) -> dict[str, set[str]]:
+    """Load {entity_id: {traced fr_ids}} from a step artifact's ``trace[]`` fields.
+
+    Used to walk each API's/invariant's trace back to its FR(s), so callers
+    can determine whether an entity's *only* tracing FR(s) are wont-have.
+    Only ``type == "fr"`` trace entries are collected — capability/other trace
+    types are irrelevant to this wont-have determination. Returns an empty
+    dict when the upstream step is absent.
+    """
+    candidates: list[Path] = []
+    if artifact_path:
+        artifact_dir = Path(artifact_path).resolve().parent
+        for fn in _iter_step_files(artifact_dir, step_prefix):
+            candidates.append(artifact_dir / fn)
+    fallback_spec = Path(toolkit_root).resolve() / "spec"
+    for fn in _iter_step_files(fallback_spec, step_prefix):
+        candidates.append(fallback_spec / fn)
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            with candidate.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError, ValueError, TypeError):
+            return {}
+        result: dict[str, set[str]] = {}
+        for entity in data.get(array_key, []):
+            if not isinstance(entity, dict):
+                continue
+            entity_id = entity.get(id_field)
+            if not entity_id:
+                continue
+            fr_ids: set[str] = set()
+            for trace_ref in entity.get("trace", []):
+                if not isinstance(trace_ref, dict):
+                    continue
+                if normalize_trace_type(trace_ref.get("type", "")) == "fr" and trace_ref.get("id"):
+                    fr_ids.add(str(trace_ref["id"]))
+            result[str(entity_id)] = fr_ids
+        return result
+
+    return {}
+
+
+def _only_traces_wont_have_frs(traced_fr_ids: set[str], wont_have_fr_ids: set[str]) -> bool:
+    """True when an entity has at least one FR trace and every traced FR is wont-have.
+
+    An entity with zero FR traces (e.g. only a capability trace) is not
+    excluded here -- there is nothing wont-have to exempt it on.
+    """
+    return bool(traced_fr_ids) and traced_fr_ids.issubset(wont_have_fr_ids)
 
 
 def _iter_step_files(directory: Path, prefix: str) -> list[str]:

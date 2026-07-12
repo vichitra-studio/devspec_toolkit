@@ -119,10 +119,11 @@ invocation prompt. This agent reads it and branches.
    ```
 3. Extract `target_file_patterns` from `plan.summary.target_file_patterns`. This is the
    only location where this field exists — no per-group override is defined in the schema
-   (confirmed: checklist item properties are `[checklist_status, description, fixture_ref,
-   id, implementation, layer, linked_test_expectation, milestone_ref, nfr_refs, spec_ref,
-   type]`; `target_file_patterns` is absent). These patterns are the exclusive boundary
-   for Edit/Write (E6).
+   (confirmed via `devspec_toolkit/schema/16_impl_context.schema.json` L320-L413: checklist
+   item properties are `[checklist_status, deferred_reason, description, fixture_ref, id,
+   implementation, layer, linked_test_expectation, milestone_ref, nfr_refs, spec_ref, type,
+   wont_do_reason]`; `target_file_patterns` is absent). These patterns are the exclusive
+   boundary for Edit/Write (E6).
 4. Iterate over `implementation.actions[]` in order. Each action has verified schema shape
    `{type, description, target, command, evidence, command_ref}` where `type` is enum
    `{file_create, file_edit, run_command, manual_verification}` (per the action object at
@@ -144,6 +145,10 @@ invocation prompt. This agent reads it and branches.
    Also run the group's test/verification command if one is present in `actions[]` with
    `type: run_command`. If neither is present, fall back to the project-level test command
    discoverable from CLAUDE.md or seed docs (see Gate semantics below).
+   When `run_command` exits non-zero, set `gate_status: "errors"` and place the exit code
+   and a truncated stderr excerpt into `errors_remaining`; do NOT add the test or gate
+   failure to `ambiguities_raised[]` — that array is for operator-input requests only,
+   not code-phase gate failures.
 6. Return structured summary (see Return contract). Do NOT write a convergence marker file.
    Convergence is determined by the next reviewer dispatch — this agent only reports gate
    cleanliness after its action batch (K2 §11.3.1: "Dispatch specdev-trinity-reviewer →
@@ -336,7 +341,7 @@ Per-group state is encoded entirely by the existence and contents of files under
 artifacts at query time — it is never stored in the plan artifact.
 
 `implementation.status` (verified schema field at
-`devspec_toolkit/schema/16_impl_context.schema.json` L423–L432, enum
+`devspec_toolkit/schema/16_impl_context.schema.json` L408-L416, enum
 `{pending, in_progress, verified, deferred}`) **stays at `pending`** throughout impl + review
 phases per E11 / §11.5. Operator flips to `verified` after deploy + live verification, by
 applying a single patch:
@@ -407,6 +412,7 @@ Return a structured JSON summary per mode. Do not print other text alongside the
   "actions_applied": 4,
   "edits": ["src/auth/jwt.py", "tests/unit/test_jwt.py"],
   "gate_status": "clean",
+  "errors_remaining": [],
   "ambiguities_raised": []
 }
 ```
@@ -424,6 +430,12 @@ Or on partial success:
   "actions_applied": 2,
   "edits": ["src/auth/jwt.py"],
   "gate_status": "errors",
+  "errors_remaining": [
+    {
+      "exit_code": 1,
+      "stderr": "FAILED tests/unit/test_jwt.py::test_validate_token - AssertionError: expected 401, got 200 ..."
+    }
+  ],
   "ambiguities_raised": [
     {
       "id": "amb-out-of-pattern-edit",

@@ -22,8 +22,10 @@ Each spec step uses the **two-phase Clarify/Emit protocol**:
 ### Pre-Flight Check
 Before starting, ensure your current specs are clean and valid.
 ```bash
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+# Or run the unified gate, which resolves project canon and runs every applicable check:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 1.  **Step 00: Seed Docs & Charter**:
@@ -204,18 +206,19 @@ Supply the executed artifact path. The reviewer validates execution against the 
 
 1.  **Regenerate Traceability Matrix**: Run the matrix command to rebuild cross-artifact trace links. Do not manually edit spec files for traceability.
     ```bash
-    mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
+    mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
     ```
-2.  **Final Validation**:
+2.  **Final Validation** (or substitute the unified `spec-check` gate for `validate-all`):
     ```bash
-    ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit
+    ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+    ./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
-    ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+    ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
     ```
     This confirms that your new feature didn't break any existing traces or schema rules.
 3.  **Governance-Compliant Commit**: Commit with a message that matches the pattern defined in `spec/10_governance.json`. Example: `feat(spec): add [feature-name] [fr-feature-id]`.

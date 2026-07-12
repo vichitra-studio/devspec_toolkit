@@ -1,0 +1,44 @@
+{
+  "digest_type": "digest_test",
+  "source_file": "tests/unit/validation/linters/test_w555_step00_out_of_scope_thin.py",
+  "source_sha": "d7c42a4882681fbb75e0f41398ebeddd11785e9d",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "test_file_path": "tests/unit/validation/linters/test_w555_step00_out_of_scope_thin.py",
+    "test_count": 18,
+    "test_names": [
+      "test_fires_when_one_substantive_item",
+      "test_fires_when_no_out_of_scope_section",
+      "test_fires_when_only_bracket_placeholders",
+      "test_fires_when_only_scaffold_labels",
+      "test_no_fire_when_aggregate_equals_three",
+      "test_no_fire_when_single_seed_has_three_items",
+      "test_no_fire_when_step00_absent",
+      "test_no_fire_when_step00_empty_list",
+      "test_no_fire_for_non_00_step_seeds",
+      "test_fires_for_real_template_with_one_real_item",
+      "test_bold_lead_without_colon_counts_as_substantive",
+      "test_w555_is_warning_only",
+      "test_w555_is_non_promotable",
+      "test_fires_exactly_once_for_multiple_thin_seeds",
+      "test_no_fire_when_fenced_block_contains_fake_section",
+      "test_no_fire_when_tilde_fenced_block_contains_fake_section",
+      "test_fires_when_only_empty_bullets",
+      "test_fires_when_cross_delimiter_fence_contains_fake_bullets"
+    ],
+    "markers": [],
+    "imports": [
+      "__future__",
+      "json",
+      "os",
+      "tempfile",
+      "unittest",
+      "specdev_tools.validation.seed_lint",
+      "specdev_tools.core.errors"
+    ],
+    "fixtures_referenced": [],
+    "hardcoded_paths": [],
+    "is_fixture": false
+  }
+}

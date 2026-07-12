@@ -3,7 +3,6 @@
 # Each slice declares:
 #   globs              — file patterns that route diff entries into this slice
 #   description        — one-line capability statement (NOT a bug list)
-#   type_weight        — per-glob impact weight (default + overrides)
 #   expansion_rules    — when a file in this slice changes, which other files
 #                        get pulled into scope. Each rule names a target glob
 #                        and optionally a capture (e.g., {step} from the source path)
@@ -14,15 +13,12 @@
 #                        (true → eligible for Tier-1/Tier-2 LLM analysis;
 #                         false → Tier-0 Bash only)
 #   model_tier         — haiku | sonnet (when semantic_work is true)
-#   complexity_per_file— weight unit used in impact bin-packing
-#                        (1 = trivial, 5 = heavy semantic load)
 #
-# Impact score (per changed file in slice):
-#   = type_weight × max(1, |expansion_set|) × |applies.drift_types ∪ applies.invariants|
-#
-# Agent allocation (Tier-2):
-#   greedy bin-pack by impact_score with budget ~200 units per sonnet agent
-#   (tunable after dry-run measurement).
+# Agent allocation (Tier-2): one discovery-semantic agent per theme (slice)
+# with semantic_work=true changed files in scope — see protocol.md §3. A
+# theme's files only split across multiple agents on overflow (~15+ files in
+# one theme), and then only along a coherent sub-axis (shared pipeline step
+# or directory), never by an arbitrary score.
 
 # Schema version: 1
 #
@@ -74,9 +70,6 @@ slices:
     Source of truth for field shapes, enums, required-ness, $refs.
   globs:
     - "schema/**/*.json"
-  type_weight:
-    default: 8
-    "schema/core/**": 12        # primitives cascade across all schemas
   expansion_rules:
     - target: "prompts/prompt_{step}_*.md"
       capture: "schema/{step}_*.json"
@@ -95,7 +88,6 @@ slices:
     invariants:  [I1, I3, I4, I7, I9, I13]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 5
 
 # ---------------------------------------------------------------
 # Prompts slice — prompt contracts and shared expectations
@@ -106,9 +98,6 @@ slices:
     guidance, escape-valve declarations, schema-authority directives.
   globs:
     - "prompts/**/*.md"
-  type_weight:
-    default: 6
-    "prompts/shared_expectations.md": 12   # affects all prompts
   expansion_rules:
     - target: "schema/{step}_*.json"
       capture: "prompts/prompt_{step}_*.md"
@@ -124,7 +113,6 @@ slices:
     invariants:  [I1, I2, I3, I6, I9, I12, I13]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 5
 
 # ---------------------------------------------------------------
 # Agent-contracts slice — Claude agent definitions (.claude/agents)
@@ -136,8 +124,6 @@ slices:
     so they drift against schema/infra and protocol.md if left unaudited.
   globs:
     - ".claude/agents/**/*.md"
-  type_weight:
-    default: 5
   expansion_rules:
     - target: "schema/infra/findings.schema.json"
     - target: "schema/infra/pr_audit_fix_plan.schema.json"
@@ -146,7 +132,6 @@ slices:
     invariants:  [I2, I13]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 4
 
 # ---------------------------------------------------------------
 # Canon slice — canonical registry (two-tier)
@@ -159,9 +144,6 @@ slices:
   globs:
     - "canon/**/*.json"
     - "canon/**/*.md"
-  type_weight:
-    default: 7
-    "canon/manifest.json": 11
   expansion_rules:
     - target: "tools/specdev_tools/canonical/**"
     - target: "tools/specdev_tools/registry/**"
@@ -172,7 +154,6 @@ slices:
     invariants:  [I1, I4, I7, I9, I11]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 4
 
 # ---------------------------------------------------------------
 # Validators slice — Python check logic (validation, canonical, registry)
@@ -191,9 +172,6 @@ slices:
     - "tools/specdev_tools/generation/**/*.py"
     - "tools/specdev_tools/core/**/*.py"          # shared core utilities (loaders, parsers, constants)
     - "tools/specdev_tools/*.py"                  # top-level lint/validate modules (validate.py, fixtures_lint.py, matrix.py, governance.py, invariants.py, registry.py, seed_lint.py, docs_lint.py)
-  type_weight:
-    default: 6
-    "tools/specdev_tools/core/errors.py": 12   # error registry affects everything
   expansion_rules:
     - target: "schema/{step}_*.json"
       capture: "tools/specdev_tools/validation/step_*.py"
@@ -206,7 +184,6 @@ slices:
     invariants:  [I3, I4, I5, I7, I8, I11, I13]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 4
 
 # ---------------------------------------------------------------
 # CLI surface slice — commands, flags, env vars
@@ -227,8 +204,6 @@ slices:
     #   - step_docs.json — step→reference-doc map (consumed by `specdev ai-help`)
     - "tools/command_prefixes.json"
     - "tools/step_docs.json"
-  type_weight:
-    default: 5
   expansion_rules:
     - target: "docs/developers/reference.md"
     - target: "docs/developers/**/*.md"
@@ -238,7 +213,6 @@ slices:
     invariants:  [I9, I10, I12]
   semantic_work: true                     # subjective: flag naming, help-text quality
   model_tier: haiku
-  complexity_per_file: 2
 
 # ---------------------------------------------------------------
 # Tests + fixtures slice
@@ -251,9 +225,6 @@ slices:
     - "tests/**/*.py"
     - "tests/**/*.json"
     - "tests/fixtures/**"
-  type_weight:
-    default: 3
-    "tests/fixtures/**": 4
   expansion_rules:
     # {step} token convention: captures the leading NN prefix from filenames like
     # NN_name.schema.json (e.g., "00" from "00_charter.schema.json").
@@ -269,7 +240,6 @@ slices:
     invariants:  [I3, I8, I10]
   semantic_work: true                     # D4 requires semantic comparison of test assertions against current code contract
   model_tier: haiku
-  complexity_per_file: 1
 
 # ---------------------------------------------------------------
 # Generated artifacts slice — generator-owned files
@@ -281,8 +251,6 @@ slices:
   globs:
     - "tools/entry_key_registry.json"
     - "tools/extraction_paths.json"
-  type_weight:
-    default: 9                            # any drift here is high-signal
   expansion_rules:
     - target: "schema/**/*.json"          # generators read schemas
     - target: "tools/specdev_tools/registry/**"
@@ -291,7 +259,6 @@ slices:
     invariants:  [I1, I11]
   semantic_work: false                    # purely deterministic (re-run generator + diff)
   model_tier: haiku
-  complexity_per_file: 1
 
 # ---------------------------------------------------------------
 # Migration + versioning slice
@@ -308,9 +275,6 @@ slices:
     - "changelog/**/*.yaml"
     - "CHANGELOG.md"
     - "tools/pyproject.toml"
-  type_weight:
-    default: 6
-    "tools/pyproject.toml": 10           # version source-of-truth
   expansion_rules:
     # docs/developers/migration*.md — removed; file does not exist
     # docs/developers/versioning*.md — removed; file does not exist
@@ -320,7 +284,6 @@ slices:
     invariants:  [I7, I11]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 3
 
 # ---------------------------------------------------------------
 # Governance + CI slice
@@ -334,8 +297,6 @@ slices:
     - "tools/specdev_tools/validation/forward_replay*.py"
     - "tools/specdev_tools/core/config.py"
     - ".github/workflows/**/*.yml"
-  type_weight:
-    default: 7
   expansion_rules:
     - target: "tools/specdev_tools/core/errors.py"
     # docs/developers/governance*.md — removed; file does not exist
@@ -345,7 +306,6 @@ slices:
     invariants:  [I5, I7, I11]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 3
 
 # ---------------------------------------------------------------
 # Pipeline topology slice — DAG metadata wherever it lives
@@ -360,8 +320,6 @@ slices:
     - "tools/specdev_tools/validation/dag_lint.py"
     - "tools/specdev_tools/validation/extraction_intent_check.py"
     - "tools/specdev_tools/validation/_extraction_intent_parser.py"
-  type_weight:
-    default: 9                            # topology changes are high-signal
   expansion_rules:
     - target: "prompts/**/*.md"           # extraction-intent sections live here
     - target: "schema/**/*.json"          # downstream_consumers fields live here
@@ -370,7 +328,6 @@ slices:
     invariants:  [I2, I4, I12, I13]
   semantic_work: true
   model_tier: sonnet
-  complexity_per_file: 4
 
 # ---------------------------------------------------------------
 # Docs slice
@@ -385,10 +342,6 @@ slices:
     - "README.md"
     - "CLAUDE.md"
     - "tools/README.md"
-  type_weight:
-    default: 2
-    "docs/developers/reference.md": 5
-    "docs/developers/error-codes.md": 5
   expansion_rules:
     - target: "tools/specdev_tools/cli.py"
     - target: "tools/specdev_tools/core/errors.py"
@@ -398,7 +351,6 @@ slices:
     invariants:  [I1, I9, I12]
   semantic_work: true                     # audience-utility judgments
   model_tier: haiku
-  complexity_per_file: 1
 
 # ---------------------------------------------------------------
 # Host integration slice — submodule deployment surface
@@ -416,8 +368,6 @@ slices:
     - "templates/**"                       # toolkit-root templates shipped to host
     - "seed_templates/**"                  # phase-0 seed templates for host bootstrap
     - ".claude/skills/**"                  # toolkit-distributed skills (host-installed)
-  type_weight:
-    default: 5
   expansion_rules:
     - target: "docs/developers/getting_started.md"
     # docs/developers/installation*.md — removed; file does not exist
@@ -427,4 +377,3 @@ slices:
     invariants:  [I9, I10]
   semantic_work: false                    # mostly path/flag parity (Bash)
   model_tier: haiku
-  complexity_per_file: 1

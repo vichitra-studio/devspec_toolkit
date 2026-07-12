@@ -19,6 +19,12 @@ VALID_CHECKLIST_TYPES = frozenset({"behavior", "constraint", "validation", "meta
 VALID_CHECKLIST_LAYERS = frozenset({"db", "model", "service", "api", "integration", "tests", "docs", "config", "security"})
 TYPES_REQUIRING_PROOF = frozenset({"behavior", "constraint", "validation", "perf", "security"})
 
+# checklist_status values meaning "paused or permanently cancelled, not absent"
+# (DEVSPEC-122 follow-up). Shared by every proof/coverage/binding exemption
+# below and by step_16a.py -- a single constant so a future third status value
+# only needs to change in one place, not be re-grepped across the module family.
+PAUSED_OR_CANCELLED_CHECKLIST_STATUSES = frozenset({"deferred", "wont_do"})
+
 # Success marker keywords for evidence content validation (Task 7-03 AUDIT-070)
 _SUCCESS_MARKERS: tuple[str, ...] = ("PASS", "OK", "passed", "success", "0 failures")
 
@@ -160,8 +166,11 @@ def _collect_milestone_refs(data: dict[str, Any]) -> set[str]:
 def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: list[SpecError]) -> None:
     """E307: For every behavioral spec ref (fr, api, inv, nfr), ensure at least one behavior and one validation item.
 
-    Groups non-deferred checklist items by their spec_ref.id and checks that each
-    group has both a 'behavior' and a 'validation' type item.
+    Groups checklist items by their spec_ref.id and checks that each group has
+    both a 'behavior' and a 'validation' type item. Deferred items are included
+    in this grouping -- a deferred 'validation' item still satisfies the pairing
+    requirement (it's paused, not absent); only its own proof-of-work fields
+    (implementation, linked_test_expectation) are exempted elsewhere.
     Non-behavioral spec_ref types ('doc', 'code', 'task') are excluded — these are work items,
     not testable behaviors, and do not require behavior+validation pairing.
     """
@@ -170,8 +179,6 @@ def _check_behavior_validation_pairing(checklist: list[dict[str, Any]], errors: 
     groups: dict[str, set] = defaultdict(set)
     for item in checklist:
         if not isinstance(item, dict):
-            continue
-        if item.get("checklist_status") == "deferred":
             continue
         spec_ref = item.get("spec_ref")
         if not isinstance(spec_ref, dict):
@@ -251,6 +258,8 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     fr_ids_with_nfrs = _build_fr_ids_with_nfrs(nfrs_data)
 
     plan = data.get("plan", {})
+    if not isinstance(plan, dict):
+        plan = {}
     checklist = plan.get("spec_alignment", {}).get("checklist", [])
     docs_impact = plan.get("docs_impact")
 
@@ -270,23 +279,24 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
         if item_layer not in VALID_CHECKLIST_LAYERS:
             errors.append(make_error("E530", f"Checklist item '{item_id}' has invalid layer '{item_layer}'. Must be one of: {', '.join(sorted(VALID_CHECKLIST_LAYERS))}"))
 
-        # Logic Check: checklist fields required for non-deferred proof-type items.
-        # Only types with measurable NFR/fixture associations require proof; types like
-        # docs, metadata, logging, and config legitimately have no NFR or fixture link.
+        # Logic Check: checklist fields required for non-deferred, non-wont_do
+        # proof-type items. Only types with measurable NFR/fixture associations
+        # require proof; types like docs, metadata, logging, and config
+        # legitimately have no NFR or fixture link.
         # nfr_refs gate: only fire when the owning FR has at least one NFR tracing to it
         # in 07_nfrs.json (direct trace, type=="fr"). When nfrs_data is absent the gate
         # silently skips — consistent with the W570 graceful-skip pattern.
-        if checklist_status != "deferred" and item_type in TYPES_REQUIRING_PROOF:
+        if checklist_status not in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES and item_type in TYPES_REQUIRING_PROOF:
             spec_ref = item.get("spec_ref", {})
             spec_ref_fr_id = spec_ref.get("id") if isinstance(spec_ref, dict) and spec_ref.get("type") == "fr" else None
 
             nfr_refs = item.get("nfr_refs", [])
             if not nfr_refs and fr_ids_with_nfrs is not None and spec_ref_fr_id in fr_ids_with_nfrs:
-                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no nfr_refs (FR '{spec_ref_fr_id}' has NFRs in 07_nfrs.json)"))
+                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred/wont_do but has no nfr_refs (FR '{spec_ref_fr_id}' has NFRs in 07_nfrs.json)"))
 
             fixture_ref = item.get("fixture_ref")
             if not fixture_ref:
-                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred but has no fixture_ref"))
+                errors.append(make_error("E520", f"Checklist item '{item_id}' is not deferred/wont_do but has no fixture_ref"))
 
         # Logic Check: Verified/In-Progress items must have actions
         if status in ["verified", "in_progress"]:
@@ -336,6 +346,22 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
                             errors.append(make_error("W601", f"EVIDENCE_NO_ARTIFACT_REF: evidence in checklist item '{item_id}' action '{action.get('type', 'unknown')}' does not reference any spec artifact ID (fr-*, api-*, nfr-*, inv-*)"))
                 if not has_evidence:
                     errors.append(make_error("E301", f"Checklist item '{item_id}' is 'verified' but contains no evidence in any action."))
+
+        # W616: a checklist item marked deferred/wont_do while its
+        # implementation.status still says "verified" (with full evidence) is a
+        # stale contradiction -- either the item isn't really paused/cancelled,
+        # or the implementation record needs its own reconciling note. Found by
+        # adversarial testing, not static reading: nothing previously flagged
+        # this combination. Extended to wont_do for the same reason every other
+        # deferred-only guard in this file was: cancelled-but-verified is the
+        # same class of stale contradiction as paused-but-verified.
+        if checklist_status in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES and status == "verified":
+            errors.append(make_error(
+                "W616",
+                f"PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED: checklist item '{item_id}' has "
+                f"checklist_status='{checklist_status}' but implementation.status='verified' "
+                f"-- reconcile which is accurate"
+            ))
 
     # Logic Check: Ensure target_file_patterns cover touched files
     summary_patterns = set(plan.get("summary", {}).get("target_file_patterns", []))
@@ -567,13 +593,21 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
                             continue
                         found_refs.add(mid)
                     else:
-                        # No scoping signal — include non-done milestones
-                        if mstatus in ("done", "completed"):
+                        # No scoping signal — include non-done, non-deferred milestones
+                        if mstatus in ("done", "completed", "deferred"):
                             continue
                     for task in milestone.get("tasks", []):
                         tid = task.get("task_id")
-                        if tid:
-                            roadmap_task_ids.add(tid)
+                        if not tid:
+                            continue
+                        # A task itself marked deferred/wont_do (schema/14_roadmap
+                        # .schema.json status + status_reason) is already the
+                        # authored acknowledgment that it's paused/cancelled --
+                        # it doesn't also need a checklist item to "cover" it.
+                        # Mirrors the milestone-level deferred skip just above.
+                        if task.get("status") in ("deferred", "wont_do"):
+                            continue
+                        roadmap_task_ids.add(tid)
                 # E582 -- a declared milestone_ref points to a non-existent roadmap milestone
                 if roadmap_data.get("milestones") and milestone_refs:
                     for missing in sorted(milestone_refs - found_refs):
@@ -584,12 +618,14 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
                                 f"(from checklist) not found in roadmap milestones",
                             )
                         )
+                # A deferred/wont_do checklist item is still an authored,
+                # acknowledged acknowledgment of the roadmap task -- paused or
+                # cancelled, not absent -- so it still counts as coverage here.
                 checklist_refs = {
                     item["spec_ref"]["id"]
                     for item in checklist
                     if isinstance(item, dict)
                     and isinstance(item.get("spec_ref"), dict)
-                    and item.get("checklist_status") != "deferred"
                 }
                 unmapped = roadmap_task_ids - checklist_refs
                 for task_id in sorted(unmapped):
@@ -614,7 +650,7 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
                 for item in checklist:
                     if not isinstance(item, dict):
                         continue
-                    if item.get("checklist_status") == "deferred":
+                    if item.get("checklist_status") in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES:
                         continue
                     item_id = item.get("id", "unknown")
                     milestone_ref = item.get("milestone_ref")
@@ -639,7 +675,9 @@ def validate_step_16(data: dict[str, Any], toolkit_root: str, spec_path: Optiona
     if final_status and final_status.get("ci_status") == "green":
         planned_ids = {
             item["id"] for item in checklist
-            if isinstance(item, dict) and item.get("checklist_status") != "deferred" and "id" in item
+            if isinstance(item, dict)
+            and item.get("checklist_status") not in PAUSED_OR_CANCELLED_CHECKLIST_STATUSES
+            and "id" in item
         }
         critical_evidence_2 = data.get("execution", {}).get("critical_evidence", {}) if isinstance(data.get("execution"), dict) else {}
         satisfied_ids = set(

@@ -463,15 +463,18 @@ If both Tier-1 slices have changed files, the two agents can be dispatched in pa
 
 ### Tier-2 (semantic, sonnet)
 
-Read `context_bundle.json` `.tier2_bins[]`. Each bin is an array of
-`{file, slice, impact, digests_needed[]}` objects, already bin-packed by the
-context-author using the impact formula from protocol §3 (~200 units per bin).
+Read `context_bundle.json` `.tier2_bins[]`. Each bin is an object
+`{bin_id, theme, files[]}` where `files[]` (i.e. `tier2_bins[N].files`) holds the
+`{file, slice, digests_needed[]}` objects, already grouped by the context-author using
+the theme-based dispatch rule from protocol §3: one bin per theme (slice) with changed
+files, split only on the rare
+~15-file-per-theme overflow.
 
 Dispatch bins in waves of up to 6 agents in parallel. Wait for all agents in a wave
 to complete before dispatching the next wave.
 
-**Example:** 14 bins → wave 1 dispatches bins 1-6, wave 2 dispatches bins 7-12, wave 3
-dispatches bins 13-14.
+**Example:** a PR touching 8 code areas produces 8 bins → wave 1 dispatches bins 1-6,
+wave 2 dispatches bins 7-8.
 
 <!-- Constraints: keep in sync with §Invocation template in .claude/agents/pr-audit-discovery-semantic.md -->
 For each bin, invoke (substituting `$RUN_ID`, `$BIN_ID`, and inlining `$BIN_FILES_JSON`):
@@ -481,7 +484,7 @@ You are pr-audit-discovery-semantic, invoked for run 20260520-143201-a3f9b2c, bi
 
 Inputs:
 - bin_id: 3
-- bin_files: [{"file":"schema/core/canon.schema.json","slice":"schemas","impact":480,"digests_needed":["digests/digest_schema/canon.schema.json"]}]  (sourced from context_bundle.json tier2_bins[2])
+- bin_files: [{"file":"schema/core/canon.schema.json","slice":"schemas","digests_needed":["digests/digest_schema/canon.schema.json"]}]  (sourced from context_bundle.json tier2_bins[2].files)
 - docs/audit/runs/20260520-143201-a3f9b2c/context_bundle.json
 - docs/audit/runs/20260520-143201-a3f9b2c/digests/<type>/<slug>.json  (paths listed in each file's digests_needed[])
 - Raw source files for each file in bin_files (escape hatch — prefer digests)
@@ -683,6 +686,30 @@ Update `manifest.json` `phases_completed`, `phase_trace[]`, and `updated_at` usi
 `loop_iterations=<converged or capped ITER_N>`,
 `outcome="OK"` on normal convergence, `"DEGRADED"` on L2 cap.
 
+### P4→P5 gate: validate agent outputs
+
+Before entering P5, run the schema-validation hard gate across all consolidated
+artifacts.  This step corresponds to §9.6 of the audit protocol:
+
+```bash
+python3 .claude/skills/devspec_pr_audit/scripts/validate_agent_outputs.py \
+  --run-dir docs/audit/runs/$RUN_ID --strict
+```
+
+If this script exits non-zero, **P5 is skipped entirely**.  On schema failure the
+script merge-writes two keys into `<run-dir>/manifest.json`:
+
+```json
+{
+  "status": "blocked",
+  "blocked_reason": "<schema file> failed validation for <artifact>"
+}
+```
+
+`p5_finalize.py` reads this blocked status on startup (G3 guard) and exits 1,
+printing the `blocked_reason` to stderr so the caller knows which artifact caused
+the block.
+
 ---
 
 ## 9. P5 — Audit-of-Audit and Finalization
@@ -758,6 +785,17 @@ Omit the "## Fix plan" section if `fix_plan.json` does not exist (no findings pa
 If `STATUS == "PARTIAL"`, open with `STATUS: PARTIAL — see manifest.json meta_findings[]
 for unresolved items` (protocol §11).
 
+When findings > 0, append the following section to `SUMMARY.md` (omit when findings
+total is zero — no `fix_plan.json` was produced):
+
+```markdown
+## Next steps
+
+After applying fix_plan.json tasks, run `p6_verify.py` to confirm each task's
+`acceptance_command` passes, then re-run `/devspec_pr_audit` to confirm findings are
+closed. See protocol §12 for the full post-fix verification workflow.
+```
+
 ### P5 completion
 
 The P5 completion sequence is **strictly ordered** — the SUMMARY.md render must read a
@@ -798,6 +836,60 @@ manifest that already reflects phase 5 completion, otherwise the first render sh
    Findings: docs/audit/runs/$RUN_ID/findings.json
    Fix plan: docs/audit/runs/$RUN_ID/fix_plan.json  (or "Fix plan: none (no findings)")
    ```
+
+### Post-fix pipeline (`--post-fix`)
+
+After applying all fix_plan.json tasks (manually or via the `pr-audit-fix-apply` agent),
+confirm all acceptance gates pass, commit the verified fixes, and produce a
+closing-loop re-audit scoped to just those fixes.
+
+**Invocation:**
+```
+/devspec_pr_audit --post-fix <fix_plan_path>
+```
+
+This path does **not** re-run P0–P5 from scratch. Instead:
+
+1. **Capture the pre-fix ref**, before applying any task:
+   ```bash
+   PRE_FIX_SHA=$(git rev-parse HEAD)
+   ```
+2. Reads `fix_plan.json` tasks. Dispatches `pr-audit-fix-apply` per task in
+   topological order, passing `file`, `change_summary`, and `acceptance_command`
+   from each task object.
+3. Gates all applied tasks via `p6_verify.py`:
+   ```bash
+   python3 .claude/skills/devspec_pr_audit/scripts/p6_verify.py <fix_plan_path>
+   ```
+   Exit 0 = all acceptance commands passed; exit 1 = one or more failed. On
+   failure, halt here — do not commit and do not re-audit (see protocol §12.2).
+4. **Commit the verified fixes.** On `p6_verify.py` exit 0, stage only the files
+   touched by the fix plan (the union of `fix_plan.tasks[].file`) and make a
+   single commit referencing the run-id, e.g.:
+   ```bash
+   git add <fix_plan.tasks[].file, deduplicated>
+   git commit -m "fix(pr-audit): apply <run-id> fix_plan (<N> tasks)"
+   ```
+   `--post-fix` now commits the verified fixes (previously they were left
+   uncommitted in the working tree) — this is required so the scoped diff in the
+   next step can see them. If nothing is staged (e.g. a no-op fix whose
+   `acceptance_command` already passed without any edit), skip the commit and the
+   scoped re-audit in step 5 and report those tasks as already-satisfied — an
+   empty commit must not be created.
+5. **Scoped closing re-audit.** Re-run `/devspec_pr_audit --base <PRE_FIX_SHA>`.
+   Because the audit computes its changed-file set as
+   `git diff --name-only "${BASE_REF}...HEAD"` (Step 0d above), passing
+   `--base <PRE_FIX_SHA>` scopes the entire re-audit to exactly the fix commit's
+   changes. If the original run used `--allow-tier0-failure=<check-name>`
+   overrides, pass them again on the scoped re-run. Confirm findings previously
+   addressed by `fix_plan.json` are absent, and check for any new findings
+   introduced by the fixes themselves (see protocol §12.2).
+
+This scoped loop is deliberately narrow: `p6_verify.py` already confirms each
+fix's `acceptance_command`, so the closing re-audit's job is only to catch
+fix-introduced side effects in the changed files — not to re-check cross-boundary
+drift against untouched neighbors. A full branch-vs-main audit remains available
+by running `/devspec_pr_audit` normally (no `--base` override) before merge.
 
 ---
 
@@ -873,3 +965,4 @@ The orchestrator (this skill) may use: **Bash, Read, Write, Agent**.
 | discovery-semantic agent | `.claude/agents/pr-audit-discovery-semantic.md` |
 | cross-boundary agent | `.claude/agents/pr-audit-cross-boundary.md` |
 | consolidator agent | `.claude/agents/pr-audit-consolidator.md` |
+| fix-apply agent | `.claude/agents/pr-audit-fix-apply.md` |

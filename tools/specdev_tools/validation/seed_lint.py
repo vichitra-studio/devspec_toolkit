@@ -18,6 +18,46 @@ from .validate import validate_file
 # filename ends in .json (not .md), so the \.md suffix acts as the exclusion.
 _HARDCODED_SEED_RE = _re.compile(r"\bseed_\w+\.md\b")
 
+# W555 STEP00_SEED_OUT_OF_SCOPE_THIN helpers.
+#
+# _OUT_OF_SCOPE_HEADING_RE — matches lines that begin a heading for an
+# out-of-scope / non-goals section (case-insensitive).  Accepted variants:
+#   ### 3.2 Out-of-Scope (Non-Goals)
+#   ## Out-of-Scope
+#   ### Out-of-Scope
+#   ### Non-Goals
+#   ### Non-Goal
+# Deliberately rejects § 3.1 "In-Scope Goals (Must-Haves)" which contains
+# "Scope" but not "out-of-scope" / "non-goal".
+_OUT_OF_SCOPE_HEADING_RE = _re.compile(
+    r"^#{1,6}\s.*?\b(?:out[\s\-]of[\s\-]scope|non[\s\-]?goals?)\b",
+    _re.IGNORECASE,
+)
+
+# _HEADING_RE — any Markdown ATX heading; used to detect the *next* heading
+# after the out-of-scope section so we know when to stop collecting bullets.
+_HEADING_RE = _re.compile(r"^#{1,6}\s")
+
+# _BULLET_RE — standard Markdown bullet markers (-, *, +).
+_BULLET_RE = _re.compile(r"^\s*[-*+]\s+(.*)")
+
+# _BRACKET_PLACEHOLDER_RE — a bullet whose entire content is a bracketed token,
+# e.g. `- [Non-goal 1]`.  These are template placeholders; they are NOT counted
+# as substantive out-of-scope items.
+_BRACKET_PLACEHOLDER_RE = _re.compile(r"^\[[^\]]*\]\s*$")
+
+# _SCAFFOLD_LABEL_RE — the seed_overview.md template uses "- **Expectation**:"
+# and "- **Content**:" as STRUCTURAL labels in every subsection (3.1, 3.2, 3.3,
+# metrics, …); the actual items are the nested/placeholder bullets beneath
+# "**Content**:". These label bullets are template scaffolding, not real
+# out-of-scope items, so they must not be counted. Keying on these two reserved
+# template tokens (not arbitrary prose) is therefore intentional, not fragile.
+# Accepted limitation: a genuine non-goal authored to literally begin with the
+# reserved token "**Content**:" / "**Expectation**:" would be skipped — but that
+# collides with a reserved structural label of the very template being filled in,
+# so it is a pathological, accepted false-negative for a warning-level check.
+_SCAFFOLD_LABEL_RE = _re.compile(r"^\*\*(expectation|content)\*\*\s*:", _re.IGNORECASE)
+
 
 def _scan_prompts_dir(
     prompts_dir: Path,
@@ -200,6 +240,112 @@ def _check_seed_content_overlap(
                 ))
 
 
+def _count_substantive_out_of_scope(text: str) -> int:
+    """Count substantive out-of-scope bullet items in *text*.
+
+    Scans for the first heading matching ``_OUT_OF_SCOPE_HEADING_RE``, then
+    collects bullet-list items until the next Markdown heading.
+
+    A bullet item is counted as **substantive** when it is NOT:
+    - A bracket-only placeholder such as ``[Non-goal 1]``
+      (matched by ``_BRACKET_PLACEHOLDER_RE``).
+    - A toolkit scaffold label such as ``- **Expectation**:`` or
+      ``- **Content**:`` (matched by ``_SCAFFOLD_LABEL_RE``).
+
+    Returns the integer count of substantive items found.  Returns 0 when no
+    out-of-scope heading is present.
+    """
+    in_section = False
+    fence_char: str | None = None  # None = outside fence; "`" or "~" = inside fence
+    count = 0
+    for line in text.splitlines():
+        # Track fenced code block state by the opening delimiter character so
+        # that cross-delimiter lines inside a fence (e.g. a ~~~ line inside a
+        # ```-opened fence) are treated as fence content, not toggles.
+        # Accepted limitation: the scanner tracks the opening delimiter character
+        # but does NOT match fence-delimiter LENGTHS per CommonMark (e.g. `````
+        # vs ```) — that length simplification remains an accepted simplification
+        # for a warning-level check.
+        stripped = line.strip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            delim = stripped[0]
+            if fence_char is None:
+                # Open the fence; record which delimiter started it.
+                fence_char = delim
+            elif delim == fence_char:
+                # Matching closing delimiter — close the fence.
+                fence_char = None
+            # else: non-matching delimiter inside the fence — fence content; fall through.
+            continue
+        if fence_char is not None:
+            continue
+        if _HEADING_RE.match(line):
+            if in_section:
+                # Reached the next heading — stop collecting.
+                break
+            if _OUT_OF_SCOPE_HEADING_RE.match(line):
+                in_section = True
+            continue
+        if not in_section:
+            continue
+        m = _BULLET_RE.match(line)
+        if not m:
+            continue
+        content = m.group(1).strip()
+        # Empty bullet ("- " with no text) is not substantive content.
+        if not content:
+            continue
+        if _BRACKET_PLACEHOLDER_RE.match(content):
+            continue
+        if _SCAFFOLD_LABEL_RE.match(content):
+            continue
+        count += 1
+    return count
+
+
+def _check_step00_out_of_scope_thin(
+    manifest: Dict, project_root: str, errors: List[SpecError]
+) -> None:
+    """Emit W555 when seeds routed to step 00 supply fewer than 3 substantive
+    out-of-scope items combined.
+
+    Only runs when step "00" is present in ``manifest["step_requirements"]``
+    and the list is non-empty.  Counts across ALL seeds routed to step 00 and
+    fires exactly once if the aggregate count < 3.
+    """
+    step00_seed_ids: List[str] = manifest.get("step_requirements", {}).get("00") or []
+    # Guard: no step-00 routing at all, or explicit empty list → skip.
+    if not step00_seed_ids:
+        return
+
+    seed_paths = resolve_seed_paths(manifest, step00_seed_ids, project_root)
+    total_substantive = 0
+    for _sid, seed_path in seed_paths.items():
+        if not os.path.isfile(seed_path):
+            continue
+        try:
+            with open(seed_path, "r", encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            continue
+        total_substantive += _count_substantive_out_of_scope(text)
+
+    # Threshold 3 matches schema/00_charter.schema.json "out_of_scope": {"minItems": 3}.
+    # The value is restated inline (not read from the schema at runtime) by design:
+    # (1) it follows the validation layer's established mirror-with-comment convention
+    #     for schema-owned bounds (cf. step_16.py, step_16b.py, linter_utils.py); and
+    # (2) reading a Step-00 schema from the seed layer would couple seeds to Step 00 —
+    #     exactly the separation W555 exists to preserve.
+    # If that schema constraint is bumped, update this threshold to match.
+    if total_substantive < 3:
+        errors.append(make_error(
+            "W555",
+            f"STEP00_SEED_OUT_OF_SCOPE_THIN seeds routed to step 00 supply"
+            f" {total_substantive} substantive out_of_scope item(s);"
+            f" charter schema requires minItems:3",
+        ))
+
+
 def lint_seeds(
     repo_root: str,
     spec_dir: str,
@@ -318,5 +464,6 @@ def lint_seeds(
             ))
 
     _check_seed_content_overlap(spec_dir, manifest, project_root, errors)
+    _check_step00_out_of_scope_thin(manifest, project_root, errors)
 
     return errors

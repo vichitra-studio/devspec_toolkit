@@ -29,6 +29,8 @@ class StepScriptBridgeTests(unittest.TestCase):
             ("test_step_06.py", [str(toolkit_root / "tests" / "fixtures" / "step_06" / "valid_full.json")], repo_root, {0, 1}),
             ("test_step_07.py", [str(toolkit_root / "tests" / "fixtures" / "step_07" / "valid_full.json")], repo_root, {0}),
             ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_generic.json")], repo_root, {0}),
+            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "valid" / "valid_out_of_scope.json")], repo_root, {0}),
+            ("test_step_08.py", [str(toolkit_root / "tests" / "fixtures" / "step_08" / "invalid" / "invalid_out_of_scope_missing_rationale.json")], repo_root, {1}),
             ("test_step_09.py", [str(toolkit_root / "tests" / "fixtures" / "step_09" / "valid_complete.json")], repo_root, {0}),
             ("test_step_10.py", [str(toolkit_root / "tests" / "fixtures" / "step_10" / "valid_full.json")], repo_root, {0}),
             ("test_step_11.py", [], repo_root, {0}),

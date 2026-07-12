@@ -1,7 +1,7 @@
 """Changelog parser for DevSpec Toolkit migration system.
 
 Parses and validates YAML changelog files for version tracking and migration.
-See: docs/developers/workflows/migration_system_spec.md
+See: docs/developers/design/migration_system_spec.md
 """
 from __future__ import annotations
 
@@ -89,11 +89,18 @@ def load_format(changelog_dir: Path) -> ChangelogFormat:
         ValueError: If format.yaml is invalid
     """
     format_path = changelog_dir / "format.yaml"
-    if not format_path.exists():
+    try:
+        exists = format_path.exists()
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot access changelog format {format_path}: {e}") from e
+    if not exists:
         raise FileNotFoundError(f"Changelog format not found: {format_path}")
-    
-    with open(format_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+
+    try:
+        with open(format_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot read changelog format {format_path}: {e}") from e
     
     if not data:
         raise ValueError(f"Empty format file: {format_path}")
@@ -121,12 +128,19 @@ def load_version(changelog_dir: Path, version: str) -> VersionChangelog:
         FileNotFoundError: If version YAML doesn't exist
         ValueError: If YAML is invalid or missing required fields
     """
-    yaml_path = changelog_dir / f"v{version}.yaml"
-    if not yaml_path.exists():
+    yaml_path = changelog_dir / "unreleased.yaml" if version == "unreleased" else changelog_dir / f"v{version}.yaml"
+    try:
+        exists = yaml_path.exists()
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot access changelog for version {version} at {yaml_path}: {e}") from e
+    if not exists:
         raise FileNotFoundError(f"Changelog not found for version {version}: {yaml_path}")
-    
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except OSError as e:
+        raise FileNotFoundError(f"Cannot read changelog for version {version} at {yaml_path}: {e}") from e
     
     if not data:
         raise ValueError(f"Empty changelog file: {yaml_path}")
@@ -190,17 +204,20 @@ def list_versions(changelog_dir: Path) -> List[str]:
         List of version strings, sorted by semantic version (oldest first)
     """
     versions = []
-    
-    if not changelog_dir.exists():
-        return versions
-    
-    for f in changelog_dir.iterdir():
-        if f.is_file() and f.suffix == ".yaml" and f.name.startswith("v"):
-            # Extract version from filename (v0.1.0.yaml -> 0.1.0)
-            version = f.stem[1:]  # Remove leading 'v'
-            if _is_valid_semver(version):
-                versions.append(version)
-    
+
+    try:
+        if not changelog_dir.exists():
+            return versions
+
+        for f in changelog_dir.iterdir():
+            if f.is_file() and f.suffix == ".yaml" and f.name.startswith("v"):
+                # Extract version from filename (v0.1.0.yaml -> 0.1.0)
+                version = f.stem[1:]  # Remove leading 'v'
+                if _is_valid_semver(version):
+                    versions.append(version)
+    except OSError:
+        return []
+
     return sorted(versions, key=_parse_semver)
 
 
@@ -285,7 +302,7 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
 
     try:
         fmt = load_format(changelog_dir)
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError, OSError) as e:
         errors.append(make_error("E520", f"Cannot load format: {e}"))
         return errors
 
@@ -293,7 +310,7 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     # Raw-dict structural checks (run before load_version so type/key
     # problems are visible even when the parsed dataclass would succeed).
     # ------------------------------------------------------------------
-    yaml_path = changelog_dir / f"v{version}.yaml"
+    yaml_path = changelog_dir / "unreleased.yaml" if version == "unreleased" else changelog_dir / f"v{version}.yaml"
     try:
         with open(yaml_path, "r", encoding="utf-8") as _f:
             raw = yaml.safe_load(_f)
@@ -335,7 +352,8 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
     # Check 3: `version` field must be valid semver and match filename argument.
     if "version" in raw:
         file_version = raw["version"]
-        if not isinstance(file_version, str) or not _is_valid_semver(file_version):
+        is_unreleased_sentinel = version == "unreleased" and file_version == "unreleased"
+        if not isinstance(file_version, str) or not (is_unreleased_sentinel or _is_valid_semver(file_version)):
             errors.append(
                 make_error(
                     "E520",
@@ -350,12 +368,63 @@ def validate_changelog(changelog_dir: Path, version: str) -> List[SpecError]:
                 )
             )
 
+    # Check 4: when `source_of_truth`/`render_target` are declared (per
+    # format.yaml's optional_fields), the files they point to must exist and
+    # be non-empty. This is a structural existence check only — it does not
+    # attempt to verify content-level parity (e.g. entry-for-entry sync
+    # between the YAML source and its rendered Markdown), which would need a
+    # dedicated warning-level error code to stay non-fatal on legitimate
+    # pre-existing content.
+    repo_root = changelog_dir.parent
+    for _field_name in ("source_of_truth", "render_target"):
+        if _field_name not in raw or _field_name not in allowed_keys:
+            continue
+        _value = raw[_field_name]
+        if not isinstance(_value, str) or not _value.strip():
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Field '{_field_name}' must be a non-empty string path, got {_value!r} in {yaml_path.name}.",
+                )
+            )
+            continue
+        _target_path = repo_root / _value
+        try:
+            if not _target_path.exists():
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to a missing file: {_value}",
+                    )
+                )
+            elif not _target_path.is_file():
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to a non-file path: {_value}",
+                    )
+                )
+            elif _target_path.stat().st_size == 0:
+                errors.append(
+                    make_error(
+                        "E520",
+                        f"Field '{_field_name}' in {yaml_path.name} points to an empty file: {_value}",
+                    )
+                )
+        except OSError as e:
+            errors.append(
+                make_error(
+                    "E520",
+                    f"Cannot check field '{_field_name}' in {yaml_path.name}: {e}",
+                )
+            )
+
     # ------------------------------------------------------------------
     # Parsed-object checks (change types + migration actions).
     # ------------------------------------------------------------------
     try:
         changelog = load_version(changelog_dir, version)
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, ValueError, OSError) as e:
         errors.append(make_error("E520", f"Cannot load changelog: {e}"))
         return errors
 
@@ -393,9 +462,12 @@ def get_toolkit_version(repo_root: Path) -> Optional[str]:
         Version string, or None if not found
     """
     pyproject = repo_root / "tools" / "pyproject.toml"
-    if not pyproject.exists():
+    try:
+        if not pyproject.exists():
+            return None
+    except OSError:
         return None
-    
+
     # Try using tomllib (Python 3.11+) for robust parsing
     try:
         import tomllib  # type: ignore[import-not-found]

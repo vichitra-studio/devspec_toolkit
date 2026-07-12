@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+from unittest import mock
 
 # Add scripts to path for import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
@@ -18,9 +19,9 @@ class TestBuildPreCommitConfig:
         content = _build_pre_commit_config("custom/path")
         assert "--repo-root ./custom/path" in content
 
-    def test_contains_validate_all_hook(self):
+    def test_contains_spec_check_hook(self):
         content = _build_pre_commit_config("devspec_toolkit")
-        assert "validate-all" in content
+        assert "spec-check" in content
 
     def test_contains_canonical_lint_hook(self):
         content = _build_pre_commit_config("devspec_toolkit")
@@ -37,7 +38,41 @@ class TestBuildPreCommitConfig:
     def test_path_substitution_applied(self):
         content = _build_pre_commit_config("my_toolkit")
         assert "./devspec_toolkit" not in content
+        assert "devspec_toolkit/" not in content
+        assert "devspec_toolkit/tools" not in content
         assert "./my_toolkit" in content
+        assert "my_toolkit/" in content
+
+    def test_build_pre_commit_config_missing_template(self):
+        with mock.patch("init_project.os.path.exists", return_value=False):
+            content = _build_pre_commit_config("devspec_toolkit")
+        assert "spec-check" in content
+        assert "devspec_env/bin/python" in content
+        assert "--repo-root ./devspec_toolkit" in content
+        assert "--spec-root ./spec" in content
+        assert "--git-root ." in content
+
+    def test_contains_dag_lint_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "dag-lint" in content
+
+    def test_contains_extraction_intent_check_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "extraction-intent-check" in content
+
+    def test_contains_canon_schema_alignment_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "canon-schema-alignment" in content
+
+    def test_contains_canonical_integrity_hook(self):
+        content = _build_pre_commit_config("devspec_toolkit")
+        assert "canonical-integrity" in content
+
+    def test_custom_venv_name_propagates(self):
+        content = _build_pre_commit_config("devspec_toolkit", "customenv")
+        assert "customenv/bin/python" in content
+        # no leakage of the default venv name when a custom one is requested
+        assert "devspec_env/bin/python" not in content
 
 
 class TestManifestDerivedSeedBootstrap:
@@ -159,6 +194,13 @@ class TestCiWorkflowRender:
         assert "customenv/bin" in content
         # no leakage of the default venv name when a custom one is requested
         assert "devspec_env" not in content
+
+    def test_ci_uses_spec_check_not_validate_all(self):
+        content = _render_ci_workflow(".", "devspec_env")
+        assert "spec-check" in content
+        assert "validate-all" not in content
+        assert "--spec-root ./spec" in content
+        assert "--git-root ." in content
 
     def test_toolkit_path_substitution(self):
         content = _render_ci_workflow("vendor/devspec_toolkit", "devspec_env")

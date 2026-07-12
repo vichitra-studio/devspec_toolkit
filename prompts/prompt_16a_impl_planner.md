@@ -51,7 +51,7 @@ Instead of prose, you must **create or update the artifact file on disk** (`spec
 7.  **Emit**: Generate the JSON.
 
 ### Roadmap-to-Checklist Coverage
-Every `tasks[].task_id` from `14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
+Every `tasks[].task_id` from `spec/14_roadmap.json` MUST map to at least one checklist item in the implementation plan. Unmapped roadmap tasks indicate incomplete planning.
 
 ## Self-Audit Gate
 > Per shared_expectations: if ANY item below cannot be satisfied, enter Clarify mode.
@@ -73,12 +73,11 @@ Before emitting, verify:
 - [ ] The plan covers all `fr_refs` listed on the active Step 14 milestone — no FR is left without an implementation task
 - [ ] The generated plan does not contradict or expand scope beyond what is defined in the Step 16 anchor (spec/16_impl_context.json)
 - [ ] Every roadmap task_id from the active milestone maps to ≥1 checklist item in the plan (no roadmap task left without implementation steps)
-- [ ] Every roadmap `task_id` in the active milestone maps to at least one checklist item in this plan.
 - [ ] All `spec_ref.commit_hash` values are valid 40-char SHAs (not zeros or placeholders).
 - [ ] Every `checklist[].id` is prefixed with the `checklist_id_prefix` declared in the Trinity Anchor's `milestone_index[]` entry for this milestone.
 
 **Extraction Mandate**:
-- Every milestone from `14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
+- Every milestone from `spec/14_roadmap.json` must appear in ≥1 checklist item. List any milestone not scheduled.
 
 ## Negative Constraints
 
@@ -136,10 +135,12 @@ For every `task_id` in the active milestone's `tasks[]` array from `spec/14_road
 - If a task has N `acceptance_criteria`, create ≥N checklist items, one per criterion, to preserve full traceability
 - Document the mapping in your blocker report if any task is ambiguous
 
-Every checklist item MUST include a `milestone_ref` field containing the `milestone_id` from Step 14 that owns the referenced task. Deferred items inherit the milestone_ref of their parent scope.
+Every checklist item MUST include a `milestone_ref` field containing the `milestone_id` from Step 14 that owns the referenced task. Deferred/wont_do items inherit the milestone_ref of their parent scope.
+
+A Step 14 task itself marked `status: "deferred"` or `"wont_do"` (with its own `status_reason`) is already the authored acknowledgment that it's paused/cancelled — it does NOT need a checklist item to "cover" it.
 
 **FORBIDDEN:**
-- Checklist that does not cover every non-deferred roadmap task
+- Checklist that does not cover every roadmap task whose own `status` is not `deferred`/`wont_do`
 - Using `spec_ref.id` values not present in the active milestone's `tasks[]`
 
 *   `checklist`: A list of **Atomic Requirements**.
@@ -153,8 +154,10 @@ Every checklist item MUST include a `milestone_ref` field containing the `milest
         *   *Rule*: **Atomic means Indivisible**. If a requirement can be broken down into two checks, you MUST break it down.
     *   `type`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item type enum).
     *   `layer`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item layer enum).
-    *   `checklist_status`: `active` or `deferred`.
-    *   `linked_test_expectation`: **CRITICAL**. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`).
+    *   `checklist_status`: allowed values are defined in `schema/16_impl_context.schema.json` (checklist item status enum).
+        *   *Rule*: When `deferred`, `deferred_reason` is MANDATORY on this item — name the blocker and the condition required to undefer (e.g. "Waiting for auth service API contract finalisation. Unblock: auth-service publishes OpenAPI 3.0 spec."). This is per-item and independent of `plan.deferred_reason` (which documents deferring the whole plan) — deferring one item does not require deferring the plan.
+        *   *Rule*: When `wont_do`, `wont_do_reason` is MANDATORY on this item — name the decision and, if applicable, what supersedes it (e.g. "Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow."). Use `wont_do` for work that will *permanently* never be built (distinct from `deferred`, which implies resuming later) — this keeps the item's history documented instead of forcing deletion to satisfy coverage checks.
+    *   `linked_test_expectation`: **CRITICAL** for `active` items. A concrete test identifier or command (e.g. `pytest tests/module/test_feature.py::test_name`). Optional when `checklist_status` is `deferred` or `wont_do` — the eventual test contract isn't always known before work starts, or will never be needed.
         *   *Expectation*: This serves as the "contract" for verification. Use specific test names, not just file paths.
     *   `nfr_refs`: Array of NFR IDs this checklist item relates to.
     *   `fixture_ref`: Reference to the test fixture for this checklist item.
@@ -194,7 +197,7 @@ Field shape (ids, required-status, enum members) is in `schema/16_impl_context.s
 ## 7. `plan.review_requirements` (Verification Plan)
 *   `test_commands`: Precision commands to run tests. Each entry is either a **string** (the command) OR an **object** `{ command, command_ref?, description? }` — the schema accepts both forms (`oneOf [string, object]` in `schema/16_impl_context.schema.json`).
     *   *Rule*: must match `linked_test_expectation` commands.
-    *   *Rule (strict, no-exception)*: every distinct command or script invocation that appears in any `checklist[*].linked_test_expectation` — including shell probe scripts, curl calls, ghost/npm CLI invocations, and any other ad-hoc command strings, not just test-runner invocations (pytest/jest/playwright/etc.) — MUST appear in `test_commands`, either as a direct match OR via a broader file-level / suite-level invocation that demonstrably exercises it (e.g. a shell-level `bash theme/scripts/probe_all.sh` that runs the probe referenced in a checklist item). A `linked_test_expectation` whose command is neither directly present nor subsumed by a broader entry in `test_commands` is a declaration gap and MUST be added before emit. This closes the probe-command under-declaration hole observed in prior milestone plans.
+    *   *Rule (strict, no-exception)*: every distinct command or script invocation that appears in any `checklist[*].linked_test_expectation` — including shell probe scripts, curl calls, ghost/npm CLI invocations, and any other ad-hoc command strings, not just test-runner invocations (pytest/jest/playwright/etc.) — MUST appear in `test_commands`, either as a direct match OR via a broader file-level / suite-level invocation that demonstrably exercises it (e.g. a shell-level `bash theme/scripts/probe_all.sh` that runs the probe referenced in a checklist item). A `linked_test_expectation` whose command is neither directly present nor subsumed by a broader entry in `test_commands` is a declaration gap and MUST be added before emit.
     *   *Rule (non-universal verbs)*: hallucination-lint (E530) restricts the leading verb to a known allowlist. For verbs **not** in the toolkit default `command_prefixes.json`, use one of the supported escape routes — **do NOT wrap the command in `bash -c "..."`** (legal but discouraged):
         *   **PRIMARY** — register the verb as a canonical command entry in `<spec-root>/canon/kinds/command.json` (e.g. `cn:project:command:hugo`) and emit the entry in **object form** with a sibling `command_ref` pointing at it. Hallucination-lint bypasses the prefix check whenever a sibling `command_ref.id` is a `cn:`-prefixed string (shape-only); the corresponding canon entry must exist for `canonical-integrity` (E110/E210) to stay green.
         *   **ESCAPE** — for one-off verbs that don't merit a canon entry, append the verb to `<spec-root>/canon/command_prefixes.json` (project-level allowlist, merged with the toolkit default).
@@ -247,7 +250,7 @@ The `plan.docs` field is distinct from `plan.docs_impact` — it carries a **str
 - Set `status: "not_applicable"` with a concrete `reason` only for test-only changes, internal refactors with no external interface change, or documentation-only updates that are themselves the deliverable.
 - When in doubt, prefer `"planned"` — it is safer to over-declare than to miss a documentation gap.
 
-**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level. `plan.docs` is the *actionable update plan* consumed by the coding agent. Both may be present; they are not redundant — `docs_impact` gates governance approval, `docs` drives the coder's file list.
+**Relationship to `plan.docs_impact`**: `plan.docs_impact` assesses *whether* docs are required and tracks impact at the governance level; `plan.docs_impact.docs_touched` is what the coding agent (16b) actually reads to determine its file list. `plan.docs` is a separate, structured documentation update plan for human/downstream doc-authoring use — 16b does not consume it. Both may be present; they are not redundant, but only `docs_impact.docs_touched` drives 16b's file list. Note: unlike `docs_impact.docs_touched`, `plan.docs.required_updates` has no downstream validator consumer — it is advisory only, informing human/downstream doc authoring, and is not enforced or read by any pipeline check.
 
 **Example (planned)**:
 ```json

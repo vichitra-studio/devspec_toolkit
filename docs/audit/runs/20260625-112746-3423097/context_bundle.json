@@ -1,0 +1,262 @@
+{
+  "run_id": "20260625-112746-3423097",
+  "iteration": 1,
+  "slices_in_scope": [
+    "docs",
+    "host_integration",
+    "migration_versioning",
+    "tests_fixtures",
+    "validators"
+  ],
+  "per_slice": {
+    "validators": {
+      "changed_files": [
+        "tools/specdev_tools/core/errors.py",
+        "tools/specdev_tools/validation/seed_lint.py"
+      ],
+      "expansion_files": [
+        "tests/unit/core/test_errors_submodule.py",
+        "docs/developers/error-codes.md",
+        "docs/developers/reference.md",
+        "CHANGELOG.md"
+      ],
+      "catalog_applies": {
+        "drift_types": ["D2", "D3", "D4", "D5", "D6", "D7", "D10", "D14"],
+        "invariants": ["I3", "I4", "I5", "I7", "I8", "I11", "I13"]
+      },
+      "severity_priors": {
+        "D5": "P0",
+        "I3": "P0",
+        "I8": "P1",
+        "D3": "P1"
+      },
+      "semantic_work": true
+    },
+    "tests_fixtures": {
+      "changed_files": [
+        "tests/integration/test_w555_spec_check_aggregation.py",
+        "tests/unit/core/test_error_code_coverage.py",
+        "tests/unit/core/test_error_code_registry.py",
+        "tests/unit/validation/linters/test_w553_seed_step_unknown.py",
+        "tests/unit/validation/linters/test_w555_step00_out_of_scope_thin.py"
+      ],
+      "expansion_files": [],
+      "catalog_applies": {
+        "drift_types": ["D4", "D5"],
+        "invariants": ["I3", "I8", "I10"]
+      },
+      "severity_priors": {
+        "I8": "P1",
+        "D4": "P1"
+      },
+      "semantic_work": true
+    },
+    "migration_versioning": {
+      "changed_files": [
+        "changelog/unreleased.md",
+        "changelog/unreleased.yaml"
+      ],
+      "expansion_files": [
+        "schema/00_charter.schema.json",
+        "schema/01_capabilities.schema.json",
+        "schema/02_system_sketch.schema.json",
+        "schema/02a_delivery_baseline.schema.json",
+        "schema/03_glossary.schema.json",
+        "schema/04_fr_list.schema.json",
+        "schema/05_interface_contracts.schema.json",
+        "schema/06_invariants.schema.json",
+        "schema/07_nfrs.schema.json",
+        "schema/08_fixtures.schema.json",
+        "schema/09_impl_plan.schema.json",
+        "schema/10_governance.schema.json",
+        "schema/11_redteam.schema.json",
+        "schema/12_ci_gates.schema.json",
+        "schema/13_extension_manifest.schema.json",
+        "schema/13a_completeness_assessment.schema.json",
+        "schema/14_roadmap.schema.json",
+        "schema/15_scaffold.schema.json",
+        "schema/16_anchor.schema.json",
+        "schema/16_impl_context.schema.json",
+        "schema/core/atoms.schema.json",
+        "schema/core/canon.schema.json",
+        "schema/core/collections.schema.json",
+        "schema/core/errors.schema.json",
+        "schema/core/step_base.schema.json",
+        "schema/entry_key_registry.schema.json",
+        "schema/infra/findings.schema.json",
+        "schema/infra/pr_audit_fix_plan.schema.json",
+        "schema/seed_manifest.schema.json",
+        "schema/seed_requirements.schema.json",
+        "schema/step_order.schema.json"
+      ],
+      "catalog_applies": {
+        "drift_types": ["D11", "D12", "D13"],
+        "invariants": ["I7", "I11"]
+      },
+      "severity_priors": {
+        "D11": "P1",
+        "I11": "P1",
+        "D12": "P0"
+      },
+      "semantic_work": true
+    },
+    "docs": {
+      "changed_files": [
+        "docs/developers/error-codes.md"
+      ],
+      "expansion_files": [
+        "tools/specdev_tools/cli.py",
+        "tools/specdev_tools/core/errors.py",
+        "CHANGELOG.md"
+      ],
+      "catalog_applies": {
+        "drift_types": ["D1", "D3", "D14"],
+        "invariants": ["I1", "I9", "I12"]
+      },
+      "severity_priors": {
+        "D3": "P1",
+        "I9": "P1"
+      },
+      "semantic_work": true
+    },
+    "host_integration": {
+      "changed_files": [
+        "seed_templates/seed_overview.md"
+      ],
+      "expansion_files": [
+        "docs/developers/getting_started.md",
+        "CLAUDE.md"
+      ],
+      "catalog_applies": {
+        "drift_types": ["D3", "D10"],
+        "invariants": ["I9", "I10"]
+      },
+      "severity_priors": {
+        "D10": "P1"
+      },
+      "semantic_work": false
+    }
+  },
+  "tier1_slices": ["host_integration"],
+  "tier2_bins": [
+    {
+      "bin_id": 1,
+      "total_impact": 930,
+      "files": [
+        {
+          "file": "changelog/unreleased.md",
+          "slice": "migration_versioning",
+          "impact": 930,
+          "digests_needed": [
+            "digests/changelog/changelog_unreleased.md.json"
+          ]
+        }
+      ]
+    },
+    {
+      "bin_id": 2,
+      "total_impact": 930,
+      "files": [
+        {
+          "file": "changelog/unreleased.yaml",
+          "slice": "migration_versioning",
+          "impact": 930,
+          "digests_needed": [
+            "digests/changelog/changelog_unreleased.yaml.json"
+          ]
+        }
+      ]
+    },
+    {
+      "bin_id": 3,
+      "total_impact": 720,
+      "files": [
+        {
+          "file": "tools/specdev_tools/core/errors.py",
+          "slice": "validators",
+          "impact": 720,
+          "digests_needed": [
+            "digests/validator/tools_specdev_tools_core_errors.py.json",
+            "digests/doc/docs_developers_error-codes.md.json"
+          ]
+        }
+      ]
+    },
+    {
+      "bin_id": 4,
+      "total_impact": 270,
+      "files": [
+        {
+          "file": "tools/specdev_tools/validation/seed_lint.py",
+          "slice": "validators",
+          "impact": 270,
+          "digests_needed": [
+            "digests/validator/tools_specdev_tools_validation_seed_lint.py.json",
+            "digests/doc/docs_developers_error-codes.md.json"
+          ]
+        }
+      ]
+    },
+    {
+      "bin_id": 5,
+      "total_impact": 165,
+      "files": [
+        {
+          "file": "docs/developers/error-codes.md",
+          "slice": "docs",
+          "impact": 90,
+          "digests_needed": [
+            "digests/doc/docs_developers_error-codes.md.json"
+          ]
+        },
+        {
+          "file": "tests/integration/test_w555_spec_check_aggregation.py",
+          "slice": "tests_fixtures",
+          "impact": 15,
+          "digests_needed": [
+            "digests/test/tests_integration_test_w555_spec_check_aggregation.py.json"
+          ]
+        },
+        {
+          "file": "tests/unit/core/test_error_code_coverage.py",
+          "slice": "tests_fixtures",
+          "impact": 15,
+          "digests_needed": [
+            "digests/test/tests_unit_core_test_error_code_coverage.py.json"
+          ]
+        },
+        {
+          "file": "tests/unit/core/test_error_code_registry.py",
+          "slice": "tests_fixtures",
+          "impact": 15,
+          "digests_needed": [
+            "digests/test/tests_unit_core_test_error_code_registry.py.json"
+          ]
+        },
+        {
+          "file": "tests/unit/validation/linters/test_w553_seed_step_unknown.py",
+          "slice": "tests_fixtures",
+          "impact": 15,
+          "digests_needed": [
+            "digests/test/tests_unit_validation_linters_test_w553_seed_step_unknown.py.json"
+          ]
+        },
+        {
+          "file": "tests/unit/validation/linters/test_w555_step00_out_of_scope_thin.py",
+          "slice": "tests_fixtures",
+          "impact": 15,
+          "digests_needed": [
+            "digests/test/tests_unit_validation_linters_test_w555_step00_out_of_scope_thin.py.json"
+          ]
+        }
+      ]
+    }
+  ],
+  "scope_footprint": {
+    "total_impact": 3015,
+    "changed_file_count": 11,
+    "tier2_bin_count": 5
+  },
+  "generated_at": 1782387049,
+  "bundle_warnings": []
+}

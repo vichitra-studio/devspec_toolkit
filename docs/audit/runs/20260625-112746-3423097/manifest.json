@@ -1,0 +1,77 @@
+{
+  "run_id": "20260625-112746-3423097",
+  "head_sha": "3423097",
+  "base_sha": "f4336cb1090955a98071a0e2e1804fcac3344373",
+  "branch": "bugs/1.1.1",
+  "phases_completed": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "phase_trace": [
+    {
+      "phase": 0,
+      "phase_name": "P0 deterministic",
+      "started_at": 1782386865,
+      "ended_at": 1782386866,
+      "loop_iterations": null,
+      "outcome": "OK"
+    },
+    {
+      "phase": 1,
+      "phase_name": "P1 context",
+      "started_at": 1782387710,
+      "ended_at": 1782387710,
+      "loop_iterations": 1,
+      "outcome": "OK"
+    },
+    {
+      "phase": 2,
+      "phase_name": "P2 discovery",
+      "started_at": 1782388276,
+      "ended_at": 1782388276,
+      "loop_iterations": null,
+      "outcome": "OK"
+    },
+    {
+      "phase": 3,
+      "phase_name": "P3 cross-boundary",
+      "started_at": 1782388492,
+      "ended_at": 1782388492,
+      "loop_iterations": null,
+      "outcome": "OK"
+    },
+    {
+      "phase": 4,
+      "phase_name": "P4 consolidation",
+      "started_at": 1782388669,
+      "ended_at": 1782388669,
+      "loop_iterations": 1,
+      "outcome": "OK"
+    },
+    {
+      "phase": 5,
+      "phase_name": "P5 finalize",
+      "started_at": 1782388832,
+      "ended_at": 1782388832,
+      "loop_iterations": null,
+      "outcome": "OK"
+    }
+  ],
+  "tier0_overrides": [],
+  "slices_in_scope": [
+    "docs",
+    "host_integration",
+    "migration_versioning",
+    "tests_fixtures",
+    "validators"
+  ],
+  "out_of_scope_files": [],
+  "created_at": 1782386866,
+  "updated_at": 1782388832,
+  "meta_findings": [],
+  "status": "OK"
+}

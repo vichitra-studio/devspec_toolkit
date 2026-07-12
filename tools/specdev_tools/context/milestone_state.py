@@ -15,7 +15,13 @@ for all 240 impl objects (XOR = 0), so the semantic change is invisible in
 practice but correct in principle.
 
 **Predicate precedence (per-group, first match wins):**
-``deferred > verified > blocked > code_converged > pending``.
+``deferred/wont_do > verified > blocked > code_converged > pending``.
+``wont_do`` (DEVSPEC-122 follow-up) has the same precedence and roll-up
+exclusion as ``deferred`` — both mean "not part of the active work being
+tracked" (paused vs. permanently cancelled) and are excluded identically from
+``derive_phase_position``'s progress computations. They are kept as distinct
+state literals (not collapsed into one) so callers can still tell "paused" from
+"cancelled" when inspecting per-group state.
 
 This ensures that a group with ``implementation.status == "verified"`` reaches
 ``verified`` state even if no convergence file exists on the filesystem — exactly
@@ -29,8 +35,8 @@ documents it as "not normally observed".
 **``impl_complete`` vs ``review_pending`` disambiguation.**
 The original contract's two predicates collapse to the same condition when read
 literally.  The engine disambiguates:
-- ``impl_complete``: every non-deferred group in {code_converged, blocked,
-  verified} AND *no milestone-review file exists at all*.
+- ``impl_complete``: every active (non-deferred, non-wont_do) group in
+  {code_converged, blocked, verified} AND *no milestone-review file exists at all*.
 - ``review_pending``: same group condition AND milestone-review file(s) exist but
   *none* has empty findings.
 - ``review_complete``: same group condition AND ≥1 milestone-review file has
@@ -41,9 +47,9 @@ The roll-up's "progress" set is {executing, code_converged, *verified*} so that 
 mixed milestone (some verified, some pending) correctly resolves to
 ``impl_in_progress`` instead of falling through all predicates.
 
-**All-deferred milestone.**  If every group is deferred, ``derived_phase_position``
-defaults to ``"pending"`` (no non-deferred group fails any predicate; treat as if
-nothing has started).
+**All-deferred/wont_do milestone.**  If every group is deferred or wont_do,
+``derived_phase_position`` defaults to ``"pending"`` (no active group fails any
+predicate; treat as if nothing has started).
 
 **``resolved`` field defaults to False.**  Ambiguity objects that lack a
 ``resolved`` key (as seen in real host data) are treated as unresolved, which is
@@ -126,7 +132,7 @@ def derive_group_state(
 
             {
               "group_id": str,
-              "state": "pending|code_converged|blocked|verified|deferred",
+              "state": "pending|code_converged|blocked|verified|deferred|wont_do",
               "implementation_converged_at": str | None,
               "reviewer_rounds": int,
               "findings_resolved_path": str | None,
@@ -216,13 +222,15 @@ def derive_group_state(
     fixture_ref = group.get("fixture_ref")
     fixtures_exercised: list[str] = [fixture_ref] if fixture_ref else []
 
-    # --- State derivation (precedence: deferred > verified > blocked > code_converged > pending) --
+    # --- State derivation (precedence: deferred/wont_do > verified > blocked > code_converged > pending) --
     checklist_status: str = group.get("checklist_status", "")
     impl: dict = group.get("implementation", {}) or {}
     impl_status: str = impl.get("status", "")
 
     if checklist_status == "deferred":
         state = "deferred"
+    elif checklist_status == "wont_do":
+        state = "wont_do"
     elif impl_status == "verified":
         state = "verified"
     elif (
@@ -323,16 +331,19 @@ def derive_phase_position(
         One of ``pending``, ``impl_in_progress``, ``impl_complete``,
         ``review_pending``, ``review_complete``, ``operator_pending``, ``closed``.
     """
-    non_deferred = [g for g in groups if g["state"] != "deferred"]
+    # "active" excludes both deferred (paused) and wont_do (permanently
+    # cancelled) groups from every progress computation below -- neither is
+    # part of the work currently being tracked (DEVSPEC-122 follow-up).
+    active_groups = [g for g in groups if g["state"] not in ("deferred", "wont_do")]
 
-    # All-deferred → treat as pending (nothing to track)
-    if not non_deferred:
+    # All-deferred/wont_do → treat as pending (nothing to track)
+    if not active_groups:
         return "pending"
 
-    # --- closed: every non-deferred group has implementation.status == "verified"
+    # --- closed: every active group has implementation.status == "verified"
     # (the original used status_ref.id; after DEVSPEC-38 we use the status string)
     # Note: "state == verified" is an exact proxy since verified state ↔ impl.status=="verified"
-    if all(g["state"] == "verified" for g in non_deferred):
+    if all(g["state"] == "verified" for g in active_groups):
         return "closed"
 
     # --- Milestone-review files
@@ -345,13 +356,13 @@ def derive_phase_position(
     has_review_empty = any(_is_empty_findings(f) for f in review_files)
 
     # --- operator_pending requires review_complete first
-    all_advanced = all(g["state"] in _ADVANCED_STATES for g in non_deferred)
+    all_advanced = all(g["state"] in _ADVANCED_STATES for g in active_groups)
 
     if all_advanced and has_review_empty:
         # review_complete condition met — check operator_pending
-        has_blocked = any(g["state"] == "blocked" for g in non_deferred)
+        has_blocked = any(g["state"] == "blocked" for g in active_groups)
         has_unresolved_blocking_amb = any(
-            h for g in non_deferred
+            h for g in active_groups
             for h in g.get("blocking_amb_health", [])
             if not h["resolved"]
         )
@@ -368,13 +379,13 @@ def derive_phase_position(
         return "impl_complete"
 
     # --- impl_in_progress: ≥1 progress, ≥1 pending
-    has_progress = any(g["state"] in _PROGRESS_STATES for g in non_deferred)
-    has_pending = any(g["state"] == "pending" for g in non_deferred)
+    has_progress = any(g["state"] in _PROGRESS_STATES for g in active_groups)
+    has_pending = any(g["state"] == "pending" for g in active_groups)
     if has_progress and has_pending:
         return "impl_in_progress"
 
-    # --- pending: every non-deferred group is pending
-    if all(g["state"] == "pending" for g in non_deferred):
+    # --- pending: every active group is pending
+    if all(g["state"] == "pending" for g in active_groups):
         return "pending"
 
     # Fallback: covers transient executing-bearing cases not captured by the named predicates
@@ -425,11 +436,11 @@ def compute_milestone_state(
     amb is surfaced in ``blockers[]`` for visibility, not as a gate.
 
     **``verified`` outranks ``blocked`` by design.**  Per-group state resolution
-    applies ``deferred > verified > blocked > code_converged > pending`` (first
-    match wins).  Operator verification (``impl_status == "verified"``) is the
-    terminal override — it cannot be downgraded by an unresolved amb.
+    applies ``deferred/wont_do > verified > blocked > code_converged > pending``
+    (first match wins).  Operator verification (``impl_status == "verified"``)
+    is the terminal override — it cannot be downgraded by an unresolved amb.
     """
-    # Use batch_id directly per the output contract (specdev-scope.md:238: "milestone_id": "<batch_id>").
+    # Use batch_id directly per the output contract (specdev-scope.md:226: "milestone_id": "<batch_id>").
     # SKILL.md:201 confirms the consumer only parses groups[] and derived_phase_position;
     # milestone_id in the output is not gate-critical for downstream consumers.
     milestone_id: str = batch_id

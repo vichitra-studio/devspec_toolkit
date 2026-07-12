@@ -58,7 +58,8 @@
             "nfr-availability-uptime"
           ],
           "fixture_ref": "fixture-database-migration",
-          "checklist_status": "deferred"
+          "checklist_status": "deferred",
+          "deferred_reason": "Waiting for schema owner sign-off on the migration's rollback strategy (expected next sprint). Unblock: rollback plan reviewed and approved."
         },
         {
           "id": "REQ_API_ENDPOINT",

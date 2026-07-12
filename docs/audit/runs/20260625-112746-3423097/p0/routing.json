@@ -1,0 +1,48 @@
+{
+  "routing": {
+    "schemas": [],
+    "prompts": [],
+    "agent_contracts": [],
+    "canon": [],
+    "validators": [
+      "tools/specdev_tools/core/errors.py",
+      "tools/specdev_tools/validation/seed_lint.py"
+    ],
+    "cli_surface": [],
+    "tests_fixtures": [
+      "tests/integration/test_w555_spec_check_aggregation.py",
+      "tests/unit/core/test_error_code_coverage.py",
+      "tests/unit/core/test_error_code_registry.py",
+      "tests/unit/validation/linters/test_w553_seed_step_unknown.py",
+      "tests/unit/validation/linters/test_w555_step00_out_of_scope_thin.py"
+    ],
+    "generated_artifacts": [],
+    "migration_versioning": [
+      "changelog/unreleased.md",
+      "changelog/unreleased.yaml"
+    ],
+    "governance_ci": [],
+    "pipeline_topology": [],
+    "docs": [
+      "docs/developers/error-codes.md"
+    ],
+    "host_integration": [
+      "seed_templates/seed_overview.md"
+    ]
+  },
+  "unrouted": [],
+  "excluded": [],
+  "slices_in_scope": [
+    "docs",
+    "host_integration",
+    "migration_versioning",
+    "tests_fixtures",
+    "validators"
+  ],
+  "counts": {
+    "total": 11,
+    "excluded": 0,
+    "unrouted": 0,
+    "routed_pairs": 11
+  }
+}

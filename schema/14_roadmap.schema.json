@@ -54,7 +54,12 @@
               },
               "status": {
                 "$ref": "vc:core:atoms#milestoneStatus",
-                "description": "Current progress status of the milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release. Use 'pending' for newly created milestones."
+                "description": "Current progress status of the milestone. 'pending': not yet started, waiting to begin. 'in_progress': actively being worked on. 'done': all deliverables completed and verified. 'deferred': postponed to a later milestone or release, requires this milestone's own `milestone_status_reason`. Use 'pending' for newly created milestones."
+              },
+              "milestone_status_reason": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Required when status is 'deferred'. Explanation for why this milestone was postponed. Format: name the blocker/decision and the condition required to resume. Example: 'Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.' Anti-pattern: 'TBD' or 'not doing this' (provides no actionable context)."
               },
               "risk_status": {
                 "$ref": "vc:core:atoms#severityLevel",
@@ -139,9 +144,16 @@
                       "enum": [
                         "pending",
                         "in_progress",
-                        "done"
+                        "done",
+                        "deferred",
+                        "wont_do"
                       ],
-                      "description": "Task-level status: 'pending' (not started), 'in_progress' (actively being worked), 'done' (completed and verified). Note: tasks cannot be 'deferred' — only milestones support deferral. If a task's parent milestone is deferred, the task remains 'pending'."
+                      "description": "Task-level status: 'pending' (not started), 'in_progress' (actively being worked), 'done' (completed and verified), 'deferred' (explicitly postponed, requires this task's own `status_reason`), 'wont_do' (permanently cancelled, requires this task's own `status_reason`). Decision rule: use 'deferred' when the task will resume later under a named condition; use 'wont_do' when the task will never be built. Anti-pattern: deleting a task to work around coverage validation instead of marking it 'deferred'/'wont_do' with a reason — deletion loses the record that the work was considered and explicitly paused or cancelled."
+                    },
+                    "status_reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Required when status is 'deferred' or 'wont_do'. Explanation for why this specific task was postponed or cancelled. Format: name the blocker/decision and, for 'deferred', the condition required to resume. Example (deferred): 'Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.' Example (wont_do): 'Superseded by task-implement-unified-checkout; wallet routing folded into that flow.' Anti-pattern: 'TBD' or 'not doing this' (provides no actionable context)."
                     },
                     "environment_ref": {
                       "description": "Canonical reference to the target environment for this task. Kind must be 'environment'. Example: {\"id\": \"cn:core:environment:staging\", \"kind\": \"environment\", \"label\": \"staging\"}. Use to indicate which environment this task targets for deployment or testing. Common IDs: 'cn:core:environment:dev', 'cn:core:environment:staging', 'cn:core:environment:prod'.",
@@ -204,6 +216,28 @@
                     "task_id",
                     "description"
                   ],
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "deferred",
+                              "wont_do"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "status_reason"
+                        ]
+                      }
+                    }
+                  ],
                   "description": "A single task within a milestone, with acceptance criteria and dependencies."
                 },
                 "description": "Atomic sub-tasks required to complete the user story."
@@ -236,6 +270,27 @@
               "deliverables",
               "fr_refs",
               "capability_refs"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "deferred"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "milestone_status_reason"
+                  ]
+                }
+              }
             ],
             "description": "A single roadmap milestone with user story, tasks, and deliverables."
           }

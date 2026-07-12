@@ -1,0 +1,37 @@
+{
+  "digest_type": "digest_test",
+  "source_file": "tests/unit/validation/linters/test_w553_seed_step_unknown.py",
+  "source_sha": "dbcc6389e1d61c7f924a1667c517ed511d1b0cba",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "test_file_path": "tests/unit/validation/linters/test_w553_seed_step_unknown.py",
+    "test_count": 11,
+    "test_names": [
+      "test_late_step_09_no_w553",
+      "test_late_step_14_no_w553",
+      "test_unpadded_step_9_fires_w553",
+      "test_nonexistent_step_02b_fires_w553",
+      "test_step_17_beyond_pipeline_fires_w553",
+      "test_step_16_no_w553",
+      "test_step_16b_no_w553",
+      "test_all_trinity_sub_phases_no_w553",
+      "test_impl_context_artifact_with_bare_16_key_no_false_w140_w553",
+      "test_unknown_seed_id_in_step_requirements_fires_e520",
+      "test_duplicate_seed_id_fires_e410"
+    ],
+    "markers": [],
+    "imports": [
+      "__future__",
+      "json",
+      "os",
+      "tempfile",
+      "unittest",
+      "specdev_tools.validation.seed_lint",
+      "specdev_tools.core.errors"
+    ],
+    "fixtures_referenced": [],
+    "hardcoded_paths": [],
+    "is_fixture": false
+  }
+}

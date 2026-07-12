@@ -1,12 +1,16 @@
 ---
 name: specdev-context
 description: >
-  Load context for a pipeline step. Required before any spec-related work: authoring,
-  reviewing, analysing, debugging, or answering questions about spec files or pipeline steps.
-  Never read files under spec/ directly with the Read tool — use this skill's primitives.
-  Trigger on: any mention of a step number, "what does step NN need", "look at step NN",
-  "work on step NN", "/specdev-context NN", or any task involving spec files, milestones,
-  cross-step concepts, or backlog follow-up.
+  Load context for a pipeline step — for orientation, read-only inspection, and answering
+  questions about spec files or pipeline steps. Use its primitives to safely read spec files;
+  never read spec/ directly with the Read tool.
+  NOT for authoring a new step artifact (→ /specdev-step). NOT for reviewing or fixing an
+  existing artifact (→ /specdev-review). NOT for trinity phases or ms_*_plan.json work
+  (→ /specdev-trinity). NOT when the task is to author, edit, or review a spec step.
+  Sibling skills: specdev-step (author new step), specdev-review (review+fix), specdev-trinity
+  (trinity phases).
+  Trigger on: "what does step NN need", "look at step NN", "explain step NN",
+  "/specdev-context NN", or any orientation/analysis/debugging question about a spec step.
 ---
 
 # /specdev-context — Step Context Loader

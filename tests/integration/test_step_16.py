@@ -58,7 +58,107 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (bad enum) should fail validation")
         self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
-    
+
+    def test_invalid_deferred_checklist_item_missing_reason(self):
+        # DEVSPEC-122: checklist_status=="deferred" on a single item requires that
+        # item's own deferred_reason, independent of plan.status (which stays
+        # "active" here — deferring one item must not require deferring the plan).
+        path = os.path.join(self.fixtures_dir, "invalid_deferred_missing_reason.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(
+            len(errors) > 0,
+            "Invalid fixture (deferred checklist item missing deferred_reason) should fail validation"
+        )
+        self.assertTrue(
+            any("deferred_reason" in e.message for e in errors),
+            f"Expected a schema error mentioning deferred_reason. Got: {errors}"
+        )
+
+    def test_invalid_wont_do_checklist_item_missing_reason(self):
+        # DEVSPEC-122 follow-up: checklist_status=="wont_do" on a single item
+        # requires that item's own wont_do_reason, mirroring the enforced
+        # deferred_reason pattern (not the unenforced prose used elsewhere).
+        path = os.path.join(self.fixtures_dir, "invalid_wont_do_missing_reason.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(
+            len(errors) > 0,
+            "Invalid fixture (wont_do checklist item missing wont_do_reason) should fail validation"
+        )
+        self.assertTrue(
+            any("wont_do_reason" in e.message for e in errors),
+            f"Expected a schema error mentioning wont_do_reason. Got: {errors}"
+        )
+
+    def test_valid_wont_do_item_with_reason_and_no_linked_test_expectation(self):
+        # A wont_do item with its own wont_do_reason, and no linked_test_expectation
+        # (optional for wont_do, mirroring the deferred exemption), should pass fully.
+        path = os.path.join(self.fixtures_dir, "valid_wont_do_item.json")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        wont_do_items = [
+            item for item in data["plan"]["spec_alignment"]["checklist"]
+            if item.get("checklist_status") == "wont_do"
+        ]
+        self.assertTrue(wont_do_items, "Fixture should contain at least one wont_do checklist item")
+        for item in wont_do_items:
+            self.assertTrue(
+                item.get("wont_do_reason"),
+                f"wont_do item {item.get('id')} must carry its own wont_do_reason"
+            )
+            self.assertNotIn(
+                "linked_test_expectation", item,
+                f"wont_do item {item.get('id')} should legitimately omit linked_test_expectation in this fixture"
+            )
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"valid_wont_do_item.json should pass validation. Errors: {errors}")
+
+    def test_valid_full_covers_single_item_deferred_with_active_plan(self):
+        # DEVSPEC-122 regression guard: valid_full.json defers one checklist item
+        # (REQ_DB_SCHEMA) while plan.status stays "active" and other items remain
+        # active/verified — confirms per-item deferral doesn't require plan-wide
+        # deferred status.
+        path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.assertEqual(data["plan"]["status"], "active")
+        deferred_items = [
+            item for item in data["plan"]["spec_alignment"]["checklist"]
+            if item.get("checklist_status") == "deferred"
+        ]
+        self.assertTrue(deferred_items, "Fixture should contain at least one deferred checklist item")
+        for item in deferred_items:
+            self.assertTrue(
+                item.get("deferred_reason"),
+                f"Deferred item {item.get('id')} must carry its own deferred_reason"
+            )
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(errors, [], f"valid_full.json should still pass validation. Errors: {errors}")
+
+    def test_valid_deferred_item_may_omit_linked_test_expectation(self):
+        # DEVSPEC-122: linked_test_expectation was unconditionally required for every
+        # checklist item, including deferred ones -- the eventual test contract isn't
+        # always known before work starts. Now optional when checklist_status=="deferred".
+        path = os.path.join(self.fixtures_dir, "valid_deferred_missing_linked_test_expectation.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertEqual(
+            errors, [],
+            f"Deferred item without linked_test_expectation should pass validation. Errors: {errors}"
+        )
+
+    def test_invalid_active_item_still_requires_linked_test_expectation(self):
+        # DEVSPEC-122 regression guard: the relaxation above must not become universal --
+        # an active (non-deferred) checklist item still requires linked_test_expectation.
+        path = os.path.join(self.fixtures_dir, "invalid_active_missing_linked_test_expectation.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(
+            len(errors) > 0,
+            "Active checklist item missing linked_test_expectation should fail validation"
+        )
+        self.assertTrue(
+            any("linked_test_expectation" in e.message for e in errors),
+            f"Expected a schema error mentioning linked_test_expectation. Got: {errors}"
+        )
+
     def test_nfr_refs_gate_skips_entirely_when_07_nfrs_absent(self):
         # Path A: 07_nfrs.json absent → nfrs_data is None → gate silently skips.
         # The fixture has no sibling 07_nfrs.json and the toolkit spec/ has none either.
@@ -305,6 +405,71 @@ class TestStep16(unittest.TestCase):
         self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")
         self.assertFalse(any(e.code == "E520" for e in errors), f"Metadata item must not trigger E520. Got: {errors}")
 
+    def test_types_requiring_proof_exemption_deferred_and_wont_do_zero_e520(self):
+        # DEVSPEC-122 follow-up regression guard: a TYPES_REQUIRING_PROOF item
+        # (behavior/constraint/validation/perf/security) that is deferred or
+        # wont_do is exempt from both the nfr_refs and fixture_ref proof-of-work
+        # gates (see PAUSED_OR_CANCELLED_CHECKLIST_STATUSES in step_16.py). This
+        # must hold even when both fields are entirely absent -- not just when
+        # one of them is present.
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "REQ_DEFERRED_PROOF_TYPE",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Implement login endpoint (paused)",
+                "type": "behavior",
+                "layer": "api",
+                "checklist_status": "deferred",
+                "deferred_reason": "Blocked on upstream auth contract; resume once finalised."
+            },
+            {
+                "id": "REQ_WONT_DO_PROOF_TYPE",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Validate login endpoint edge cases (cancelled)",
+                "type": "validation",
+                "layer": "tests",
+                "checklist_status": "wont_do",
+                "wont_do_reason": "Superseded by unified-auth validation suite; this path will never be built."
+            }
+        ]
+        data.pop("execution", None)
+        data["review"] = {}
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e520_errors = [e for e in errors if e.code == "E520"]
+        self.assertEqual(
+            [], e520_errors,
+            f"Deferred/wont_do TYPES_REQUIRING_PROOF items must not trigger E520 "
+            f"even with nfr_refs and fixture_ref both absent. Got: {e520_errors}"
+        )
+
     def test_invalid_invalid_type(self):
         # Expect failure due to invalid type
         path = os.path.join(self.fixtures_dir, "invalid_invalid_type.json")
@@ -337,6 +502,45 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(
             any(e.code == "E305" for e in errors),
             f"Expected E305 error. Got: {errors}"
+        )
+
+    def test_wont_do_item_excluded_from_e305_planned_vs_executed(self):
+        """E305 exempts wont_do items from the planned-vs-executed diff, same as
+        deferred (DEVSPEC-122 follow-up): a wont_do item was never intended to
+        be executed, so it should not count as an unexecuted planned item."""
+        path = os.path.join(self.fixtures_dir, "invalid_unexecuted_planned.json")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # cl-002 was 'deferred' in the base fixture; make it 'wont_do' instead.
+        cl_002 = data["plan"]["spec_alignment"]["checklist"][1]
+        self.assertEqual(cl_002["id"], "cl-002")
+        del cl_002["checklist_status"]
+        del cl_002["deferred_reason"]
+        cl_002["checklist_status"] = "wont_do"
+        cl_002["wont_do_reason"] = "Session-store team abandoned token revocation; logout now client-side only."
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e305_errors = [e for e in errors if e.code == "E305"]
+        self.assertFalse(
+            any("cl-002" in e.message for e in e305_errors),
+            f"Did not expect E305 for wont_do item cl-002. Got: {e305_errors}"
+        )
+        # Control: cl-001 (still active, still unexecuted) must still fire E305.
+        self.assertTrue(
+            any("cl-001" in e.message for e in e305_errors),
+            f"Expected E305 for still-active unexecuted item cl-001. Got: {e305_errors}"
         )
 
     def test_valid_with_semantic_review(self):
@@ -597,6 +801,67 @@ class TestStep16(unittest.TestCase):
         e307_errors = [e for e in errors if e.code == "E307"]
         self.assertEqual(e307_errors, [], f"Did not expect E307 for code spec_ref.type. Got: {e307_errors}")
 
+    def test_e307_deferred_validation_item_still_counts_as_pairing(self):
+        """A deferred 'validation' item still satisfies E307 pairing -- paused, not absent."""
+        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["plan"]["spec_alignment"]["checklist"] = [
+            {
+                "id": "REQ_BEHAVIOR",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Implement login endpoint",
+                "type": "behavior",
+                "layer": "api",
+                "linked_test_expectation": "login returns 200",
+                "nfr_refs": ["nfr-availability-uptime"],
+                "fixture_ref": "fixture-login-api"
+            },
+            {
+                "id": "REQ_VALIDATION_DEFERRED",
+                "spec_ref": {
+                    "type": "fr",
+                    "id": "task-login-impl",
+                    "line_range": "L1-L50",
+                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                },
+                "description": "Validate login endpoint edge cases",
+                "type": "validation",
+                "layer": "tests",
+                "checklist_status": "deferred",
+                "deferred_reason": "Edge-case test harness not ready yet; resume once fixture-login-api-edge lands."
+            }
+        ]
+        data.pop("execution", None)
+        data["review"] = {}
+        data["plan"].pop("review_requirements", None)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8"
+            )
+            errors = validate_file(self.repo_root, str(fixture_path))
+
+        e307_errors = [e for e in errors if e.code == "E307"]
+        self.assertEqual(
+            [], e307_errors,
+            f"Deferred validation item should still satisfy E307 pairing. Got: {e307_errors}"
+        )
+
     def _make_milestone_ref_fixture(self, tmpdir, checklist_items, roadmap_milestones):
         """Helper to create a step_16 fixture with roadmap for milestone_ref tests."""
         tmp_dir = Path(tmpdir)
@@ -677,6 +942,26 @@ class TestStep16(unittest.TestCase):
             any(e.code == "W581" for e in errors),
             f"Expected W581 MILESTONE_REF_MISSING. Got: {errors}"
         )
+
+    def test_wont_do_item_missing_milestone_ref_does_not_warn_w581(self):
+        """W581 exempts wont_do items from milestone_ref, same as deferred
+        (DEVSPEC-122 follow-up)."""
+        checklist = [{
+            "id": "CHK_01",
+            "description": "Wallet routing (cancelled)",
+            "type": "behavior",
+            "layer": "api",
+            "checklist_status": "wont_do",
+            "wont_do_reason": "Superseded by unified checkout flow.",
+        }]
+        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": []}]
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_milestone_ref_fixture(td, checklist, milestones)
+            errors = validate_file(self.repo_root, path)
+
+        w581 = [e for e in errors if e.code == "W581"]
+        self.assertEqual(w581, [], f"Did not expect W581 for wont_do item. Got: {w581}")
 
     def test_checklist_valid_milestone_ref_passes(self):
         """Valid milestone_ref matching roadmap should not emit W581 or E582."""
@@ -907,6 +1192,160 @@ class TestStep16(unittest.TestCase):
         self.assertFalse(
             any("t1" in msg for msg in e304_messages),
             f"Did not expect E304 for task 't1' in done milestone. Got E304 errors: {e304_messages}"
+        )
+
+    def test_e304_deferred_checklist_item_still_counts_as_coverage(self):
+        """A deferred checklist item still covers its roadmap task -- paused, not absent."""
+        checklist = [
+            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="m1"),
+        ]
+        checklist[0]["checklist_status"] = "deferred"
+        checklist[0]["deferred_reason"] = "Blocked on upstream contract; resume once finalised."
+        del checklist[0]["linked_test_expectation"]  # optional when deferred
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "m1",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}]
+            }
+        ]
+
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        self.assertEqual(
+            [], e304_errors,
+            f"Deferred checklist item should still cover its task; expected no E304. Got: {e304_errors}"
+        )
+
+    def test_e304_control_active_uncovered_task_still_fires(self):
+        """Control: an active (non-deferred) uncovered task must still fire E304."""
+        checklist = []  # no checklist items at all -- t1 genuinely uncovered
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "m1",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}]
+            }
+        ]
+
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        self.assertTrue(
+            any("t1" in e.message for e in e304_errors),
+            f"Expected E304 for genuinely uncovered task 't1'. Got: {e304_errors}"
+        )
+
+    def test_e304_deferred_task_status_exempts_from_coverage(self):
+        """A roadmap task marked status:"deferred" (its own status_reason, not a
+        checklist item) is already the authored acknowledgment that it's
+        paused -- it must not also need a checklist item to avoid E304."""
+        checklist = []  # no checklist items at all -- t1 is deferred at the task layer itself
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "m1",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{
+                    "task_id": "t1",
+                    "status": "deferred",
+                    "status_reason": "Blocked on upstream contract; resume once finalised.",
+                }]
+            }
+        ]
+
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        self.assertEqual(
+            [], e304_errors,
+            f"Task-level deferred status should exempt from E304 without any checklist item. Got: {e304_errors}"
+        )
+
+    def test_e304_wont_do_task_status_exempts_from_coverage(self):
+        """A roadmap task marked status:"wont_do" is permanently cancelled --
+        it must not need a checklist item to avoid E304 either."""
+        checklist = []
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "m1",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{
+                    "task_id": "t1",
+                    "status": "wont_do",
+                    "status_reason": "Superseded by task-implement-unified-checkout.",
+                }]
+            }
+        ]
+
+        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        self.assertEqual(
+            [], e304_errors,
+            f"Task-level wont_do status should exempt from E304 without any checklist item. Got: {e304_errors}"
+        )
+
+    def test_e304_skips_deferred_milestones(self):
+        """E304's milestone-fallback branch skips 'deferred' milestones, like 'done'."""
+        checklist = []  # no checklist items — no coverage for either milestone
+
+        roadmap_milestones = [
+            {
+                "milestone_id": "ms-deferred",
+                "status": "deferred",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t1"}]
+            },
+            {
+                "milestone_id": "ms-active",
+                "status": "in_progress",
+                "fr_refs": [],
+                "tasks": [{"task_id": "t2"}]
+            }
+        ]
+
+        # No milestone_ref set — exercises the fallback skip-list branch
+        impl_context = self._minimal_impl_context(checklist)
+
+        with tempfile.TemporaryDirectory() as td:
+            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
+            errors = validate_file(self.repo_root, path)
+
+        e304_errors = [e for e in errors if e.code == "E304"]
+        e304_messages = [e.message for e in e304_errors]
+
+        self.assertTrue(
+            any("t2" in msg for msg in e304_messages),
+            f"Expected E304 for uncovered task 't2' in in_progress milestone. Got: {e304_messages}"
+        )
+        self.assertFalse(
+            any("t1" in msg for msg in e304_messages),
+            f"Did not expect E304 for task 't1' in deferred milestone. Got: {e304_messages}"
         )
 
     def test_invalid_verified_no_semantic_review(self):
@@ -1732,6 +2171,165 @@ class TestStep16(unittest.TestCase):
             },
             "canonical_refs_used": []
         }
+
+    def test_w616_fires_for_deferred_item_marked_verified(self):
+        """W616 fires when checklist_status='deferred' but implementation.status='verified'."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Check output",
+                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W616_CONTRADICTION", actions)
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item["checklist_status"] = "deferred"
+        item["deferred_reason"] = "Marked deferred after verification without reconciling implementation status."
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w616_errors = [e for e in errors if e.code == "W616"]
+        self.assertTrue(
+            len(w616_errors) > 0,
+            f"Expected W616 for deferred item marked verified. Got: {errors}"
+        )
+        self.assertTrue(
+            any("CHK_W616_CONTRADICTION" in e.message for e in w616_errors),
+            f"Expected W616 message to reference item id. Got: {[e.message for e in w616_errors]}"
+        )
+
+    def test_w616_control_active_verified_item_does_not_fire(self):
+        """Control: an active (non-deferred) verified item must not fire W616."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Check output",
+                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W616_CONTROL", actions)
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w616_errors = [e for e in errors if e.code == "W616"]
+        self.assertEqual(
+            [], w616_errors,
+            f"Did not expect W616 for active verified item. Got: {w616_errors}"
+        )
+
+    def test_w616_control_deferred_pending_item_does_not_fire(self):
+        """Control: a deferred item with implementation.status='pending' (not
+        verified) must not fire W616 -- no contradiction to reconcile."""
+        actions = []
+        data = self._make_evidence_test_data("CHK_W616_PENDING", actions)
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item["checklist_status"] = "deferred"
+        item["deferred_reason"] = "Blocked on upstream dependency."
+        item["implementation"]["status"] = "pending"
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w616_errors = [e for e in errors if e.code == "W616"]
+        self.assertEqual(
+            [], w616_errors,
+            f"Did not expect W616 for deferred+pending item. Got: {w616_errors}"
+        )
+
+    def test_w616_fires_for_wont_do_item_marked_verified(self):
+        """W616 also fires when checklist_status='wont_do' but implementation.status='verified'
+        -- the same stale contradiction as deferred+verified, just for a permanently
+        cancelled item instead of a paused one."""
+        actions = [
+            {
+                "type": "manual_verification",
+                "description": "Check output",
+                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
+            }
+        ]
+        data = self._make_evidence_test_data("CHK_W616_WONT_DO_CONTRADICTION", actions)
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item["checklist_status"] = "wont_do"
+        item["wont_do_reason"] = "Superseded after verification without reconciling implementation status."
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w616_errors = [e for e in errors if e.code == "W616"]
+        self.assertTrue(
+            len(w616_errors) > 0,
+            f"Expected W616 for wont_do item marked verified. Got: {errors}"
+        )
+        self.assertTrue(
+            any("CHK_W616_WONT_DO_CONTRADICTION" in e.message for e in w616_errors),
+            f"Expected W616 message to reference item id. Got: {[e.message for e in w616_errors]}"
+        )
+
+    def test_w616_control_wont_do_pending_item_does_not_fire(self):
+        """Control: a wont_do item with implementation.status='pending' (not
+        verified) must not fire W616 -- no contradiction to reconcile."""
+        actions = []
+        data = self._make_evidence_test_data("CHK_W616_WONT_DO_PENDING", actions)
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item["checklist_status"] = "wont_do"
+        item["wont_do_reason"] = "Superseded by a different checklist item."
+        item["implementation"]["status"] = "pending"
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
+            )
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+        w616_errors = [e for e in errors if e.code == "W616"]
+        self.assertEqual(
+            [], w616_errors,
+            f"Did not expect W616 for wont_do+pending item. Got: {w616_errors}"
+        )
 
     def test_w599_fires_for_short_evidence(self):
         """W599 fires when verified action evidence content is shorter than 50 characters."""
@@ -2802,6 +3400,21 @@ class TestStep16(unittest.TestCase):
                     f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
                 )
 
+    def test_invalid_fixture_step_08_no_phantom_unevaluated_companion(self):
+        """Step 08 shares the same schema restructure as 09/13/15/16 — its invalid fixture must
+        surface its real error without triggering a phantom 'Unevaluated properties' companion."""
+        rel = "tests/fixtures/step_08/invalid/invalid_out_of_scope_missing_rationale.json"
+        errors = validate_file(self.repo_root, rel)
+        unevaluated = [e for e in errors if "Unevaluated properties" in e.message]
+        self.assertEqual(
+            unevaluated, [],
+            f"Phantom unevaluated companion on {rel}: {[e.message for e in errors]}",
+        )
+        self.assertTrue(
+            any(e.code == "E520" for e in errors),
+            f"Expected a real E520 on {rel}, got: {[(e.code, e.message[:80]) for e in errors]}",
+        )
+
     # --- crossCycleAmbiguityItem accepts optional resolved/decision ---
 
     def test_emergent_ambiguity_with_resolved_and_decision(self):
@@ -3004,6 +3617,52 @@ class TestStep16(unittest.TestCase):
         data = self._w603_data(milestone_supporting_files=[])
         w603 = [e for e in self._run_w603(data) if e.code == "W603" and "tests/README.md" in e.message]
         self.assertTrue(w603, "W603 must still fire for undeclared file not in milestone_supporting_files.")
+
+    # --- W570: seed_manifest.json missing / unreadable / missing doc_paths ---
+
+    def _run_w570(self, write_manifest=True, manifest_text=None):
+        """Run validate_step_16 over valid_minimal.json with a controllable
+        common/seed_manifest.json: absent (write_manifest=False), malformed
+        (manifest_text is invalid JSON), or well-formed (manifest_text is a
+        dict serialized as-is, e.g. missing/empty doc_paths)."""
+        base_path = os.path.join(self.fixtures_dir, "valid_minimal.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            fixture_path = tmp_dir / "16_impl_context.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            if write_manifest:
+                common_dir = tmp_dir / "common"
+                common_dir.mkdir()
+                text = manifest_text if isinstance(manifest_text, str) else json.dumps(manifest_text or {})
+                (common_dir / "seed_manifest.json").write_text(text, encoding="utf-8")
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            return validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+
+    def test_w570_fires_when_manifest_missing(self):
+        # Branch 1: manifest_path is None (no common/seed_manifest.json at all).
+        errors = self._run_w570(write_manifest=False)
+        w570 = [e for e in errors if e.code == "W570" and "not found" in e.message]
+        self.assertTrue(w570, f"Expected W570 for missing seed_manifest.json. Got: {errors}")
+
+    def test_w570_fires_when_manifest_malformed(self):
+        # Branch 2: manifest exists but is unreadable/malformed (json.load raises).
+        errors = self._run_w570(write_manifest=True, manifest_text="{not valid json")
+        w570 = [e for e in errors if e.code == "W570" and "Failed to read seed_manifest.json" in e.message]
+        self.assertTrue(w570, f"Expected W570 for malformed seed_manifest.json. Got: {errors}")
+
+    def test_w570_fires_when_doc_paths_missing(self):
+        # Branch 3: manifest is valid JSON but has no (or empty) doc_paths.
+        errors = self._run_w570(write_manifest=True, manifest_text={"other_field": "x"})
+        w570 = [e for e in errors if e.code == "W570" and "missing doc_paths" in e.message]
+        self.assertTrue(w570, f"Expected W570 for missing doc_paths. Got: {errors}")
+
+    def test_w570_does_not_fire_with_valid_manifest(self):
+        # Control: a well-formed manifest with non-empty doc_paths must not fire W570.
+        errors = self._run_w570(write_manifest=True, manifest_text={"doc_paths": ["README.md", "docs/**"]})
+        w570 = [e for e in errors if e.code == "W570"]
+        self.assertEqual(w570, [], f"Did not expect W570 with a valid seed_manifest.json. Got: {w570}")
 
 
 if __name__ == '__main__':

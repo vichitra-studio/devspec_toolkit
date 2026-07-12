@@ -2,7 +2,7 @@
 
 > **REQUIRED**: Before starting, read `$TOOLKIT_ROOT/docs/prompts/shared_expectations.md` in full. All directives in that document apply to this step unless explicitly overridden below. Do not proceed without reading it.
 
-Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds 2 downstream steps.
+Run `specdev prompt-context 08` to see downstream consumers. This prompt's output feeds downstream steps (see `specdev prompt-context 08` for the current consumer list).
 
 ## Role
 You are a **test architect specializing in fixture design**. Your job is to emit a single JSON artifact for **Step 08 · Fixtures** that provides concrete test data covering every high-priority FR acceptance criterion. You do not write examples, tutorials, or comments. You only output the canonical JSON that matches the schema.
@@ -34,7 +34,7 @@ For each upstream artifact ingested, extract the following:
 - **Validate**: Verify every high-priority FR has ≥1 fixture whose `targets[]` references the FR; every automatable acceptance criterion is covered by at least one such fixture's `targets`; no fixture is missing a `targets` entry.
 - **Emit**: Write the artifact only when coverage is complete.
 
-**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why.
+**Extraction Mandate**: Every high-priority FR (`priority: high`) must have ≥1 fixture whose `targets[]` includes that `fr_id`. Every automatable acceptance criterion must be covered by at least one fixture targeting its parent FR. List any high-priority FR without a fixture and explain why: add an `out_of_scope` entry (`fr_id`, `rationale`) for any FR that needs no executable fixture, OR ensure the FR is targeted by an existing fixture.
 
 ### Weak-vs-Strong Fixture Examples
 
@@ -46,7 +46,7 @@ For each upstream artifact ingested, extract the following:
 | Edge case | `fix-search-empty-results`: GET /products?q=zzznomatch → 200 + `{"results": [], "total_count": 0}` |
 
 ## Heuristics For Completeness
-- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes are defined by `vc:core:collections#traceRef` (see schema/core/collections.schema.json for the full authoritative prefix list); MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput`.
+- MUST add `targets` referencing every upstream spec artifact this fixture exercises; valid target ID prefixes for Step 08 (fr/api/nfr/inv only) are defined by `schema/08_fixtures.schema.json` as the step-specific authority; MUST ensure `tag_ref` references the appropriate canonical tag entry for high-priority fixture categorisation (e.g., the smoke canonical tag for fixtures covering high-priority FRs, the load canonical tag for NFR benchmarks); MUST add `tags` string label `smoke` for fixtures covering FRs listed as high-priority in capabilities; MUST add `tags` string label `load` for fixtures covering NFRs with `category: latency` or `category: throughput` (see schema/07_nfrs.schema.json → `category` field for the authoritative category enum). Note: `tags` and `tag_ref` are write-only fields — they are not validated by `step_08.py` or `fixtures_lint.py`; populate them correctly by hand since no automated gate checks their content.
 - Error coverage: at least one fixture per meaningful error in interface contracts.
 - Ambiguity scrub: express expected state/data exactly; avoid “approximate/maybe”.
 
@@ -68,6 +68,8 @@ Before emitting, verify:
 - Every `api_id` in `spec/05_interface_contracts.json` has ≥1 contract-mode fixture covering its request/response shape.
 - Every `inv_id` with `severity: error` in `spec/06_invariants.json` has a negative-case fixture that verifies the invariant is enforced.
 - Performance-critical `nfr_id` values from `spec/07_nfrs.json` have benchmark or load-test fixtures.
+
+These four coverage rules (FR acceptance criteria, API contract coverage, invariant negative-case coverage, NFR benchmark/load coverage) are manual authoring checks performed during Map → Generate → Validate — they are not automatically enforced by `step_08.py` or `fixtures_lint.py`, so the author is responsible for verifying them before emitting the artifact.
 - All `targets[*].id` values resolve to IDs present in the referenced upstream spec files.
 - If any acceptance criterion cannot be expressed as a fixture: add a gap question (Clarify mode) rather than omitting the test case.
 - [ ] Every upstream ID from ingested context has been consumed
@@ -75,7 +77,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every high-priority FR (`priority: high`) has at least one fixture covering its happy path
 - [ ] Every FR with error conditions has at least one fixture covering the failure path
-- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `vc:core:collections#traceRef` for the full authoritative prefix vocabulary)
+- [ ] Every fixture has valid entries in `targets[]` referencing existing upstream spec artifact IDs (see `schema/08_fixtures.schema.json` for the step-specific target ID prefix vocabulary: fr/api/nfr/inv only)
 - [ ] No ID referenced by this step conflicts with the same ID defined in a sibling step
 
 ## Step-Specific Completeness Checklist
@@ -86,7 +88,7 @@ Before emitting, verify:
 - Tag important scenarios (e.g., `smoke`, `load`) for CI gating.
 
 ## Cross-Step Synthesis Notes
-- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`.
+- **contract mode**: `expected` MUST have `status`, `body`, and optionally `headers`. Note: `expected.body` is not actually required by the linter — `fixtures_lint.py` only enforces a valid HTTP `status` (100-599) for `mode: contract`; `body`, if present, is merely checked to be JSON-serializable. Author `body` anyway per the authoring contract above; the gate will not catch its absence.
 - **expected**: MUST contain the exact expected payload fields and values as defined by the `output_schema_ref` in `spec/05_interface_contracts.json`; MUST include error shapes (status code + error body) for negative cases.
 
 ## Best Practices

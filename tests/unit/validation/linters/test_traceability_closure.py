@@ -477,13 +477,61 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Did not expect E535 when FR is only in out_of_scope (no trace). Got: {rendered}"
             )
 
+    def test_e536_step08_contradiction_fr_in_out_of_scope_and_fixture_target(self):
+        """E536 fires when an FR appears in both Step 08 out_of_scope[] and a fixture target[] — contradiction.
+
+        Mirrors test_e535_fires_when_fr_in_both_out_of_scope_and_api_trace but for
+        Step 08's fixture coverage (DEVSPEC-122 follow-up) — deliberately separate
+        from E535/Step 05, since "no API surface" and "no fixture" are independent
+        scoping decisions.
+        """
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
+
+        # FR in Step 08 out_of_scope[] AND referenced by a fixture target → E536
+        fixtures_contradicted = {
+            "fixtures": [{"fixture_id": "fix-infra", "targets": [{"type": "fr", "id": "fr-infra"}]}],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Background job — no observable behavior to fixture-test."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "08_fixtures.json", fixtures_contradicted)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("E536" in e and "fr-infra" in e for e in rendered),
+                f"Expected E536 for fr-infra contradicted across Step 08 out_of_scope and fixture target. Got: {rendered}"
+            )
+            # W565 must NOT also fire — the target reference covers it, contradiction is E536
+            self.assertFalse(
+                any("W565" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W565 when E536 already fires for fr-infra. Got: {rendered}"
+            )
+
+        # FR only in Step 08 out_of_scope[] (no fixture target) → no E536, no W565
+        fixtures_oos_only = {
+            "fixtures": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Background job — no observable behavior to fixture-test."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "08_fixtures.json", fixtures_oos_only)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("E536" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect E536 when FR is only in Step 08 out_of_scope (no fixture target). Got: {rendered}"
+            )
+
     def test_w561_w566_suppressed_by_step05_out_of_scope(self):
         """W561/W566 are suppressed when FR is listed in Step 05 out_of_scope[] with rationale.
 
         Step 05 out_of_scope[] exemption propagates to W561 (UNCOVERED_FR) and W566
         (UNCOVERED_FR_MILESTONE) per DEVSPEC-2: infra/ops FRs with no HTTP API surface
-        may also legitimately lack milestone coverage. W565 (UNCOVERED_FR_FIXTURE) is NOT
-        suppressed — Step 08 has no analogous out_of_scope[] array (scope boundary).
+        may also legitimately lack milestone coverage. W565 (UNCOVERED_FR_FIXTURE) is
+        deliberately NOT suppressed by Step 05's out_of_scope[] (DEVSPEC-122): "no API
+        surface" and "no fixture" are independent scoping decisions — an FR with no API
+        can still need a fixture (e.g. a background job). W565 has its own, separate
+        out_of_scope[] in Step 08 — see test_w565_suppressed_by_step08_out_of_scope.
         """
         frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
         roadmap_missing = {"milestones": [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-1"}]}]}
@@ -507,7 +555,8 @@ class TestTraceabilityClosure(unittest.TestCase):
                 f"Did not expect W566 for fr-infra in Step 05 out_of_scope. Got: {rendered}"
             )
 
-        # W565 (fixture coverage) is NOT suppressed — Step 08 has no out_of_scope[]
+        # W565 (fixture coverage) is NOT suppressed by Step 05's out_of_scope[] alone —
+        # the two exemptions are deliberately independent (DEVSPEC-122).
         with tempfile.TemporaryDirectory() as d:
             self._write_all(d, frs=frs)
             _write(d, "05_interface_contracts.json", apis_oos)
@@ -516,7 +565,63 @@ class TestTraceabilityClosure(unittest.TestCase):
             rendered = render_errors(errs)
             self.assertTrue(
                 any("W565" in e and "fr-infra" in e for e in rendered),
-                f"Expected W565 for fr-infra — Step 08 has no out_of_scope (scope boundary). Got: {rendered}"
+                f"Expected W565 for fr-infra — Step 05 out_of_scope does not exempt fixture coverage. Got: {rendered}"
+            )
+
+    def test_w565_suppressed_by_step08_out_of_scope_with_rationale(self):
+        """W565 is suppressed when FR is listed in fixtures.out_of_scope[] with a non-empty rationale.
+
+        Mirrors test_w564_suppressed_by_out_of_scope_with_rationale but for Step 08's
+        own out_of_scope[] (DEVSPEC-122) — deliberately separate from Step 05's, since
+        "no API surface" and "no fixture" are independent scoping decisions.
+        """
+        frs = {"functional_requirements": [{"fr_id": "fr-infra", "trace": [{"type": "capability", "id": "cap-ops"}]}]}
+
+        # FR in Step 08 out_of_scope with rationale → no W565
+        fixtures_oos_with_rationale = {
+            "fixtures": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Background job — no observable behavior to fixture-test."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "08_fixtures.json", fixtures_oos_with_rationale)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W565" in e and "fr-infra" in e for e in rendered),
+                f"Did not expect W565 for fr-infra in Step 08 out_of_scope with rationale. Got: {rendered}"
+            )
+
+        # FR in Step 08 out_of_scope with empty rationale → W565 still fires
+        fixtures_oos_empty_rationale = {
+            "fixtures": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": ""}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "08_fixtures.json", fixtures_oos_empty_rationale)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W565" in e and "fr-infra" in e for e in rendered),
+                f"Expected W565 for fr-infra with empty rationale in Step 08 out_of_scope. Got: {rendered}"
+            )
+
+        # FR only in Step 05 out_of_scope (not Step 08's) → W565 still fires — the two
+        # exemptions are independent, not interchangeable.
+        apis_oos = {
+            "apis": [],
+            "out_of_scope": [{"fr_id": "fr-infra", "rationale": "Infrastructure FR — no HTTP API surface."}],
+        }
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, frs=frs)
+            _write(d, "05_interface_contracts.json", apis_oos)
+            _write(d, "08_fixtures.json", {"fixtures": []})
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W565" in e and "fr-infra" in e for e in rendered),
+                f"Expected W565 for fr-infra — Step 05 out_of_scope must not cross-exempt Step 08's check. Got: {rendered}"
             )
 
     def test_w565_fires_when_fr_has_no_fixture_coverage(self):
@@ -622,6 +727,54 @@ class TestTraceabilityClosure(unittest.TestCase):
             self.assertFalse(
                 any("W568" in e and "cap-auth" in e for e in rendered),
                 f"Did not expect W568 for cap-auth. Got: {rendered}"
+            )
+
+    def test_w568_suppressed_by_capability_scope_out(self):
+        """A capability marked scope:"out" is permanently excluded from the project
+        (the capability-level analog of FR priority:"wont-have") and has no FR by
+        design -- W568 must not fire for it."""
+        caps = {"capabilities": [{"capability_id": "cap-legacy-export", "scope": "out"}]}
+        frs_no_trace = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
+
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, caps=caps, frs=frs_no_trace)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W568" in e and "cap-legacy-export" in e for e in rendered),
+                f"Did not expect W568 for scope:out capability cap-legacy-export. Got: {rendered}"
+            )
+
+    def test_w568_suppressed_by_capability_scope_future(self):
+        """A capability marked scope:"future" (acknowledged, deferred to a later
+        release -- the capability-level analog of task/milestone "deferred") is
+        parked by design and not expected to have an FR trace yet -- W568 must
+        not fire for it, same as scope:"out"."""
+        caps = {"capabilities": [{"capability_id": "cap-roadmap-v2", "scope": "future"}]}
+        frs_no_trace = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
+
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, caps=caps, frs=frs_no_trace)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W568" in e and "cap-roadmap-v2" in e for e in rendered),
+                f"Did not expect W568 for scope:future capability cap-roadmap-v2. Got: {rendered}"
+            )
+
+    def test_w568_control_scope_in_capability_still_fires(self):
+        """Control: a scope:"in" capability (the normal case) with no FR tracing to
+        it must still fire W568 -- only scope:"out"/"future" are exempt."""
+        caps = {"capabilities": [{"capability_id": "cap-auth", "scope": "in"}]}
+        frs_no_trace = {"functional_requirements": [{"fr_id": "fr-login", "trace": []}]}
+
+        with tempfile.TemporaryDirectory() as d:
+            self._write_all(d, caps=caps, frs=frs_no_trace)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W568" in e and "cap-auth" in e for e in rendered),
+                f"Expected W568 for scope:in capability cap-auth with no FR. Got: {rendered}"
             )
 
     def test_w567_fires_when_milestone_fr_not_covered_by_task_fr_refs(self):
@@ -857,6 +1010,54 @@ class TestGovernanceCICrossValidation(unittest.TestCase):
             )
 
 
+class TestW575ImplPlanDeliverableCoverage(unittest.TestCase):
+    """W575 fires when a Step 09 milestone deliverable ID has no corresponding
+    Step 14 coverage (task fr_refs or milestone deliverables); clears when covered."""
+
+    def _write_base(self, d: str, impl_plan: dict, roadmap: dict) -> None:
+        _write(d, "01_capabilities.json", CAPS)
+        _write(d, "04_fr_list.json", FRS_FULL)
+        _write(d, "09_impl_plan.json", impl_plan)
+        _write(d, "14_roadmap.json", roadmap)
+        _write_anchor_with_plan(d, "ms-v1", IMPL_FULL)
+
+    def test_w575_fires_when_deliverable_uncovered(self):
+        """W575 fires when a Step 09 deliverable ID is referenced by no Step 14
+        task fr_refs and no Step 14 milestone deliverables list."""
+        impl_plan = {"milestones": [{"milestone_id": "ms-v1", "deliverables": [{"id": "deliv-auth-api"}]}]}
+        roadmap = {"milestones": [{
+            "milestone_id": "ms-v1",
+            "fr_refs": ["fr-login"],
+            "tasks": [{"task_id": "task-1", "fr_refs": ["fr-login"]}],
+        }]}
+        with tempfile.TemporaryDirectory() as d:
+            self._write_base(d, impl_plan, roadmap)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertTrue(
+                any("W575" in e and "deliv-auth-api" in e for e in rendered),
+                f"Expected W575 for uncovered deliverable deliv-auth-api. Got: {rendered}"
+            )
+
+    def test_w575_suppressed_when_deliverable_covered_by_task_fr_refs(self):
+        """W575 does NOT fire when the deliverable ID is referenced by a Step 14
+        task's fr_refs."""
+        impl_plan = {"milestones": [{"milestone_id": "ms-v1", "deliverables": [{"id": "fr-login"}]}]}
+        roadmap = {"milestones": [{
+            "milestone_id": "ms-v1",
+            "fr_refs": ["fr-login"],
+            "tasks": [{"task_id": "task-1", "fr_refs": ["fr-login"]}],
+        }]}
+        with tempfile.TemporaryDirectory() as d:
+            self._write_base(d, impl_plan, roadmap)
+            errs = check_traceability_closure(d)
+            rendered = render_errors(errs)
+            self.assertFalse(
+                any("W575" in e and "fr-login" in e for e in rendered),
+                f"Did not expect W575 when deliverable is covered by task fr_refs. Got: {rendered}"
+            )
+
+
 class TestW576TaskExecutionCoverage(unittest.TestCase):
     """W576 resolves executed task IDs via satisfied_checklist_ids → checklist.spec_ref.id."""
 
@@ -935,6 +1136,108 @@ class TestW576TaskExecutionCoverage(unittest.TestCase):
             self.assertTrue(
                 any("W576" in e and "task-1" in e for e in rendered),
                 f"Expected W576 when satisfied id is unknown. Got: {rendered}",
+            )
+
+    def test_deferred_task_status_does_not_require_execution(self):
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", [])
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "deferred", "status_reason": "Paused."}]
+            self._write_base(d, plan, tasks=tasks)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertFalse(
+                any("W576" in e for e in rendered),
+                f"W576 should not fire for status=deferred tasks. Got: {rendered}",
+            )
+
+    def test_wont_do_task_status_does_not_require_execution(self):
+        with tempfile.TemporaryDirectory() as d:
+            plan = self._plan("ms-v1", "AUTH_LOGIN_OK", "task-1", [])
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "wont_do", "status_reason": "Cancelled."}]
+            self._write_base(d, plan, tasks=tasks)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertFalse(
+                any("W576" in e for e in rendered),
+                f"W576 should not fire for status=wont_do tasks. Got: {rendered}",
+            )
+
+    def test_all_covering_checklist_items_deferred_suppresses_W576(self):
+        """Defense-in-depth: task status hasn't been updated yet, but every checklist
+        item covering it is deferred -- transitionally paused, should not fire W576."""
+        with tempfile.TemporaryDirectory() as d:
+            plan = {
+                "id": "ms-v1",
+                "plan": {
+                    "spec_alignment": {
+                        "checklist": [
+                            {
+                                "id": "AUTH_LOGIN_OK",
+                                "spec_ref": {"id": "task-1"},
+                                "checklist_status": "deferred",
+                            }
+                        ]
+                    }
+                },
+                "execution": {
+                    "execution_results": [
+                        {
+                            "status": "passed",
+                            "outcome_description": "ok",
+                            "reasoning": "unrelated",
+                            "command": "pytest",
+                            "evidence": "1 passed",
+                        }
+                    ],
+                    "critical_evidence": {"satisfied_checklist_ids": []},
+                },
+            }
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "pending"}]
+            self._write_base(d, plan, tasks=tasks)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertFalse(
+                any("W576" in e for e in rendered),
+                f"W576 should not fire when every covering checklist item is deferred. Got: {rendered}",
+            )
+
+    def test_partially_deferred_checklist_coverage_still_fires_W576(self):
+        """Control: if only SOME covering checklist items are deferred (not all), and
+        none are satisfied, W576 must still fire -- real active work remains uncovered."""
+        with tempfile.TemporaryDirectory() as d:
+            plan = {
+                "id": "ms-v1",
+                "plan": {
+                    "spec_alignment": {
+                        "checklist": [
+                            {
+                                "id": "AUTH_LOGIN_DEFERRED",
+                                "spec_ref": {"id": "task-1"},
+                                "checklist_status": "deferred",
+                            },
+                            {
+                                "id": "AUTH_LOGIN_ACTIVE",
+                                "spec_ref": {"id": "task-1"},
+                            },
+                        ]
+                    }
+                },
+                "execution": {
+                    "execution_results": [
+                        {
+                            "status": "passed",
+                            "outcome_description": "ok",
+                            "reasoning": "unrelated",
+                            "command": "pytest",
+                            "evidence": "1 passed",
+                        }
+                    ],
+                    "critical_evidence": {"satisfied_checklist_ids": []},
+                },
+            }
+            tasks = [{"task_id": "task-1", "fr_refs": ["fr-login"], "status": "pending"}]
+            self._write_base(d, plan, tasks=tasks)
+            rendered = render_errors(check_traceability_closure(d))
+            self.assertTrue(
+                any("W576" in e and "task-1" in e for e in rendered),
+                f"Expected W576 when an active checklist item remains unsatisfied. Got: {rendered}",
             )
 
     def test_cross_milestone_checklist_id_collision_resolves_per_plan(self):

@@ -1,0 +1,30 @@
+{
+  "digest_type": "digest_validator",
+  "source_file": "tools/specdev_tools/core/errors.py",
+  "source_sha": "588f7410286f89e8a4abf345fc0c66e40c567146",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "module_path": "tools.specdev_tools.core.errors",
+    "error_codes": [],
+    "warning_codes": [],
+    "checks_exported": [
+      "SpecError",
+      "make_error",
+      "render_errors",
+      "ensure_spec_errors",
+      "SpecdevError",
+      "SubmoduleDetectionError",
+      "SchemaRegistryError"
+    ],
+    "guide_refs": [],
+    "schema_paths_referenced": [],
+    "imports": [
+      "__future__",
+      "collections",
+      "dataclasses",
+      "re",
+      "typing"
+    ]
+  }
+}

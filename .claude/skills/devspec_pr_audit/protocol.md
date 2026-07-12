@@ -28,7 +28,7 @@ Agents cite this document by section number (§1, §2, …). Do not paraphrase; 
 
 **P2 — Discovery.**  
 - *Tier-1 (mechanical):* `discovery-mechanical` (haiku) handles only slices where `semantic_work: false` (`generated_artifacts`, `host_integration`). Runs deterministic diff-and-compare checks. Emits findings to its designated output path.  
-- *Tier-2 (semantic):* `discovery-semantic` (sonnet) instances are dispatched via greedy bin-packing (see §3). Each instance receives: its slice's changed files in full, digests of cross-slice neighbor files, and the applicable D/I subset from `slices.yaml`. Emits findings with `catalog_tag` populated for every item.  
+- *Tier-2 (semantic):* `discovery-semantic` (sonnet) instances are dispatched one per theme (see §3). Each instance receives: its slice's changed files in full, digests of cross-slice neighbor files, and the applicable D/I subset from `slices.yaml`. Emits findings with `catalog_tag` populated for every item.  
 
 Tier-1 is only dispatched if `generated_artifacts` or `host_integration` slices have changed files. If neither is in scope, skip Tier-1.
 
@@ -96,38 +96,40 @@ All agents operate within the `devspec_pr_audit` skill. **Nested subagents are f
 | `pr-audit-discovery-semantic` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (finding fragments per bin) | semantic |
 | `pr-audit-cross-boundary` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (cross-boundary findings) + meta-findings in §9 | cross-boundary, meta-review |
 | `pr-audit-consolidator` | sonnet | Read, Glob, Grep, Bash, Write | Own output path only (`findings.json`, `fix_plan.json`, `iter_p4_*`) | compose, verify |
+| `pr-audit-fix-apply` | sonnet | Bash, Read, Edit, Write | Source file at `fix_plan.tasks[].file` (one file per invocation; post-fix class — see §12) | apply |
 
 Agent names in §1/§2 narrative use shortened forms (e.g. `context-author`); §3 is the canonical roster with the `pr-audit-` invocation prefix.
 
-**Write restriction:** Every agent may call Write only to its designated output path under `docs/audit/runs/<run-id>/`. No agent may edit source files.  
-**Edit tool:** Forbidden for all agents without exception. Agents use Write (never Edit) to their designated output paths.  
+**Write restriction:** Pipeline agents (P0–P5) may call Write only to their designated output path under `docs/audit/runs/<run-id>/` and may not edit source files. `pr-audit-fix-apply` (post-fix class) is the sole exception: it edits and may Write the source file at `fix_plan.tasks[].file` only — see §12.  
+**Edit tool:** Forbidden for all pipeline agents (P0–P5). `pr-audit-fix-apply` is a post-fix agent (outside P0–P5) permitted to use Edit; its write scope is limited to the source file at `fix_plan.tasks[].file` (one file per invocation) — see §12.  
 **Agent tool:** Forbidden for all agents (no nested subagent dispatch).
 
-### Bin-packing (Tier-2 dispatch)
+### Theme-based dispatch (Tier-2)
 
-Impact score per changed file:
+**One `discovery-semantic` bin per theme, by default.** A theme is a `slices.yaml` slice — the same taxonomy used by `routing.json` — and each slice already represents a coherent code area (schemas, prompts, validators, canon, cli_surface, tests_fixtures, docs, ...). Group all `semantic_work: true` changed files by slice; every non-empty theme group becomes exactly one bin, containing all of that theme's changed files. No file-level scoring and no cross-theme merging — a PR touching 4 themes dispatches 4 agents, touching 8 themes dispatches 8. This puts a natural, low ceiling on Tier-2 agent count: the total number of `semantic_work: true` slices (currently 11).
 
-```
-impact = type_weight(file) × max(1, |expansion_set(file)|) × |applies.drift_types ∪ applies.invariants|
-```
+Each bin's agent receives the full `applies.drift_types ∪ invariants` set for its theme — review of a theme is never split by aspect (e.g. drift checks vs. invariant checks); the only thing that can fragment a theme is the overflow rule below.
 
-where `type_weight` and `applies` come from `slices.yaml` for the file's owning slice.
+- **Multi-slice files** (matched by more than one slice's globs) are assigned to a single theme: choose the slice whose glob pattern shares the longest common leading path prefix with the file's path; on a tie, choose the lexicographically earlier slice name.
 
-Greedy bin-packing: assign files to bins in decreasing impact order; open a new bin when the current bin would exceed ~200 units. Each non-empty bin = one `discovery-semantic` invocation. Concurrency cap: 6 agents dispatched in parallel waves. Wave size ≤ 6; start the next wave only after the previous wave completes.
+**Overflow split (rare).** If a single theme's file count (changed files + deduped `expansion_set` neighbors) exceeds ~15 files, split that theme into sub-bins along a coherent sub-axis — never by an arbitrary score or fill order:
+- If the slice's `expansion_rules` capture a `{step}` token, group by that step number (files touching the same pipeline step stay together).
+- Otherwise, group by shared parent directory.
 
-**Worked example.** Three changed files in scope:
+Each sub-bin still receives the theme's full `applies` set — overflow splitting divides files, not review aspects.
 
-```
-schema/example_a.schema.json   type_weight=12, expansion_set=4, |applies|=10  → impact = 480
-schema/example_b.schema.json   type_weight=8,  expansion_set=3, |applies|=10  → impact = 240
-prompts/example_step.md        type_weight=6,  expansion_set=2, |applies|=9   → impact = 108
-```
+Each non-empty bin = one `discovery-semantic` invocation. Dispatch in waves of ≤ 6 bins simultaneously; start the next wave only after the previous wave completes. The concurrency limit for PR-audit is independent of `SPECDEV_REVIEW_CONCURRENCY` (which governs the spec-review loop, not PR audit).
 
-Bin 1: `example_a.schema.json` (480 > 200 alone — single-file bins are permitted when impact > budget).
-Bin 2: `example_b.schema.json` (240 > 200 alone — same rule).
-Bin 3: `example_step.md` (108 fits).
+**Worked example.** A PR changes 2 schema files, 1 prompt file:
+- `schemas` theme: 2 changed files → 1 bin (both files, one agent).
+- `prompts` theme: 1 changed file → 1 bin.
+- Total: **2 bins**, one wave — one agent per code area touched, regardless of per-file weight.
 
-Result: 3 `discovery-semantic` agents dispatched in one wave. The ~200 unit budget is a starting heuristic; tune after a dry-run measurement pass.
+**Worked example — overflow.** A PR changes 17 files under `tests_fixtures` (observed in run `20260702-100406-04dda8d`) plus a handful of files in other themes:
+- `tests_fixtures` exceeds the ~15-file overflow threshold → split by shared parent directory (or `{step}` capture group) into 2 coherent sub-bins, each still carrying the full `tests_fixtures` `applies` set.
+- Every other touched theme stays a single bin.
+
+This replaces the prior impact-score/greedy-bin-packing model (`type_weight × expansion_set × |applies|`, ~600/800 unit budgets, orphan-only cross-theme merge), which fragmented themes independently of the file count driving actual reviewer workload — see the `20260702-100406-04dda8d` and `20260702-152521-64cd062` runs, where 8 and 7 touched themes produced 15 and 14 bins respectively under the old model.
 
 ### `cross-boundary` dual mode
 
@@ -390,7 +392,7 @@ The agent reads these paths via the Read/Glob tools; it never writes to any of t
 - `literal_true` — `true` as the entire command
 - `hardcoded_pass` — `printf`/`echo` without any side-effect check
 
-**Cross-phase consistency.** Every `finding_id` referenced in a `fix_plan.json` task's `finding_ids[]` must exist as an `id` in `findings.json`. Every `catalog_tag` in any finding must be one of the canonical D1–D14 / I1–I13 values declared in `catalogs.md`. No invented `kind` enum values (permitted values per `vc:infra:findings`); no invented `severity` enum values.
+**Cross-phase consistency.** Every finding signature referenced in a `fix_plan.json` task's `findings[]` array must exist as a `signature` value in `findings.json`. Every `catalog_tag` in any finding must be one of the canonical D1–D14 / I1–I13 values declared in `catalogs.md`. No invented `kind` enum values (permitted values per `vc:infra:findings`); no invented `severity` enum values.
 
 **Hallucination check.** Every cited `location` (file path + optional `#/json-pointer` or `#Lstart-Lend` line range) in a finding must be verifiable: the file path must exist in the audit's changed-file set or the run artifacts; cited line ranges must fall within the file's actual line count (checked against the digest `line_count` field if available, or by stat).
 
@@ -400,12 +402,13 @@ The agent reads these paths via the Read/Glob tools; it never writes to any of t
 
 ```json
 {
-  "phase_observed": "P4",
-  "defect_class": "vacuous_acceptance | schema_nonconformance | cross_phase_inconsistency | hallucinated_citation",
+  "kind": "bug",
   "description": "<human-readable summary>",
-  "evidence": ["<artifact path>", "<specific field or line>"]
+  "affected_finding_signatures": ["<sig1>", ...]
 }
 ```
+
+This shape is skill-internal (no `$id` lock) — see `.claude/agents/pr-audit-cross-boundary.md` §Output schema constraints ("Mode B") for the authoritative field list. `kind` is a fixed literal (`"bug"`); `affected_finding_signatures` references `signature` values from `findings.json` and may be empty (`[]`) when the defect is not tied to a specific finding.
 
 No separate `audit_of_audit.json` file is written. The agent appends only to `manifest.json` `meta_findings[]`. It does **not** modify `findings.json` or `fix_plan.json` — meta-findings are framework defects, not PR defects, and `findings.json` must remain strictly conformant to `vc:infra:findings`.
 
@@ -512,3 +515,73 @@ Findings total: P0=N, P1=N, P2=N
 Tasks total: N  (P0=N, P1=N, P2=N, P3=N)
 See fix_plan.json for full task list.
 ```
+
+---
+
+## §12. Post-fix verification
+
+Before applying any `fix_plan.json` (generated in P4) task, the post-fix pipeline
+captures `PRE_FIX_SHA=$(git rev-parse HEAD)` — see SKILL.md `--post-fix` step 1.
+After applying all tasks, operators and the post-fix pipeline must confirm that
+every task's acceptance gate passes, commit the verified fixes, and that
+previously-found findings are closed via a re-audit scoped to `PRE_FIX_SHA`.
+
+### §12.1 Per-task verification
+
+**Tool:** `scripts/p6_verify.py`
+
+**Invocation:**
+```bash
+python3 .claude/skills/devspec_pr_audit/scripts/p6_verify.py \
+  docs/audit/runs/$RUN_ID/fix_plan.json
+```
+
+The script reads `fix_plan.json`, executes each task's `acceptance_command` in
+topological order (respecting `deps`), and reports PASS/FAIL per task.
+
+Exit codes:
+- `0` — all acceptance commands passed
+- `1` — one or more acceptance commands failed
+- `2` — input missing, JSON parse error, or cycle detected in deps
+
+### §12.2 Closing-loop re-audit
+
+If `p6_verify.py` exits non-zero, halt: do not commit and do not re-audit — fix
+the failing task(s) and re-run `p6_verify.py`. On exit 0, proceed:
+
+1. **Commit the verified fixes first.** Stage the union of `fix_plan.tasks[].file`
+   and commit as a single change referencing the run-id (e.g.
+   `fix(pr-audit): apply <run-id> fix_plan (<N> tasks)`). This is a change from
+   prior behavior — fixes used to be left uncommitted in the working tree. The
+   commit is required so that step 2's `--base` diff has something to see. If
+   nothing is staged (a no-op fix whose `acceptance_command` already passed
+   without an edit), do not create an empty commit — skip the commit and the
+   step-2 re-audit and report those tasks as already-satisfied.
+2. **Re-run `/devspec_pr_audit --base <PRE_FIX_SHA>`**, where `PRE_FIX_SHA` is the
+   `HEAD` sha captured before any fix task was applied (§12 preamble / SKILL.md
+   `--post-fix` step 1). The audit computes its changed-file set as
+   `git diff --name-only "${BASE_REF}...HEAD"` (SKILL.md Step 0d), so this reuses
+   the existing `--base` flag to scope the entire re-audit — routing, Tier-0
+   checks, P2/P3 discovery, everything — to exactly the fix commit's diff. This
+   produces a new `run-id` directory with its own `findings.json` and
+   `SUMMARY.md`, but the diff underlying it is just the fix changes.
+   If the original run used `--allow-tier0-failure=<check-name>` overrides, pass
+   them again on this re-run.
+3. Confirm that findings previously addressed by `fix_plan.json` tasks are absent
+   from the new run's findings, and inspect the new run's findings for anything
+   newly introduced by the fixes.
+
+**Why scoping to `--base <PRE_FIX_SHA>` is sufficient:** `p6_verify.py` (§12.1)
+already confirms each individual fix via its `acceptance_command`; the closing
+re-audit's remaining job is to catch side effects the fixes introduced in the
+changed files, which a diff scoped to the fix commit fully covers. What this
+scoped loop deliberately does **not** do is re-check cross-boundary drift against
+files the fixes didn't touch — for that, run `/devspec_pr_audit` normally (no
+`--base` override) as a full branch-vs-main audit before merge.
+
+### §12.3 Post-fix agent class
+
+`pr-audit-fix-apply` is a **post-fix agent** — it operates outside the P0–P5 pipeline
+and edits source files (not audit-run artifacts). This is the only agent class permitted
+to use the Edit tool; its write scope is limited to the file at `fix_plan.tasks[].file`
+(one file per invocation). See §3 roster table and `.claude/agents/pr-audit-fix-apply.md`.

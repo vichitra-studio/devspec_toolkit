@@ -145,3 +145,9 @@ class TestStep11Fixtures:
         errors = _validate_references(fake_fixture, MOCK_ID_INDEX)
         assert len(errors) == 1
         assert "invalid target type" in errors[0]
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(pytest.main([__file__, "-v"]))

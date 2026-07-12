@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-def _build_pre_commit_config(rel_toolkit_root: str) -> str:
+def _build_pre_commit_config(rel_toolkit_root: str, venv_name: str = "devspec_env") -> str:
     """Read the host pre-commit template and substitute the toolkit root path."""
     template_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -16,17 +16,20 @@ def _build_pre_commit_config(rel_toolkit_root: str) -> str:
     if os.path.exists(template_path):
         with open(template_path) as f:
             content = f.read()
-        # Replace the default ./devspec_toolkit with the actual relative path
-        return content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
+        # Replace ./devspec_toolkit (flags) and bare devspec_toolkit/ (files: patterns)
+        content = content.replace("./devspec_toolkit", f"./{rel_toolkit_root}")
+        content = content.replace("devspec_toolkit/", f"{rel_toolkit_root}/")
+        content = content.replace("devspec_env", venv_name)
+        return content
     # Fallback: minimal config if template is missing
     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
     return f"""# Pre-commit hooks — template not found, minimal config generated.
 repos:
   - repo: local
     hooks:
-      - id: validate-all
+      - id: spec-check
         name: Validate all spec files
-        entry: python -m specdev_tools.cli validate-all spec {repo_root_flag}
+        entry: {venv_name}/bin/python -m specdev_tools.cli spec-check spec {repo_root_flag} --spec-root ./spec --git-root .
         language: system
         pass_filenames: false
         files: spec/.*\\.json$
@@ -68,7 +71,7 @@ jobs:
           echo "$PWD/devspec_env/bin" >> $GITHUB_PATH
           uv pip install --python devspec_env/bin/python -e devspec_toolkit/tools/
       - name: Validate all specs
-        run: ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+        run: ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
       - name: Governance check (PR Title)
         if: github.event_name == 'pull_request'
         run: ./tools/run_specdev.sh governance-check spec --message "${{ github.event.pull_request.title }}" --repo-root ./devspec_toolkit
@@ -161,7 +164,6 @@ def install_claude_symlinks(host_root, actual_toolkit_root, force=False):
         "specdev-step",
         "specdev-review",
         "specdev-trinity",
-        "specdev-trinity-plan",
         "devspec_pr_audit",
     }
     KNOWN_AGENT_PREFIXES = ("specdev-", "pr-audit-")
@@ -667,7 +669,7 @@ def main():
     pre_commit_file = os.path.join(target_dir, ".pre-commit-config.yaml")
     if not os.path.exists(pre_commit_file):
         print("Creating .pre-commit-config.yaml...")
-        config_content = _build_pre_commit_config(rel_toolkit_root)
+        config_content = _build_pre_commit_config(rel_toolkit_root, args.venv_name)
         with open(pre_commit_file, "w") as f:
             f.write(config_content)
         print("Note: pre-commit will be installed into the virtualenv and 'pre-commit install' run automatically.")
@@ -722,9 +724,9 @@ def main():
                     repo_root_flag = f"--repo-root ./{rel_toolkit_root}"
                     governance_hook = f"""      - id: devspec-governance
         name: DevSpec Governance Check
-        entry: python -m specdev_tools.cli governance-check spec {repo_root_flag} --message
+        entry: {venv_name}/bin/python -m specdev_tools.cli governance-check spec {repo_root_flag} --spec-root ./spec --git-root . --message
         language: system
-        pass_filenames: false
+        pass_filenames: true
         stages: [commit-msg]
 """
                     with open(config_path, "a") as f:

@@ -10,6 +10,10 @@ Covers:
   B3 — known steps including "16" and "16b" produce no W553.
   B4 — bare "16" key + impl_context artifact: seed_lint union includes the seed
        (no false W140 / W553), tested at the seed_lint integration level.
+
+Also colocates (DRY — reuses this module's seed-manifest ``_build_project``
+fixture) one E410 CANONICAL_ALIAS_COLLISION test for the duplicate-``seed_id``
+detection path in ``lint_seeds`` (class ``TestE410DuplicateSeedId``).
 """
 from __future__ import annotations
 
@@ -329,6 +333,42 @@ class TestE520UnknownSeedIdLintIntegration(unittest.TestCase):
                 msg=(
                     "W553 must not fire for known step '04'. "
                     f"Got: {w553}"
+                ),
+            )
+
+
+class TestE410DuplicateSeedId(unittest.TestCase):
+    """E410 CANONICAL_ALIAS_COLLISION — duplicate seed_id in seed manifest.
+
+    lint_seeds() must emit E410 when seed_manifest.json contains two entries
+    in seeds[] that share the same seed_id value.
+    """
+
+    def test_duplicate_seed_id_fires_e410(self):
+        """Two seeds[] entries sharing the same seed_id → E410 is emitted.
+
+        Uses a real temp project; lint_seeds() and manifest parsing are NOT mocked.
+        Routes seeds to a known pipeline step ("04") so W553 does not fire.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_dir = _build_project(
+                tmpdir,
+                seeds=[
+                    _seed_tuple("seed-dup", "seed_dup_a.md", text="first seed content"),
+                    _seed_tuple("seed-dup", "seed_dup_b.md", text="second seed content"),
+                ],
+                global_seed_order=["seed-dup"],
+                step_requirements={"04": ["seed-dup"]},
+            )
+            errors = lint_seeds(repo_root=_TOOLKIT_ROOT, spec_dir=spec_dir, project_root=tmpdir)
+            rendered = render_errors(errors)
+
+            e410 = [e for e in rendered if "E410" in e]
+            self.assertTrue(
+                len(e410) >= 1,
+                msg=(
+                    "E410 must fire when seeds[] contains two entries with the same "
+                    f"seed_id ('seed-dup'). Got rendered errors: {rendered}"
                 ),
             )
 

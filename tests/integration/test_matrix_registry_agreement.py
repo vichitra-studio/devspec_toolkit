@@ -37,7 +37,7 @@ from pathlib import Path
 
 import pytest
 
-from specdev_tools.core.entry_key_registry import list_entries
+from specdev_tools.core.entry_key_registry import list_entries, iter_array_path
 from specdev_tools.validation.matrix import build_trace_matrix
 
 # ---------------------------------------------------------------------------
@@ -60,18 +60,34 @@ def _load_registry_doc() -> dict:
     return json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 
 
+def _iter_entry_kinds(entry: dict):
+    """Yield ``(full_array_path, kind)`` for every array in a registry *entry*.
+
+    Descends ``nested`` to arbitrary depth (DEVSPEC-125: step 14's ``criterion``
+    sits three levels under ``milestones``), building the full ``[].``-joined
+    path so the caller can resolve the array against live spec data.  A
+    single-level walk here would silently drop deep-nested kinds and desync this
+    agreement gate from the now-recursive ``list_entries``.
+    """
+    def _walk(node: dict, prefix: str):
+        full = f"{prefix}{node['array_path']}"
+        if node.get("kind"):
+            yield full, node["kind"]
+        for nested in node.get("nested", []):
+            yield from _walk(nested, f"{full}[]")
+
+    for arr in entry.get("arrays", []):
+        yield from _walk(arr, "")
+
+
 def _all_registered_kinds(registry_doc: dict) -> set[str]:
-    """Return all kind values declared in the registry (top-level and nested)."""
+    """Return all kind values declared in the registry (at any nesting depth)."""
     kinds: set[str] = set()
     for _bn, entry in registry_doc.get("registry", {}).items():
         if entry.get("_special", False):
             continue
-        for arr in entry.get("arrays", []):
-            if arr.get("kind"):
-                kinds.add(arr["kind"])
-            for nested in arr.get("nested", []):
-                if nested.get("kind"):
-                    kinds.add(nested["kind"])
+        for _path, kind in _iter_entry_kinds(entry):
+            kinds.add(kind)
     return kinds
 
 
@@ -106,20 +122,13 @@ def _kinds_with_data_in_spec(registry_doc: dict, spec_dir: str) -> set[str]:
             data = json.loads(Path(spec_path).read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
-        for arr_entry in entry.get("arrays", []):
-            array_key = arr_entry["array_path"].lstrip(".")
-            val = data.get(array_key)
-            if val and isinstance(val, list):
-                if arr_entry.get("kind"):
-                    kinds_with_data.add(arr_entry["kind"])
-            for nested in arr_entry.get("nested", []):
-                if nested.get("kind"):
-                    # Check if any parent item has the nested array
-                    if val and isinstance(val, list) and val[0]:
-                        nested_key = nested["array_path"].lstrip(".")
-                        nested_val = val[0].get(nested_key) if isinstance(val[0], dict) else None
-                        if nested_val and isinstance(nested_val, list):
-                            kinds_with_data.add(nested["kind"])
+        # A kind "has data" when its array — at any depth — holds at least one
+        # item somewhere in the spec.  Resolve each registered path with the same
+        # shared walker build_trace_matrix() uses (iter_array_path), so this
+        # check stays faithful to the production discovery path and depth-agnostic.
+        for full_path, kind in _iter_entry_kinds(entry):
+            if next(iter_array_path(data, full_path), None) is not None:
+                kinds_with_data.add(kind)
     return kinds_with_data
 
 

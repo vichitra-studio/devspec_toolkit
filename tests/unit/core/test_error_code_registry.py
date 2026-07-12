@@ -20,6 +20,7 @@ CROSS_PREFIX_SEMANTIC_ALLOWLIST = {
     "552",  # E=MISSING_PAIRED_SCHEMA         / W=POTENTIAL_UNREGISTERED_PAIRING
     "553",  # E=MISSING_ENUM_PATH             / W=SEED_STEP_UNKNOWN
     "554",  # E=CANON_ENUM_DRIFT              / W=HARDCODED_SEED_REFERENCE
+    "555",  # E=SEMANTIC_COVERAGE_REGRESSION  / W=STEP00_SEED_OUT_OF_SCOPE_THIN
     "585",  # E=DAG_CIRCULAR_DEPENDENCY       / W=ANCHOR_DRIFT_SKIP
     "590",  # E=CROSS_STEP_ID_NOT_FOUND       / W=CROSS_STEP_UPSTREAM_MISSING
     "592",  # E=COVERAGE_THRESHOLD_BREACH     / W=COVERAGE_THRESHOLD_WARN
@@ -112,7 +113,7 @@ class TestR9ErrorCodes(unittest.TestCase):
 
     def test_non_promotable_codes_excluded(self):
         """Non-promotable W-codes are NOT in PROMOTABLE_PAIRS."""
-        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W570", "W590", "W596", "W597"}
+        non_promotable = {"W110", "W120", "W130", "W140", "W552", "W553", "W554", "W555", "W570", "W590", "W596", "W597", "W606"}
         for code in non_promotable:
             self.assertNotIn(code, PROMOTABLE_PAIRS,
                              f"{code} should not be promotable")

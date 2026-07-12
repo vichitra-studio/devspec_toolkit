@@ -126,6 +126,44 @@ class Step14IntegrationTests(unittest.TestCase):
             f"Expected E142 TECH_STACK_MISMATCH error. Got: {errors}",
         )
 
+    def test_task_status_deferred_or_wont_do_requires_status_reason(self):
+        for status in ("deferred", "wont_do"):
+            fixture = json.loads((self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8"))
+            fixture["milestones"][0]["tasks"][0]["status"] = status
+            tmp_path = self.fixtures_dir / f"14_tmp_invalid_task_status_{status}_no_reason.json"
+            try:
+                tmp_path.write_text(json.dumps(fixture), encoding="utf-8")
+                errors = validate_file(str(self.repo_root), str(tmp_path))
+                self.assertTrue(
+                    errors,
+                    msg=f"Task status '{status}' without status_reason should fail validation",
+                )
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+
+    def test_task_status_deferred_or_wont_do_passes_with_status_reason(self):
+        for status in ("deferred", "wont_do"):
+            fixture = json.loads((self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8"))
+            fixture["milestones"][0]["tasks"][0]["status"] = status
+            fixture["milestones"][0]["tasks"][0]["status_reason"] = (
+                "Blocked on vendor API access; resume once sandbox credentials are granted."
+            )
+            tmp_path = self.fixtures_dir / f"14_tmp_valid_task_status_{status}_with_reason.json"
+            try:
+                tmp_path.write_text(json.dumps(fixture), encoding="utf-8")
+                errors = validate_file(str(self.repo_root), str(tmp_path))
+                self.assertEqual(
+                    [], errors, msg=f"Task status '{status}' with status_reason should pass. Errors: {errors}"
+                )
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+
+    def test_task_status_pending_does_not_require_status_reason(self):
+        errors = validate_file(str(self.repo_root), str(self.fixtures_dir / "valid_roadmap.json"))
+        self.assertEqual([], errors, msg=f"Baseline valid_roadmap.json should still pass. Errors: {errors}")
+
     def test_missing_step09_artifact_fails_when_source_milestones_present(self):
         fixture = json.loads((self.fixtures_dir / "valid_roadmap.json").read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as td:

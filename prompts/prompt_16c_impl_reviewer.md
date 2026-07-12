@@ -21,6 +21,14 @@ You output the final version of the JSON, populating the `review` section.
 Before marking a milestone complete, verify all deliverables listed in `14_roadmap.json` for that milestone are satisfied by `execution_results`. A milestone with unverified deliverables MUST NOT be marked `done`.
 
 ## Crucial Side Effect (Anchor + Roadmap Sync)
+
+> **Agentified flow note:** When running via `/specdev-trinity --phase review`, the
+> anchor/roadmap sync is performed by the skill's post-convergence Step C3, not by this
+> prompt directly. The skill synthesizes the `review` block, writes `review.verdict`, and
+> then presents an operator AskUserQuestion gate before updating the three files below. If
+> running 16c manually (human-driven flow), execute this Crucial Side Effect yourself as
+> documented here.
+
 - If your `verdict` is `verified`, you **MUST** also update:
     - `spec/16_impl_context.json` (Trinity Anchor): Set the corresponding `plan.milestone_index[<this milestone>].status` to `done` and update its `summary` line.
     - `spec/14_roadmap.json`: Set the corresponding milestone's status to `done`.
@@ -203,6 +211,7 @@ For each `checklist[]` item:
 - Paraphrased evidence ("tests passed" instead of actual output)
 - `ci_status: red` with `verdict: verified`
 - Files touched outside scope without acknowledgment
+- `checklist_status: deferred` or `checklist_status: wont_do` on an item whose `implementation.status` is `verified` — this contradiction fires `W616` (`PAUSED_OR_CANCELLED_ITEM_MARKED_VERIFIED`)
 
 # Failure Modes (Pitfalls)
 *   **Rubber Stamping**: Approving based on prose summary, not test logs. *Fix*: Verify `execution.execution_results` matches `critical_evidence`.

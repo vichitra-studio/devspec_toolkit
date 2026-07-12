@@ -37,10 +37,12 @@ Before writing any new content, check which spec artifacts are missing.
 
 ```bash
 # List all spec artifacts and their validation status
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+# Or run the unified gate, which resolves project canon and runs every applicable check:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Check the canonical registry for alignment issues
-./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 **Why?**
@@ -70,7 +72,7 @@ Fill in `docs/seed/seed_overview.md` with the project's problem statement, targe
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 1.2: Capabilities — `spec/01_capabilities.json`
@@ -91,7 +93,7 @@ Scan `package.json`, `pyproject.toml`, `Dockerfile`, `go.mod`, or any infra-as-c
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/01_capabilities.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -153,13 +155,13 @@ Use this step if the project has measurable delivery metrics to capture before P
 After emitting, promote project-specific terms to the canon registry:
 
 ```bash
-./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canon-accept --from spec/03_glossary.json --repo-root ./devspec_toolkit --git-root .
 ```
 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/03_glossary.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 2.4: Functional Requirements — `spec/04_fr_list.json`
@@ -179,8 +181,8 @@ After emitting, promote project-specific terms to the canon registry:
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/04_fr_list.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -206,9 +208,9 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/05_interface_contracts.json --repo-root ./devspec_toolkit
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
 # Run after Step 08 is complete
-./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 3.2: Invariants — `spec/06_invariants.json`
@@ -260,7 +262,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/08_fixtures.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -311,10 +313,12 @@ Add potential security threats for the project. `target_ids` must reference API 
 
 **Validation ritual after all Phase 4 steps:**
 ```bash
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
+# Or run the unified gate in place of validate-all + the individual lints below:
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
 ```
 
@@ -362,7 +366,7 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/13a_completeness_assessment.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 ### Step 5.3: Roadmap — `spec/14_roadmap.json`
@@ -382,7 +386,7 @@ These steps bridge Phase I Discovery into Phase II Implementation. They must be 
 **Validation ritual:**
 ```bash
 ./tools/run_specdev.sh validate spec/14_roadmap.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -489,7 +493,7 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 **Validation ritual after each Trinity Loop iteration:**
 ```bash
 ./tools/run_specdev.sh validate spec/16_impl_context.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 ```
 
 > **Commit**: After completing this phase, make a governance-compliant commit per `spec/10_governance.json`.
@@ -498,13 +502,15 @@ The Trinity Loop iterates over each implementation milestone. All three steps op
 
 ## Completion & Next Steps
 
-1. Run the full validation suite to confirm complete coverage across all phases:
+1. Run the full validation suite to confirm complete coverage across all phases
+   (or substitute the unified `spec-check` gate for `validate-all`):
    ```bash
-   ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
-   ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit
-   ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
+   ./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+   ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+   ./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+   ./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
-   ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+   ./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
    ```
 2. Commit with a governance-compliant message (see `spec/10_governance.json` for the required pattern).
 3. **You are now fully bootstrapped through implementation.** Steps 13, 13a, and 14 are covered in Phase 5; Steps 15–16c are covered in Phase 6.

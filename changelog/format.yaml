@@ -11,6 +11,8 @@ optional_fields:
   - description    # Multi-line summary of the release
   - steps          # List of steps included in this version
   - changes        # List of changes from previous version
+  - source_of_truth  # Path to the authoritative source file for this changelog
+  - render_target    # Path to the rendered Markdown derived from source_of_truth
 
 change_types:
   - add_step        # New step added to toolkit

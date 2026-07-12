@@ -347,6 +347,68 @@ class TestContextFreshness:
             "Seed content changed after indexing; must report stale=True"
         )
 
+    def test_untracked_manifest_seed_detected(self, tmp_path):
+        """A manifest seed absent from the index reports untracked=True and W595.
+
+        Regression guard for DEVSPEC-125 Gap 2: previously check_freshness only
+        iterated indexed seeds, so a manifest seed added after the last index
+        escaped drift detection silently.
+        """
+        spec_dir = tmp_path / "spec"
+        common_dir = spec_dir / "common"
+        seed_file_dir = tmp_path / "docs" / "seed"
+        common_dir.mkdir(parents=True)
+        seed_file_dir.mkdir(parents=True)
+        (seed_file_dir / "seed_overview.md").write_text("Overview.\n", encoding="utf-8")
+
+        def _seed(sid, fname):
+            return {
+                "seed_id": sid,
+                "path": f"docs/seed/{fname}",
+                "description": f"{sid} seed",
+                "required": True,
+                "source_type": "doc",
+            }
+
+        base_manifest = {
+            "$schema": "vc:seed-manifest",
+            "seed_manifest_id": "seed-manifest-untracked-smoke",
+            "version": "0.1.0",
+            "created_at": "2026-01-01T00:00:00Z",
+            "last_updated": "2026-01-01T00:00:00Z",
+            "global_seed_order": ["seed-overview"],
+            "seeds": [_seed("seed-overview", "seed_overview.md")],
+            "step_requirements": {"00": ["seed-overview"]},
+        }
+        manifest_path = common_dir / "seed_manifest.json"
+        manifest_path.write_text(json.dumps(base_manifest, indent=2), encoding="utf-8")
+
+        # Index with only seed-overview present.
+        idx_proc = _run(
+            "seed-index", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+            "--json",
+        )
+        assert idx_proc.returncode == 0, f"seed-index failed: {idx_proc.stderr}"
+
+        # Add a second seed to the manifest (and its file) WITHOUT re-indexing.
+        (seed_file_dir / "seed_extra.md").write_text("Extra.\n", encoding="utf-8")
+        base_manifest["seeds"].append(_seed("seed-extra", "seed_extra.md"))
+        base_manifest["global_seed_order"].append("seed-extra")
+        manifest_path.write_text(json.dumps(base_manifest, indent=2), encoding="utf-8")
+
+        proc = _run(
+            "context", "freshness", str(spec_dir),
+            "--repo-root", str(REPO_ROOT),
+        )
+        data = _parse_json(proc)
+        assert "seed-extra" in data, f"untracked seed missing from output: {data}"
+        assert data["seed-extra"]["untracked"] is True
+        assert data["seed-overview"]["untracked"] is False
+        assert "W595" in proc.stderr and "seed-extra" in proc.stderr, (
+            f"expected W595 SEED_UNTRACKED for seed-extra on stderr: {proc.stderr!r}"
+        )
+
     def test_nested_layout_freshness_resolves_via_git_root(self, tmp_path):
         """Nested layout: spec_dir is NOT a direct child of the host root.
 

@@ -30,7 +30,7 @@ Synthesize the foundational strategy (Step 09: Implementation Plan), the detaile
 - **11_redteam.json**: Identified threats and mitigations used to populate milestone risks and inform task prioritization for security-critical implementation sequences
 - **12_ci_gates.json**: CI pipeline gate definitions used to ensure roadmap milestones include validation tasks that satisfy all required continuous integration quality checks
 - **13_extension_manifest.json**: Extension manifest entries and `extension_decision` used to schedule extension implementation work as dedicated milestones; if `extension_decision.status == 'none-required'`, skip extension milestones entirely — this is correct behavior, not a gap
-- **13a_completeness_assessment.json** (if present): Coverage gaps to address in milestone decomposition; high-priority missing elements used to schedule remediation tasks before implementation begins
+- **13a_completeness_assessment.json**: Coverage gaps to address in milestone decomposition; high-priority missing elements used to schedule remediation tasks before implementation begins
 
 ## Operating Flow: Ingest → Synthesize → Sequence → Decompose → Emit
 - **Ingest**: Scan all `spec/` artifacts (Steps 00-13) to understand the complete scope.
@@ -80,6 +80,8 @@ Task `acceptance_criteria` in Step 14 REFINE the FR `acceptance_criteria` from S
 - **NO Ambiguous Task Scope**: Task `description` must name the specific deliverable artifact (endpoint, template, table, config, module) being created or modified. "Configure dependencies" is too vague — "Configure OAuth2 client credentials in session middleware settings" is specific.
 - If `risk_status` is 'high' or 'critical', the `risks` array MUST contain >=1 entry naming the specific blocker.
 - If task `status` is 'done', the task MUST have >=1 acceptance criterion documenting what was verified.
+- If task `status` is 'deferred' or 'wont_do', the task MUST have a `status_reason` explaining why the task was postponed or cancelled.
+- If milestone `status` is 'deferred', the milestone MUST have a `milestone_status_reason` explaining why the milestone was postponed.
 
 ## Coverage Closure
 Before emitting, verify:
@@ -138,6 +140,7 @@ Before emitting, verify:
 ### milestones[].status / milestones[].risk_status
 - Use only the enum values from the schema.
 - Omit if you want defaults (`pending`, `low`).
+- If `status` is `deferred`, the milestone MUST have a `milestone_status_reason` explaining why: name the blocker/decision and the condition required to resume (e.g., "Blocked on payment-provider wallet API access; resume once vendor grants sandbox credentials.").
 
 ### milestones[].tasks
 - Use objects with `task_id` and `description` (optional `status`).
@@ -168,13 +171,19 @@ Before emitting, verify:
 ### milestones[].fr_refs
 - List FR IDs from `spec/04_fr_list.json` that this milestone delivers.
 - Must use exact IDs (e.g., `fr-user-login`). Every ID must exist in Step 04.
-- **If this milestone has deliverables, `fr_refs` MUST be non-empty.** Omit or use `[]` only if the milestone is purely infrastructure with no user-facing functional requirements (e.g., CI pipeline setup, dependency upgrades). A milestone with deliverables but no `fr_refs` is a traceability gap and a red flag.
-- Note: `fr_refs` and `capability_refs` belong on milestones, not on individual tasks. Tasks within a milestone inherit traceability through the milestone's refs.
+- **If this milestone has deliverables, `fr_refs` MUST be non-empty.** Use `[]` only if the milestone is purely infrastructure with no user-facing functional requirements (e.g., CI pipeline setup, dependency upgrades). A milestone with deliverables but no `fr_refs` is a traceability gap and a red flag.
+- Note: Tasks within a milestone also carry their own `fr_refs`. The task-level `fr_refs` across all tasks in a milestone must collectively cover every FR listed in that milestone's `fr_refs`.
+
+### tasks[].invariant_refs
+- List invariant IDs from `spec/06_invariants.json` that this task enforces or tests.
+- Must use exact IDs.
+- Omit or use `[]` if the task has no direct invariant enforcement responsibility.
+- Note: no validator currently consumes this field — it is informational/best-effort documentation, not enforced by any check.
 
 ### milestones[].capability_refs
 - Bind to capability IDs from `spec/01_capabilities.json` that this milestone implements.
 - Must use exact IDs (e.g., `cap-authentication`). Every ID must exist in Step 01.
-- Omit or use `[]` if the milestone does not map to a specific capability.
+- Use `[]` if the milestone does not map to a specific capability.
 
 ### milestones[].risks
 - List only risks that are directly related to the milestone.
@@ -231,10 +240,10 @@ The `$schema` field is required in the output and is stripped before validation 
   },
   "milestones": [
     {
-      "milestone_id": "m1-core-foundation",
+      "milestone_id": "ms-core-foundation",
       "name": "Core Foundation",
       "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
-      "source_milestones": ["m1-core-foundation"],
+      "source_milestones": ["ms-core-foundation"],
       "tasks": [
         {
           "task_id": "init-fastapi-project",

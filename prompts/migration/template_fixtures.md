@@ -21,8 +21,8 @@
   - `mode`: Must be one of `unit | contract | e2e | redteam`.
   - `input`: Any JSON value representing the fixture's input data.
   - `expected`: Any JSON value representing the expected system behavior.
-  - `targets`: Array of trace reference objects (minItems: 1) — each requires `type: validates` and an `id` from `fr-*`, `api-*`, `nfr-*`, or `inv-*`.
-  - `tag_ref`: Canonical reference object (kind: `term`) — required on every fixture.
+  - `targets`: Array of trace reference objects (minItems: 1) — each requires `type` set to the target's canonical kind (`fr`, `api`, `nfr`, or `invariant`), an `id` from `fr-*`, `api-*`, `nfr-*`, or `inv-*`, and a `note` describing the validates relationship. Anti-pattern: `type='validates'` — `validates` is a relationship verb, not a canonical kind.
+  - `tag_ref`: Canonical reference object (kind: `tag`) — required on every fixture.
 
 ## Output Contract
 
@@ -50,7 +50,9 @@ After migration, run:
 
 Fixtures provide concrete test data for the spec pipeline. The field is `targets`
 (not `target_ids`) — rename accordingly. Each target is now a trace reference
-object (`{type: validates, id: "fr-..."}`) not a bare string. The `tag_ref`
+object (`{type: "fr", id: "fr-...", note: "validates: ..."}`) not a bare string —
+`type` is the target's canonical kind (`fr`, `api`, `nfr`, or `invariant`), and the
+validates relationship goes in `note`. The `tag_ref`
 canonical reference is now required on every fixture — add it. The `fixture_id`
 field (not `id`) must use the `fix-` prefix convention. Always run `fixtures-lint`
 after migration to catch dangling references. If any upstream artifact renamed or

@@ -246,8 +246,19 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             }
 
     capability_ids: set[str] = set()
+    # Capabilities marked scope:"out" (permanently excluded, the capability-level
+    # analog of FR-level priority:"wont-have") or scope:"future" (acknowledged but
+    # deferred to a later release -- the capability-level analog of task/milestone
+    # "deferred") are both parked by design and exempted from W568 below: neither
+    # is expected to have an FR trace yet.
+    capability_parked_ids: set[str] = set()
     if "capabilities" in data:
         capability_ids = {c.get("capability_id") for c in data["capabilities"].get("capabilities", []) if c.get("capability_id")}
+        capability_parked_ids = {
+            c.get("capability_id")
+            for c in data["capabilities"].get("capabilities", [])
+            if c.get("capability_id") and c.get("scope") in ("out", "future")
+        }
 
     # Charter → Capabilities chain
     if "charter" in data and "capabilities" in data:
@@ -306,13 +317,25 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # with a non-empty rationale is acknowledged as having no HTTP API surface;
     # the same exemption extends to milestone coverage because infra/ops FRs with
     # no API surface may also legitimately lack milestone placement (DEVSPEC-2).
-    # W565 (fixture coverage) is NOT exempted — Step 08 has no out_of_scope[]
-    # array; that exemption requires a schema addition to 08_fixtures.schema.json.
     step05_oos_fr_ids: set[str] = set()
     if "apis" in data:
         step05_oos_fr_ids = {
             entry["fr_id"]
             for entry in data["apis"].get("out_of_scope", [])
+            if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
+        }
+
+    # Compute FR IDs exempted by Step 08 out_of_scope[] from W565 (fixture coverage).
+    # Deliberately separate from step05_oos_fr_ids (DEVSPEC-122): "no API surface"
+    # (Step 05) and "no fixture" (Step 08) are independent scoping decisions — an
+    # FR with no API can still need a fixture (e.g. a background job), and an FR
+    # with an API can legitimately have no fixture yet. Reusing step05_oos_fr_ids
+    # here would silently suppress legitimate W565 warnings.
+    step08_oos_fr_ids: set[str] = set()
+    if "fixtures" in data:
+        step08_oos_fr_ids = {
+            entry["fr_id"]
+            for entry in data["fixtures"].get("out_of_scope", [])
             if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale")
         }
 
@@ -384,7 +407,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         for fr_id in sorted(fr_ids - api_fr_refs - step05_oos_fr_ids):
             errors.append(make_error("W564", f"UNCOVERED_FR_API {fr_id}"))
 
-    # W565: FR→fixture coverage — each FR should be referenced by at least one fixture's targets.
+    # W565 / E536: FR→fixture coverage and out_of_scope[] contradiction check.
+    # step08_oos_fr_ids (computed above) carries the Step 08 out_of_scope[] exemption.
     if "frs" in data and "fixtures" in data:
         fixture_fr_refs: set[str] = set()
         for fixture in data["fixtures"].get("fixtures", []):
@@ -392,7 +416,12 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 # "type" field confirmed by 08_fixtures.schema.json targets[].type (via vc:core:collections#traceRef)
                 if isinstance(target, dict) and normalize_trace_type(target.get("type") or "") == _FR_TRACE_TYPE and "id" in target:
                     fixture_fr_refs.add(target["id"])
-        for fr_id in sorted(fr_ids - fixture_fr_refs):
+        # E536: FR declared in out_of_scope[] ("no fixture needed") but also referenced by
+        # a fixture's targets[] — the two claims contradict. out_of_scope[] suppresses W565,
+        # so without this check the target reference would be silently masked.
+        for fr_id in sorted(step08_oos_fr_ids & fixture_fr_refs):
+            errors.append(make_error("E536", f"CONTRADICTORY_OUT_OF_SCOPE_FR_FIXTURE {fr_id} appears in out_of_scope[] but is also referenced by a fixture target"))
+        for fr_id in sorted(fr_ids - fixture_fr_refs - step08_oos_fr_ids):
             errors.append(make_error("W565", f"UNCOVERED_FR_FIXTURE {fr_id}"))
 
     # W566: FR→milestone coverage (same dimension as W561 but as a pairwise completeness code).
@@ -428,8 +457,9 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     # W568: Capability coverage — each capability should be traced by at least one FR.
     # Mirrors the E560 capability_without_fr check but as a promotable warning.
+    # scope:"out" capabilities are exempt (permanently excluded, no FR expected).
     if "capabilities" in data and "frs" in data:
-        for cap_id in sorted(capability_ids - fr_traced_caps):
+        for cap_id in sorted(capability_ids - fr_traced_caps - capability_parked_ids):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
 
     # W575: Step 09 deliverable → Step 14 task pairwise completeness.
@@ -482,7 +512,24 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         executed_task_ids: set[str] = set(
             data["code_execution"].get("execution", {}).get("satisfied_task_ids", [])
         )
-        # Check each non-done task
+        # Defense-in-depth: a task whose own status hasn't been updated to
+        # deferred/wont_do yet, but whose every covering checklist item has
+        # already been marked deferred/wont_do, is transitionally paused too --
+        # mirrors the coverage-counting logic in step_16.py's E304 check.
+        checklist_item_statuses: dict[str, list[str]] = {}
+        for item in data.get("impl_planner", {}).get("plan", {}).get("spec_alignment", {}).get("checklist", []):
+            if not isinstance(item, dict):
+                continue
+            spec_ref = item.get("spec_ref")
+            if not isinstance(spec_ref, dict):
+                continue
+            spec_ref_id = spec_ref.get("id")
+            if not isinstance(spec_ref_id, str) or not spec_ref_id:
+                continue
+            checklist_item_statuses.setdefault(spec_ref_id, []).append(
+                item.get("checklist_status", "active")
+            )
+        # Check each non-done, non-deferred, non-wont_do task
         for ms in data["roadmap"].get("milestones", []):
             for task in ms.get("tasks", []):
                 if not isinstance(task, dict):
@@ -491,7 +538,10 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 task_status = task.get("status", "pending")
                 if not isinstance(task_id, str) or not task_id:
                     continue
-                if task_status == "done":
+                if task_status in ("done", "deferred", "wont_do"):
+                    continue
+                covering_statuses = checklist_item_statuses.get(task_id)
+                if covering_statuses and all(s in ("deferred", "wont_do") for s in covering_statuses):
                     continue
                 if task_id not in executed_task_ids:
                     errors.append(make_error(

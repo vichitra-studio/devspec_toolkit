@@ -398,8 +398,15 @@ class TestR003Drift:
             codes = [e.code for e in errs]
             assert "E622" not in codes
 
-    def test_nested_array_missing_fires_E622(self) -> None:
-        """Nested array_path missing under first parent → E622."""
+    def test_nested_array_missing_is_not_drift(self) -> None:
+        """A missing NESTED array key is NOT R003 drift (DEVSPEC-125).
+
+        Nested arrays may be optional per schema; their required presence is
+        owned by schema validation and the registry-generate byte-exact gate.
+        registry_check only flags a nested array that is PRESENT but wrong-shape
+        (see test_nested_id_field_mismatch_fires_E622).  Flagging a missing
+        optional nested array would false-positive on schema-valid host specs.
+        """
         with tempfile.TemporaryDirectory() as tmpdir:
             spec_root = os.path.join(tmpdir, "spec")
             repo_root = os.path.join(tmpdir, "toolkit")
@@ -422,14 +429,121 @@ class TestR003Drift:
                 }
             })
             _write(repo_root, "tools/entry_key_registry.json", registry)
-            # Parent entry exists but has no 'tasks' key
+            # Parent entry exists but has no 'tasks' key — schema-valid absence,
+            # not drift.
             _write(spec_root, "14_roadmap.json", {
                 "milestones": [{"milestone_id": "ms-1", "name": "M1"}]
             })
 
             errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
             codes = [e.code for e in errs]
-            assert "E622" in codes, f"Expected E622 for missing nested array, got: {errs}"
+            assert "E622" not in codes, (
+                f"Missing nested array must NOT fire E622, got: {errs}"
+            )
+
+    def test_deep_nested_missing_grandchild_is_not_drift(self) -> None:
+        """3-deep: first task lacking optional acceptance_criteria is NOT drift.
+
+        Direct guard for the DEVSPEC-125 false-positive: acceptance_criteria is
+        optional on a roadmap task, so a first task that omits it must not trip
+        R003 when the registry declares the 3-deep criterion entry.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            _write(repo_root, "tools/step_order.json", _make_step_order(["14"]))
+            _write(repo_root, "tools/extraction_paths.json",
+                   _make_extraction_paths(["14_roadmap.json"], step="14"))
+
+            registry = _make_registry({
+                "14_roadmap.json": {
+                    "step": "14",
+                    "arrays": [{
+                        "array_path": ".milestones",
+                        "id_field": "milestone_id",
+                        "kind": "milestone",
+                        "nested": [{
+                            "array_path": ".tasks",
+                            "id_field": "task_id",
+                            "kind": "task",
+                            "nested": [{
+                                "array_path": ".acceptance_criteria",
+                                "id_field": "criterion_id",
+                                "kind": "criterion",
+                            }],
+                        }],
+                    }],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # First task has NO acceptance_criteria (optional) — must not drift.
+            _write(spec_root, "14_roadmap.json", {
+                "milestones": [{
+                    "milestone_id": "ms-1", "name": "M1",
+                    "tasks": [{"task_id": "t-1", "description": "do"}],
+                }]
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            assert "E622" not in [e.code for e in errs], (
+                f"Optional deep-nested array absence must NOT fire E622, got: {errs}"
+            )
+
+    def test_deep_nested_wrong_id_field_fires_E622(self) -> None:
+        """3-deep: acceptance_criteria PRESENT with wrong id_field → E622.
+
+        Confirms the recursive drift check still catches a present-but-wrong
+        grandchild array (the non-redundant job registry_check owns).
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            spec_root = os.path.join(tmpdir, "spec")
+            repo_root = os.path.join(tmpdir, "toolkit")
+            os.makedirs(spec_root)
+            os.makedirs(os.path.join(repo_root, "tools"))
+
+            _write(repo_root, "tools/step_order.json", _make_step_order(["14"]))
+            _write(repo_root, "tools/extraction_paths.json",
+                   _make_extraction_paths(["14_roadmap.json"], step="14"))
+
+            registry = _make_registry({
+                "14_roadmap.json": {
+                    "step": "14",
+                    "arrays": [{
+                        "array_path": ".milestones",
+                        "id_field": "milestone_id",
+                        "kind": "milestone",
+                        "nested": [{
+                            "array_path": ".tasks",
+                            "id_field": "task_id",
+                            "kind": "task",
+                            "nested": [{
+                                "array_path": ".acceptance_criteria",
+                                "id_field": "criterion_id",
+                                "kind": "criterion",
+                            }],
+                        }],
+                    }],
+                }
+            })
+            _write(repo_root, "tools/entry_key_registry.json", registry)
+            # acceptance_criteria present but uses "id" not "criterion_id".
+            _write(spec_root, "14_roadmap.json", {
+                "milestones": [{
+                    "milestone_id": "ms-1", "name": "M1",
+                    "tasks": [{
+                        "task_id": "t-1", "description": "do",
+                        "acceptance_criteria": [{"id": "ac-x", "text": "wrong field"}],
+                    }],
+                }]
+            })
+
+            errs = run_registry_check(spec_root=spec_root, repo_root=repo_root)
+            assert "E622" in [e.code for e in errs], (
+                f"Present-but-wrong grandchild array must fire E622, got: {errs}"
+            )
 
     def test_nested_id_field_mismatch_fires_E622(self) -> None:
         """Nested array exists but first entry lacks registered nested id_field → E622."""

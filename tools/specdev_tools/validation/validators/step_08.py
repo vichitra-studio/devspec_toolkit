@@ -78,4 +78,15 @@ def validate_step_08(instance: dict[str, Any], toolkit_root: str, spec_root: str
                         )
                     break
 
+    # Validate each out_of_scope[] entry's fr_id against the FR upstream ID set
+    for i, oos in enumerate(instance.get("out_of_scope", [])):
+        if not isinstance(oos, dict):
+            continue
+        fr_id = oos.get("fr_id", "")
+        if fr_id and fr_ids is not None and fr_id not in fr_ids:
+            errors.append(
+                make_error("E590", f"CROSS_STEP_ID_NOT_FOUND out_of_scope[{i}] "
+                f"fr_id '{fr_id}' not found in 04_fr_list.json")
+            )
+
     return errors

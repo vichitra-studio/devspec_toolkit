@@ -6,7 +6,7 @@ import os, json, warnings
 from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
-from ..core.entry_key_registry import list_entries, _ALWAYS_EXCLUDED
+from ..core.entry_key_registry import list_entries, iter_array_path, _ALWAYS_EXCLUDED
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -201,36 +201,22 @@ def _legacy_scan_data(
 
 
 def _extract_array_items(data: dict, array_path: str) -> list:
-    """Extract items from *data* at *array_path* (supports nested paths like `.foo[].bar`).
+    """Extract items from *data* at *array_path* (supports nested paths of any depth).
 
-    *array_path* uses dot-notation with an optional ``[]`` segment for nested arrays,
-    e.g. ``.milestones[].tasks``.  A leading dot is stripped.  ``[]`` signals
-    "iterate all list items and collect the sub-array from each".
+    *array_path* uses dot-notation with ``[].`` separating each array level,
+    e.g. ``.milestones[].tasks`` or ``.milestones[].tasks[].acceptance_criteria``.
+    A leading dot is optional.  Every ``[].`` level is walked (arbitrary depth),
+    iterating all items at each level and collecting the leaf-array items.
 
     Examples::
 
-        .functional_requirements           → data["functional_requirements"]
-        .milestones[].tasks                → [t for m in data["milestones"] for t in m.get("tasks", [])]
+        .functional_requirements                       → data["functional_requirements"]
+        .milestones[].tasks                            → [t for m in ... for t in m.get("tasks", [])]
+        .milestones[].tasks[].acceptance_criteria      → all criteria across all tasks of all milestones
 
     Returns an empty list if any key is missing or the value is not a list.
     """
-    path = array_path.lstrip(".")
-    # Split on "[]." to separate the parent path from the nested key
-    if "[]." in path:
-        parent_key, _, nested_key = path.partition("[].")
-        parent_items = data.get(parent_key, [])
-        if not isinstance(parent_items, list):
-            return []
-        result = []
-        for parent_item in parent_items:
-            if isinstance(parent_item, dict):
-                sub = parent_item.get(nested_key, [])
-                if isinstance(sub, list):
-                    result.extend(sub)
-        return result
-    # Simple top-level array
-    items = data.get(path, [])
-    return items if isinstance(items, list) else []
+    return [item for item, _ in iter_array_path(data, array_path)]
 
 
 def build_trace_matrix(
@@ -388,6 +374,36 @@ def build_trace_matrix(
             if t.get("type") == _MATRIX_LINK_API_TYPE:
                 api_to_threat[t["id"]].add(th["threat_id"])
 
+    # Exclude FRs that will never be built from the coverage denominator:
+    # priority:"wont-have" FRs (explicitly parked, no API/fixture/threat
+    # expected by design) and FRs listed in a Step 05 out_of_scope[] entry
+    # (acknowledged as having no HTTP API surface). Mirrors the equivalent
+    # exclusions already applied in traceability_closure.py's W561/W564/W565/
+    # W566 checks (DEVSPEC-122 follow-up) — without this, either category
+    # silently drags down fr_coverage and can fail SPECDEV_MATRIX_STRICT=1 CI.
+    wont_have_fr_ids = {fr.get("fr_id") for fr in frs if fr.get("priority") == "wont-have"}
+    step05_oos_fr_ids: set[str] = set()
+    step08_oos_fr_ids: set[str] = set()
+    for data in artifacts.values():
+        # Matched by the presence of a top-level "apis"/"fixtures" key (same
+        # convention traceability_closure.py uses), not by pinning to the
+        # canonical $schema string -- more robust across schema versions/aliases.
+        if "apis" in data:
+            for entry in data.get("out_of_scope", []):
+                if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale"):
+                    step05_oos_fr_ids.add(entry["fr_id"])
+        if "fixtures" in data:
+            for entry in data.get("out_of_scope", []):
+                if isinstance(entry, dict) and entry.get("fr_id") and entry.get("rationale"):
+                    step08_oos_fr_ids.add(entry["fr_id"])
+    excluded_fr_ids = wont_have_fr_ids | step05_oos_fr_ids
+    # Step 08 fixtures.out_of_scope[] is a deliberately separate exemption
+    # from Step 05's (an FR with no API can still need a fixture and vice
+    # versa -- see traceability_closure.py's W565 vs W564/W566 split) so
+    # fr_with_fixture gets its own exclusion set rather than reusing
+    # excluded_fr_ids, which would count Step-08-exempt FRs against it.
+    excluded_fr_ids_fixture = wont_have_fr_ids | step08_oos_fr_ids
+
     # Emit matrix
     matrix = []
     for fr in frs:
@@ -410,13 +426,21 @@ def build_trace_matrix(
         }
         matrix.append(row)
 
-    # Coverage summaries
+    # Coverage summaries. wont-have/Step-05-out-of-scope FRs are excluded from
+    # both the denominator (fr_total) and the api/nfr/threat numerators — they
+    # are parked by design, so counting them either way would misrepresent
+    # coverage of the FRs actually intended to ship. fr_with_fixture uses its
+    # own exclusion set (excluded_fr_ids_fixture) and denominator (fr_total_fixture)
+    # since Step 08's out-of-scope FRs are a separate exemption from Step 05's.
+    covered_matrix = [r for r in matrix if r["fr_id"] not in excluded_fr_ids]
+    covered_matrix_fixture = [r for r in matrix if r["fr_id"] not in excluded_fr_ids_fixture]
     coverage = {
-        "fr_total": len(frs),
-        "fr_with_api": sum(1 for r in matrix if r["apis"]),
-        "fr_with_fixture": sum(1 for r in matrix if r["fixtures"]),
-        "fr_with_nfr": sum(1 for r in matrix if r["nfrs"]),
-        "fr_with_threat": sum(1 for r in matrix if r["threats"]),
+        "fr_total": len(frs) - len(excluded_fr_ids),
+        "fr_total_fixture": len(frs) - len(excluded_fr_ids_fixture),
+        "fr_with_api": sum(1 for r in covered_matrix if r["apis"]),
+        "fr_with_fixture": sum(1 for r in covered_matrix_fixture if r["fixtures"]),
+        "fr_with_nfr": sum(1 for r in covered_matrix if r["nfrs"]),
+        "fr_with_threat": sum(1 for r in covered_matrix if r["threats"]),
         "scaffolds_found": len([a for a in artifacts.values() if "15_scaffold" in a.get("$schema", "")]),
     }
     

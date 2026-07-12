@@ -1,0 +1,148 @@
+{
+  "$schema": "vc:16-impl-context",
+  "id": "step-impl-full",
+  "owner": "api",
+  "created_at": "2024-01-15T10:00:00Z",
+  "extensions": {
+    "execution_context": {
+      "command_overrides": {
+        "test": "pytest -v"
+      }
+    }
+  },
+  "plan": {
+    "status": "active",
+    "summary": {
+      "functional_summary": "Full implementation of the user profile feature.",
+      "scope_in": [
+        "profile-api",
+        "database-migration"
+      ],
+      "scope_out": [
+        "frontend-ui"
+      ],
+      "target_file_patterns": [
+        "src/api/profile.py",
+        "migrations/001_users.sql"
+      ]
+    },
+    "spec_alignment": {
+      "requirements_summary": [
+        {
+          "theme": "Data Persistence",
+          "summary": "Persist user data securely",
+          "spec_refs": [
+            {
+              "type": "doc",
+              "id": "doc-security-policy",
+              "line_range": "L50-L60",
+              "commit_hash": "1111111111111111111111111111111111111111"
+            }
+          ]
+        }
+      ],
+      "checklist": [
+        {
+          "id": "REQ_DB_SCHEMA",
+          "spec_ref": {
+            "type": "code",
+            "id": "schema-user-table",
+            "line_range": "L1-L100",
+            "commit_hash": "2222222222222222222222222222222222222222"
+          },
+          "description": "Create user table migration",
+          "type": "metadata",
+          "layer": "db",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-database-migration",
+          "checklist_status": "wont_do",
+          "wont_do_reason": "Legacy user table migration superseded by the new profile-service schema; this table is being retired, not migrated."
+        },
+        {
+          "id": "REQ_API_ENDPOINT",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-get-profile",
+            "line_range": "L20-L40",
+            "commit_hash": "3333333333333333333333333333333333333333"
+          },
+          "description": "Implement GET /profile endpoint",
+          "type": "behavior",
+          "layer": "api",
+          "linked_test_expectation": "returns 200 OK",
+          "nfr_refs": [
+            "nfr-availability-uptime",
+            "nfr-latency-page-load"
+          ],
+          "fixture_ref": "fixture-api-profile-get",
+          "implementation": {
+            "status": "verified",
+            "files_touched": [
+              "src/api/profile.py"
+            ],
+            "actions": [
+              {
+                "type": "file_edit",
+                "target": "src/api/profile.py",
+                "description": "Add route handler",
+                "evidence": {
+                  "type": "log",
+                  "content": "PASSED tests/test_profile.py::test_get_profile_returns_200 (0.12s) [fr-get-user-profile]"
+                }
+              },
+              {
+                "type": "manual_verification",
+                "description": "Curl the endpoint",
+                "evidence": {
+                  "type": "log",
+                  "content": "HTTP/1.1 200 OK\nContent-Type: application/json\nAll checks passed successfully. Satisfies api-get-profile endpoint."
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "REQ_API_VALIDATION",
+          "spec_ref": {
+            "type": "api",
+            "id": "api-get-profile",
+            "line_range": "L20-L40",
+            "commit_hash": "3333333333333333333333333333333333333333"
+          },
+          "description": "Validate GET /profile endpoint returns correct data",
+          "type": "validation",
+          "layer": "tests",
+          "linked_test_expectation": "returns expected profile fields",
+          "nfr_refs": [
+            "nfr-availability-uptime"
+          ],
+          "fixture_ref": "fixture-api-profile-get",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify profile endpoint returns correct data"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "docs_impact": {
+      "status": "required",
+      "rationale": "Code changes require documentation updates for traceability.",
+      "docs_touched": [
+        "README.md"
+      ]
+    },
+    "review_requirements": {
+      "test_commands": [
+        "pytest tests/"
+      ]
+    }
+  },
+  "canonical_refs_used": []
+}

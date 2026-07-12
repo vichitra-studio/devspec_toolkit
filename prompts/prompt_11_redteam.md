@@ -47,10 +47,10 @@ For each upstream artifact ingested, extract the following:
 - **10_governance.json**: Access control policies, commit traceability rules, and review enforcement boundaries to determine which governance controls serve as mitigation anchors for authorization threats
 
 ## Operating Flow: Threat Model → Exploit → Mitigate → Emit
-1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — valid categories are `authn`, `authz`, `business_logic`, `transport`, and `data_privacy` (see Taxonomy of Threats below for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to these five schema-defined categories.
+1.  **Threat Model**: Identify attack surfaces from APIs, invariants, and trust boundaries. For each Public API and Critical Component, ask "How can this fail?" and "How can this be abused?". Classify threats using the schema enum `vc:core:atoms#threatCategory` — consult the atom for the authoritative, current set of valid categories (see Taxonomy of Threats above for per-category examples). Do not use STRIDE labels directly — map STRIDE-style analysis to the schema-defined categories.
 2.  **Exploit**: For each attack surface, enumerate concrete exploit scenarios and their preconditions. Link the threat explicitly to the `api` or `component` ID it targets. `target_ids` is MANDATORY. Identify non-malicious failure modes (timeouts, race conditions) as structured objects.
 3.  **Mitigate**: Propose mitigations as structured objects with `type`, `id`, and optional `note` — see schema `vc:11-redteam` for the authoritative mitigation shape and full `type` enum. Not plain strings. MUST link to existing upstream artifact IDs using the correct `type` value (e.g., `inv`, `nfr`, `fr`, `api`, `fixture`, `doc`). If no existing control applies, MUST use `type: doc` with a concrete action description in `note` (`doc` is exempt from upstream cross-reference). Use `type: capability` ONLY to reference an EXISTING `cap-*` ID from Step 01.
-4.  **Emit**: Write the artifact when all high-severity threats have mitigations.
+4.  **Emit**: Write the artifact once mitigations are required for every threat and every threat has at least one mitigation defined, regardless of severity.
 
 ## Examples: Weak vs. Strong
 | Quality | Threat Description | Vector | Linking |
@@ -61,7 +61,7 @@ For each upstream artifact ingested, extract the following:
 | ✅ **Strong** | "Profile Update SQLi" | "Unsanitized 'bio' field" | `target_ids: [{type: api, id: api-user-profile}]` |
 
 ## Heuristics For Completeness
-- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector).
+- **Coverage**: Every `public` API in `spec/05_interface_contracts.json` MUST have at least one mapped threat (AuthZ bypass, Rate Limit abuse, or domain-specific attack vector). Exception (enforced by `step_11.py`, W583): an API is exempt ONLY when it has at least one Step-04 FR trace AND every traced FR is `priority: "wont-have"` — an API with no FR trace at all is NOT exempt and still requires threat coverage.
 - **Specificity**: Avoid "Generic DDOS". Use "Search API Reflection Attack".
 - **Linkage**: If you list a mitigation "Enforce Role Check", link it to the actual invariant `inv-authz-admin-only`.
 
@@ -83,9 +83,9 @@ For each upstream artifact ingested, extract the following:
 
 ## Coverage Closure
 Before emitting, verify:
-- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids`. For low-risk internal-only endpoints with no viable threat, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
+- Every `api_id` in `spec/05_interface_contracts.json` appears in ≥1 threat's `target_ids` (enforced by W583). The only schema-recognized wont-have-FR exemption (`step_11.py`): an `api_id` is skipped ONLY when it has at least one Step-04 FR trace and every traced FR is `priority: "wont-have"`; an `api_id` with no FR trace at all is still required to have coverage. For low-risk internal-only endpoints that don't qualify for this exemption, document the omission rationale in a gap question (Clarify mode) rather than adding an `out_of_scope` field (the schema does not define such a field).
 - Every `component_id` in `spec/02_system_sketch.json` that crosses a trust boundary has ≥1 threat scenario.
-- Every step-06 invariant that carries a `risk_category_ref` must be referenced by at least one threat mitigation of `type: inv` (enforced by W615).
+- Every step-06 invariant that carries a `risk_category_ref` must be referenced by at least one threat mitigation of `type: inv` (enforced by W615), unless it qualifies for the same wont-have-FR exemption (all of its Step-04 FR traces, and at least one exists, are `priority: "wont-have"`).
 - All `target_ids[*].id` values resolve to existing `api_id` or `component_id` values in their referenced spec files (steps 05 and 02 respectively).
 - If any external-facing surface has unclear threat model: add a gap question (Clarify mode) rather than leaving it unanalyzed.
 - [ ] Every upstream ID from ingested context has been consumed
@@ -93,7 +93,7 @@ Before emitting, verify:
 - [ ] All required fields populated from actual upstream data (not hallucinated)
 - [ ] Every externally-facing API endpoint from Step 05 has at least one threat scenario
 - [ ] All mitigations are structured objects (not plain strings)
-- [ ] High-severity threats have ≥1 mitigation each
+- [ ] Every threat has ≥1 mitigation each — mitigations are required for every threat, not only high-severity ones
 - [ ] Every high-priority FR has at least one threat scenario modeled
 - [ ] Every proposed mitigation references a specific control or implementation step (not just "add validation")
 - [ ] Attack surfaces align with trust zone boundaries from the system sketch

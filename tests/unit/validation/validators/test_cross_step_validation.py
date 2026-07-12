@@ -430,6 +430,26 @@ class TestStep08CrossStep(unittest.TestCase):
             self.assertIn("fr-nonexistent", combined)
             self.assertIn("api-ghost", combined)
 
+    def test_out_of_scope_broken_fr_id_emits_e590(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec_dir = os.path.join(tmp, "spec")
+            os.makedirs(spec_dir)
+            _write_json(spec_dir, "04_fr_list.json", {
+                "functional_requirements": [{"fr_id": "fr-login"}]
+            })
+            instance = {
+                "fixtures": [],
+                "out_of_scope": [
+                    {"fr_id": "fr-login", "rationale": "covered elsewhere"},
+                    {"fr_id": "fr-nonexistent", "rationale": "not yet implemented"},
+                ],
+            }
+            errors = validate_step_08(instance, tmp)
+            e = _e590(errors)
+            self.assertEqual(len(e), 1, f"Expected exactly 1 E590 for the broken out_of_scope fr_id: {e}")
+            self.assertIn("fr-nonexistent", e[0])
+            self.assertIn("out_of_scope", e[0])
+
 
 # ---------------------------------------------------------------------------
 # Step 09 — Capability refs in milestone deliverables/capability_refs

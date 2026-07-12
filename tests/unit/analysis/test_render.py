@@ -73,6 +73,22 @@ def test_plain_w613_header_when_unclassified():
     assert "[1 x W613 — see stderr]" in out
 
 
+def test_plain_origin_tag_plan_renders_16a():
+    r = _rec(bucket="plan_level", impact=["plan.x"], origin="plan")
+    out = render_plain([r], status_filter="open", total_records=1,
+                       open_count=1, resolved_count=0, milestones_scanned=1,
+                       unclassified_w613_count=0)
+    assert "[16a]" in out
+
+
+def test_plain_origin_tag_execution_renders_16b_plus():
+    r = _rec(bucket="plan_level", impact=["plan.x"], origin="execution")
+    out = render_plain([r], status_filter="open", total_records=1,
+                       open_count=1, resolved_count=0, milestones_scanned=1,
+                       unclassified_w613_count=0)
+    assert "[16b+]" in out
+
+
 def test_plain_totals_line():
     out = render_plain([], status_filter="open", total_records=0,
                        open_count=0, resolved_count=0, milestones_scanned=0,
@@ -166,3 +182,38 @@ def test_json_preserves_non_string_impact_entries():
         milestones_scanned=1, unclassified_count=1, warnings=[],
     ))
     assert out["records"][0]["impact"] == ["plain", 42, {"x": 1}]
+
+
+def test_json_hidden_by_status_count_defaults_to_zero():
+    out = json.loads(render_json(
+        [], total_records=0, open_count=0, resolved_count=0,
+        milestones_scanned=0, unclassified_count=0, warnings=[],
+    ))
+    assert out["summary"]["hidden_by_status_count"] == 0
+
+
+def test_json_hidden_by_status_count_passthrough():
+    out = json.loads(render_json(
+        [], total_records=0, open_count=0, resolved_count=0,
+        milestones_scanned=0, unclassified_count=0, warnings=[],
+        hidden_by_status_count=71,
+    ))
+    assert out["summary"]["hidden_by_status_count"] == 71
+
+
+def test_json_record_origin_defaults_to_execution_without_origin_key():
+    r = _rec(bucket="unclassified")
+    out = json.loads(render_json(
+        [r], total_records=1, open_count=1, resolved_count=0,
+        milestones_scanned=1, unclassified_count=1, warnings=[],
+    ))
+    assert out["records"][0]["origin"] == "execution"
+
+
+def test_json_record_origin_plan_passthrough():
+    r = _rec(bucket="unclassified", origin="plan", severity="blocking")
+    out = json.loads(render_json(
+        [r], total_records=1, open_count=1, resolved_count=0,
+        milestones_scanned=1, unclassified_count=1, warnings=[],
+    ))
+    assert out["records"][0]["origin"] == "plan"

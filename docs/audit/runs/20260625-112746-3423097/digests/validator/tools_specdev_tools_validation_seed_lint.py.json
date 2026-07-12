@@ -1,0 +1,39 @@
+{
+  "digest_type": "digest_validator",
+  "source_file": "tools/specdev_tools/validation/seed_lint.py",
+  "source_sha": "67be68d39c6bdb6d26cd3c413c8447f62d0736d4",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "module_path": "tools.specdev_tools.validation.seed_lint",
+    "error_codes": [
+      "E410",
+      "E520"
+    ],
+    "warning_codes": [
+      "W140",
+      "W551",
+      "W553",
+      "W554",
+      "W555",
+      "W570"
+    ],
+    "checks_exported": [
+      "check_hardcoded_seed_reference",
+      "project_root_from_spec_dir",
+      "lint_seeds"
+    ],
+    "guide_refs": [],
+    "schema_paths_referenced": [],
+    "imports": [
+      "__future__",
+      "core",
+      "json",
+      "os",
+      "pathlib",
+      "re",
+      "typing",
+      "validate"
+    ]
+  }
+}

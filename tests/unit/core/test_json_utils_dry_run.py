@@ -220,6 +220,7 @@ class TestWS1DifferentialValidation:
             "nfr_refs": ["nfr-availability-uptime"],
             "fixture_ref": "fixture-database-migration",
             "checklist_status": "deferred",
+            "deferred_reason": "Waiting for schema owner sign-off on the migration's rollback strategy. Unblock: rollback plan reviewed and approved.",
         }
         new_checklist = [valid_prepend, bad_item]
 

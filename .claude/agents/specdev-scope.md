@@ -73,8 +73,27 @@ Dispatcher supplies a JSON object as the invocation prompt:
 Execute this rule against the gathered evidence:
 
 1. If the change_set touches >= 80% of artifact bytes OR the scope spans more than 3 steps:
-   - Assign one reviewer per step (parallel within a round).
-   - `scope_kind` = `single_step` for each.
+   - Cluster in-scope steps/files by theme or related-file affinity. Never assign one reviewer
+     per step or one reviewer per file. Emit each cluster as `scope_kind: "theme_group"`.
+   - **Clustering algorithm — spec steps (`spec/NN_*.json`):** walk in-scope steps in the
+     order defined by `tools/step_order.json` (the DAG authority); group consecutive steps
+     into clusters of ≤6 steps each. Do NOT split below ≤6 unless the cluster must be smaller
+     to respect a DAG adjacency boundary visible in `step_order.json`. Cite `step_order.json`
+     step order in rationale; do not hardcode a step list.
+     Note: "shared FR/domain affinity" grouping requires reading `spec/` content, which this
+     agent is prohibited from doing (§Tools). The DAG-adjacency/≤6 rule is the sole
+     deterministic grouping criterion for spec steps.
+   - **Clustering algorithm — toolkit/WIP files:** group by file-type affinity — schema files
+     together (`schema/`), prompt files together (`prompts/`), CLI/tool source together
+     (`tools/specdev_tools/`), test files together (`tests/`), agent/skill files together
+     (`.claude/agents/`, `.claude/skills/`). Files without a clear affinity bucket are assigned
+     to the cluster whose directory bucket shares the longest common leading path prefix with the
+     file's path; if two clusters tie on prefix length, choose the one with the lexicographically
+     smallest bucket name.
+   - Record the full ordered cluster list in `fan_out[]`. Each cluster gets a unique `reviewer_id`.
+   - Cite `SPECDEV_REVIEW_CONCURRENCY` (default 6) in rationale to document the wave-dispatch
+     context for the skill; this agent does NOT enforce wave dispatch (that is the skill's job).
+   - `scope_kind` = `theme_group` for each cluster.
 
 2. If the change_set is localized (< 30% of any step's bytes, <= 3 steps total):
    - Assign one reviewer covering the whole range.
@@ -108,12 +127,12 @@ Return a single JSON object to stdout. Do not print any other text.
 ```json
 {
   "fan_out": [
-    { "reviewer_id": "r1", "steps": ["04", "05"], "scope_kind": "step_range" },
-    { "reviewer_id": "r2", "steps": ["07"], "scope_kind": "single_step" },
-    { "reviewer_id": "r3", "steps": ["04","05","07"], "scope_kind": "cross_step_relational" }
+    { "reviewer_id": "r1", "steps": ["04", "05", "06"], "scope_kind": "theme_group" },
+    { "reviewer_id": "r2", "steps": ["07", "08", "09"], "scope_kind": "theme_group" },
+    { "reviewer_id": "r3", "steps": ["04","05","06","07","08","09"], "scope_kind": "cross_step_relational" }
   ],
   "max_rounds": 5,
-  "rationale": "Change-set touches 45% of step-04 bytes and 12% of step-05 bytes (<30% each, <=3 steps). Combined into one step_range reviewer. Relational reviewer r3 added for cross-step drift coverage."
+  "rationale": "Scope spans 6 steps (>3 threshold). Steps grouped into clusters of ≤6 in DAG order (step_order.json): cluster 1 steps 04-06, cluster 2 steps 07-09. Cross-step relational reviewer added for cross-step drift coverage. SPECDEV_REVIEW_CONCURRENCY=6 (default); both clusters dispatch in wave 1."
 }
 ```
 
@@ -150,15 +169,11 @@ Output:
 ```json
 {
   "fan_out": [
-    { "reviewer_id": "r1", "steps": ["04"], "scope_kind": "single_step" },
-    { "reviewer_id": "r2", "steps": ["05"], "scope_kind": "single_step" },
-    { "reviewer_id": "r3", "steps": ["06"], "scope_kind": "single_step" },
-    { "reviewer_id": "r4", "steps": ["07"], "scope_kind": "single_step" },
-    { "reviewer_id": "r5", "steps": ["08"], "scope_kind": "single_step" },
-    { "reviewer_id": "r6", "steps": ["04","05","06","07","08"], "scope_kind": "cross_step_relational" }
+    { "reviewer_id": "r1", "steps": ["04", "05", "06", "07", "08"], "scope_kind": "theme_group" },
+    { "reviewer_id": "r2", "steps": ["04","05","06","07","08"], "scope_kind": "cross_step_relational" }
   ],
   "max_rounds": 5,
-  "rationale": "Scope spans 5 steps (>3 threshold). One reviewer per step plus one cross_step_relational reviewer for backlog-driven cross-step concerns."
+  "rationale": "Scope spans 5 steps (>3 threshold). All 5 fit in a single cluster of ≤6 (DAG order per step_order.json). Cross-step relational reviewer r2 added for backlog-driven cross-step concerns. SPECDEV_REVIEW_CONCURRENCY=6 (default); both clusters dispatch in wave 1."
 }
 ```
 
@@ -212,7 +227,7 @@ The CLI computes the full output contract deterministically: per-group state (us
   "groups": [
     {
       "group_id": "...",
-      "state": "pending|code_converged|blocked|verified|deferred",
+      "state": "pending|code_converged|blocked|verified|deferred|wont_do",
       "implementation_converged_at": "<ISO timestamp or null>",
       "reviewer_rounds": 0,
       "findings_resolved_path": "<path or null>",
@@ -230,7 +245,7 @@ The CLI computes the full output contract deterministically: per-group state (us
 }
 ```
 
-> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, and `deferred`.
+> Note: the CLI never emits `executing` — it is a transient/reserved state. The observed emitted values are `pending`, `code_converged`, `blocked`, `verified`, `deferred`, and `wont_do` (DEVSPEC-122 follow-up). `wont_do` (permanently cancelled) has the same precedence and roll-up exclusion as `deferred` (paused) — both are excluded identically from `derived_phase_position`'s progress computations — but are kept as distinct literals so callers can tell "paused" from "cancelled".
 
 Note: `reactivation_condition` and routable `impact_routes[]` are proposed K2 extensions NOT landed this session — `well_formed` excludes them. When schema lands them, the CLI will be updated.
 

@@ -349,6 +349,9 @@ Each version has both human-readable and machine-readable changelogs:
 | `changelog/format.yaml` | Schema defining valid change types and migration actions |
 | `changelog/vX.Y.Z.md` | Human-readable version notes |
 | `changelog/vX.Y.Z.yaml` | Machine-readable for automation |
+| `changelog/unreleased.yaml` / `changelog/unreleased.md` | Pre-release changelog pair using the `"unreleased"` version sentinel (recognized by `changelog_parser.py`); accumulates changes before the next version is cut |
+
+`changelog/format.yaml` also declares two optional top-level fields, `source_of_truth` and `render_target`, which a versioned changelog file (including `unreleased.yaml`) may set to declare the yaml→md derivation relationship: `source_of_truth` names the authoritative YAML file and `render_target` names the Markdown file rendered from it. `changelog_parser.py` (Check 4) enforces that, when declared, each field is a non-empty string path pointing to a file that exists and is non-empty, raising `E520` on any violation. This is a structural existence check only — content-level parity between the two paths (e.g. entry-for-entry sync) is a manual convention, not tool-enforced.
 
 ### Machine-Readable Changelog (changelog/vX.Y.Z.yaml)
 

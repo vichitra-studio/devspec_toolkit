@@ -21,14 +21,14 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             # Canonical registry (4xx)
             "E410", "E420", "W421", "E422",
             # Spec content quality (5xx)
-            "E510", "E512", "E520", "E521", "E530", "E535", "E540", "E541", "E543",
+            "E510", "E512", "E520", "E521", "E530", "E535", "E536", "E540", "E541", "E543",
             "E550", "E551", "E552", "E553", "E554", "E555",
             "E560", "E561", "E562", "E563",
             "E564", "E565", "E566", "E567", "E568", "E569",
             "E571", "E572", "E573",
             "E575", "E576",
             "E580", "E581", "E582", "E585",
-            "W550", "W551", "W552", "W553", "W554", "W560", "W561", "W562", "W563",
+            "W550", "W551", "W552", "W553", "W554", "W555", "W560", "W561", "W562", "W563",
             "W564", "W565", "W566", "W567", "W568", "W569",
             "W570", "W571", "W572", "W573", "W574",
             "W575", "W576",
@@ -69,6 +69,10 @@ class ErrorCodeCoverageTests(unittest.TestCase):
             "W614",
             # DEVSPEC-89: invariant↔threat drift detection
             "W615", "E615",
+            # DEVSPEC-122 follow-up: deferred-item/verified-implementation contradiction
+            "W616",
+            # DEVSPEC-123: upstream-backlog discloses records hidden by --status filtering
+            "W617",
         }
         actual = set(ERROR_CODES.keys())
         self.assertEqual(

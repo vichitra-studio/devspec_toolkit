@@ -1,0 +1,292 @@
+{
+  "digest_type": "digest_doc",
+  "source_file": "docs/developers/error-codes.md",
+  "source_sha": "b5fc618fb1a0f7c7d10d1d0ce745a739bf90441b",
+  "extractor_version": "1.0.0",
+  "extracted_at": 1782386866,
+  "payload": {
+    "doc_path": "docs/developers/error-codes.md",
+    "headings": [
+      {
+        "depth": 1,
+        "text": "Error Codes Reference"
+      },
+      {
+        "depth": 2,
+        "text": "Validation Error Codes"
+      },
+      {
+        "depth": 3,
+        "text": "E110 UNKNOWN_CANONICAL_ID"
+      },
+      {
+        "depth": 3,
+        "text": "E520 UNRESOLVED_INPUT / SCHEMA_NOT_FOUND"
+      },
+      {
+        "depth": 3,
+        "text": "E530 INVENTED_ENUM_OR_ID"
+      },
+      {
+        "depth": 3,
+        "text": "E530 LINKED_TEST_FILE_NOT_FOUND"
+      },
+      {
+        "depth": 3,
+        "text": "E125 ALIAS_SUNSET_EXPIRED"
+      },
+      {
+        "depth": 3,
+        "text": "E211 PARTIAL_DRIFT"
+      },
+      {
+        "depth": 3,
+        "text": "E511 PLACEHOLDER_SCAN_MISMATCH"
+      },
+      {
+        "depth": 3,
+        "text": "E535 CONTRADICTORY_OUT_OF_SCOPE_FR"
+      },
+      {
+        "depth": 3,
+        "text": "E541 UNBOUND_CANONICAL_TERM"
+      },
+      {
+        "depth": 3,
+        "text": "E561 / W561 UNCOVERED_FR"
+      },
+      {
+        "depth": 3,
+        "text": "E562 / W562 ORPHAN_MILESTONE"
+      },
+      {
+        "depth": 3,
+        "text": "E563 / W563 CHECKLIST_ROADMAP_MISMATCH"
+      },
+      {
+        "depth": 3,
+        "text": "E564 / W564 UNCOVERED_FR_API"
+      },
+      {
+        "depth": 3,
+        "text": "E565 / W565 UNCOVERED_FR_FIXTURE"
+      },
+      {
+        "depth": 3,
+        "text": "E566 / W566 UNCOVERED_FR_MILESTONE"
+      },
+      {
+        "depth": 3,
+        "text": "E567 / W567 INCOMPLETE_MILESTONE_DECOMPOSITION"
+      },
+      {
+        "depth": 3,
+        "text": "E568 / W568 UNCOVERED_CAPABILITY"
+      },
+      {
+        "depth": 3,
+        "text": "E582 / W582 UNCOVERED_FR_REVIEW_COVERAGE"
+      },
+      {
+        "depth": 3,
+        "text": "E410 CANONICAL_ALIAS_COLLISION"
+      },
+      {
+        "depth": 3,
+        "text": "E150 / W150 SEED_MANIFEST_NOT_PROVIDED"
+      },
+      {
+        "depth": 3,
+        "text": "W140 SEED_CONTENT_OVERLAP_LOW"
+      },
+      {
+        "depth": 3,
+        "text": "W551 UNDECLARED_SEED"
+      },
+      {
+        "depth": 3,
+        "text": "W553 SEED_STEP_UNKNOWN"
+      },
+      {
+        "depth": 3,
+        "text": "W554 HARDCODED_SEED_REFERENCE"
+      },
+      {
+        "depth": 3,
+        "text": "W555 STEP00_SEED_OUT_OF_SCOPE_THIN"
+      },
+      {
+        "depth": 3,
+        "text": "E581 / W581 MILESTONE_REF_MISSING"
+      },
+      {
+        "depth": 3,
+        "text": "W583 API_UNCOVERED_BY_THREAT"
+      },
+      {
+        "depth": 3,
+        "text": "E604 / W604 TRACE_MATRIX_STALE"
+      },
+      {
+        "depth": 3,
+        "text": "E210 CROSS_ARTIFACT_DRIFT"
+      },
+      {
+        "depth": 2,
+        "text": "R9 Error Codes \u2014 Validator & CI Enforcement"
+      },
+      {
+        "depth": 3,
+        "text": "Canon/Schema Alignment (55x)"
+      },
+      {
+        "depth": 3,
+        "text": "E551 SCHEMA_ENUM_EXTRA"
+      },
+      {
+        "depth": 3,
+        "text": "E552 MISSING_PAIRED_SCHEMA"
+      },
+      {
+        "depth": 3,
+        "text": "E553 MISSING_ENUM_PATH"
+      },
+      {
+        "depth": 3,
+        "text": "W552 POTENTIAL_UNREGISTERED_PAIRING"
+      },
+      {
+        "depth": 3,
+        "text": "E554 CANON_ENUM_DRIFT"
+      },
+      {
+        "depth": 3,
+        "text": "E555 SEMANTIC_COVERAGE_REGRESSION"
+      },
+      {
+        "depth": 3,
+        "text": "Cross-Step Validation (59x)"
+      },
+      {
+        "depth": 3,
+        "text": "E590 / W590 CROSS_STEP_ID_NOT_FOUND / CROSS_STEP_UPSTREAM_MISSING"
+      },
+      {
+        "depth": 3,
+        "text": "E591 / W591 EXTRACTION_INTENT_EMPTY"
+      },
+      {
+        "depth": 3,
+        "text": "E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN"
+      },
+      {
+        "depth": 3,
+        "text": "E593 / W593 VAGUE_LANGUAGE_FREE_TEXT"
+      },
+      {
+        "depth": 3,
+        "text": "E594 / W594 CONTENT_DERIVATION_LOW_OVERLAP"
+      },
+      {
+        "depth": 3,
+        "text": "E595 / W595 CONTENT_STALENESS"
+      },
+      {
+        "depth": 3,
+        "text": "E596 DAG_DEAD_END_PRODUCER"
+      },
+      {
+        "depth": 3,
+        "text": "W596 UNDECLARED_UPSTREAM_REF"
+      },
+      {
+        "depth": 3,
+        "text": "E597 / W597 EXTRACTION_INTENT_UPSTREAM_GAP / EXTRACTION_INTENT_VAGUE"
+      },
+      {
+        "depth": 3,
+        "text": "E598 EXTRACTION_INTENT_INVALID_REF"
+      },
+      {
+        "depth": 3,
+        "text": "E599 DAG_CONSUMER_INCONSISTENCY"
+      },
+      {
+        "depth": 3,
+        "text": "E585 DAG_CIRCULAR_DEPENDENCY"
+      },
+      {
+        "depth": 3,
+        "text": "Vague Language & Quality (57x)"
+      },
+      {
+        "depth": 3,
+        "text": "E571 / W571 ASSUMPTION_VAGUE_QUANTIFIER"
+      },
+      {
+        "depth": 3,
+        "text": "E572 / W572 ASSUMPTION_COUNT_HIGH"
+      },
+      {
+        "depth": 3,
+        "text": "E573 / W573 ASSUMPTION_UNBOUND_ID"
+      },
+      {
+        "depth": 3,
+        "text": "W570 GRACEFUL_SKIP"
+      },
+      {
+        "depth": 3,
+        "text": "Substep & Milestone Drift (58x)"
+      },
+      {
+        "depth": 3,
+        "text": "E580 / W580 SUBSTEP_DRIFT"
+      },
+      {
+        "depth": 3,
+        "text": "E608 TOOLKIT_VERSION_MISMATCH"
+      },
+      {
+        "depth": 3,
+        "text": "W615 / E615 INVARIANT_UNEXERCISED_BY_THREAT"
+      },
+      {
+        "depth": 3,
+        "text": "Step-16 Anchor Validation (W611 / W612)"
+      },
+      {
+        "depth": 4,
+        "text": "W611 ANCHOR_DRIFT_SUPPRESSED"
+      },
+      {
+        "depth": 4,
+        "text": "W612 ANCHOR_PHANTOM_MILESTONE"
+      },
+      {
+        "depth": 2,
+        "text": "Exception Classes"
+      },
+      {
+        "depth": 3,
+        "text": "SubmoduleDetectionError"
+      },
+      {
+        "depth": 3,
+        "text": "SchemaRegistryError"
+      }
+    ],
+    "code_blocks": [],
+    "referenced_commands": [
+      "align",
+      "canon-accept",
+      "guide",
+      "hardcoded-seed-check",
+      "json",
+      "spec-check",
+      "update",
+      "validate"
+    ],
+    "referenced_files": []
+  }
+}

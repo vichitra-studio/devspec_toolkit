@@ -362,13 +362,24 @@
                     "type": "string",
                     "enum": [
                       "active",
-                      "deferred"
+                      "deferred",
+                      "wont_do"
                     ],
                     "default": "active",
-                    "description": "Lifecycle of this checklist item. Decision rules: 'active' = required for the current plan; 'deferred' = explicitly postponed (requires a deferred_reason on the parent plan). Impact: any 'deferred' item blocks the overall 'done' status unless documented. Anti-pattern: 'deferred' as a synonym for 'not started yet' — use 'active' with implementation.status 'pending' for items not yet begun."
+                    "description": "Lifecycle of this checklist item. Decision rules: 'active' = required for the current plan; 'deferred' = explicitly postponed (requires this item's own `deferred_reason`), will resume later under a named condition; 'wont_do' = permanently cancelled (requires this item's own `wont_do_reason`), will never be built. Impact: any 'deferred' or 'wont_do' item is excluded from milestone phase-position computation and exempt from proof-of-work requirements. Anti-pattern: 'deferred' as a synonym for 'not started yet' — use 'active' with implementation.status 'pending' for items not yet begun. Anti-pattern: deleting a checklist item to work around coverage validation instead of marking it 'deferred'/'wont_do' with a reason."
+                  },
+                  "deferred_reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Required when checklist_status is 'deferred'. Explanation for why this specific item was postponed. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition). This is independent of `plan.deferred_reason`, which documents deferral of the whole plan, not a single item."
+                  },
+                  "wont_do_reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Required when checklist_status is 'wont_do'. Explanation for why this specific item will never be built. Format: name the decision and, if applicable, what supersedes it. Example: 'Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow.' Anti-pattern: 'not doing this' (provides no actionable context). Independent of `deferred_reason` — a 'wont_do' item is permanently cancelled, not paused."
                   },
                   "linked_test_expectation": {
-                    "description": "Test expectation(s) that validate this checklist item. Format: test function name or test description string. Examples: 'test_login_invalid_credentials_returns_401', 'POST /auth/login with unknown email → 401 INVALID_CREDENTIALS'. Can be a single string or array of strings. Anti-pattern: 'see tests' (not traceable to a specific test).",
+                    "description": "Test expectation(s) that validate this checklist item. Required when checklist_status is 'active'; optional when 'deferred' or 'wont_do' (the eventual test contract isn't always known before work starts, or will never be needed). Format: test function name or test description string. Examples: 'test_login_invalid_credentials_returns_401', 'POST /auth/login with unknown email → 401 INVALID_CREDENTIALS'. Can be a single string or array of strings. Anti-pattern: 'see tests' (not traceable to a specific test).",
                     "oneOf": [
                       {
                         "type": "string",
@@ -564,8 +575,7 @@
                 "required": [
                   "id",
                   "spec_ref",
-                  "description",
-                  "linked_test_expectation"
+                  "description"
                 ],
                 "allOf": [
                   {
@@ -573,7 +583,7 @@
                       "not": {
                         "properties": {
                           "checklist_status": {
-                            "const": "deferred"
+                            "enum": ["deferred", "wont_do"]
                           }
                         },
                         "required": [
@@ -583,7 +593,8 @@
                     },
                     "then": {
                       "required": [
-                        "implementation"
+                        "implementation",
+                        "linked_test_expectation"
                       ]
                     }
                   },
@@ -594,7 +605,7 @@
                           "not": {
                             "properties": {
                               "checklist_status": {
-                                "const": "deferred"
+                                "enum": ["deferred", "wont_do"]
                               }
                             },
                             "required": [
@@ -623,6 +634,40 @@
                     "then": {
                       "required": [
                         "fixture_ref"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "checklist_status": {
+                          "const": "deferred"
+                        }
+                      },
+                      "required": [
+                        "checklist_status"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "deferred_reason"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "checklist_status": {
+                          "const": "wont_do"
+                        }
+                      },
+                      "required": [
+                        "checklist_status"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "wont_do_reason"
                       ]
                     }
                   }

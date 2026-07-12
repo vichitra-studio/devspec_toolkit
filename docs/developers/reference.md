@@ -2,7 +2,21 @@
 
 ## Submodule-Aware Flags
 
-The following flags are available on `validate`, `validate-all`, and `forward-replay-check` commands:
+The following flags are available on most spec-operating commands, including
+`validate`, `validate-all`, `spec-check`, `matrix`, `seed-lint`, `fixtures-lint`,
+`invariants-check`, `governance-check`, `canonical-lint`, `canonical-integrity`,
+`spec-quality-lint`, `hallucination-lint`, `forward-replay-check`,
+`milestone-state`, and `canon-schema-alignment`. Per-command exceptions (per
+CLAUDE.md): `canon-accept` takes `--git-root` (and `--repo-root`) but **not**
+`--spec-root`; most `specdev json` subcommands take `--repo-root` only; and
+diagnostic/utility commands (`ai-help`, `env-check`, `dependency-order-lint`,
+`dag-lint`, `extraction-intent-check`, `prompt-context`) take `--repo-root`
+only; `update` takes `spec_dir` (positional) + `--repo-root` only and does
+**not** accept `--spec-root` or `--git-root`; `seed-index` takes `spec_dir`
+(positional) + `--repo-root` + `--git-root` but **not** `--spec-root`, and
+`hardcoded-seed-check` takes `--repo-root` + `--git-root` only (no
+positional, no `--spec-root`).
+Run `<command> --help` to confirm the supported flags for any subcommand:
 
 | Flag | Description | Default |
 |------|-------------|---------|
@@ -13,7 +27,8 @@ The following flags are available on `validate`, `validate-all`, and `forward-re
 ### Examples
 
 ```bash
-# Standard (non-submodule) usage
+# Standard (non-submodule) usage — intentionally flagless: when spec/ lives under the
+# toolkit root, --spec-root/--git-root default correctly and are omitted on purpose.
 ./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
 
 # Submodule deployment
@@ -47,7 +62,7 @@ This reference collects recurring facts that developers need while authoring or 
 
 ## Naming & Schema Conventions
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).
-- **Owner enum**: one of `{api, ui, system, ops, data, product, business, engineering}`.
+- **Owner enum**: one of `{api, ui, system, ops, data, product, business, engineering}` (source of truth: `schema/core/atoms.schema.json#owner`).
 - **Artifacts**: include the canonical `$schema` URI exactly as emitted in the prompt.
 - **File naming**: `spec/NN_name.json`, `spec/NN_name.guide.md`, [./devspec_toolkit/prompts/prompt_NN_name.md](../../prompts/) (adjust the toolkit path as needed).
 - **No redefining primitives**: reuse atoms/collections/errors from [schema/core/](../../schema/core/).
@@ -73,33 +88,44 @@ python3 devspec_toolkit/scripts/init_project.py --target . --strict
 
 ### Core validation commands
 ```bash
+# Unified gate — runs all applicable validation / lint checks (preferred over bare validate-all;
+# resolves project canon, so it avoids the false E110s that validate-all alone can emit)
+./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
 # Validation
 ./tools/run_specdev.sh validate spec/00_charter.json --repo-root ./devspec_toolkit
-./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh validate-all spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Traceability & fixtures
-mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --out spec/extras/trace_matrix.json
-./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit
+mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --out spec/extras/trace_matrix.json
+./tools/run_specdev.sh fixtures-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+
+# Traceability closure — verifies the full charter-goal -> capability -> FR -> API/fixture
+# chain has no dangling links (capability/FR/API/fixture trace-type checks); add --json
+# for a machine-readable report; accepts --repo-root, --spec-root, and --git-root
+./tools/run_specdev.sh traceability-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Seed enforcement
-./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh seed-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Invariants & Governance
-./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --sample ./path/to/sample.json
-./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --message "feat(spec): add login [fr-initial-login]"
+# SPECDEV_INVARIANTS_STRICT=1 is equivalent to passing --strict: promotes unevaluable
+# rules (W_INVARIANT_UNEVALUABLE) to fatal errors (E_INVARIANT_UNEVALUABLE)
+./tools/run_specdev.sh invariants-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --sample ./path/to/sample.json
+./tools/run_specdev.sh governance-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --message "feat(spec): add login [fr-initial-login]"
 
 # Quality, hallucination, and canonical integrity
-./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit
-./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit
+./tools/run_specdev.sh spec-quality-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh hallucination-lint spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh canonical-lint canon --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh canonical-integrity spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Canon/schema alignment
-./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit
+./tools/run_specdev.sh canon-schema-alignment --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
 
 # Step-order integrity (strict waterfall)
 ./tools/run_specdev.sh dependency-order-lint --repo-root ./devspec_toolkit
-./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --base-ref origin/main
+./tools/run_specdev.sh forward-replay-check --repo-root ./devspec_toolkit --spec-root ./spec --git-root . --base-ref origin/main
 
 # DAG completeness lint (validates downstream_consumers consistency)
 ./tools/run_specdev.sh dag-lint --repo-root ./devspec_toolkit
@@ -169,6 +195,36 @@ seeds a missing target file with `{"$schema": "<uri>"}` and bootstraps the
 array-valued field before validating — enabling first-use creation of an artifact
 (e.g. `spec/canon/command_prefixes.json`) without a separate file-creation step.
 
+### `specdev context` — context preparation family
+
+Drives the `/specdev-context` skill's Orientation flow (scoped structure/canon reads
+that feed targeted `specdev json` calls, rather than reading `spec/*.json` directly).
+
+| Subcommand | Required flags | Purpose |
+|------------|-----------------|---------|
+| `specdev context structure <spec_dir> --step STEP` | `--step` | Print the artifact shape (keys/types) scoped to one step, for Orientation reads |
+| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | Resolve the scoped read/jq plan for one canon or spec entry |
+| `specdev context canon --step STEP [--spec-root SPEC_ROOT]` | `--step` | List canon entries relevant to a step; `--spec-root` optionally includes project-tier canon alongside toolkit canon |
+| `specdev context freshness <spec_dir> [--git-root GIT_ROOT]` | none | Report staleness of loaded context relative to upstream step edits |
+| `specdev context review <artifact_path> --step STEP [--entry ENTRY] [--spec-dir SPEC_DIR] [--git-root GIT_ROOT]` | `--step` | Prepare review context for one artifact ahead of a review pass |
+| `specdev context extract` | — | **Removed.** Errors with a message directing to `specdev json read <file> '<jq>'`, scoped via `specdev context structure` + `specdev json schema` |
+
+### Registry, Canon & Prompt Maintenance Commands
+
+| Subcommand | Purpose |
+|------------|---------|
+| `specdev seed-index spec_dir [--git-root GIT_ROOT] [--json]` | Report seed-doc reference index/coverage across spec artifacts |
+| `specdev prompt-sync [spec_dir] [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Check prompt files are in sync with their canonical templates |
+| `specdev canonical-autofix spec_dir [--canon-dir CANON_DIR] [--write \| --dry-run] [--json]` | Auto-fix canonical-reference issues; defaults to reporting only — pass `--write` to persist |
+| `specdev glossary-drift-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Validate definition parity across glossary terms, canonical proposals, and the canon registry |
+| `specdev completeness-check spec_dir [--spec-root SPEC_ROOT] [--git-root GIT_ROOT] [--json]` | Run pairwise completeness checks (W564–W568) and report coverage ratios |
+| `specdev registry-check --spec-root SPEC_ROOT [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Validate `entry_key_registry.json`: coverage, phantom basenames, and drift against live spec files (R003) |
+| `specdev registry-generate --repo-root REPO_ROOT [--out OUT] [--extraction-paths-out PATH]` | Regenerate `entry_key_registry.json` + `extraction_paths.json` from toolkit schemas (byte-deterministic; run after any schema change — see CLAUDE.md) |
+| `specdev guide <CODE> [--json]` | Show the remediation playbook for an error/warning code, e.g. `specdev guide E110` or `specdev guide E530-INVENTED_ENUM_OR_ID` |
+| `specdev hardcoded-seed-check [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--json]` | Detect literal seed-doc filenames hardcoded in prompts (W554 regression guard); with `--git-root` also scans `<git-root>/prompts/` for submodule deployments |
+| `specdev upstream-backlog spec_dir [--severity {low,medium,high,critical}] [--status {open,resolved,all}] [--json]` | Aggregate both `plan.ambiguities[]` (16a) and `execution.emergent_ambiguities[]` (16b/16c) across `impl_context` plans by implicated upstream step (read-only) |
+| `specdev canon-accept --from SPEC_FILE [--namespace NAMESPACE] [--owner OWNER] [--repo-root REPO_ROOT] [--git-root GIT_ROOT] [--dry-run] [--json]` | Promote `canonical_proposals` from a spec file into `canon/manifest.json`; with `--git-root`, writes project canon to `<git-root>/spec/canon/` instead (accepts `--git-root`, not `--spec-root` — see CLAUDE.md exception list) |
+
 ### DAG & Extraction Intent Commands
 
 #### `dag-lint`
@@ -234,7 +290,7 @@ output through unchanged, so the output contract is identical for skills that pa
   "groups": [
     {
       "group_id": "<string>",
-      "state": "<pending|code_converged|blocked|verified|deferred>",
+      "state": "<pending|code_converged|blocked|verified|deferred|wont_do>",
       "implementation_converged_at": "<ISO8601 or null>",
       "reviewer_rounds": "<integer>",
       "findings_resolved_path": "<path or null>",
@@ -262,6 +318,10 @@ specdev milestone-state \
 
 **When to run:** When debugging Trinity loop state, verifying phase-position transitions, or
 smoke-testing the `specdev-trinity` skill's milestone dispatch.
+
+> **Note:** The former `specdev-trinity-plan` skill no longer exists as a separate skill;
+> its plan-phase functionality is now `/specdev-trinity <batch_id> --phase plan` (the default
+> phase — see `.claude/skills/specdev-trinity/SKILL.md`).
 
 ### Version Update & Migration
 
@@ -301,9 +361,14 @@ specdev align prompts spec --output prompts/migration/ --mode upgrade --repo-roo
 
 # Finalize: full post-migration validation + version stamp (with migration history)
 specdev align validate spec --repo-root ./devspec_toolkit
+
+# Restore spec/ from a migration backup (non-interactive)
+specdev align rollback spec --repo-root ./devspec_toolkit --backup-dir <backup-name> --yes
 ```
 
 > Finalize a migration with `align validate`, not by re-running `specdev update`. `validate` stamps `spec/specdev_version` only after schema + trace-integrity checks pass and records a `migration_history` entry; `update` re-stamps after a weaker structural-diff check and omits the audit trail.
+
+> `align rollback` restores `spec/` from a backup in `spec/migration_backups/`. Without `--backup-dir` it lists available backups and prompts interactively for a selection — `--yes` alone does **not** make this non-interactive-safe; it only skips the early guard and the final confirmation prompt, not the backup-selection `input()` call, which still raises on non-interactive stdin. Pass `--backup-dir <name>` as well to bypass interactive backup selection entirely and restore that backup directly. `--json` is not yet supported for this action.
 
 
 
@@ -359,7 +424,7 @@ Invoke commands from the root of your host repository so relative paths to `spec
 - **Scaffold (Step 15) failures**:
   - `method` error: Must be one of GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD.
   - `duplicate api_ref`: Each API Contract can only be mapped once.
-- **Canon/schema alignment failures** (`canon-schema-alignment`):
+- **Canon/schema alignment failures** (`canon-schema-alignment`); see [error-codes.md](error-codes.md#canonschema-alignment-55x) for the authoritative E551-E554 definitions:
   - `E554 CANON_ENUM_DRIFT`: Canon kind has entries missing from the paired schema enum.
   - `E551 SCHEMA_ENUM_EXTRA`: Schema enum has values not present in the paired canon kind.
   - `E552 MISSING_PAIRED_SCHEMA`: Schema file referenced in pairing config not found.

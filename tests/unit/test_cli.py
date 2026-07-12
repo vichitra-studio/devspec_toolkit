@@ -1865,6 +1865,179 @@ class CliTests(unittest.TestCase):
             payload = json.loads(out)
             self.assertIn("coverage", payload, f"Expected 'coverage' key in JSON output. Got: {payload}")
 
+    def test_completeness_check_excludes_wont_have_frs_from_total(self):
+        """A priority:"wont-have" FR must not count toward fr_api_coverage's
+        total_frs denominator (DEVSPEC-122 follow-up) -- it is parked by
+        design and was never expected to have API coverage."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
+                {"fr_id": "fr-legacy-export", "priority": "wont-have"},
+            ]}
+            caps = {"capabilities": [{"capability_id": "cap-auth"}]}
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(
+                1, payload["coverage"]["fr_api_coverage"]["total_count"],
+                f"Expected wont-have FR excluded from total_count. Got: {payload['coverage']}"
+            )
+
+    def test_completeness_check_step05_oos_excluded_from_api_not_fixture_total(self):
+        """An FR exempted via Step 05 apis.out_of_scope[] must be excluded from
+        fr_api_coverage/fr_milestone_coverage's denominator, but NOT from
+        fr_fixture_coverage's -- traceability_closure.py deliberately keeps the
+        Step 05 (no API surface) and Step 08 (no fixture) exemption sets
+        separate, since an FR with no API can still need a fixture."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
+                {"fr_id": "fr-batch-job"},
+            ]}
+            apis = {"out_of_scope": [{"fr_id": "fr-batch-job", "rationale": "no HTTP surface"}]}
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+            (spec_dir / "05_interface_contracts.json").write_text(json.dumps(apis), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(
+                1, payload["coverage"]["fr_api_coverage"]["total_count"],
+                f"Expected Step-05 out_of_scope FR excluded from fr_api_coverage total. Got: {payload['coverage']}"
+            )
+            self.assertEqual(
+                1, payload["coverage"]["fr_milestone_coverage"]["total_count"],
+                f"Expected Step-05 out_of_scope FR excluded from fr_milestone_coverage total. Got: {payload['coverage']}"
+            )
+            self.assertEqual(
+                2, payload["coverage"]["fr_fixture_coverage"]["total_count"],
+                f"Expected Step-05 out_of_scope FR to remain in fr_fixture_coverage total "
+                f"(it's a different exemption set). Got: {payload['coverage']}"
+            )
+
+    def test_completeness_check_step08_oos_excluded_from_fixture_not_api_total(self):
+        """An FR exempted via Step 08 fixtures.out_of_scope[] must be excluded
+        from fr_fixture_coverage's denominator only -- the mirror-image control
+        of the Step 05 case above."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]},
+                {"fr_id": "fr-webhook"},
+            ]}
+            fixtures = {"out_of_scope": [{"fr_id": "fr-webhook", "rationale": "no fixture yet"}]}
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+            (spec_dir / "08_fixtures.json").write_text(json.dumps(fixtures), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(
+                1, payload["coverage"]["fr_fixture_coverage"]["total_count"],
+                f"Expected Step-08 out_of_scope FR excluded from fr_fixture_coverage total. Got: {payload['coverage']}"
+            )
+            self.assertEqual(
+                2, payload["coverage"]["fr_api_coverage"]["total_count"],
+                f"Expected Step-08 out_of_scope FR to remain in fr_api_coverage total "
+                f"(it's a different exemption set). Got: {payload['coverage']}"
+            )
+            self.assertEqual(
+                2, payload["coverage"]["fr_milestone_coverage"]["total_count"],
+                f"Expected Step-08 out_of_scope FR to remain in fr_milestone_coverage total "
+                f"(it's a different exemption set). Got: {payload['coverage']}"
+            )
+
+    def test_completeness_check_control_all_must_have_frs_counted(self):
+        """Control: with no wont-have FRs, both FRs count toward the total."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "priority": "must-have"},
+                {"fr_id": "fr-logout", "priority": "should-have"},
+            ]}
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(2, payload["coverage"]["fr_api_coverage"]["total_count"])
+
+    def test_completeness_check_excludes_scope_out_and_future_capabilities_from_total(self):
+        """scope:"out" and scope:"future" capabilities must not count toward
+        capability_fr_coverage's total_caps denominator (DEVSPEC-122
+        follow-up). Both are parked by design -- "out" permanently, "future"
+        deferred to a later release -- so W568 UNCOVERED_CAPABILITY itself
+        exempts both (traceability_closure.py's capability_parked_ids), and
+        this denominator mirrors that exemption set exactly."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            caps = {"capabilities": [
+                {"capability_id": "cap-auth", "scope": "in"},
+                {"capability_id": "cap-legacy", "scope": "out"},
+                {"capability_id": "cap-roadmap-v2", "scope": "future"},
+            ]}
+            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            cov = payload["coverage"]["capability_fr_coverage"]
+            self.assertEqual(
+                1, cov["total_count"],
+                f"Expected scope:out/future capabilities excluded from total_count. Got: {cov}"
+            )
+            self.assertEqual(
+                [], cov["uncovered_ids"],
+                f"Expected no uncovered ids -- the only counted capability (cap-auth) is covered. Got: {cov}"
+            )
+            self.assertEqual(1, cov["covered_count"])
+
+    def test_completeness_check_control_scope_in_capabilities_counted(self):
+        """Control: with only scope:"in" capabilities, all count toward the total."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            caps = {"capabilities": [
+                {"capability_id": "cap-auth", "scope": "in"},
+                {"capability_id": "cap-billing", "scope": "in"},
+            ]}
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(2, payload["coverage"]["capability_fr_coverage"]["total_count"])
+
     def test_completeness_check_exits_nonzero_on_wcodes_with_warnings_as_errors(self):
         """With SPECDEV_WARNINGS_AS_ERRORS=1, W-codes from completeness-check cause non-zero exit."""
         import os as _os

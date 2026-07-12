@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """p5_finalize — Phase 5 finalization script for devspec_pr_audit.
 
-Reads findings.json, fix_plan.json, and manifest.json from a completed
+Reads findings.json and manifest.json (required) and fix_plan.json
+(optional — required only when findings are non-empty) from a completed
 audit run directory and produces a human-readable SUMMARY.md.
 
 Usage:
@@ -517,6 +518,18 @@ def build_summary(
     parts.append(_artifacts_section(run_dir, n_findings, n_tasks))
     parts.append("")
 
+    # ------------------------------------------------------------------
+    # Next steps (only when findings > 0)
+    # ------------------------------------------------------------------
+    if n_findings > 0:
+        parts.append("## Next steps\n")
+        parts.append(
+            "After applying fix_plan.json tasks, run `p6_verify.py` to confirm each task's\n"
+            "`acceptance_command` passes, then re-run `/devspec_pr_audit` to confirm findings are\n"
+            "closed. See protocol §12 for the full post-fix verification workflow."
+        )
+        parts.append("")
+
     return "\n".join(parts)
 
 
@@ -534,7 +547,7 @@ def main(argv: list[str] | None = None) -> int:
         "--run-dir",
         required=True,
         metavar="PATH",
-        help="Path to the audit run directory (must contain findings.json, fix_plan.json, manifest.json).",
+        help="Path to the audit run directory (must contain findings.json and manifest.json; fix_plan.json is optional and required only when findings are non-empty).",
     )
     ap.add_argument(
         "--output",
@@ -569,11 +582,10 @@ def main(argv: list[str] | None = None) -> int:
     fix_plan_path = run_dir / "fix_plan.json"
     manifest_path = run_dir / "manifest.json"
 
-    # Check presence
+    # Check presence — fix_plan.json is optional; zero-findings runs may omit it
     missing: list[str] = []
     for p, name in [
         (findings_path, "findings.json"),
-        (fix_plan_path, "fix_plan.json"),
         (manifest_path, "manifest.json"),
     ]:
         if not p.exists():
@@ -584,32 +596,52 @@ def main(argv: list[str] | None = None) -> int:
             print(m, file=sys.stderr)
         return 1
 
-    # Check schema files
-    for sp, label in [
-        (findings_schema_path, "findings.schema.json"),
-        (fix_plan_schema_path, "pr_audit_fix_plan.schema.json"),
-    ]:
-        if not sp.exists():
-            print(
-                f"ERROR: schema file not found: {label} (tried {sp}). "
-                "Run from the toolkit root or ensure schema/infra/ is present.",
-                file=sys.stderr,
-            )
-            return 1
+    # Check findings schema (always required); fix_plan schema is checked inside the conditional below
+    if not findings_schema_path.exists():
+        print(
+            f"ERROR: schema file not found: findings.schema.json (tried {findings_schema_path}). "
+            "Run from the toolkit root or ensure schema/infra/ is present.",
+            file=sys.stderr,
+        )
+        return 1
 
     try:
-        # Load inputs
+        # Load required inputs
         findings_doc = _load_json(findings_path, "findings.json")
-        fix_plan_doc = _load_json(fix_plan_path, "fix_plan.json")
         manifest = _load_json(manifest_path, "manifest.json")
 
-        # Load schemas
-        findings_schema = _load_json(findings_schema_path, "findings.schema.json")
-        fix_plan_schema = _load_json(fix_plan_schema_path, "pr_audit_fix_plan.schema.json")
+        # G3: exit early if a prior phase (e.g. validate_agent_outputs) set status=blocked
+        if manifest.get("status") == "blocked":
+            reason = manifest.get("blocked_reason", "(no reason recorded)")
+            print(f"ERROR: run is blocked — {reason}; skipping summary generation.", file=sys.stderr)
+            return 1
 
-        # Validate
+        # Load and validate findings
+        findings_schema = _load_json(findings_schema_path, "findings.schema.json")
         _validate_document(findings_doc, findings_schema, findings_schema_path, "findings.json")
-        _validate_document(fix_plan_doc, fix_plan_schema, fix_plan_schema_path, "fix_plan.json")
+
+        # fix_plan.json is optional — zero-findings runs do not produce one.
+        # Non-empty findings without a fix_plan is an error (P4 consolidation was not run).
+        if fix_plan_path.exists():
+            if not fix_plan_schema_path.exists():
+                print(
+                    f"ERROR: schema file not found: pr_audit_fix_plan.schema.json (tried {fix_plan_schema_path}). "
+                    "Run from the toolkit root or ensure schema/infra/ is present.",
+                    file=sys.stderr,
+                )
+                return 1
+            fix_plan_doc = _load_json(fix_plan_path, "fix_plan.json")
+            fix_plan_schema = _load_json(fix_plan_schema_path, "pr_audit_fix_plan.schema.json")
+            _validate_document(fix_plan_doc, fix_plan_schema, fix_plan_schema_path, "fix_plan.json")
+        else:
+            if findings_doc.get("findings"):
+                print(
+                    "ERROR: fix_plan.json absent but findings.json contains findings — "
+                    "run consolidation (P4) before finalizing.",
+                    file=sys.stderr,
+                )
+                return 1
+            fix_plan_doc = {}
 
         # Build summary
         summary = build_summary(run_dir, findings_doc, fix_plan_doc, manifest)
