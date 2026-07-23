@@ -12,6 +12,7 @@ consumed by `specdev align`.
 
 | Version | Documentation | Migration Spec |
 | :--- | :--- | :--- |
+| **[1.1.1]** | [v1.1.1.md](changelog/v1.1.1.md) | [v1.1.1.yaml](changelog/v1.1.1.yaml) |
 | **[1.1.0]** | [v1.1.0.md](changelog/v1.1.0.md) | [v1.1.0.yaml](changelog/v1.1.0.yaml) |
 | **[1.0.0]** | [v1.0.0.md](changelog/v1.0.0.md) | [v1.0.0.yaml](changelog/v1.0.0.yaml) |
 
