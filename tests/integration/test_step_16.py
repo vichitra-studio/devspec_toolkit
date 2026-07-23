@@ -704,6 +704,41 @@ class TestStep16(unittest.TestCase):
             f"Expected E304 error for malformed roadmap JSON. Got: {errors2}"
         )
 
+    def test_e304_plan_not_a_dict_does_not_crash_milestone_ref_collection(self):
+        """validate_step_16 must not crash when 'plan' is not a dict and a real
+        roadmap is present (regression: validate_step_16 guards its own local
+        'plan' var, but the _collect_milestone_refs helper it calls for E304
+        independently re-read the raw 'plan' field without the same guard,
+        raising AttributeError on data={"plan": None, ...})."""
+        base_path = os.path.join(self.fixtures_dir, "valid_with_semantic_review.json")
+        with open(base_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["plan"] = None
+
+        roadmap = {"milestones": [{"milestone_id": "m1", "status": "in_progress"}]}
+
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            fixture_path = impl_context_dir / "ms_test_plan.json"
+            fixture_path.write_text(json.dumps(data), encoding="utf-8")
+            (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
+            common_dir = tmp_dir / "common"
+            common_dir.mkdir()
+            (common_dir / "seed_manifest.json").write_text(
+                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
+                encoding="utf-8"
+            )
+
+            from specdev_tools.validation.validators.step_16 import validate_step_16
+            try:
+                errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
+            except AttributeError as exc:
+                self.fail(f"validate_step_16 crashed on non-dict 'plan' with a roadmap present: {exc}")
+
+        self.assertIsInstance(errors, list)
+
     def test_e307_behavior_validation_pairing(self):
         """E307: roadmap task with only behavior items (no validation) triggers E307."""
         base_path = os.path.join(self.fixtures_dir, "valid_full.json")

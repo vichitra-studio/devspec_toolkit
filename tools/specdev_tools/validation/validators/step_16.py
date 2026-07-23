@@ -148,11 +148,10 @@ def _load_roadmap(spec_path: str) -> Optional[dict[str, Any]]:
 
 def _collect_milestone_refs(data: dict[str, Any]) -> set[str]:
     """Extract unique milestone_ref values from checklist items."""
-    checklist = (
-        data.get("plan", {})
-        .get("spec_alignment", {})
-        .get("checklist", [])
-    )
+    plan = data.get("plan")
+    if not isinstance(plan, dict):
+        plan = {}
+    checklist = plan.get("spec_alignment", {}).get("checklist", [])
     refs: set[str] = set()
     if isinstance(checklist, list):
         for item in checklist:
