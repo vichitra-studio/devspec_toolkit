@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0 # Needed for commit history if checking multiple commits
       - name: Setup uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
       - name: Setup Virtual Environment & Install tooling
@@ -84,7 +84,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
       - name: Setup Virtual Environment & Install tooling
