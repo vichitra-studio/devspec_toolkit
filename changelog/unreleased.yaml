@@ -1,5 +1,5 @@
 version: "unreleased"
-breaking: false
+breaking: true
 source_of_truth: changelog/unreleased.yaml
 render_target: changelog/unreleased.md
 
@@ -69,5 +69,82 @@ changes:
       spec-check and the canonical checks share one schema registry and cache
       validators (core/registry.py: get_shared_registry, get_cached_validator,
       clear_shared_caches), removing repeated schema loads. Speed only.
+    migration:
+      action: none
+
+  - type: paradigm_shift
+    description: >
+      Breaking for host specs: steps 00 to 05 move to the spec-graph shape.
+      Step 00 (charter): in_scope / out_of_scope merge into scope_items (each
+      with scope in | later | out, scope_reason for later / out, scope_id);
+      assumptions, risks, stakeholders and needs become objects with ids; new
+      constraints list; links removed; derives_from added to scope items,
+      assumptions, risks, needs, segments, metrics and constraints. Step 01:
+      capabilities lose goal_id, success_metric_refs and trace and gain
+      derives_from, scope in | later | out (future becomes later) and
+      scope_reason. Step 02: components and connections lose trace;
+      connections lose from, to, schema_ref and interface_ref and gain
+      connection_id, derives_from (source) and connects_to; new third_parties
+      list (tech_stack is deprecated). Step 02a: artifact-level trace removed;
+      ci_gates and secrets become objects (gate_id, secret_id); each
+      environment gains scope, derives_from and a config object that holds the
+      host keys. Step 03: terms gain aliases, lifecycle and replaces. Step 04:
+      FRs lose trace and gain derives_from (capabilities) and depends_on (FRs);
+      acceptance criteria gain scope. Step 05: APIs lose trace and example_refs
+      and gain derives_from (FRs), provided_by, relies_on and depends_on; errors
+      become objects (error_id, code, message, derives_from). Every node also
+      accepts aliases, lifecycle, assumes and replaces. Existing host specs do
+      not validate until migrated; the migration passes for steps 00 to 05 land
+      later in this release, and the specdev align status / diff / plan
+      commands do not see item-level changes (string to object, trace to
+      derives_from) until then.
+    migration:
+      action: ai_assisted
+
+  - type: remove_validator
+    description: >
+      Link-existence checks are removed from the step validators of 01, 02, 02a,
+      04 and 05 (validate_step_01 now returns no errors; the trace-based
+      reference checks of 04 and 05 are gone; the E590 capability-coverage
+      check of 02 stays). Nothing replaces them until the graph resolver later in this release, so
+      a step 00 to 05 spec gets no link-existence or cycle error in the
+      meantime. Content checks stay.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      E311 (MISSING_ENUM_PROVENANCE) is narrowed: it fires only for an API that
+      declares a parameters[].enum without enum_provenance; error lists and
+      error_codes no longer trigger it. schema/05_interface_contracts.schema.json
+      adds the optional parameters[].enum (array of strings, minItems 1, unique).
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      registry-check no longer reports E622 for a registered root collection
+      (plain name or first hop of a wide path) that is absent from a spec file,
+      matching nested arrays; a collection of the wrong shape and a missing
+      id_field are still E622. Required presence stays with schema validation.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      FR-to-API coverage (matrix fr_to_api, E564 / W564 / E535) and the
+      charter-to-capability closure checks (E560) read only the pre-1.2.0
+      trace, goal_id and success_metric_refs fields, and run only when a spec
+      still carries one. A new-shape spec (apis[].derives_from) is therefore
+      silent for them until graph coverage later in this release. The W583
+      reader of step 11 reads API derives_from.
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      W555 text no longer cites a charter minItems:3 bound (the threshold is a
+      seed-quality heuristic). scripts/generate_fixtures_02a.py removed (stale,
+      nothing called it); toolkit-internal.
     migration:
       action: none

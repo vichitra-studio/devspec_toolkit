@@ -42,16 +42,16 @@ Clarify responses should be short, bulleted questions grouped by topic (no JSON,
 Use the [core validation commands](../reference.md#core-validation-commands) after each artifact update to keep discovery outputs consistent before moving to implementation.
 
 ## Step 02 Troubleshooting
-- Missing `trace_refs` on components or connections will fail schema validation.
+- Components, connections and third parties require `derives_from` (links to capabilities or constraints, components, seeds or constraints respectively); a missing one fails schema validation.
 - Components must include 3–6 responsibilities and an owner.
-- Multiple components require at least one connection; each connection must include `trust_boundary`.
+- Multiple components require at least one connection; each connection must include `connection_id`, `trust_boundary`, `derives_from` (the source component) and `connects_to` (a component or third party).
 - `partner`/`public` connections require `auth` and `rate_limit`; `event` protocol requires `reliability`.
-- `schema_ref` must use `file://`, `https://`, `glossary:`, `api:`, or `-tbd`.
+- Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is deprecated in favour of `third_parties`.
 
 ## Step 02a Troubleshooting
 - **Empty Environments**: Validation fails with `minProperties: 1` if an environment (`dev`, `ci`, etc.) object is empty. You must properly define keys (e.g., region, runner) or remove the environment from the list if not applicable (though all 4 are required by default).
-- **Invalid Gate Names**: `ci_gates` must be kebab-case strings (regex: `^[a-z0-9-]+$`). "Run Tests" or "Schema Validate" will fail; use `run-tests` or `schema-validate`.
-- **Missing Trace**: `trace` array is required to link the delivery baseline to upstream capabilities or charter.
+- **Invalid Gate Names**: each `ci_gates[]` entry is an object whose `gate_id` must be kebab-case (regex: `^[a-z0-9-]+$`). "Run Tests" or "Schema Validate" will fail; use `run-tests` or `schema-validate`.
+- **Missing `derives_from`**: every environment, gate and secret requires `derives_from`; the artifact-level `trace` is gone. Environment host keys go under the environment's optional `config` object.
 
 ## Step 03 Troubleshooting
 - **Empty Terms**: Validation fails if `terms` array is empty (`minItems: 1`).
@@ -60,8 +60,8 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - **NFR/Monitor Coverage**: Tooling will flag if metrics in NFRs/Monitoring do not match glossary terms or units.
 
 ## Step 04 Troubleshooting
-- **Broken Bridge**: Every FR must trace to at least one upstream `capability-*`. Matrix validation will fail if this link is missing or broken.
-- **Trace Format**: The `trace` field must be an array of objects (`{type, id, note}`), not strings.
+- **Missing `derives_from`**: Every FR must list at least one upstream capability in `derives_from`; schema validation fails if it is missing. FR-to-FR dependencies go in `depends_on`.
+- **No `trace`**: the `trace` field is gone; use `derives_from` and `depends_on`.
 - **Lazy Requirements**: Validation fails if `statement` < 20 chars or `acceptance_criteria.text` < 15 chars.
 - **Invalid ID**: `fr_id` must follow kebab-case and be unique.
 
