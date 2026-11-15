@@ -65,42 +65,53 @@ def check_partner_public_rate_limit(connections: list[dict]) -> list[SpecError]:
     return errors
 
 
-def _load_capabilities(repo_root: str, spec_root: str | None) -> dict[str, dict]:
+def _load_capabilities(repo_root: str, spec_root: str | None, artifact_path: str | None = None) -> dict[str, dict]:
     """Read the Step 01 artifact and return its capabilities keyed by ``capability_id``.
 
-    Searches *spec_root* (when given), then ``<repo_root>/spec``. A missing or
-    unreadable file yields an empty mapping: no coverage data, no error.
+    Searches the directory of the artifact being validated, then *spec_root*
+    (when given), then ``<repo_root>/spec``. In the first directory that holds
+    a ``01_*.json`` file, the first candidate that parses as a JSON object is
+    used. No such file yields an empty mapping: no coverage data, no error.
     """
-    search_dirs = [d for d in (spec_root, os.path.join(repo_root, "spec")) if d]
+    artifact_dir = os.path.dirname(os.path.abspath(artifact_path)) if artifact_path else None
+    search_dirs = [d for d in (artifact_dir, spec_root, os.path.join(repo_root, "spec")) if d]
     for directory in search_dirs:
         if not os.path.isdir(directory):
             continue
         for name in sorted(os.listdir(directory)):
             if name.startswith("01_") and name.endswith(".json"):
-                return _read_capabilities(os.path.join(directory, name))
+                data = _read_json_object(os.path.join(directory, name))
+                if data is not None:
+                    return _capabilities_of(data)
     return {}
 
 
-def _read_capabilities(path: str) -> dict[str, dict]:
+def _read_json_object(path: str) -> dict | None:
     try:
         with open(path, encoding="utf-8") as fh:
             data: Any = json.load(fh)
     except (OSError, ValueError):
-        return {}
-    items = data.get("capabilities") if isinstance(data, dict) else None
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _capabilities_of(data: dict) -> dict[str, dict]:
+    items = data.get("capabilities")
     if not isinstance(items, list):
         return {}
     return {c["capability_id"]: c for c in items if isinstance(c, dict) and isinstance(c.get("capability_id"), str)}
 
 
-def validate_step_02(instance: dict, repo_root: str, spec_root: str | None = None) -> list[SpecError]:
+def validate_step_02(
+    instance: dict, repo_root: str, spec_root: str | None = None, artifact_path: str | None = None
+) -> list[SpecError]:
     """
     Deep validation logic for Step 02 (System Sketch).
 
     Schema validation is handled by the orchestrator (validate.py) before
     this function is called.  This function performs deep logic checks.
-    Capability coverage reads the Step 01 artifact from *spec_root* or
-    ``<repo_root>/spec``; without it the coverage check is skipped.
+    Capability coverage reads the Step 01 artifact from the artifact's own
+    directory, *spec_root* or ``<repo_root>/spec``; without it the coverage check is skipped.
     """
     errors: list[SpecError] = []
 
@@ -113,7 +124,7 @@ def validate_step_02(instance: dict, repo_root: str, spec_root: str | None = Non
     errors.extend(check_partner_public_rate_limit(connections))
     errors.extend(check_external_trust_boundaries(connections, third_party_ids))
 
-    capabilities = _load_capabilities(repo_root, spec_root)
+    capabilities = _load_capabilities(repo_root, spec_root, artifact_path)
     if capabilities:
         errors.extend(check_capability_coverage(components, capabilities))
 

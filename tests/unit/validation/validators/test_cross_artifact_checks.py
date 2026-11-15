@@ -311,7 +311,7 @@ class TestCheckStep02IntegrityPositive(unittest.TestCase):
                     {
                         "component_id": "comp-api",
                         "type": "service",
-                        # No trace at all
+                        "trace": [],  # 1.1.1 components require `trace`; none covers a capability
                     }
                 ],
             )),

@@ -424,7 +424,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                 errs = _run_deep_validation("02", instance, str(root), artifact_path)
             self.assertEqual([], errs)
             p_ctx.assert_called_once_with(str(root), artifact_path, git_root=None, spec_root=None)
-            p_step.assert_called_once_with(instance, str(root), None)
+            p_step.assert_called_once_with(instance, str(root), None, artifact_path)
 
     def test_run_deep_validation_threads_git_root_and_spec_root_to_context(self):
         """Verify non-None git_root and spec_root are forwarded to _build_validation_context."""

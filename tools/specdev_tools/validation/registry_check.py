@@ -307,15 +307,22 @@ def _check_array_entry(
     array_key = entry["array_path"].lstrip(".")
     id_field = entry.get("id_field", "")
     full_display = f"{display_prefix}{entry['array_path']}"
-    val = container.get(array_key) if isinstance(container, dict) else None
-
-    if val is None:
+    if is_root and not isinstance(container, dict):
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{full_display}' exists but the file's top level is not an object "
+            f"(got {type(container).__name__}).",
+        ))
+        return
+    if not isinstance(container, dict) or array_key not in container:
         # An absent collection is never drift, at any level: it may be OPTIONAL per
         # schema (a root ``constraints``, a roadmap task's ``acceptance_criteria``).
         # Required presence is owned by schema validation, which ``spec-check`` runs
-        # beside this check (DEVSPEC-125, extended to root collections by D4); only a
-        # present-but-wrong-shape collection is drift (checked below).
+        # beside this check (DEVSPEC-125, extended to root collections by D4). "Absent"
+        # means the key is not there: a present ``null`` is a wrong-shape collection
+        # (checked below), as it is for a wide-path root.
         return
+    val = container[array_key]
 
     if not isinstance(val, list):
         errs.append(_drift(

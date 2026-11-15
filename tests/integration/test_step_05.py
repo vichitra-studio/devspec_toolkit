@@ -61,7 +61,7 @@ class Step05IntegrationTests(unittest.TestCase):
         self.assertEqual(self._schema_errors("valid_rest_api.json", lambda spec: None), [])
 
     def test_api_without_derives_from_fails(self):
-        rendered = self._schema_errors("invalid_missing_trace.json", lambda spec: None)
+        rendered = self._schema_errors("invalid_missing_derives_from.json", lambda spec: None)
         self.assertTrue(any("derives_from" in msg for msg in rendered), rendered)
 
     def test_api_error_without_error_id_fails(self):

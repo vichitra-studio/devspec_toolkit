@@ -85,7 +85,9 @@ changes:
       scope_reason. Step 02: components and connections lose trace;
       connections lose from, to, schema_ref and interface_ref and gain
       connection_id, derives_from (source) and connects_to; new third_parties
-      list (tech_stack is deprecated). Step 02a: artifact-level trace removed;
+      list (tech_stack is deprecated); component type external and the tag
+      external-dependency are removed (model the service as a third_parties
+      entry). Step 02a: artifact-level trace removed;
       ci_gates and secrets become objects (gate_id, secret_id); each
       environment gains scope, derives_from and a config object that holds the
       host keys. Step 03: terms gain aliases, lifecycle and replaces. Step 04:
@@ -96,8 +98,10 @@ changes:
       accepts aliases, lifecycle, assumes and replaces. Existing host specs do
       not validate until migrated; the migration passes for steps 00 to 05 land
       later in this release, and the specdev align status / diff / plan
-      commands do not see item-level changes (string to object, trace to
-      derives_from) until then.
+      commands report nothing for a 1.1.1 spec of steps 00 to 05 against the
+      new schemas, top-level renames such as in_scope to scope_items included,
+      because the differ reads only a schema's top-level required, properties
+      and additionalProperties.
     migration:
       action: ai_assisted
 
@@ -125,19 +129,20 @@ changes:
     description: >
       registry-check no longer reports E622 for a registered root collection
       (plain name or first hop of a wide path) that is absent from a spec file,
-      matching nested arrays; a collection of the wrong shape and a missing
-      id_field are still E622. Required presence stays with schema validation.
+      matching nested arrays (key not present); a present null, a collection
+      of the wrong shape, a file whose top level is not an object and a
+      missing id_field are still E622. Required presence stays with schema validation.
     migration:
       action: none
 
   - type: change_config
     description: >
-      FR-to-API coverage (matrix fr_to_api, E564 / W564 / E535) and the
-      charter-to-capability closure checks (E560) read only the pre-1.2.0
-      trace, goal_id and success_metric_refs fields, and run only when a spec
-      still carries one. A new-shape spec (apis[].derives_from) is therefore
-      silent for them until graph coverage later in this release. The W583
-      reader of step 11 reads API derives_from.
+      A check that reads fields of the 1.1.1 shape (trace, goal_id,
+      success_metric_refs) runs only when the files it reads carry those
+      fields. A spec whose steps 00 to 05 have the new shape gets none of
+      E560, W564 / E535 and W568, and no FR-to-API coverage warning from the
+      matrix, whatever shape its later steps have, until graph coverage later
+      in this release. The W583 reader of step 11 reads API derives_from.
     migration:
       action: none
 

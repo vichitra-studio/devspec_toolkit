@@ -353,6 +353,21 @@ class TestR003Drift:
         errs = self._run(wide, {"04_fr_list.json": {"environments": []}})
         assert [e.code for e in errs if e.code == "E622"] == ["E622"]
 
+    def test_null_root_collection_is_drift_for_plain_and_wide_roots(self) -> None:
+        """D4 means absent: a root key present with ``null`` is E622 (as on main), plain or wide."""
+        plain = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(plain, {"04_fr_list.json": {"functional_requirements": None}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+        wide = self._minimal_registry_with(".environments{}", "item_id")
+        errs = self._run(wide, {"04_fr_list.json": {"environments": None}})
+        assert [e.code for e in errs if e.code == "E622"] == ["E622"]
+
+    def test_non_object_top_level_is_drift(self) -> None:
+        """A file whose top level is a list is E622 for a plain-name root (as on main)."""
+        registry = self._minimal_registry_with(".functional_requirements", "fr_id")
+        errs = self._run(registry, {"04_fr_list.json": []})
+        assert "E622" in [e.code for e in errs], errs
+
     def test_array_path_rename_is_not_drift_when_old_key_is_absent(self) -> None:
         """A renamed key reads as an absent collection; the schema check owns that signal."""
         registry = self._minimal_registry_with(".functional_requirements", "fr_id")

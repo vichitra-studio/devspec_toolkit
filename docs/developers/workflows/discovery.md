@@ -49,8 +49,8 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is deprecated in favour of `third_parties`.
 
 ## Step 02a Troubleshooting
-- **Empty Environments**: Validation fails with `minProperties: 1` if an environment (`dev`, `ci`, etc.) object is empty. You must properly define keys (e.g., region, runner) or remove the environment from the list if not applicable (though all 4 are required by default).
-- **Invalid Gate Names**: each `ci_gates[]` entry is an object whose `gate_id` must be kebab-case (regex: `^[a-z0-9-]+$`). "Run Tests" or "Schema Validate" will fail; use `run-tests` or `schema-validate`.
+- **Empty Environments**: an empty environment object (`"dev": {}`) fails schema validation: every environment needs `scope` and a non-empty `derives_from`, plus `scope_reason` when `scope` is `later` or `out`. Host keys (region, runner, replica count and so on) are optional and go under the environment's `config` object, never beside `scope`. All four environments (`dev`, `ci`, `staging`, `prod`) are required by default.
+- **Invalid Gate Names**: each `ci_gates[]` entry is an object whose `gate_id` must be kebab-case (regex: `^[a-z0-9]+(?:-[a-z0-9]+)*$`). "Run Tests" or "Schema Validate" will fail; use `run-tests` or `schema-validate`.
 - **Missing `derives_from`**: every environment, gate and secret requires `derives_from`; the artifact-level `trace` is gone. Environment host keys go under the environment's optional `config` object.
 
 ## Step 03 Troubleshooting
@@ -67,9 +67,9 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Step 05 Troubleshooting
 - **Missing Parameters**: Validation fails if `parameters` are needed but not defined in the new array format.
-- **Invalid Schema Refs**: `input_schema_ref` and `output_schema_ref` should point to valid `file://`, `glossary:`, or be marked `-tbd`.
+- **Invalid Schema Refs**: `input_schema_ref` and `output_schema_ref` are a path relative to the repository root, a JSON Pointer into the current document or an absolute URL; use `-tbd` while the schema is not defined, and omit the field when the endpoint has no body.
 - **Protocol Mismatch**: Non-HTTP protocols like `grpc` must mapping their methods (e.g., to `POST`) as per proper guidance.
-- **Empty Errors**: Every API must define at least one error state or explicitly justify why it cannot fail.
+- **Error Objects**: each `errors[]` entry is an object with `error_id`, `code`, `message`, `scope` and `derives_from` (acceptance criteria ids); `severity` is optional. A string entry or an `http_status` field fails schema validation. The schema does not require the list to be non-empty; include at least one 4xx and one 5xx error by convention.
 
 ## Step 07 Troubleshooting
 - **Invalid ID Pattern**: NFR IDs must follow the `nfr-<category>-<metric>` pattern (e.g., `nfr-latency-p95`).

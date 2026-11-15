@@ -563,7 +563,7 @@ DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[SpecError]]
 # side-effects.  See AUDIT-043 for the auto-discovery proposal.
 DEEP_VALIDATORS: dict[str, DeepValidator] = {
     "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root),
-    "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("spec_root")),
+    "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("spec_root"), ctx.get("artifact_path")),
     "02a": lambda instance, root, ctx: step_02a.validate_step_02a(instance, root),
     "03": lambda instance, root, ctx: step_03.validate_step_03(
         instance,

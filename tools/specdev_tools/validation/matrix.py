@@ -7,7 +7,8 @@ from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
-from ._legacy_shim import LEGACY_FIELDS, has_legacy_fields
+from ..core.scope_helpers import is_parked
+from ._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -351,9 +352,10 @@ def build_trace_matrix(
     # APIs carry the authoritative FR trace: each API lists the FRs it implements.
     # Iterating from the API side (rather than the FR side) is the correct direction:
     # FRs trace to capabilities, not to APIs.
-    # Guarded: the FR trace on an API is a 1.1.1 field (M6c retires this reader).
-    legacy = has_legacy_fields(artifacts.values(), LEGACY_FIELDS)
-    for api in apis.values() if legacy else ():
+    # Legacy-guarded (M6c deletes): reads the `trace` of the apis. When it is skipped,
+    # fr_to_api_computed is False and no FR-to-API coverage threshold is reported.
+    fr_to_api_computed = has_legacy_fields(apis.values(), LEGACY_TRACE_FIELDS)
+    for api in apis.values() if fr_to_api_computed else ():
         for t in api.get("trace", []):
             if t.get("type") == _MATRIX_LINK_FR_TYPE:
                 fr_to_api[t["id"]].add(api["api_id"])
@@ -383,7 +385,7 @@ def build_trace_matrix(
     # exclusions already applied in traceability_closure.py's W561/W564/W565/
     # W566 checks (DEVSPEC-122 follow-up) — without this, either category
     # silently drags down fr_coverage and can fail SPECDEV_MATRIX_STRICT=1 CI.
-    wont_have_fr_ids = {fr.get("fr_id") for fr in frs if fr.get("priority") == "wont-have"}
+    wont_have_fr_ids = {fr.get("fr_id") for fr in frs if is_parked(fr)}
     step05_oos_fr_ids: set[str] = set()
     step08_oos_fr_ids: set[str] = set()
     for data in artifacts.values():
@@ -503,14 +505,16 @@ def build_trace_matrix(
         result["integrity_errors"] = render_errors(integrity_errors)
 
     # R9/T24: Configurable coverage threshold enforcement
-    threshold_errors = _check_coverage_thresholds(coverage, repo_root)
+    threshold_errors = _check_coverage_thresholds(coverage, repo_root, fr_to_api_computed)
     if threshold_errors:
         result.setdefault("integrity_errors", []).extend(render_errors(threshold_errors))
 
     return result
 
 
-def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[SpecError]:
+def _check_coverage_thresholds(
+    coverage: dict, repo_root: str, fr_to_api_computed: bool = True
+) -> list[SpecError]:
     """R9/T24: Enforce coverage thresholds from step_order.json."""
     errors: list[SpecError] = []
     config = _load_coverage_thresholds(repo_root)
@@ -527,9 +531,10 @@ def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[SpecError
     if fr_total == 0:
         return errors
 
+    # The only check is FR-to-API coverage; a skipped reader leaves nothing to report.
     checks = [
         ("fr_coverage", coverage.get("fr_with_api", 0)),
-    ]
+    ] if fr_to_api_computed else []
     for check_name, actual_count in checks:
         threshold = config.get(check_name)
         if threshold is None:

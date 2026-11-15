@@ -410,7 +410,8 @@ class TestTraceabilityClosure(unittest.TestCase):
 
         # FR in out_of_scope with empty rationale → W564 still fires
         apis_oos_empty_rationale = {
-            "apis": [],
+            # 1.1.1 shape: W564 reads the apis' trace, so one api must carry it.
+            "apis": [{"api_id": "api-other", "trace": [{"type": "fr", "id": "fr-other"}]}],
             "out_of_scope": [{"fr_id": "fr-infra", "rationale": ""}],
         }
         with tempfile.TemporaryDirectory() as d:
@@ -425,7 +426,8 @@ class TestTraceabilityClosure(unittest.TestCase):
 
         # FR in out_of_scope with rationale key absent → W564 still fires (missing key is not exempt)
         apis_oos_missing_rationale_key = {
-            "apis": [],
+            # 1.1.1 shape: W564 reads the apis' trace, so one api must carry it.
+            "apis": [{"api_id": "api-other", "trace": [{"type": "fr", "id": "fr-other"}]}],
             "out_of_scope": [{"fr_id": "fr-infra"}],
         }
         with tempfile.TemporaryDirectory() as d:

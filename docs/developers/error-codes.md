@@ -67,7 +67,7 @@
 
 ### E535 CONTRADICTORY_OUT_OF_SCOPE_FR
 
-**Trigger**: A functional requirement appears in both `apis.out_of_scope[]` in step 05 (declaring it has no HTTP API surface) and in an API's `trace[]` in the same step 05 file (declaring it is covered by an API endpoint). The two claims are mutually exclusive.
+**Trigger**: A functional requirement appears in both `apis.out_of_scope[]` in step 05 (declaring it has no HTTP API surface) and in an API's `trace[]` in the same step 05 file (declaring it is covered by an API endpoint). The two claims are mutually exclusive. The check reads the 1.1.1 `trace` field and runs only when the file it reads carries it (see E564).
 
 **Resolution**: Remove the FR from `out_of_scope[]` if an API does cover it, or remove the trace reference from the API if the FR genuinely has no API surface.
 
@@ -119,7 +119,7 @@
 
 ### E560 TRACEABILITY_GAP
 
-**Trigger**: Fired by the traceability-closure check (`check_traceability_closure()`) for two Charter → Capabilities gaps: (1) `charter_goal_without_capability` — a Step 00 charter `goals[].goal_id` is not referenced by any Step 01 capability's `trace[]` (a trace entry of the charter-goal type); or (2) `charter_success_metric_without_capability` — a Step 00 charter `success_metrics[].metric_id` is not referenced by any capability's `success_metric_refs[]`. Only fires when both `00_charter.json` and `01_capabilities.json` are present and the loaded artifacts still carry a pre-1.2.0 field (`trace`, `goal_id`, `success_metric_refs`, `from`, `to` or `schema_ref`). The new shape of steps 00 and 01 has no `goals`, `goal_id`, `success_metric_refs` or `trace` (capabilities carry `derives_from`), so for a new-shape spec this check is silent; graph coverage later in this release replaces it. Note: E560 previously covered a `capability_without_fr` check (a capability with no tracing FR); that check was superseded by W568/E568 UNCOVERED_CAPABILITY, and E560 now covers only the two charter-level gaps described above.
+**Trigger**: Fired by the traceability-closure check (`check_traceability_closure()`) for two Charter → Capabilities gaps: (1) `charter_goal_without_capability` — a Step 00 charter `goals[].goal_id` is not referenced by any Step 01 capability's `trace[]` (a trace entry of the charter-goal type); or (2) `charter_success_metric_without_capability` — a Step 00 charter `success_metrics[].metric_id` is not referenced by any capability's `success_metric_refs[]`. Only fires when both `00_charter.json` and `01_capabilities.json` are present and carry the 1.1.1 fields this check reads (`goal_id`, `success_metric_refs`, `trace`). A spec whose steps 00 to 05 have the new shape gets no E560, whatever shape its later steps have, until graph coverage later in this release. Note: E560 previously covered a `capability_without_fr` check (a capability with no tracing FR); that check was superseded by W568/E568 UNCOVERED_CAPABILITY, and E560 now covers only the two charter-level gaps described above.
 
 **Resolution**: For a pre-1.2.0 spec, for `charter_goal_without_capability`, add a capability in `01_capabilities.json` with a `trace[]` entry referencing the uncovered `goal_id`. For `charter_success_metric_without_capability`, add the `metric_id` to the appropriate capability's `success_metric_refs[]`.
 
@@ -147,7 +147,7 @@
 
 ### E564 / W564 UNCOVERED_FR_API
 
-**Trigger**: A functional requirement defined in step 04 has no API trace reference — no API in step 05 has a trace link with type "fr" pointing to this FR. The check reads only the pre-1.2.0 `trace` field of step 05 APIs and runs only when the loaded artifacts carry a pre-1.2.0 field (see E560). A new-shape step 05 (`apis[].derives_from`) is not read here, so E564 / W564 stay silent for it until graph coverage later in this release.
+**Trigger**: A functional requirement defined in step 04 has no API trace reference — no API in step 05 has a trace link with type "fr" pointing to this FR. The check reads only the 1.1.1 `trace` field of step 05 APIs and runs only when the files it reads carry that field. A spec whose steps 00 to 05 have the new shape gets no E564 / W564 / E535 and no FR-to-API coverage warning from the matrix, whatever shape its later steps have, until graph coverage later in this release.
 
 **Resolution**: In a pre-1.2.0 spec, add a trace link of type "fr" in the appropriate API contract in `05_interface_contracts.json`. If the FR genuinely has no HTTP API surface (infra, ops, external constraint), add it to `out_of_scope[]` in `05_interface_contracts.json` with a non-empty rationale — that suppresses W564, W561, and W566 for that FR. See also E535 for the contradiction check.
 
@@ -179,7 +179,7 @@
 
 ### E568 / W568 UNCOVERED_CAPABILITY
 
-**Trigger**: A capability defined in step 01 has no functional requirement tracing to it. This replaces the former E560 `capability_without_fr` check.
+**Trigger**: A capability defined in step 01 has no functional requirement tracing to it. This replaces the former E560 `capability_without_fr` check. The check reads 1.1.1 fields and runs only when the files it reads carry them; a spec whose steps 00 to 05 have the new shape gets no W568 / E568 until graph coverage later in this release.
 
 **Resolution**: Add an FR in `04_fr_list.json` that traces to the uncovered capability, or remove the capability if it is no longer relevant.
 

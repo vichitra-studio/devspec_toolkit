@@ -109,7 +109,15 @@ def _all_declared_kinds(decls) -> set[str]:
 
 
 def test_m2_schema_files_are_found() -> None:
-    assert {"00_charter.schema.json", "01_capabilities.schema.json", "02_system_sketch.schema.json"} <= set(_FILES)
+    assert set(_FILES) == {
+        "00_charter.schema.json",
+        "01_capabilities.schema.json",
+        "02_system_sketch.schema.json",
+        "02a_delivery_baseline.schema.json",
+        "03_glossary.schema.json",
+        "04_fr_list.schema.json",
+        "05_interface_contracts.schema.json",
+    }
 
 
 @pytest.mark.parametrize("fname", _FILES)

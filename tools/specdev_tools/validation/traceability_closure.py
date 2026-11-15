@@ -5,8 +5,9 @@ import warnings
 from typing import Any
 
 from ..core.errors import SpecError, make_error
+from ..core.scope_helpers import is_parked
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
-from ._legacy_shim import LEGACY_FIELDS, has_legacy_fields
+from ._legacy_shim import LEGACY_CHARTER_CHAIN_FIELDS, LEGACY_TRACE_FIELDS, has_legacy_fields
 
 # ---------------------------------------------------------------------------
 # Business-rule trace-type constants for traceability closure chains
@@ -246,28 +247,27 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 }
             }
 
-    # The charter, capability-trace and API-trace checks below read 1.1.1 fields
-    # (trace, goal_id, success_metric_refs); they run only while a loaded artifact
-    # still carries one. M6c retires them with this guard.
-    legacy = has_legacy_fields(data.values(), LEGACY_FIELDS)
-
     capability_ids: set[str] = set()
     # Capabilities marked scope:"out" (permanently excluded, the capability-level
-    # analog of FR-level priority:"wont-have"), scope:"later" or the 1.1.1 scope:"future"
-    # (acknowledged but deferred -- the capability-level analog of task/milestone
-    # "deferred") are all parked by design and exempted from W568 below: none
-    # is expected to have an FR trace yet.
+    # analog of FR-level priority:"wont-have") or scope:"future" (acknowledged but
+    # deferred to a later release -- the capability-level analog of task/milestone
+    # "deferred") are both parked by design and exempted from W568 below: neither
+    # is expected to have an FR trace yet. This is the 1.1.1 set: W568 is legacy-guarded.
     capability_parked_ids: set[str] = set()
     if "capabilities" in data:
         capability_ids = {c.get("capability_id") for c in data["capabilities"].get("capabilities", []) if c.get("capability_id")}
         capability_parked_ids = {
             c.get("capability_id")
             for c in data["capabilities"].get("capabilities", [])
-            if c.get("capability_id") and c.get("scope") in ("out", "later", "future")
+            if c.get("capability_id") and c.get("scope") in ("out", "future")
         }
 
     # Charter → Capabilities chain
-    if legacy and "charter" in data and "capabilities" in data:
+    # Legacy-guarded (M6c deletes): reads charter goal_id, capability trace / success_metric_refs.
+    if (
+        "charter" in data and "capabilities" in data
+        and has_legacy_fields([data["charter"], data["capabilities"]], LEGACY_CHARTER_CHAIN_FIELDS)
+    ):
         charter_goals = data["charter"]
         goal_ids: set[str] = set()
         for goal in charter_goals.get("goals", []):
@@ -313,7 +313,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             # are explicitly out-of-scope (parked for a later phase) and have
             # no APIs, fixtures, or milestones by design. Including them
             # produces false-positive W561/W564/W565/W566 warnings.
-            if fr.get("priority") == "wont-have":
+            if is_parked(fr):
                 continue
             if "fr_id" in fr:
                 fr_ids.add(fr["fr_id"])
@@ -399,7 +399,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     # W564 / E535: FR→API coverage and out_of_scope[] contradiction check.
     # step05_oos_fr_ids (computed above) carries the Step 05 out_of_scope[] exemption.
-    if legacy and "frs" in data and "apis" in data:
+    # Legacy-guarded (M6c deletes): reads the `trace` of the apis.
+    if "frs" in data and "apis" in data and has_legacy_fields([data["apis"]], LEGACY_TRACE_FIELDS):
         api_fr_refs: set[str] = set()
         for api in data["apis"].get("apis", []):
             for trace_ref in api.get("trace", []):
@@ -464,7 +465,8 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W568: Capability coverage — each capability should be traced by at least one FR.
     # Mirrors the E560 capability_without_fr check but as a promotable warning.
     # scope:"out" capabilities are exempt (permanently excluded, no FR expected).
-    if legacy and "capabilities" in data and "frs" in data:
+    # Legacy-guarded (M6c deletes): reads the `trace` of the frs.
+    if "capabilities" in data and "frs" in data and has_legacy_fields([data["frs"]], LEGACY_TRACE_FIELDS):
         for cap_id in sorted(capability_ids - fr_traced_caps - capability_parked_ids):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
 
