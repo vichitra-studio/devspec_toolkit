@@ -48,10 +48,9 @@ from __future__ import annotations
 
 import json
 
-from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 
-from .registry import SchemaRegistry, get_cached_validator, get_shared_registry  # noqa: F401
+from .registry import SchemaRegistry, get_schema_validator, get_shared_registry
 
 
 # ---------------------------------------------------------------------------
@@ -236,14 +235,7 @@ def validate_data_against_schema(
     # raise ``AttributeError``.  Both escape the existing family — route them
     # into SchemaRuntimeError so callers see the typed E521 path.
     try:
-        def _build_validator() -> Draft202012Validator:
-            return Draft202012Validator(
-                schema,
-                registry=registry.to_referencing_registry(),
-                format_checker=Draft202012Validator.FORMAT_CHECKER,
-            )
-
-        v = get_cached_validator(repo_root, schema_uri, registry, _build_validator)
+        v = get_schema_validator(registry, schema_uri, schema)
     except SchemaValidationError:
         raise
     except Exception as exc:

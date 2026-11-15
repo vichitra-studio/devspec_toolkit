@@ -3,6 +3,7 @@ from __future__ import annotations
 import json, os, threading
 from typing import Any, Callable, Optional
 
+from jsonschema import Draft202012Validator
 from referencing import Registry as _ReferencingRegistry, Resource as _Resource
 
 def _resolve_rel(repo_root: str, rel: str) -> Optional[str]:
@@ -206,6 +207,24 @@ def get_cached_validator(
         validator = factory()
         _VALIDATOR_CACHE[key] = (registry, validator)
         return validator
+
+
+def get_schema_validator(registry: SchemaRegistry, schema_uri: str, schema: dict[str, Any]) -> Draft202012Validator:
+    """Return the cached ``Draft202012Validator`` for *schema_uri*, built from *schema* and *registry* on a miss.
+
+    Cached per ``(registry.repo_root, schema_uri)`` as ``get_cached_validator`` does.  Raises whatever
+    ``to_referencing_registry`` or the validator constructor raises (nothing is cached then).
+    """
+    return get_cached_validator(
+        registry.repo_root,
+        schema_uri,
+        registry,
+        lambda: Draft202012Validator(
+            schema,
+            registry=registry.to_referencing_registry(),
+            format_checker=Draft202012Validator.FORMAT_CHECKER,
+        ),
+    )
 
 
 def clear_shared_caches() -> None:

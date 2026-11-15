@@ -18,10 +18,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from ..core.errors import SpecError, make_error
-from ..core.registry import SchemaRegistry, get_cached_validator, get_shared_registry
+from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
 
 CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
 CANON_KIND_SCHEMA_URI = "vc:canon:kind"
@@ -489,16 +488,7 @@ def _validate_doc_schema(
     except json.JSONDecodeError as exc:
         return [make_error("E520", f"UNRESOLVED_INPUT schema_json_decode_failed uri={schema_uri} detail={exc}")]
 
-    validator = get_cached_validator(
-        schema_registry.repo_root,
-        schema_uri,
-        schema_registry,
-        lambda: Draft202012Validator(
-            schema,
-            registry=schema_registry.to_referencing_registry(),
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
-        ),
-    )
+    validator = get_schema_validator(schema_registry, schema_uri, schema)
     try:
         validation_errors = sorted(validator.iter_errors(data), key=lambda e: tuple(e.path))
     except _WrappedReferencingError as exc:

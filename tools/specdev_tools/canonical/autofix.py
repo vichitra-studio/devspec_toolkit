@@ -13,7 +13,7 @@ from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
-from ..core.registry import SchemaRegistry, get_cached_validator, get_shared_registry
+from ..core.registry import SchemaRegistry, get_schema_validator, get_shared_registry
 from ..core.constants import INFERENCE_RULES
 
 
@@ -185,16 +185,7 @@ def _build_schema_validator(
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, f"schema_load_failed uri={schema_uri} detail={str(exc)}"
     try:
-        validator = get_cached_validator(
-            schema_registry.repo_root,
-            schema_uri,
-            schema_registry,
-            lambda: Draft202012Validator(
-                schema,
-                registry=schema_registry.to_referencing_registry(),
-                format_checker=Draft202012Validator.FORMAT_CHECKER,
-            ),
-        )
+        validator = get_schema_validator(schema_registry, schema_uri, schema)
         return validator, None
     except Exception as exc:
         return None, f"schema_validator_build_failed detail={type(exc).__name__}: {str(exc)}"

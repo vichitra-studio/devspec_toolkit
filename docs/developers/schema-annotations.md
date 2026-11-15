@@ -18,7 +18,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `step` | Optional step id. Default: the numeric prefix of the schema file name. |
 | `files` | Optional relative globs. Default: the step's spec file. Step 16 plan files must set `files: ["impl_context/ms_*_plan.json"]` explicitly. |
 
-**Which schemas are hosts.** `registry-generate` registers nodes from step schemas (`schema/NN_*.schema.json`), the seed manifest, and any other schema registered in `tools/schema_registry.json` whose own file declares an `x-node` with `files`; such entries go under the `files` glob key, with `step` taken from `x-node.step` (required there, since a registry entry needs a step). A node declared in a non-step schema without `files` is not registered.
+**Which schemas are hosts.** `registry-generate` registers nodes from step schemas (`schema/NN_*.schema.json`), the seed manifest, and any other schema registered in `tools/schema_registry.json` whose own file declares an `x-node` with `files`; such entries go under the `files` glob key and always register under step `extras`; `x-node.step` is not read for these hosts. A node declared in a non-step schema without `files` is not registered.
 
 `nodeRole` values: `obligation-system`, `obligation-delivery`, `verifier`, `plan`, `context`, `record`. `seed` is not a role.
 

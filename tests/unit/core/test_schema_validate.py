@@ -143,9 +143,9 @@ class TestConstructionWrap:
             def __init__(self, *args, **kwargs):
                 raise AttributeError("injected: non-dict schema has no $schema key")
 
-        import specdev_tools.core.schema_validate as _sv_mod
+        import specdev_tools.core.registry as _reg_mod
 
-        monkeypatch.setattr(_sv_mod, "Draft202012Validator", _FakeBrokenValidator)
+        monkeypatch.setattr(_reg_mod, "Draft202012Validator", _FakeBrokenValidator)
 
         doc = _load_valid_full()
 
@@ -184,9 +184,9 @@ class TestConstructionWrap:
             def __init__(self, *args, **kwargs):
                 raise AttributeError("injected: broken validator")
 
-        import specdev_tools.core.schema_validate as _sv_mod
+        import specdev_tools.core.registry as _reg_mod
 
-        monkeypatch.setattr(_sv_mod, "Draft202012Validator", _FakeBrokenValidator)
+        monkeypatch.setattr(_reg_mod, "Draft202012Validator", _FakeBrokenValidator)
 
         # A syntactically valid patch; the refusal must come from validation, not jq.
         with pytest.raises(JsonUtilsError) as exc_info:

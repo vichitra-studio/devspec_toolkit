@@ -5,7 +5,6 @@ lint -> registry -> derived step order.  The resolver and the checks on spec dat
 """
 from __future__ import annotations
 
-import copy
 import json
 import shutil
 from pathlib import Path
@@ -23,11 +22,6 @@ _FIX = _ROOT / "tests" / "fixtures" / "graph"
 _MINI = _FIX / "mini_toolkit"
 
 
-@pytest.fixture(autouse=True)
-def _fresh_caches():
-    clear_shared_caches()
-    yield
-    clear_shared_caches()
 
 
 def _toolkit(tmp_path: Path) -> Path:

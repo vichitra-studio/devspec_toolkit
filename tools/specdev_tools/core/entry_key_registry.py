@@ -87,7 +87,8 @@ _LOAD_LOCK = threading.Lock()
 # regardless of which spec file contains them.  Additional per-array
 # exclusions are declared via ``corpus_excluded: true`` in the registry JSON
 # and precomputed into the excluded-keys set at load time.
-_ALWAYS_EXCLUDED = frozenset(["canonical_refs_used", "canonical_proposals"])
+ALWAYS_EXCLUDED = frozenset(["canonical_refs_used", "canonical_proposals"])
+_ALWAYS_EXCLUDED = ALWAYS_EXCLUDED  # earlier name, kept for existing importers
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
 
@@ -365,6 +366,9 @@ def _parse_array_path(array_path: str) -> List[Tuple[List[str], str]]:
     if not hops:
         raise ValueError(f"malformed array_path {array_path!r}")
     return hops
+
+
+parse_array_path = _parse_array_path  # public name; the underscore name stays for existing importers
 
 
 def array_top_key(array_path: str) -> str:

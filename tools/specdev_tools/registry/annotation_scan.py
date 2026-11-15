@@ -29,8 +29,8 @@ from typing import Any, Callable
 from specdev_tools.core.registry import SchemaRegistry
 from specdev_tools.registry.annotations import (
     AnnotationDecls,
-    _Schemas,
-    _Walker,
+    SchemaReader,
+    SchemaRefs,
     collect_annotations,
 )
 
@@ -54,12 +54,7 @@ def make_ref_resolver(
     (no fragment).  A ref without a URI part resolves against *base_uri*.  The result is
     ``(target_schema, target_uri, pointer)`` or ``None`` when the ref does not resolve.
     """
-    walker = _Walker(registry)
-
-    def resolve(ref: str, base_uri: str = "") -> tuple[Any, str, str] | None:
-        return walker.resolve(ref, base_uri)
-
-    return resolve
+    return SchemaRefs(registry).resolve
 
 
 def step_of_schema_file(basename: str) -> str | None:
@@ -120,11 +115,16 @@ class HostScan:
     occurrences: list[Occurrence] = field(default_factory=list)
 
 
+def _walk_nothing(uri: str) -> list[ScanNode]:
+    """Host walk of an empty scan: no schema is a host."""
+    return []
+
+
 @dataclass
 class AnnotationScan:
     decls: AnnotationDecls
-    _walker: _Walker | None = None
-    _schemas: _Schemas | None = None
+    _walk_host: Callable[[str], list[ScanNode]] = _walk_nothing
+    _declaring_uris: frozenset[str] = frozenset()
     _rel_to_uri: dict[str, str] = field(default_factory=dict)
     _hosts: dict[str, HostScan | None] = field(default_factory=dict)
 
@@ -143,7 +143,7 @@ class AnnotationScan:
                 self._hosts[key] = None
             else:
                 nodes = self._walk_host(uri)
-                own = any(n.uri == uri for n in self.decls.nodes)
+                own = uri in self._declaring_uris
                 occs = [
                     Occurrence(n.to_entry(), n, n.value.get("step"), n.value.get("files"))
                     for n in nodes
@@ -156,9 +156,9 @@ class AnnotationScan:
         """Occurrences declared by registered non-step schemas, in schema-path order.
 
         A registered schema that is neither a step schema nor the seed manifest is a host only
-        when its own file declares an ``x-node`` with ``files``; only those occurrences (with
-        ``files`` and an ``x-node.step``) are returned.  Reuses the glob-key path of step hosts.
-        A node there without ``files`` is not registered.
+        when its own file declares an ``x-node`` with ``files``; only those occurrences (the ones
+        with ``files``) are returned.  ``x-node.step`` is not read: the generator registers them
+        under step ``extras``.  A node there without ``files`` is not registered.
         """
         if self.empty:
             return []
@@ -167,12 +167,12 @@ class AnnotationScan:
             base = os.path.basename(rel)
             if step_of_schema_file(base) is not None or base == SEED_SCHEMA_BASENAME:
                 continue
-            if not any(n.uri == uri for n in self.decls.nodes):
+            if uri not in self._declaring_uris:
                 continue
             host = self.host(rel)
             if host is None:
                 continue
-            out.extend(o for o in host.occurrences if o.files and o.step)
+            out.extend(o for o in host.occurrences if o.files)
         return out
 
     @property
@@ -195,10 +195,6 @@ class AnnotationScan:
                     })
         return sorted(out, key=lambda e: e["kind"])
 
-    def _walk_host(self, uri: str) -> list[ScanNode]:
-        assert self._walker is not None and self._schemas is not None
-        return _HostWalk(self._walker, self._schemas).run(uri)
-
 
 def scan_annotations(repo_root: str, decls: AnnotationDecls | None = None) -> AnnotationScan:
     """Scan *repo_root*'s schemas; the result is empty when no schema carries an annotation."""
@@ -206,11 +202,11 @@ def scan_annotations(repo_root: str, decls: AnnotationDecls | None = None) -> An
     if decls.empty or decls.registry is None:
         return AnnotationScan(decls)
     reg = decls.registry
-    walker = _Walker(reg)
+    refs = SchemaRefs(reg)
     return AnnotationScan(
         decls,
-        _walker=walker,
-        _schemas=_Schemas(reg),
+        _walk_host=lambda uri: _HostWalk(refs, SchemaReader(refs)).run(uri),
+        _declaring_uris=frozenset(n.uri for n in decls.nodes),
         _rel_to_uri={rel.replace(os.sep, "/"): uri for uri, rel in reg.map.items()},
     )
 
@@ -218,15 +214,15 @@ def scan_annotations(repo_root: str, decls: AnnotationDecls | None = None) -> An
 class _HostWalk:
     """Walk one host schema and return its top-level ``ScanNode`` list."""
 
-    def __init__(self, walker: _Walker, schemas: _Schemas):
-        self.w = walker
-        self.sch = schemas
+    def __init__(self, refs: SchemaRefs, reader: SchemaReader):
+        self.refs = refs
+        self.sch = reader
         self.top: list[ScanNode] = []
         self._seen: set[tuple[int, int, str]] = set()
         self._active: set[tuple[int, int, str]] = set()
 
     def run(self, uri: str) -> list[ScanNode]:
-        doc = self.w.store.get(uri)
+        doc = self.refs.store.get(uri)
         if isinstance(doc, dict):
             self._visit(doc, uri, "", None, None)
         return self.top
@@ -268,7 +264,7 @@ class _HostWalk:
 
         ref = node.get("$ref")
         if isinstance(ref, str):
-            hit = self.w.resolve(ref, uri)
+            hit = self.refs.resolve(ref, uri)
             if hit is not None:
                 self._visit(hit[0], hit[1], rel, scope, fname)
         for key in _BRANCH_KEYS:

@@ -82,8 +82,8 @@
       "properties": {
         "step": {
           "type": "string",
-          "description": "Step ID matching an entry in step_order.json::steps[], e.g. '04' or '16a'.",
-          "pattern": "^[0-9]{2}[a-z]?$"
+          "description": "Step ID matching an entry in step_order.json::steps[], e.g. '04' or '16a'; or 'extras' for the entries of a record host (a non-step schema whose x-node sets files).",
+          "pattern": "^([0-9]{2}[a-z]?|extras)$"
         },
         "arrays": {
           "type": "array",

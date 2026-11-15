@@ -94,20 +94,24 @@ def _esc(token: str) -> str:
     return token.replace("~", "~0").replace("/", "~1")
 
 
-class _Walker:
+class SchemaRefs:
+    """``$ref`` resolution over a registry's raw schema store (no merging, origin kept)."""
+
     def __init__(self, registry: SchemaRegistry):
         self.reg = registry
         self.store = registry.store
-        self.nodes: dict[Site, NodeDecl] = {}
-        self.links: dict[tuple[Site, str | None], LinkDecl] = {}
-        self._visited: set[tuple[str, str, str | None]] = set()
 
     def file_of(self, uri: str) -> str:
+        """Repo-relative file of schema *uri*, or *uri* itself when unmapped."""
         rel = self.reg.map.get(uri)
         return rel if rel else uri
 
-    def resolve(self, ref: str, uri: str) -> tuple[Any, str, str] | None:
-        """Resolve *ref* seen in schema *uri*: (target, target_uri, target_pointer)."""
+    def resolve(self, ref: str, uri: str = "") -> tuple[Any, str, str] | None:
+        """Resolve *ref* seen in schema *uri*: ``(target, target_uri, target_pointer)`` or ``None``.
+
+        Handles ``vc:...#anchor`` (a ``$anchor``), ``#/json/pointer`` and whole-schema URIs; a ref
+        without a URI part resolves against *uri*.
+        """
         base, _, frag = ref.partition("#")
         target_uri = base or uri
         doc = self.store.get(target_uri)
@@ -146,8 +150,18 @@ class _Walker:
                     return hit
         return None
 
+
+class AnnotationWalker:
+    """Provenance-tracking walk over every schema of the store, recording annotations."""
+
+    def __init__(self, refs: SchemaRefs):
+        self.refs = refs
+        self.nodes: dict[Site, NodeDecl] = {}
+        self.links: dict[tuple[Site, str | None], LinkDecl] = {}
+        self._visited: set[tuple[str, str, str | None]] = set()
+
     def walk_all(self) -> None:
-        for uri, doc in self.store.items():
+        for uri, doc in self.refs.store.items():
             if isinstance(doc, dict):
                 self.walk(doc, uri, "", None, None)
 
@@ -158,40 +172,60 @@ class _Walker:
         if key in self._visited:
             return
         self._visited.add(key)
-        file = self.file_of(uri)
-        if "x-node" in node:
-            site = (uri, ptr)
-            val = node["x-node"]
-            if site not in self.nodes:
-                kind = val.get("kind") if isinstance(val, dict) else None
-                self.nodes[site] = NodeDecl(kind, val, site, ptr or "/", file, node, uri)
-            if isinstance(val, dict) and isinstance(val.get("kind"), str):
-                holder = val["kind"]
-        if "x-link" in node:
-            site = (uri, ptr)
-            lk = (site, fname)
-            decl = self.links.get(lk)
-            if decl is None:
-                decl = LinkDecl(fname, node["x-link"], site, ptr or "/", file, node, uri)
-                self.links[lk] = decl
-            if holder is not None:
-                decl.holders.add(holder)
+        file = self.refs.file_of(uri)
+        holder = self._note_node(node, uri, ptr, file, holder)
+        self._note_link(node, uri, ptr, file, fname, holder)
+        self._descend(node, uri, ptr, holder)
+
+    def _note_node(
+        self, node: dict, uri: str, ptr: str, file: str, holder: str | None
+    ) -> str | None:
+        """Record *node*'s ``x-node``; return the holder kind in force below it."""
+        if "x-node" not in node:
+            return holder
+        site = (uri, ptr)
+        val = node["x-node"]
+        if site not in self.nodes:
+            kind = val.get("kind") if isinstance(val, dict) else None
+            self.nodes[site] = NodeDecl(kind, val, site, ptr or "/", file, node, uri)
+        if isinstance(val, dict) and isinstance(val.get("kind"), str):
+            return val["kind"]
+        return holder
+
+    def _note_link(
+        self, node: dict, uri: str, ptr: str, file: str, fname: str | None, holder: str | None
+    ) -> None:
+        """Record *node*'s ``x-link`` and the node kind that holds it."""
+        if "x-link" not in node:
+            return
+        site = (uri, ptr)
+        lk = (site, fname)
+        decl = self.links.get(lk)
+        if decl is None:
+            decl = LinkDecl(fname, node["x-link"], site, ptr or "/", file, node, uri)
+            self.links[lk] = decl
+        if holder is not None:
+            decl.holders.add(holder)
+
+    def _descend(self, node: dict, uri: str, ptr: str, holder: str | None) -> None:
         for k, v in node.items():
-            if k in _DATA_KEYS:
-                continue
-            child = f"{ptr}/{_esc(k)}"
-            if k == "$ref" and isinstance(v, str):
-                hit = self.resolve(v, uri)
-                if hit is not None:
-                    self.walk(hit[0], hit[1], hit[2], holder, None)
-            elif k == "properties" and isinstance(v, dict):
-                for name, sub in v.items():
-                    self.walk(sub, uri, f"{child}/{_esc(name)}", holder, name)
-            elif isinstance(v, dict):
-                self.walk(v, uri, child, holder, None)
-            elif isinstance(v, list):
-                for i, sub in enumerate(v):
-                    self.walk(sub, uri, f"{child}/{i}", holder, None)
+            if k not in _DATA_KEYS:
+                self._descend_key(k, v, uri, f"{ptr}/{_esc(k)}", holder)
+
+    def _descend_key(self, k: str, v: Any, uri: str, child: str, holder: str | None) -> None:
+        """Walk the value *v* of keyword *k* of a schema object whose child pointer is *child*."""
+        if k == "$ref" and isinstance(v, str):
+            hit = self.refs.resolve(v, uri)
+            if hit is not None:
+                self.walk(hit[0], hit[1], hit[2], holder, None)
+        elif k == "properties" and isinstance(v, dict):
+            for name, sub in v.items():
+                self.walk(sub, uri, f"{child}/{_esc(name)}", holder, name)
+        elif isinstance(v, dict):
+            self.walk(v, uri, child, holder, None)
+        elif isinstance(v, list):
+            for i, sub in enumerate(v):
+                self.walk(sub, uri, f"{child}/{i}", holder, None)
 
 
 def collect_annotations(repo_root: str) -> AnnotationDecls:
@@ -205,7 +239,7 @@ def collect_annotations(repo_root: str) -> AnnotationDecls:
     reg = get_shared_registry(root)
     if GRAPH_URI not in reg.store:
         return AnnotationDecls(registry=reg)
-    walker = _Walker(reg)
+    walker = AnnotationWalker(SchemaRefs(reg))
     walker.walk_all()
     return AnnotationDecls(
         nodes=list(walker.nodes.values()),
@@ -219,16 +253,16 @@ def collect_annotations(repo_root: str) -> AnnotationDecls:
 # Lint
 # ---------------------------------------------------------------------------
 
-class _Schemas:
+class SchemaReader:
     """Read helpers over the raw store, following ``$ref`` chains."""
 
-    def __init__(self, reg: SchemaRegistry):
-        self.w = _Walker(reg)
+    def __init__(self, refs: SchemaRefs):
+        self.refs = refs
 
     def follow(self, node: Any, uri: str) -> tuple[Any, str]:
         for _ in range(_MAX_HOPS):
             if isinstance(node, dict) and isinstance(node.get("$ref"), str):
-                hit = self.w.resolve(node["$ref"], uri)
+                hit = self.refs.resolve(node["$ref"], uri)
                 if hit is None:
                     return node, uri
                 node, uri = hit[0], hit[1]
@@ -244,7 +278,7 @@ class _Schemas:
             if key in node:
                 return node[key], uri
             if isinstance(node.get("$ref"), str):
-                hit = self.w.resolve(node["$ref"], uri)
+                hit = self.refs.resolve(node["$ref"], uri)
                 if hit is None:
                     break
                 node, uri = hit[0], hit[1]
@@ -308,19 +342,11 @@ def _errors_text(validator: Draft202012Validator, instance: Any) -> str:
     return "; ".join(e.message for e in errs[:3])
 
 
-def lint_annotations(decls: AnnotationDecls) -> list[str]:
-    """Return the ANNOT-nn issues for *decls* (empty when the scan found nothing)."""
-    if decls.empty or decls.registry is None:
-        return []
-    reg = decls.registry
-    sch = _Schemas(reg)
-    reg_ref = reg.to_referencing_registry()
-    v_node = Draft202012Validator({"$ref": f"{GRAPH_URI}#xNode"}, registry=reg_ref)
-    v_link = Draft202012Validator({"$ref": f"{GRAPH_URI}#xLink"}, registry=reg_ref)
-    verbs = set(reg.store[GRAPH_URI].get("$defs", {}).get("linkVerb", {}).get("enum", []))
+def _lint_values(
+    decls: AnnotationDecls, v_node: Draft202012Validator, v_link: Draft202012Validator
+) -> tuple[list[str], list[NodeDecl], list[LinkDecl]]:
+    """ANNOT-01: values validate against the annotation language; returns the valid decls."""
     issues: list[str] = []
-
-    # ANNOT-01: values validate against the annotation language.
     valid_nodes: list[NodeDecl] = []
     for n in decls.nodes:
         text = _errors_text(v_node, n.value)
@@ -335,10 +361,14 @@ def lint_annotations(decls: AnnotationDecls) -> list[str]:
             issues.append(f"ANNOT-01 {_where(lk.schema_file, lk.path)}: invalid x-link: {text}")
         else:
             valid_links.append(lk)
+    return issues, valid_nodes, valid_links
 
-    # ANNOT-02: kebab-case kind names; one definition site per kind.
+
+def _lint_kinds(nodes: list[NodeDecl]) -> list[str]:
+    """ANNOT-02: kebab-case kind names; one definition site per kind."""
+    issues: list[str] = []
     sites_by_kind: dict[str, list[NodeDecl]] = {}
-    for n in decls.nodes:
+    for n in nodes:
         if not isinstance(n.kind, str):
             continue
         if not _KEBAB.match(n.kind):
@@ -348,59 +378,73 @@ def lint_annotations(decls: AnnotationDecls) -> list[str]:
         if len(group) > 1:
             where = ", ".join(_where(g.schema_file, g.path) for g in group)
             issues.append(f"ANNOT-02 kind {kind!r} is declared at more than one site: {where}")
+    return issues
 
-    # ANNOT-03 / ANNOT-08 per valid node.
-    for n in valid_nodes:
-        val = n.value
-        loc = _where(n.schema_file, n.path)
-        if val.get("map_keyed"):
-            item, iuri = sch.get(n.container, n.uri, "additionalProperties")
-            if not isinstance(item, dict):
-                issues.append(
-                    f"ANNOT-03 {loc}: map_keyed node {n.kind!r} needs additionalProperties "
-                    "as an object schema holding the item schema"
-                )
-                continue
-        else:
-            item, iuri = sch.get(n.container, n.uri, "items")
-            if not isinstance(item, dict):
-                issues.append(f"ANNOT-03 {loc}: node {n.kind!r} has no items schema")
-                continue
-            props = sch.properties(item, iuri)
-            id_name = val["id"]
-            if id_name not in props:
-                issues.append(f"ANNOT-03 {loc}: item schema of {n.kind!r} has no id property {id_name!r}")
-            elif not sch.is_string(props[id_name][0], props[id_name][1]):
-                issues.append(f"ANNOT-03 {loc}: id property {id_name!r} of {n.kind!r} is not a string")
-        # ANNOT-08
-        if val.get("top_of_graph") or val.get("role") == "record":
-            continue
-        props = sch.properties(item, iuri)
-        lc = props.get("lifecycle")
-        if lc is None or not (isinstance(lc[0], dict) and lc[0].get("$ref") == f"{GRAPH_URI}#lifecycle"):
-            issues.append(
-                f"ANNOT-08 {loc}: item of {n.kind!r} must declare lifecycle as $ref {GRAPH_URI}#lifecycle"
+
+def _node_item(sch: SchemaReader, n: NodeDecl) -> tuple[Any, str] | str:
+    """ANNOT-03 shape check: the item schema and its URI, or the issue text when it is missing."""
+    loc = _where(n.schema_file, n.path)
+    if n.value.get("map_keyed"):
+        item, iuri = sch.get(n.container, n.uri, "additionalProperties")
+        if not isinstance(item, dict):
+            return (
+                f"ANNOT-03 {loc}: map_keyed node {n.kind!r} needs additionalProperties "
+                "as an object schema holding the item schema"
             )
-        if val.get("role") in _OBLIGATION_ROLES:
-            for need in ("scope", "scope_reason"):
-                if need not in props:
-                    issues.append(f"ANNOT-08 {loc}: obligation item of {n.kind!r} must declare {need}")
-            if f"{GRAPH_URI}#scopeReasonRule" not in sch.all_of_refs(item, iuri):
-                issues.append(
-                    f"ANNOT-08 {loc}: obligation item of {n.kind!r} must carry "
-                    f"{GRAPH_URI}#scopeReasonRule in allOf"
-                )
+        return item, iuri
+    item, iuri = sch.get(n.container, n.uri, "items")
+    if not isinstance(item, dict):
+        return f"ANNOT-03 {loc}: node {n.kind!r} has no items schema"
+    return item, iuri
 
-    declared = {n.kind for n in valid_nodes} | _EXTERNAL_KINDS
 
-    # ANNOT-05 / ANNOT-07 per valid link.
-    for lk in valid_links:
+def _lint_node(sch: SchemaReader, n: NodeDecl) -> list[str]:
+    """ANNOT-03 then ANNOT-08 for one valid node; stops after ANNOT-03 when the item is missing."""
+    found = _node_item(sch, n)
+    if isinstance(found, str):
+        return [found]
+    item, iuri = found
+    val = n.value
+    loc = _where(n.schema_file, n.path)
+    issues: list[str] = []
+    props = sch.properties(item, iuri)
+    if not val.get("map_keyed"):
+        id_name = val["id"]
+        if id_name not in props:
+            issues.append(f"ANNOT-03 {loc}: item schema of {n.kind!r} has no id property {id_name!r}")
+        elif not sch.is_string(props[id_name][0], props[id_name][1]):
+            issues.append(f"ANNOT-03 {loc}: id property {id_name!r} of {n.kind!r} is not a string")
+    if val.get("top_of_graph") or val.get("role") == "record":
+        return issues
+    lc = props.get("lifecycle")
+    if lc is None or not (isinstance(lc[0], dict) and lc[0].get("$ref") == f"{GRAPH_URI}#lifecycle"):
+        issues.append(
+            f"ANNOT-08 {loc}: item of {n.kind!r} must declare lifecycle as $ref {GRAPH_URI}#lifecycle"
+        )
+    if val.get("role") in _OBLIGATION_ROLES:
+        for need in ("scope", "scope_reason"):
+            if need not in props:
+                issues.append(f"ANNOT-08 {loc}: obligation item of {n.kind!r} must declare {need}")
+        if f"{GRAPH_URI}#scopeReasonRule" not in sch.all_of_refs(item, iuri):
+            issues.append(
+                f"ANNOT-08 {loc}: obligation item of {n.kind!r} must carry "
+                f"{GRAPH_URI}#scopeReasonRule in allOf"
+            )
+    return issues
+
+
+def _lint_links(
+    sch: SchemaReader, links: list[LinkDecl], verbs: set[str], declared: set[Any]
+) -> list[str]:
+    """ANNOT-05 / ANNOT-07 per valid link."""
+    issues: list[str] = []
+    for lk in links:
         loc = _where(lk.schema_file, lk.path)
         name = lk.field_name
         if name is None or name not in verbs:
             issues.append(f"ANNOT-05 {loc}: x-link field {name!r} is not a verb of linkVerb")
         t, _ = sch.get(lk.container, lk.uri, "type")
-        items, iuri = sch.get(lk.container, lk.uri, "items")
+        items, _ = sch.get(lk.container, lk.uri, "items")
         ref = items.get("$ref") if isinstance(items, dict) else None
         if t != "array" or ref not in _ID_ATOM_REFS:
             issues.append(
@@ -423,5 +467,23 @@ def lint_annotations(decls: AnnotationDecls) -> list[str]:
             for k in same:
                 if k not in kinds:
                     issues.append(f"ANNOT-07 {loc}: same_step_kinds entry {k!r} is not in kinds")
-
     return issues
+
+
+def lint_annotations(decls: AnnotationDecls) -> list[str]:
+    """Return the ANNOT-nn issues for *decls* (empty when the scan found nothing)."""
+    if decls.empty or decls.registry is None:
+        return []
+    reg = decls.registry
+    sch = SchemaReader(SchemaRefs(reg))
+    reg_ref = reg.to_referencing_registry()
+    v_node = Draft202012Validator({"$ref": f"{GRAPH_URI}#xNode"}, registry=reg_ref)
+    v_link = Draft202012Validator({"$ref": f"{GRAPH_URI}#xLink"}, registry=reg_ref)
+    verbs = set(reg.store[GRAPH_URI].get("$defs", {}).get("linkVerb", {}).get("enum", []))
+
+    issues, valid_nodes, valid_links = _lint_values(decls, v_node, v_link)
+    issues += _lint_kinds(decls.nodes)
+    for n in valid_nodes:
+        issues += _lint_node(sch, n)
+    declared = {n.kind for n in valid_nodes} | _EXTERNAL_KINDS
+    return issues + _lint_links(sch, valid_links, verbs, declared)

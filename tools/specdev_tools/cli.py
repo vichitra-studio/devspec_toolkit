@@ -139,13 +139,19 @@ def check_venv():
         print("Error: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
         sys.exit(1)
 
-def build_parser() -> argparse.ArgumentParser:
+class _SpecdevParser(argparse.ArgumentParser):
+    """The top-level parser; ``ctx_parser`` is the ``context`` group parser."""
+
+    ctx_parser: argparse.ArgumentParser
+
+
+def build_parser() -> _SpecdevParser:
     """Build the full ``specdev`` argparse parser (no parsing, no side effects).
 
     The ``context`` group parser is attached as ``parser.ctx_parser`` because the
     dispatch block prints its help when no sub-command is given.
     """
-    p = argparse.ArgumentParser(prog="specdev-tools")
+    p = _SpecdevParser(prog="specdev-tools")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     v = sub.add_parser("validate")
@@ -2166,6 +2172,7 @@ def main():
             cli_commands_out = os.path.join(repo_root, "tools", "cli_commands.json")
         else:
             cli_commands_out = None
+        from .registry.annotations import AnnotationError
         from .registry.generate import run as registry_generate_run
         try:
             registry_generate_run(
@@ -2175,7 +2182,7 @@ def main():
                 step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
                 cli_commands_out=cli_commands_out,
             )
-        except ValueError as exc:  # includes AnnotationError (issue list in the message)
+        except AnnotationError as exc:  # the issue list is in the message
             print(f"registry-generate: failed: {exc}", file=sys.stderr)
             sys.exit(1)
 

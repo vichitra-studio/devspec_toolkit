@@ -54,12 +54,14 @@ import os
 from typing import Any
 
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
-from specdev_tools.registry.annotation_scan import scan_annotations
+from specdev_tools.registry.annotation_scan import HostScan, scan_annotations
 from specdev_tools.registry.annotations import (
+    AnnotationDecls,
     AnnotationError,
     collect_annotations,
     lint_annotations,
 )
+from specdev_tools.registry.step_order_gen import build_step_order_document, derive_from_decls
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +553,42 @@ def _build_extraction_paths(
 # Main generator
 # ---------------------------------------------------------------------------
 
+#: Registry ``step`` of every entry declared by a record host (a non-step schema).
+RECORD_HOST_STEP = "extras"
+
+
+def _register_glob_entry(
+    registry: dict[str, dict[str, Any]], key: str, step: str, entry: dict[str, Any]
+) -> None:
+    """Append *entry* to the registry slot of glob *key*, creating the slot under *step*."""
+    registry.setdefault(key, {"step": step, "arrays": []})["arrays"].append(entry)
+
+
+def _in_slot(registry: dict[str, dict[str, Any]], key: str, entry: dict[str, Any]) -> bool:
+    """True when the slot of *key* already holds an entry with the same array path and kind."""
+    arrays = registry.get(key, {}).get("arrays", [])
+    return any(a["array_path"] == entry["array_path"] and a["kind"] == entry["kind"] for a in arrays)
+
+
+def _register_host_entries(
+    registry: dict[str, dict[str, Any]], host: HostScan, step: str, arrays: list[dict[str, Any]]
+) -> set[str]:
+    """Register one step host's annotation entries; return the glob keys it claimed.
+
+    An occurrence with ``files`` goes under each glob key (step *step* unless it names its own);
+    any other occurrence joins *arrays* unless the heuristic scan already found that path.
+    """
+    legacy_paths = {a["array_path"] for a in arrays}
+    claimed: set[str] = set()
+    for occ in host.occurrences:
+        if occ.files:
+            for glob_key in occ.files:
+                _register_glob_entry(registry, glob_key, occ.step or step, occ.entry)
+                claimed.add(glob_key)
+        elif occ.entry["array_path"] not in legacy_paths:
+            arrays.append(occ.entry)
+    return claimed
+
 def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Generate the entry_key_registry and extraction_paths dicts from schemas.
 
@@ -566,12 +604,25 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         json.JSONDecodeError: if any schema file is malformed.
         AnnotationError: if the x-node / x-link annotation lint finds issues.
     """
+    return generate_registry_from_decls(repo_root, collect_annotations(repo_root))
+
+
+def generate_registry_from_decls(
+    repo_root: str, decls: AnnotationDecls
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """``generate_registry`` over annotation declarations the caller already collected.
+
+    Args:
+        repo_root: Absolute path to the toolkit root.
+        decls: ``collect_annotations(repo_root)``; the lint runs here.
+
+    Returns and raises as ``generate_registry``.
+    """
     schema_dir = os.path.join(repo_root, "schema")
     tools_dir = os.path.join(repo_root, "tools")
 
     # Annotation lint (x-node / x-link): a no-op when the toolkit has no
     # vc:core:graph entry or no schema carries an annotation.
-    decls = collect_annotations(repo_root)
     annotation_issues = lint_annotations(decls)
     if annotation_issues:
         raise AnnotationError(annotation_issues)
@@ -618,19 +669,7 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
             )
         sentinels_set.update(sentinels_found)
 
-        extra_keys: set[str] = set()
-        if host is not None:
-            legacy_paths = {a["array_path"] for a in arrays}
-            for occ in host.occurrences:
-                if occ.files:
-                    for glob_key in occ.files:
-                        slot = registry.setdefault(
-                            glob_key, {"step": occ.step or step, "arrays": []}
-                        )
-                        slot["arrays"].append(occ.entry)
-                        extra_keys.add(glob_key)
-                elif occ.entry["array_path"] not in legacy_paths:
-                    arrays.append(occ.entry)
+        extra_keys = _register_host_entries(registry, host, step, arrays) if host is not None else set()
 
         if not arrays and extra_keys:
             continue  # the step's entries all live under glob keys
@@ -649,11 +688,12 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
             "arrays": arrays,
         }
 
-    # Record hosts: registered non-step schemas whose own x-node sets ``files``.
+    # Record hosts: registered non-step schemas whose own x-node sets ``files``.  Their entries
+    # belong to no step: they register under ``RECORD_HOST_STEP``.
     for occ in scan.record_hosts():
         for glob_key in occ.files or []:
-            slot = registry.setdefault(glob_key, {"step": occ.step, "arrays": []})
-            slot["arrays"].append(occ.entry)
+            if not _in_slot(registry, glob_key, occ.entry):
+                _register_glob_entry(registry, glob_key, RECORD_HOST_STEP, occ.entry)
 
     # Sentinels are a hardcoded constant list: these array names appear across
     # multiple spec files at write-time (appended by canonical-lint tooling) and
@@ -692,6 +732,14 @@ def _serialize(doc: Any) -> str:
     return json.dumps(doc, sort_keys=True, indent=2) + "\n"
 
 
+def _write_doc(path: str, doc: Any) -> None:
+    """Write *doc* serialized to *path* (creating its directory) and report it."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(_serialize(doc))
+    print(f"registry-generate: wrote {path}")
+
+
 def run(
     repo_root: str,
     out_path: str,
@@ -710,44 +758,28 @@ def run(
         cli_commands_out: Optional destination for cli_commands.json (``None`` writes nothing).
     """
     repo_root = os.path.abspath(repo_root)
-    registry_doc, extraction_paths_doc = generate_registry(repo_root)
+    decls = collect_annotations(repo_root)
+    registry_doc, extraction_paths_doc = generate_registry_from_decls(repo_root, decls)
+    outputs: list[tuple[str, Any]] = [
+        (out_path, registry_doc),
+        (extraction_paths_out, extraction_paths_doc),
+    ]
 
-    # Derive the step order first so a failure leaves no output half-written.
-    step_order_doc = None
+    # Derive everything first so a failure leaves no output half-written.
     if step_order_out:
-        from specdev_tools.registry.step_order_gen import build_step_order_document, derive_step_order
-
-        derived = derive_step_order(repo_root)
+        derived = derive_from_decls(decls)
         if not derived["steps"]:
-            raise ValueError("registry-generate --step-order-out: no annotated step to derive an order from")
+            raise AnnotationError(
+                ["registry-generate --step-order-out: no annotated step to derive an order from"]
+            )
         hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
-        step_order_doc = build_step_order_document(derived, hand)
-
-    # Write registry
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as fh:
-        fh.write(_serialize(registry_doc))
-
-    # Write extraction_paths
-    os.makedirs(os.path.dirname(os.path.abspath(extraction_paths_out)), exist_ok=True)
-    with open(extraction_paths_out, "w", encoding="utf-8") as fh:
-        fh.write(_serialize(extraction_paths_doc))
-
-    print(f"registry-generate: wrote {out_path}")
-    print(f"registry-generate: wrote {extraction_paths_out}")
-
-    if step_order_doc is not None:
-        step_order_out = os.path.abspath(step_order_out)
-        os.makedirs(os.path.dirname(step_order_out), exist_ok=True)
-        with open(step_order_out, "w", encoding="utf-8") as fh:
-            fh.write(_serialize(step_order_doc))
-        print(f"registry-generate: wrote {step_order_out}")
-
+        outputs.append((os.path.abspath(step_order_out), build_step_order_document(derived, hand)))
     if cli_commands_out:
+        # Lazy: generate_cli_commands builds the full CLI parser (specdev_tools.cli), which loads
+        # this module lazily in turn; a local import keeps loading generate from loading cli.
         from specdev_tools.registry.cli_commands import generate_cli_commands
 
-        cli_commands_out = os.path.abspath(cli_commands_out)
-        os.makedirs(os.path.dirname(cli_commands_out), exist_ok=True)
-        with open(cli_commands_out, "w", encoding="utf-8") as fh:
-            fh.write(_serialize(generate_cli_commands()))
-        print(f"registry-generate: wrote {cli_commands_out}")
+        outputs.append((os.path.abspath(cli_commands_out), generate_cli_commands()))
+
+    for path, doc in outputs:
+        _write_doc(path, doc)

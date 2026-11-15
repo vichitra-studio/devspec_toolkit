@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 import json
 import re
-import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -26,48 +25,26 @@ from specdev_tools.registry.annotation_scan import (
     make_ref_resolver,
     scan_annotations,
 )
+from specdev_tools.registry import generate as generate_mod
+from specdev_tools.registry import step_order_gen
 from specdev_tools.registry.generate import _serialize, generate_registry
 from specdev_tools.validation.matrix import _extract_array_items
 from specdev_tools.validation.registry_check import run_registry_check
 
 _ROOT = Path(__file__).resolve().parents[3]
-_MINI = _ROOT / "tests" / "fixtures" / "graph" / "mini_toolkit"
 _PRE_M1 = _ROOT / "tests" / "fixtures" / "entry_key_registry_pre_m1.json"
 _CORPUS = _ROOT / "tests" / "fixtures" / "spec_corpus"
 _REG_SCHEMA = _ROOT / "schema" / "entry_key_registry.schema.json"
 
-S01 = "schema/01_capabilities.schema.json"
 S04 = "schema/04_fr_list.schema.json"
 S05 = "schema/05_interface_contracts.schema.json"
 SREG = "tools/schema_registry.json"
 
 
-@pytest.fixture(autouse=True)
-def _fresh_caches():
-    clear_shared_caches()
-    yield
-    clear_shared_caches()
 
 
-def _toolkit(tmp_path: Path) -> Path:
-    """The mini fixture toolkit with what the generator needs around it."""
-    root = tmp_path / "gen"
-    (root / "tools").mkdir(parents=True)
-    (root / "schema" / "core").mkdir(parents=True)
-    shutil.copy(_ROOT / "tools" / "step_order.json", root / "tools")
-    shutil.copy(_ROOT / "schema" / "core" / "collections.schema.json", root / "schema" / "core")
-    shutil.copytree(_MINI / "schema", root / "schema", dirs_exist_ok=True)
-    shutil.copy(_MINI / SREG, root / SREG)
-    for name in ("graph", "atoms"):
-        shutil.copy(_ROOT / "schema" / "core" / f"{name}.schema.json", root / "schema" / "core")
-    return root
 
 
-def _edit(root: Path, rel: str, fn: Callable[[dict], None]) -> None:
-    p = root / rel
-    doc = json.loads(p.read_text())
-    fn(doc)
-    p.write_text(json.dumps(doc, indent=2) + "\n")
 
 
 def _generate(root: Path) -> tuple[dict, dict]:
@@ -107,8 +84,8 @@ def ptr_of(resolve, ref):
 
 # ------------------------------------------------- generate on the fixture (acc. 1)
 
-def test_fixture_registry_has_nested_map_keyed_roles_and_links(tmp_path):
-    reg, ext = _generate(_toolkit(tmp_path))
+def test_fixture_registry_has_nested_map_keyed_roles_and_links(mini_toolkit):
+    reg, ext = _generate(mini_toolkit)
     fr = _by_path(_arrays(reg, "04_fr_list.json"))
     assert set(fr) == {".functional_requirements", ".ambiguities"}
     frs = fr[".functional_requirements"]
@@ -149,15 +126,15 @@ def test_fixture_registry_has_nested_map_keyed_roles_and_links(tmp_path):
     assert not any("seed" in str(v) for v in ext.values())
 
 
-def test_fixture_output_is_byte_deterministic(tmp_path):
-    root = _toolkit(tmp_path)
+def test_fixture_output_is_byte_deterministic(mini_toolkit):
+    root = mini_toolkit
     first = [_serialize(d) for d in _generate(root)]
     second = [_serialize(d) for d in _generate(root)]
     assert first == second
 
 
-def test_fixture_registry_validates_against_widened_schema(tmp_path):
-    reg, _ = _generate(_toolkit(tmp_path))
+def test_fixture_registry_validates_against_widened_schema(mini_toolkit):
+    reg, _ = _generate(mini_toolkit)
     schema = json.loads(_REG_SCHEMA.read_text())
     errs = list(Draft202012Validator(schema).iter_errors(reg))
     assert errs == []
@@ -231,16 +208,16 @@ def test_path_grammar_rejects(path):
     assert not _PATH_RE.match(path)
 
 
-def test_registry_schema_rejects_malformed_array_path(tmp_path):
-    reg, _ = _generate(_toolkit(tmp_path))
+def test_registry_schema_rejects_malformed_array_path(mini_toolkit):
+    reg, _ = _generate(mini_toolkit)
     bad = copy.deepcopy(reg)
     bad["registry"]["04_fr_list.json"]["arrays"][0]["array_path"] = ".a..b"
     schema = json.loads(_REG_SCHEMA.read_text())
     assert list(Draft202012Validator(schema).iter_errors(bad))
 
 
-def test_registry_schema_requires_id_field_unless_map_keyed(tmp_path):
-    reg, _ = _generate(_toolkit(tmp_path))
+def test_registry_schema_requires_id_field_unless_map_keyed(mini_toolkit):
+    reg, _ = _generate(mini_toolkit)
     bad = copy.deepcopy(reg)
     arr = bad["registry"]["04_fr_list.json"]["arrays"][0]
     del arr["id_field"]
@@ -305,15 +282,18 @@ _S07 = {
 }
 
 
-def _with_s07(tmp_path: Path) -> Path:
-    root = _toolkit(tmp_path)
+EditJson = Callable[[Path, str, Callable[[dict], None]], None]
+
+
+def _with_s07(root: Path, edit_json: EditJson) -> Path:
+    """The mini toolkit at *root* plus a registered step-07 schema (``_S07``)."""
     (root / "schema" / "07_nfrs.schema.json").write_text(json.dumps(_S07, indent=2))
-    _edit(root, SREG, lambda d: d.update({"vc:07-nfrs-fixture": "schema/07_nfrs.schema.json"}))
+    edit_json(root, SREG, lambda d: d.update({"vc:07-nfrs-fixture": "schema/07_nfrs.schema.json"}))
     return root
 
 
-def test_object_path_unannotated_type_id_list_and_distinct_kinds(tmp_path):
-    reg, _ = _generate(_with_s07(tmp_path))
+def test_object_path_unannotated_type_id_list_and_distinct_kinds(mini_toolkit, edit_json):
+    reg, _ = _generate(_with_s07(mini_toolkit, edit_json))
     arrays = _by_path(_arrays(reg, "07_nfrs.json"))
     assert set(arrays) == {".plan.items", ".risks", ".issues"}
     assert arrays[".plan.items"]["id_field"] == "thing_id"
@@ -324,8 +304,8 @@ def test_object_path_unannotated_type_id_list_and_distinct_kinds(tmp_path):
 
 # --------------------------------------- $ref-only vs own annotation (acc. 7, X2-03)
 
-def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(tmp_path):
-    root = _toolkit(tmp_path)
+def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(edit_json, mini_toolkit):
+    root = mini_toolkit
 
     def only_ref(doc):
         # 05: drop its own x-node + x-link; keep an un-annotated array and reach the
@@ -346,8 +326,8 @@ def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(tmp_path):
             "items": {"type": "object", "properties": {"legacy_id": {"type": "string"}}},
         }
 
-    _edit(root, S05, only_ref)
-    _edit(root, S04, own_annotation)
+    edit_json(root, S05, only_ref)
+    edit_json(root, S04, own_annotation)
     reg, _ = _generate(root)
     ref_only = _by_path(_arrays(reg, "05_interface_contracts.json"))
     assert ref_only[".things"] == {"array_path": ".things", "id_field": "thing_id", "kind": "thing"}
@@ -364,9 +344,9 @@ def test_ref_only_host_keeps_heuristic_and_own_annotation_replaces_it(tmp_path):
 
 # ----------------------------------------------------- glob file keys (x-node files)
 
-def test_files_glob_becomes_registry_key(tmp_path):
-    root = _toolkit(tmp_path)
-    _edit(root, "schema/16_impl_context.schema.json",
+def test_files_glob_becomes_registry_key(edit_json, mini_toolkit):
+    root = mini_toolkit
+    edit_json(root, "schema/16_impl_context.schema.json",
           lambda d: d["properties"]["plan_items"]["x-node"].update({"files": ["impl_context/ms_*_plan.json"]}))
     reg, ext = _generate(root)
     assert "16_impl_context.json" not in reg["registry"]
@@ -618,14 +598,14 @@ def test_corpus_excluded_wide_path_is_keyed_by_top_key(tmp_path):
 
 # ------------------------------------------- record hosts (registered non-step schemas)
 
-def test_non_step_schema_with_files_is_a_record_host(tmp_path):
-    root = _toolkit(tmp_path)
+def test_non_step_schema_with_files_is_a_record_host(mini_toolkit):
+    root = mini_toolkit
     reg, ext = _generate(root)
     entry = reg["registry"]["extras/sample/*.json"]
-    assert entry["step"] == "04"
+    assert entry["step"] == "extras"
     assert [(a["kind"], a["array_path"], a["role"]) for a in entry["arrays"]] == [
         ("sample-record", ".records", "record")]
-    assert "extras/sample/*.json" in ext["04"]
+    assert "extras" not in ext
     assert list(Draft202012Validator(json.loads(_REG_SCHEMA.read_text())).iter_errors(reg)) == []
     spec = root / "spec" / "extras" / "sample"
     spec.mkdir(parents=True)
@@ -638,10 +618,57 @@ def test_non_step_schema_with_files_is_a_record_host(tmp_path):
     assert [i["record_id"] for i, _, _ in iter_nodes(data, entries[0].array_path)] == ["rec-1"]
 
 
-def test_non_step_schema_node_without_files_is_not_registered(tmp_path):
-    root = _toolkit(tmp_path)
-    _edit(root, "schema/extras/sample_record.schema.json",
-          lambda d: d["properties"]["records"]["x-node"].pop("files"))
+def _add_second_record_host(
+    root: Path, edit_json: EditJson, x_node_edit: Callable[[dict], None] = lambda x: None) -> None:
+    """A second registered record host that claims the same ``files`` glob as the sample host."""
+    doc = json.loads((root / "schema/extras/sample_record.schema.json").read_text())
+    doc["$id"] = "vc:extras-other-record"
+    xn = doc["properties"]["records"]["x-node"]
+    xn["kind"] = "other-record"
+    x_node_edit(xn)
+    (root / "schema/extras/other_record.schema.json").write_text(json.dumps(doc))
+    edit_json(root, SREG, lambda d: d.update(
+        {"vc:extras-other-record": "schema/extras/other_record.schema.json"}))
+
+
+def test_record_host_ignores_x_node_step(edit_json, mini_toolkit):
+    root = mini_toolkit
+    edit_json(root, "schema/extras/sample_record.schema.json",
+          lambda d: d["properties"]["records"]["x-node"].update(step="05"))
+    reg, ext = _generate(root)
+    assert reg["registry"]["extras/sample/*.json"]["step"] == "extras"
+    assert not any("extras/sample/*.json" in block for block in ext.values() if isinstance(block, dict))
+
+
+def test_record_host_reached_through_a_step_ref_is_registered_once(edit_json, mini_toolkit):
+    root = mini_toolkit
+    edit_json(root, "schema/extras/sample_record.schema.json",
+          lambda d: d["properties"]["records"]["x-node"].update(step="04"))
+    edit_json(root, S04, lambda d: d.setdefault("allOf", []).append({"$ref": "vc:extras-sample-record"}))
     reg, _ = _generate(root)
-    assert "extras/sample/*.json" not in reg["registry"]
-    assert "sample-record" not in json.dumps(reg)
+    assert [a["kind"] for a in _arrays(reg, "extras/sample/*.json")] == ["sample-record"]
+
+
+def test_two_record_hosts_on_one_glob_both_register_under_extras(mini_toolkit, edit_json):
+    root = mini_toolkit
+    _add_second_record_host(root, edit_json, lambda xn: xn.update(step="05"))
+    reg, _ = _generate(root)
+    entry = reg["registry"]["extras/sample/*.json"]
+    assert entry["step"] == "extras"
+    assert sorted(a["kind"] for a in entry["arrays"]) == ["other-record", "sample-record"]
+
+
+def test_run_collects_annotations_once_with_step_order_out(tmp_path, monkeypatch, mini_toolkit):
+    root = mini_toolkit
+    calls = []
+    real = generate_mod.collect_annotations
+    counting = lambda r: calls.append(r) or real(r)  # noqa: E731
+    for module in (generate_mod, step_order_gen):
+        monkeypatch.setattr(module, "collect_annotations", counting)
+    clear_shared_caches()
+    generate_mod.run(
+        str(root), str(tmp_path / "r.json"), str(tmp_path / "e.json"),
+        step_order_out=str(tmp_path / "o.json"),
+    )
+    assert len(calls) == 1
+    assert json.loads((tmp_path / "o.json").read_text())["steps"]

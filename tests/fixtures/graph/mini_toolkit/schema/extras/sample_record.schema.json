@@ -12,7 +12,6 @@
         "id": "record_id",
         "role": "record",
         "contract": ["note"],
-        "step": "04",
         "files": ["extras/sample/*.json"]
       },
       "items": {

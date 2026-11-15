@@ -20,13 +20,17 @@ has a cycle), ANNOT-21 (an ``x-link`` kind lives in the holder's own step and is
 from __future__ import annotations
 
 import heapq
+import itertools
 import os
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 from specdev_tools.registry.annotation_scan import step_of_schema_file
 from specdev_tools.registry.annotations import (
+    AnnotationDecls,
     AnnotationError,
+    LinkDecl,
+    NodeDecl,
     collect_annotations,
     lint_annotations,
 )
@@ -101,7 +105,7 @@ def _find_cycle(adj: dict[str, list[str]], scc: list[str]) -> list[str]:
 
 
 def _sccs(nodes: list[str], adj: dict[str, list[str]]) -> list[list[str]]:
-    """Strongly connected components with more than one node (Tarjan, iterative-safe sizes)."""
+    """Strongly connected components with more than one node (recursive Tarjan; depth is bounded by the step count)."""
     index: dict[str, int] = {}
     low: dict[str, int] = {}
     stack: list[str] = []
@@ -137,22 +141,14 @@ def _sccs(nodes: list[str], adj: dict[str, list[str]]) -> list[list[str]]:
     return sorted(out)
 
 
-def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[str, Any]:
-    """Derive ``steps``, ``step_metadata`` and ``downstream_consumers`` from the annotations.
-
-    ``extra_edges`` are ``(holder, target)`` step pairs counted as required edges.
-    Raises ``AnnotationError`` (ANNOT-20, ANNOT-21, or the annotation lint issues).
-    """
-    decls = collect_annotations(repo_root)
-    issues = lint_annotations(decls)
-    if issues:
-        raise AnnotationError(issues)
-
-    extras = _norm_pairs(extra_edges)
+def _collect_kinds(
+    nodes: Iterable[NodeDecl],
+) -> tuple[set[str], dict[str, set[str]], dict[str, Any]]:
+    """Steps, the steps owning each kind, and each kind's role, from the ``x-node`` declarations."""
     steps: set[str] = set()
     kind_steps: dict[str, set[str]] = {}
     kind_role: dict[str, Any] = {}
-    for n in decls.nodes:
+    for n in nodes:
         if not isinstance(n.kind, str) or n.value.get("top_of_graph"):
             continue
         kind_role[n.kind] = n.value.get("role")
@@ -160,45 +156,78 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
         if step:
             steps.add(step)
             kind_steps.setdefault(n.kind, set()).add(step)
+    return steps, kind_steps, kind_role
 
+
+def _edges_for_target(
+    lk: LinkDecl,
+    holder: str,
+    hstep: str,
+    target: str,
+    kind_steps: dict[str, set[str]],
+    allowed_same: set[str],
+    is_record: bool,
+) -> tuple[list[_Edge], list[str]]:
+    """Edges and ANNOT-21 issues one link field yields for one (holder step, target kind)."""
+    edges: list[_Edge] = []
+    same_step: list[str] = []
+    for tstep in sorted(kind_steps.get(target, ())):
+        if tstep == hstep:
+            if target not in allowed_same:
+                same_step.append(
+                    f"ANNOT-21 {lk.schema_file} {lk.path}: x-link field {lk.field_name!r} "
+                    f"of kind {holder!r} points at kind {target!r} of the same step "
+                    f"{hstep}, which is not in same_step_kinds"
+                )
+        elif not is_record:  # record holders are exempt from edges only
+            edges.append(_Edge(hstep, tstep, lk.schema_file, lk.field_name or "", target))
+    return edges, same_step
+
+
+def _edges_for_link(
+    lk: LinkDecl,
+    kind_steps: dict[str, set[str]],
+    kind_role: dict[str, Any],
+) -> tuple[list[_Edge], list[str]]:
+    """Edges and ANNOT-21 issues of one ``x-link`` declaration over all its holders and targets."""
+    kinds = lk.value.get("kinds")
+    if kinds == "*" or not isinstance(kinds, list):
+        return [], []
+    allowed_same = set(lk.value.get("same_step_kinds") or [])
+    edges: list[_Edge] = []
+    same_step: list[str] = []
+    for holder in sorted(lk.holders):
+        is_record = kind_role.get(holder) == "record"
+        for hstep, target in itertools.product(sorted(kind_steps.get(holder, ())), kinds):
+            found, issues = _edges_for_target(
+                lk, holder, hstep, target, kind_steps, allowed_same, is_record
+            )
+            edges.extend(found)
+            same_step.extend(issues)
+    return edges, same_step
+
+
+def _build_edges(
+    links: Iterable[LinkDecl],
+    kind_steps: dict[str, set[str]],
+    kind_role: dict[str, Any],
+) -> tuple[dict[Pair, _Edge], list[str]]:
+    """Step edges of the link graph (first declaration wins) and the ANNOT-21 issues."""
     edges: dict[Pair, _Edge] = {}
     same_step: list[str] = []
-    for lk in sorted(decls.links, key=lambda x: (x.schema_file, x.path, x.field_name or "")):
-        kinds = lk.value.get("kinds")
-        if kinds == "*" or not isinstance(kinds, list):
-            continue
-        allowed_same = set(lk.value.get("same_step_kinds") or [])
-        for holder in sorted(lk.holders):
-            is_record = kind_role.get(holder) == "record"
-            for hstep in sorted(kind_steps.get(holder, ())):
-                for target in kinds:
-                    for tstep in sorted(kind_steps.get(target, ())):
-                        if tstep == hstep:
-                            if target not in allowed_same:
-                                same_step.append(
-                                    f"ANNOT-21 {lk.schema_file} {lk.path}: x-link field {lk.field_name!r} "
-                                    f"of kind {holder!r} points at kind {target!r} of the same step "
-                                    f"{hstep}, which is not in same_step_kinds"
-                                )
-                            continue
-                        if is_record:
-                            continue  # record holders are exempt from edges only
-                        edges.setdefault(
-                            (hstep, tstep),
-                            _Edge(hstep, tstep, lk.schema_file, lk.field_name or "", target),
-                        )
-    if same_step:
-        raise AnnotationError(sorted(set(same_step)))
+    for lk in sorted(links, key=lambda x: (x.schema_file, x.path, x.field_name or "")):
+        found, issues = _edges_for_link(lk, kind_steps, kind_role)
+        same_step.extend(issues)
+        for e in found:
+            edges.setdefault((e.holder, e.target), e)
+    return edges, same_step
 
-    for h, t in extras:
-        steps.update((h, t))
-        if h != t:
-            edges.setdefault((h, t), _Edge(h, t, "", "", ""))
 
+def _check_acyclic(steps: set[str], edges: dict[Pair, _Edge]) -> None:
+    """Raise ``AnnotationError`` (ANNOT-20) naming one cycle per cyclic component."""
     adj: dict[str, list[str]] = {s: [] for s in steps}
-    for (h, t) in edges:
+    for h, t in edges:
         adj[h].append(t)
-
     cycle_issues: list[str] = []
     for scc in _sccs(sorted(steps), adj):
         cyc = _find_cycle(adj, scc)
@@ -207,10 +236,11 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
     if cycle_issues:
         raise AnnotationError(cycle_issues)
 
+
+def _topo_order(steps: set[str], edges: dict[Pair, _Edge]) -> dict[str, Any]:
+    """Kahn order (inputs first, smallest step id first) with each step's inputs and consumers."""
     inputs: dict[str, list[str]] = {s: sorted({t for (h, t) in edges if h == s}) for s in steps}
     consumers: dict[str, list[str]] = {s: sorted({h for (h, t) in edges if t == s}) for s in steps}
-
-    # Kahn: a step is ready when all its inputs are placed; smallest id first.
     pending = {s: len(inputs[s]) for s in steps}
     ready = [s for s, c in pending.items() if c == 0]
     heapq.heapify(ready)
@@ -222,7 +252,6 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
             pending[c] -= 1
             if pending[c] == 0:
                 heapq.heappush(ready, c)
-
     return {
         "steps": order,
         "step_metadata": {s: {"required_spec_inputs": inputs[s]} for s in order},
@@ -230,23 +259,54 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
     }
 
 
+def derive_from_decls(decls: AnnotationDecls, extra_edges: Iterable[Pair] = ()) -> dict[str, Any]:
+    """Derive ``steps``, ``step_metadata`` and ``downstream_consumers`` from collected declarations.
+
+    Pure: reads nothing from disk.  ``extra_edges`` are ``(holder, target)`` step pairs
+    counted as required edges.  Raises ``AnnotationError`` (the annotation lint issues,
+    then ANNOT-21, then ANNOT-20).
+    """
+    issues = lint_annotations(decls)
+    if issues:
+        raise AnnotationError(issues)
+    steps, kind_steps, kind_role = _collect_kinds(decls.nodes)
+    edges, same_step = _build_edges(decls.links, kind_steps, kind_role)
+    if same_step:
+        raise AnnotationError(sorted(set(same_step)))
+    for h, t in _norm_pairs(extra_edges):
+        steps.update((h, t))
+        if h != t:
+            edges.setdefault((h, t), _Edge(h, t, "", "", ""))
+    _check_acyclic(steps, edges)
+    return _topo_order(steps, edges)
+
+
+def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[str, Any]:
+    """Derive ``steps``, ``step_metadata`` and ``downstream_consumers`` from the annotations.
+
+    ``extra_edges`` are ``(holder, target)`` step pairs counted as required edges.
+    Raises ``AnnotationError`` (ANNOT-20, ANNOT-21, or the annotation lint issues).
+    """
+    return derive_from_decls(collect_annotations(repo_root), extra_edges)
+
+
+def _input_pairs(doc: dict[str, Any]) -> set[Pair]:
+    """``(step, input)`` pairs listed under ``step_metadata[*].required_spec_inputs``."""
+    return {
+        (step, inp)
+        for step, meta in (doc.get("step_metadata") or {}).items()
+        for inp in (meta or {}).get("required_spec_inputs") or []
+    }
+
+
 def _hand_pairs(hand: dict[str, Any]) -> set[Pair]:
-    pairs: set[Pair] = set()
-    for step, meta in (hand.get("step_metadata") or {}).items():
-        for inp in (meta or {}).get("required_spec_inputs") or []:
-            pairs.add((step, inp))
-    for producer, consumers in (hand.get("downstream_consumers") or {}).items():
-        for c in consumers or []:
-            pairs.add((c, producer))
-    return pairs
-
-
-def _generated_pairs(generated: dict[str, Any]) -> set[Pair]:
-    pairs: set[Pair] = set()
-    for step, meta in (generated.get("step_metadata") or {}).items():
-        for inp in (meta or {}).get("required_spec_inputs") or []:
-            pairs.add((step, inp))
-    return pairs
+    """Pairs of the hand file: its inputs plus the reverse of ``downstream_consumers``."""
+    reverse = {
+        (c, producer)
+        for producer, consumers in (hand.get("downstream_consumers") or {}).items()
+        for c in consumers or []
+    }
+    return _input_pairs(hand) | reverse
 
 
 def diff_against_hand(
@@ -260,7 +320,7 @@ def diff_against_hand(
     Result is sorted by (kind, consumer, input).
     """
     extras = set(_norm_pairs(extra_edges))
-    gen = _generated_pairs(generated) | extras
+    gen = _input_pairs(generated) | extras
     old = _hand_pairs(hand)
     out = [Disagreement("missing_in_hand", c, i) for c, i in gen - old - extras]
     out += [Disagreement("extra_in_hand", c, i) for c, i in old - gen]

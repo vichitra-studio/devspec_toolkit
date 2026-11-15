@@ -9,24 +9,24 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from specdev_tools.core.registry import SchemaRegistry, clear_shared_caches
-from specdev_tools.registry.annotations import AnnotationError
+from specdev_tools.registry.annotations import (
+    AnnotationDecls,
+    AnnotationError,
+    LinkDecl,
+    NodeDecl,
+)
 from specdev_tools.registry.generate import run as registry_run
 from specdev_tools.registry.step_order_gen import (
     Disagreement,
     build_step_order_document,
+    derive_from_decls,
     derive_step_order,
     diff_against_hand,
 )
 
 _ROOT = Path(__file__).resolve().parents[3]
-_MINI = _ROOT / "tests" / "fixtures" / "graph" / "mini_toolkit"
 
 
-@pytest.fixture(autouse=True)
-def _fresh_caches():
-    clear_shared_caches()
-    yield
-    clear_shared_caches()
 
 
 def _kind_schema(step: str, kind: str, role: str, links: list[tuple]) -> dict:
@@ -323,3 +323,72 @@ def test_cli_annotation_error_prints_issue_list_without_traceback(tmp_path):
     assert res.returncode != 0
     assert "ANNOT-21" in res.stderr and "Traceback" not in res.stderr
     assert not (tmp_path / "o.json").exists()
+
+
+# derive_from_decls on in-memory declarations: no toolkit on disk.
+
+def _node(step: str, kind: str, role: str = "obligation-system") -> NodeDecl:
+    file = f"schema/{step}_{kind}.schema.json"
+    return NodeDecl(kind, {"id": "id", "role": role}, (f"vc:{kind}", "/x"), "/x", file, {}, f"vc:{kind}")
+
+
+def _link(step: str, holder: str, kinds: list[str], same_step_kinds: list[str] | None = None) -> LinkDecl:
+    value: dict = {"kinds": kinds}
+    if same_step_kinds:
+        value["same_step_kinds"] = same_step_kinds
+    file = f"schema/{step}_{holder}.schema.json"
+    return LinkDecl("derives_from", value, (f"vc:{holder}", "/l"), "/l", file, {}, f"vc:{holder}", {holder})
+
+
+def _decls(nodes: list[NodeDecl], links: list[LinkDecl] = ()) -> AnnotationDecls:
+    return AnnotationDecls(nodes=nodes, links=list(links), graph_present=True)
+
+
+def test_from_decls_edge_orders_target_first():
+    d = derive_from_decls(_decls([_node("01", "a"), _node("04", "b")], [_link("04", "b", ["a"])]))
+    assert d["steps"] == ["01", "04"]
+    assert d["step_metadata"]["04"] == {"required_spec_inputs": ["01"]}
+    assert d["downstream_consumers"] == {"01": ["04"], "04": []}
+
+
+def test_from_decls_cycle_raises_annot_20_with_legs():
+    decls = _decls(
+        [_node("04", "a"), _node("05", "b")],
+        [_link("04", "a", ["b"]), _link("05", "b", ["a"])],
+    )
+    with pytest.raises(AnnotationError) as ei:
+        derive_from_decls(decls)
+    (issue,) = ei.value.issues
+    assert issue.startswith("ANNOT-20") and "04 -> 05 -> 04" in issue
+
+
+@pytest.mark.parametrize("allowed,raises", [([], True), (["a"], False)])
+def test_from_decls_same_step_link_needs_declaration(allowed, raises):
+    decls = _decls([_node("04", "a"), _node("04", "b")], [_link("04", "b", ["a"], allowed)])
+    if not raises:
+        assert derive_from_decls(decls)["steps"] == ["04"]
+        return
+    with pytest.raises(AnnotationError) as ei:
+        derive_from_decls(decls)
+    assert ei.value.issues[0].startswith("ANNOT-21")
+
+
+def test_from_decls_extra_edge_adds_unknown_step_and_orders():
+    decls = _decls([_node("04", "a")])
+    d = derive_from_decls(decls, extra_edges=[("04", "02")])
+    assert d["steps"] == ["02", "04"]
+    assert d["step_metadata"]["04"] == {"required_spec_inputs": ["02"]}
+
+
+def test_from_decls_cycle_through_extra_edge_names_it_as_extra():
+    decls = _decls([_node("04", "a"), _node("05", "b")], [_link("04", "a", ["b"])])
+    with pytest.raises(AnnotationError) as ei:
+        derive_from_decls(decls, extra_edges=[("05", "04")])
+    assert "(extra edge)" in ei.value.issues[0]
+
+
+def test_from_decls_annot_21_is_raised_before_extra_edges_are_considered():
+    decls = _decls([_node("04", "a"), _node("04", "b")], [_link("04", "b", ["a"])])
+    with pytest.raises(AnnotationError) as ei:
+        derive_from_decls(decls, extra_edges=[("04", "05"), ("05", "04")])
+    assert ei.value.issues[0].startswith("ANNOT-21")

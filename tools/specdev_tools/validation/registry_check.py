@@ -46,14 +46,13 @@ Folded into ``spec-check`` via ``_run_checks`` in ``validation/spec_check.py``.
 
 from __future__ import annotations
 
-import fnmatch
 import glob
 import json
 import os
 import re
 from typing import Any
 
-from ..core.entry_key_registry import _parse_array_path, is_glob_key, iter_nodes
+from ..core.entry_key_registry import _parse_array_path, is_glob_key, iter_nodes, match_glob_key
 from ..core.errors import SpecError
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
@@ -203,12 +202,18 @@ def _live_files(spec_root: str, key: str) -> list[tuple[str, str]]:
         path = os.path.join(spec_root, key)
         # File doesn't exist yet (future step) — skip drift check
         return [(key, path)] if os.path.isfile(path) else []
+    # Must agree with ``match_glob_key``, which R004 uses for the same keys.
     found = sorted(glob.glob(os.path.join(glob.escape(spec_root), key)))
     return [
         (os.path.relpath(p, spec_root).replace(os.sep, "/"), p)
         for p in found
         if os.path.isfile(p)
     ]
+
+
+def _drift(basename: str, text: str) -> SpecError:
+    """An E622 R003 REGISTRY_DRIFT error for *basename*."""
+    return SpecError(code="E622", message=f"R003 REGISTRY_DRIFT: {text}", path=basename)
 
 
 def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> None:
@@ -222,26 +227,51 @@ def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> 
     cur: Any = container
     for k in keys:
         if not isinstance(cur, dict) or k not in cur:
-            errs.append(SpecError(
-                code="E622",
-                message=(
-                    f"R003 REGISTRY_DRIFT: '{basename}': array_path '{path}' "
-                    f"not found in file (key '{k}' missing)."
-                ),
-                path=basename,
+            errs.append(_drift(
+                basename, f"'{basename}': array_path '{path}' not found in file (key '{k}' missing)."
             ))
             return
         cur = cur[k]
     want = dict if marker == "{}" else list
     if not isinstance(cur, want):
-        errs.append(SpecError(
-            code="E622",
-            message=(
-                f"R003 REGISTRY_DRIFT: '{basename}': array_path '{path}' "
-                f"exists but is not {'a map' if want is dict else 'an array'} (got {type(cur).__name__})."
-            ),
-            path=basename,
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{path}' exists but is not "
+            f"{'a map' if want is dict else 'an array'} (got {type(cur).__name__}).",
         ))
+
+
+def _id_field_drift(basename: str, array_key: str, id_field: str, item: dict) -> SpecError:
+    """E622 for a first entry that lacks the registered ``id_field``."""
+    return _drift(
+        basename,
+        f"'{basename}': array '{array_key}' registered id_field='{id_field}' but first entry has "
+        f"fields {list(item.keys())[:6]!r}. Rename id_field in the registry or update the spec.",
+    )
+
+
+def _check_wide_entry(
+    entry: dict,
+    container,
+    basename: str,
+    display_prefix: str,
+    errs: list,
+    *,
+    is_root: bool,
+) -> None:
+    """Sample the first node of an entry in the wider path grammar (dotted, ``{}``, inner ``[]``)."""
+    first_node = next(iter_nodes(container, entry["array_path"]), None)
+    if first_node is None:
+        if is_root:
+            _check_wide_first_hop(entry, container, basename, errs)
+        return  # empty container: nothing to sample
+    item, _path, key = first_node
+    id_field = entry.get("id_field", "")
+    if id_field and id_field not in item and key is None:
+        errs.append(_id_field_drift(basename, entry["array_path"].lstrip("."), id_field, item))
+    nested_prefix = f"{display_prefix}{entry['array_path']}[]"
+    for nested in entry.get("nested", []):
+        _check_array_entry(nested, item, basename, nested_prefix, errs, is_root=False)
 
 
 def _check_array_entry(
@@ -268,35 +298,13 @@ def _check_array_entry(
     the nested "not found under first parent entry" wording, preserving the
     original R003 message text for existing (one-level) cases.
     """
+    if not _is_plain_name(entry["array_path"]):
+        return _check_wide_entry(entry, container, basename, display_prefix, errs, is_root=is_root)
+
     array_key = entry["array_path"].lstrip(".")
     id_field = entry.get("id_field", "")
     full_display = f"{display_prefix}{entry['array_path']}"
-
-    if _is_plain_name(entry["array_path"]):
-        val = container.get(array_key) if isinstance(container, dict) else None
-    else:
-        # Wider grammar (dotted object path, ``{}`` map, inner ``[]``): sample the first node.
-        first_node = next(iter_nodes(container, entry["array_path"]), None)
-        if first_node is None:
-            if is_root:
-                _check_wide_first_hop(entry, container, basename, errs)
-            return  # empty container: nothing to sample
-        item, _path, key = first_node
-        if id_field and id_field not in item and key is None:
-            errs.append(SpecError(
-                code="E622",
-                message=(
-                    f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
-                    f"registered id_field='{id_field}' but first entry has "
-                    f"fields {list(item.keys())[:6]!r}. Rename id_field in the registry or update the spec."
-                ),
-                path=basename,
-            ))
-        for nested in entry.get("nested", []):
-            _check_array_entry(
-                nested, item, basename, f"{full_display}[]", errs, is_root=False
-            )
-        return
+    val = container.get(array_key) if isinstance(container, dict) else None
 
     if val is None:
         # Top-level registered arrays are the file's primary entries — an absent
@@ -316,24 +324,17 @@ def _check_array_entry(
         # required array (e.g. milestone.tasks) with its own E-code, so the
         # signal is preserved end-to-end without the false-positive.
         if is_root:
-            errs.append(SpecError(
-                code="E622",
-                message=(
-                    f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
-                    f"not found in file (key '{array_key}' missing)."
-                ),
-                path=basename,
+            errs.append(_drift(
+                basename,
+                f"'{basename}': array_path '{full_display}' not found in file (key '{array_key}' missing).",
             ))
         return
 
     if not isinstance(val, list):
-        errs.append(SpecError(
-            code="E622",
-            message=(
-                f"R003 REGISTRY_DRIFT: '{basename}': array_path '{full_display}' "
-                f"exists but is not an array (got {type(val).__name__})."
-            ),
-            path=basename,
+        errs.append(_drift(
+            basename,
+            f"'{basename}': array_path '{full_display}' exists but is not an array "
+            f"(got {type(val).__name__}).",
         ))
         return
 
@@ -342,16 +343,7 @@ def _check_array_entry(
 
     first_entry = val[0]
     if isinstance(first_entry, dict) and id_field not in first_entry:
-        actual = list(first_entry.keys())[:6]
-        errs.append(SpecError(
-            code="E622",
-            message=(
-                f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
-                f"registered id_field='{id_field}' but first entry has "
-                f"fields {actual!r}. Rename id_field in the registry or update the spec."
-            ),
-            path=basename,
-        ))
+        errs.append(_id_field_drift(basename, array_key, id_field, first_entry))
 
     # Recurse into deeper nested arrays using the first element as the container.
     if not isinstance(first_entry, dict):
@@ -461,7 +453,7 @@ def _check_unregistered_arrays(
 
             array_path = f".{key}"
             if (fname, array_path) not in registered_pairs and not any(
-                ap == array_path and fnmatch.fnmatchcase(fname, gk) for gk, ap in glob_pairs
+                ap == array_path and match_glob_key(fname, gk) for gk, ap in glob_pairs
             ):
                 # Infer kind from the id field
                 id_field = id_fields[0]
