@@ -96,8 +96,12 @@ changes:
       FRs lose trace and gain derives_from (capabilities) and depends_on (FRs);
       acceptance criteria gain scope. Step 05: APIs lose trace and example_refs
       and gain derives_from (FRs), provided_by, relies_on and depends_on; errors
-      become objects (error_id, code, message, derives_from). Every node also
-      accepts aliases, lifecycle, assumes and replaces. Existing host specs do
+      become objects (error_id, code, message, derives_from). scope (in | later |
+      out) becomes required on every functional requirement, API, API error,
+      acceptance criterion, charter risk, environment, CI gate and secret
+      (none of them had it in 1.1.1; capabilities already required it). Every
+      node accepts aliases, lifecycle and replaces; every node except an
+      assumption and a glossary term also accepts assumes. Existing host specs do
       not validate until migrated; the migration passes for steps 00 to 05 land
       later in this release, and the specdev align status / diff / plan
       commands report nothing for a 1.1.1 spec of steps 00 to 05 against the
@@ -150,7 +154,10 @@ changes:
       shape, completeness-check reports FR-to-API coverage and
       capability-to-FR coverage as complete (ratio 1.0), because the checks
       behind those two numbers do not run on it, until graph coverage later in
-      this release. The W583 reader of step 11 reads API derives_from: a 1.1.1
+      this release. For the same spec, specdev matrix writes a trace matrix
+      whose coverage states fr_with_api 0 and whose FR rows have an empty apis
+      list, because its FR-to-API reader does not run on it; no coverage
+      warning follows from that. The W583 reader of step 11 reads API derives_from: a 1.1.1
       step-05 API linked only to parked requirements through trace is no
       longer exempt from W583.
     migration:

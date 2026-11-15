@@ -86,7 +86,7 @@ specdev align validate --repo-root ./devspec_toolkit
 
 **Checks**:
 - Conformance to all schemas.
-- Trace integrity (all referenced IDs exist).
+- Trace integrity (all IDs referenced by `trace`, `targets`, `links` and `*_ref` / `*_refs` fields exist; `derives_from` links of steps 00 to 05 are not checked until the graph resolver later in this release).
 - Presence of `_migration_notes` (warns if manual review needed).
 
 ### rollback

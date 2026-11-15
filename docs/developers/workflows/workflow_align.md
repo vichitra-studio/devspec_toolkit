@@ -117,7 +117,7 @@ specdev align validate
 ```
 This checks:
 *   Schema compliance for all files.
-*   Trace integrity (links between steps).
+*   Trace integrity (links between steps made by `trace`, `targets`, `links` and `*_ref` / `*_refs` fields; `derives_from` links of steps 00 to 05 are not checked until the graph resolver later in this release).
 *   Presence of `_migration_notes` (if any data couldn't be mapped).
 
 If successful, it updates `spec/specdev_version` to the new toolkit version.

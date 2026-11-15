@@ -58,7 +58,7 @@ This reference collects recurring facts that developers need while authoring or 
 | Guide      | Human playbook describing a step (`spec/NN_name.guide.md`) |
 | Prompt     | AI instruction file (`prompts/prompt_NN_name.md`)         |
 | DoR        | Definition of Ready requirements for completing a step    |
-| traceRef   | Identifier linking FRs ↔ APIs ↔ fixtures ↔ NFRs           |
+| traceRef   | `{type, id, note}` link object of steps 06–16 (`trace`, `targets`, `deliverables`); steps 00–05 link with `derives_from` id arrays |
 
 ## Naming & Schema Conventions
 - **IDs**: kebab-case only (`fr-user-login`, `api-session-create`).

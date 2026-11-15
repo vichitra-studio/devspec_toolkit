@@ -7,6 +7,11 @@ from ...validation.linter_utils import check_no_duplicates
 
 
 def validate_step_05(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
+    """Deep validation for Step 05 (Interface Contracts).
+
+    ``toolkit_root`` and ``spec_root`` are unused since the link checks left (the graph resolver
+    owns them); they are kept for the uniform ``DEEP_VALIDATORS`` call shape.
+    """
     errors: list[SpecError] = []
     check_no_duplicates(instance.get("apis", []), "api_id", "api_id", errors)
     seen_method_route: set[tuple[str, str]] = set()

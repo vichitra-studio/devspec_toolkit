@@ -289,7 +289,7 @@
 
 **Trigger**: Fired by the Step 11 (red-team) validator when Step 05 interfaces are present and a public API ID is not named by the `target_ids` (entries with `type: api`) of any threat in the artifact. Each public API should be targeted by at least one threat. The check only runs when Step 05 is present (`api_ids` is not None).
 
-**Exemption**: An API is skipped if it has at least one FR trace and every FR it traces to carries `priority: "wont-have"` in step 04 — such an API will never be built, so demanding threat coverage for it is moot. An API with zero FR traces (e.g. only a capability trace) is not exempted. This mirrors the equivalent `wont-have` exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An API is skipped if its `derives_from` is non-empty and every id in it is a parked FR of step 04 (`scope` `later` or `out`, or the 1.1.1 `priority: "wont-have"`) — such an API will never be built, so demanding threat coverage for it is moot. An API whose `derives_from` is empty or holds an id that is not a parked FR (e.g. a capability id) is not exempted, and a 1.1.1 API linked only through `trace` is not exempt. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
 
 **Resolution**: Add a threat in Step 11 whose `target_ids` includes the uncovered API (`{"type": "api", "id": "<api-id>"}`), or confirm the API is intentionally outside threat scope.
 
@@ -533,7 +533,7 @@
 
 Only fires when step 06 is present (absent step-06 file → check skipped silently). Invariants without a `risk_category_ref` are not flagged — only those explicitly marked as belonging to a risk category are expected to have a corresponding threat.
 
-**Exemption**: An invariant is skipped if it has at least one FR trace and every FR it traces to carries `priority: "wont-have"` in step 04 — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant with zero FR traces (e.g. only a capability trace) is not exempted. This mirrors the equivalent `wont-have` exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
+**Exemption**: An invariant is skipped if it has at least one FR trace (the 1.1.1 `trace` field, which step 06 still carries) and every FR it traces to is parked in step 04 (`scope` `later` or `out`, or the 1.1.1 `priority: "wont-have"`) — such an invariant guards behavior that will never be built, so demanding threat coverage for it is moot. An invariant with zero FR traces (e.g. only a capability trace) is not exempted. This mirrors the equivalent parked-FR exclusion in `matrix.py`/`traceability_closure.py` (DEVSPEC-122 follow-up).
 
 **Resolution**: Either add a threat in `11_redteam.json` with a mitigation of type `inv` referencing the flagged `inv_id`, or remove `risk_category_ref` from the invariant if it is not genuinely security-relevant.
 

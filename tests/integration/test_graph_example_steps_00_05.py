@@ -199,3 +199,40 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     assert [e.render() for e in errors if not e.code.startswith("W")] == []
     assert Counter(e.code for e in errors) == _PINNED_WARNINGS
     assert context["checks"]["seed-lint"]["status"] != "SKIP"
+
+
+def _run_cli(*argv: str) -> tuple[int, str]:
+    import io
+    import sys
+    from contextlib import redirect_stderr, redirect_stdout
+    from unittest.mock import patch
+
+    from specdev_tools import cli
+
+    buf = io.StringIO()
+    with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", ["specdev", *argv]), \
+            redirect_stdout(buf), redirect_stderr(buf):
+        try:
+            cli.main()
+            code = 0
+        except SystemExit as exc:
+            code = int(exc.code) if isinstance(exc.code, int) else 1
+    return code, buf.getvalue()
+
+
+@pytest.mark.parametrize("bad_scope", [["in"], {"x": 1}])
+def test_wrong_typed_scope_gives_schema_error_not_traceback(stamped_example: Path, tmp_path: Path, bad_scope: Any) -> None:
+    work = tmp_path / "bad"
+    shutil.copytree(stamped_example, work)
+    path = work / "spec" / "04_fr_list.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["functional_requirements"][0]["scope"] = bad_scope
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    spec = str(work / "spec")
+    root = str(_ROOT)
+    errors, _context = run_spec_check_json(root, spec, spec_root=spec, project_canon_dir=str(work / "spec" / "canon"))
+    assert any(e.code == "E520" and "scope" in e.render() for e in errors)
+    code, out = _run_cli("completeness-check", spec, "--repo-root", root, "--json")
+    assert "Traceback" not in out and "unhashable" not in out
+    code, out = _run_cli("matrix", spec, "--out", str(work / "matrix.json"), "--repo-root", root)
+    assert "Traceback" not in out and "unhashable" not in out

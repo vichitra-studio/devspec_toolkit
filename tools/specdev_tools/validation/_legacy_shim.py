@@ -39,7 +39,8 @@ def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
     For readers that can meet a legacy file and a new-shape file in the same run. When this
     module is deleted its two callers go back to ``is_parked``.
     """
-    return is_parked(node) or node.get("scope") in LEGACY_PARKED_SCOPES
+    scope = node.get("scope")
+    return is_parked(node) or (isinstance(scope, str) and scope in LEGACY_PARKED_SCOPES)
 
 
 def _carries(value: Any, names: Collection[str]) -> bool:

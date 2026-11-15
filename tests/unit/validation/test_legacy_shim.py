@@ -175,6 +175,9 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     ({"scope": "in"}, False),
     ({"priority": "wont-have"}, True),
     ({"capability_id": "cap-a"}, False),
+    ({"scope": ["in"]}, False),
+    ({"scope": {}}, False),
+    ({"scope": 7, "priority": ["wont-have"]}, False),
 ])
 def test_is_parked_contract(node, expected):
     assert is_parked(node) is expected
@@ -289,6 +292,8 @@ def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
     ({"scope": "in"}, False),
     ({"priority": "wont-have"}, True),
     ({"capability_id": "cap-a"}, False),
+    ({"scope": ["future"]}, False),
+    ({"scope": {}}, False),
 ])
 def test_is_parked_any_shape_contract(node, expected):
     assert is_parked_any_shape(node) is expected

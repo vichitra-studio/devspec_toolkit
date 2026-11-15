@@ -203,7 +203,7 @@ mkdir -p spec/extras && ./tools/run_specdev.sh matrix spec --repo-root ./devspec
 > - Full scan of controllers, routers, and resolvers in the API layer
 >
 > The AI identifies every public endpoint/method, extracts input/output types, and emits `spec/05_interface_contracts.json`.
-> Every `trace` field must link to an FR from Step 2.4.
+> Every id in an API's `derives_from` must be an FR from Step 2.4.
 
 **Validation ritual:**
 ```bash

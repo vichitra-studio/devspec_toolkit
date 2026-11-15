@@ -43,7 +43,7 @@ Before starting, ensure your current specs are clean and valid.
 5.  **Step 04: Functional Requirements**: **CRITICAL**. Add the atomic FRs here.
     *   Target artifact: `spec/04_fr_list.json`
     *   *Reference*: `prompts/prompt_04_functional_requirements.md`.
-    *   *Constraint*: Must link back to Capability ID (`trace`).
+    *   *Constraint*: Must link back to a capability id in `derives_from`.
 
 **User Action:**
 > **PROMPT:**
@@ -60,7 +60,7 @@ Before starting, ensure your current specs are clean and valid.
 
 1.  **Step 05: Interfaces**: Define the new API endpoints or Function Signatures.
     *   *Reference*: `prompts/prompt_05_interface_contracts.md`.
-    *   *Constraint*: Must trace to `fr-kebab-case` (FR ID format from Step 04).
+    *   *Constraint*: Must list the FR ids it implements (`fr-kebab-case`, the FR ID format from Step 04) in `derives_from`.
 2.  **Step 06: Invariants**: Defines the "Musts" (Business Rules).
     *   *Reference*: `prompts/prompt_06_invariants.md`.
 3.  **Step 07: NFRs**: Define performance/security constraints.

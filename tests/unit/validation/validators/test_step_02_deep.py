@@ -117,3 +117,23 @@ def test_third_party_empty_pin_fails_schema():
     assert pin["minLength"] >= 1
     assert not Draft202012Validator(pin).is_valid("")
     assert Draft202012Validator(pin).is_valid("2024-06")
+
+
+def test_non_string_connects_to_entry_does_not_raise(tmp_path):
+    instance = {
+        "components": [_component("comp-api", ["cap-a"])],
+        "third_parties": [{"third_party_id": "tp-stripe", "name": "Stripe", "pin": "2024-06"}],
+        "connections": [
+            {"connection_id": "conn-a", "connects_to": [{"x": 1}, "tp-stripe"], "trust_boundary": "internal"},
+            {"connection_id": "conn-b", "connects_to": 7, "trust_boundary": "internal"},
+        ],
+    }
+    errors = _codes(validate_step_02(instance, str(tmp_path)))
+    assert len(errors) == 1 and "Connection[0]" in errors[0]
+
+
+def test_wrong_typed_derives_from_does_not_raise(tmp_path):
+    _write_capabilities(tmp_path / "spec", [{"capability_id": "cap-a", "scope": "in"}])
+    for bad in (7, [{"x": 1}], {"x": 1}):
+        instance = {"components": [_component("comp-api", bad), _component("comp-b", ["cap-a"])]}
+        assert _codes(validate_step_02(instance, str(tmp_path))) == []

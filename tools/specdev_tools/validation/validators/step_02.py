@@ -34,8 +34,12 @@ def check_external_trust_boundaries(connections: list[dict], third_party_ids: se
     """A connection to a third party declared in this file must not be ``internal``."""
     errors: list[SpecError] = []
     for idx, conn in enumerate(connections):
-        targets = conn.get("connects_to") or []
-        if conn.get("trust_boundary") == "internal" and third_party_ids.intersection(targets):
+        targets = conn.get("connects_to")
+        if not isinstance(targets, list):
+            targets = []
+        if conn.get("trust_boundary") == "internal" and any(
+            t in third_party_ids for t in targets if isinstance(t, str)
+        ):
             errors.append(
                 make_error("E520", f"Connection[{idx}] connects to a third party but trust_boundary is internal")
             )
@@ -44,7 +48,11 @@ def check_external_trust_boundaries(connections: list[dict], third_party_ids: se
 
 def check_capability_coverage(components: list[dict], capabilities: dict[str, dict]) -> list[SpecError]:
     """Every capability that is not parked must be named in some component's ``derives_from``."""
-    covered = {ref for comp in components for ref in comp.get("derives_from") or []}
+    covered: set[str] = set()
+    for comp in components:
+        refs = comp.get("derives_from")
+        if isinstance(refs, list):
+            covered.update(ref for ref in refs if isinstance(ref, str))
     missing = sorted(cap_id for cap_id, cap in capabilities.items() if cap_id not in covered and not is_parked(cap))
     if missing:
         return [make_error("E590", f"Missing capability coverage: {', '.join(missing)}")]
