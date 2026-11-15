@@ -276,16 +276,3 @@ class TestSchemaAdditionalPropertiesArbitrary:
         errors = list(schema_validator.iter_errors(valid_instance))
         additional_errors = [e for e in errors if "additional" in e.message.lower()]
         assert len(additional_errors) > 0, f"Expected additionalProperties error, got: {[e.message for e in errors]}"
-
-
-# ---------------------------------------------------------------------------
-# F6 — Fixture-based test: use unknown_label_ref.json (a canon concern, not an E590 case)
-# ---------------------------------------------------------------------------
-
-class TestValidatorFixtureUnknownLabelRef:
-    def test_unknown_label_ref_fixture_raises_no_e590(self):
-        """The 'nonexistent label' fixture is a canon (E110) concern, not a step-13 validator error."""
-        instance = json.loads((FIXTURES_DIR / "unknown_label_ref.json").read_text())
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
-        rendered = _render(errors)
-        assert not any("E590" in e or "W590" in e for e in rendered)

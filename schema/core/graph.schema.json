@@ -89,7 +89,7 @@
     "xLink": {
       "$anchor": "xLink",
       "type": "object",
-      "description": "Value of the x-link keyword: declares that a field holds links to nodes of the named kinds. The literal '*' is allowed only for the verbs replaces, removes and about.",
+      "description": "Value of the x-link keyword: declares that a field holds links to nodes of the named kinds. The literal '*' is meant only for the verbs replaces, removes and about.",
       "properties": {
         "kinds": {
           "oneOf": [

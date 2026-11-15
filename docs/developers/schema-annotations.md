@@ -78,7 +78,7 @@ All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annota
 | ANNOT-01 | An `x-node` or `x-link` value does not validate against `vc:core:graph`. |
 | ANNOT-02 | A kind is not kebab-case, or one kind is declared at more than one site. |
 | ANNOT-03 | The node's items schema is missing, the id property is missing or not a string, or a `map_keyed` node lacks `additionalProperties`. |
-| ANNOT-05 | An `x-link` field name is not a link verb, is not an array whose items `$ref` is `vc:core:atoms#kebabId`, `vc:core:atoms#screamingSnakeId` or `vc:core:graph#nodeId`, or does not sit on a node item. |
+| ANNOT-05 | An `x-link` field name is not a link verb, is not an array whose items `$ref` is `vc:core:atoms#kebabId`, `vc:core:atoms#screamingSnakeId` or `vc:core:graph#nodeId`, or does not sit on a node item; or a `"*"` or `about` field whose items do not `$ref` `vc:core:graph#nodeId`. |
 | ANNOT-07 | An `x-link` kind (or a `same_step_kinds` entry) is not a declared kind or not in `kinds`. |
 | ANNOT-08 | A node item lacks `lifecycle` as `$ref vc:core:graph#lifecycle`; an obligation item lacks `scope`, `scope_reason` or the `scopeReasonRule` in its `allOf`. `top_of_graph` kinds and role `record` kinds are exempt from `lifecycle`, `scope` and `scope_reason`. |
 | ANNOT-20 | The derived step graph has a cycle (raised by the step-order derivation). |

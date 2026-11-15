@@ -127,7 +127,7 @@
         },
         "corpus_excluded": {
           "type": "boolean",
-          "description": "When true, this array does not contribute to the nearest-id corpus. Only emitted when true."
+          "description": "When true, this array does not contribute to the nearest-id corpus. Exclusion is by the top key of the path: every entry under that top key is excluded. Only emitted when true."
         },
         "source": {
           "const": "x-node",
