@@ -43,6 +43,11 @@ import os
 from typing import Any
 
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+from specdev_tools.registry.annotations import (
+    AnnotationError,
+    collect_annotations,
+    lint_annotations,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -547,9 +552,16 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         FileNotFoundError: if step_order.json or core/collections.schema.json
                            are missing.
         json.JSONDecodeError: if any schema file is malformed.
+        AnnotationError: if the x-node / x-link annotation lint finds issues.
     """
     schema_dir = os.path.join(repo_root, "schema")
     tools_dir = os.path.join(repo_root, "tools")
+
+    # Annotation lint (x-node / x-link): a no-op when the toolkit has no
+    # vc:core:graph entry or no schema carries an annotation.
+    annotation_issues = lint_annotations(collect_annotations(repo_root))
+    if annotation_issues:
+        raise AnnotationError(annotation_issues)
 
     # Load step order
     step_order_path = os.path.join(tools_dir, "step_order.json")

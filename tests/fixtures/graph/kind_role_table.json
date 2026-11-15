@@ -1,0 +1,179 @@
+{
+  "_source": "GRAPH_STUDY_SYNTHESIS.md section 5.5 (DOC L699-730), kind to role table",
+  "_note": "role 'content' marks a non-node (ids dropped). role null with top_of_graph marks the top of the graph. Kind 13 extension kinds are declared when first-class and are not listed.",
+  "kinds": {
+    "scope-item": {
+      "step": "00",
+      "role": "obligation-system",
+      "coarse": true
+    },
+    "risk": {
+      "step": "00",
+      "role": "obligation-system",
+      "coarse": true
+    },
+    "constraint": {
+      "step": "00",
+      "role": "obligation-system",
+      "coarse": true
+    },
+    "segment": {
+      "step": "00",
+      "role": "context"
+    },
+    "success-metric": {
+      "step": "00",
+      "role": "context"
+    },
+    "assumption": {
+      "step": "00",
+      "role": "context"
+    },
+    "stakeholder": {
+      "step": "00",
+      "role": "context"
+    },
+    "stakeholder-need": {
+      "step": "00",
+      "role": "context"
+    },
+    "capability": {
+      "step": "01",
+      "role": "obligation-system",
+      "coarse": true
+    },
+    "capability-error-state": {
+      "step": "01",
+      "role": "content"
+    },
+    "component": {
+      "step": "02",
+      "role": "context"
+    },
+    "connection": {
+      "step": "02",
+      "role": "context"
+    },
+    "third-party-node": {
+      "step": "02",
+      "role": "context"
+    },
+    "environment": {
+      "step": "02a",
+      "role": "obligation-delivery"
+    },
+    "gate": {
+      "step": "02a",
+      "role": "obligation-delivery"
+    },
+    "secret": {
+      "step": "02a",
+      "role": "obligation-delivery"
+    },
+    "glossary-term": {
+      "step": "03",
+      "role": "context"
+    },
+    "fr": {
+      "step": "04",
+      "role": "obligation-system"
+    },
+    "criterion": {
+      "step": "04",
+      "role": "obligation-system"
+    },
+    "api": {
+      "step": "05",
+      "role": "obligation-system"
+    },
+    "api-error": {
+      "step": "05",
+      "role": "obligation-system"
+    },
+    "invariant": {
+      "step": "06",
+      "role": "obligation-system"
+    },
+    "nfr": {
+      "step": "07",
+      "role": "obligation-system"
+    },
+    "fixture": {
+      "step": "08",
+      "role": "verifier"
+    },
+    "design-milestone": {
+      "step": "09",
+      "role": "plan"
+    },
+    "governance-rule": {
+      "step": "10",
+      "role": "obligation-system"
+    },
+    "threat": {
+      "step": "11",
+      "role": "obligation-system"
+    },
+    "edge-case": {
+      "step": "11",
+      "role": "obligation-system"
+    },
+    "ci-job": {
+      "step": "12",
+      "role": "verifier"
+    },
+    "job-step": {
+      "step": "12",
+      "role": "content"
+    },
+    "roadmap-milestone": {
+      "step": "14",
+      "role": "plan"
+    },
+    "task": {
+      "step": "14",
+      "role": "plan"
+    },
+    "task-criterion": {
+      "step": "14",
+      "role": "plan"
+    },
+    "scaffold-row": {
+      "step": "15",
+      "role": "context"
+    },
+    "anchor-row": {
+      "step": "16",
+      "role": "record"
+    },
+    "plan-item": {
+      "step": "16a",
+      "role": "plan"
+    },
+    "execution-record": {
+      "step": "16b",
+      "role": "record"
+    },
+    "review-record": {
+      "step": "16c",
+      "role": "record"
+    },
+    "ambiguity-item": {
+      "step": "any",
+      "role": "record"
+    },
+    "verification-record": {
+      "step": "extras",
+      "role": "record"
+    },
+    "evidence-record": {
+      "step": "extras",
+      "role": "record"
+    },
+    "seed": {
+      "step": "seed",
+      "role": null,
+      "top_of_graph": true
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:16-impl-context",
+  "title": "Impl context (fixture)",
+  "type": "object",
+  "properties": {
+    "plan_items": {
+      "type": "array",
+      "x-node": {
+        "kind": "plan-item",
+        "id": "item_id",
+        "role": "plan",
+        "contract": [
+          "title"
+        ]
+      },
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id"
+        ],
+        "properties": {
+          "item_id": {
+            "$ref": "vc:core:atoms#screamingSnakeId"
+          },
+          "title": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle"
+          },
+          "realises": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "x-link": {
+              "kinds": [
+                "fr"
+              ],
+              "required": false,
+              "built": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

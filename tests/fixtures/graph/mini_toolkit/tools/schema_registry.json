@@ -1,0 +1,11 @@
+{
+  "vc:core:atoms": "schema/core/atoms.schema.json",
+  "vc:core:graph": "schema/core/graph.schema.json",
+  "vc:core:ambiguity-fixture": "schema/core/ambiguity.schema.json",
+  "vc:seed-manifest-fixture": "schema/seed_manifest.schema.json",
+  "vc:01-capabilities": "schema/01_capabilities.schema.json",
+  "vc:02a-delivery-baseline": "schema/02a_delivery_baseline.schema.json",
+  "vc:04-fr-list": "schema/04_fr_list.schema.json",
+  "vc:05-interface-contracts": "schema/05_interface_contracts.schema.json",
+  "vc:16-impl-context": "schema/16_impl_context.schema.json"
+}

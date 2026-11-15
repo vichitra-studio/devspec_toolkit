@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:04-fr-list",
+  "title": "FR list (fixture)",
+  "type": "object",
+  "properties": {
+    "functional_requirements": {
+      "type": "array",
+      "x-node": {
+        "kind": "fr",
+        "id": "fr_id",
+        "role": "obligation-system",
+        "contract": [
+          "statement",
+          "priority",
+          "preconditions",
+          "postconditions"
+        ]
+      },
+      "items": {
+        "type": "object",
+        "properties": {
+          "fr_id": {
+            "$ref": "vc:core:atoms#kebabId"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "vc:core:graph#lifecycle"
+          },
+          "scope": {
+            "$ref": "vc:core:graph#scope"
+          },
+          "scope_reason": {
+            "$ref": "vc:core:graph#scopeReason"
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "x-node": {
+              "kind": "criterion",
+              "id": "criterion_id",
+              "role": "obligation-system",
+              "contract": [
+                "text"
+              ]
+            },
+            "items": {
+              "type": "object",
+              "properties": {
+                "criterion_id": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "statement": {
+                  "type": "string"
+                },
+                "lifecycle": {
+                  "$ref": "vc:core:graph#lifecycle"
+                },
+                "scope": {
+                  "$ref": "vc:core:graph#scope"
+                },
+                "scope_reason": {
+                  "$ref": "vc:core:graph#scopeReason"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "allOf": [
+                {
+                  "$ref": "vc:core:graph#scopeReasonRule"
+                }
+              ],
+              "required": [
+                "criterion_id"
+              ]
+            }
+          },
+          "derives_from": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "x-link": {
+              "kinds": [
+                "capability"
+              ],
+              "required": true,
+              "built": true
+            }
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "$ref": "vc:core:atoms#kebabId"
+            },
+            "x-link": {
+              "kinds": [
+                "fr"
+              ],
+              "required": false,
+              "built": false
+            }
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "vc:core:graph#scopeReasonRule"
+          }
+        ],
+        "required": [
+          "fr_id"
+        ]
+      }
+    },
+    "ambiguities": {
+      "$ref": "vc:core:ambiguity-fixture#/$defs/ambiguityList"
+    }
+  }
+}

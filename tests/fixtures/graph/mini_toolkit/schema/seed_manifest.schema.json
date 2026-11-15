@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vc:seed-manifest-fixture",
+  "title": "Seed manifest (fixture)",
+  "type": "object",
+  "properties": {
+    "seeds": {
+      "type": "array",
+      "x-node": {
+        "kind": "seed",
+        "id": "seed_id",
+        "top_of_graph": true
+      },
+      "items": {
+        "type": "object",
+        "required": [
+          "seed_id"
+        ],
+        "properties": {
+          "seed_id": {
+            "$ref": "vc:core:atoms#kebabId"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
