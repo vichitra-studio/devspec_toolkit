@@ -24,7 +24,7 @@
       "type": "string",
       "description": "Semver string for the registry format.",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "examples": ["1.0.0"]
+      "examples": ["1.1.0"]
     },
     "_note": {
       "type": "string",
@@ -32,10 +32,13 @@
     },
     "registry": {
       "type": "object",
-      "description": "Map of spec file basename (e.g. '04_fr_list.json') to entry-array metadata.",
+      "description": "Map of spec file key to entry-array metadata. A key is a spec file basename (e.g. '04_fr_list.json') or, for node kinds declared with x-node files, a relative glob (e.g. 'impl_context/ms_*_plan.json').",
       "additionalProperties": false,
       "patternProperties": {
         "^[0-9]{2}[a-z]?_[a-z_]+\\.json$": {
+          "$ref": "#/$defs/registryEntry"
+        },
+        "^[a-z0-9_*?/.\\-]*[*?][a-z0-9_*?/.\\-]*\\.json$": {
           "$ref": "#/$defs/registryEntry"
         }
       }
@@ -54,6 +57,13 @@
       "description": "Steps that have no top-level entry-bearing arrays (neither schema-derived nor deferred).",
       "items": {
         "$ref": "#/$defs/stepRationale"
+      }
+    },
+    "external_kinds": {
+      "type": "array",
+      "description": "Kinds whose ids do not come from a step schema collection (today only 'seed', declared in the host's common/seed_manifest.json). Not listed in extraction_paths.json: these are not step files.",
+      "items": {
+        "$ref": "#/$defs/externalKind"
       }
     },
     "steps_with_deferred_registration": {
@@ -77,7 +87,7 @@
         },
         "arrays": {
           "type": "array",
-          "description": "Entry-bearing top-level arrays in the spec file.",
+          "description": "Entry-bearing arrays (or map-keyed collections) in the spec file.",
           "items": {
             "$ref": "#/$defs/arrayEntry"
           }
@@ -86,17 +96,21 @@
     },
     "arrayEntry": {
       "type": "object",
-      "required": ["array_path", "id_field", "kind"],
+      "required": ["array_path", "kind"],
+      "anyOf": [
+        {"required": ["id_field"]},
+        {"required": ["map_keyed"]}
+      ],
       "additionalProperties": false,
       "properties": {
         "array_path": {
           "type": "string",
-          "description": "jq-style path to the array, e.g. '.functional_requirements'.",
-          "pattern": "^\\.[a-zA-Z_][a-zA-Z0-9_]*(\\[\\]\\.[a-zA-Z_][a-zA-Z0-9_]*)*$"
+          "description": "jq-style path to the collection. '.name' descends an object property, '[]' follows an array property, '{}' follows a map property whose keys are the node ids. Examples: '.functional_requirements', '.milestones[].tasks', '.plan.items', '.environments{}'.",
+          "pattern": "^\\.[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*((\\[\\]|\\{\\})\\.[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*)*(\\{\\})?$"
         },
         "id_field": {
           "type": "string",
-          "description": "Name of the property that carries the entry's unique ID, e.g. 'fr_id' or 'id'.",
+          "description": "Name of the property that carries the entry's unique ID, e.g. 'fr_id' or 'id'. Absent on map-keyed entries, whose map key is the id.",
           "minLength": 1
         },
         "kind": {
@@ -114,6 +128,124 @@
         "corpus_excluded": {
           "type": "boolean",
           "description": "When true, this array does not contribute to the nearest-id corpus. Only emitted when true."
+        },
+        "source": {
+          "const": "x-node",
+          "description": "Present only on entries derived from an x-node annotation."
+        },
+        "role": {
+          "type": "string",
+          "description": "Node role declared by x-node (annotation-derived entries only)."
+        },
+        "contract": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Contract property names declared by x-node."
+        },
+        "coarse": {
+          "type": "boolean",
+          "description": "x-node coarse flag."
+        },
+        "map_keyed": {
+          "const": true,
+          "description": "True when the collection is a map and the map key is the node id."
+        },
+        "links": {
+          "type": "array",
+          "description": "x-link declarations on the item, so one file holds what the link resolver reads.",
+          "items": {
+            "$ref": "#/$defs/linkEntry"
+          }
+        }
+      }
+    },
+    "linkEntry": {
+      "type": "object",
+      "required": [
+        "field",
+        "kinds",
+        "required",
+        "built",
+        "same_step_kinds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Link field name (a verb of vc:core:graph#linkVerb)."
+        },
+        "kinds": {
+          "oneOf": [
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            {
+              "const": "*"
+            }
+          ],
+          "description": "Target kinds, or '*'."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "True when every item must carry at least one value for this link."
+        },
+        "built": {
+          "type": "boolean",
+          "description": "True when the link counts toward the built computation. Default false."
+        },
+        "same_step_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Subset of kinds that may be held in the same step as the source."
+        }
+      }
+    },
+    "externalKind": {
+      "type": "object",
+      "required": [
+        "kind",
+        "source_file",
+        "array_path",
+        "id_field",
+        "top_of_graph"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "description": "The external kind name, kebab-case (today only 'seed')."
+        },
+        "source_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Spec-relative file holding the ids, e.g. 'common/seed_manifest.json'."
+        },
+        "array_path": {
+          "type": "string",
+          "pattern": "^\\.[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*((\\[\\]|\\{\\})\\.[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*)*(\\{\\})?$",
+          "description": "Path of the id-bearing array inside source_file, e.g. '.seeds'."
+        },
+        "id_field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the property that carries each id."
+        },
+        "top_of_graph": {
+          "const": true,
+          "description": "Always true: external kinds sit at the top of the graph and have no role."
         }
       }
     },

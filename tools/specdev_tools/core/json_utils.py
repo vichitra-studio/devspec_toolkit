@@ -1044,14 +1044,16 @@ def _collect_ids_from_file(
     # walked to arbitrary depth by ``iter_array_path`` — no single-level cap.
     by_top: Dict[str, List[Any]] = {}
     for entry in reg_entries:
-        top_key = entry.array_path.lstrip(".").split("[")[0]
+        top_key = _ekreg.array_top_key(entry.array_path)
         by_top.setdefault(top_key, []).append(entry)
 
     # Outer iteration follows the spec document's key order (as before) so id
     # collection order is data-driven and deterministic; inner iteration follows
     # registry order (top-level array, then each deeper nested array).
     for top_key, top_val in data.items():
-        if not isinstance(top_val, list):
+        # A top-level node container is a list, or an object holding the nodes
+        # (dotted paths such as ``.plan.items``, map-keyed ``.environments{}``).
+        if not isinstance(top_val, (list, dict)):
             continue
         # Skip corpus-excluded keys.
         if _ekreg.is_corpus_excluded(top_key, repo_root):
@@ -1061,8 +1063,9 @@ def _collect_ids_from_file(
             continue
 
         for entry in by_top[top_key]:
-            for item, jq_path in _ekreg.iter_array_path(data, entry.array_path):
-                found_id = item.get(entry.id_field)
+            for item, jq_path, map_key in _ekreg.iter_nodes(data, entry.array_path):
+                # A map-keyed node's id is its map key; otherwise read the id field.
+                found_id = map_key if map_key is not None else item.get(entry.id_field)
                 if not isinstance(found_id, str) or not found_id:
                     continue
                 all_ids.append(found_id)
@@ -1180,7 +1183,7 @@ def _resolve_single_pointer(
                 if reg_entries:
                     # Match by the last array segment name
                     for reg_e in reg_entries:
-                        reg_arr_key = reg_e.array_path.split("[].")[-1].lstrip(".")
+                        reg_arr_key = _ekreg.array_leaf_key(reg_e.array_path)
                         if reg_arr_key == raw_key:
                             kind = reg_e.kind
                             break

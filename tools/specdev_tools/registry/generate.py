@@ -34,6 +34,17 @@ Design constraints:
   - job.steps in 12_ci_gates are workflow-internal and excluded via the same map.
   - capabilities.goal_id is a secondary ID alongside capability_id; the first
     *_id field found takes precedence (schema declaration order).
+
+Two discovery sources run per schema file (1.2.0 spec graph):
+  - annotation: ``x-node`` objects (see registry/annotation_scan.py).  A schema
+    file that declares ``x-node`` at a definition site inside itself is
+    annotation-only: the heuristic below is off for it and its kinds, paths and
+    id fields are the declared ones.  A shared ``schema/core`` node reached only
+    by ``$ref`` is added to the host's entries once per occurrence and does NOT
+    switch the heuristic off.
+  - heuristic: the id-field / kind derivation above, for every file without its
+    own ``x-node``.  It has no input left once the last real schema is annotated
+    and should then be deleted.
 """
 from __future__ import annotations
 
@@ -43,6 +54,7 @@ import os
 from typing import Any
 
 from specdev_tools.core.schema_nav import effective_schema as _schema_nav_effective_schema
+from specdev_tools.registry.annotation_scan import scan_annotations
 from specdev_tools.registry.annotations import (
     AnnotationError,
     collect_annotations,
@@ -105,7 +117,7 @@ DEFERRED_STEPS: frozenset[str] = frozenset(["16a", "16b", "16c"])
 DEFERRED_RATIONALE = "per-milestone files; deferred per Out-of-scope"
 
 #: Format version for the generated registry.
-FORMAT_VERSION = "1.0.0"
+FORMAT_VERSION = "1.1.0"
 
 #: Note embedded in _note field of generated registry.
 REGISTRY_NOTE = (
@@ -559,9 +571,11 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
 
     # Annotation lint (x-node / x-link): a no-op when the toolkit has no
     # vc:core:graph entry or no schema carries an annotation.
-    annotation_issues = lint_annotations(collect_annotations(repo_root))
+    decls = collect_annotations(repo_root)
+    annotation_issues = lint_annotations(decls)
     if annotation_issues:
         raise AnnotationError(annotation_issues)
+    scan = scan_annotations(repo_root, decls)
 
     # Load step order
     step_order_path = os.path.join(tools_dir, "step_order.json")
@@ -595,11 +609,31 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         schema_basename = os.path.basename(schema_path)
         spec_basename = _spec_basename_for_step(step, schema_path)
 
-        arrays, sentinels_found = _scan_schema_for_arrays(
-            schema, schema_basename, items_resolver, array_resolver
-        )
+        host = scan.host(os.path.relpath(schema_path, repo_root))
+        if host is not None and host.annotation_only:
+            arrays, sentinels_found = [], []
+        else:
+            arrays, sentinels_found = _scan_schema_for_arrays(
+                schema, schema_basename, items_resolver, array_resolver
+            )
         sentinels_set.update(sentinels_found)
 
+        extra_keys: set[str] = set()
+        if host is not None:
+            legacy_paths = {a["array_path"] for a in arrays}
+            for occ in host.occurrences:
+                if occ.files:
+                    for glob_key in occ.files:
+                        slot = registry.setdefault(
+                            glob_key, {"step": occ.step or step, "arrays": []}
+                        )
+                        slot["arrays"].append(occ.entry)
+                        extra_keys.add(glob_key)
+                elif occ.entry["array_path"] not in legacy_paths:
+                    arrays.append(occ.entry)
+
+        if not arrays and extra_keys:
+            continue  # the step's entries all live under glob keys
         if not arrays:
             steps_without.append({
                 "step": step,
@@ -633,6 +667,9 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
         "steps_without_entry_arrays": steps_without,
         "steps_with_deferred_registration": steps_deferred,
     }
+    external_kinds = scan.external_kinds
+    if external_kinds:
+        registry_doc["external_kinds"] = external_kinds
 
     # Build extraction_paths
     extraction_paths_doc = _build_extraction_paths(registry, steps)

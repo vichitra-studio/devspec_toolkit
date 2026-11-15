@@ -6,7 +6,7 @@ import os, json, warnings
 from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
-from ..core.entry_key_registry import list_entries, iter_array_path, _ALWAYS_EXCLUDED
+from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, _ALWAYS_EXCLUDED
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -301,7 +301,7 @@ def build_trace_matrix(
             # reg_entries is a list (possibly empty) of RegistryEntry(array_path, id_field, kind)
             for reg_entry in reg_entries:
                 # Skip corpus-excluded arrays (e.g. canonical_refs_used)
-                array_key = reg_entry.array_path.lstrip(".").split("[")[0]
+                array_key = array_top_key(reg_entry.array_path)
                 if array_key in _ALWAYS_EXCLUDED:
                     continue
                 items = _extract_array_items(data, reg_entry.array_path)

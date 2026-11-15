@@ -46,11 +46,14 @@ Folded into ``spec-check`` via ``_run_checks`` in ``validation/spec_check.py``.
 
 from __future__ import annotations
 
+import fnmatch
+import glob
 import json
 import os
 import re
 from typing import Any
 
+from ..core.entry_key_registry import is_glob_key, iter_nodes
 from ..core.errors import SpecError
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
@@ -140,6 +143,9 @@ def _check_phantom_basenames(
             continue
         if basename in _SENTINEL_KEYS:
             continue
+        if is_glob_key(basename):
+            # A glob key names files the toolkit cannot list; it is never a phantom.
+            continue
         if basename not in extraction_basenames:
             errs.append(SpecError(
                 code="E621",
@@ -174,21 +180,35 @@ def _check_drift(
             # Registered with arrays:[] — no drift to check (e.g. 13a, 16)
             continue
 
-        spec_file_path = os.path.join(spec_root, basename)
-        if not os.path.isfile(spec_file_path):
-            # File doesn't exist yet (future step) — skip drift check
-            continue
+        for live_name, spec_file_path in _live_files(spec_root, basename):
+            try:
+                with open(spec_file_path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+            except (json.JSONDecodeError, OSError):
+                continue
 
-        try:
-            with open(spec_file_path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-        except (json.JSONDecodeError, OSError):
-            continue
-
-        for arr in arrays:
-            _check_array_entry(arr, data, basename, "", errs, is_root=True)
+            for arr in arrays:
+                _check_array_entry(arr, data, live_name, "", errs, is_root=True)
 
     return errs
+
+
+def _live_files(spec_root: str, key: str) -> list[tuple[str, str]]:
+    """``(display_name, path)`` of the live spec files a registry key stands for.
+
+    A plain basename gives its one file when it exists.  A glob key gives every matching
+    file under *spec_root* and nothing when none matches (no phantom or drift error).
+    """
+    if not is_glob_key(key):
+        path = os.path.join(spec_root, key)
+        # File doesn't exist yet (future step) — skip drift check
+        return [(key, path)] if os.path.isfile(path) else []
+    found = sorted(glob.glob(os.path.join(spec_root, key)))
+    return [
+        (os.path.relpath(p, spec_root).replace(os.sep, "/"), p)
+        for p in found
+        if os.path.isfile(p)
+    ]
 
 
 def _check_array_entry(
@@ -216,10 +236,32 @@ def _check_array_entry(
     original R003 message text for existing (one-level) cases.
     """
     array_key = entry["array_path"].lstrip(".")
-    id_field = entry["id_field"]
+    id_field = entry.get("id_field", "")
     full_display = f"{display_prefix}{entry['array_path']}"
 
-    val = container.get(array_key) if isinstance(container, dict) else None
+    if _is_plain_name(entry["array_path"]):
+        val = container.get(array_key) if isinstance(container, dict) else None
+    else:
+        # Wider grammar (dotted object path, ``{}`` map, inner ``[]``): sample the first node.
+        first_node = next(iter_nodes(container, entry["array_path"]), None)
+        if first_node is None:
+            return  # nothing to sample; schema validation owns presence
+        item, _path, key = first_node
+        if id_field and id_field not in item and key is None:
+            errs.append(SpecError(
+                code="E622",
+                message=(
+                    f"R003 REGISTRY_DRIFT: '{basename}': array '{array_key}' "
+                    f"registered id_field='{id_field}' but first entry has "
+                    f"fields {list(item.keys())[:6]!r}. Rename id_field in the registry or update the spec."
+                ),
+                path=basename,
+            ))
+        for nested in entry.get("nested", []):
+            _check_array_entry(
+                nested, item, basename, f"{full_display}[]", errs, is_root=False
+            )
+        return
 
     if val is None:
         # Top-level registered arrays are the file's primary entries — an absent
@@ -285,6 +327,14 @@ def _check_array_entry(
         )
 
 
+_PLAIN_NAME = re.compile(r"^\.?[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _is_plain_name(array_path: str) -> bool:
+    """True for the legacy single-key form ``.name`` (no dotted, ``[]`` or ``{}`` segments)."""
+    return bool(_PLAIN_NAME.match(array_path))
+
+
 # ---------------------------------------------------------------------------
 # Check 4 — Unregistered arrays (host-side novelty detection)
 # ---------------------------------------------------------------------------
@@ -331,11 +381,15 @@ def _check_unregistered_arrays(
 
     # Build set of (basename, array_path) pairs already declared in registry
     registered_pairs: set[tuple[str, str]] = set()
+    glob_pairs: list[tuple[str, str]] = []
     for bn, entry in registry.items():
         if entry.get("_special", False) or bn in _SENTINEL_KEYS:
             continue
         for arr in entry.get("arrays", []):
-            registered_pairs.add((bn, arr["array_path"]))
+            if is_glob_key(bn):
+                glob_pairs.append((bn, arr["array_path"]))
+            else:
+                registered_pairs.add((bn, arr["array_path"]))
 
     if not os.path.isdir(spec_root):
         return errs
@@ -371,7 +425,9 @@ def _check_unregistered_arrays(
                 continue
 
             array_path = f".{key}"
-            if (fname, array_path) not in registered_pairs:
+            if (fname, array_path) not in registered_pairs and not any(
+                ap == array_path and fnmatch.fnmatchcase(fname, gk) for gk, ap in glob_pairs
+            ):
                 # Infer kind from the id field
                 id_field = id_fields[0]
                 if id_field == "id":

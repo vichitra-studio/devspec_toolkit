@@ -57,8 +57,10 @@ Design constraints
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
+import re
 import threading
 from typing import Any, Dict, FrozenSet, List, NamedTuple, Optional, Tuple
 
@@ -167,13 +169,12 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
     if not spec_file:
         return None  # None/empty → unknown file
 
-    basename = os.path.basename(spec_file)
     registry, _ = _load(repo_root)
-
-    if basename not in registry:
+    key = _match_registry_key(spec_file, registry)
+    if key is None:
         return None  # unknown file — caller uses fallback
 
-    entry = registry[basename]
+    entry = registry[key]
     if entry.get("_special"):
         # sentinel (canonical_refs_used etc.) — no entry arrays
         return []
@@ -182,6 +183,33 @@ def list_entries(spec_file: str, repo_root: str) -> Optional[List[RegistryEntry]
     for arr in entry.get("arrays", []):
         _flatten_entry(arr, arr["array_path"], arrays)
     return arrays
+
+
+def is_glob_key(key: str) -> bool:
+    """True when a registry file key is a glob (``impl_context/ms_*_plan.json``)."""
+    return "*" in key or "?" in key or "[" in key
+
+
+def match_glob_key(spec_file: str, key: str) -> bool:
+    """True when *spec_file* (relative path or basename) matches the glob *key*.
+
+    The key is relative to the spec directory, so a spec path such as
+    ``spec/impl_context/ms_1_plan.json`` matches ``impl_context/ms_*_plan.json``
+    by its trailing path components.
+    """
+    path = spec_file.replace(os.sep, "/")
+    return fnmatch.fnmatchcase(path, key) or fnmatch.fnmatchcase(path, "*/" + key)
+
+
+def _match_registry_key(spec_file: str, registry: Dict[str, Any]) -> Optional[str]:
+    """Registry key for *spec_file*: the basename, else the first matching glob key."""
+    basename = os.path.basename(spec_file)
+    if basename in registry:
+        return basename
+    for key in registry:
+        if is_glob_key(key) and match_glob_key(spec_file, key):
+            return key
+    return None
 
 
 def _flatten_entry(
@@ -200,12 +228,24 @@ def _flatten_entry(
     """
     out.append(RegistryEntry(
         array_path=full_path,
-        id_field=node["id_field"],
+        # A map-keyed node has no id field: the map key is the id (see iter_nodes).
+        id_field=node.get("id_field", ""),
         kind=node["kind"],
     ))
     for nested in node.get("nested", []):
-        child_path = f"{full_path}[].{nested['array_path'].lstrip('.')}"
+        child_path = join_nested_path(full_path, nested["array_path"])
         _flatten_entry(nested, child_path, out)
+
+
+def join_nested_path(parent_full: str, relative: str) -> str:
+    """Full path of a nested entry: ``<parent>[]<relative>``, or ``<parent><relative>`` under a map.
+
+    A map-keyed parent's full path already ends in ``{}``, which plays the part of ``[]``.
+    """
+    rel = "." + relative.lstrip(".")
+    if parent_full.endswith("{}"):
+        return parent_full + rel
+    return f"{parent_full}[]{rel}"
 
 
 def find_entry(
@@ -295,46 +335,110 @@ def is_corpus_excluded(array_key: str, repo_root: str) -> bool:
 # resolves a registry array_path against actual spec data)
 # ---------------------------------------------------------------------------
 
-def iter_array_path(data: Any, array_path: str):
-    """Yield ``(item, jq_index_path)`` for every leaf item at *array_path*.
+_SEG = r"[A-Za-z_][A-Za-z0-9_]*"
+_TOKEN_RE = re.compile(rf"\.?({_SEG}(?:\.{_SEG})*)(\[\]|\{{\}})?")
+_KEY_RE = re.compile(rf"^\.?({_SEG})")
 
-    *array_path* is a registry-style jq path where ``[].`` separates each array
-    level, e.g. ``.milestones``, ``.milestones[].tasks``, or
-    ``.milestones[].tasks[].acceptance_criteria``.  A leading dot is optional.
-    The walker descends through **all** array segments (arbitrary depth),
-    iterating every element at each level, and yields each leaf-array item
-    together with its concrete index path
-    (e.g. ``.milestones[0].tasks[2].acceptance_criteria[1]``).
 
-    Non-dict containers, missing keys, and non-list values are skipped silently
-    — the same lenient contract the previous single-level implementations used.
-    Only dict leaf items are yielded (callers read an id field off them).
+def _parse_array_path(array_path: str) -> List[Tuple[List[str], str]]:
+    """Split a registry ``array_path`` into ``(keys, marker)`` hops.
 
-    This replaces three separate ``partition("[].")`` reimplementations that
-    each split on only the first array level and therefore silently dropped
-    entries nested two-or-more levels deep.
+    Grammar: ``.name`` descends an object property (dotted names chain), ``[]`` follows an
+    array-valued property, ``{}`` follows a map-valued property.  Each hop is the dotted keys
+    walked from the current object plus the marker that ends it (``"[]"``, ``"{}"`` or ``""``
+    for the final hop of an array path).  Raises ``ValueError`` on a malformed path.
+    """
+    text = array_path if array_path.startswith(".") else "." + array_path
+    hops: List[Tuple[List[str], str]] = []
+    pos = 0
+    while pos < len(text):
+        m = _TOKEN_RE.match(text, pos)
+        if m is None or m.start() != pos:
+            raise ValueError(f"malformed array_path {array_path!r}")
+        hops.append((m.group(1).split("."), m.group(2) or ""))
+        pos = m.end()
+    if not hops:
+        raise ValueError(f"malformed array_path {array_path!r}")
+    return hops
+
+
+def array_top_key(array_path: str) -> str:
+    """First property name of *array_path*: ``.a.b[].c`` -> ``a``, ``.env{}`` -> ``env``."""
+    m = _KEY_RE.match(array_path)
+    if m is None:
+        raise ValueError(f"malformed array_path {array_path!r}")
+    return m.group(1)
+
+
+def array_leaf_key(array_path: str) -> str:
+    """Last property name of *array_path*: ``.m[].tasks`` -> ``tasks``, ``.plan.items`` -> ``items``."""
+    return _parse_array_path(array_path)[-1][0][-1]
+
+
+def iter_nodes(data: Any, array_path: str):
+    """Yield ``(item, concrete_path, key_or_None)`` for every node at *array_path*.
+
+    *array_path* uses the registry grammar: ``.name`` descends an object property,
+    ``[]`` follows an array property, ``{}`` follows a map property whose keys are the node
+    ids.  A leading dot is optional.  Examples: ``.functional_requirements``,
+    ``.milestones[].tasks``, ``.plan.items``, ``.environments{}``.
+
+    ``key_or_None`` is the map key for a node under a ``{}`` leaf, else ``None``.  The concrete
+    path is jq-style: ``.milestones[0].tasks[2]``, ``.environments["prod"]``.
+
+    Non-dict containers, missing keys and wrongly typed values are skipped silently.  Only dict
+    nodes are yielded (callers read an id field off them).
     """
     if not isinstance(data, dict):
         return
-    segments = array_path.lstrip(".").split("[].")
+    hops = _parse_array_path(array_path)
+    last = len(hops) - 1
 
-    def _descend(node: Any, seg_index: int, prefix: str):
-        key = segments[seg_index]
-        is_last = seg_index == len(segments) - 1
+    def _descend(node: Any, hop_index: int, prefix: str):
         if not isinstance(node, dict):
             return
-        val = node.get(key)
-        if not isinstance(val, list):
+        keys, marker = hops[hop_index]
+        cur: Any = node
+        for k in keys:
+            if not isinstance(cur, dict):
+                return
+            cur = cur.get(k)
+        base = prefix + "." + ".".join(keys)
+        is_last = hop_index == last
+        if marker == "{}":
+            if not isinstance(cur, dict):
+                return
+            for key, item in cur.items():
+                item_path = f"{base}[{json.dumps(key)}]"
+                if is_last:
+                    if isinstance(item, dict):
+                        yield item, item_path, key
+                else:
+                    yield from _descend(item, hop_index + 1, item_path)
             return
-        for idx, item in enumerate(val):
-            item_path = f"{prefix}.{key}[{idx}]"
+        if not isinstance(cur, list):
+            return
+        for idx, item in enumerate(cur):
+            item_path = f"{base}[{idx}]"
             if is_last:
                 if isinstance(item, dict):
-                    yield item, item_path
-            elif isinstance(item, dict):
-                yield from _descend(item, seg_index + 1, item_path)
+                    yield item, item_path, None
+            else:
+                yield from _descend(item, hop_index + 1, item_path)
 
     yield from _descend(data, 0, "")
+
+
+def iter_array_path(data: Any, array_path: str):
+    """Yield ``(item, jq_index_path)`` for every leaf item at *array_path*.
+
+    Thin wrapper over :func:`iter_nodes` that drops the map key.  For the array-only paths of
+    the pre-1.2.0 registry (``.milestones``, ``.milestones[].tasks``, any depth) the output is
+    identical to the original single-purpose walker; paths in the wider grammar (dotted object
+    paths, ``{}`` maps) are walked too.
+    """
+    for item, path, _key in iter_nodes(data, array_path):
+        yield item, path
 
 
 def all_registered_basenames(repo_root: str) -> List[str]:
@@ -349,7 +453,7 @@ def all_registered_basenames(repo_root: str) -> List[str]:
     registry, _ = _load(repo_root)
     return [
         k for k, v in registry.items()
-        if not v.get("_special", False)
+        if not v.get("_special", False) and not is_glob_key(k)
     ]
 
 
@@ -362,7 +466,8 @@ def get_step_for_file(basename: str, repo_root: str) -> Optional[str]:
             The registry is loaded from ``<repo_root>/tools/entry_key_registry.json``.
     """
     registry, _ = _load(repo_root)
-    entry = registry.get(basename)
+    key = _match_registry_key(basename, registry)
+    entry = registry.get(key) if key is not None else None
     if entry and not entry.get("_special"):
         return entry.get("step")
     return None

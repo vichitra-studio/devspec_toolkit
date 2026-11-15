@@ -32,6 +32,11 @@
     },
     "seeds": {
       "type": "array",
+      "x-node": {
+        "kind": "seed",
+        "id": "seed_id",
+        "top_of_graph": true
+      },
       "minItems": 1,
       "items": {
         "type": "object",
