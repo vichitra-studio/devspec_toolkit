@@ -539,3 +539,78 @@ def test_registry_check_wide_paths_do_not_misfire(tmp_path):
     assert run_registry_check(str(spec), str(root)) == []
     (spec / "07_nfrs.json").write_text(json.dumps({"plan": {"items": [{"other": "a"}]}}))
     assert [e.code for e in run_registry_check(str(spec), str(root))] == ["E622"]
+
+
+def test_matrix_resolves_glob_keyed_file_through_registry_not_legacy_scan(tmp_path, monkeypatch):
+    import specdev_tools.validation.matrix as matrix_mod
+
+    root = _registry_toolkit(tmp_path, _WIDE_REGISTRY)
+    spec = tmp_path / "spec"
+    (spec / "impl_context").mkdir(parents=True)
+    (spec / "impl_context" / "ms_1_plan.json").write_text(json.dumps({"plan_items": [{"item_id": "x"}]}))
+    legacy_calls: list[dict] = []
+    monkeypatch.setattr(matrix_mod, "_legacy_scan_data", lambda data, *a, **k: legacy_calls.append(data))
+    matrix_mod.build_trace_matrix(str(root), str(spec))
+    assert legacy_calls == []
+
+
+def _wide_check(tmp_path, registry, spec_files):
+    root = _registry_toolkit(tmp_path, registry)
+    paths = {"_meta": {}, **{e["step"]: {k: [a["array_path"] for a in e["arrays"]]} for k, e in registry.items()}}
+    (root / "tools" / "extraction_paths.json").write_text(json.dumps(paths))
+    spec = tmp_path / "spec"
+    spec.mkdir()
+    for name, body in spec_files.items():
+        (spec / name).write_text(json.dumps(body))
+    return [e for e in run_registry_check(str(spec), str(root)) if e.code in ("E621", "E622")]
+
+
+_NFR_REGISTRY = {"07_nfrs.json": _WIDE_REGISTRY["07_nfrs.json"]}
+
+
+def test_registry_check_wide_root_entry_absent_first_hop_is_e622(tmp_path):
+    errs = _wide_check(tmp_path, _NFR_REGISTRY, {"07_nfrs.json": {}})
+    assert [e.code for e in errs] == ["E622"] and "missing" in errs[0].message
+    errs = _wide_check(tmp_path / "b", _NFR_REGISTRY, {"07_nfrs.json": {"plan": {}}})
+    assert [e.code for e in errs] == ["E622"]
+
+
+def test_registry_check_wide_root_entry_wrong_type_is_e622_and_empty_is_silent(tmp_path):
+    errs = _wide_check(tmp_path, _NFR_REGISTRY, {"07_nfrs.json": {"plan": {"items": {"a": 1}}}})
+    assert [e.code for e in errs] == ["E622"] and "not an array" in errs[0].message
+    assert _wide_check(tmp_path / "b", _NFR_REGISTRY, {"07_nfrs.json": {"plan": {"items": []}}}) == []
+
+
+def test_registry_check_wide_root_map_entry_absent_and_wrong_type(tmp_path):
+    reg = {"02a_delivery_baseline.json": _WIDE_REGISTRY["02a_delivery_baseline.json"]}
+    assert [e.code for e in _wide_check(tmp_path, reg, {"02a_delivery_baseline.json": {}})] == ["E622"]
+    errs = _wide_check(tmp_path / "b", reg, {"02a_delivery_baseline.json": {"environments": []}})
+    assert [e.code for e in errs] == ["E622"] and "not a map" in errs[0].message
+    assert _wide_check(tmp_path / "c", reg, {"02a_delivery_baseline.json": {"environments": {}}}) == []
+
+
+def test_registry_check_glob_key_with_bracket_in_spec_root(tmp_path):
+    base = tmp_path / "we[ird]"
+    base.mkdir()
+    root, spec = _write_checked_toolkit(base)
+    (spec / "impl_context").mkdir()
+    (spec / "impl_context" / "ms_1_plan.json").write_text(json.dumps({"plan_items": [{"wrong": 1}]}))
+    assert [e.code for e in run_registry_check(str(spec), str(root))] == ["E622"]
+
+
+def test_match_glob_key_star_does_not_cross_a_slash():
+    from specdev_tools.core.entry_key_registry import match_glob_key
+
+    assert match_glob_key("spec/impl_context/ms_1_plan.json", "impl_context/ms_*_plan.json")
+    assert match_glob_key("impl_context/ms_1_plan.json", "impl_context/ms_*_plan.json")
+    assert not match_glob_key("impl_context/ms_1/x_plan.json", "impl_context/ms_*_plan.json")
+    assert not match_glob_key("impl_context/sub/ms_1_plan.json", "impl_context/*_plan.json")
+
+
+def test_corpus_excluded_wide_path_is_keyed_by_top_key(tmp_path):
+    from specdev_tools.core.entry_key_registry import is_corpus_excluded
+
+    reg = {"07_nfrs.json": {"step": "07", "arrays": [
+        {"array_path": ".plan.items", "id_field": "thing_id", "kind": "plan-thing", "corpus_excluded": True}]}}
+    root = str(_registry_toolkit(tmp_path, reg))
+    assert is_corpus_excluded("plan", root)

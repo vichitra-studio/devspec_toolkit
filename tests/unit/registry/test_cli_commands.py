@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
 
 from specdev_tools import cli
@@ -68,6 +69,17 @@ def test_build_parser_help_matches_main_help():
         [sys.executable, "-m", "specdev_tools.cli", "context"], capture_output=True, text=True, cwd=_ROOT / "tools"
     ).stdout
     assert ctx.format_help() == out
+
+
+# `context extract` is a removed-command stub (add_help=False); it prints a removal notice instead.
+@pytest.mark.parametrize("path", [p for p in _paths() if p != "context extract"])
+def test_every_command_path_answers_help(path):
+    r = subprocess.run(
+        [sys.executable, "-m", "specdev_tools.cli", *path.split(), "--help"],
+        capture_output=True, text=True, cwd=_ROOT / "tools",
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip()
 
 
 def test_json_group_sub_commands_come_only_from_build_json_parser():

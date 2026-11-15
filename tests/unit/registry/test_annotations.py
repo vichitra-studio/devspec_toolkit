@@ -305,6 +305,22 @@ def test_annot05_nodeid_and_screaming_snake_atoms_are_allowed(tmp_path):
     assert _lint(root2) == []
 
 
+def test_annot05_wildcard_and_about_fields_must_reference_nodeid(tmp_path):
+    root = _build(tmp_path)
+    # kinds "*" with a plain kebabId must fail
+    _edit(root, S16, lambda d: _realises(d)["realises"]["x-link"].update(kinds="*"))
+    issues = _with(_lint(root), "ANNOT-05")
+    assert issues and "nodeId" in issues[0]
+    # the same with nodeId is clean
+    _edit(root, S16, lambda d: _realises(d)["realises"].update(items={"$ref": "vc:core:graph#nodeId"}))
+    assert _with(_lint(root), "ANNOT-05") == []
+    # verb about with kebabId (explicit kinds) must fail
+    root2 = _build(tmp_path / "two")
+    _edit(root2, S16, lambda d: _realises(d).__setitem__("about", _realises(d).pop("realises")))
+    issues = _with(_lint(root2), "ANNOT-05")
+    assert any("about" in i and "nodeId" in i for i in issues)
+
+
 def test_annot05_link_must_sit_on_a_node_item(tmp_path):
     root = _build(tmp_path)
 

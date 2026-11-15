@@ -279,13 +279,13 @@ class TestSchemaAdditionalPropertiesArbitrary:
 
 
 # ---------------------------------------------------------------------------
-# F6 — Fixture-based test: use orphaned invalid_missing_ref.json
+# F6 — Fixture-based test: use unknown_label_ref.json (a canon concern, not an E590 case)
 # ---------------------------------------------------------------------------
 
-class TestValidatorFixtureMissingRef:
-    def test_invalid_missing_ref_fixture_raises_no_e590(self):
+class TestValidatorFixtureUnknownLabelRef:
+    def test_unknown_label_ref_fixture_raises_no_e590(self):
         """The 'nonexistent label' fixture is a canon (E110) concern, not a step-13 validator error."""
-        instance = json.loads((FIXTURES_DIR / "invalid_missing_ref.json").read_text())
+        instance = json.loads((FIXTURES_DIR / "unknown_label_ref.json").read_text())
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
         rendered = _render(errors)
         assert not any("E590" in e or "W590" in e for e in rendered)

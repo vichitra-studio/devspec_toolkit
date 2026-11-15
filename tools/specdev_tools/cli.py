@@ -290,9 +290,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     rg = sub.add_parser(
         "registry-generate",
-        help="Regenerate the entry-key registry and extraction-paths from toolkit schemas.",
+        help="Regenerate the entry-key registry, extraction-paths and cli_commands.json (and optionally the step order) from toolkit schemas.",
         description=(
-            "Regenerate the entry-key registry and extraction-paths from toolkit schemas.\n\n"
+            "Regenerate the entry-key registry, extraction-paths and cli_commands.json from toolkit\n"
+            "schemas and the CLI parser; with --step-order-out also the step order derived from annotations.\n\n"
             "Output is byte-deterministic across runs (sort_keys + indent=2 + trailing newline)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2166,13 +2167,17 @@ def main():
         else:
             cli_commands_out = None
         from .registry.generate import run as registry_generate_run
-        registry_generate_run(
-            repo_root=repo_root,
-            out_path=out_path,
-            extraction_paths_out=extraction_paths_out,
-            step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
-            cli_commands_out=cli_commands_out,
-        )
+        try:
+            registry_generate_run(
+                repo_root=repo_root,
+                out_path=out_path,
+                extraction_paths_out=extraction_paths_out,
+                step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
+                cli_commands_out=cli_commands_out,
+            )
+        except ValueError as exc:  # includes AnnotationError (issue list in the message)
+            print(f"registry-generate: failed: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     elif args.cmd == "spec-check":
         repo_root = os.path.abspath(args.repo_root)

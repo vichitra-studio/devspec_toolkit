@@ -169,8 +169,7 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
             continue
         allowed_same = set(lk.value.get("same_step_kinds") or [])
         for holder in sorted(lk.holders):
-            if kind_role.get(holder) == "record":
-                continue
+            is_record = kind_role.get(holder) == "record"
             for hstep in sorted(kind_steps.get(holder, ())):
                 for target in kinds:
                     for tstep in sorted(kind_steps.get(target, ())):
@@ -182,6 +181,8 @@ def derive_step_order(repo_root: str, extra_edges: Iterable[Pair] = ()) -> dict[
                                     f"{hstep}, which is not in same_step_kinds"
                                 )
                             continue
+                        if is_record:
+                            continue  # record holders are exempt from edges only
                         edges.setdefault(
                             (hstep, tstep),
                             _Edge(hstep, tstep, lk.schema_file, lk.field_name or "", target),

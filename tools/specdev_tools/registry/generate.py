@@ -706,6 +706,17 @@ def run(
     repo_root = os.path.abspath(repo_root)
     registry_doc, extraction_paths_doc = generate_registry(repo_root)
 
+    # Derive the step order first so a failure leaves no output half-written.
+    step_order_doc = None
+    if step_order_out:
+        from specdev_tools.registry.step_order_gen import build_step_order_document, derive_step_order
+
+        derived = derive_step_order(repo_root)
+        if not derived["steps"]:
+            raise ValueError("registry-generate --step-order-out: no annotated step to derive an order from")
+        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
+        step_order_doc = build_step_order_document(derived, hand)
+
     # Write registry
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fh:
@@ -719,17 +730,11 @@ def run(
     print(f"registry-generate: wrote {out_path}")
     print(f"registry-generate: wrote {extraction_paths_out}")
 
-    if step_order_out:
-        from specdev_tools.registry.step_order_gen import build_step_order_document, derive_step_order
-
-        derived = derive_step_order(repo_root)
-        if not derived["steps"]:
-            raise ValueError("registry-generate --step-order-out: no annotated step to derive an order from")
-        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
+    if step_order_doc is not None:
         step_order_out = os.path.abspath(step_order_out)
         os.makedirs(os.path.dirname(step_order_out), exist_ok=True)
         with open(step_order_out, "w", encoding="utf-8") as fh:
-            fh.write(_serialize(build_step_order_document(derived, hand)))
+            fh.write(_serialize(step_order_doc))
         print(f"registry-generate: wrote {step_order_out}")
 
     if cli_commands_out:

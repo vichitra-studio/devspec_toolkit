@@ -133,7 +133,7 @@ def _load(repo_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
                         continue
                     for _arr in _entry.get("arrays", []):
                         if _arr.get("corpus_excluded", False):
-                            excluded.add(_arr["array_path"].lstrip("."))
+                            excluded.add(array_top_key(_arr["array_path"]))
                 _REGISTRY_CACHE[cache_key] = (registry, frozenset(excluded))
     return _REGISTRY_CACHE[cache_key]
 
@@ -197,8 +197,13 @@ def match_glob_key(spec_file: str, key: str) -> bool:
     ``spec/impl_context/ms_1_plan.json`` matches ``impl_context/ms_*_plan.json``
     by its trailing path components.
     """
-    path = spec_file.replace(os.sep, "/")
-    return fnmatch.fnmatchcase(path, key) or fnmatch.fnmatchcase(path, "*/" + key)
+    path_parts = spec_file.replace(os.sep, "/").split("/")
+    key_parts = key.split("/")
+    if len(path_parts) < len(key_parts):
+        return False
+    # Segment-wise, so a ``*`` never crosses a ``/`` (the same rule ``glob.glob`` applies).
+    tail = path_parts[-len(key_parts):]
+    return all(fnmatch.fnmatchcase(p, k) for p, k in zip(tail, key_parts))
 
 
 def _match_registry_key(spec_file: str, registry: Dict[str, Any]) -> Optional[str]:

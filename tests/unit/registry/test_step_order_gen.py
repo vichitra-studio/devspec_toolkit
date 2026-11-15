@@ -46,7 +46,8 @@ def _kind_schema(step: str, kind: str, role: str, links: list[tuple]) -> dict:
         xl: dict = {"kinds": kinds, "required": False}
         if same:
             xl["same_step_kinds"] = same
-        props[verb] = {"type": "array", "items": {"$ref": "vc:core:atoms#kebabId"}, "x-link": xl}
+        atom = "vc:core:graph#nodeId" if kinds == "*" or verb == "about" else "vc:core:atoms#kebabId"
+        props[verb] = {"type": "array", "items": {"$ref": atom}, "x-link": xl}
     item: dict = {"type": "object", "properties": props, "required": [id_name]}
     if role != "record":
         item["allOf"] = [{"$ref": "vc:core:graph#scopeReasonRule"}]
@@ -271,3 +272,54 @@ def test_without_step_order_out_nothing_extra_is_written(tmp_path):
     clear_shared_caches()
     registry_run(str(root), str(tmp_path / "r.json"), str(tmp_path / "e.json"))
     assert sorted(p.name for p in tmp_path.iterdir() if p.is_file()) == ["e.json", "r.json"]
+
+
+def test_record_holder_same_step_link_still_raises_annot_21(tmp_path):
+    root = _toolkit(tmp_path, [
+        _N("04", "fr"),
+        _N("04", "note", [("derives_from", ["fr"], None)], role="record"),
+    ])
+    with pytest.raises(AnnotationError) as ei:
+        _derive(root)
+    assert any(i.startswith("ANNOT-21") and "'note'" in i for i in ei.value.issues)
+
+
+def test_step_order_out_failure_writes_nothing(tmp_path):
+    root = _toolkit(tmp_path, [])  # no annotated step: --step-order-out raises
+    r, e, o = tmp_path / "r.json", tmp_path / "e.json", tmp_path / "o.json"
+    clear_shared_caches()
+    with pytest.raises(ValueError, match="no annotated step"):
+        registry_run(str(root), str(r), str(e), step_order_out=str(o))
+    assert not r.exists() and not e.exists() and not o.exists()
+
+
+def test_cli_step_order_failure_is_a_clean_error(tmp_path):
+    import subprocess
+    import sys
+
+    root = _toolkit(tmp_path, [])
+    res = subprocess.run(
+        [sys.executable, "-m", "specdev_tools.cli", "registry-generate", "--repo-root", str(root),
+         "--out", str(tmp_path / "r.json"), "--extraction-paths-out", str(tmp_path / "e.json"),
+         "--step-order-out", str(tmp_path / "o.json")],
+        capture_output=True, text=True, cwd=_ROOT / "tools",
+    )
+    assert res.returncode != 0
+    assert "no annotated step" in res.stderr and "Traceback" not in res.stderr
+    assert not (tmp_path / "r.json").exists()
+
+
+def test_cli_annotation_error_prints_issue_list_without_traceback(tmp_path):
+    import subprocess
+    import sys
+
+    root = _toolkit(tmp_path, [_N("04", "fr", [("depends_on", ["fr"], None)])])
+    res = subprocess.run(
+        [sys.executable, "-m", "specdev_tools.cli", "registry-generate", "--repo-root", str(root),
+         "--out", str(tmp_path / "r.json"), "--extraction-paths-out", str(tmp_path / "e.json"),
+         "--step-order-out", str(tmp_path / "o.json")],
+        capture_output=True, text=True, cwd=_ROOT / "tools",
+    )
+    assert res.returncode != 0
+    assert "ANNOT-21" in res.stderr and "Traceback" not in res.stderr
+    assert not (tmp_path / "o.json").exists()

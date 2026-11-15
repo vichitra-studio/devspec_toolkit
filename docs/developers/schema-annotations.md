@@ -16,7 +16,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 | `contract` | Property names that make up the node's contract. Required unless `top_of_graph`. |
 | `coarse` | Optional boolean. Declares a coarse obligation; the built computation that reads it comes later. |
 | `step` | Optional step id. Default: the numeric prefix of the schema file name. |
-| `files` | Optional relative globs. Default: the step's spec file (step 16 plan files use `impl_context/ms_*_plan.json`). |
+| `files` | Optional relative globs. Default: the step's spec file. Step 16 plan files must set `files: ["impl_context/ms_*_plan.json"]` explicitly. |
 
 `nodeRole` values: `obligation-system`, `obligation-delivery`, `verifier`, `plan`, `context`, `record`. `seed` is not a role.
 
@@ -24,7 +24,7 @@ Declares that each item of an array, or each value of a map, is a graph node.
 
 | Key | Meaning |
 |---|---|
-| `kinds` | Required. Non-empty array of kind names, or the literal `"*"` (only for `replaces`, `removes`, `about`). |
+| `kinds` | Required. Non-empty array of kind names, or the literal `"*"`. `"*"` is meant only for `replaces`, `removes` and `about`; the lint does not check which verb uses it. A field whose `kinds` is `"*"`, or whose verb is `about`, must reference `vc:core:graph#nodeId`. |
 | `required` | Required boolean. |
 | `built` | Optional boolean, default false. |
 | `same_step_kinds` | Optional array, a subset of `kinds` that may be held in the same step. |
@@ -64,10 +64,10 @@ Attach the reason rule in the item's `allOf`; it makes `scope_reason` required w
 |---|---|---|
 | `tools/entry_key_registry.json` | `--out` | Annotated nodes add entries marked `source: "x-node"` with `role`, `contract`, `coarse` and `links`. When an annotated shared node has the same `array_path` as a legacy heuristic entry, the legacy entry is kept. Map-keyed nodes carry no `id_field`. Glob-keyed entries (step 16 plan files) use the glob as the key. |
 | `tools/extraction_paths.json` | `--extraction-paths-out` | Unchanged. |
-| `tools/cli_commands.json` | `--cli-commands-out` | The CLI command list built from the argparse tree. Defaults to `tools/cli_commands.json` only when `--out` is absent. |
-| derived step order | `--step-order-out` | Written only when a path is given. `tools/step_order.json` stays the hand file; the derived order is compared against it, never written into it. |
+| `tools/cli_commands.json` | `--cli-commands-out` | The CLI command list built from the argparse tree. Defaults to `tools/cli_commands.json` only when `--out` is absent; the defaults of `--out` and `--extraction-paths-out` are unchanged. |
+| derived step order | `--step-order-out` | Written only when a path is given. `tools/step_order.json` stays the hand file and is never overwritten. No command compares the derived order with the hand file yet (`step_order_gen.diff_against_hand` is library only). With no annotated step, or when the annotation lint finds issues, the command fails, prints the reason and writes nothing. |
 
-All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annotations produces the legacy registry unchanged.
+All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annotations produces the legacy registry entries unchanged; `_format_version` is `1.1.0`.
 
 ## Lint codes (`ANNOT-NN`)
 
@@ -78,10 +78,10 @@ All outputs are byte-deterministic. A toolkit with no `x-node` / `x-link` annota
 | ANNOT-01 | An `x-node` or `x-link` value does not validate against `vc:core:graph`. |
 | ANNOT-02 | A kind is not kebab-case, or one kind is declared at more than one site. |
 | ANNOT-03 | The node's items schema is missing, the id property is missing or not a string, or a `map_keyed` node lacks `additionalProperties`. |
-| ANNOT-05 | An `x-link` field name is not a link verb, is not an array of `$ref` items, or does not sit on a node item. |
+| ANNOT-05 | An `x-link` field name is not a link verb, is not an array whose items `$ref` is `vc:core:atoms#kebabId`, `vc:core:atoms#screamingSnakeId` or `vc:core:graph#nodeId`, or does not sit on a node item. |
 | ANNOT-07 | An `x-link` kind (or a `same_step_kinds` entry) is not a declared kind or not in `kinds`. |
-| ANNOT-08 | A node item lacks `lifecycle` as `$ref vc:core:graph#lifecycle`; an obligation item lacks `scope`, `scope_reason` or the `scopeReasonRule` in its `allOf`. |
+| ANNOT-08 | A node item lacks `lifecycle` as `$ref vc:core:graph#lifecycle`; an obligation item lacks `scope`, `scope_reason` or the `scopeReasonRule` in its `allOf`. `top_of_graph` kinds and role `record` kinds are exempt from `lifecycle`, `scope` and `scope_reason`. |
 | ANNOT-20 | The derived step graph has a cycle (raised by the step-order derivation). |
-| ANNOT-21 | An `x-link` kind lives in the holder's own step and is not in `same_step_kinds` (step-order derivation). |
+| ANNOT-21 | An `x-link` kind lives in the holder's own step and is not in `same_step_kinds` (step-order derivation). Record-role holders are checked too; only their edges are exempt from the order. |
 
 The kind `seed` is external: links may name it without a declaring node.

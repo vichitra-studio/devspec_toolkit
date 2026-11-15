@@ -53,7 +53,7 @@ import os
 import re
 from typing import Any
 
-from ..core.entry_key_registry import is_glob_key, iter_nodes
+from ..core.entry_key_registry import _parse_array_path, is_glob_key, iter_nodes
 from ..core.errors import SpecError
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
@@ -203,12 +203,45 @@ def _live_files(spec_root: str, key: str) -> list[tuple[str, str]]:
         path = os.path.join(spec_root, key)
         # File doesn't exist yet (future step) — skip drift check
         return [(key, path)] if os.path.isfile(path) else []
-    found = sorted(glob.glob(os.path.join(spec_root, key)))
+    found = sorted(glob.glob(os.path.join(glob.escape(spec_root), key)))
     return [
         (os.path.relpath(p, spec_root).replace(os.sep, "/"), p)
         for p in found
         if os.path.isfile(p)
     ]
+
+
+def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> None:
+    """E622 for a root wide-path entry whose first hop is absent or of the wrong type.
+
+    Mirrors the plain-name branch: an absent or mistyped primary collection is drift; an
+    empty one is not.  Only the first hop is tested (deeper hops may legitimately be empty).
+    """
+    path = entry["array_path"]
+    keys, marker = _parse_array_path(path)[0]
+    cur: Any = container
+    for k in keys:
+        if not isinstance(cur, dict) or k not in cur:
+            errs.append(SpecError(
+                code="E622",
+                message=(
+                    f"R003 REGISTRY_DRIFT: '{basename}': array_path '{path}' "
+                    f"not found in file (key '{k}' missing)."
+                ),
+                path=basename,
+            ))
+            return
+        cur = cur[k]
+    want = dict if marker == "{}" else list
+    if not isinstance(cur, want):
+        errs.append(SpecError(
+            code="E622",
+            message=(
+                f"R003 REGISTRY_DRIFT: '{basename}': array_path '{path}' "
+                f"exists but is not {'a map' if want is dict else 'an array'} (got {type(cur).__name__})."
+            ),
+            path=basename,
+        ))
 
 
 def _check_array_entry(
@@ -245,7 +278,9 @@ def _check_array_entry(
         # Wider grammar (dotted object path, ``{}`` map, inner ``[]``): sample the first node.
         first_node = next(iter_nodes(container, entry["array_path"]), None)
         if first_node is None:
-            return  # nothing to sample; schema validation owns presence
+            if is_root:
+                _check_wide_first_hop(entry, container, basename, errs)
+            return  # empty container: nothing to sample
         item, _path, key = first_node
         if id_field and id_field not in item and key is None:
             errs.append(SpecError(

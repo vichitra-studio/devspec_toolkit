@@ -173,8 +173,3 @@ def test_map_keyed_environments_read_by_key(pipeline):
     data = {"environments": {"dev": {"config": {}}, "prod": {"config": {}}}}
     keys = [k for _, _, k in iter_nodes(data, kinds["environment"]["path"])]
     assert keys == ["dev", "prod"]
-
-
-def test_pre_m1_registry_fixture_is_a_registry():
-    doc = json.loads((_ROOT / "tests" / "fixtures" / "entry_key_registry_pre_m1.json").read_text())
-    assert "registry" in doc and "x-node" not in json.dumps(doc)

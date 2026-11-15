@@ -5,6 +5,14 @@ from typing import Any, Callable, Optional
 
 from referencing import Registry as _ReferencingRegistry, Resource as _Resource
 
+def _resolve_rel(repo_root: str, rel: str) -> Optional[str]:
+    for base in [repo_root, os.getcwd()]:
+        cand = os.path.join(base, rel)
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
 class SchemaRegistry:
     def __init__(self, repo_root: str):
         self.repo_root = os.path.abspath(repo_root)
@@ -31,11 +39,7 @@ class SchemaRegistry:
                 pass
 
     def _resolve_path(self, rel: str) -> Optional[str]:
-        for base in [self.repo_root, os.getcwd()]:
-            cand = os.path.join(base, rel)
-            if os.path.exists(cand):
-                return cand
-        return None
+        return _resolve_rel(self.repo_root, rel)
 
     def resolve(self, uri: str) -> Optional[str]:
         rel = self.map.get(uri)
@@ -123,24 +127,47 @@ def _stat_sig(path: Optional[str]) -> Optional[tuple[int, int]]:
     return (st.st_mtime_ns, st.st_size)
 
 
-def _registry_signature(reg: SchemaRegistry) -> tuple:
-    """Cheap change signature: mtime_ns + size of the registry map and each mapped schema file."""
-    map_path = os.path.join(reg.repo_root, "tools", "schema_registry.json")
+def _map_path_for(repo_root: str) -> str:
+    map_path = os.path.join(repo_root, "tools", "schema_registry.json")
     if not os.path.exists(map_path):
-        map_path = os.path.join(reg.repo_root, "schema_registry.json")
+        map_path = os.path.join(repo_root, "schema_registry.json")
+    return map_path
+
+
+def _compute_signature(repo_root: str, schema_map: dict[str, str]) -> tuple:
+    map_path = _map_path_for(repo_root)
     parts: list[Any] = [(map_path, _stat_sig(map_path))]
-    for uri, rel in reg.map.items():
-        path = reg._resolve_path(rel)
+    for uri, rel in schema_map.items():
+        path = _resolve_rel(repo_root, rel)
         parts.append((uri, path, _stat_sig(path)))
     return tuple(parts)
+
+
+def _registry_signature(reg: SchemaRegistry) -> tuple:
+    """Cheap change signature: mtime_ns + size of the registry map and each mapped schema file."""
+    return _compute_signature(reg.repo_root, reg.map)
+
+
+def _signature_before_load(repo_root: str) -> Optional[tuple]:
+    """Signature of *repo_root* taken before a ``SchemaRegistry`` is built (``None`` if the map is unreadable)."""
+    root = os.path.abspath(repo_root)
+    try:
+        with open(_map_path_for(root), "r", encoding="utf-8") as f:
+            schema_map = _validate_registry_map(json.load(f))
+    except (OSError, ValueError):
+        return None
+    return _compute_signature(root, schema_map)
 
 
 def get_shared_registry(repo_root: str) -> SchemaRegistry:
     """Return a memoised ``SchemaRegistry`` for *repo_root*.
 
     Keyed by ``realpath``; a fresh instance is built when the signature of the
-    registry map or any mapped schema file changed.  Constructor errors
-    propagate unchanged and are never cached.
+    registry map or any mapped schema file changed.  The signature is taken
+    before the load and the instance is cached only if it is unchanged after
+    it, so a file edited mid-load is never cached under its new signature with
+    the old content.  Constructor errors propagate unchanged and are never
+    cached.
     """
     key = os.path.realpath(repo_root)
     with _SHARED_LOCK:
@@ -149,8 +176,12 @@ def get_shared_registry(repo_root: str) -> SchemaRegistry:
             sig, reg = entry
             if _registry_signature(reg) == sig:
                 return reg
+        before = _signature_before_load(repo_root)
         reg = SchemaRegistry(repo_root)
-        _SHARED_REGISTRIES[key] = (_registry_signature(reg), reg)
+        if before is not None and _registry_signature(reg) == before:
+            _SHARED_REGISTRIES[key] = (before, reg)
+        else:
+            _SHARED_REGISTRIES.pop(key, None)
         return reg
 
 

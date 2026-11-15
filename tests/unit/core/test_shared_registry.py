@@ -108,37 +108,116 @@ def test_clear_shared_caches_empties_all() -> None:
     assert get_shared_registry(TOOLKIT_ROOT) is not reg
 
 
-def test_spec_check_style_run_constructs_one_registry_and_one_validator_per_uri(
+class _CountingDict(dict):
+    """Counts item assignment: ``get_cached_validator`` assigns once per cache miss."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sets: list[tuple[str, str]] = []
+
+    def __setitem__(self, key, value) -> None:
+        self.sets.append(key)
+        super().__setitem__(key, value)
+
+
+def test_one_spec_check_run_builds_one_registry_per_root_and_one_validator_per_uri(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Many validations over one repo_root: <=1 SchemaRegistry, <=1 validator per schema URI."""
-    reg_ctor = {"n": 0}
-    val_ctor: dict[str, int] = {}
+    """One real spec-check over the corpus: <=1 SchemaRegistry per repo root, <=1 validator per URI.
+
+    Validators are counted as cache misses (one ``_VALIDATOR_CACHE`` assignment each), not as
+    ``Draft202012Validator.__init__`` calls: ``jsonschema`` ``evolve`` re-enters ``__init__``
+    for sub-schemas without being a cache miss.
+    """
+    from specdev_tools.validation.spec_check import run_spec_check_json
+
+    clear_shared_caches()
+    reg_ctor: dict[str, int] = {}
     orig_init = SchemaRegistry.__init__
 
     def _counting_init(self, repo_root):
-        reg_ctor["n"] += 1
+        key = os.path.realpath(repo_root)
+        reg_ctor[key] = reg_ctor.get(key, 0) + 1
         orig_init(self, repo_root)
 
     monkeypatch.setattr(SchemaRegistry, "__init__", _counting_init)
+    misses = _CountingDict()
+    monkeypatch.setattr(reg_mod, "_VALIDATOR_CACHE", misses)
 
-    import specdev_tools.core.schema_validate as sv
+    corpus = os.path.join(TOOLKIT_ROOT, "tests", "fixtures", "spec_corpus")
+    run_spec_check_json(TOOLKIT_ROOT, corpus)
 
-    class _CountingValidator:
-        FORMAT_CHECKER = Draft202012Validator.FORMAT_CHECKER
+    assert reg_ctor, "spec-check built no SchemaRegistry: the counter is not wired"
+    assert misses.sets, "spec-check built no cached validator: the counter is not wired"
+    assert all(n <= 1 for n in reg_ctor.values()), reg_ctor
+    assert len(misses.sets) == len(set(misses.sets)), [k for k in misses.sets if misses.sets.count(k) > 1]
+    clear_shared_caches()
 
-        def __new__(cls, schema, *a, **k):
-            key = schema.get("$id", "?")
-            val_ctor[key] = val_ctor.get(key, 0) + 1
-            return Draft202012Validator(schema, *a, **k)
 
-    monkeypatch.setattr(sv, "Draft202012Validator", _CountingValidator)
+def test_deleted_schema_file_after_caching_rebuilds_and_load_raises(tmp_path: Path) -> None:
+    root = _make_toolkit(tmp_path, _S0)
+    first = get_shared_registry(str(root))
+    assert first.load("vc:test:s") == _S0
+    (root / "schema" / "s.json").unlink()
+    second = get_shared_registry(str(root))
+    assert second is not first
+    with pytest.raises(FileNotFoundError):
+        second.load("vc:test:s")
 
-    uri = next(iter(SchemaRegistry(TOOLKIT_ROOT).store))
-    reg_ctor["n"] = 0
-    for _ in range(5):
-        validate_data_against_schema(TOOLKIT_ROOT, {"$schema": uri})
-        get_shared_registry(TOOLKIT_ROOT)
-    assert reg_ctor["n"] <= 1
-    assert all(n <= 1 for n in val_ctor.values())
-    assert sum(val_ctor.values()) == 1
+
+def test_changed_registry_map_file_rebuilds(tmp_path: Path) -> None:
+    root = _make_toolkit(tmp_path, _S0)
+    first = get_shared_registry(str(root))
+    (root / "schema" / "t.json").write_text(json.dumps(_S0), encoding="utf-8")
+    (root / "tools" / "schema_registry.json").write_text(
+        json.dumps({"vc:test:s": "schema/s.json", "vc:test:t": "schema/t.json"}), encoding="utf-8"
+    )
+    second = get_shared_registry(str(root))
+    assert second is not first
+    assert "vc:test:t" in second.map
+
+
+def test_schema_edited_during_load_is_not_cached_under_new_signature(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _make_toolkit(tmp_path, _S0)
+    edited = {**_S0, "required": ["a"]}
+    orig_init = SchemaRegistry.__init__
+
+    def _init_then_edit(self, repo_root):
+        orig_init(self, repo_root)  # loads the old content
+        (Path(repo_root) / "schema" / "s.json").write_text(json.dumps(edited), encoding="utf-8")
+
+    monkeypatch.setattr(SchemaRegistry, "__init__", _init_then_edit)
+    stale = get_shared_registry(str(root))
+    assert stale.load("vc:test:s") == _S0
+    monkeypatch.setattr(SchemaRegistry, "__init__", orig_init)
+    fresh = get_shared_registry(str(root))
+    assert fresh is not stale
+    assert fresh.load("vc:test:s") == edited
+
+
+def test_threads_share_one_registry_and_one_validator(tmp_path: Path) -> None:
+    import threading
+
+    from specdev_tools.core.registry import get_cached_validator
+
+    root = _make_toolkit(tmp_path, _S0)
+    regs: list[SchemaRegistry] = []
+    vals: list[object] = []
+    built: list[int] = []
+    barrier = threading.Barrier(8)
+
+    def _work() -> None:
+        barrier.wait()
+        reg = get_shared_registry(str(root))
+        regs.append(reg)
+        vals.append(get_cached_validator(str(root), "vc:test:s", reg, lambda: built.append(1) or object()))
+
+    threads = [threading.Thread(target=_work) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(regs) == 8 and all(r is regs[0] for r in regs)
+    assert len(built) == 1 and all(v is vals[0] for v in vals)

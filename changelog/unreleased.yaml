@@ -20,7 +20,7 @@ changes:
       toolkit-author codes) and the step-order derivation
       (registry/step_order_gen.py, ANNOT-20 / ANNOT-21). registry-generate
       folds annotated nodes into entry_key_registry.json; a toolkit with no
-      annotations produces the previous output unchanged.
+      annotations produces unchanged entries, with _format_version 1.1.0.
     migration:
       action: none
 

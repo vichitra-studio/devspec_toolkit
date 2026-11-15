@@ -407,9 +407,14 @@ def lint_annotations(decls: AnnotationDecls) -> list[str]:
                 f"ANNOT-05 {loc}: x-link field {name!r} must be an array whose items $ref one of "
                 f"{', '.join(sorted(_ID_ATOM_REFS))}"
             )
+        kinds = lk.value["kinds"]
+        if (kinds == "*" or name == "about") and ref in _ID_ATOM_REFS and ref != f"{GRAPH_URI}#nodeId":
+            issues.append(
+                f"ANNOT-05 {loc}: x-link field {name!r} (kinds \"*\" or verb about) must reference "
+                f"{GRAPH_URI}#nodeId"
+            )
         if not lk.holders:
             issues.append(f"ANNOT-05 {loc}: x-link field {name!r} does not sit on a node item")
-        kinds = lk.value["kinds"]
         if isinstance(kinds, list):
             for k in kinds:
                 if k not in declared:

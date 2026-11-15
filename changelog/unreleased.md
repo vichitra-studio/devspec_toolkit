@@ -3,7 +3,7 @@
 ### Added
 
 - `schema/core/graph.schema.json` (`vc:core:graph`): the `x-node` / `x-link` annotation language for declaring graph nodes and links in step schemas. See `docs/developers/schema-annotations.md`. Only `schema/seed_manifest.schema.json` is annotated in this release.
-- Annotation reader and lint with `ANNOT-NN` toolkit-author codes, and a step-order derivation (`ANNOT-20` cycle, `ANNOT-21` same-step link). `registry-generate` folds annotated nodes into `entry_key_registry.json`; without annotations the output is unchanged.
+- Annotation reader and lint with `ANNOT-NN` toolkit-author codes, and a step-order derivation (`ANNOT-20` cycle, `ANNOT-21` same-step link). `registry-generate` folds annotated nodes into `entry_key_registry.json`; without annotations the entries are unchanged and `_format_version` is `1.1.0`.
 - `tools/cli_commands.json` (generated; `schema/cli_commands.schema.json`) and the `registry-generate` flags `--cli-commands-out` and `--step-order-out`. Toolkit-internal: no host action.
 
 ### Changed

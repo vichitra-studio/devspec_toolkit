@@ -29,7 +29,7 @@ For each upstream artifact ingested, extract the following:
 - **07_nfrs.json**: Non-functional requirement IDs, categories (security, compliance, performance), and thresholds evaluated for extension necessity when complexity exceeds core NFR coverage
 - **08_fixtures.json**: Test fixture targets and coverage patterns used to confirm that proposed extensions have testable surface area and are not purely theoretical
 - **09_impl_plan.json**: Refined technology stack decisions (superset of Step 02's tech_stack) and milestone structure consulted to ensure proposed extensions align with chosen frameworks and implementation sequencing; Step 02 is the authoritative origin, Step 09 may add version pins or spike-discovered tools
-- **10_governance.json**: Governance label definitions and canonical refs used to bind each extension entry to a required governance_label_ref value
+- **10_governance.json**: Governance label definitions (context only; `governance_label_ref` resolves through `canon/manifest.json`, not through this file)
 - **11_redteam.json**: Threat model findings and attack surface analysis evaluated for security or compliance domains that warrant dedicated extension specifications
 - **12_ci_gates.json**: CI gate definitions and quality thresholds reviewed to confirm that proposed extensions can be validated within the existing continuous integration pipeline
 

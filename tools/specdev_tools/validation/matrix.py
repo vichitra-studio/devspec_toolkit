@@ -292,8 +292,7 @@ def build_trace_matrix(
         # that entity_index insertion order — and therefore matrix row order —
         # is stable and byte-equivalent to the pre-refactor output.
         for p, data in path_to_data.items():
-            basename = os.path.basename(p)
-            reg_entries = list_entries(basename, repo_root)
+            reg_entries = list_entries(p, repo_root)
             if reg_entries is None:
                 # Unknown file — fall back to legacy _id-suffix scan for this file only
                 _legacy_scan_data(data, entity_index, seen_entities, _is_valid_type, _normalize_type)

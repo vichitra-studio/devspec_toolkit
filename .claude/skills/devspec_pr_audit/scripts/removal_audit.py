@@ -82,7 +82,7 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 # are produced by `registry-generate`. schema_registry.json, step_order.json, command_prefixes.json,
 # and step_docs.json are manually maintained but equally load-bearing, so their
 # deletion is treated with the same severity. (This set is NOT synced to
-# slices.yaml's generated_artifacts slice, which now lists only the two true
+# slices.yaml's generated_artifacts slice, which now lists only the three true
 # generator outputs.)
 GENERATED_ARTIFACT_NAMES: set[str] = {
     "schema_registry.json",
