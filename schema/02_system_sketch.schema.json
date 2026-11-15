@@ -152,7 +152,7 @@
           }
         },
         "connections": {
-          "description": "Array of connections between components describing protocols, trust boundaries, and data flow.",
+          "description": "Array of connections from a component to a component or third party, describing protocols, trust boundaries, and data flow.",
           "type": "array",
           "x-node": {
             "kind": "connection",

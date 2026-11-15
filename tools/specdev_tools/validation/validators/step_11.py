@@ -428,7 +428,10 @@ def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
 
     An API's ``derives_from`` lists FRs only; an id that is not a parked FR keeps the entity out of the
     "only parked FRs" subset test of ``_only_traces_wont_have_frs``."""
-    return {str(ref) for ref in entity.get("derives_from", []) if isinstance(ref, str) and ref}
+    refs = entity.get("derives_from")
+    if not isinstance(refs, list):
+        return set()
+    return {ref for ref in refs if isinstance(ref, str) and ref}
 
 
 def _load_fr_traces_by_id(

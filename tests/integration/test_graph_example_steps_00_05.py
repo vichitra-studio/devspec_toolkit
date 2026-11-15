@@ -7,14 +7,19 @@ against the real schemas, validators, registry and ``spec-check``, with a known 
 from __future__ import annotations
 
 import copy
+import io
 import json
 import shutil
+import sys
 from collections import Counter
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple
+from unittest.mock import patch
 
 import pytest
 
+from specdev_tools import cli
 from specdev_tools.core.changelog_parser import get_toolkit_version
 from specdev_tools.core.entry_key_registry import iter_nodes, join_nested_path
 from specdev_tools.core.schema_validate import validate_data_against_schema
@@ -202,13 +207,6 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
 
 
 def _run_cli(*argv: str) -> tuple[int, str]:
-    import io
-    import sys
-    from contextlib import redirect_stderr, redirect_stdout
-    from unittest.mock import patch
-
-    from specdev_tools import cli
-
     buf = io.StringIO()
     with patch("specdev_tools.cli.check_venv", return_value=None), patch.object(sys, "argv", ["specdev", *argv]), \
             redirect_stdout(buf), redirect_stderr(buf):
@@ -234,5 +232,8 @@ def test_wrong_typed_scope_gives_schema_error_not_traceback(stamped_example: Pat
     assert any(e.code == "E520" and "scope" in e.render() for e in errors)
     code, out = _run_cli("completeness-check", spec, "--repo-root", root, "--json")
     assert "Traceback" not in out and "unhashable" not in out
+    assert code == 0
+    assert "coverage" in json.loads(out)
     code, out = _run_cli("matrix", spec, "--out", str(work / "matrix.json"), "--repo-root", root)
     assert "Traceback" not in out and "unhashable" not in out
+    assert code == 0

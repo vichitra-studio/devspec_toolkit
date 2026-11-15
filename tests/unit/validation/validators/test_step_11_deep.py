@@ -1159,3 +1159,11 @@ class TestHostSpecSiblingResolution:
         # Toolkit-side component MUST be flagged unknown: the sibling dir
         # resolved successfully, so the toolkit spec must not shadow it.
         assert any("comp-toolkit-only" in e and "unknown component" in e for e in rendered)
+
+
+def test_fr_ids_from_derives_from_ignores_wrong_typed_value():
+    from specdev_tools.validation.validators.step_11 import _fr_ids_from_derives_from
+
+    for bad in (7, None, "fr-a", {"x": 1}):
+        assert _fr_ids_from_derives_from({"derives_from": bad}) == set()
+    assert _fr_ids_from_derives_from({"derives_from": ["fr-a", 7, "", None]}) == {"fr-a"}

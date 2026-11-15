@@ -118,5 +118,5 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 
 ## Outputs
 - Validated JSON artifacts under `spec/00*` through `spec/12*`.
-- Updated trace matrix demonstrating FR ↔ API ↔ fixture ↔ NFR coverage.
+- Updated trace matrix (FR ↔ API coverage is not computed for steps 00-05 in the new shape until graph coverage lands; the matrix reports `fr_with_api: 0` for them).
 - Governance rules embedded in CI to keep the spec authoritative.

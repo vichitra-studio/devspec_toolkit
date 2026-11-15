@@ -137,3 +137,10 @@ def test_wrong_typed_derives_from_does_not_raise(tmp_path):
     for bad in (7, [{"x": 1}], {"x": 1}):
         instance = {"components": [_component("comp-api", bad), _component("comp-b", ["cap-a"])]}
         assert _codes(validate_step_02(instance, str(tmp_path))) == []
+
+
+def test_wrong_typed_third_parties_do_not_raise(tmp_path):
+    connection = {"connection_id": "conn-a", "connects_to": ["tp-x"], "trust_boundary": "external"}
+    for bad in (None, 7, ["x"], [7], [{"third_party_id": {"a": 1}}], [{"third_party_id": ["a"]}]):
+        instance = {"components": [_component("comp-a", [])], "third_parties": bad, "connections": [connection]}
+        validate_step_02(instance, str(tmp_path))

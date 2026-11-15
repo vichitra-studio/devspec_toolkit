@@ -371,6 +371,8 @@
 
 **Trigger (E590)**: A spec artifact references an ID (FR, API, INV, NFR, capability) that does not exist in the upstream artifact.
 
+**Trigger (E590, step 02)**: "Missing capability coverage" (`validators/step_02.py` `check_capability_coverage`): a capability in the Step 01 artifact is not named in any component's `derives_from`. A parked capability (`scope` `later` or `out`) is exempt. The check is skipped when the Step 01 artifact is not found.
+
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 
 **Resolution (E590)**: Fix the broken ID reference to match an ID that exists in the upstream artifact.

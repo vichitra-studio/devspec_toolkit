@@ -103,7 +103,12 @@ def validate_step_02(
 
     components = instance.get("components", [])
     connections = instance.get("connections", [])
-    third_party_ids = {tp["third_party_id"] for tp in instance.get("third_parties", []) if tp.get("third_party_id")}
+    third_parties = instance.get("third_parties")
+    third_party_ids = {
+        tp["third_party_id"]
+        for tp in (third_parties if isinstance(third_parties, list) else [])
+        if isinstance(tp, dict) and isinstance(tp.get("third_party_id"), str) and tp["third_party_id"]
+    }
 
     errors.extend(check_component_ids(components))
     errors.extend(check_rate_limits(connections))

@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping
 from typing import Any
 
-from ..core.scope_helpers import is_parked
+from ..core.scope_helpers import is_parked, scope_in
 
 # 1.1.1 `trace` links, read by three live readers: W564/E535 (05 apis) and W568 (04 frs) in
 # `traceability_closure.py`, and FR-to-API coverage (05 apis) in `matrix.py`.
@@ -39,8 +39,7 @@ def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
     For readers that can meet a legacy file and a new-shape file in the same run. When this
     module is deleted its two callers go back to ``is_parked``.
     """
-    scope = node.get("scope")
-    return is_parked(node) or (isinstance(scope, str) and scope in LEGACY_PARKED_SCOPES)
+    return is_parked(node) or scope_in(node, LEGACY_PARKED_SCOPES)
 
 
 def _carries(value: Any, names: Collection[str]) -> bool:
