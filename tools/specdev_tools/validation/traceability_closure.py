@@ -7,7 +7,12 @@ from typing import Any
 from ..core.errors import SpecError, make_error
 from ..core.scope_helpers import is_parked
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
-from ._legacy_shim import LEGACY_CHARTER_CHAIN_FIELDS, LEGACY_TRACE_FIELDS, has_legacy_fields
+from ._legacy_shim import (
+    LEGACY_CHARTER_CHAIN_FIELDS,
+    LEGACY_TRACE_FIELDS,
+    has_legacy_fields,
+    is_parked_any_shape,
+)
 
 # ---------------------------------------------------------------------------
 # Business-rule trace-type constants for traceability closure chains
@@ -248,18 +253,16 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
             }
 
     capability_ids: set[str] = set()
-    # Capabilities marked scope:"out" (permanently excluded, the capability-level
-    # analog of FR-level priority:"wont-have") or scope:"future" (acknowledged but
-    # deferred to a later release -- the capability-level analog of task/milestone
-    # "deferred") are both parked by design and exempted from W568 below: neither
-    # is expected to have an FR trace yet. This is the 1.1.1 set: W568 is legacy-guarded.
+    # Parked capabilities (scope "out" or "later"; the 1.1.1 spelling "future" too, because a
+    # legacy FR file switches the W568 reader on while the capability file may already have
+    # the new shape) are not expected to have an FR yet and are exempted from W568 below.
     capability_parked_ids: set[str] = set()
     if "capabilities" in data:
         capability_ids = {c.get("capability_id") for c in data["capabilities"].get("capabilities", []) if c.get("capability_id")}
         capability_parked_ids = {
             c.get("capability_id")
             for c in data["capabilities"].get("capabilities", [])
-            if c.get("capability_id") and c.get("scope") in ("out", "future")
+            if c.get("capability_id") and is_parked_any_shape(c)
         }
 
     # Charter → Capabilities chain

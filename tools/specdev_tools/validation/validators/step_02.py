@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
-import os
-from typing import Any
-
 from ...core.errors import make_error, SpecError
+from ...core.loaders import load_sibling_json
 from ...core.scope_helpers import is_parked
 
 def check_component_ids(components: list[dict]) -> list[SpecError]:
@@ -68,31 +65,12 @@ def check_partner_public_rate_limit(connections: list[dict]) -> list[SpecError]:
 def _load_capabilities(repo_root: str, spec_root: str | None, artifact_path: str | None = None) -> dict[str, dict]:
     """Read the Step 01 artifact and return its capabilities keyed by ``capability_id``.
 
-    Searches the directory of the artifact being validated, then *spec_root*
-    (when given), then ``<repo_root>/spec``. In the first directory that holds
-    a ``01_*.json`` file, the first candidate that parses as a JSON object is
-    used. No such file yields an empty mapping: no coverage data, no error.
+    The lookup is ``core.loaders.load_sibling_json`` (artifact directory, then
+    *spec_root*, then ``<repo_root>/spec``; first candidate that parses as an
+    object). No such file yields an empty mapping: no coverage data, no error.
     """
-    artifact_dir = os.path.dirname(os.path.abspath(artifact_path)) if artifact_path else None
-    search_dirs = [d for d in (artifact_dir, spec_root, os.path.join(repo_root, "spec")) if d]
-    for directory in search_dirs:
-        if not os.path.isdir(directory):
-            continue
-        for name in sorted(os.listdir(directory)):
-            if name.startswith("01_") and name.endswith(".json"):
-                data = _read_json_object(os.path.join(directory, name))
-                if data is not None:
-                    return _capabilities_of(data)
-    return {}
-
-
-def _read_json_object(path: str) -> dict | None:
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data: Any = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
+    data = load_sibling_json(artifact_path, "01", spec_root=spec_root, fallback_root=repo_root)
+    return _capabilities_of(data) if data is not None else {}
 
 
 def _capabilities_of(data: dict) -> dict[str, dict]:

@@ -49,7 +49,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 - Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is deprecated in favour of `third_parties`.
 
 ## Step 02a Troubleshooting
-- **Empty Environments**: an empty environment object (`"dev": {}`) fails schema validation: every environment needs `scope` and a non-empty `derives_from`, plus `scope_reason` when `scope` is `later` or `out`. Host keys (region, runner, replica count and so on) are optional and go under the environment's `config` object, never beside `scope`. All four environments (`dev`, `ci`, `staging`, `prod`) are required by default.
+- **Empty Environments**: an empty environment object (`"dev": {}`) fails schema validation: every environment needs `scope` and a non-empty `derives_from`, plus `scope_reason` when `scope` is `later` or `out`. Host keys (region, runner, replica count and so on) are optional and go under the environment's `config` object, never beside `scope`; `config`, when present, needs at least one key (`"dev": {"config": {}}` fails). All four environments (`dev`, `ci`, `staging`, `prod`) are required by default.
 - **Invalid Gate Names**: each `ci_gates[]` entry is an object whose `gate_id` must be kebab-case (regex: `^[a-z0-9]+(?:-[a-z0-9]+)*$`). "Run Tests" or "Schema Validate" will fail; use `run-tests` or `schema-validate`.
 - **Missing `derives_from`**: every environment, gate and secret requires `derives_from`; the artifact-level `trace` is gone. Environment host keys go under the environment's optional `config` object.
 

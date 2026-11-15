@@ -993,7 +993,7 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E622 REGISTRY_DRIFT
 
-**Trigger**: R003 — `specdev registry-check` finds that a registered `(array_path, id_field)` pair no longer matches the live spec file's structure: the declared array path is not an array, or its entries lack the registered `id_field`. An absent collection, root or nested (e.g. an optional root `constraints` or a task's `acceptance_criteria`), is not drift: collections may be legitimately optional per schema, and required presence is owned by schema validation in `spec-check`. A present-but-wrong-shape collection, or one whose first entry lacks the `id_field`, still fires E622.
+**Trigger**: R003 — `specdev registry-check` finds that a registered `(array_path, id_field)` pair no longer matches the live spec file's structure: the declared array path is not an array, or its entries lack the registered `id_field`. An absent collection, root or nested (e.g. an optional root `constraints` or a task's `acceptance_criteria`), is not drift: collections may be legitimately optional per schema, and required presence is owned by schema validation in `spec-check`. A present-but-wrong-shape collection (including a key present with `null`), one whose first entry lacks the `id_field`, and a file whose top level is not an object still fire E622.
 
 **Resolution**: Run `specdev registry-generate` to regenerate `entry_key_registry.json`/`extraction_paths.json` from the current schemas, or fix the schema/spec structure if the drift indicates an unintended shape change.
 

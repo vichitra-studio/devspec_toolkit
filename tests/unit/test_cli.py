@@ -2020,6 +2020,34 @@ class CliTests(unittest.TestCase):
             )
             self.assertEqual(1, cov["covered_count"])
 
+    def test_completeness_check_legacy_fr_file_parked_capabilities_leave_total_and_w568(self):
+        """With a 1.1.1 FR file (``trace``) the W568 reader runs, so ``uncovered_ids``
+        is a real assertion. Parked capabilities of any shape (out, later, and the
+        1.1.1 future) leave the denominator and are not reported as uncovered."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            caps = {"capabilities": [
+                {"capability_id": "cap-auth", "scope": "in"},
+                {"capability_id": "cap-legacy", "scope": "out"},
+                {"capability_id": "cap-roadmap-v2", "scope": "later"},
+                {"capability_id": "cap-old-future", "scope": "future"},
+                {"capability_id": "cap-missed", "scope": "in"},
+            ]}
+            frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
+            (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            payload = json.loads(out)
+            cov = payload["coverage"]["capability_fr_coverage"]
+            self.assertEqual(2, cov["total_count"], f"Got: {cov}")
+            self.assertEqual(["cap-missed"], cov["uncovered_ids"], f"Got: {cov}")
+            self.assertEqual(1, cov["covered_count"])
+
     def test_completeness_check_control_scope_in_capabilities_counted(self):
         """Control: with only scope:"in" capabilities, all count toward the total."""
         with tempfile.TemporaryDirectory() as td:

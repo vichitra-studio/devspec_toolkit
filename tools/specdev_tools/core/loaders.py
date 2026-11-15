@@ -155,6 +155,57 @@ def _extract_ids(data: Any, array_key: str, id_field: str) -> set[str]:
 # load_sibling_artifact — step_14-style "look next to artifact, fallback to spec/"
 # ---------------------------------------------------------------------------
 
+def _sibling_candidates(
+    artifact_path: str | Path | None,
+    prefix: str,
+    spec_root: str | Path | None,
+    fallback_root: str | Path | None,
+) -> list[Path]:
+    """Candidate files ``<prefix>_*.json`` in search order, each directory sorted by name.
+
+    Search order: the directory of *artifact_path*, then *spec_root*, then
+    ``<fallback_root>/spec``. A directory that does not exist contributes nothing.
+    """
+    directories: list[Path] = []
+    if artifact_path:
+        directories.append(Path(artifact_path).resolve().parent)
+    if spec_root:
+        directories.append(Path(spec_root).resolve())
+    if fallback_root:
+        directories.append(Path(fallback_root).resolve() / "spec")
+    return [
+        directory / fn
+        for directory in directories
+        for fn in sorted(_match_prefix(directory, prefix))
+        if (directory / fn).is_file()
+    ]
+
+
+def load_sibling_json(
+    artifact_path: str | Path | None,
+    prefix: str,
+    *,
+    spec_root: str | Path | None = None,
+    fallback_root: str | Path | None = None,
+) -> dict | None:
+    """Find and read the sibling artifact ``<prefix>_*.json``.
+
+    Searches the directory of *artifact_path*, then *spec_root*, then
+    ``<fallback_root>/spec``; within a directory files are tried in name order.
+    Returns the first candidate that parses as a JSON object, or ``None`` when
+    there is none. Never raises for a missing or unreadable file.
+    """
+    for path in _sibling_candidates(artifact_path, prefix, spec_root, fallback_root):
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
 def load_sibling_artifact(
     artifact_path: str | Path,
     sibling_prefix: str,
@@ -167,6 +218,7 @@ def load_sibling_artifact(
 
     If the sibling is not found beside *artifact_path* and *fallback_root* is
     given, checks ``<fallback_root>/spec/<sibling_prefix>_*.json`` as well.
+    The lookup is :func:`load_sibling_json`.
 
     Returns
     -------
@@ -182,28 +234,10 @@ def load_sibling_artifact(
         Malformed JSON or read errors also yield an empty set — the file
         was found but could not be mined, which is distinct from absent.
     """
-    candidates: list[Path] = []
-    if artifact_path:
-        artifact_dir = Path(artifact_path).resolve().parent
-        for fn in _match_prefix(artifact_dir, sibling_prefix):
-            candidates.append(artifact_dir / fn)
-    if fallback_root:
-        spec_dir = Path(fallback_root).resolve() / "spec"
-        for fn in _match_prefix(spec_dir, sibling_prefix):
-            candidates.append(spec_dir / fn)
-
-    found_any = False
-    for path in candidates:
-        if not path.exists():
-            continue
-        found_any = True
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError, ValueError, TypeError):
-            return set()
+    data = load_sibling_json(artifact_path, sibling_prefix, fallback_root=fallback_root)
+    if data is not None:
         return _extract_ids(data, array_key, id_field)
-
+    found_any = bool(_sibling_candidates(artifact_path, sibling_prefix, None, fallback_root))
     return set() if found_any else None
 
 

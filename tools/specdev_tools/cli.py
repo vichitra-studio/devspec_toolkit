@@ -1111,12 +1111,14 @@ def main():
         total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
 
         # Parked capabilities (scope "later": deferred; scope "out": permanently
-        # excluded) are not expected to have an FR yet, so they leave the W568
-        # denominator.
+        # excluded; the 1.1.1 "future" too) are not expected to have an FR yet, so
+        # they leave the W568 denominator.
+        # Same predicate as the W568 exemption in traceability_closure.py (any shape).
+        from .validation._legacy_shim import is_parked_any_shape
         caps_data = _load_spec_json("01_capabilities.json")
         total_caps = sum(
             1 for cap in caps_data.get("capabilities", [])
-            if not is_parked(cap)
+            if not is_parked_any_shape(cap)
         )
 
         roadmap_data = _load_spec_json("14_roadmap.json")

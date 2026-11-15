@@ -142,7 +142,9 @@ changes:
       fields. A spec whose steps 00 to 05 have the new shape gets none of
       E560, W564 / E535 and W568, and no FR-to-API coverage warning from the
       matrix, whatever shape its later steps have, until graph coverage later
-      in this release. The W583 reader of step 11 reads API derives_from.
+      in this release. A 1.1.1 spec whose step-05 APIs carry no trace at all
+      gets no W564 and no FR-to-API threshold warning; such a file is invalid
+      under the 1.1.1 schema. The W583 reader of step 11 reads API derives_from.
     migration:
       action: none
 

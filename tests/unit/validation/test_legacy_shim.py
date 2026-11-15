@@ -13,8 +13,10 @@ from specdev_tools.validation._legacy_shim import (
     LEGACY_CHARTER_CHAIN_FIELDS,
     LEGACY_COMPONENT_TRACE_FIELDS,
     LEGACY_CONNECTION_FIELDS,
+    LEGACY_PARKED_SCOPES,
     LEGACY_TRACE_FIELDS,
     has_legacy_fields,
+    is_parked_any_shape,
 )
 from specdev_tools.validation.cross_artifact_checks import check_step_02_integrity, check_step_04_integrity
 from specdev_tools.validation.matrix import build_trace_matrix
@@ -72,37 +74,69 @@ def test_has_legacy_fields_false_for_new_shape():
         assert not has_legacy_fields(NEW_SHAPE.values(), names)
 
 
-def _assert_guarded_readers_silent(root: Path, spec_dir: str, files: dict[str, dict]) -> None:
+def _silent_closure(root, spec_dir, files):
+    assert _closure_codes(spec_dir) == set()
+
+
+def _silent_matrix_integrity(root, spec_dir, files):
+    assert "integrity_errors" not in build_trace_matrix(str(root), spec_dir)
+
+
+def _silent_matrix_fr_to_api(root, spec_dir, files):
+    matrix = build_trace_matrix(str(root), spec_dir)
+    assert all(row["apis"] == [] for row in matrix["matrix"])
+
+
+def _silent_step_02_integrity(root, spec_dir, files):
     arts = {f"spec/{name}": data for name, data in files.items()}
     capability_ids = {c["capability_id"] for c in files["01_capabilities.json"]["capabilities"]}
-
-    assert _closure_codes(spec_dir) == set()
-    matrix = build_trace_matrix(str(root), spec_dir)
-    assert "integrity_errors" not in matrix
-    assert all(row["apis"] == [] for row in matrix["matrix"])
     assert check_step_02_integrity(arts, capability_ids=capability_ids) == []
+
+
+def _silent_step_04_integrity(root, spec_dir, files):
+    arts = {f"spec/{name}": data for name, data in files.items()}
+    capability_ids = {c["capability_id"] for c in files["01_capabilities.json"]["capabilities"]}
     assert check_step_04_integrity(arts, set(), capability_ids) == []
+
+
+def _silent_scope_resolver(root, spec_dir, files):
     _, adjacency = _build_trace_graph(spec_dir)
     assert not any(adjacency[fr["fr_id"]] for fr in files["04_fr_list.json"]["functional_requirements"])
+
+
+def _silent_reviewer(root, spec_dir, files):
     review = _run_structural_pass(
         files["05_interface_contracts.json"], "", [("", files["04_fr_list.json"])]
     )
     assert review.upstream_coverage["covered"] == []
 
 
-def test_guarded_readers_silent_on_new_shape(tmp_path):
+SILENT_READERS = {
+    "closure": _silent_closure,
+    "matrix_integrity": _silent_matrix_integrity,
+    "matrix_fr_to_api": _silent_matrix_fr_to_api,
+    "step_02_integrity": _silent_step_02_integrity,
+    "step_04_integrity": _silent_step_04_integrity,
+    "scope_resolver": _silent_scope_resolver,
+    "reviewer": _silent_reviewer,
+}
+
+
+@pytest.mark.parametrize("reader", sorted(SILENT_READERS))
+def test_guarded_reader_silent_on_new_shape(tmp_path, reader):
     spec_dir = _write_spec(tmp_path, NEW_SHAPE)
-    _assert_guarded_readers_silent(tmp_path, spec_dir, NEW_SHAPE)
+    SILENT_READERS[reader](tmp_path, spec_dir, NEW_SHAPE)
 
 
-def test_guarded_readers_silent_on_graph_example():
+@pytest.mark.parametrize("reader", sorted(SILENT_READERS))
+def test_guarded_reader_silent_on_graph_example(reader):
     example = Path(__file__).parents[2] / "fixtures" / "graph_example"
     spec_dir = example / "spec"
     files = {
         name: json.loads((spec_dir / name).read_text(encoding="utf-8"))
         for name in NEW_SHAPE
     }
-    _assert_guarded_readers_silent(example, str(spec_dir), files)
+    SILENT_READERS[reader](example, str(spec_dir), files)
 
 
 def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
@@ -157,7 +191,13 @@ def test_legacy_later_file_does_not_switch_on_00_05_readers(tmp_path, name):
     mixed = _example_copy(tmp_path / "mixed", {name: LEGACY_LATER_FILES[name]})
 
     assert _closure_codes(mixed) == _closure_codes(plain) == set()
-    assert build_trace_matrix(str(TOOLKIT_ROOT), mixed)["coverage"] == build_trace_matrix(str(TOOLKIT_ROOT), plain)["coverage"]
+    plain_matrix = build_trace_matrix(str(TOOLKIT_ROOT), plain)
+    mixed_matrix = build_trace_matrix(str(TOOLKIT_ROOT), mixed)
+    assert mixed_matrix["coverage"] == plain_matrix["coverage"]
+    # The only integrity line is the added file's own dangling reference. The old tree also
+    # reported a W592 fr_coverage warning here, in the plain and in the mixed spec.
+    assert "integrity_errors" not in plain_matrix
+    assert [line for line in mixed_matrix["integrity_errors"] if name not in line] == []
 
 
 def test_matrix_reports_no_fr_to_api_threshold_on_new_shape():
@@ -186,6 +226,30 @@ def test_matrix_threshold_unchanged_on_legacy_shape(tmp_path):
     assert any("E592" in line and "fr_coverage=50.0%" in line for line in result["integrity_errors"])
 
 
+def test_matrix_threshold_reported_when_there_is_no_05_file(tmp_path):
+    """No API artifact at all: FR-to-API coverage is 0 by definition, as on main."""
+    files = {"04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
+        {"fr_id": "fr-a", "derives_from": ["cap-a"]}]}}
+    root = tmp_path / "repo"
+    root.mkdir()
+    spec_dir = _write_spec(root, files)
+    result = build_trace_matrix(_threshold_repo(root, "warn"), spec_dir)
+    assert any("W592" in line and "fr_coverage=0.0%" in line for line in result["integrity_errors"])
+
+
+def test_matrix_threshold_silent_when_apis_exist_and_none_carries_trace(tmp_path):
+    files = {
+        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
+            {"fr_id": "fr-a", "derives_from": ["cap-a"]}]},
+        "05_interface_contracts.json": {"apis": [{"api_id": "api-a", "derives_from": ["fr-a"]}]},
+    }
+    root = tmp_path / "repo"
+    root.mkdir()
+    spec_dir = _write_spec(root, files)
+    result = build_trace_matrix(_threshold_repo(root, "warn"), spec_dir)
+    assert not any("fr_coverage" in line for line in result.get("integrity_errors", []))
+
+
 def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
     files = {
         "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [
@@ -200,13 +264,41 @@ def test_new_shape_scope_later_fr_is_parked_in_matrix_and_closure(tmp_path):
     assert build_trace_matrix(str(tmp_path), spec_dir)["coverage"]["fr_total"] == 1
 
 
-def test_fully_legacy_capability_exemption_is_the_main_set(tmp_path):
-    files = {
-        "01_capabilities.json": {"capabilities": [
-            {"capability_id": "cap-future", "scope": "future"}, {"capability_id": "cap-out", "scope": "out"},
-            {"capability_id": "cap-later", "scope": "later"}]},
-        "04_fr_list.json": {"$schema": "vc:04_fr_list", "functional_requirements": [{"fr_id": "fr-a", "trace": []}]},
-    }
-    messages = [e.message for e in check_traceability_closure(_write_spec(tmp_path, files))]
-    assert any("UNCOVERED_CAPABILITY cap-later" in m for m in messages)
-    assert not any("cap-future" in m or "cap-out" in m for m in messages)
+# --- one spelling of "parked" for the readers that can meet either shape ------------------------
+
+@pytest.mark.parametrize(("node", "expected"), [
+    ({"scope": "later"}, True),
+    ({"scope": "out"}, True),
+    ({"scope": "future"}, True),
+    ({"scope": "in"}, False),
+    ({"priority": "wont-have"}, True),
+    ({"capability_id": "cap-a"}, False),
+])
+def test_is_parked_any_shape_contract(node, expected):
+    assert is_parked_any_shape(node) is expected
+
+
+def test_legacy_parked_scopes_is_the_1_1_1_value():
+    assert LEGACY_PARKED_SCOPES == frozenset({"future"})
+    assert not is_parked({"scope": "future"})  # the shared helper stays new-shape only
+
+
+def _w568_ids(tmp_path: Path, capabilities: list[dict]) -> set[str]:
+    """W568 messages of a spec whose FR file is legacy (switches the reader on)."""
+    spec_dir = _write_spec(tmp_path, {
+        "01_capabilities.json": {"capabilities": capabilities},
+        "04_fr_list.json": LEGACY_SHAPE["04_fr_list.json"],
+    })
+    return {e.message for e in check_traceability_closure(spec_dir) if e.code == "W568"}
+
+
+@pytest.mark.parametrize("scope", ["later", "out", "future"])
+def test_w568_exempts_parked_capability_of_either_shape(tmp_path, scope):
+    # legacy FR file + a capability file already in the new shape (scope later) or the old one
+    messages = _w568_ids(tmp_path, [{"capability_id": "cap-parked", "scope": scope}])
+    assert not any("cap-parked" in m for m in messages), messages
+
+
+def test_w568_still_reports_an_uncovered_in_scope_capability(tmp_path):
+    messages = _w568_ids(tmp_path, [{"capability_id": "cap-live", "scope": "in"}])
+    assert any("cap-live" in m for m in messages), messages

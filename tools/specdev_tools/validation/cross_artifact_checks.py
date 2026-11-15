@@ -122,40 +122,40 @@ def check_step_02_integrity(
         # Connection endpoint validation. Legacy-guarded (M6c deletes): reads the 1.1.1
         # connection fields from/to/schema_ref; the guard is given the connections only.
         component_id_set = set(component_ids)
-        legacy_connections = has_legacy_fields([connections], LEGACY_CONNECTION_FIELDS)
-        for idx, conn in enumerate(connections if legacy_connections else ()):
-            source = conn.get("from")
-            target = conn.get("to")
-            if source and source not in component_id_set:
-                errors.append(make_error(
-                    "E590",
-                    f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found.",
-                ))
-            if target and target not in component_id_set:
-                errors.append(make_error(
-                    "E590",
-                    f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found.",
-                ))
+        if has_legacy_fields([connections], LEGACY_CONNECTION_FIELDS):
+            for idx, conn in enumerate(connections):
+                source = conn.get("from")
+                target = conn.get("to")
+                if source and source not in component_id_set:
+                    errors.append(make_error(
+                        "E590",
+                        f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found.",
+                    ))
+                if target and target not in component_id_set:
+                    errors.append(make_error(
+                        "E590",
+                        f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found.",
+                    ))
 
-            # schema_ref format
-            schema_ref = conn.get("schema_ref")
-            if schema_ref and not _SCHEMA_REF_RE.match(schema_ref):
-                errors.append(make_error(
-                    "E520",
-                    f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid.",
-                ))
-
-            # Trust boundary vs external component
-            if (
-                (source and component_types.get(source) == "external")
-                or (target and component_types.get(target) == "external")
-            ):
-                trust_boundary = conn.get("trust_boundary")
-                if trust_boundary == "internal":
+                # schema_ref format
+                schema_ref = conn.get("schema_ref")
+                if schema_ref and not _SCHEMA_REF_RE.match(schema_ref):
                     errors.append(make_error(
                         "E520",
-                        f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component.",
+                        f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid.",
                     ))
+
+                # Trust boundary vs external component
+                if (
+                    (source and component_types.get(source) == "external")
+                    or (target and component_types.get(target) == "external")
+                ):
+                    trust_boundary = conn.get("trust_boundary")
+                    if trust_boundary == "internal":
+                        errors.append(make_error(
+                            "E520",
+                            f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component.",
+                        ))
 
         # Capability coverage. This is the legacy block (M6c deletes): it reads component
         # trace / trace_refs. The check that survives is the one in validators/step_02.py,

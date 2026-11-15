@@ -10,18 +10,35 @@ from __future__ import annotations
 from collections.abc import Collection, Iterable, Mapping
 from typing import Any
 
-# 1.1.1 `trace` links: read by the W564/E535 (05 apis), W568 (04 frs), matrix FR-to-API (05 apis)
-# and step-04 integrity (04 frs) readers. M4's node/trace links replace them.
+from ..core.scope_helpers import is_parked
+
+# 1.1.1 `trace` links, read by three live readers: W564/E535 (05 apis) and W568 (04 frs) in
+# `traceability_closure.py`, and FR-to-API coverage (05 apis) in `matrix.py`.
 LEGACY_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 
-# Charter -> capabilities chain (E560): charter `goal_id`, capability `trace` and `success_metric_refs`.
+# Charter -> capabilities chain: read by E560 in `traceability_closure.py` (charter `goal_id`,
+# capability `trace` and `success_metric_refs`).
 LEGACY_CHARTER_CHAIN_FIELDS: frozenset[str] = frozenset({"goal_id", "trace", "success_metric_refs"})
 
-# Step-02 connection reader only (`from`/`to` are generic keys: give it the connections, nothing else).
+# Step-02 connection reader in `cross_artifact_checks.py` only (`from`/`to` are generic keys:
+# give it the connections, nothing else).
 LEGACY_CONNECTION_FIELDS: frozenset[str] = frozenset({"from", "to", "schema_ref"})
 
-# Step-02 capability-coverage reader (component `trace` / `trace_refs`).
+# Step-02 capability-coverage reader in `cross_artifact_checks.py` (component `trace` / `trace_refs`).
 LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"})
+
+# The 1.1.1 spelling of a parked capability (`scope: future`). The W568 reader in
+# `traceability_closure.py` and the completeness denominator in `cli.py` call `is_parked_any_shape`.
+LEGACY_PARKED_SCOPES: frozenset[str] = frozenset({"future"})
+
+
+def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
+    """Return True when *node* is parked in the current shape (``is_parked``) or the 1.1.1 one.
+
+    For readers that can meet a legacy file and a new-shape file in the same run. When this
+    module is deleted its two callers go back to ``is_parked``.
+    """
+    return is_parked(node) or node.get("scope") in LEGACY_PARKED_SCOPES
 
 
 def _carries(value: Any, names: Collection[str]) -> bool:

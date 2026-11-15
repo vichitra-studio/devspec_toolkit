@@ -14,6 +14,7 @@ from specdev_tools.core.loaders import (
     kebab_id_re,
     load_json_artifact,
     load_sibling_artifact,
+    load_sibling_json,
     load_upstream_ids,
 )
 
@@ -308,6 +309,55 @@ class TestLoadSiblingArtifact:
         artifact.write_text("{}", encoding="utf-8")
         result = load_sibling_artifact(str(artifact), "04", "requirements", "fr_id")
         assert result == set()
+
+
+class TestLoadSiblingJson:
+    """Tests for load_sibling_json, the one lookup behind load_sibling_artifact."""
+
+    @staticmethod
+    def _write(directory, name, payload):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / name).write_text(
+            payload if isinstance(payload, str) else json.dumps(payload), encoding="utf-8"
+        )
+
+    def test_search_order_artifact_dir_then_spec_root_then_fallback_spec(self, tmp_path):
+        self._write(tmp_path / "own", "02_x.json", {})
+        self._write(tmp_path / "root", "01_a.json", {"where": "spec_root"})
+        self._write(tmp_path / "fb" / "spec", "01_a.json", {"where": "fallback"})
+        artifact = str(tmp_path / "own" / "02_x.json")
+        kwargs = {"spec_root": tmp_path / "root", "fallback_root": tmp_path / "fb"}
+
+        assert load_sibling_json(artifact, "01", **kwargs) == {"where": "spec_root"}
+        self._write(tmp_path / "own", "01_a.json", {"where": "own"})
+        assert load_sibling_json(artifact, "01", **kwargs) == {"where": "own"}
+        (tmp_path / "root" / "01_a.json").unlink()
+        (tmp_path / "own" / "01_a.json").unlink()
+        assert load_sibling_json(artifact, "01", **kwargs) == {"where": "fallback"}
+
+    def test_listing_is_sorted(self, tmp_path):
+        self._write(tmp_path, "01_b.json", {"n": "b"})
+        self._write(tmp_path, "01_a.json", {"n": "a"})
+        assert load_sibling_json(tmp_path / "02_x.json", "01") == {"n": "a"}
+
+    def test_first_candidate_that_parses_as_an_object_wins(self, tmp_path):
+        self._write(tmp_path, "01_a.json", "{bad")
+        self._write(tmp_path, "01_b.json", [1, 2])
+        self._write(tmp_path, "01_c.json", {"n": "c"})
+        assert load_sibling_json(tmp_path / "02_x.json", "01") == {"n": "c"}
+
+    def test_none_when_nothing_usable_and_never_raises(self, tmp_path):
+        assert load_sibling_json(tmp_path / "02_x.json", "01") is None
+        assert load_sibling_json(None, "01", spec_root=tmp_path / "missing") is None
+        self._write(tmp_path, "01_a.json", "{bad")
+        (tmp_path / "01_dir.json").mkdir()
+        assert load_sibling_json(tmp_path / "02_x.json", "01") is None
+
+    def test_load_sibling_artifact_still_distinguishes_unusable_from_absent(self, tmp_path):
+        self._write(tmp_path, "01_a.json", [1, 2])
+        artifact = tmp_path / "08_x.json"
+        assert load_sibling_artifact(str(artifact), "01", "items", "id") == set()
+        assert load_sibling_artifact(str(artifact), "02", "items", "id") is None
 
 
 # ---------------------------------------------------------------------------

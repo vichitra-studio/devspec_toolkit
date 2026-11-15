@@ -352,13 +352,16 @@ def build_trace_matrix(
     # APIs carry the authoritative FR trace: each API lists the FRs it implements.
     # Iterating from the API side (rather than the FR side) is the correct direction:
     # FRs trace to capabilities, not to APIs.
-    # Legacy-guarded (M6c deletes): reads the `trace` of the apis. When it is skipped,
-    # fr_to_api_computed is False and no FR-to-API coverage threshold is reported.
-    fr_to_api_computed = has_legacy_fields(apis.values(), LEGACY_TRACE_FIELDS)
-    for api in apis.values() if fr_to_api_computed else ():
-        for t in api.get("trace", []):
-            if t.get("type") == _MATRIX_LINK_FR_TYPE:
-                fr_to_api[t["id"]].add(api["api_id"])
+    # Legacy-guarded (M6c deletes): reads the `trace` of the apis. FR-to-API coverage counts
+    # as computed when there is no API at all (coverage is 0 by definition, as on main) or
+    # when the reader ran; it is not computed when APIs exist and none carries `trace`.
+    legacy_api_trace = has_legacy_fields(apis.values(), LEGACY_TRACE_FIELDS)
+    fr_to_api_computed = legacy_api_trace or not apis
+    if legacy_api_trace:
+        for api in apis.values():
+            for t in api.get("trace", []):
+                if t.get("type") == _MATRIX_LINK_FR_TYPE:
+                    fr_to_api[t["id"]].add(api["api_id"])
 
     for fx in fixtures:
         for t in fx.get("targets", []):
@@ -505,16 +508,15 @@ def build_trace_matrix(
         result["integrity_errors"] = render_errors(integrity_errors)
 
     # R9/T24: Configurable coverage threshold enforcement
-    threshold_errors = _check_coverage_thresholds(coverage, repo_root, fr_to_api_computed)
-    if threshold_errors:
-        result.setdefault("integrity_errors", []).extend(render_errors(threshold_errors))
+    if fr_to_api_computed:
+        threshold_errors = _check_coverage_thresholds(coverage, repo_root)
+        if threshold_errors:
+            result.setdefault("integrity_errors", []).extend(render_errors(threshold_errors))
 
     return result
 
 
-def _check_coverage_thresholds(
-    coverage: dict, repo_root: str, fr_to_api_computed: bool = True
-) -> list[SpecError]:
+def _check_coverage_thresholds(coverage: dict, repo_root: str) -> list[SpecError]:
     """R9/T24: Enforce coverage thresholds from step_order.json."""
     errors: list[SpecError] = []
     config = _load_coverage_thresholds(repo_root)
@@ -531,10 +533,9 @@ def _check_coverage_thresholds(
     if fr_total == 0:
         return errors
 
-    # The only check is FR-to-API coverage; a skipped reader leaves nothing to report.
     checks = [
         ("fr_coverage", coverage.get("fr_with_api", 0)),
-    ] if fr_to_api_computed else []
+    ]
     for check_name, actual_count in checks:
         threshold = config.get(check_name)
         if threshold is None:
