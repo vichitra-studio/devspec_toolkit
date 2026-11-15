@@ -100,7 +100,10 @@
                 "fr"
               ],
               "required": false,
-              "built": false
+              "built": false,
+              "same_step_kinds": [
+                "fr"
+              ]
             }
           }
         },
