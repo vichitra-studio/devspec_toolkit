@@ -88,7 +88,6 @@ _LOAD_LOCK = threading.Lock()
 # exclusions are declared via ``corpus_excluded: true`` in the registry JSON
 # and precomputed into the excluded-keys set at load time.
 ALWAYS_EXCLUDED = frozenset(["canonical_refs_used", "canonical_proposals"])
-_ALWAYS_EXCLUDED = ALWAYS_EXCLUDED  # earlier name, kept for existing importers
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
 
@@ -128,7 +127,7 @@ def _load(repo_root: str) -> Tuple[Dict[str, Any], FrozenSet[str]]:
                     raw = json.load(fh)
                 registry = raw.get("registry", {})
                 # Precompute the excluded keys set from per-array declarations.
-                excluded: set = set(_ALWAYS_EXCLUDED)
+                excluded: set = set(ALWAYS_EXCLUDED)
                 for _entry in registry.values():
                     if _entry.get("_special"):
                         continue
@@ -317,7 +316,7 @@ def find_entry(
 def is_corpus_excluded(array_key: str, repo_root: str) -> bool:
     """Return True if *array_key* must not contribute to nearest-id corpus.
 
-    Always-excluded keys are hard-coded in ``_ALWAYS_EXCLUDED`` (e.g.
+    Always-excluded keys are hard-coded in ``ALWAYS_EXCLUDED`` (e.g.
     ``canonical_refs_used``, ``canonical_proposals``); additional per-array
     exclusions can be declared via ``corpus_excluded: true`` in the registry
     JSON.  The excluded set is precomputed at first load so this function
@@ -346,7 +345,7 @@ _TOKEN_RE = re.compile(rf"\.?({_SEG}(?:\.{_SEG})*)(\[\]|\{{\}})?")
 _KEY_RE = re.compile(rf"^\.?({_SEG})")
 
 
-def _parse_array_path(array_path: str) -> List[Tuple[List[str], str]]:
+def parse_array_path(array_path: str) -> List[Tuple[List[str], str]]:
     """Split a registry ``array_path`` into ``(keys, marker)`` hops.
 
     Grammar: ``.name`` descends an object property (dotted names chain), ``[]`` follows an
@@ -368,9 +367,6 @@ def _parse_array_path(array_path: str) -> List[Tuple[List[str], str]]:
     return hops
 
 
-parse_array_path = _parse_array_path  # public name; the underscore name stays for existing importers
-
-
 def array_top_key(array_path: str) -> str:
     """First property name of *array_path*: ``.a.b[].c`` -> ``a``, ``.env{}`` -> ``env``."""
     m = _KEY_RE.match(array_path)
@@ -381,7 +377,7 @@ def array_top_key(array_path: str) -> str:
 
 def array_leaf_key(array_path: str) -> str:
     """Last property name of *array_path*: ``.m[].tasks`` -> ``tasks``, ``.plan.items`` -> ``items``."""
-    return _parse_array_path(array_path)[-1][0][-1]
+    return parse_array_path(array_path)[-1][0][-1]
 
 
 def iter_nodes(data: Any, array_path: str):
@@ -400,7 +396,7 @@ def iter_nodes(data: Any, array_path: str):
     """
     if not isinstance(data, dict):
         return
-    hops = _parse_array_path(array_path)
+    hops = parse_array_path(array_path)
     last = len(hops) - 1
 
     def _descend(node: Any, hop_index: int, prefix: str):

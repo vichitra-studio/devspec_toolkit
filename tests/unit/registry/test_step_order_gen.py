@@ -96,6 +96,19 @@ def _N(step, kind, links=(), role="obligation-system"):
     return (step, kind, role, list(links))
 
 
+def test_record_host_x_node_step_is_not_a_step_order_input(tmp_path):
+    root = _toolkit(tmp_path, [_N("04", "fr")])
+    doc = _kind_schema("99", "rec", "record", [])
+    node = doc["properties"]["things"]["x-node"]
+    node.update(step="99", files=["extras/rec/*.json"])
+    (root / "schema" / "extras_rec.schema.json").write_text(json.dumps(doc))
+    reg_path = root / "tools" / "schema_registry.json"
+    reg = json.loads(reg_path.read_text())
+    reg[doc["$id"]] = "schema/extras_rec.schema.json"
+    reg_path.write_text(json.dumps(reg))
+    assert "99" not in _derive(root)["steps"]
+
+
 def test_edges_same_step_link_is_not_an_edge(tmp_path):
     root = _toolkit(tmp_path, [
         _N("01", "capability"),

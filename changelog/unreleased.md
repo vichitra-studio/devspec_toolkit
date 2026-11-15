@@ -8,7 +8,7 @@
 
 ### Changed
 
-- `schema/entry_key_registry.schema.json` accepts annotation-derived entries (map-keyed entries without `id_field`, glob keys).
+- `schema/entry_key_registry.schema.json` accepts annotation-derived entries (map-keyed entries without `id_field`, glob keys) and the step `extras` for record-host entries.
 - `spec-check` and the canonical checks share one schema registry and cache validators (speed only).
 
 ### Fixed

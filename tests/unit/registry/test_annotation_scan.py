@@ -647,6 +647,7 @@ def test_record_host_reached_through_a_step_ref_is_registered_once(edit_json, mi
     edit_json(root, S04, lambda d: d.setdefault("allOf", []).append({"$ref": "vc:extras-sample-record"}))
     reg, _ = _generate(root)
     assert [a["kind"] for a in _arrays(reg, "extras/sample/*.json")] == ["sample-record"]
+    assert reg["registry"]["extras/sample/*.json"]["step"] == "extras"
 
 
 def test_two_record_hosts_on_one_glob_both_register_under_extras(mini_toolkit, edit_json):

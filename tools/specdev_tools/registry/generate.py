@@ -572,13 +572,15 @@ def _in_slot(registry: dict[str, dict[str, Any]], key: str, entry: dict[str, Any
 
 def _register_host_entries(
     registry: dict[str, dict[str, Any]], host: HostScan, step: str, arrays: list[dict[str, Any]]
-) -> set[str]:
-    """Register one step host's annotation entries; return the glob keys it claimed.
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """Register one step host's annotation entries; return ``(arrays, claimed glob keys)``.
 
     An occurrence with ``files`` goes under each glob key (step *step* unless it names its own);
-    any other occurrence joins *arrays* unless the heuristic scan already found that path.
+    any other occurrence is added to the returned *arrays* unless the heuristic scan already
+    found that path.  The *arrays* argument itself is not modified.
     """
     legacy_paths = {a["array_path"] for a in arrays}
+    out = list(arrays)
     claimed: set[str] = set()
     for occ in host.occurrences:
         if occ.files:
@@ -586,8 +588,9 @@ def _register_host_entries(
                 _register_glob_entry(registry, glob_key, occ.step or step, occ.entry)
                 claimed.add(glob_key)
         elif occ.entry["array_path"] not in legacy_paths:
-            arrays.append(occ.entry)
-    return claimed
+            out.append(occ.entry)
+    return out, claimed
+
 
 def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Generate the entry_key_registry and extraction_paths dicts from schemas.
@@ -669,7 +672,9 @@ def generate_registry_from_decls(
             )
         sentinels_set.update(sentinels_found)
 
-        extra_keys = _register_host_entries(registry, host, step, arrays) if host is not None else set()
+        extra_keys: set[str] = set()
+        if host is not None:
+            arrays, extra_keys = _register_host_entries(registry, host, step, arrays)
 
         if not arrays and extra_keys:
             continue  # the step's entries all live under glob keys
@@ -692,7 +697,9 @@ def generate_registry_from_decls(
     # belong to no step: they register under ``RECORD_HOST_STEP``.
     for occ in scan.record_hosts():
         for glob_key in occ.files or []:
-            if not _in_slot(registry, glob_key, occ.entry):
+            if _in_slot(registry, glob_key, occ.entry):
+                registry[glob_key]["step"] = RECORD_HOST_STEP  # a step schema reached it via $ref first
+            else:
                 _register_glob_entry(registry, glob_key, RECORD_HOST_STEP, occ.entry)
 
     # Sentinels are a hardcoded constant list: these array names appear across

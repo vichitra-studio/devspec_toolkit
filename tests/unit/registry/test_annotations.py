@@ -173,15 +173,6 @@ def test_legacy_output_byte_identical_without_graph_schema(tmp_path, monkeypatch
     assert actual == baseline
 
 
-# ---------------------------------------------------------- ANNOT-01
-
-
-# ---------------------------------------------------------- ANNOT-02
-
-
-# ---------------------------------------------------------- ANNOT-03
-
-
 def test_annot03_does_not_read_fields_beside_additional_properties(mini_toolkit):
     root = mini_toolkit
     shutil.copy(_FIXTURES / "neg_map_beside_additional.schema.json", root / S02A)
@@ -190,8 +181,6 @@ def test_annot03_does_not_read_fields_beside_additional_properties(mini_toolkit)
     # the item is the additionalProperties value: its missing lifecycle is what fails
     assert any(i.startswith("ANNOT-08") and S02A in i and "lifecycle" in i for i in issues)
 
-
-# ---------------------------------------------------------- ANNOT-05
 
 def _realises(d: dict) -> dict:
     return d["properties"]["plan_items"]["items"]["properties"]
@@ -234,16 +223,10 @@ def test_annot05_wildcard_and_about_fields_must_reference_nodeid(tmp_path, edit_
     assert any("about" in i and "nodeId" in i for i in issues)
 
 
-# ---------------------------------------------------------- ANNOT-07
-
-
 def test_annot07_seed_is_an_allowed_external_kind(edit_json, mini_toolkit):
     root = mini_toolkit
     edit_json(root, S16, lambda d: _realises(d)["realises"]["x-link"].update(kinds=["seed"]))
     assert _with(_lint(root), "ANNOT-07") == []
-
-
-# ---------------------------------------------------------- ANNOT-08
 
 
 def test_annot08_top_of_graph_is_exempt(mini_toolkit):

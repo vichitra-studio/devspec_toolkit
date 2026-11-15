@@ -38,7 +38,8 @@ changes:
     description: >
       schema/entry_key_registry.schema.json accepts annotation-derived entries
       (source, role, contract, coarse, links; map-keyed entries without
-      id_field; glob keys such as impl_context/ms_*_plan.json). Host
+      id_field; glob keys such as impl_context/ms_*_plan.json) and the
+      step "extras" for record-host entries. Host
       entry_key_registry.json files are unaffected.
     migration:
       action: none

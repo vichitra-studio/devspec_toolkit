@@ -202,6 +202,10 @@ class TestConstructionWrap:
         assert "refusing to proceed" in str(exc_info.value), (
             f"Expected 'refusing to proceed' in JsonUtilsError message; got: {exc_info.value!r}"
         )
+        # Only the construction wrap turns the AttributeError into SchemaRuntimeError; without it
+        # json_utils' generic "Unexpected error" branch answers instead.
+        assert "schema resolution/runtime error: injected: broken validator" in str(exc_info.value)
+        assert "Unexpected error" not in str(exc_info.value)
 
         # File must be UNCHANGED — the broken constructor must not allow a silent write.
         assert dst.read_bytes() == original_bytes, (

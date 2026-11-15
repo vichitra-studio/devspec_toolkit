@@ -52,7 +52,7 @@ import os
 import re
 from typing import Any
 
-from ..core.entry_key_registry import _parse_array_path, is_glob_key, iter_nodes, match_glob_key
+from ..core.entry_key_registry import parse_array_path, is_glob_key, iter_nodes, match_glob_key
 from ..core.errors import SpecError
 
 _REGISTRY_FILENAME = "entry_key_registry.json"
@@ -223,7 +223,7 @@ def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> 
     empty one is not.  Only the first hop is tested (deeper hops may legitimately be empty).
     """
     path = entry["array_path"]
-    keys, marker = _parse_array_path(path)[0]
+    keys, marker = parse_array_path(path)[0]
     cur: Any = container
     for k in keys:
         if not isinstance(cur, dict) or k not in cur:

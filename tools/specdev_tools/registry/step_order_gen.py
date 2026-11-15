@@ -71,6 +71,9 @@ def _norm_pairs(extra_edges: Iterable[Pair]) -> list[Pair]:
 
 
 def _step_of(node: Any) -> str | None:
+    base = os.path.basename(node.schema_file)
+    if step_of_schema_file(base) is None and isinstance(node.value, dict) and node.value.get("files"):
+        return None  # a record host's kinds have no step; ``x-node.step`` is not read there
     step = node.value.get("step") if isinstance(node.value, dict) else None
     if isinstance(step, str):
         return step
