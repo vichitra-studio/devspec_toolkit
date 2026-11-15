@@ -37,7 +37,7 @@ The migrated artifact MUST include:
 - `terms[].domain`: Lowercase alphabetic-only kebab-case string (pattern: `^[a-z]+(?:-[a-z]+)*$`) — no digits allowed.
 - `terms[].units`: String (pattern: `^[A-Za-z0-9/]+$`) — unit of measurement if the term is quantifiable.
 - `terms[].acronym_ref`: Canonical reference (kind: `acronym`) — only when `acronym` field is also set.
-- `terms[].unit_ref`: Canonical reference (kind: `term`) — only when `units` field is also set.
+- `terms[].unit_ref`: Canonical reference (kind: `unit`) — only when `units` field is also set.
 
 ## Validation
 

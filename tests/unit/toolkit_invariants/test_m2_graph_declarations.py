@@ -333,3 +333,98 @@ def test_every_m2_kind_in_registry_with_id_field(kind: str, id_field: str | None
         assert entry.get("map_keyed") is True and "id_field" not in entry
     else:
         assert entry["id_field"] == id_field
+
+
+# Every ``x-link`` of the seven M2 schemas: (schema file, JSON pointer of the link field, sorted ``kinds`` or "*").
+# Written out by hand on purpose: a change of one link's ``kinds`` list must be a deliberate change of this table.
+_EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
+    ('00_charter.schema.json', '/allOf/1/properties/scope_items/items/properties/derives_from', ['need', 'seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/scope_items/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/scope_items/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/assumptions/items/properties/derives_from', ['seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/assumptions/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/risks/items/properties/derives_from', ['assumption', 'seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/risks/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/risks/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/stakeholders/items/properties/needs/items/properties/derives_from', ['seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/stakeholders/items/properties/needs/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/stakeholders/items/properties/needs/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/stakeholders/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/stakeholders/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/user_segments/items/properties/derives_from', ['seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/user_segments/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/user_segments/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/success_metrics/items/properties/derives_from', ['need', 'seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/success_metrics/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/success_metrics/items/properties/replaces', '*'),
+    ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/derives_from', ['need', 'seed']),
+    ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/assumes', ['assumption']),
+    ('00_charter.schema.json', '/allOf/1/properties/constraints/items/properties/replaces', '*'),
+    ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/derives_from', ['metric', 'scope-item', 'segment']),
+    ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/assumes', ['assumption']),
+    ('01_capabilities.schema.json', '/allOf/1/properties/capabilities/items/properties/replaces', '*'),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/derives_from', ['capability', 'constraint']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/assumes', ['assumption']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/components/items/properties/replaces', '*'),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/derives_from', ['component']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/connects_to', ['component', 'third-party']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/assumes', ['assumption']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/connections/items/properties/replaces', '*'),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/third_parties/items/properties/derives_from', ['constraint', 'seed']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/third_parties/items/properties/part_of', ['third-party']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/third_parties/items/properties/assumes', ['assumption']),
+    ('02_system_sketch.schema.json', '/allOf/1/properties/third_parties/items/properties/replaces', '*'),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/derives_from', ['constraint', 'scope-item', 'seed']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/assumes', ['assumption']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/environments/additionalProperties/properties/replaces', '*'),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/derives_from', ['component', 'constraint']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/assumes', ['assumption']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/ci_gates/items/properties/replaces', '*'),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/derives_from', ['component', 'connection', 'constraint']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/assumes', ['assumption']),
+    ('02a_delivery_baseline.schema.json', '/allOf/1/properties/secrets/items/properties/replaces', '*'),
+    ('03_glossary.schema.json', '/allOf/1/properties/terms/items/properties/replaces', '*'),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/assumes', ['assumption']),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/acceptance_criteria/items/properties/replaces', '*'),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/derives_from', ['capability']),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/depends_on', ['fr']),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/assumes', ['assumption']),
+    ('04_fr_list.schema.json', '/allOf/1/properties/functional_requirements/items/properties/replaces', '*'),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/derives_from', ['criterion']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/assumes', ['assumption']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/errors/items/properties/replaces', '*'),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/derives_from', ['fr']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/provided_by', ['component']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/relies_on', ['third-party']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/depends_on', ['api']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/assumes', ['assumption']),
+    ('05_interface_contracts.schema.json', '/allOf/1/properties/apis/items/properties/replaces', '*'),
+]
+
+
+def _declared_link_kinds() -> list[tuple[str, str, Any]]:
+    found: list[tuple[str, str, Any]] = []
+
+    def walk(node: Any, pointer: str, fname: str) -> None:
+        if isinstance(node, dict):
+            if "x-link" in node:
+                kinds = node["x-link"]["kinds"]
+                found.append((fname, pointer, kinds if kinds == "*" else sorted(kinds)))
+            for key, value in node.items():
+                walk(value, f"{pointer}/{key}", fname)
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{pointer}/{index}", fname)
+
+    for fname in _FILES:
+        walk(json.loads((_SCHEMA_DIR / fname).read_text(encoding="utf-8")), "", fname)
+    return found
+
+
+def test_every_x_link_declares_the_pinned_kinds() -> None:
+    declared = _declared_link_kinds()
+    expected_keys = [(f, p) for f, p, _ in _EXPECTED_LINK_KINDS]
+    declared_keys = [(f, p) for f, p, _ in declared]
+    assert [k for k in declared_keys if k not in expected_keys] == [], "x-link declared but not in the table"
+    assert [k for k in expected_keys if k not in declared_keys] == [], "x-link in the table but not declared"
+    assert sorted(declared, key=repr) == sorted(_EXPECTED_LINK_KINDS, key=repr)

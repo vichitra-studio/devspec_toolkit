@@ -91,6 +91,19 @@ _PINNED_WARNINGS = Counter(
     }
 )
 
+# The same set with the file each warning is about (the errors carry no file attribute, so the subject is a needle
+# in the rendered message: a file name, or the code's own name for the seed lint).
+_PINNED_WARNING_SUBJECTS = Counter(
+    {
+        ("W555", "STEP00_SEED_OUT_OF_SCOPE_THIN"): 1,
+        ("W570", "07_nfrs.json"): 1,
+        ("W570", "14_roadmap.json"): 1,
+        ("W570", "16_impl_context.json"): 1,
+        ("W594", "01_capabilities.json"): 1,
+        ("W594", "03_glossary.json"): 1,
+    }
+)
+
 
 class _Node(NamedTuple):
     node_id: str
@@ -203,6 +216,11 @@ def test_spec_check_warning_set_is_pinned(stamped_example: Path) -> None:
     )
     assert [e.render() for e in errors if not e.code.startswith("W")] == []
     assert Counter(e.code for e in errors) == _PINNED_WARNINGS
+    subjects = Counter(
+        (e.code, next((n for c, n in _PINNED_WARNING_SUBJECTS if c == e.code and n in e.render()), "?"))
+        for e in errors
+    )
+    assert subjects == _PINNED_WARNING_SUBJECTS, [e.render() for e in errors]
     assert context["checks"]["seed-lint"]["status"] != "SKIP"
 
 

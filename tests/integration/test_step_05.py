@@ -78,3 +78,14 @@ class Step05IntegrationTests(unittest.TestCase):
         self._assert_valid_fixture_fails_naming(
             lambda spec: spec["apis"][0]["errors"][0].update(derives_from=[]), "derives_from"
         )
+
+    def test_invalid_bad_protocol_fixture_fails(self):
+        """invalid_bad_protocol.json must fail because protocol is not in the protocol enum."""
+        rendered = [
+            m
+            for m in self._schema_errors("invalid_bad_protocol.json", lambda spec: None)
+            if "Unevaluated properties" not in m
+        ]
+        self.assertTrue(
+            any("apis/0/protocol" in msg and "'invalid-protocol' is not one of" in msg for msg in rendered), rendered
+        )

@@ -45,7 +45,7 @@ The migrated artifact MUST include:
 - `capabilities[].error_states`: Array of `errorState` objects with named error codes.
 - `capabilities[].action_ref`: Canonical reference (kind: `action`) for the verb.
 - `capabilities[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
-- `capabilities[].role_ref`: Canonical reference (kind: `entity`) for the actor exercising this capability.
+- `capabilities[].role_ref`: Canonical reference (kind: `role`) for the actor exercising this capability.
 
 ## Validation
 

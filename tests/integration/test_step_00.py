@@ -144,3 +144,7 @@ class Step00IntegrationTests(unittest.TestCase):
     def test_invalid_missing_scope_fails_validation(self):
         """invalid_missing_scope.json must fail because scope_items is required."""
         self._assert_fails_naming("invalid_missing_scope.json", "'scope_items' is a required property")
+
+    def test_invalid_bad_owner_fails_validation(self):
+        """invalid_bad_owner.json must fail because owner is not in the owner enum."""
+        self._assert_fails_naming("invalid_bad_owner.json", "owner: 'frontend' is not one of")

@@ -502,6 +502,18 @@ def test_w583_in_scope_fr_api_still_fires(toolkit_root):
     assert any("api-live" in e for e in _w583_ids(toolkit_root))
 
 
+def test_w583_api_deriving_from_parked_fr_and_other_id_not_exempt(toolkit_root):
+    """Only parked FRs exempt: one id that is not a parked FR (here a capability) keeps W583 on."""
+    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
+        {"fr_id": "fr-parked", "priority": "wont-have", "scope": "in"}]})
+    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
+        {"api_id": "api-mixed-ids", "derives_from": ["fr-parked", "cap-x"]},
+        {"api_id": "api-only-parked", "derives_from": ["fr-parked"]}]})
+    fired = _w583_ids(toolkit_root)
+    assert any("api-mixed-ids" in e for e in fired), fired
+    assert not any("api-only-parked" in e for e in fired), fired
+
+
 def test_w583_invariant_trace_via_06_unchanged(tmp_path):
     spec_dir = tmp_path / "spec"
     spec_dir.mkdir()

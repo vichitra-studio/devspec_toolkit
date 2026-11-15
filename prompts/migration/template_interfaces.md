@@ -17,7 +17,7 @@
 
 - `$schema`: Must reference the URI above for the target toolkit version.
 - `apis`: Array of API contract objects (minItems: 1). Each entry requires:
-  - `api_id`: kebab-case identifier with `api-` prefix (e.g., `api-user-auth`, `api-session-create`).
+  - `api_id`: kebab-case identifier; `api-` prefix recommended (e.g., `api-user-auth`, `api-session-create`).
   - `name`: Human-readable endpoint name (e.g., `Create User Session`).
   - `version`: String matching pattern `^v\d+(?:\.\d+)*$` (e.g., `v1`, `v2.1`).
   - `protocol`: Must be one of `http | grpc | ws | mqtt`.
@@ -41,14 +41,14 @@ The migrated artifact MUST include:
 - `apis[].security`: Auth mechanism — one of `none | jwt | oauth2 | api-key | mTLS`.
 - `apis[].input_schema_ref`: Relative path to request body JSON Schema file (use `-tbd` as placeholder).
 - `apis[].output_schema_ref`: Relative path to response body JSON Schema file (use `-tbd` as placeholder).
-- `apis[].errors`: Array of error state objects, each with `code` (SCREAMING_SNAKE_CASE), `http_status` (integer), and `condition`.
+- `apis[].errors`: Array of error objects, each requiring `error_id` (kebab-case), `code` (kebab-case), `message`, `scope` (`in | later | out`) and `derives_from` (ids of acceptance criteria, minItems: 1); `severity` (`info | warn | error | fatal`) is optional, and `scope_reason` is required when `scope` is `later` or `out`.
 - `apis[].parameters`: Array of parameter objects, each requiring `name`, `in` (`query | path | header`), and `required` (boolean).
 - `apis[].provided_by`: Array of component ids that provide this API.
 - `apis[].relies_on`: Array of third-party ids this API relies on.
 - `apis[].event_ref`: Canonical reference (kind: `event`) for events emitted or consumed.
 - `apis[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
-- `apis[].policy_ref`: Canonical reference (kind: `risk_category`) for access control policy.
-- `apis[].enum_provenance`: Object required when enum values are sourced from an external standard; needs `source_url`, `source_date`, and `resolved_at`; required whenever a parameter declares `enum`.
+- `apis[].policy_ref`: Canonical reference (kind: `policy`) for access control policy.
+- `apis[].enum_provenance`: Object required whenever a parameter declares `enum`; needs `source_url`, `source_date`, and `resolved_at`.
 
 ## Validation
 

@@ -36,7 +36,7 @@ The migrated artifact MUST include:
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
 - `title`: Short human-readable title (2–6 words, Title Case noun phrase).
-- `stakeholders[].role_ref`: Canonical reference (kind: `entity`) for the stakeholder role.
+- `stakeholders[].role_ref`: Canonical reference (kind: `role`) for the stakeholder role.
 - `success_metrics[].baseline`: Current measured value before the project (number or string).
 - `constraints`: Array of constraint objects. Each requires `constraint_id` (kebab-case), `text`, `scope` and `derives_from`.
 
@@ -52,7 +52,7 @@ After migration, run:
 
 The charter is the root artifact of every spec pipeline. During migration,
 preserve all `metric_id` values from `success_metrics` since downstream NFRs
-and capabilities trace back to them via `metric-*` IDs. The `stakeholders[].owner`
+and capabilities trace back to them via their `metric_id` values. The `stakeholders[].owner`
 field is NOT part of this schema — the `owner` field belongs to step-base.
 Validate `success_metrics[].unit` against canonical abbreviations (`ms`, `percent`,
 `req/s`, `count`) and ensure a matching `unit_ref` canonical reference is present.

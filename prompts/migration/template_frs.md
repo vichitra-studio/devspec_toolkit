@@ -18,9 +18,9 @@
 
 - `$schema`: Must reference the URI above for the target toolkit version.
 - `functional_requirements`: Array of FR objects (minItems: 2). Each entry requires:
-  - `fr_id`: kebab-case identifier with `fr-` prefix (e.g., `fr-user-login`).
+  - `fr_id`: kebab-case identifier with `fr-` prefix (e.g., `fr-user-login`); the step validator rejects any other form (E530).
   - `statement`: String (minLength: 20) — falsifiable statement of a single system behavior.
-  - `acceptance_criteria`: Array of criterion objects (minItems: 2). Each requires `criterion_id` (kebab-case) and `text` (string, minLength: 15).
+  - `acceptance_criteria`: Array of criterion objects (minItems: 2). Each requires `criterion_id` (kebab-case), `scope` (`in | later | out`; `later` and `out` also require `scope_reason`) and `text` (string, minLength: 15).
   - `scope`: Must be one of `in | later | out`; `later` and `out` also require `scope_reason`.
   - `derives_from`: Array of capability ids (minItems: 1) that this requirement implements.
   - `capability_ref`: Canonical reference object (kind: `capability`) — required on every FR.
@@ -58,7 +58,7 @@ tasks (Step 14). Never rename an `fr_id` without updating all downstream
 references. The field is `functional_requirements` (not `requirements`) — rename
 accordingly. Each FR requires a `capability_ref` canonical object and a `derives_from`
 array of capability ids; FRs without these will fail canonical-integrity checks. The
-`acceptance_criteria` field requires structured objects (`criterion_id` + `text`),
+`acceptance_criteria` field requires structured objects (`criterion_id` + `scope` + `text`),
 not plain strings — convert any string-format criteria. The trace matrix must
 be regenerated after migration.
 

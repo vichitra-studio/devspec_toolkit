@@ -18,7 +18,7 @@
 - `$schema`: Must reference the URI above for the target toolkit version.
 - `components`: Array of component objects (minItems: 1). Each entry requires:
   - `component_id`: kebab-case identifier (e.g., `api-gateway`, `user-service`).
-  - `type`: Must be one of `service | db | queue | cache | job | ui | lib | external`.
+  - `type`: Must be one of `service | db | queue | cache | job | ui | lib`.
   - `responsibilities`: Array of strings (minItems: 3, maxItems: 6) — present-tense action phrases.
   - `owner`: Canonical owner enum (`api | ui | system | ops | data | product | business | engineering`).
   - `derives_from`: Array of capability or constraint ids (minItems: 1).
@@ -26,7 +26,7 @@
   - `connection_id`: kebab-case identifier of the connection.
   - `derives_from`: Array of component ids (minItems: 1) naming the source component.
   - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination.
-  - `protocol`: Must be one of `http | grpc | event | db | file`.
+  - `protocol`: Must be one of `http | grpc | event | rpc | db | file`.
   - `trust_boundary`: Must be one of `internal | partner | public`.
   - When `trust_boundary` is `partner` or `public`: `auth` and `rate_limit` are also required.
   - When `protocol` is `event`: `reliability` is also required.
@@ -46,7 +46,7 @@ The migrated artifact MUST include:
 - `third_parties`: Array of third-party objects. Each requires `third_party_id` (kebab-case), `name`, `pin` (the pinned version) and `derives_from`; `rationale` is optional. Replaces `tech_stack`, which is deprecated.
 - `connections[].rate_limit`: **Conditionally required** — must be present when `trust_boundary` is `partner` or `public` (enforced by schema `if/then`). Object with `rps` (integer, 1–100000) and `scope` (`ip | client | token | global`) required; `burst` and `window_s` optional. Omit only for `internal` trust boundary connections where back-pressure is not needed.
 - `connections[].reliability`: Must be one of `best-effort | at-least-once | exactly-once` (required for event connections).
-- `connections[].event_ref`: Canonical reference (kind: `event`) for the event type (required when `protocol` is `event`).
+- `connections[].event_ref`: Canonical reference (kind: `event`) for the event type (used when `protocol` is `event`).
 
 ## Validation
 
@@ -61,11 +61,12 @@ After migration, run:
 The system sketch defines the architectural topology. Component IDs
 (`component_id`) are referenced by interface contracts (Step 05), invariants
 (Step 06), and the implementation plan (Step 09). Rename any legacy `id` field
-to `component_id`. The schema no longer uses `name` as a required field —
+to `component_id`. The schema has no `name` property on components (it is rejected) —
 human-readable labels come from `responsibilities`. Connections between 2+
 components are required; if no `connections` array exists, add at least one.
-For external components (`type: external`), the tag `external-dependency` is
-required in `tags`.
+An external service is not a component: record it as a
+`third_parties` entry and point the `connects_to` of the connection that reaches it
+at its `third_party_id`, with `trust_boundary` set to `partner` or `public`.
 
 
 ## Full Generation Reference

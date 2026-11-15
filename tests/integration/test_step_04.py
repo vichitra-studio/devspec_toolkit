@@ -74,3 +74,14 @@ class Step04IntegrationTests(unittest.TestCase):
             fr["depends_on"] = [fr["fr_id"]]
 
         self.assertEqual(self._schema_errors(self_reference), [])
+
+    def test_invalid_bad_derives_from_fixture_fails(self):
+        """invalid_bad_derives_from.json must fail on the id pattern of derives_from[0]."""
+        errors = specdev_validate_file(
+            str(_REPO_ROOT), str(_REPO_ROOT / "tests" / "fixtures" / "step_04" / "invalid_bad_derives_from.json")
+        )
+        rendered = [e.render() for e in errors if e.code == "E520" and "Unevaluated properties" not in e.render()]
+        self.assertTrue(
+            any("functional_requirements/0/derives_from/0" in msg and "does not match" in msg for msg in rendered),
+            rendered,
+        )

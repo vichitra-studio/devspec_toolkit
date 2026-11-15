@@ -100,9 +100,11 @@ changes:
       out) becomes required on every functional requirement, API, API error,
       acceptance criterion, charter risk, environment, CI gate and secret
       (none of them had it in 1.1.1; capabilities already required it).
+      scope_reason is required wherever scope is later or out, capabilities
+      included (1.1.1 had no such rule).
       derives_from with at least one id becomes required on every node of
       steps 00 to 05 except stakeholders, glossary terms and acceptance
-      criteria. tech_stack is no longer required in step 02. Every
+      criteria. A stakeholder needs at least one need. tech_stack is no longer required in step 02. Every
       node accepts aliases, lifecycle and replaces; every node except an
       assumption and a glossary term also accepts assumes. Existing host specs do
       not validate until migrated; the migration passes for steps 00 to 05 land
@@ -123,8 +125,9 @@ changes:
       later in this release, so a step 00 to 05 spec gets no link-existence or
       cycle error in the meantime. The step 04 check that a requirement
       carries a non-empty trace and the step 02 check for a missing tech_stack
-      go with those fields. The step 02 capability-coverage check (E590) and
-      the other content checks stay.
+      go with those fields. The step 02 capability-coverage check (E590)
+      stays; it now reads component derives_from and exempts capabilities
+      whose scope is later or out. The other content checks stay.
     migration:
       action: none
 

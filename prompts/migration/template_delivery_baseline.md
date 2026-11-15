@@ -32,8 +32,8 @@ The migrated artifact MUST include:
 - `secrets`: Array of secret objects. Each requires `secret_id` (kebab-case), `name` (the environment variable key required at runtime), `scope` and `derives_from`.
 - `compliance`: Array of compliance standard strings (e.g., `SOC2`, `GDPR`, `PCI-DSS`).
 - `environment_ref`: Canonical reference (kind: `environment`) to the environment definitions.
-- `command_ref`: Canonical reference (kind: `capability`) for the CI command.
-- `policy_ref`: Canonical reference (kind: `risk_category`) for the compliance framework enforced.
+- `command_ref`: Canonical reference (kind: `command`) for the CI command.
+- `policy_ref`: Canonical reference (kind: `policy`) for the compliance framework enforced.
 
 ## Validation
 
