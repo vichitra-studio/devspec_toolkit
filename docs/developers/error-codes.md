@@ -369,7 +369,7 @@
 
 ### E590 / W590 CROSS_STEP_ID_NOT_FOUND / CROSS_STEP_UPSTREAM_MISSING
 
-**Trigger (E590)**: A spec artifact references an ID (FR, API, INV, NFR, capability, governance label) that does not exist in the upstream artifact.
+**Trigger (E590)**: A spec artifact references an ID (FR, API, INV, NFR, capability) that does not exist in the upstream artifact.
 
 **Trigger (W590)**: The upstream artifact file is missing entirely; cross-step validation is skipped for that upstream.
 

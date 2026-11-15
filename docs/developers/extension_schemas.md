@@ -59,6 +59,8 @@ The manifest requires an `extension_decision` field declaring whether extensions
 }
 ```
 
+The governance label is listed in this step's own `canonical_refs_used` only. Do not list it in step 10's `canonical_refs_used`: the step 10 schema has no field for it, so it would raise E210 `canonical_refs_used_extra`.
+
 ## Authoring Extension Schemas
 
 If you need to enforce strict structure for an extension (e.g. `ext_03_ml_models.json`), create a matching schema:

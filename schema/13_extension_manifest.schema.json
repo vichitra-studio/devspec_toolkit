@@ -88,7 +88,7 @@
               { "$ref": "vc:core:collections#canonicalRef" },
               { "properties": { "kind": { "const": "governance_label" } } }
             ],
-            "description": "Canonical reference to the governance label applied to this extension. Kind is structurally pinned to 'governance_label'. Example: {\"id\": \"cn:core:governance_label:mandatory\", \"kind\": \"governance_label\"}. Required field — dual-checked by canonical-integrity (canon/manifest.json) and step_13.py (10_governance.json canonical_refs_used). Links the extension to its governance review tier (mandatory, recommended, optional)."
+            "description": "Canonical reference to the governance label applied to this extension. Kind is structurally pinned to 'governance_label'. Example: {\"id\": \"cn:core:governance_label:mandatory\", \"kind\": \"governance_label\"}. Required field — checked by canonical-integrity against canon/manifest.json (E110). Do not list the label in step 10's canonical_refs_used. Links the extension to its governance review tier (mandatory, recommended, optional)."
           }
         },
         "required": [

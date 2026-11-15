@@ -68,9 +68,10 @@ class TestValidatorJustification:
         assert any("E320" in e and "justification" in e for e in rendered)
 
 
-class TestValidatorCrossStep:
-    def test_governance_label_not_in_step_10_raises_e590(self, base_extension):
-        """When spec_root points at fixture dir with 10_governance.json, unknown label → E590."""
+class TestValidatorNoStep10Check:
+    """E-030: governance_label_ref is checked by canonical-integrity only, not against step 10."""
+
+    def test_label_absent_from_step_10_emits_no_e590(self, base_extension):
         base_extension["governance_label_ref"] = {
             "id": "cn:core:governance_label:nonexistent",
             "kind": "governance_label",
@@ -78,21 +79,13 @@ class TestValidatorCrossStep:
         instance = {"extensions": [base_extension]}
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
         rendered = _render(errors)
-        assert any("E590" in e and "nonexistent" in e for e in rendered)
+        assert not any("E590" in e or "W590" in e for e in rendered)
 
-    def test_governance_label_in_step_10_passes(self, base_extension):
-        """When spec_root points at fixture dir, known label → no E590."""
-        instance = {"extensions": [base_extension]}
-        errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
-        rendered = _render(errors)
-        assert not any("E590" in e for e in rendered)
-
-    def test_no_step_10_file_raises_w590(self, base_extension, tmp_path):
-        """When spec_root points at a dir with no 10_*.json and extensions exist → W590."""
+    def test_no_step_10_file_emits_no_w590(self, base_extension, tmp_path):
         instance = {"extensions": [base_extension]}
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(tmp_path))
         rendered = _render(errors)
-        assert any("W590" in e for e in rendered)
+        assert not any("E590" in e or "W590" in e for e in rendered)
 
 
 # ---------------------------------------------------------------------------
@@ -290,9 +283,9 @@ class TestSchemaAdditionalPropertiesArbitrary:
 # ---------------------------------------------------------------------------
 
 class TestValidatorFixtureMissingRef:
-    def test_invalid_missing_ref_fixture_raises_e590(self):
-        """Shipped invalid_missing_ref.json fixture triggers E590 for nonexistent label."""
+    def test_invalid_missing_ref_fixture_raises_no_e590(self):
+        """The 'nonexistent label' fixture is a canon (E110) concern, not a step-13 validator error."""
         instance = json.loads((FIXTURES_DIR / "invalid_missing_ref.json").read_text())
         errors = validate_step_13(instance, str(TOOLKIT_ROOT), spec_root=str(FIXTURES_DIR))
         rendered = _render(errors)
-        assert any("E590" in e and "nonexistent" in e for e in rendered)
+        assert not any("E590" in e or "W590" in e for e in rendered)

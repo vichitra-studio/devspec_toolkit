@@ -85,15 +85,13 @@ Before emitting, verify:
 - [ ] Extension is created only when the domain requires ≥3 dedicated schema sections that are not expressible in existing step schemas (05, 06, 07) — no extension for concerns already covered by core steps
 
 ## Governance Label Resolution
-`governance_label_ref` is dual-checked:
-1. The referenced canonical ID must exist in `canon/manifest.json` (verified by `canonical-integrity`, error E110).
-2. The same ID must appear in `spec/10_governance.json` `canonical_refs_used` with `kind: "governance_label"` (verified by `step_13.py`, error E590; missing file yields W590).
+`governance_label_ref` is checked once: the referenced canonical ID must exist in `canon/manifest.json` (verified by `canonical-integrity`, error E110). It is not checked against step 10. List the label in this step's own `canonical_refs_used`; do NOT add it to `spec/10_governance.json` `canonical_refs_used` (the 10 schema has no field that can hold it, so it would raise E210 `canonical_refs_used_extra`).
 
 Authoritative values: resolve governance_label IDs from `canon/manifest.json` (kind: `governance_label`). Do not enumerate inline — the registry is the source of truth and validated by canonical-integrity lint (E110).
 
 ## Cross-Step Synthesis Notes
 - extensions[*].justification: MUST reference a specific `component_id` from `spec/02_system_sketch.json` or `nfr_id` from `spec/07_nfrs.json` that necessitates the extension.
-- extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in both `canon/manifest.json` and `spec/10_governance.json` (see Governance Label Resolution above). If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
+- extensions[*].governance_label_ref: **REQUIRED** by the schema. MUST be a canonical ref object (`{id, kind}`) with `kind: "governance_label"`. The `id` must resolve in `canon/manifest.json` (see Governance Label Resolution above); it is not listed in step 10. If no matching governance label exists in the canonical registry, add it to `canonical_proposals`.
 - extension_decision: **REQUIRED**. The cardinality constraints between `status` and `extensions` are machine-enforced by schema `vc:13-extension-manifest` allOf conditionals — consult the schema as the authoritative source.
 - **Optional per-extension fields** (omit when not applicable): `tag_ref` (kind: `"tag"` — for cross-cutting concern tags like `critical-path`), `policy_ref` (kind: `"policy"` — when the extension is governed by a specific policy), `id_pattern_ref` (kind: `"id_pattern"` — only when extension IDs follow a non-standard pattern).
 - Output filename is derived from `extension_id`: replace hyphens with underscores and append `.json` (e.g., `ext-01-database` → `ext_01_database.json`).

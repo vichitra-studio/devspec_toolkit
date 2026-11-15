@@ -678,111 +678,42 @@ class TestStep12CrossStep(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestStep13CrossStep(unittest.TestCase):
-    """Cross-step validation: step_13 checks governance_label_ref against 10_governance.json."""
+    """step_13 no longer cross-checks governance_label_ref against step 10 (E-030).
 
-    def test_valid_upstream_refs_pass(self):
+    The label is a canon reference, checked by canonical-integrity (E110).
+    """
+
+    def _instance(self, label_id):
+        return {
+            "extensions": [
+                {
+                    "extension_id": "ext-auth",
+                    "required_schema_sections": ["04_fr_list"],
+                    "justification": "Authentication needs custom schema section.",
+                    "schema_design_guidelines": "Validate with assertion checks.",
+                    "governance_label_ref": {"id": label_id},
+                }
+            ]
+        }
+
+    def test_label_absent_from_step_10_emits_no_e590_or_w590(self):
         with tempfile.TemporaryDirectory() as tmp:
             spec_dir = os.path.join(tmp, "spec")
             os.makedirs(spec_dir)
             _write_json(spec_dir, "10_governance.json", {
                 "id": "gov-main",
-                "canonical_refs_used": [
-                    {"kind": "governance_label", "id": "label-security"},
-                ]
+                "canonical_refs_used": [],
             })
-            instance = {
-                "extensions": [
-                    {
-                        "extension_id": "ext-auth",
-                        "required_schema_sections": ["04_fr_list"],
-                        "justification": "Authentication needs custom schema section.",
-                        "schema_design_guidelines": "Validate with assertion checks.",
-                        "governance_label_ref": {"id": "label-security"},
-                    }
-                ]
-            }
-            errors = validate_step_13(instance, tmp)
-            self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
-            self.assertEqual(len(_e590(errors)), 0, f"Unexpected E590: {_e590(errors)}")
+            errors = validate_step_13(self._instance("label-security"), tmp)
+            self.assertEqual(_e590(errors), [])
+            self.assertEqual(_w590(errors), [])
 
-    def test_missing_upstream_emits_w590(self):
+    def test_missing_step_10_emits_no_w590(self):
         with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            # No 10_governance.json
-            instance = {
-                "extensions": [
-                    {
-                        "extension_id": "ext-auth",
-                        "required_schema_sections": ["04_fr_list"],
-                        "justification": "Authentication needs custom schema section.",
-                        "schema_design_guidelines": "Validate with assertion checks.",
-                        "governance_label_ref": {"id": "label-security"},
-                    }
-                ]
-            }
-            errors = validate_step_13(instance, tmp)
-            w = _w590(errors)
-            self.assertGreaterEqual(len(w), 1, "Expected W590 for missing 10_governance.json")
-            self.assertTrue(
-                any("10_governance.json" in msg for msg in w),
-                f"W590 should mention 10_governance.json: {w}"
-            )
-
-    def test_broken_ref_emits_e590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "10_governance.json", {
-                "id": "gov-main",
-                "canonical_refs_used": [
-                    {"kind": "governance_label", "id": "label-security"},
-                ]
-            })
-            instance = {
-                "extensions": [
-                    {
-                        "extension_id": "ext-auth",
-                        "required_schema_sections": ["04_fr_list"],
-                        "justification": "Authentication needs custom schema section.",
-                        "schema_design_guidelines": "Validate with assertion checks.",
-                        "governance_label_ref": {"id": "label-nonexistent"},
-                    }
-                ]
-            }
-            errors = validate_step_13(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken governance label ref")
-            self.assertTrue(
-                any("label-nonexistent" in msg for msg in e),
-                f"E590 should mention the broken ref: {e}"
-            )
-
-    def test_governance_doc_own_id_is_valid_ref(self):
-        """The governance document's own top-level id should resolve as valid."""
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "10_governance.json", {
-                "id": "gov-main",
-                "canonical_refs_used": []
-            })
-            instance = {
-                "extensions": [
-                    {
-                        "extension_id": "ext-gov",
-                        "required_schema_sections": ["10_governance"],
-                        "justification": "Governance meta-extension.",
-                        "schema_design_guidelines": "Verify compliance checks.",
-                        "governance_label_ref": {"id": "gov-main"},
-                    }
-                ]
-            }
-            errors = validate_step_13(instance, tmp)
-            # Governance doc's own top-level id is no longer added to label set
-            # (plain kebab string can never match cn:-prefixed refs), so
-            # gov-main is unresolvable and correctly emits E590.
-            self.assertGreaterEqual(len(_e590(errors)), 1, "gov-main is not a governance label")
+            os.makedirs(os.path.join(tmp, "spec"))
+            errors = validate_step_13(self._instance("label-security"), tmp)
+            self.assertEqual(_e590(errors), [])
+            self.assertEqual(_w590(errors), [])
 
 
 # ---------------------------------------------------------------------------
@@ -1189,7 +1120,7 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
                 }]
             }
             errors = validate_step_13(instance, tmp)
-            self.assertGreaterEqual(len(_w590(errors)), 1)
+            self.assertEqual(_w590(errors), [])  # E-030: no step-10 cross-check
 
     def test_step_13a_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
