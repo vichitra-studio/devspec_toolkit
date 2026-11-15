@@ -15,6 +15,7 @@ import os
 from typing import Any
 
 from ..core.constants import resolve_extras_path
+from ..validation._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +100,9 @@ def _collect_entity_ids_and_traces(
     are added so BFS reaches everything).
     """
 
+    # ``trace`` edges are a 1.1.1 field (M4's node/trace links replace them); skipped for new-shape data.
+    has_trace_edges = has_legacy_fields([data], LEGACY_TRACE_FIELDS)
+
     def _scan(obj: Any, parent_array_key: str | None, array_index: int | None) -> None:
         if isinstance(obj, dict):
             # Collect entity definitions (*_id fields)
@@ -121,7 +125,7 @@ def _collect_entity_ids_and_traces(
                     }
 
                 # Collect trace edges from this entity
-                for trace_entry in obj.get("trace", []):
+                for trace_entry in obj.get("trace", []) if has_trace_edges else ():
                     if isinstance(trace_entry, dict):
                         linked = trace_entry.get("id")
                         if isinstance(linked, str) and linked:

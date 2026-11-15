@@ -539,6 +539,35 @@ class HallucinationLintTests(unittest.TestCase):
                 f"expected a W570 GRACEFUL_SKIP diagnostic, got: {rendered}",
             )
 
+    def test_m2_02a_objects_and_capability_without_metric_refs_give_no_e530_e541(self):
+        capabilities = {
+            "$schema": "vc:01-capabilities",
+            "capabilities": [{
+                "capability_id": "cap-checkout",
+                "verb": "pay",
+                "scope": "in",
+                "capability_ref": "cn:project:capability:checkout",
+                "derives_from": ["seg-buyers"],
+            }],
+        }
+        delivery = {
+            "$schema": "vc:02a-delivery-baseline",
+            "environments": {
+                env: {"scope": "in", "derives_from": ["seed-delivery"]} for env in ("dev", "ci", "staging", "prod")
+            },
+            "ci_gates": [{"gate_id": "unit-tests", "scope": "in", "derives_from": ["seed-delivery"]}],
+            "secrets": [{
+                "secret_id": "secret-db-url", "name": "DATABASE_URL", "scope": "in", "derives_from": ["seed-delivery"],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            spec = Path(td) / "spec"
+            spec.mkdir()
+            (spec / "01_capabilities.json").write_text(json.dumps(capabilities), encoding="utf-8")
+            (spec / "02a_delivery_baseline.json").write_text(json.dumps(delivery), encoding="utf-8")
+            errs = render_errors(lint_hallucinations(str(spec), repo_root=str(Path(__file__).resolve().parents[4])))
+        self.assertEqual([], [e for e in errs if "E530" in e or "E541" in e], errs)
+
 
 class ExtractPathFromStringTests(unittest.TestCase):
     """Unit tests for _extract_path_from_string covering all four branches."""

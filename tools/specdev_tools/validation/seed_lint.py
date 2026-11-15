@@ -330,19 +330,15 @@ def _check_step00_out_of_scope_thin(
             continue
         total_substantive += _count_substantive_out_of_scope(text)
 
-    # Threshold 3 matches schema/00_charter.schema.json "out_of_scope": {"minItems": 3}.
-    # The value is restated inline (not read from the schema at runtime) by design:
-    # (1) it follows the validation layer's established mirror-with-comment convention
-    #     for schema-owned bounds (cf. step_16.py, step_16b.py, linter_utils.py); and
-    # (2) reading a Step-00 schema from the seed layer would couple seeds to Step 00 —
-    #     exactly the separation W555 exists to preserve.
-    # If that schema constraint is bumped, update this threshold to match.
+    # The threshold is a seed-quality heuristic, not a mirror of a schema bound.
+    # It is stated inline (not read from a schema at runtime) so the seed layer
+    # stays decoupled from Step 00, which is what W555 exists to preserve.
     if total_substantive < 3:
         errors.append(make_error(
             "W555",
             f"STEP00_SEED_OUT_OF_SCOPE_THIN seeds routed to step 00 supply"
             f" {total_substantive} substantive out_of_scope item(s);"
-            f" charter schema requires minItems:3",
+            " at least 3 are expected",
         ))
 
 

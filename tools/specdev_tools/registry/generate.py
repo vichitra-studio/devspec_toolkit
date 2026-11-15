@@ -32,8 +32,8 @@ Design constraints:
     fr_id but is a cross-reference list, not primary entries) are excluded via
     the CROSS_REF_EXCLUSIONS hardcoded map.
   - job.steps in 12_ci_gates are workflow-internal and excluded via the same map.
-  - capabilities.goal_id is a secondary ID alongside capability_id; the first
-    *_id field found takes precedence (schema declaration order).
+  - when an array item declares more than one *_id field, the first one found
+    takes precedence (schema declaration order).
 
 Two discovery sources run per schema file (1.2.0 spec graph):
   - annotation: ``x-node`` objects (see registry/annotation_scan.py).  A schema
@@ -81,8 +81,9 @@ CROSS_REF_EXCLUSIONS: frozenset[tuple[str, str]] = frozenset([
 #: IDs and produce false nearest_id matches and spurious E110 collisions.
 #:
 #: traceRef (vc:core:collections#traceRef) is the canonical example: every
-#: "trace" array in specs holds {type, id} pairs where id is a FOREIGN KEY
-#: into another step's artifact, not a primary entry key for this step.
+#: "trace" array holds {type, id} pairs where id is a FOREIGN KEY into
+#: another step's artifact, not a primary entry key for this step. Steps 00-05
+#: no longer carry "trace" (they link through derives_from); 06-16 still do.
 #:
 #: Note: dependencyItem also has a {type, id} shape but is a primary entry
 #: (dependencies are owned by the roadmap).  That ref resolves via

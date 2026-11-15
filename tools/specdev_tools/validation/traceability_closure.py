@@ -6,6 +6,7 @@ from typing import Any
 
 from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
+from ._legacy_shim import LEGACY_FIELDS, has_legacy_fields
 
 # ---------------------------------------------------------------------------
 # Business-rule trace-type constants for traceability closure chains
@@ -245,11 +246,16 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
                 }
             }
 
+    # The charter, capability-trace and API-trace checks below read 1.1.1 fields
+    # (trace, goal_id, success_metric_refs); they run only while a loaded artifact
+    # still carries one. M6c retires them with this guard.
+    legacy = has_legacy_fields(data.values(), LEGACY_FIELDS)
+
     capability_ids: set[str] = set()
     # Capabilities marked scope:"out" (permanently excluded, the capability-level
-    # analog of FR-level priority:"wont-have") or scope:"future" (acknowledged but
-    # deferred to a later release -- the capability-level analog of task/milestone
-    # "deferred") are both parked by design and exempted from W568 below: neither
+    # analog of FR-level priority:"wont-have"), scope:"later" or the 1.1.1 scope:"future"
+    # (acknowledged but deferred -- the capability-level analog of task/milestone
+    # "deferred") are all parked by design and exempted from W568 below: none
     # is expected to have an FR trace yet.
     capability_parked_ids: set[str] = set()
     if "capabilities" in data:
@@ -257,11 +263,11 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
         capability_parked_ids = {
             c.get("capability_id")
             for c in data["capabilities"].get("capabilities", [])
-            if c.get("capability_id") and c.get("scope") in ("out", "future")
+            if c.get("capability_id") and c.get("scope") in ("out", "later", "future")
         }
 
     # Charter → Capabilities chain
-    if "charter" in data and "capabilities" in data:
+    if legacy and "charter" in data and "capabilities" in data:
         charter_goals = data["charter"]
         goal_ids: set[str] = set()
         for goal in charter_goals.get("goals", []):
@@ -393,7 +399,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
 
     # W564 / E535: FR→API coverage and out_of_scope[] contradiction check.
     # step05_oos_fr_ids (computed above) carries the Step 05 out_of_scope[] exemption.
-    if "frs" in data and "apis" in data:
+    if legacy and "frs" in data and "apis" in data:
         api_fr_refs: set[str] = set()
         for api in data["apis"].get("apis", []):
             for trace_ref in api.get("trace", []):
@@ -458,7 +464,7 @@ def check_traceability_closure(spec_dir: str, repo_root: str | None = None) -> l
     # W568: Capability coverage — each capability should be traced by at least one FR.
     # Mirrors the E560 capability_without_fr check but as a promotable warning.
     # scope:"out" capabilities are exempt (permanently excluded, no FR expected).
-    if "capabilities" in data and "frs" in data:
+    if legacy and "capabilities" in data and "frs" in data:
         for cap_id in sorted(capability_ids - fr_traced_caps - capability_parked_ids):
             errors.append(make_error("W568", f"UNCOVERED_CAPABILITY {cap_id}"))
 

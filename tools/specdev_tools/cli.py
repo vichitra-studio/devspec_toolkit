@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .core.config import get_config, reset_config
 from .core.errors import SpecError
+from .core.scope_helpers import is_parked
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
 # Also match warnings prefixed with file paths (e.g., "spec/05_x.json: W590 ...")
@@ -1078,7 +1079,7 @@ def main():
             except (OSError, ValueError):
                 return {}
 
-        # Exclude FRs that will never be built (priority:"wont-have") from
+        # Exclude parked FRs (scope later/out, or priority:"wont-have") from
         # every FR-based denominator below. W564 (API coverage) and W566
         # (milestone coverage) additionally exempt FRs listed in Step 05's
         # apis.out_of_scope[]; W565 (fixture coverage) exempts a *different*
@@ -1094,7 +1095,7 @@ def main():
         }
         wont_have_fr_ids = {
             fr["fr_id"] for fr in frs_data.get("functional_requirements", [])
-            if fr.get("priority") == "wont-have" and fr.get("fr_id")
+            if is_parked(fr) and fr.get("fr_id")
         }
         apis_data = _load_spec_json("05_interface_contracts.json")
         step05_oos_fr_ids = {
@@ -1109,14 +1110,13 @@ def main():
         total_frs_api_milestone = len(all_fr_ids - wont_have_fr_ids - step05_oos_fr_ids)
         total_frs_fixture = len(all_fr_ids - wont_have_fr_ids - step08_oos_fr_ids)
 
-        # Capabilities marked scope:"out" (permanently excluded) or scope:"future"
-        # (acknowledged, deferred to a later release) are both exempt from W568
-        # (mirrors traceability_closure.py's capability_parked_ids exactly) --
-        # neither is expected to have an FR trace yet.
+        # Parked capabilities (scope "later": deferred; scope "out": permanently
+        # excluded) are not expected to have an FR yet, so they leave the W568
+        # denominator.
         caps_data = _load_spec_json("01_capabilities.json")
         total_caps = sum(
             1 for cap in caps_data.get("capabilities", [])
-            if cap.get("scope") not in ("out", "future")
+            if not is_parked(cap)
         )
 
         roadmap_data = _load_spec_json("14_roadmap.json")

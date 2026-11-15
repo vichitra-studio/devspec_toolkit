@@ -132,8 +132,12 @@ def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "")
 
 
 def _scan_assumption_value(rel: str, value: Any, known_ids: set[str], path: str) -> list[SpecError]:
+    """Scan one ``assumptions`` value: a string, a list of them, or an assumption node whose ``text`` is scanned."""
     errs: list[SpecError] = []
-    if isinstance(value, str):
+    if isinstance(value, dict):
+        if "text" in value:
+            errs.extend(_scan_assumption_value(rel, value["text"], known_ids, f"{path}.text"))
+    elif isinstance(value, str):
         if PLACEHOLDER_RE.search(value):
             errs.append(make_error("E512", f"ASSUMPTION_HAS_PLACEHOLDER {rel}:{path} value={value}"))
         for token in _scan_for_vague_language(value):

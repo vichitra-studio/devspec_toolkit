@@ -15,6 +15,7 @@ from typing import Any
 
 from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
+from ._legacy_shim import LEGACY_FIELDS, has_legacy_fields
 
 # ---------------------------------------------------------------------------
 # Business-rule trace-type constants for cross-artifact checks
@@ -118,9 +119,16 @@ def check_step_02_integrity(
                 ))
             seen.add(comp_id)
 
+        # Endpoint, schema_ref and trust-boundary checks read 1.1.1 fields
+        # (from/to/schema_ref) and are skipped for new-shape data. The capability
+        # coverage check reads component trace, which a minimal 1.1.1 component may
+        # lack, so it is skipped by the new-shape marker instead: components that
+        # declare derives_from. M6c retires both.
+        legacy = has_legacy_fields([data], LEGACY_FIELDS)
+
         # Connection endpoint validation
         component_id_set = set(component_ids)
-        for idx, conn in enumerate(connections):
+        for idx, conn in enumerate(connections if legacy else ()):
             source = conn.get("from")
             target = conn.get("to")
             if source and source not in component_id_set:
@@ -155,7 +163,7 @@ def check_step_02_integrity(
                     ))
 
         # Capability coverage
-        if capability_ids:
+        if capability_ids and not any("derives_from" in comp for comp in components):
             traced: set[str] = set()
             for comp in components:
                 traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])
@@ -298,6 +306,8 @@ def check_step_04_integrity(
             continue
 
         basename = os.path.basename(path)
+        if not has_legacy_fields([data], LEGACY_FIELDS):
+            continue
         for fr in data.get("functional_requirements", []):
             for trace in fr.get("trace", []) or []:
                 trace_type = normalize_trace_type(trace.get("type") or "")

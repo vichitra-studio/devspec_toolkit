@@ -435,7 +435,7 @@ class TestApiCoverageWontHaveFrExclusion:
     def test_api_tracing_only_to_wont_have_fr_does_not_fire_w583(self, toolkit_root):
         self._write_step04(toolkit_root, [{"fr_id": "fr-legacy-export", "priority": "wont-have"}])
         self._write_step05(toolkit_root, [
-            {"api_id": "api-legacy-export", "trace": [{"type": "fr", "id": "fr-legacy-export"}]}
+            {"api_id": "api-legacy-export", "derives_from": ["fr-legacy-export"]}
         ])
         errors = validate_step_11({"threats": []}, toolkit_root)
         rendered = _render(errors)
@@ -445,7 +445,7 @@ class TestApiCoverageWontHaveFrExclusion:
         """Control: an API tracing only to a must-have FR must still fire W583."""
         self._write_step04(toolkit_root, [{"fr_id": "fr-login", "priority": "must-have"}])
         self._write_step05(toolkit_root, [
-            {"api_id": "api-login", "trace": [{"type": "fr", "id": "fr-login"}]}
+            {"api_id": "api-login", "derives_from": ["fr-login"]}
         ])
         errors = validate_step_11({"threats": []}, toolkit_root)
         rendered = _render(errors)
@@ -461,15 +461,59 @@ class TestApiCoverageWontHaveFrExclusion:
         self._write_step05(toolkit_root, [
             {
                 "api_id": "api-mixed",
-                "trace": [
-                    {"type": "fr", "id": "fr-legacy-export"},
-                    {"type": "fr", "id": "fr-login"},
-                ],
+                "derives_from": ["fr-legacy-export", "fr-login"],
             }
         ])
         errors = validate_step_11({"threats": []}, toolkit_root)
         rendered = _render(errors)
         assert any("W583" in e and "api-mixed" in e for e in rendered), rendered
+
+
+def _write_spec(toolkit_root, filename, data):
+    with open(os.path.join(toolkit_root, "spec", filename), "w") as f:
+        json.dump(data, f)
+
+
+def _w583_ids(toolkit_root):
+    return [e for e in _render(validate_step_11({"threats": []}, toolkit_root)) if "W583" in e]
+
+
+def test_w583_wont_have_only_api_exempt_via_derives_from(toolkit_root):
+    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
+        {"fr_id": "fr-parked", "priority": "wont-have", "scope": "in"}]})
+    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
+        {"api_id": "api-parked", "derives_from": ["fr-parked"]}]})
+    assert _w583_ids(toolkit_root) == []
+
+
+def test_w583_scope_out_only_api_exempt_via_derives_from(toolkit_root):
+    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
+        {"fr_id": "fr-out", "priority": "must-have", "scope": "out", "scope_reason": "dropped"}]})
+    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
+        {"api_id": "api-out", "derives_from": ["fr-out"]}]})
+    assert _w583_ids(toolkit_root) == []
+
+
+def test_w583_in_scope_fr_api_still_fires(toolkit_root):
+    _write_spec(toolkit_root, "04_fr_list.json", {"functional_requirements": [
+        {"fr_id": "fr-live", "priority": "must-have", "scope": "in"}]})
+    _write_spec(toolkit_root, "05_interface_contracts.json", {"apis": [
+        {"api_id": "api-live", "derives_from": ["fr-live"]}]})
+    assert any("api-live" in e for e in _w583_ids(toolkit_root))
+
+
+def test_w583_invariant_trace_via_06_unchanged(tmp_path):
+    spec_dir = tmp_path / "spec"
+    spec_dir.mkdir()
+    (spec_dir / "04_fr_list.json").write_text(json.dumps({"functional_requirements": [
+        {"fr_id": "fr-out", "scope": "out", "scope_reason": "dropped"}]}))
+    (spec_dir / "06_invariants.json").write_text(json.dumps({"rules": [{
+        "inv_id": "inv-out",
+        "risk_category_ref": {"id": "cn:core:risk_category:security", "kind": "risk_category", "label": "security"},
+        "trace": [{"type": "fr", "id": "fr-out"}],
+    }]}))
+    errors = validate_step_11({"threats": []}, str(tmp_path), str(spec_dir / "11_redteam.json"))
+    assert not any("W615" in e and "inv-out" in e for e in _render(errors))
 
 
 class TestMitigationCrossRef:

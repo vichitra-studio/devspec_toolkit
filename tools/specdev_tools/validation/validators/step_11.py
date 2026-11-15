@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import os
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from ...core.errors import make_error, SpecError
 from ...core.loaders import load_sibling_artifact
+from ...core.scope_helpers import is_parked
 from ...core.trace_types import is_valid_trace_type, normalize_trace_type
 from ...validation.linter_utils import check_no_duplicates
 
@@ -110,8 +112,8 @@ def validate_step_11(
     # coverage either (DEVSPEC-122 follow-up, mirrors the equivalent exclusion
     # already applied in matrix.py/traceability_closure.py).
     wont_have_fr_ids = _load_wont_have_fr_ids(toolkit_root, artifact_path)
-    api_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "05", "apis", "api_id")
-    invariant_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "06", "rules", "inv_id")
+    api_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "05", "apis", "api_id", _fr_ids_from_derives_from)
+    invariant_fr_traces = _load_fr_traces_by_id(toolkit_root, artifact_path, "06", "rules", "inv_id", _fr_ids_from_trace)
 
     for i, threat in enumerate(instance.get("threats", [])):
         if not isinstance(threat, dict):
@@ -375,7 +377,7 @@ def _load_security_invariant_ids(
 
 
 def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) -> set[str]:
-    """Load the set of step-04 fr_ids marked priority:"wont-have".
+    """Load the set of step-04 fr_ids that are parked (``is_parked``).
 
     Mirrors ``_load_security_invariant_ids``'s sibling-first / fallback
     resolution. Returns an empty set when step 04 is absent or contains no
@@ -403,23 +405,44 @@ def _load_wont_have_fr_ids(toolkit_root: str, artifact_path: str | None = None) 
             if not isinstance(fr, dict):
                 continue
             fr_id = fr.get("fr_id")
-            if fr_id and fr.get("priority") == "wont-have":
+            if fr_id and is_parked(fr):
                 result.add(str(fr_id))
         return result
 
     return set()
 
 
-def _load_fr_traces_by_id(
-    toolkit_root: str, artifact_path: str | None, step_prefix: str, array_key: str, id_field: str
-) -> dict[str, set[str]]:
-    """Load {entity_id: {traced fr_ids}} from a step artifact's ``trace[]`` fields.
+def _fr_ids_from_trace(entity: dict[str, Any]) -> set[str]:
+    """FR ids named by an entity's 1.1.1 ``trace[]`` (entries with ``type == "fr"``); other types are ignored."""
+    return {
+        str(trace_ref["id"])
+        for trace_ref in entity.get("trace", [])
+        if isinstance(trace_ref, dict)
+        and normalize_trace_type(trace_ref.get("type", "")) == "fr"
+        and trace_ref.get("id")
+    }
 
-    Used to walk each API's/invariant's trace back to its FR(s), so callers
-    can determine whether an entity's *only* tracing FR(s) are wont-have.
-    Only ``type == "fr"`` trace entries are collected — capability/other trace
-    types are irrelevant to this wont-have determination. Returns an empty
-    dict when the upstream step is absent.
+
+def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
+    """Ids in an entity's ``derives_from``; the subset test against the FR set ignores non-FR ids."""
+    return {str(ref) for ref in entity.get("derives_from", []) if isinstance(ref, str) and ref}
+
+
+def _load_fr_traces_by_id(
+    toolkit_root: str,
+    artifact_path: str | None,
+    step_prefix: str,
+    array_key: str,
+    id_field: str,
+    fr_ids_of: Callable[[dict[str, Any]], set[str]],
+) -> dict[str, set[str]]:
+    """Load {entity_id: {linked fr_ids}} from a step artifact's *array_key* entities.
+
+    Used to walk each API's/invariant's link back to its FR(s), so callers
+    can determine whether an entity's *only* FR(s) are parked. *fr_ids_of*
+    extracts the FR ids from one entity (``_fr_ids_from_trace`` for the
+    1.1.1 shape, ``_fr_ids_from_derives_from`` for the graph shape). Returns
+    an empty dict when the upstream step is absent.
     """
     candidates: list[Path] = []
     if artifact_path:
@@ -445,20 +468,14 @@ def _load_fr_traces_by_id(
             entity_id = entity.get(id_field)
             if not entity_id:
                 continue
-            fr_ids: set[str] = set()
-            for trace_ref in entity.get("trace", []):
-                if not isinstance(trace_ref, dict):
-                    continue
-                if normalize_trace_type(trace_ref.get("type", "")) == "fr" and trace_ref.get("id"):
-                    fr_ids.add(str(trace_ref["id"]))
-            result[str(entity_id)] = fr_ids
+            result[str(entity_id)] = fr_ids_of(entity)
         return result
 
     return {}
 
 
 def _only_traces_wont_have_frs(traced_fr_ids: set[str], wont_have_fr_ids: set[str]) -> bool:
-    """True when an entity has at least one FR trace and every traced FR is wont-have.
+    """True when an entity has at least one FR link and every linked FR is parked.
 
     An entity with zero FR traces (e.g. only a capability trace) is not
     excluded here -- there is nothing wont-have to exempt it on.

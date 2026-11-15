@@ -1983,13 +1983,13 @@ class CliTests(unittest.TestCase):
             payload = json.loads(out)
             self.assertEqual(2, payload["coverage"]["fr_api_coverage"]["total_count"])
 
-    def test_completeness_check_excludes_scope_out_and_future_capabilities_from_total(self):
-        """scope:"out" and scope:"future" capabilities must not count toward
+    def test_completeness_check_excludes_scope_out_and_later_capabilities_from_total(self):
+        """scope:"out" and scope:"later" capabilities must not count toward
         capability_fr_coverage's total_caps denominator (DEVSPEC-122
-        follow-up). Both are parked by design -- "out" permanently, "future"
-        deferred to a later release -- so W568 UNCOVERED_CAPABILITY itself
-        exempts both (traceability_closure.py's capability_parked_ids), and
-        this denominator mirrors that exemption set exactly."""
+        follow-up). Both are parked by design -- "out" permanently, "later"
+        deferred -- so W568 UNCOVERED_CAPABILITY itself exempts both
+        (traceability_closure.py's capability_parked_ids), and this
+        denominator mirrors that exemption set."""
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
             spec_dir = repo_root / "spec"
@@ -1997,7 +1997,7 @@ class CliTests(unittest.TestCase):
             caps = {"capabilities": [
                 {"capability_id": "cap-auth", "scope": "in"},
                 {"capability_id": "cap-legacy", "scope": "out"},
-                {"capability_id": "cap-roadmap-v2", "scope": "future"},
+                {"capability_id": "cap-roadmap-v2", "scope": "later"},
             ]}
             frs = {"functional_requirements": [{"fr_id": "fr-login", "trace": [{"type": "capability", "id": "cap-auth"}]}]}
             (spec_dir / "01_capabilities.json").write_text(json.dumps(caps), encoding="utf-8")
@@ -2011,7 +2011,7 @@ class CliTests(unittest.TestCase):
             cov = payload["coverage"]["capability_fr_coverage"]
             self.assertEqual(
                 1, cov["total_count"],
-                f"Expected scope:out/future capabilities excluded from total_count. Got: {cov}"
+                f"Expected scope:out/later capabilities excluded from total_count. Got: {cov}"
             )
             self.assertEqual(
                 [], cov["uncovered_ids"],

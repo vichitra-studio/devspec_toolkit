@@ -7,6 +7,7 @@ from ..core.errors import SpecError, make_error, render_errors
 from ..core.loaders import iter_spec_artifacts
 from ..core.trace_types import normalize_trace_type, is_valid_trace_type, get_trace_types
 from ..core.entry_key_registry import list_entries, iter_array_path, array_top_key, ALWAYS_EXCLUDED
+from ._legacy_shim import LEGACY_FIELDS, has_legacy_fields
 from .cross_artifact_checks import (
     collect_capability_ids,
     collect_glossary_term_ids,
@@ -350,7 +351,9 @@ def build_trace_matrix(
     # APIs carry the authoritative FR trace: each API lists the FRs it implements.
     # Iterating from the API side (rather than the FR side) is the correct direction:
     # FRs trace to capabilities, not to APIs.
-    for api in apis.values():
+    # Guarded: the FR trace on an API is a 1.1.1 field (M6c retires this reader).
+    legacy = has_legacy_fields(artifacts.values(), LEGACY_FIELDS)
+    for api in apis.values() if legacy else ():
         for t in api.get("trace", []):
             if t.get("type") == _MATRIX_LINK_FR_TYPE:
                 fr_to_api[t["id"]].add(api["api_id"])

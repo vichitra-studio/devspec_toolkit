@@ -18,6 +18,7 @@ from typing import Any
 
 from ..core.registry import SchemaRegistry
 from ..core.seed_routing import resolve_seeds_for_step, resolve_seed_paths
+from ..validation._legacy_shim import LEGACY_TRACE_FIELDS, has_legacy_fields
 from ._utils import find_step_schema_uri as _u_find_step_schema_uri
 from ._utils import get_boilerplate_keys as _u_get_boilerplate_keys
 from ._utils import merge_allof as _u_merge_allof
@@ -291,7 +292,10 @@ def _run_structural_pass(
         all_upstream_ids = {uid for uid in all_upstream_ids if not uid.startswith("ac-")}
 
     # --- Collect artifact trace IDs ---
-    artifact_trace_ids: set[str] = set(_collect_trace_ids(artifact))
+    # ``trace`` is a 1.1.1 field (M4's node/trace links replace it); skipped for new-shape data.
+    artifact_trace_ids: set[str] = (
+        set(_collect_trace_ids(artifact)) if has_legacy_fields([artifact], LEGACY_TRACE_FIELDS) else set()
+    )
 
     # Also collect IDs referenced in scope.apis and scope.components fields.
     # Invariant-style artifacts (step 06) express API and component coverage via
