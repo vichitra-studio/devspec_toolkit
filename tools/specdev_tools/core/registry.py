@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json, os
-from typing import Optional
+import json, os, threading
+from typing import Any, Callable, Optional
 
 from referencing import Registry as _ReferencingRegistry, Resource as _Resource
 
@@ -16,6 +16,7 @@ class SchemaRegistry:
             loaded = json.load(f)
         self.map = _validate_registry_map(loaded)
         self.store: dict[str, dict] = {}
+        self._crawled_registry: _ReferencingRegistry | None = None
         self._preload_store()
 
     def _preload_store(self) -> None:
@@ -64,14 +65,32 @@ class SchemaRegistry:
 
         This consolidates the pattern previously duplicated across validate,
         canonical lint, canonical autofix, and prompt-schema sync modules.
+
+        The crawled registry is built once per ``SchemaRegistry`` instance and
+        reused (``referencing`` otherwise re-crawls the whole store on the
+        first lookup of each new registry).  A failed build is not cached.
         """
+        cached = self._crawled_registry
+        if cached is not None:
+            return cached
         store = {
             uri: _Resource.from_contents(schema)
             for uri, schema in self.store.items()
         }
-        return _ReferencingRegistry().with_resources(store.items())
+        built = _ReferencingRegistry().with_resources(store.items()).crawl()
+        self._crawled_registry = built
+        return built
 
     def load(self, uri: str) -> dict:
+        """Return the schema for *uri*.
+
+        Served from the pre-loaded ``self.store`` when present (the same dict
+        object each call; callers must treat it as read-only).  Falls back to
+        reading the file so missing/malformed schemas raise as before.
+        """
+        cached = self.store.get(uri)
+        if cached is not None:
+            return cached
         path = self.resolve(uri)
         if not path or not os.path.exists(path):
             raise FileNotFoundError(
@@ -81,6 +100,88 @@ class SchemaRegistry:
             )
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
+
+
+# ---------------------------------------------------------------------------
+# Shared (memoised) registry and validator caches
+# ---------------------------------------------------------------------------
+
+_SHARED_LOCK = threading.RLock()
+# realpath(repo_root) -> (signature, SchemaRegistry)
+_SHARED_REGISTRIES: dict[str, tuple[tuple, SchemaRegistry]] = {}
+# (realpath(repo_root), schema_uri) -> (SchemaRegistry it was built from, validator)
+_VALIDATOR_CACHE: dict[tuple[str, str], tuple[SchemaRegistry, Any]] = {}
+
+
+def _stat_sig(path: Optional[str]) -> Optional[tuple[int, int]]:
+    if not path:
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _registry_signature(reg: SchemaRegistry) -> tuple:
+    """Cheap change signature: mtime_ns + size of the registry map and each mapped schema file."""
+    map_path = os.path.join(reg.repo_root, "tools", "schema_registry.json")
+    if not os.path.exists(map_path):
+        map_path = os.path.join(reg.repo_root, "schema_registry.json")
+    parts: list[Any] = [(map_path, _stat_sig(map_path))]
+    for uri, rel in reg.map.items():
+        path = reg._resolve_path(rel)
+        parts.append((uri, path, _stat_sig(path)))
+    return tuple(parts)
+
+
+def get_shared_registry(repo_root: str) -> SchemaRegistry:
+    """Return a memoised ``SchemaRegistry`` for *repo_root*.
+
+    Keyed by ``realpath``; a fresh instance is built when the signature of the
+    registry map or any mapped schema file changed.  Constructor errors
+    propagate unchanged and are never cached.
+    """
+    key = os.path.realpath(repo_root)
+    with _SHARED_LOCK:
+        entry = _SHARED_REGISTRIES.get(key)
+        if entry is not None:
+            sig, reg = entry
+            if _registry_signature(reg) == sig:
+                return reg
+        reg = SchemaRegistry(repo_root)
+        _SHARED_REGISTRIES[key] = (_registry_signature(reg), reg)
+        return reg
+
+
+def get_cached_validator(
+    repo_root: str,
+    schema_uri: str,
+    registry: SchemaRegistry,
+    factory: Callable[[], Any],
+) -> Any:
+    """Return the validator cached for ``(repo_root, schema_uri)``, building it with *factory* on a miss.
+
+    A cached validator is reused only while it was built from the same
+    ``SchemaRegistry`` instance (so a rebuilt shared registry invalidates it).
+    The caller supplies *factory* so it constructs ``Draft202012Validator``
+    from its own module namespace.  A failing factory caches nothing.
+    """
+    key = (os.path.realpath(repo_root), schema_uri)
+    with _SHARED_LOCK:
+        entry = _VALIDATOR_CACHE.get(key)
+        if entry is not None and entry[0] is registry:
+            return entry[1]
+        validator = factory()
+        _VALIDATOR_CACHE[key] = (registry, validator)
+        return validator
+
+
+def clear_shared_caches() -> None:
+    """Clear the shared-registry map, and the validator cache (crawled registries live on the instances)."""
+    with _SHARED_LOCK:
+        _SHARED_REGISTRIES.clear()
+        _VALIDATOR_CACHE.clear()
 
 
 def derive_allowed_upstream(step_id: str, steps: list) -> list:

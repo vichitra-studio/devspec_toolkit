@@ -36,7 +36,7 @@ from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts, load_json_artifact, load_sibling_artifact
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_shared_registry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
     step_01,
@@ -182,7 +182,7 @@ def validate_file(
     _step16_cache.clear()
 
     try:
-        SchemaRegistry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
+        get_shared_registry(repo_root)  # bootstrap probe — fires schema_registry_bootstrap_failed before the helper
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
         return [make_error("E520", f"{path}: schema_registry_bootstrap_failed detail={str(e)}")]
     try:

@@ -21,7 +21,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 from ..core.errors import SpecError, make_error
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_cached_validator, get_shared_registry
 
 CANON_ALIASES_SCHEMA_URI = "vc:canon:aliases"
 CANON_KIND_SCHEMA_URI = "vc:canon:kind"
@@ -469,7 +469,7 @@ def _load_schema_registry_if_available(root: Path, errs: list[SpecError]) -> Sch
     if not registry_path.exists() and not fallback_path.exists():
         return None
     try:
-        return SchemaRegistry(str(root))
+        return get_shared_registry(str(root))
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         errs.append(make_error("E520", f"UNRESOLVED_INPUT schema_registry_bootstrap_failed detail={exc}"))
         return None
@@ -489,11 +489,15 @@ def _validate_doc_schema(
     except json.JSONDecodeError as exc:
         return [make_error("E520", f"UNRESOLVED_INPUT schema_json_decode_failed uri={schema_uri} detail={exc}")]
 
-    reg = schema_registry.to_referencing_registry()
-    validator = Draft202012Validator(
-        schema,
-        registry=reg,
-        format_checker=Draft202012Validator.FORMAT_CHECKER,
+    validator = get_cached_validator(
+        schema_registry.repo_root,
+        schema_uri,
+        schema_registry,
+        lambda: Draft202012Validator(
+            schema,
+            registry=schema_registry.to_referencing_registry(),
+            format_checker=Draft202012Validator.FORMAT_CHECKER,
+        ),
     )
     try:
         validation_errors = sorted(validator.iter_errors(data), key=lambda e: tuple(e.path))

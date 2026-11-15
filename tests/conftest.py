@@ -26,6 +26,19 @@ def _reset_specdev_config_singleton():
     reset_config()
 
 
+@pytest.fixture(autouse=True)
+def _clear_shared_schema_caches():
+    """Clear the shared SchemaRegistry / validator caches before each test.
+
+    The caches (specdev_tools.core.registry) memoise registries and validators
+    per repo_root; tests that monkeypatch validator constructors or rewrite
+    schemas in a tmp toolkit must not see another test's cached objects.
+    """
+    from specdev_tools.core.registry import clear_shared_caches
+    clear_shared_caches()
+    yield
+
+
 @pytest.fixture(scope="session")
 def repo_root():
     """Return the toolkit repository root directory."""

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from referencing import Registry
 
 from ..core.errors import SpecError, make_error
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_shared_registry
 
 FENCED_JSON_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 EMBEDDED_SCHEMA_RE = re.compile(r"#+\s*Embedded Schema\s*```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
@@ -219,7 +219,7 @@ def _extract_schema_reference(prompt_path: str) -> tuple[dict[str, str] | None, 
 
 def _schema_registry_map(repo_root: Path) -> tuple[dict[str, str] | None, str | None]:
     try:
-        schema_registry = SchemaRegistry(str(repo_root))
+        schema_registry = get_shared_registry(str(repo_root))
     except (OSError, ValueError, json.JSONDecodeError, TypeError) as exc:
         return None, str(exc)
     return schema_registry.map, None
@@ -533,7 +533,7 @@ def _validate_output_schema_uri(payload: dict[str, Any], schema: dict[str, Any])
 
 def _schema_registry(repo_root: Path) -> tuple[Registry | None, str | None]:
     try:
-        schema_registry = SchemaRegistry(str(repo_root))
+        schema_registry = get_shared_registry(str(repo_root))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return None, str(exc)
     return schema_registry.to_referencing_registry(), None

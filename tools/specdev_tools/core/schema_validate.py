@@ -51,7 +51,7 @@ import json
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import _WrappedReferencingError  # type: ignore[attr-defined]
 
-from .registry import SchemaRegistry
+from .registry import SchemaRegistry, get_cached_validator, get_shared_registry  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ def validate_data_against_schema(
 
     # --- Step 2: bootstrap registry (wrapped as typed exception) ---
     try:
-        registry = SchemaRegistry(repo_root)
+        registry = get_shared_registry(repo_root)
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         raise SchemaBootstrapError(original=exc) from exc
 
@@ -236,12 +236,14 @@ def validate_data_against_schema(
     # raise ``AttributeError``.  Both escape the existing family — route them
     # into SchemaRuntimeError so callers see the typed E521 path.
     try:
-        reg = registry.to_referencing_registry()
-        v = Draft202012Validator(
-            schema,
-            registry=reg,
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
-        )
+        def _build_validator() -> Draft202012Validator:
+            return Draft202012Validator(
+                schema,
+                registry=registry.to_referencing_registry(),
+                format_checker=Draft202012Validator.FORMAT_CHECKER,
+            )
+
+        v = get_cached_validator(repo_root, schema_uri, registry, _build_validator)
     except SchemaValidationError:
         raise
     except Exception as exc:

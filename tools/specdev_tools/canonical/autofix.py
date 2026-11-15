@@ -13,7 +13,7 @@ from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_cached_validator, get_shared_registry
 from ..core.constants import INFERENCE_RULES
 
 
@@ -155,7 +155,7 @@ def _iter_json(spec_dir: str):
 
 def _load_schema_registry(repo_root: str) -> tuple[SchemaRegistry | None, str | None]:
     try:
-        return SchemaRegistry(repo_root), None
+        return get_shared_registry(repo_root), None
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, str(exc)
 
@@ -185,11 +185,15 @@ def _build_schema_validator(
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, f"schema_load_failed uri={schema_uri} detail={str(exc)}"
     try:
-        reg = schema_registry.to_referencing_registry()
-        validator = Draft202012Validator(
-            schema,
-            registry=reg,
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
+        validator = get_cached_validator(
+            schema_registry.repo_root,
+            schema_uri,
+            schema_registry,
+            lambda: Draft202012Validator(
+                schema,
+                registry=schema_registry.to_referencing_registry(),
+                format_checker=Draft202012Validator.FORMAT_CHECKER,
+            ),
         )
         return validator, None
     except Exception as exc:

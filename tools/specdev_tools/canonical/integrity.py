@@ -24,7 +24,7 @@ from .lint import lint_canon_dirs
 from .registry import CanonicalRegistry
 from ..core.errors import ERROR_CODES, SpecError, make_error
 from ..core.loaders import iter_spec_artifacts
-from ..core.registry import SchemaRegistry
+from ..core.registry import SchemaRegistry, get_shared_registry
 from ..validation.linter_utils import is_resolved_canonical_ref as _is_resolved_ref
 
 
@@ -528,7 +528,7 @@ def _norm_semantic(value: str) -> str:
 
 def _try_load_schema_registry(repo_root: str) -> tuple[SchemaRegistry | None, str | None]:
     try:
-        return SchemaRegistry(repo_root), None
+        return get_shared_registry(repo_root), None
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
         return None, f"schema_registry_bootstrap_failed detail={exc}"
 
