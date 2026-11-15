@@ -1,7 +1,7 @@
 # Schema Annotations (`vc:core:graph`)
 
 `schema/core/graph.schema.json` (`$id` `vc:core:graph`) defines the annotation language step schemas use to declare
-graph nodes and links. It only defines shapes. Only `schema/seed_manifest.schema.json` carries an annotation today (the top-of-graph `seed` kind); step schemas are annotated in later milestones. Every definition has an
+graph nodes and links. It only defines shapes. The seed manifest (`schema/seed_manifest.schema.json`, the top-of-graph `seed` kind) and the step schemas 00, 01, 02, 02a, 03, 04 and 05 carry annotations today; the schemas of steps 06 to 16 are annotated later in this release. Every definition has an
 `$anchor` equal to its name, so reference it as `vc:core:graph#<name>`.
 
 ## `x-node` (`xNode`)

@@ -22,7 +22,7 @@ def _write_capabilities(spec_dir, capabilities):
     (spec_dir / "01_capabilities.json").write_text(json.dumps({"capabilities": capabilities}))
 
 
-def test_trust_boundary_internal_to_third_party():
+def test_trust_boundary_internal_to_third_party(tmp_path):
     instance = {
         "components": [_component("comp-api", ["cap-a"])],
         "third_parties": [{"third_party_id": "tp-stripe", "name": "Stripe", "pin": "2024-06"}],
@@ -31,7 +31,7 @@ def test_trust_boundary_internal_to_third_party():
             {"connection_id": "conn-db", "connects_to": ["comp-api"], "trust_boundary": "internal"},
         ],
     }
-    errors = _codes(validate_step_02(instance, "."))
+    errors = _codes(validate_step_02(instance, str(tmp_path)))
     assert len(errors) == 1
     assert "E520" in errors[0] and "Connection[0]" in errors[0]
 

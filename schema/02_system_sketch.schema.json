@@ -177,7 +177,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "derives_from": {
-                "description": "Id of the component that is the source of this connection (exactly the component the data or call originates from). Must be a component declared in this document; the link is checked by the graph, not by JSON Schema.",
+                "description": "Ids of the components that are the source of this connection (normally one: the component the data or call originates from; at least one is required). Each must be a component declared in this document; the link is checked by the graph, not by JSON Schema.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -196,7 +196,7 @@
                 "minItems": 1
               },
               "connects_to": {
-                "description": "Id of the component or third party that is the target of this connection. Must be a component or third party declared in this document; the link is checked by the graph, not by JSON Schema.",
+                "description": "Ids of the components or third parties that are the target of this connection (normally one; at least one is required). Each must be a component or third party declared in this document; the link is checked by the graph, not by JSON Schema.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -430,7 +430,7 @@
                 "minItems": 1
               },
               "part_of": {
-                "description": "Id of the third party that this one is bundled with or a part of (for example a library inside a platform). Optional.",
+                "description": "Ids of the third parties that this one is bundled with or a part of (normally one; for example a library inside a platform). Optional.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"

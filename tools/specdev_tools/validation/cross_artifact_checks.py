@@ -130,12 +130,12 @@ def check_step_02_integrity(
     """Validate system-sketch cross-artifact integrity.
 
     Checks:
-    - Duplicate component IDs
-    - Connection endpoint references
-    - schema_ref format on connections
-    - External component trust-boundary constraints
-    - Capability coverage across components
-    - External-dependency tag requirement
+    - Duplicate component IDs (every shape)
+    - Connection endpoint references, schema_ref format, external component trust-boundary
+      constraints and the external-dependency tag requirement (only on 1.1.1-shaped
+      connections, behind ``has_legacy_fields``)
+    - Capability coverage across components (legacy block: only when components carry
+      ``trace`` / ``trace_refs``; the surviving check is in ``validators/step_02.py``)
     """
     errors: list[SpecError] = []
 

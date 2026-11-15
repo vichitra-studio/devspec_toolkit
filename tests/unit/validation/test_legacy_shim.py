@@ -68,6 +68,8 @@ def test_has_legacy_fields_true_for_1_1_1_shape():
     assert has_legacy_fields(LEGACY_SHAPE.values(), LEGACY_TRACE_FIELDS)
     assert has_legacy_fields([LEGACY_SHAPE["00_charter.json"]], LEGACY_CHARTER_CHAIN_FIELDS)
     assert has_legacy_fields([LEGACY_SHAPE["02_system_sketch.json"]["connections"]], LEGACY_CONNECTION_FIELDS)
+    assert has_legacy_fields([{"component_id": "comp-a", "trace": []}], LEGACY_COMPONENT_TRACE_FIELDS)
+    assert has_legacy_fields([{"component_id": "comp-a", "trace_refs": []}], LEGACY_COMPONENT_TRACE_FIELDS)
 
 
 def test_has_legacy_fields_false_for_new_shape():
@@ -152,15 +154,19 @@ def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
     spec_dir = _write_spec(tmp_path, LEGACY_SHAPE)
     arts = {f"spec/{name}": data for name, data in LEGACY_SHAPE.items()}
 
-    assert {"E560", "W568"} <= _closure_codes(spec_dir)
+    assert {"E560", "W568"} <= _closure_codes(spec_dir), "traceability_closure reader (E560/W568)"
     matrix = build_trace_matrix(str(tmp_path), spec_dir)
-    assert matrix["matrix"][0]["apis"] == ["api-a"]
-    assert any("not found" in line for line in render_errors(check_step_02_integrity(arts, capability_ids=set())))
-    assert any("unknown capability" in line for line in render_errors(check_step_04_integrity(arts, set(), {"cap-a"})))
+    assert matrix["matrix"][0]["apis"] == ["api-a"], "matrix reader"
+    assert any(
+        "not found" in line for line in render_errors(check_step_02_integrity(arts, capability_ids=set()))
+    ), "check_step_02_integrity reader"
+    assert any(
+        "unknown capability" in line for line in render_errors(check_step_04_integrity(arts, set(), {"cap-a"}))
+    ), "check_step_04_integrity reader"
     _, adjacency = _build_trace_graph(spec_dir)
-    assert "cap-missing" in adjacency["fr-a"]
+    assert "cap-missing" in adjacency["fr-a"], "scope_resolver _build_trace_graph reader"
     review = _run_structural_pass(LEGACY_SHAPE["05_interface_contracts.json"], "", [("", {"fr_id": "fr-a"})])
-    assert review.upstream_coverage["covered"] == ["fr-a"]
+    assert review.upstream_coverage["covered"] == ["fr-a"], "reviewer _run_structural_pass reader"
 
 
 @pytest.mark.parametrize(("node", "expected"), [

@@ -9,8 +9,10 @@ changes:
       Added schema/core/graph.schema.json (vc:core:graph): the x-node / x-link
       annotation language step schemas use to declare graph nodes and links
       (roles, closed set of 19 link verbs, lifecycle, scope, scope_reason and
-      the scope-reason rule). No step schema is annotated in this release except
-      schema/seed_manifest.schema.json (top-of-graph seed kind).
+      the scope-reason rule). The seed manifest
+      (schema/seed_manifest.schema.json, top-of-graph seed kind) and the step
+      schemas 00, 01, 02, 02a, 03, 04 and 05 are annotated; the schemas of
+      steps 06 to 16 are annotated later in this release.
     migration:
       action: none
 
@@ -144,7 +146,13 @@ changes:
       matrix, whatever shape its later steps have, until graph coverage later
       in this release. A 1.1.1 spec whose step-05 APIs carry no trace at all
       gets no W564 and no FR-to-API threshold warning; such a file is invalid
-      under the 1.1.1 schema. The W583 reader of step 11 reads API derives_from.
+      under the 1.1.1 schema. For a spec whose steps 00 to 05 have the new
+      shape, completeness-check reports FR-to-API coverage and
+      capability-to-FR coverage as complete (ratio 1.0), because the checks
+      behind those two numbers do not run on it, until graph coverage later in
+      this release. The W583 reader of step 11 reads API derives_from: a 1.1.1
+      step-05 API linked only to parked requirements through trace is no
+      longer exempt from W583.
     migration:
       action: none
 
