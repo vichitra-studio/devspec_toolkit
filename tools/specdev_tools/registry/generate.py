@@ -690,6 +690,7 @@ def run(
     repo_root: str,
     out_path: str,
     extraction_paths_out: str,
+    step_order_out: str | None = None,
 ) -> None:
     """Generate registry and extraction_paths files and write them to disk.
 
@@ -697,6 +698,8 @@ def run(
         repo_root: Absolute or relative path to the toolkit root.
         out_path: Destination path for entry_key_registry.json.
         extraction_paths_out: Destination path for extraction_paths.json.
+        step_order_out: Optional destination for the step order derived from the
+            annotations (``None`` writes nothing; ``tools/step_order.json`` is never touched).
     """
     repo_root = os.path.abspath(repo_root)
     registry_doc, extraction_paths_doc = generate_registry(repo_root)
@@ -713,3 +716,16 @@ def run(
 
     print(f"registry-generate: wrote {out_path}")
     print(f"registry-generate: wrote {extraction_paths_out}")
+
+    if step_order_out:
+        from specdev_tools.registry.step_order_gen import build_step_order_document, derive_step_order
+
+        derived = derive_step_order(repo_root)
+        if not derived["steps"]:
+            raise ValueError("registry-generate --step-order-out: no annotated step to derive an order from")
+        hand = _load_json(os.path.join(repo_root, "tools", "step_order.json"))
+        step_order_out = os.path.abspath(step_order_out)
+        os.makedirs(os.path.dirname(step_order_out), exist_ok=True)
+        with open(step_order_out, "w", encoding="utf-8") as fh:
+            fh.write(_serialize(build_step_order_document(derived, hand)))
+        print(f"registry-generate: wrote {step_order_out}")

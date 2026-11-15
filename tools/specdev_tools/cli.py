@@ -321,6 +321,12 @@ def main():
         dest="extraction_paths_out",
         help="Output path for extraction_paths.json (default: <repo-root>/tools/extraction_paths.json).",
     )
+    rg.add_argument(
+        "--step-order-out",
+        default=None,
+        dest="step_order_out",
+        help="Also write the step order derived from the x-node/x-link annotations to this path (default: not written).",
+    )
 
     gd = sub.add_parser("guide", help="Show remediation guide for an error code")
     gd.add_argument("code", help="Error code to look up, e.g. E110 or E530-INVENTED_ENUM_OR_ID")
@@ -2137,6 +2143,7 @@ def main():
             repo_root=repo_root,
             out_path=out_path,
             extraction_paths_out=extraction_paths_out,
+            step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
         )
 
     elif args.cmd == "spec-check":
