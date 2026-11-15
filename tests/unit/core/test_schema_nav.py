@@ -643,3 +643,95 @@ def test_bogus_path_returns_navigate_failure():
     assert "Could not navigate" in info["error"], (
         f"Error message format unexpected: {info['error']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# WI-M1-01: keywords beside $ref survive (JSON Schema 2020-12 sibling overlay)
+# ---------------------------------------------------------------------------
+
+def test_ref_sibling_x_node_and_x_link_survive():
+    stub = make_stub_resolver({"vc:t": {"type": "string", "description": "target"}})
+    node = {"$ref": "vc:t", "x-node": {"kind": "k"}, "x-link": {"to": "z"}}
+    result = effective_schema(node, stub)
+    assert result["x-node"] == {"kind": "k"}
+    assert result["x-link"] == {"to": "z"}
+    assert result["type"] == "string"
+
+
+def test_ref_sibling_description_and_items_win():
+    stub = make_stub_resolver(
+        {"vc:t": {"description": "target", "items": {"type": "string"}, "minItems": 0}}
+    )
+    node = {"$ref": "vc:t", "description": "own", "items": {"type": "integer"}, "minItems": 1}
+    result = effective_schema(node, stub)
+    assert result["description"] == "own"
+    assert result["items"] == {"type": "integer"}
+    assert result["minItems"] == 1
+
+
+def test_ref_sibling_properties_union_and_required_union_ordered():
+    stub = make_stub_resolver(
+        {"vc:t": {"properties": {"a": {"x": 1}, "b": {"x": 1}}, "required": ["b", "a"]}}
+    )
+    node = {
+        "$ref": "vc:t",
+        "properties": {"b": {"x": 2}, "c": {"x": 2}},
+        "required": ["a", "c"],
+    }
+    result = effective_schema(node, stub)
+    assert result["properties"] == {"a": {"x": 1}, "b": {"x": 2}, "c": {"x": 2}}
+    assert result["required"] == ["b", "a", "c"]
+
+
+def test_ref_sibling_overlay_is_idempotent():
+    stub = make_stub_resolver({"vc:t": {"properties": {"a": {}}, "required": ["a"]}})
+    node = {"$ref": "vc:t", "description": "own", "x-node": {"k": 1}}
+    once = effective_schema(node, stub)
+    assert effective_schema(once, stub) == once
+
+
+def test_ref_sibling_cycle_guard_and_unresolved_unchanged():
+    stub = make_stub_resolver({"vc:loop": {"properties": {"n": {"$ref": "vc:loop"}}}})
+    node = {"$ref": "vc:loop", "description": "own"}
+    result = effective_schema(node, stub)
+    assert result["description"] == "own"
+    assert "n" in result["properties"]
+    assert effective_schema({"$ref": "vc:x", "description": "d"}, lambda n: None) == {
+        "properties": {},
+        "required": [],
+    }
+
+
+def test_schema_ref_sibling_census():
+    """Pin the set of ``$ref`` nodes carrying siblings across schema/**/*.json.
+
+    A new sibling anywhere forces a deliberate update of this census.
+    226 = the original 224 plus two description-only siblings in
+    ``schema/core/graph.schema.json`` (``xNode.properties.kind`` and ``.role``).
+    """
+    from collections import Counter
+
+    counts: Counter = Counter()
+
+    def walk(n: Any) -> None:
+        if isinstance(n, dict):
+            if "$ref" in n and len(n) > 1:
+                counts[tuple(sorted(k for k in n if k != "$ref"))] += 1
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
+        walk(json.loads(f.read_text(encoding="utf-8")))
+
+    assert sum(counts.values()) == 226
+    assert dict(counts) == {
+        ("description",): 214,
+        ("description", "items"): 5,
+        ("description", "items", "minItems"): 4,
+        ("description", "maxItems", "minItems"): 1,
+        ("default", "description"): 1,
+        ("$anchor", "description"): 1,
+    }

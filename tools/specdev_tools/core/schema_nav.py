@@ -83,10 +83,13 @@ def effective_schema(
         correctly in both.
     """
     # --- Step 1: resolve $ref ---
-    # If the node is a bare $ref, resolve it and use the resolved dict as the
-    # base.  Any own keys alongside $ref are retained by the resolved result
-    # (JSON Schema 2020-12 allows sibling keywords, but the toolkit's own
-    # schemas use bare $ref objects, so the resolved dict IS the full node).
+    # JSON Schema 2020-12: keywords beside ``$ref`` apply together with the
+    # target.  After the ref resolves to dict R, the effective node is R
+    # overlaid by the node's own keywords other than ``$ref``: a sibling value
+    # wins on collision; ``properties`` are unioned (sibling wins per key);
+    # ``required`` is the order-preserving union.  Composition keywords beside
+    # ``$ref`` (allOf/oneOf/anyOf/if/then/else) are NOT overlaid; the resolved
+    # dict's own composition keywords are the ones merged.
     if "$ref" in node:
         ref: str = node["$ref"]
         if ref in _seen:
@@ -101,7 +104,24 @@ def effective_schema(
             # a harmless empty branch rather than crashing.  See resolve_ref
             # contract in the docstring — returning the input node is incorrect.
             return {"properties": {}, "required": []}
-        node = resolved
+        merged: dict[str, Any] = dict(resolved)
+        for key, value in node.items():
+            if key == "$ref" or key in _CONSUMED_KEYWORDS:
+                continue
+            if key == "properties" and isinstance(value, dict):
+                base_props = merged.get("properties")
+                merged["properties"] = {
+                    **(base_props if isinstance(base_props, dict) else {}),
+                    **value,
+                }
+            elif key == "required" and isinstance(value, list):
+                base_req = merged.get("required")
+                union = list(base_req) if isinstance(base_req, list) else []
+                union.extend(r for r in value if r not in union)
+                merged["required"] = union
+            else:
+                merged[key] = value
+        node = merged
         _seen = _seen | {ref}
 
     # --- Step 2: build the base result ---
