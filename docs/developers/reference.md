@@ -449,3 +449,4 @@ The `prompt-context` command now outputs a 2-column table (`Step`, `Name`) inste
 - [workflows/discovery.md](workflows/discovery.md) & [workflows/spec_to_impl.md](workflows/spec_to_impl.md) — Conceptual phase breakdowns.
 - [tooling/coverage_matrix.md](tooling/coverage_matrix.md) — How traceability is enforced.
 - [../agents/agents.md](../agents/agents.md) — Automation contract used by AI assistants.
+- [schema-annotations.md](schema-annotations.md) — Graph annotation language (`x-node`, `x-link`, link verbs, lifecycle and scope fields) defined by `schema/core/graph.schema.json`.

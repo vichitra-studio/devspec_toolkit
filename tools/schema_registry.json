@@ -6,6 +6,7 @@
   "vc:canon:kind": "canon/kind.schema.json",
   "vc:core:collections": "schema/core/collections.schema.json",
   "vc:core:errors": "schema/core/errors.schema.json",
+  "vc:core:graph": "schema/core/graph.schema.json",
   "vc:core:step-base": "schema/core/step_base.schema.json",
   "vc:00-charter": "schema/00_charter.schema.json",
   "vc:01-capabilities": "schema/01_capabilities.schema.json",
