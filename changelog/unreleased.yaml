@@ -3,4 +3,70 @@ breaking: false
 source_of_truth: changelog/unreleased.yaml
 render_target: changelog/unreleased.md
 
-changes: []
+changes:
+  - type: add_definition
+    description: >
+      Added schema/core/graph.schema.json (vc:core:graph): the x-node / x-link
+      annotation language step schemas use to declare graph nodes and links
+      (roles, closed set of 19 link verbs, lifecycle, scope, scope_reason and
+      the scope-reason rule). No step schema is annotated in this release except
+      schema/seed_manifest.schema.json (top-of-graph seed kind).
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      Added the annotation reader and lint (registry/annotations.py, ANNOT-NN
+      toolkit-author codes) and the step-order derivation
+      (registry/step_order_gen.py, ANNOT-20 / ANNOT-21). registry-generate
+      folds annotated nodes into entry_key_registry.json; a toolkit with no
+      annotations produces the previous output unchanged.
+    migration:
+      action: none
+
+  - type: add_config
+    description: >
+      Added tools/cli_commands.json (generated, byte-exact with the CLI parser;
+      schema/cli_commands.schema.json) and the registry-generate flags
+      --cli-commands-out and --step-order-out. The generator-owned file set is
+      now entry_key_registry.json, extraction_paths.json, cli_commands.json and
+      the golden fixture. Toolkit-internal; no host action.
+    migration:
+      action: none
+
+  - type: change_schema
+    description: >
+      schema/entry_key_registry.schema.json accepts annotation-derived entries
+      (source, role, contract, coarse, links; map-keyed entries without
+      id_field; glob keys such as impl_context/ms_*_plan.json). Host
+      entry_key_registry.json files are unaffected.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      schema_nav.effective_schema keeps keywords that sit beside a $ref
+      (description, default, items bounds) instead of dropping them. Only
+      description-level and sibling keys change in merged schemas; validation
+      results are unchanged.
+    migration:
+      action: none
+
+  - type: fix
+    description: >
+      Step 13 governance_label_ref is no longer checked by E590 / W590
+      against step 10; the label resolves through canon (E110 when unknown) and
+      E210 stays for labels also present in step 10. Removes a clash between
+      E590 and E210 on the same label. Hosts with no declared extensions
+      (none-required) see no change. Description-only change in
+      schema/13_extension_manifest.schema.json.
+    migration:
+      action: none
+
+  - type: internal_restructure
+    description: >
+      spec-check and the canonical checks share one schema registry and cache
+      validators (core/registry.py: get_shared_registry, get_cached_validator,
+      clear_shared_caches), removing repeated schema loads. Speed only.
+    migration:
+      action: none

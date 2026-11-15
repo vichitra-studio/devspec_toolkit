@@ -78,8 +78,8 @@ FINDINGS_SCHEMA_PATH = REPO_ROOT / "schema" / "infra" / "findings.schema.json"
 
 # High-value, deterministic toolkit files whose deletion is held to a P0 (D9) bar.
 # NOTE: despite the historical variable name, NOT all of these are generator
-# outputs — only entry_key_registry.json and extraction_paths.json are produced by
-# `registry-generate`. schema_registry.json, step_order.json, command_prefixes.json,
+# outputs — only entry_key_registry.json, extraction_paths.json and cli_commands.json
+# are produced by `registry-generate`. schema_registry.json, step_order.json, command_prefixes.json,
 # and step_docs.json are manually maintained but equally load-bearing, so their
 # deletion is treated with the same severity. (This set is NOT synced to
 # slices.yaml's generated_artifacts slice, which now lists only the two true
@@ -89,6 +89,7 @@ GENERATED_ARTIFACT_NAMES: set[str] = {
     "step_order.json",
     "entry_key_registry.json",
     "extraction_paths.json",
+    "cli_commands.json",
     "command_prefixes.json",
     "step_docs.json",
 }

@@ -197,8 +197,8 @@ slices:
     - "tools/specdev_tools/guides/**/*.yaml"
     - "tools/specdev_tools/context/**/*.py"
     # Manually-maintained toolkit config files that live under tools/ but are NOT
-    # generator outputs (registry-generate writes only entry_key_registry.json and
-    # extraction_paths.json). Routed here for semantic drift review rather than the
+    # generator outputs (registry-generate writes only entry_key_registry.json,
+    # extraction_paths.json and cli_commands.json). Routed here for semantic drift review rather than the
     # deterministic generated_artifacts slice:
     #   - command_prefixes.json — command-prefix allowlist (E530 / hallucination_lint)
     #   - step_docs.json — step→reference-doc map (consumed by `specdev ai-help`)
@@ -251,6 +251,7 @@ slices:
   globs:
     - "tools/entry_key_registry.json"
     - "tools/extraction_paths.json"
+    - "tools/cli_commands.json"
   expansion_rules:
     - target: "schema/**/*.json"          # generators read schemas
     - target: "tools/specdev_tools/registry/**"
