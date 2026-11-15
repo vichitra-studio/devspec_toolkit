@@ -11,9 +11,31 @@
       "type": "object",
       "properties": {
         "capabilities": {
-          "description": "Array of system capabilities derived from the charter, each with scope and traceability.",
+          "description": "Array of system capabilities derived from the charter, each with scope and links to the charter nodes it derives from.",
           "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "capability",
+            "role": "obligation-system",
+            "contract": [
+              "name",
+              "verb",
+              "description",
+              "inputs",
+              "outputs",
+              "preconditions",
+              "postconditions",
+              "error_states",
+              "capability_ref",
+              "action_ref",
+              "entity_ref",
+              "role_ref",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "capability_id",
+            "coarse": true
+          },
           "items": {
             "description": "A single capability describing what the system can do, with inputs, outputs, and error states.",
             "type": "object",
@@ -34,13 +56,8 @@
                 "minLength": 20
               },
               "scope": {
-                "description": "Delivery scope for this capability. Use 'in' for capabilities committed for the current release, 'out' for explicitly excluded capabilities (document why to prevent scope creep), and 'future' for capabilities acknowledged but deferred to a later release. Out-of-scope capabilities should still be listed so downstream steps can reference them as exclusions.",
-                "type": "string",
-                "enum": [
-                  "in",
-                  "out",
-                  "future"
-                ]
+                "description": "Delivery scope for this capability. Use 'in' for capabilities committed for the current release, 'later' for capabilities acknowledged but deferred to a later release, and 'out' for explicitly excluded capabilities. 'later' and 'out' require scope_reason (document why, to prevent scope creep). Parked capabilities should still be listed so downstream steps can reference them as exclusions.",
+                "$ref": "vc:core:graph#scope"
               },
               "owner": {
                 "description": "Team or domain responsible for implementing this capability. See vc:core:atoms#owner for the canonical value set. Choose the team that will build and maintain this capability.",
@@ -75,31 +92,12 @@
                 "type": "string",
                 "minLength": 2
               },
-              "goal_id": {
-                "description": "Kebab-case ID of a named charter goal this capability directly serves. Note: the default Step 00 charter schema does not include a goals array — this field is used by host repos that extend the charter with project-level goals alongside or instead of success_metrics. If no goals array exists in the charter, omit this field entirely rather than fabricating a goal ID. Decision rule: when a capability contributes to multiple goals, choose the *primary* goal that most directly motivated including this capability in scope — the one whose removal would cause this capability to be descoped. When the fit to any goal is loose, omit this field entirely rather than forcing a mapping; a missing goal_id is preferable to a misleading one. Correct: capability 'cap-user-authentication' → goal_id='goal-reduce-churn' when authentication improvements directly reduce churn (removing the goal would descope this capability). Wrong: mapping 'cap-audit-logging' to 'goal-increase-revenue' because logs help debugging which might eventually affect revenue — this is incidental, not causal. Anti-pattern: forcing a goal_id when the capability is a technical enabler (security, compliance, infrastructure) with no direct charter goal — omit rather than fabricate. Validated by linter cross-reference at build time.",
-                "$ref": "vc:core:atoms#kebabId"
-              },
-              "success_metric_refs": {
-                "description": "Charter success metric IDs this capability contributes to, referencing success_metrics[*].metric_id from spec/00_charter.json. Include a metric_id when this capability is responsible for moving that metric, even partially. Example: 'cap-checkout-performance' fully drives 'metric-checkout-page-load-time' and partially drives 'metric-checkout-conversion' (faster pages increase conversion) — list both. Omit a metric when the capability's removal would not measurably affect that metric. Omit the array entirely when the capability does not map to any quantifiable charter success metric. Anti-pattern: listing every charter metric for every capability — only list metrics the capability directly influences. Validated by linter cross-reference.",
-                "type": "array",
-                "items": {
-                  "$ref": "vc:core:atoms#kebabId"
-                }
-              },
               "error_states": {
                 "description": "Named error conditions that may arise during capability execution. Include error_states for all in-scope capabilities that can fail with a named error. Omit only for capabilities that have no defined error contract (e.g., 'cap-system-health-check' that returns a boolean). Each in-scope capability that interacts with external data, users, or services should have at least one named error state. Anti-pattern: omitting error_states because 'errors are handled in the FR' — capabilities define the error vocabulary; FRs reference it.",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:errors#errorState",
                   "description": "A specific error condition that may arise during this capability's execution. Provide a named error code (SCREAMING_SNAKE_CASE) and a brief description of what triggered it and what the caller should do. Examples: INSUFFICIENT_PERMISSIONS (caller does not have the required role for this operation), RATE_LIMIT_EXCEEDED (too many requests from this IP in the configured window — retry after 60s), RESOURCE_NOT_FOUND (the targeted entity does not exist or is soft-deleted), UPSTREAM_SERVICE_UNAVAILABLE (dependent external service is unreachable — circuit breaker open). Avoid generic codes like ERROR or FAILURE — each error state should be specific enough to handle distinctly."
-                }
-              },
-              "trace": {
-                "description": "Traceability links back to upstream artifacts (e.g., charter segments, stakeholders).",
-                "type": "array",
-                "items": {
-                  "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this capability to an upstream charter artifact. At step 01 (capabilities), use type 'charter-goal' pointing to the charter goal ID (e.g., a goal-* id from the charter goals array). Example: {\"type\": \"charter-goal\", \"id\": \"goal-checkout-flow\", \"note\": \"Derives from this charter goal; capability directly addresses the checkout flow in-scope item\"}. At minimum, include one trace per capability — capabilities without trace links are architectural drift that cannot be validated against charter scope."
                 }
               },
               "capability_ref": {
@@ -129,6 +127,69 @@
                   { "properties": { "kind": { "const": "role" } } }
                 ],
                 "description": "Canonical registry entry for the actor or role that exercises this capability. Kind is structurally pinned to role. Examples: {\"id\": \"cn:core:role:reviewer\", \"kind\": \"role\", \"label\": \"reviewer\"} for review capabilities; {\"id\": \"cn:project:role:admin\", \"kind\": \"role\", \"label\": \"admin\"} for admin-only capabilities. Should match a role defined in the canon manifest. Validated by canonical-integrity lint. Use real example ID: cn:core:role:reviewer"
+              },
+              "scope_reason": {
+                "description": "Why this capability is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this capability is derived from (charter scope items, user segments or success metrics). At least one is required; every capability must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "scope-item",
+                    "segment",
+                    "metric"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this capability relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this capability: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this capability, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this capability replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -136,7 +197,12 @@
               "verb",
               "scope",
               "capability_ref",
-              "trace"
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
             ]
           }
         }

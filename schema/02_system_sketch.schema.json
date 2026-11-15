@@ -11,20 +11,30 @@
       "type": "object",
       "properties": {
         "components": {
-          "description": "Array of system components forming the architecture, each with type, responsibilities, and trace links.",
+          "description": "Array of system components forming the architecture, each with type, responsibilities, and links to the capabilities and constraints it derives from.",
           "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "component",
+            "role": "context",
+            "contract": [
+              "type",
+              "responsibilities",
+              "entity_ref"
+            ],
+            "id": "component_id"
+          },
           "items": {
             "description": "A single architectural component (service, database, queue, etc.) in the system sketch.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
               "component_id": {
-                "description": "Unique kebab-case identifier for this system component. Format: descriptive kebab-case identifier. Examples: 'api-gateway', 'user-service', 'postgres-db', 'auth-service'. Should be stable across spec versions — downstream connections, trace links, and interface refs all reference this ID.",
+                "description": "Unique kebab-case identifier for this system component. Format: descriptive kebab-case identifier. Examples: 'api-gateway', 'user-service', 'postgres-db', 'auth-service'. Should be stable across spec versions — downstream connections, links, and interface refs all reference this ID.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "type": {
-                "description": "Architectural classification of this component. Must be one of: 'service' (business logic), 'db' (persistent storage), 'queue' (async messaging), 'cache' (ephemeral storage), 'job' (scheduled/batch processing), 'ui' (user-facing frontend), 'lib' (shared library/SDK), 'external' (third-party dependency). When type is 'external': this component represents a third-party service outside the project boundary (e.g., Stripe, Auth0, SendGrid, Twilio). External components MUST include the tag 'external-dependency'. They should have a source_url pointing to the vendor's API docs. Do NOT model internal microservices as 'external' — use 'service' for internal services you own. Anti-pattern: using 'external' for an internal service that happens to be in a different repo.",
+                "description": "Architectural classification of this component. Must be one of: 'service' (business logic), 'db' (persistent storage), 'queue' (async messaging), 'cache' (ephemeral storage), 'job' (scheduled/batch processing), 'ui' (user-facing frontend), 'lib' (shared library/SDK). A third-party service outside the project boundary (e.g., Stripe, Auth0, SendGrid, Twilio) is not a component: record it under third_parties. Anti-pattern: modelling a vendor service as a component of type 'service'.",
                 "$ref": "vc:core:atoms#componentType"
               },
               "responsibilities": {
@@ -46,7 +56,6 @@
                   "enum": [
                     "critical-path",
                     "supporting",
-                    "external-dependency",
                     "shared-platform",
                     "stateful",
                     "stateless",
@@ -67,21 +76,70 @@
                   ]
                 }
               },
-              "trace": {
-                "description": "Traceability links back to upstream capabilities (Step 01) or charter goals (Step 00). Every component must justify its existence through at least one upstream trace. Use the target artifact's actual ID (e.g., a capability_id from Step 01).",
-                "type": "array",
-                "items": {
-                  "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this component to the upstream capability that drives its inclusion. At step 02 (system sketch), use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json (the kind of the target; describe the 'implements' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-user-authentication\", \"note\": \"Implements this capability\"}. Components without trace links are architectural drift — every component must trace to at least one capability that justified its design."
-                },
-                "minItems": 1
-              },
               "entity_ref": {
                 "description": "Canonical reference to the primary domain entity this component owns or manages. Kind must be 'entity'. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"user\"} for a user service; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"order\"} for an order management service. Drives consistent naming in downstream FRs, APIs, and data models. Omit for infrastructure components (db, cache, queue) that don't own a specific domain entity.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "entity" } } }
                 ]
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "capability",
+                    "constraint"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this component relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this component: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this component, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this component replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "required": [
@@ -89,25 +147,73 @@
               "type",
               "responsibilities",
               "owner",
-              "trace"
+              "derives_from"
             ]
           }
         },
         "connections": {
           "description": "Array of connections between components describing protocols, trust boundaries, and data flow.",
           "type": "array",
+          "x-node": {
+            "kind": "connection",
+            "role": "context",
+            "contract": [
+              "protocol",
+              "trust_boundary",
+              "auth",
+              "rate_limit",
+              "reliability",
+              "event_ref"
+            ],
+            "id": "connection_id"
+          },
           "items": {
-            "description": "A connection between two components specifying protocol, trust boundary, and optional rate limiting.",
+            "description": "A connection from one component to another component or third party, specifying protocol, trust boundary, and optional rate limiting.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "from": {
-                "description": "Component ID of the connection source. Must match a component_id defined in components[*].component_id in this same document. The linter validates this cross-reference at build time — JSON Schema alone cannot enforce it. Examples: 'api-gateway' (the ingress service), 'auth-service' (the authentication microservice), 'web-ui' (the frontend component). Anti-pattern: using a display name ('API Gateway'), a non-existent component ID, or the component's name field instead of its component_id.",
+              "connection_id": {
+                "description": "Unique kebab-case identifier for this connection. Must be stable across spec versions: links from other nodes reference it. Example: 'conn-api-gateway-to-auth-service'.",
                 "$ref": "vc:core:atoms#kebabId"
               },
-              "to": {
-                "description": "Component ID of the connection destination. Must match a component_id defined in components[*].component_id in this same document. The linter validates this cross-reference at build time — JSON Schema alone cannot enforce it. Examples: 'postgres-db' (the database component receiving a query), 'notification-service' (the service receiving an outbound call), 'event-bus' (the queue component receiving a published message). Anti-pattern: using a display name ('Postgres Database'), a non-existent component ID, or the component's name field instead of its component_id.",
-                "$ref": "vc:core:atoms#kebabId"
+              "derives_from": {
+                "description": "Id of the component that is the source of this connection (exactly the component the data or call originates from). Must be a component declared in this document; the link is checked by the graph, not by JSON Schema.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "component"
+                  ],
+                  "required": true,
+                  "built": true,
+                  "same_step_kinds": [
+                    "component"
+                  ]
+                },
+                "minItems": 1
+              },
+              "connects_to": {
+                "description": "Id of the component or third party that is the target of this connection. Must be a component or third party declared in this document; the link is checked by the graph, not by JSON Schema.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "component",
+                    "third-party"
+                  ],
+                  "required": true,
+                  "same_step_kinds": [
+                    "component",
+                    "third-party"
+                  ]
+                },
+                "minItems": 1
               },
               "protocol": {
                 "description": "Transport abstraction for this connection — never the implementation technology. Decision rules: 'http' — synchronous REST or HTTP call between services; 'grpc' — binary Protocol Buffers over HTTP/2; 'rpc' — generic remote procedure call (use when gRPC is not the specific protocol); 'event' — any asynchronous message broker (Kafka, SQS, RabbitMQ); pair with a 'queue' component as the target; 'db' — database wire protocol (PostgreSQL wire, MongoDB wire); 'file' — file-based exchange via S3, SFTP, or shared volume. Examples: api-gateway → auth-service uses 'http'; order-service → order-events-queue uses 'event'; user-service → postgres-db uses 'db'. Anti-pattern: using 'kafka' or 'rabbitmq' as the protocol value — those are implementation details, not transport protocols; use 'event' instead.",
@@ -116,11 +222,6 @@
               "trust_boundary": {
                 "description": "Security trust boundary classification: 'internal' (same trust zone, no external exposure), 'partner' (B2B or machine-to-machine with a known external party), or 'public' (internet-facing, untrusted callers). Partner and public trust boundaries require auth and rate_limit.",
                 "$ref": "vc:core:atoms#trustBoundary"
-              },
-              "schema_ref": {
-                "description": "Reference to the schema describing this connection's data contract. Format: relative path from repo root to the spec file, optionally with a JSON Pointer fragment. Must start with 'file://', 'https://', 'glossary:', 'api:', or be exactly '-tbd'. Worked examples: 'file://spec/05_interface_contracts.json#/apis/0' for a specific API object within the contracts file; 'file://spec/05_interface_contracts.json' for the full contracts file; 'api:user-auth' when referencing by logical name; '-tbd' as a placeholder when the interface schema does not yet exist (signals that Step 05 needs to define this contract). Anti-pattern: absolute paths ('/Users/dev/project/spec/...') that break in CI and other environments; HTTP URLs pointing to external registries; JSON Schema $id URNs (those are schema identifiers, not spec references).",
-                "type": "string",
-                "pattern": "^(?:-tbd|(file://|https://|glossary:|api:).+)$"
               },
               "auth": {
                 "description": "Authentication mechanism required for this connection. Must be provided when trust_boundary is 'partner' or 'public' (enforced by if/then). Options: 'none' (internal connections only), 'basic' (HTTP basic auth), 'oauth2' (delegated authorization), 'jwt' (signed token), 'mTLS' (mutual TLS certificate), 'key' (API key or shared secret). Note: connectionAuth uses 'key' for static shared secrets; the separate apiSecurity atom uses 'api-key' for the same concept — do not confuse them.",
@@ -169,28 +270,53 @@
                 "description": "Message delivery guarantee for event-based connections. Decision rule: 'best-effort' when message loss is acceptable and ordering is not required (e.g., analytics events, non-critical notifications); 'at-least-once' when every message must be processed but idempotent consumers can handle duplicates (default for most async operations); 'exactly-once' only when both loss and duplication are unacceptable AND the infrastructure supports it (higher cost and complexity — use sparingly). Wrong choice: exactly-once for a notification email sender — email delivery infrastructure rarely guarantees exactly-once, and duplicate emails are less harmful than complex transaction overhead. Correct choice: at-least-once for order events (duplicates are handled by idempotent consumers). Anti-pattern: using exactly-once by default without verifying infrastructure support — Kafka exactly-once semantics require specific producer/consumer configuration and add significant latency overhead. Only applicable to event/queue connections; omit for synchronous http or grpc connections.",
                 "$ref": "vc:core:atoms#messageReliability"
               },
-              "trace": {
-                "description": "Traceability links back to upstream capabilities or charter items that justify this connection. Every connection must be traceable to an upstream requirement — connections without a trace are architectural drift.",
-                "type": "array",
-                "items": {
-                  "$ref": "vc:core:collections#traceRef",
-                  "description": "A traceability reference linking this connection to the capability that requires it. At step 02, use type 'capability' pointing to a cap-* ID from spec/01_capabilities.json (the kind of the target; describe the 'implements' relationship in note). Example: {\"type\": \"capability\", \"id\": \"cap-payment-processing\", \"note\": \"Implements this capability; payment service calls auth service to validate session before processing charge\"}. Connections that cannot be traced to a capability may indicate architectural over-design."
-                },
-                "minItems": 1
-              },
-              "interface_ref": {
-                "description": "Canonical reference to the named interface in the canonical registry for this connection's API contract. Kind must be 'interface'. Example: {\"id\": \"cn:project:interface:user-auth-api\", \"kind\": \"interface\", \"label\": \"User Auth API\"}. Use when this connection crosses a defined API boundary that will be formally specified in Step 05. If the interface is not yet named in canon, add a canonical_proposals entry. Distinct from schema_ref: interface_ref points to the contract owner; schema_ref points to the payload schema.",
-                "allOf": [
-                  { "$ref": "vc:core:collections#canonicalRef" },
-                  { "properties": { "kind": { "const": "interface" } } }
-                ]
-              },
               "event_ref": {
                 "description": "Canonical reference to the event type flowing through this connection. Required when protocol is 'event'. Kind must be 'event'. Example: {\"id\": \"cn:project:event:order-placed\", \"kind\": \"event\", \"label\": \"order-placed\"}. The event ID should match the topic or event type name in your message broker. Anti-pattern: using event_ref for REST endpoint connections — event_ref is only for async message-passing.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "event" } } }
                 ]
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this connection relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this connection: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this connection, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this connection replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
               }
             },
             "allOf": [
@@ -230,16 +356,16 @@
               }
             ],
             "required": [
-              "from",
-              "to",
+              "connection_id",
+              "derives_from",
+              "connects_to",
               "protocol",
-              "trust_boundary",
-              "trace"
+              "trust_boundary"
             ]
           }
         },
         "tech_stack": {
-          "description": "Technology decisions for the system, extracted from seed_tech_stack.md. Declares the languages, frameworks, infrastructure, and tools that downstream steps (05 Interface Contracts, 07 NFRs, 08 Fixtures, 15 Scaffold) should use when making technology-dependent decisions. Step 09 (Implementation Plan) inherits and may refine these choices.",
+          "description": "Technology decisions for the system, extracted from seed_tech_stack.md. Declares the languages, frameworks, infrastructure, and tools that downstream steps (05 Interface Contracts, 07 NFRs, 08 Fixtures, 15 Scaffold) should use when making technology-dependent decisions. Step 09 (Implementation Plan) inherits and may refine these choices. Deprecated: no longer required; third_parties records the pinned third-party versions and this field is removed in a later release.",
           "allOf": [
             {
               "$ref": "vc:core:collections#techStack",
@@ -249,11 +375,130 @@
               "required": ["languages", "frameworks", "infrastructure", "tools"]
             }
           ]
+        },
+        "third_parties": {
+          "description": "Third-party services, libraries and platforms the system depends on, one node per separately versioned or contracted thing. Each carries the exact pinned version it was specified against. Optional; omit when the system has no third-party dependency.",
+          "type": "array",
+          "x-node": {
+            "kind": "third-party",
+            "role": "context",
+            "contract": [
+              "name",
+              "pin",
+              "rationale"
+            ],
+            "id": "third_party_id"
+          },
+          "items": {
+            "description": "A single third-party dependency with its pinned version.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "third_party_id": {
+                "description": "Unique kebab-case identifier for this third party. Must be stable across spec versions: links from other nodes reference it. Example: 'tp-stripe-api'.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "name": {
+                "description": "Human-readable name of the third-party thing, e.g. 'Stripe API', 'PostgreSQL', 'React'.",
+                "type": "string",
+                "minLength": 1
+              },
+              "pin": {
+                "description": "The exact version or release the specification relies on, e.g. '2024-06-20' for a dated API version, '16.3' for a database, 'v3' for an API generation. Must be non-empty; whether it is exact is not checked by the schema.",
+                "type": "string",
+                "minLength": 1
+              },
+              "rationale": {
+                "description": "Why this third party was chosen and what it is used for. Optional.",
+                "type": "string"
+              },
+              "derives_from": {
+                "description": "Ids of the upstream nodes this third party is derived from (seed documents or charter constraints). At least one is required; every third party must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "constraint"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "part_of": {
+                "description": "Id of the third party that this one is bundled with or a part of (for example a library inside a platform). Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "third-party"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "third-party"
+                  ]
+                }
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this third party relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this third party: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this third party, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this third party replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "third_party_id",
+              "name",
+              "pin",
+              "derives_from"
+            ]
+          }
         }
       },
       "required": [
-        "components",
-        "tech_stack"
+        "components"
       ],
       "description": "Step-specific properties for 02_system_sketch."
     },

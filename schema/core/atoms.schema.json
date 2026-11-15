@@ -138,10 +138,9 @@
         "cache",
         "job",
         "ui",
-        "lib",
-        "external"
+        "lib"
       ],
-      "description": "Architectural component type classification in system sketches. Decision rules: 'service' — stateless business logic process (REST API, gRPC service); 'db' — persistent store with durable writes (PostgreSQL, DynamoDB, MongoDB); 'queue' — async message broker with a channel/topic model (Kafka, SQS, RabbitMQ); 'cache' — ephemeral in-memory store (Redis, Memcached); 'job' — triggered or scheduled batch process (cron job, AWS Lambda); 'ui' — browser or mobile frontend application; 'lib' — importable library with no own runtime or deployment; 'external' — third-party service outside the project boundary (Stripe, Auth0, Twilio). Anti-pattern: calling a message broker a 'db' — use 'queue' for any async publish/subscribe component."
+      "description": "Architectural component type classification in system sketches. Decision rules: 'service' — stateless business logic process (REST API, gRPC service); 'db' — persistent store with durable writes (PostgreSQL, DynamoDB, MongoDB); 'queue' — async message broker with a channel/topic model (Kafka, SQS, RabbitMQ); 'cache' — ephemeral in-memory store (Redis, Memcached); 'job' — triggered or scheduled batch process (cron job, AWS Lambda); 'ui' — browser or mobile frontend application; 'lib' — importable library with no own runtime or deployment. A third-party service outside the project boundary (Stripe, Auth0, Twilio) is not a component: it is a third-party node. Anti-pattern: calling a message broker a 'db' — use 'queue' for any async publish/subscribe component."
     },
     "connectionProtocol": {
       "$anchor": "connectionProtocol",

@@ -137,13 +137,7 @@ Consult the schema for valid `schema_ref` formats and the `rate_limit` object sh
         "Persist user preferences"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "capability",
-          "id": "cap-user-management",
-          "note": "Implements: this component delivers the user management capability"
-        }
-      ]
+      "derives_from": ["cap-user-management"]
     }
   ],
   "connections": [],

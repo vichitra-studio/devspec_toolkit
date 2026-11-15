@@ -101,28 +101,46 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:00:00Z",
   "title": "Project Charter",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
-  "in_scope": [
-    "User authentication flows",
-    "Session lifecycle management",
-    "Token refresh and expiry handling"
-  ],
-  "out_of_scope": [
-    "OAuth third-party integrations",
-    "Legacy SSO migration",
-    "Mobile biometric authentication"
+  "scope_items": [
+    {
+      "scope_id": "scope-user-authentication",
+      "text": "User authentication flows",
+      "scope": "in",
+      "derives_from": ["need-clear-auth-requirements"]
+    },
+    {
+      "scope_id": "scope-oauth-integrations",
+      "text": "OAuth third-party integrations",
+      "scope": "out",
+      "scope_reason": "Post-launch only; no identity provider is contracted yet.",
+      "derives_from": ["need-clear-auth-requirements"]
+    }
   ],
   "assumptions": [
-    "Existing user database schema remains unchanged"
+    {
+      "assumption_id": "asm-user-db-unchanged",
+      "text": "Existing user database schema remains unchanged",
+      "derives_from": ["seed-project-brief"]
+    }
   ],
   "risks": [
-    "Session storage capacity under peak load"
+    {
+      "risk_id": "risk-session-capacity",
+      "text": "Session storage capacity under peak load",
+      "scope": "in",
+      "derives_from": ["asm-user-db-unchanged"]
+    }
   ],
   "stakeholders": [
     {
+      "stakeholder_id": "sh-engineering-lead",
       "role": "Engineering Lead",
       "needs": [
-        "Clear authentication requirements",
-        "Defined session lifecycle"
+        {
+          "need_id": "need-clear-auth-requirements",
+          "text": "Clear authentication requirements and a defined session lifecycle",
+          "derives_from": ["seed-project-brief"]
+        }
       ]
     }
   ],
@@ -138,7 +156,8 @@ Before emitting, verify:
       ],
       "gains": [
         "Reliable authentication"
-      ]
+      ],
+      "derives_from": ["seed-project-brief"]
     }
   ],
   "success_metrics": [
@@ -151,7 +170,8 @@ Before emitting, verify:
       "unit_ref": {
         "id": "cn:core:unit:percent",
         "kind": "unit"
-      }
+      },
+      "derives_from": ["need-clear-auth-requirements"]
     },
     {
       "metric_id": "session-error-rate",
@@ -162,7 +182,16 @@ Before emitting, verify:
       "unit_ref": {
         "id": "cn:core:unit:percent",
         "kind": "unit"
-      }
+      },
+      "derives_from": ["need-clear-auth-requirements"]
+    }
+  ],
+  "constraints": [
+    {
+      "constraint_id": "con-eu-data-residency",
+      "text": "Customer data must be stored in EU regions only",
+      "scope": "in",
+      "derives_from": ["seed-project-brief"]
     }
   ],
   "canonical_refs_used": []

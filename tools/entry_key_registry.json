@@ -20,14 +20,328 @@
     "00_charter.json": {
       "arrays": [
         {
+          "array_path": ".scope_items",
+          "coarse": true,
+          "contract": [
+            "text",
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "scope_id",
+          "kind": "scope-item",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "need"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "need"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".assumptions",
+          "contract": [
+            "text"
+          ],
+          "id_field": "assumption_id",
+          "kind": "assumption",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".risks",
+          "coarse": true,
+          "contract": [
+            "text",
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "risk_id",
+          "kind": "risk",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "assumption"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".stakeholders",
+          "contract": [
+            "role",
+            "role_ref"
+          ],
+          "id_field": "stakeholder_id",
+          "kind": "stakeholder",
+          "links": [
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "nested": [
+            {
+              "array_path": ".needs",
+              "contract": [
+                "text"
+              ],
+              "id_field": "need_id",
+              "kind": "need",
+              "links": [
+                {
+                  "built": true,
+                  "field": "derives_from",
+                  "kinds": [
+                    "seed"
+                  ],
+                  "required": true,
+                  "same_step_kinds": []
+                },
+                {
+                  "built": false,
+                  "field": "assumes",
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                },
+                {
+                  "built": false,
+                  "field": "replaces",
+                  "kinds": "*",
+                  "required": false,
+                  "same_step_kinds": []
+                }
+              ],
+              "role": "context",
+              "source": "x-node"
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
+        },
+        {
           "array_path": ".user_segments",
+          "contract": [
+            "description",
+            "jobs_to_be_done",
+            "pains",
+            "gains"
+          ],
           "id_field": "segment_id",
-          "kind": "segment"
+          "kind": "segment",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
         },
         {
           "array_path": ".success_metrics",
+          "contract": [
+            "name",
+            "baseline",
+            "target",
+            "unit",
+            "measurement_method",
+            "unit_ref"
+          ],
           "id_field": "metric_id",
-          "kind": "metric"
+          "kind": "metric",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "need"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "need"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".constraints",
+          "coarse": true,
+          "contract": [
+            "text",
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "constraint_id",
+          "kind": "constraint",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "need"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "need"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "00"
@@ -36,8 +350,58 @@
       "arrays": [
         {
           "array_path": ".capabilities",
+          "coarse": true,
+          "contract": [
+            "name",
+            "verb",
+            "description",
+            "inputs",
+            "outputs",
+            "preconditions",
+            "postconditions",
+            "error_states",
+            "capability_ref",
+            "action_ref",
+            "entity_ref",
+            "role_ref",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "capability_id",
-          "kind": "capability"
+          "kind": "capability",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "scope-item",
+                "segment",
+                "metric"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "01"
@@ -46,8 +410,157 @@
       "arrays": [
         {
           "array_path": ".components",
+          "contract": [
+            "type",
+            "responsibilities",
+            "entity_ref"
+          ],
           "id_field": "component_id",
-          "kind": "component"
+          "kind": "component",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "capability",
+                "constraint"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".connections",
+          "contract": [
+            "protocol",
+            "trust_boundary",
+            "auth",
+            "rate_limit",
+            "reliability",
+            "event_ref"
+          ],
+          "id_field": "connection_id",
+          "kind": "connection",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "component"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "component"
+              ]
+            },
+            {
+              "built": false,
+              "field": "connects_to",
+              "kinds": [
+                "component",
+                "third-party"
+              ],
+              "required": true,
+              "same_step_kinds": [
+                "component",
+                "third-party"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".third_parties",
+          "contract": [
+            "name",
+            "pin",
+            "rationale"
+          ],
+          "id_field": "third_party_id",
+          "kind": "third-party",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "constraint"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "part_of",
+              "kinds": [
+                "third-party"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "third-party"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
         }
       ],
       "step": "02"

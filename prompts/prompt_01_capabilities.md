@@ -116,13 +116,7 @@ Before emitting, verify:
         "id": "cn:project:capability:user-authentication",
         "kind": "capability"
       },
-      "trace": [
-        {
-          "type": "charter-goal",
-          "id": "goal-login-success-rate",
-          "note": "Derives from: login-success-rate charter success metric; capability directly drives the login success rate success metric"
-        }
-      ]
+      "derives_from": ["login-success-rate"]
     }
   ],
   "canonical_refs_used": []

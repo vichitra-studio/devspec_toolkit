@@ -1,8 +1,13 @@
 {
   "00": {
     "00_charter.json": [
+      ".scope_items",
+      ".assumptions",
+      ".risks",
+      ".stakeholders",
       ".user_segments",
-      ".success_metrics"
+      ".success_metrics",
+      ".constraints"
     ]
   },
   "01": {
@@ -12,7 +17,9 @@
   },
   "02": {
     "02_system_sketch.json": [
-      ".components"
+      ".components",
+      ".connections",
+      ".third_parties"
     ]
   },
   "03": {

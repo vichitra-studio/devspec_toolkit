@@ -21,7 +21,7 @@
       "step": "00",
       "role": "context"
     },
-    "success-metric": {
+    "metric": {
       "step": "00",
       "role": "context"
     },
@@ -33,7 +33,7 @@
       "step": "00",
       "role": "context"
     },
-    "stakeholder-need": {
+    "need": {
       "step": "00",
       "role": "context"
     },
@@ -54,7 +54,7 @@
       "step": "02",
       "role": "context"
     },
-    "third-party-node": {
+    "third-party": {
       "step": "02",
       "role": "context"
     },
@@ -70,7 +70,7 @@
       "step": "02a",
       "role": "obligation-delivery"
     },
-    "glossary-term": {
+    "term": {
       "step": "03",
       "role": "context"
     },
