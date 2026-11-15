@@ -97,9 +97,9 @@ specdev json delete spec/03_glossary.json '.terms[3]'
 # Diagnostic — print active SPECDEV_* config
 specdev env-check --repo-root ./devspec_toolkit
 
-# Regenerate toolkit-side entry-key registry + extraction_paths from schemas
-# Run after any schema change; the two generator-owned files it writes
-# (entry_key_registry.json, extraction_paths.json) must stay byte-exact with
+# Regenerate toolkit-side entry-key registry + extraction_paths + cli_commands from schemas
+# Run after any schema or CLI-parser change; the three generator-owned files it writes
+# (entry_key_registry.json, extraction_paths.json, cli_commands.json) must stay byte-exact with
 # this output (enforced by CI gate — do not hand-edit them). Note:
 # command_prefixes.json and step_docs.json are NOT generator outputs — they are
 # manually maintained despite also living under tools/.

@@ -139,20 +139,12 @@ def check_venv():
         print("Error: Running without a virtual environment. Please activate 'devspec_env' or similar.", file=sys.stderr)
         sys.exit(1)
 
-def main():
-    # --version must bypass venv check so it works in any environment.
-    # We short-circuit here before check_venv() and before argparse, because
-    # required=True on add_subparsers would otherwise reject bare --version.
-    if "--version" in sys.argv[1:]:
-        _toolkit_root = Path(__file__).resolve().parent.parent.parent
-        from .core.changelog_parser import get_toolkit_version as _gtv
-        _ver = _gtv(_toolkit_root) or "unknown"
-        print(f"specdev {_ver}")
-        sys.exit(0)
+def build_parser() -> argparse.ArgumentParser:
+    """Build the full ``specdev`` argparse parser (no parsing, no side effects).
 
-    check_venv()
-    # Reset config singleton so each CLI invocation reads current env vars
-    reset_config()
+    The ``context`` group parser is attached as ``parser.ctx_parser`` because the
+    dispatch block prints its help when no sub-command is given.
+    """
     p = argparse.ArgumentParser(prog="specdev-tools")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -326,6 +318,15 @@ def main():
         default=None,
         dest="step_order_out",
         help="Also write the step order derived from the x-node/x-link annotations to this path (default: not written).",
+    )
+    rg.add_argument(
+        "--cli-commands-out",
+        default=None,
+        dest="cli_commands_out",
+        help=(
+            "Output path for cli_commands.json (default: <repo-root>/tools/cli_commands.json, "
+            "written only when --out is also absent)."
+        ),
     )
 
     gd = sub.add_parser("guide", help="Show remediation guide for an error code")
@@ -549,6 +550,26 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     json_p.add_argument("args", nargs=argparse.REMAINDER, help="json subcommand and arguments")
+    p.ctx_parser = ctx_p
+    return p
+
+
+def main():
+    # --version must bypass venv check so it works in any environment.
+    # We short-circuit here before check_venv() and before argparse, because
+    # required=True on add_subparsers would otherwise reject bare --version.
+    if "--version" in sys.argv[1:]:
+        _toolkit_root = Path(__file__).resolve().parent.parent.parent
+        from .core.changelog_parser import get_toolkit_version as _gtv
+        _ver = _gtv(_toolkit_root) or "unknown"
+        print(f"specdev {_ver}")
+        sys.exit(0)
+
+    check_venv()
+    # Reset config singleton so each CLI invocation reads current env vars
+    reset_config()
+    p = build_parser()
+    ctx_p = p.ctx_parser
 
     args = p.parse_args()
 
@@ -2138,12 +2159,19 @@ def main():
             if args.extraction_paths_out
             else os.path.join(repo_root, "tools", "extraction_paths.json")
         )
+        if args.cli_commands_out:
+            cli_commands_out = os.path.abspath(args.cli_commands_out)
+        elif not args.out:
+            cli_commands_out = os.path.join(repo_root, "tools", "cli_commands.json")
+        else:
+            cli_commands_out = None
         from .registry.generate import run as registry_generate_run
         registry_generate_run(
             repo_root=repo_root,
             out_path=out_path,
             extraction_paths_out=extraction_paths_out,
             step_order_out=os.path.abspath(args.step_order_out) if args.step_order_out else None,
+            cli_commands_out=cli_commands_out,
         )
 
     elif args.cmd == "spec-check":

@@ -62,7 +62,8 @@ jobs:
           python -m specdev_tools.cli registry-generate \
             --repo-root . \
             --out "$TMPDIR/entry_key_registry.json" \
-            --extraction-paths-out "$TMPDIR/extraction_paths.json"
+            --extraction-paths-out "$TMPDIR/extraction_paths.json" \
+            --cli-commands-out "$TMPDIR/cli_commands.json"
           REGEN_CMD="specdev registry-generate --repo-root . --out ./tools/entry_key_registry.json"
           if ! diff -q "$TMPDIR/entry_key_registry.json" tools/entry_key_registry.json; then
             echo "::error::Registry out of date. Run '$REGEN_CMD' and commit the result."
@@ -70,6 +71,10 @@ jobs:
           fi
           if ! diff -q "$TMPDIR/extraction_paths.json" tools/extraction_paths.json; then
             echo "::error::extraction_paths out of date. Run '$REGEN_CMD' and commit the result."
+            exit 1
+          fi
+          if ! diff -q "$TMPDIR/cli_commands.json" tools/cli_commands.json; then
+            echo "::error::cli_commands out of date. Run '$REGEN_CMD' and commit the result."
             exit 1
           fi
           if ! diff -q "$TMPDIR/entry_key_registry.json" tests/fixtures/entry_key_registry_golden.json; then

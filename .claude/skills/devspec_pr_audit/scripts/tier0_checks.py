@@ -502,10 +502,11 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_ekr = Path(tmpdir) / "entry_key_registry.json"
         tmp_ep = Path(tmpdir) / "extraction_paths.json"
+        tmp_cc = Path(tmpdir) / "cli_commands.json"
 
         gen_cmd = (
             f"{env_setup}specdev registry-generate --repo-root . "
-            f"--out {tmp_ekr} --extraction-paths-out {tmp_ep}"
+            f"--out {tmp_ekr} --extraction-paths-out {tmp_ep} --cli-commands-out {tmp_cc}"
         )
         gen_result = subprocess.run(
             ["bash", "-c", gen_cmd],
@@ -529,8 +530,8 @@ def check_t10_generated_artifacts_clean() -> list[dict[str, Any]]:
             ))
             return findings
 
-        tmp_paths = [tmp_ekr, tmp_ep]
-        disk_rels = ["tools/entry_key_registry.json", "tools/extraction_paths.json"]
+        tmp_paths = [tmp_ekr, tmp_ep, tmp_cc]
+        disk_rels = ["tools/entry_key_registry.json", "tools/extraction_paths.json", "tools/cli_commands.json"]
         for tmp_file, rel in zip(tmp_paths, disk_rels):
             disk_file = REPO_ROOT / rel
             if not tmp_file.exists():

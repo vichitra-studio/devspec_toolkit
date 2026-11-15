@@ -1339,7 +1339,8 @@ def _write_report(report: Dict[str, Any], out_path: Optional[str]) -> None:
 
 # --- CLI Setup ---
 
-def main():
+def build_json_parser() -> argparse.ArgumentParser:
+    """Build the ``specdev json`` argparse parser (no parsing, no side effects)."""
     parser = argparse.ArgumentParser(description="Smart JSON Tool for AI Agents")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1462,6 +1463,11 @@ def main():
         metavar="DIR",
         help="Root directory for resolving relative file paths (defaults to cwd)",
     )
+    return parser
+
+
+def main():
+    parser = build_json_parser()
 
     args = parser.parse_args()
 

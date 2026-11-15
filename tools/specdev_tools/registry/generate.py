@@ -691,6 +691,7 @@ def run(
     out_path: str,
     extraction_paths_out: str,
     step_order_out: str | None = None,
+    cli_commands_out: str | None = None,
 ) -> None:
     """Generate registry and extraction_paths files and write them to disk.
 
@@ -700,6 +701,7 @@ def run(
         extraction_paths_out: Destination path for extraction_paths.json.
         step_order_out: Optional destination for the step order derived from the
             annotations (``None`` writes nothing; ``tools/step_order.json`` is never touched).
+        cli_commands_out: Optional destination for cli_commands.json (``None`` writes nothing).
     """
     repo_root = os.path.abspath(repo_root)
     registry_doc, extraction_paths_doc = generate_registry(repo_root)
@@ -729,3 +731,12 @@ def run(
         with open(step_order_out, "w", encoding="utf-8") as fh:
             fh.write(_serialize(build_step_order_document(derived, hand)))
         print(f"registry-generate: wrote {step_order_out}")
+
+    if cli_commands_out:
+        from specdev_tools.registry.cli_commands import generate_cli_commands
+
+        cli_commands_out = os.path.abspath(cli_commands_out)
+        os.makedirs(os.path.dirname(cli_commands_out), exist_ok=True)
+        with open(cli_commands_out, "w", encoding="utf-8") as fh:
+            fh.write(_serialize(generate_cli_commands()))
+        print(f"registry-generate: wrote {cli_commands_out}")

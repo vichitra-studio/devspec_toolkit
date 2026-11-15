@@ -73,8 +73,10 @@ docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json
       `generated_artifacts`, run:
       ```bash
       TMPFILE=$(mktemp)
-      specdev registry-generate --repo-root . --out "$TMPFILE"
+      CLITMP=$(mktemp)
+      specdev registry-generate --repo-root . --out "$TMPFILE" --cli-commands-out "$CLITMP"
       diff "$TMPFILE" tools/entry_key_registry.json
+      diff "$CLITMP" tools/cli_commands.json
       ```
       Any delta in the diff output → P0 finding
       `catalog_tag: "D9"`. Evidence: diff excerpt (first 20 lines).
@@ -197,7 +199,7 @@ Example P0/P1 finding fragment:
 - **Read**: raw source files for changed paths in scope; digest files for expansion neighbors
 - **Glob**: enumerate files under assigned slice paths
 - **Grep**: pattern checks (hardcoded paths, flag names, documented surface)
-- **Bash**: run `specdev registry-generate --out "$TMPFILE"` + `diff "$TMPFILE" tools/entry_key_registry.json`; JSON parse validation;
+- **Bash**: run `specdev registry-generate --out "$TMPFILE" --cli-commands-out "$CLITMP"` + `diff "$TMPFILE" tools/entry_key_registry.json` + `diff "$CLITMP" tools/cli_commands.json`; JSON parse validation;
   `git show <base>:<file>` to retrieve the pre-PR version of a file for diff comparison
 - **Write**: ONLY to `docs/audit/runs/<run-id>/p2/tier1_<bin>_findings.json`
 - Do NOT call Edit; do NOT call any nested Agent tool
