@@ -2,7 +2,9 @@
 
 Where ``annotations.collect_annotations`` answers "which ``x-node`` / ``x-link`` objects exist
 and where are they defined", this module answers "which registry entries does each host
-schema file get".  A *host* is a step schema file (``schema/NN_*.schema.json``).  Starting at
+schema file get".  A *host* is a step schema file (``schema/NN_*.schema.json``), the seed manifest, or any other
+registered schema whose own file declares an ``x-node`` with ``files`` (a *record host*; see
+``AnnotationScan.record_hosts``).  Starting at
 the host root the scan walks ``properties``, ``items`` (array) and ``additionalProperties``
 (map), follows ``$ref`` and the ``allOf`` / ``anyOf`` / ``oneOf`` / ``if`` / ``then`` /
 ``else`` branches, and records a node wherever a schema object carries ``x-node``.
@@ -149,6 +151,29 @@ class AnnotationScan:
                 ]
                 self._hosts[key] = HostScan(own, occs) if (own or occs) else None
         return self._hosts[key]
+
+    def record_hosts(self) -> list[Occurrence]:
+        """Occurrences declared by registered non-step schemas, in schema-path order.
+
+        A registered schema that is neither a step schema nor the seed manifest is a host only
+        when its own file declares an ``x-node`` with ``files``; only those occurrences (with
+        ``files`` and an ``x-node.step``) are returned.  Reuses the glob-key path of step hosts.
+        A node there without ``files`` is not registered.
+        """
+        if self.empty:
+            return []
+        out: list[Occurrence] = []
+        for rel, uri in sorted(self._rel_to_uri.items()):
+            base = os.path.basename(rel)
+            if step_of_schema_file(base) is not None or base == SEED_SCHEMA_BASENAME:
+                continue
+            if not any(n.uri == uri for n in self.decls.nodes):
+                continue
+            host = self.host(rel)
+            if host is None:
+                continue
+            out.extend(o for o in host.occurrences if o.files and o.step)
+        return out
 
     @property
     def external_kinds(self) -> list[dict[str, Any]]:

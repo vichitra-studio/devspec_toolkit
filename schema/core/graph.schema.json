@@ -102,7 +102,7 @@
             },
             {
               "const": "*",
-              "description": "Any kind. Only for the verbs replaces, removes and about."
+              "description": "Any kind. Meant only for the verbs replaces, removes and about; not enforced by a lint."
             }
           ],
           "description": "Target kinds: a non-empty array of kind names, or the single literal '*'."

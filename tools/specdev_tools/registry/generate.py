@@ -649,6 +649,12 @@ def generate_registry(repo_root: str) -> tuple[dict[str, Any], dict[str, Any]]:
             "arrays": arrays,
         }
 
+    # Record hosts: registered non-step schemas whose own x-node sets ``files``.
+    for occ in scan.record_hosts():
+        for glob_key in occ.files or []:
+            slot = registry.setdefault(glob_key, {"step": occ.step, "arrays": []})
+            slot["arrays"].append(occ.entry)
+
     # Sentinels are a hardcoded constant list: these array names appear across
     # multiple spec files at write-time (appended by canonical-lint tooling) and
     # are never declared in any schema's properties.  We do NOT discover them

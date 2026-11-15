@@ -614,3 +614,34 @@ def test_corpus_excluded_wide_path_is_keyed_by_top_key(tmp_path):
         {"array_path": ".plan.items", "id_field": "thing_id", "kind": "plan-thing", "corpus_excluded": True}]}}
     root = str(_registry_toolkit(tmp_path, reg))
     assert is_corpus_excluded("plan", root)
+
+
+# ------------------------------------------- record hosts (registered non-step schemas)
+
+def test_non_step_schema_with_files_is_a_record_host(tmp_path):
+    root = _toolkit(tmp_path)
+    reg, ext = _generate(root)
+    entry = reg["registry"]["extras/sample/*.json"]
+    assert entry["step"] == "04"
+    assert [(a["kind"], a["array_path"], a["role"]) for a in entry["arrays"]] == [
+        ("sample-record", ".records", "record")]
+    assert "extras/sample/*.json" in ext["04"]
+    assert list(Draft202012Validator(json.loads(_REG_SCHEMA.read_text())).iter_errors(reg)) == []
+    spec = root / "spec" / "extras" / "sample"
+    spec.mkdir(parents=True)
+    (spec / "a.json").write_text(json.dumps({"records": [{"record_id": "rec-1", "note": "n"}]}))
+    reg_path = root / "tools" / "entry_key_registry.json"
+    reg_path.write_text(json.dumps(reg))
+    entries = list_entries("spec/extras/sample/a.json", str(root))
+    assert [(e.array_path, e.id_field, e.kind) for e in entries] == [(".records", "record_id", "sample-record")]
+    data = json.loads((spec / "a.json").read_text())
+    assert [i["record_id"] for i, _, _ in iter_nodes(data, entries[0].array_path)] == ["rec-1"]
+
+
+def test_non_step_schema_node_without_files_is_not_registered(tmp_path):
+    root = _toolkit(tmp_path)
+    _edit(root, "schema/extras/sample_record.schema.json",
+          lambda d: d["properties"]["records"]["x-node"].pop("files"))
+    reg, _ = _generate(root)
+    assert "extras/sample/*.json" not in reg["registry"]
+    assert "sample-record" not in json.dumps(reg)

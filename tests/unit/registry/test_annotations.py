@@ -75,7 +75,8 @@ def test_collect_reads_nodes_and_links(tmp_path):
     decls = collect_annotations(str(_build(tmp_path)))
     kinds = sorted(n.kind for n in decls.nodes)
     assert kinds == [
-        "ambiguity-item", "api", "capability", "criterion", "environment", "fr", "plan-item", "seed",
+        "ambiguity-item", "api", "capability", "criterion", "environment", "fr", "plan-item",
+        "sample-record", "seed",
     ]
     holders = {(l.field_name, tuple(sorted(l.holders))) for l in decls.links}
     assert ("derives_from", ("fr",)) in holders
