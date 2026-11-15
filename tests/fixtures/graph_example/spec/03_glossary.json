@@ -1,0 +1,26 @@
+{
+  "$schema": "vc:03-glossary",
+  "id": "glossary-password-reset",
+  "owner": "product",
+  "created_at": "2026-11-15T00:00:00Z",
+  "terms": [
+    {
+      "term_id": "term-reset-token",
+      "term": "reset token",
+      "definition": "A single-use secret, sent by email, that authorises one password change for one account until it expires.",
+      "term_ref": {
+        "id": "cn:project:term:reset-token",
+        "kind": "term",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:project:term:reset-token",
+      "kind": "term",
+      "version": "^1.0.0"
+    }
+  ],
+  "canonical_proposals": []
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "vc:02a-delivery-baseline",
+  "id": "delivery-baseline-password-reset",
+  "owner": "ops",
+  "created_at": "2026-11-15T00:00:00Z",
+  "environments": {
+    "dev": {
+      "scope": "in",
+      "derives_from": [
+        "con-staged-delivery"
+      ]
+    },
+    "ci": {
+      "scope": "in",
+      "derives_from": [
+        "con-staged-delivery"
+      ]
+    },
+    "staging": {
+      "scope": "in",
+      "derives_from": [
+        "con-staged-delivery"
+      ]
+    },
+    "prod": {
+      "scope": "in",
+      "derives_from": [
+        "con-staged-delivery"
+      ]
+    }
+  },
+  "ci_gates": [
+    {
+      "gate_id": "contract-tests",
+      "scope": "in",
+      "derives_from": [
+        "identity-service"
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "secret_id": "secret-reset-token-signing-key",
+      "name": "RESET_TOKEN_SIGNING_KEY",
+      "scope": "in",
+      "derives_from": [
+        "identity-service"
+      ]
+    },
+    {
+      "secret_id": "secret-mailrelay-api-key",
+      "name": "MAILRELAY_API_KEY",
+      "scope": "in",
+      "derives_from": [
+        "conn-identity-to-mailrelay"
+      ]
+    }
+  ],
+  "canonical_refs_used": []
+}

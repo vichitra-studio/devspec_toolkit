@@ -1,0 +1,72 @@
+{
+  "$schema": "vc:04-fr-list",
+  "id": "fr-list-password-reset",
+  "owner": "product",
+  "created_at": "2026-11-15T00:00:00Z",
+  "functional_requirements": [
+    {
+      "fr_id": "fr-password-reset",
+      "priority": "must-have",
+      "scope": "in",
+      "statement": "The system shall let a registered member set a new password by redeeming a single-use reset token emailed to the account address, which expires 30 minutes after it is issued.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-password-reset-1",
+          "scope": "in",
+          "text": "Given a registered member who forgot their password, when a reset is requested, then a single-use link is emailed to the account address."
+        },
+        {
+          "criterion_id": "ac-password-reset-2",
+          "scope": "in",
+          "text": "Given a reset token issued less than 30 minutes ago and not yet used, when a new password is submitted with it, then the password is changed and the token is spent."
+        },
+        {
+          "criterion_id": "ac-password-reset-3",
+          "scope": "in",
+          "text": "Given a reset token that has expired or was already used, when a new password is submitted with it, then the request is rejected and the stored password is unchanged."
+        }
+      ],
+      "derives_from": [
+        "cap-account-recovery"
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:account-recovery",
+        "kind": "capability",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "fr_id": "fr-password-reset-request",
+      "priority": "must-have",
+      "scope": "in",
+      "statement": "The system shall email a single-use reset link to the address of a registered member who requests a password reset.",
+      "acceptance_criteria": [
+        {
+          "criterion_id": "ac-password-reset-request-1",
+          "scope": "in",
+          "text": "Given a registered member, when a reset is requested for their account, then an email with a single-use link is sent to the account address."
+        },
+        {
+          "criterion_id": "ac-password-reset-request-2",
+          "scope": "in",
+          "text": "Given an address that belongs to no account, when a reset is requested, then the response is identical and no email is sent."
+        }
+      ],
+      "derives_from": [
+        "cap-account-recovery"
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:account-recovery",
+        "kind": "capability",
+        "version": "1.0.0"
+      }
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:project:capability:account-recovery",
+      "kind": "capability",
+      "version": "^1.0.0"
+    }
+  ]
+}
