@@ -15,7 +15,7 @@ from typing import Any
 
 from ..core.errors import SpecError, make_error
 from ..core.trace_types import is_valid_trace_type, normalize_trace_type
-from ._legacy_shim import LEGACY_COMPONENT_TRACE_FIELDS, LEGACY_CONNECTION_FIELDS, has_legacy_fields
+from ._legacy_shim import LEGACY_COMPONENT_TRACE_FIELDS, has_legacy_fields
 
 # ---------------------------------------------------------------------------
 # Business-rule trace-type constants for cross-artifact checks
@@ -83,8 +83,8 @@ def _legacy_connection_errors(
 ) -> list[SpecError]:
     """Connection endpoint, schema_ref and trust-boundary checks of the 1.1.1 shape.
 
-    Reads the connection fields ``from`` / ``to`` / ``schema_ref``; called only when the
-    connections carry them. M6c deletes this with the other legacy blocks.
+    Reads the connection fields ``from`` / ``to`` / ``schema_ref``; a new-shape connection has
+    none of them, so it yields nothing (no guard needed). M6c deletes this with the other legacy blocks.
     """
     errors: list[SpecError] = []
     for idx, conn in enumerate(connections):
@@ -132,7 +132,7 @@ def check_step_02_integrity(
     Checks:
     - Duplicate component IDs (every shape)
     - Connection endpoint references, schema_ref format and external component trust-boundary
-      constraints (only on 1.1.1-shaped connections, behind ``has_legacy_fields``)
+      constraints (read from the 1.1.1 connection fields; new-shape connections yield nothing)
     - External-dependency tag requirement (unguarded; yields nothing on the new shape,
       because ``type: external`` is gone)
     - Capability coverage across components (legacy block: only when components carry
@@ -168,11 +168,10 @@ def check_step_02_integrity(
                 ))
             seen.add(comp_id)
 
-        # Connection endpoint validation. Legacy-guarded (M6c deletes): reads the 1.1.1
-        # connection fields from/to/schema_ref; the guard is given the connections only.
+        # Connection endpoint validation (M6c deletes): reads the 1.1.1 connection fields
+        # from/to/schema_ref; a new-shape connection has none of them and yields nothing.
         component_id_set = set(component_ids)
-        if has_legacy_fields([connections], LEGACY_CONNECTION_FIELDS):
-            errors.extend(_legacy_connection_errors(connections, component_id_set, component_types, basename))
+        errors.extend(_legacy_connection_errors(connections, component_id_set, component_types, basename))
 
         # Capability coverage. This is the legacy block (M6c deletes): it reads component
         # trace / trace_refs. The check that survives is the one in validators/step_02.py,

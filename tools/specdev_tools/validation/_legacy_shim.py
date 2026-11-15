@@ -21,10 +21,6 @@ LEGACY_TRACE_FIELDS: frozenset[str] = frozenset({"trace"})
 # capability `trace` and `success_metric_refs`).
 LEGACY_CHARTER_CHAIN_FIELDS: frozenset[str] = frozenset({"goal_id", "trace", "success_metric_refs"})
 
-# Step-02 connection reader in `cross_artifact_checks.py` only (`from`/`to` are generic keys:
-# give it the connections, nothing else).
-LEGACY_CONNECTION_FIELDS: frozenset[str] = frozenset({"from", "to", "schema_ref"})
-
 # Step-02 capability-coverage reader in `cross_artifact_checks.py` (component `trace` / `trace_refs`).
 LEGACY_COMPONENT_TRACE_FIELDS: frozenset[str] = frozenset({"trace", "trace_refs"})
 

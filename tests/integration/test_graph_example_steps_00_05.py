@@ -85,7 +85,7 @@ _EXPECTED_KINDS: dict[str, str] = {
 # Warnings the example produces by construction: no other code may appear.
 _PINNED_WARNINGS = Counter(
     {
-        "W555": 1,  # the seed excerpt names one out-of-scope item; the lint expects three
+        "W555": 1,  # the seed has no out-of-scope section (only a prose line), so the lint counts 0 of the 3 it expects
         "W570": 3,  # steps 07, 14 and 16 are absent: the example stops at step 05 until M3
         "W594": 2,  # 01 and 03 restate the design's wording with little token overlap upstream
     }

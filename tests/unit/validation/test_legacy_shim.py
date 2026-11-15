@@ -13,7 +13,6 @@ from specdev_tools.core.scope_helpers import is_parked
 from specdev_tools.validation._legacy_shim import (
     LEGACY_CHARTER_CHAIN_FIELDS,
     LEGACY_COMPONENT_TRACE_FIELDS,
-    LEGACY_CONNECTION_FIELDS,
     LEGACY_PARKED_SCOPES,
     LEGACY_TRACE_FIELDS,
     has_legacy_fields,
@@ -60,14 +59,13 @@ def _closure_codes(spec_dir: str) -> set[str]:
 
 
 _ALL_LEGACY_NAMES = (
-    LEGACY_TRACE_FIELDS, LEGACY_CHARTER_CHAIN_FIELDS, LEGACY_CONNECTION_FIELDS, LEGACY_COMPONENT_TRACE_FIELDS,
+    LEGACY_TRACE_FIELDS, LEGACY_CHARTER_CHAIN_FIELDS, LEGACY_COMPONENT_TRACE_FIELDS,
 )
 
 
 def test_has_legacy_fields_true_for_1_1_1_shape():
     assert has_legacy_fields(LEGACY_SHAPE.values(), LEGACY_TRACE_FIELDS)
     assert has_legacy_fields([LEGACY_SHAPE["00_charter.json"]], LEGACY_CHARTER_CHAIN_FIELDS)
-    assert has_legacy_fields([LEGACY_SHAPE["02_system_sketch.json"]["connections"]], LEGACY_CONNECTION_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace": []}], LEGACY_COMPONENT_TRACE_FIELDS)
     assert has_legacy_fields([{"component_id": "comp-a", "trace_refs": []}], LEGACY_COMPONENT_TRACE_FIELDS)
 

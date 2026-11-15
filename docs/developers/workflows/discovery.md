@@ -44,7 +44,7 @@ Use the [core validation commands](../reference.md#core-validation-commands) aft
 ## Step 02 Troubleshooting
 - Components, connections and third parties require `derives_from` (links to capabilities or constraints, components, seeds or constraints respectively); a missing one fails schema validation.
 - Components must include 3–6 responsibilities and an owner.
-- Multiple components require at least one connection; each connection must include `connection_id`, `trust_boundary`, `derives_from` (the source component) and `connects_to` (a component or third party).
+- Multiple components require at least one connection; each connection must include `connection_id`, `protocol`, `trust_boundary`, `derives_from` (the source component) and `connects_to` (a component or third party).
 - `partner`/`public` connections require `auth` and `rate_limit`; `event` protocol requires `reliability`.
 - Connections no longer carry `schema_ref` or `interface_ref`; `tech_stack` is deprecated in favour of `third_parties`.
 

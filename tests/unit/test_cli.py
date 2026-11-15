@@ -1891,6 +1891,29 @@ class CliTests(unittest.TestCase):
                 f"Expected wont-have FR excluded from total_count. Got: {payload['coverage']}"
             )
 
+    def test_completeness_check_excludes_scope_later_frs_from_total(self):
+        """A new-shape FR with scope:"later" (no priority) is parked (``is_parked``) and must
+        not count toward the FR denominators, as the priority:"wont-have" FR of the test above."""
+        with tempfile.TemporaryDirectory() as td:
+            repo_root = Path(td)
+            spec_dir = repo_root / "spec"
+            spec_dir.mkdir()
+            frs = {"functional_requirements": [
+                {"fr_id": "fr-login", "scope": "in"},
+                {"fr_id": "fr-roadmap-v2", "scope": "later"},
+            ]}
+            (spec_dir / "04_fr_list.json").write_text(json.dumps(frs), encoding="utf-8")
+
+            code, out, err = self._run_cli(
+                ["completeness-check", str(spec_dir), "--repo-root", str(repo_root), "--json"]
+            )
+            self.assertEqual(0, code, msg=f"stdout: {out}\nstderr: {err}")
+            payload = json.loads(out)
+            self.assertEqual(
+                1, payload["coverage"]["fr_api_coverage"]["total_count"],
+                f"Expected scope:later FR excluded from total_count. Got: {payload['coverage']}"
+            )
+
     def test_completeness_check_step05_oos_excluded_from_api_not_fixture_total(self):
         """An FR exempted via Step 05 apis.out_of_scope[] must be excluded from
         fr_api_coverage/fr_milestone_coverage's denominator, but NOT from

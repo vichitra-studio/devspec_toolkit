@@ -79,12 +79,12 @@ changes:
       Breaking for host specs: steps 00 to 05 move to the spec-graph shape.
       Step 00 (charter): in_scope / out_of_scope merge into scope_items (each
       with scope in | later | out, scope_reason for later / out, scope_id);
-      assumptions, risks, stakeholders and needs become objects with ids; new
-      constraints list; links removed; derives_from added to scope items,
+      assumptions, risks and stakeholder needs become objects with ids (they
+      were strings); stakeholders gain stakeholder_id; new constraints list; links removed; derives_from added to scope items,
       assumptions, risks, needs, segments, metrics and constraints. Step 01:
       capabilities lose goal_id, success_metric_refs and trace and gain
-      derives_from, scope in | later | out (future becomes later) and
-      scope_reason. Step 02: components and connections lose trace;
+      derives_from and scope_reason; the scope value future becomes later.
+      Step 02: components and connections lose trace;
       connections lose from, to, schema_ref and interface_ref and gain
       connection_id, derives_from (source) and connects_to; new third_parties
       list (tech_stack is deprecated); component type external and the tag
@@ -95,8 +95,8 @@ changes:
       host keys. Step 03: terms gain aliases, lifecycle and replaces. Step 04:
       FRs lose trace and gain derives_from (capabilities) and depends_on (FRs);
       acceptance criteria gain scope. Step 05: APIs lose trace and example_refs
-      and gain derives_from (FRs), provided_by, relies_on and depends_on; errors
-      become objects (error_id, code, message, derives_from). scope (in | later |
+      and gain derives_from (FRs), provided_by, relies_on and depends_on; each
+      error gains required error_id, scope and derives_from. scope (in | later |
       out) becomes required on every functional requirement, API, API error,
       acceptance criterion, charter risk, environment, CI gate and secret
       (none of them had it in 1.1.1; capabilities already required it).
@@ -123,8 +123,8 @@ changes:
       later in this release, so a step 00 to 05 spec gets no link-existence or
       cycle error in the meantime. The step 04 check that a requirement
       carries a non-empty trace and the step 02 check for a missing tech_stack
-      go with those fields. The step 02 capability-coverage check (E590), the
-      step 04 capability_ref check and the other content checks stay.
+      go with those fields. The step 02 capability-coverage check (E590) and
+      the other content checks stay.
     migration:
       action: none
 
@@ -152,18 +152,18 @@ changes:
       A check that reads fields of the 1.1.1 shape (trace, goal_id,
       success_metric_refs) runs only when the files it reads carry those
       fields. A spec whose steps 00 to 05 have the new shape gets none of
-      E560, W564 / E535 and W568, and no FR-to-API coverage warning from the
-      matrix, whatever shape its later steps have, until graph coverage later
+      E560, W564 / E535 and W568, and no FR-to-API coverage finding from the
+      matrix (W592, or E592 when coverage_thresholds.mode is error), whatever shape its later steps have, until graph coverage later
       in this release. A 1.1.1 spec whose step-05 APIs carry no trace at all
-      gets no W564 and no FR-to-API threshold warning; such a file is invalid
+      gets no W564 and no W592 / E592; such a file is invalid
       under the 1.1.1 schema. For a spec whose steps 00 to 05 have the new
       shape, completeness-check reports FR-to-API coverage and
       capability-to-FR coverage as complete (ratio 1.0), because the checks
       behind those two numbers do not run on it, until graph coverage later in
       this release. For the same spec, specdev matrix writes a trace matrix
       whose coverage states fr_with_api 0 and whose FR rows have an empty apis
-      list, because its FR-to-API reader does not run on it; no coverage
-      warning follows from that. The W583 reader of step 11 reads API derives_from: a 1.1.1
+      list, because its FR-to-API reader does not run on it; no W592 / E592
+      follows from that. The W583 reader of step 11 reads API derives_from: a 1.1.1
       step-05 API linked only to parked requirements through trace is no
       longer exempt from W583.
     migration:

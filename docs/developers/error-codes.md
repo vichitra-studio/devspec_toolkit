@@ -391,7 +391,7 @@
 
 ### E592 / W592 COVERAGE_THRESHOLD_BREACH / COVERAGE_THRESHOLD_WARN
 
-**Trigger**: The traceability matrix FR coverage percentage falls below the configured threshold in `tools/step_order.json` → `coverage_thresholds.fr_coverage` (default: 80%).
+**Trigger**: The traceability matrix FR coverage percentage falls below the configured threshold in `tools/step_order.json` → `coverage_thresholds.fr_coverage` (default: 80%). The percentage is FR-to-API coverage, read from the 1.1.1 `trace` field of step 05 APIs. When a step 05 file is loaded and its APIs carry no `trace` (a spec whose steps 00 to 05 have the new shape), that coverage is not computed and neither W592 nor E592 is emitted, in either mode, until graph coverage later in this release.
 
 **Resolution**: Increase FR coverage by adding API contracts, fixtures, or NFR bindings for uncovered FRs.
 

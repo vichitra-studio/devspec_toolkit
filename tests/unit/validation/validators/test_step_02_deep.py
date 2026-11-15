@@ -144,3 +144,18 @@ def test_wrong_typed_third_parties_do_not_raise(tmp_path):
     for bad in (None, 7, ["x"], [7], [{"third_party_id": {"a": 1}}], [{"third_party_id": ["a"]}]):
         instance = {"components": [_component("comp-a", [])], "third_parties": bad, "connections": [connection]}
         validate_step_02(instance, str(tmp_path))
+
+
+def test_partner_and_public_connection_without_rate_limit_is_an_error():
+    from specdev_tools.validation.validators.step_02 import check_partner_public_rate_limit
+
+    connections = [
+        {"connection_id": "conn-partner", "trust_boundary": "partner"},
+        {"connection_id": "conn-public", "trust_boundary": "public"},
+        {"connection_id": "conn-internal", "trust_boundary": "internal"},
+        {"connection_id": "conn-limited", "trust_boundary": "public", "rate_limit": {"requests": 10}},
+    ]
+    errors = check_partner_public_rate_limit(connections)
+    assert [e.code for e in errors] == ["E520", "E520"]
+    assert "Connection[0]" in errors[0].message and "'partner'" in errors[0].message
+    assert "Connection[1]" in errors[1].message and "'public'" in errors[1].message
