@@ -6,8 +6,20 @@
   "capabilities": [
     {
       "capability_id": "capability-search-products",
-      "description": "Missing verb and scope"
+      "description": "Missing verb and scope",
+      "capability_ref": {
+        "id": "cn:product:capability:search-products",
+        "kind": "capability"
+      },
+      "derives_from": [
+        "scope-product-search"
+      ]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:product:capability:search-products",
+      "kind": "capability"
+    }
+  ]
 }

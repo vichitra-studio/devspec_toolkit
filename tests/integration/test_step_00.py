@@ -109,15 +109,35 @@ class Step00IntegrationTests(unittest.TestCase):
         self.repo_root = Path(__file__).resolve().parents[2]
         self.fixtures_dir = self.repo_root / "tests" / "fixtures" / "step_00"
 
-    def test_invalid_missing_scope_fails_validation(self):
-        """invalid_missing_scope.json must fail because in_scope is required."""
-        errors = specdev_validate_file(
-            str(self.repo_root),
-            str(self.fixtures_dir / "invalid_missing_scope.json"),
-        )
-        self.assertTrue(errors, "Expected validation errors for missing in_scope")
-        rendered = [e.render() for e in errors]
+    def _schema_errors(self, fixture: str) -> list[str]:
+        """Rendered E520 (schema) errors for a step_00 fixture."""
+        errors = specdev_validate_file(str(self.repo_root), str(self.fixtures_dir / fixture))
+        return [e.render() for e in errors if e.code == "E520"]
+
+    def _assert_fails_naming(self, fixture: str, needle: str) -> None:
+        rendered = self._schema_errors(fixture)
+        self.assertTrue(rendered, f"Expected schema errors for {fixture}")
         self.assertTrue(
-            any("in_scope" in msg for msg in rendered),
-            f"Expected an error mentioning 'in_scope', got: {rendered}",
+            any(needle in msg for msg in rendered),
+            f"Expected an error mentioning {needle!r}, got: {rendered}",
         )
+
+    def test_valid_charter_with_one_in_and_one_out_item_passes(self):
+        """The minimal charter has one in and one out scope item and no per-class floor."""
+        self.assertEqual(self._schema_errors("00_charter.json"), [])
+
+    def test_empty_scope_items_fails(self):
+        self._assert_fails_naming("invalid_empty_scope_items.json", "scope_items")
+
+    def test_later_scope_item_without_scope_reason_fails(self):
+        self._assert_fails_naming("invalid_later_without_scope_reason.json", "scope_reason")
+
+    def test_empty_needs_list_fails(self):
+        self._assert_fails_naming("invalid_empty_needs.json", "needs")
+
+    def test_old_shape_in_scope_charter_fails(self):
+        self._assert_fails_naming("invalid_old_shape_in_scope.json", "in_scope")
+
+    def test_invalid_missing_scope_fails_validation(self):
+        """invalid_missing_scope.json must fail because scope_items is required."""
+        self._assert_fails_naming("invalid_missing_scope.json", "scope_items")

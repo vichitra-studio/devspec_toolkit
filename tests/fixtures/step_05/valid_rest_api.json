@@ -17,12 +17,22 @@
         {
           "code": "invalid-credentials",
           "message": "The provided username or password is invalid",
-          "severity": "error"
+          "severity": "error",
+          "error_id": "err-invalid-credentials",
+          "derives_from": [
+            "ac-user-login-2"
+          ],
+          "scope": "in"
         },
         {
           "code": "account-disabled",
           "message": "The account has been disabled",
-          "severity": "error"
+          "severity": "error",
+          "error_id": "err-account-disabled",
+          "derives_from": [
+            "ac-user-login-2"
+          ],
+          "scope": "in"
         }
       ],
       "parameters": [
@@ -51,12 +61,10 @@
         "source_date": "2025-01-01",
         "resolved_at": "2025-01-01T00:00:00Z"
       },
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-login"
-        }
-      ]
+      "derives_from": [
+        "fr-user-login"
+      ],
+      "scope": "in"
     },
     {
       "api_id": "api-user-profile",
@@ -71,7 +79,12 @@
         {
           "code": "user-not-found",
           "message": "The requested user was not found",
-          "severity": "error"
+          "severity": "error",
+          "error_id": "err-user-not-found",
+          "derives_from": [
+            "ac-user-profile-2"
+          ],
+          "scope": "in"
         }
       ],
       "parameters": [
@@ -94,12 +107,10 @@
         "source_date": "2025-01-01",
         "resolved_at": "2025-01-01T00:00:00Z"
       },
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-user-profile"
-        }
-      ]
+      "derives_from": [
+        "fr-user-profile"
+      ],
+      "scope": "in"
     }
   ],
   "canonical_refs_used": [

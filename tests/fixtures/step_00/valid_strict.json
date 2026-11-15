@@ -5,28 +5,80 @@
   "owner": "product",
   "created_at": "2023-10-27T10:00:00Z",
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
-  "in_scope": [
-    "User Authentication",
-    "Dashboard Reporting",
-    "Data Export API"
-  ],
-  "out_of_scope": [
-    "Mobile App",
-    "Legacy Data Migration",
-    "Third-party Integrations"
+  "scope_items": [
+    {
+      "scope_id": "scope-user-authentication",
+      "text": "User Authentication",
+      "scope": "in",
+      "derives_from": [
+        "need-scalability"
+      ]
+    },
+    {
+      "scope_id": "scope-dashboard-reporting",
+      "text": "Dashboard Reporting",
+      "scope": "in",
+      "derives_from": [
+        "need-security"
+      ]
+    },
+    {
+      "scope_id": "scope-third-party-integrations",
+      "text": "Third-party Integrations",
+      "scope": "later",
+      "scope_reason": "Deferred until the core platform is stable.",
+      "derives_from": [
+        "need-scalability"
+      ]
+    },
+    {
+      "scope_id": "scope-mobile-app",
+      "text": "Mobile App",
+      "scope": "out",
+      "scope_reason": "The first release targets the web only.",
+      "derives_from": [
+        "seed-charter-brief"
+      ]
+    }
   ],
   "assumptions": [
-    "Existing AWS infrastructure is available"
+    {
+      "assumption_id": "assumption-aws-available",
+      "text": "Existing AWS infrastructure is available",
+      "derives_from": [
+        "seed-charter-brief"
+      ]
+    }
   ],
   "risks": [
-    "Team capacity constraints"
+    {
+      "risk_id": "risk-team-capacity",
+      "text": "Team capacity constraints",
+      "scope": "in",
+      "derives_from": [
+        "assumption-aws-available"
+      ]
+    }
   ],
   "stakeholders": [
     {
+      "stakeholder_id": "stakeholder-cto",
       "role": "CTO",
       "needs": [
-        "Scalability",
-        "Security"
+        {
+          "need_id": "need-scalability",
+          "text": "Scalability",
+          "derives_from": [
+            "seed-charter-brief"
+          ]
+        },
+        {
+          "need_id": "need-security",
+          "text": "Security",
+          "derives_from": [
+            "seed-charter-brief"
+          ]
+        }
       ]
     }
   ],
@@ -43,6 +95,9 @@
       ],
       "gains": [
         "Faster troubleshooting"
+      ],
+      "derives_from": [
+        "seed-charter-brief"
       ]
     }
   ],
@@ -56,7 +111,10 @@
         "id": "cn:core:unit:ms",
         "kind": "unit"
       },
-      "measurement_method": "P95 via Datadog"
+      "measurement_method": "P95 via Datadog",
+      "derives_from": [
+        "need-scalability"
+      ]
     },
     {
       "metric_id": "uptime",
@@ -67,7 +125,10 @@
         "id": "cn:core:unit:percent",
         "kind": "unit"
       },
-      "measurement_method": "Monthly monitoring"
+      "measurement_method": "Monthly monitoring",
+      "derives_from": [
+        "need-scalability"
+      ]
     }
   ],
   "canonical_refs_used": [

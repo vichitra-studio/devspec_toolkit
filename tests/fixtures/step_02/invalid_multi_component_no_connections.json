@@ -12,11 +12,8 @@
         "Serve account queries"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-profile"
       ]
     },
     {
@@ -28,19 +25,36 @@
         "Revoke sessions"
       ],
       "owner": "api",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        }
+      "derives_from": [
+        "capability-user-auth"
       ]
     }
   ],
   "tech_stack": {
-    "languages": [{ "name": "Python", "version": "3.12" }],
-    "frameworks": [{ "name": "FastAPI", "version": "0.111" }],
-    "infrastructure": [{ "name": "SQLite", "version": "3" }],
-    "tools": [{ "name": "pytest", "version": "8.0" }]
+    "languages": [
+      {
+        "name": "Python",
+        "version": "3.12"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "FastAPI",
+        "version": "0.111"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "SQLite",
+        "version": "3"
+      }
+    ],
+    "tools": [
+      {
+        "name": "pytest",
+        "version": "8.0"
+      }
+    ]
   },
   "canonical_refs_used": []
 }

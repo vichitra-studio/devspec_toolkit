@@ -20,7 +20,8 @@
         "id": "cn:core:interface:http-json",
         "kind": "interface",
         "version": "1.0.0"
-      }
+      },
+      "scope": "in"
     }
   ],
   "canonical_refs_used": [

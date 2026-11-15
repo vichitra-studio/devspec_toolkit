@@ -4,14 +4,45 @@
   "owner": "system",
   "created_at": "2023-10-27T10:00:00Z",
   "problem_statement": "This is a problem statement.",
-  "in_scope": [
-    "Just one thing"
-  ],
-  "out_of_scope": [
-    "Just one thing"
+  "scope_items": [
+    {
+      "scope_id": "scope-user-authentication",
+      "text": "User Authentication",
+      "scope": "in",
+      "derives_from": [
+        "need-scalability"
+      ]
+    },
+    {
+      "scope_id": "scope-dashboard-reporting",
+      "text": "Dashboard Reporting",
+      "scope": "in",
+      "derives_from": [
+        "need-security"
+      ]
+    },
+    {
+      "scope_id": "scope-third-party-integrations",
+      "text": "Third-party Integrations",
+      "scope": "later",
+      "scope_reason": "Deferred until the core platform is stable.",
+      "derives_from": [
+        "need-scalability"
+      ]
+    },
+    {
+      "scope_id": "scope-mobile-app",
+      "text": "Mobile App",
+      "scope": "out",
+      "scope_reason": "The first release targets the web only.",
+      "derives_from": [
+        "seed-charter-brief"
+      ]
+    }
   ],
   "stakeholders": [
     {
+      "stakeholder_id": "stakeholder-cto",
       "role": "CTO"
     }
   ],

@@ -25,3 +25,56 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests
+# ---------------------------------------------------------------------------
+
+import json
+import tempfile
+import unittest
+from typing import Callable
+
+from specdev_tools.validation.validate import validate_file as specdev_validate_file
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "step_05"
+
+
+class Step05IntegrationTests(unittest.TestCase):
+    def _schema_errors(self, fixture: str, mutate: Callable[[dict], None]) -> list[str]:
+        """Rendered E520 errors for a step_05 fixture after ``mutate`` edits a copy."""
+        spec = json.loads((_FIXTURES / fixture).read_text())
+        mutate(spec)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "05_interface_contracts.json"
+            path.write_text(json.dumps(spec))
+            errors = specdev_validate_file(str(_REPO_ROOT), str(path))
+        return [e.render() for e in errors if e.code == "E520"]
+
+    def _assert_valid_fixture_fails_naming(self, mutate: Callable[[dict], None], needle: str) -> None:
+        rendered = self._schema_errors("valid_rest_api.json", mutate)
+        self.assertTrue(any(needle in msg for msg in rendered), rendered)
+
+    def test_valid_fixture_has_no_schema_errors(self):
+        self.assertEqual(self._schema_errors("valid_rest_api.json", lambda spec: None), [])
+
+    def test_api_without_derives_from_fails(self):
+        rendered = self._schema_errors("invalid_missing_trace.json", lambda spec: None)
+        self.assertTrue(any("derives_from" in msg for msg in rendered), rendered)
+
+    def test_api_error_without_error_id_fails(self):
+        self._assert_valid_fixture_fails_naming(
+            lambda spec: spec["apis"][0]["errors"][0].pop("error_id"), "error_id"
+        )
+
+    def test_api_with_example_refs_fails(self):
+        self._assert_valid_fixture_fails_naming(
+            lambda spec: spec["apis"][0].update(example_refs=["fixture-login"]), "example_refs"
+        )
+
+    def test_api_error_empty_derives_from_fails(self):
+        self._assert_valid_fixture_fails_naming(
+            lambda spec: spec["apis"][0]["errors"][0].update(derives_from=[]), "derives_from"
+        )

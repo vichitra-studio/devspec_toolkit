@@ -19,17 +19,23 @@
       "acceptance_criteria": [
         {
           "criterion_id": "ac-login-success",
-          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard"
+          "text": "Given valid username and password, when user submits login form, then system authenticates user and redirects to dashboard",
+          "scope": "in"
+        },
+        {
+          "criterion_id": "ac-login-failure",
+          "scope": "in",
+          "text": "Given an invalid request, when the user submits it, then the system rejects it with an error response"
         }
       ],
-      "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},
-      "trace": [
-        {
-          "type": "random",
-          "id": "some-id",
-          "note": "Invalid trace type"
-        }
-      ]
+      "capability_ref": {
+        "id": "cn:project:capability:user-auth",
+        "kind": "capability"
+      },
+      "derives_from": [
+        "Not A Valid Id!"
+      ],
+      "scope": "in"
     },
     {
       "fr_id": "fr-user-logout",
@@ -45,20 +51,23 @@
       "acceptance_criteria": [
         {
           "criterion_id": "ac-logout-success",
-          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page"
-        }
-      ],
-      "capability_ref": {"id": "cn:project:capability:user-auth", "kind": "capability"},
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-login"
+          "text": "Given authenticated user, when user clicks logout, then system terminates session and redirects to login page",
+          "scope": "in"
         },
         {
-          "type": "capability",
-          "id": "cap-user-auth"
+          "criterion_id": "ac-logout-failure",
+          "scope": "in",
+          "text": "Given an invalid request, when the user submits it, then the system rejects it with an error response"
         }
-      ]
+      ],
+      "capability_ref": {
+        "id": "cn:project:capability:user-auth",
+        "kind": "capability"
+      },
+      "derives_from": [
+        "cap-user-auth"
+      ],
+      "scope": "in"
     }
   ],
   "canonical_refs_used": []

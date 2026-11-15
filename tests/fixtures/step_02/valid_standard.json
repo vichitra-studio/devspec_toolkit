@@ -16,11 +16,8 @@
         "critical-path",
         "stateless"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-profile"
       ]
     },
     {
@@ -36,11 +33,8 @@
         "supporting",
         "stateless"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        }
+      "derives_from": [
+        "capability-user-auth"
       ]
     },
     {
@@ -56,11 +50,8 @@
         "critical-path",
         "stateful"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
+      "derives_from": [
+        "capability-payment-processing"
       ]
     },
     {
@@ -76,72 +67,79 @@
         "critical-path",
         "stateful"
       ],
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
+      "derives_from": [
+        "capability-user-profile"
       ]
     }
   ],
   "connections": [
     {
-      "from": "user-service",
-      "to": "auth-service",
+      "connection_id": "user-service-to-auth-service",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "auth-service"
+      ],
       "protocol": "http",
       "trust_boundary": "internal",
-      "schema_ref": "file://schemas/auth.json",
       "rate_limit": {
         "rps": 100,
         "scope": "client"
-      },
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-auth"
-        }
-      ]
+      }
     },
     {
-      "from": "user-service",
-      "to": "user-db",
+      "connection_id": "user-service-to-user-db",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "user-db"
+      ],
       "protocol": "db",
-      "trust_boundary": "internal",
-      "schema_ref": "file://schemas/user.json",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-user-profile"
-        }
-      ]
+      "trust_boundary": "internal"
     },
     {
-      "from": "user-service",
-      "to": "billing-service",
+      "connection_id": "user-service-to-billing-service",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "billing-service"
+      ],
       "protocol": "event",
       "trust_boundary": "internal",
-      "schema_ref": "file://schemas/payments.json",
-      "reliability": "at-least-once",
-      "trace": [
-        {
-          "type": "doc",
-          "id": "capability-payment-processing"
-        }
-      ]
+      "reliability": "at-least-once"
     }
   ],
   "tech_stack": {
     "languages": [
-      { "name": "TypeScript", "version": "5.4", "rationale": "Type safety for service development" }
+      {
+        "name": "TypeScript",
+        "version": "5.4",
+        "rationale": "Type safety for service development"
+      }
     ],
     "frameworks": [
-      { "name": "Express", "version": "^4.19", "rationale": "HTTP framework for user-service and auth-service" }
+      {
+        "name": "Express",
+        "version": "^4.19",
+        "rationale": "HTTP framework for user-service and auth-service"
+      }
     ],
     "infrastructure": [
-      { "name": "PostgreSQL", "version": "16", "rationale": "Primary data store for user-db component" }
+      {
+        "name": "PostgreSQL",
+        "version": "16",
+        "rationale": "Primary data store for user-db component"
+      }
     ],
     "tools": [
-      { "name": "ESLint", "version": "^9.0", "rationale": "Linting for TypeScript codebase" }
+      {
+        "name": "ESLint",
+        "version": "^9.0",
+        "rationale": "Linting for TypeScript codebase"
+      }
     ]
   },
   "canonical_refs_used": []

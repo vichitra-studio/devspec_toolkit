@@ -5,23 +5,44 @@
   "owner": "product",
   "created_at": "2023-10-27T10:00:00Z",
   "problem_statement": "The current system is too slow and causes user churn. We need to fix this immediately.",
-  "out_of_scope": [
-    "Mobile App",
-    "Legacy Data Migration",
-    "Third-party Integrations"
-  ],
   "assumptions": [
-    "Existing AWS infrastructure is available"
+    {
+      "assumption_id": "assumption-aws-available",
+      "text": "Existing AWS infrastructure is available",
+      "derives_from": [
+        "seed-charter-brief"
+      ]
+    }
   ],
   "risks": [
-    "Team capacity constraints"
+    {
+      "risk_id": "risk-team-capacity",
+      "text": "Team capacity constraints",
+      "scope": "in",
+      "derives_from": [
+        "assumption-aws-available"
+      ]
+    }
   ],
   "stakeholders": [
     {
+      "stakeholder_id": "stakeholder-cto",
       "role": "CTO",
       "needs": [
-        "Scalability",
-        "Security"
+        {
+          "need_id": "need-scalability",
+          "text": "Scalability",
+          "derives_from": [
+            "seed-charter-brief"
+          ]
+        },
+        {
+          "need_id": "need-security",
+          "text": "Security",
+          "derives_from": [
+            "seed-charter-brief"
+          ]
+        }
       ]
     }
   ],
@@ -38,6 +59,9 @@
       ],
       "gains": [
         "Faster troubleshooting"
+      ],
+      "derives_from": [
+        "seed-charter-brief"
       ]
     }
   ],
@@ -51,7 +75,10 @@
         "id": "cn:core:unit:ms",
         "kind": "unit"
       },
-      "measurement_method": "P95 via Datadog"
+      "measurement_method": "P95 via Datadog",
+      "derives_from": [
+        "need-scalability"
+      ]
     },
     {
       "metric_id": "uptime",
@@ -62,12 +89,19 @@
         "id": "cn:core:unit:percent",
         "kind": "unit"
       },
-      "measurement_method": "Monthly monitoring"
+      "measurement_method": "Monthly monitoring",
+      "derives_from": [
+        "need-scalability"
+      ]
     }
   ],
   "canonical_refs_used": [
     {
       "id": "cn:core:unit:ms",
+      "kind": "unit"
+    },
+    {
+      "id": "cn:core:unit:percent",
       "kind": "unit"
     }
   ]

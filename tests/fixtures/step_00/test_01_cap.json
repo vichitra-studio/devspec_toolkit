@@ -10,6 +10,10 @@
       "description": "Manual approval step for project funding.",
       "scope": "in",
       "owner": "business",
+      "capability_ref": {
+        "id": "cn:product:capability:approve-budget",
+        "kind": "capability"
+      },
       "inputs": [
         "budget-request-id"
       ],
@@ -23,8 +27,15 @@
         "budget-approved"
       ],
       "error_states": [],
-      "trace": []
+      "derives_from": [
+        "scope-budget-approval"
+      ]
     }
   ],
-  "canonical_refs_used": []
+  "canonical_refs_used": [
+    {
+      "id": "cn:product:capability:approve-budget",
+      "kind": "capability"
+    }
+  ]
 }

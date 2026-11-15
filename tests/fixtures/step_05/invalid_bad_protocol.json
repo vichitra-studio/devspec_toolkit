@@ -11,18 +11,19 @@
       "protocol": "invalid-protocol",
       "path": "/test",
       "method": "GET",
-      "input_schema_ref": "-tbd",
-      "output_schema_ref": "-tbd",
+      "input_schema_ref": "schemas/payloads/test.json",
+      "output_schema_ref": "schemas/payloads/test-out.json",
       "errors": [],
       "security": "none",
       "owner": "api",
-      "interface_ref": {"id": "cn:core:interface:http-json", "kind": "interface"},
-      "trace": [
-        {
-          "type": "fr",
-          "id": "fr-test"
-        }
-      ]
+      "interface_ref": {
+        "id": "cn:core:interface:http-json",
+        "kind": "interface"
+      },
+      "derives_from": [
+        "fr-test"
+      ],
+      "scope": "in"
     }
   ],
   "canonical_refs_used": []

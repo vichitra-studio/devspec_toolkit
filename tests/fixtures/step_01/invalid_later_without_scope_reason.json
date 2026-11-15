@@ -1,0 +1,28 @@
+{
+  "$schema": "vc:01-capabilities",
+  "id": "capabilities-catalog",
+  "owner": "product",
+  "created_at": "2025-01-01T00:00:00Z",
+  "capabilities": [
+    {
+      "capability_id": "capability-archive-user",
+      "verb": "archive",
+      "description": "Archive a user account.",
+      "scope": "later",
+      "owner": "ops",
+      "capability_ref": {
+        "id": "cn:ops:capability:archive-user",
+        "kind": "capability"
+      },
+      "derives_from": [
+        "scope-user-archive"
+      ]
+    }
+  ],
+  "canonical_refs_used": [
+    {
+      "id": "cn:ops:capability:archive-user",
+      "kind": "capability"
+    }
+  ]
+}

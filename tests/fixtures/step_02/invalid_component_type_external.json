@@ -1,0 +1,79 @@
+{
+  "id": "system-sketch-invalid-component-type-external",
+  "owner": "api",
+  "created_at": "2025-01-01T00:00:00Z",
+  "components": [
+    {
+      "component_id": "user-service",
+      "type": "service",
+      "responsibilities": [
+        "Create user accounts",
+        "Update profiles",
+        "Serve account queries"
+      ],
+      "owner": "api",
+      "derives_from": [
+        "capability-user-auth",
+        "capability-user-profile"
+      ]
+    },
+    {
+      "component_id": "stripe-api",
+      "type": "external",
+      "responsibilities": [
+        "Tokenize payment details",
+        "Authorize card payments",
+        "Return payment confirmations"
+      ],
+      "owner": "business",
+      "derives_from": [
+        "capability-payment-processing"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "connection_id": "user-service-to-stripe-api",
+      "derives_from": [
+        "user-service"
+      ],
+      "connects_to": [
+        "stripe-api"
+      ],
+      "protocol": "http",
+      "trust_boundary": "partner",
+      "auth": "jwt",
+      "rate_limit": {
+        "rps": 50,
+        "scope": "client"
+      }
+    }
+  ],
+  "tech_stack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": "3.12"
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "FastAPI",
+        "version": "0.111"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "SQLite",
+        "version": "3"
+      }
+    ],
+    "tools": [
+      {
+        "name": "pytest",
+        "version": "8.0"
+      }
+    ]
+  },
+  "canonical_refs_used": []
+}
