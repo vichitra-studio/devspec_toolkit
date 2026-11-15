@@ -11,13 +11,14 @@ because the registry generator (W3) guarantees coverage as an internal contract.
   R003 / E622 REGISTRY_DRIFT
       For every registered ``(spec_file, array_path, id_field)`` triple,
       read ``<spec_root>/<spec_file>`` and verify:
-      - The array_path resolves to a non-null array in the file.
+      - The array_path, when present, resolves to an array (or map, for a
+        ``{}`` wide path) in the file.
       - The first entry of the array contains the registered ``id_field``.
-      - Nested arrays are checked only when present: a present-but-wrong-shape
-        nested array (wrong id_field or not an array) still fires E622, but a
-        missing nested array is not drift (nested arrays may be optional per
-        schema; a missing *required* nested array is caught by schema
-        validation in ``spec-check`` instead).
+      - Every collection, root or nested, is checked only when present: a
+        present-but-wrong-shape collection (wrong id_field or not an array)
+        still fires E622, but an absent one is not drift (collections may be
+        optional per schema; a missing *required* collection is caught by
+        schema validation in ``spec-check`` instead).
 
   R004 / W614 UNREGISTERED_ARRAY
       For every ``.json`` file in ``<spec_root>/``, scan top-level arrays
@@ -217,19 +218,22 @@ def _drift(basename: str, text: str) -> SpecError:
 
 
 def _check_wide_first_hop(entry: dict, container, basename: str, errs: list) -> None:
-    """E622 for a root wide-path entry whose first hop is absent or of the wrong type.
+    """E622 for a root wide-path entry whose first hop is present but of the wrong type.
 
-    Mirrors the plain-name branch: an absent or mistyped primary collection is drift; an
-    empty one is not.  Only the first hop is tested (deeper hops may legitimately be empty).
+    An absent first hop is not drift (required presence is owned by schema validation,
+    as for plain-name roots); an empty collection is not drift either.  Only the first
+    hop is tested (deeper hops may legitimately be empty).
     """
     path = entry["array_path"]
     keys, marker = parse_array_path(path)[0]
     cur: Any = container
     for k in keys:
-        if not isinstance(cur, dict) or k not in cur:
+        if not isinstance(cur, dict):
             errs.append(_drift(
-                basename, f"'{basename}': array_path '{path}' not found in file (key '{k}' missing)."
+                basename, f"'{basename}': array_path '{path}' exists but is not an object at '{k}'."
             ))
+            return
+        if k not in cur:
             return
         cur = cur[k]
     want = dict if marker == "{}" else list
@@ -294,9 +298,8 @@ def _check_array_entry(
 
     ``display_prefix`` accumulates the human-readable path used in messages,
     e.g. ``.milestones[]`` when validating a nested entry under milestones.
-    ``is_root`` distinguishes the top-level "not found in file" wording from
-    the nested "not found under first parent entry" wording, preserving the
-    original R003 message text for existing (one-level) cases.
+    ``is_root`` marks a top-level entry; for a wide path only a root entry has its
+    first hop shape-checked.  An absent collection is never drift at any level.
     """
     if not _is_plain_name(entry["array_path"]):
         return _check_wide_entry(entry, container, basename, display_prefix, errs, is_root=is_root)
@@ -307,27 +310,11 @@ def _check_array_entry(
     val = container.get(array_key) if isinstance(container, dict) else None
 
     if val is None:
-        # Top-level registered arrays are the file's primary entries — an absent
-        # one is genuine drift.  Nested arrays, however, may be OPTIONAL per
-        # schema (e.g. a roadmap task's ``acceptance_criteria``); their required
-        # presence is owned by schema validation and the registry-generate
-        # byte-exact gate, so a missing nested key is NOT drift here — only a
-        # present-but-wrong-shape nested array is (checked below).  Flagging
-        # missing optional nested arrays would false-positive on schema-valid
-        # host specs (DEVSPEC-125).
-        #
-        # DECISION (DEVSPEC-125): this deliberately narrows standalone
-        # ``registry-check`` — a missing *required* nested array is no longer
-        # flagged here.  registry_check cannot read the schema's ``required``, so
-        # it cannot tell required from optional; the canonical ``spec-check`` gate
-        # runs schema validation alongside this check and catches a missing
-        # required array (e.g. milestone.tasks) with its own E-code, so the
-        # signal is preserved end-to-end without the false-positive.
-        if is_root:
-            errs.append(_drift(
-                basename,
-                f"'{basename}': array_path '{full_display}' not found in file (key '{array_key}' missing).",
-            ))
+        # An absent collection is never drift, at any level: it may be OPTIONAL per
+        # schema (a root ``constraints``, a roadmap task's ``acceptance_criteria``).
+        # Required presence is owned by schema validation, which ``spec-check`` runs
+        # beside this check (DEVSPEC-125, extended to root collections by D4); only a
+        # present-but-wrong-shape collection is drift (checked below).
         return
 
     if not isinstance(val, list):

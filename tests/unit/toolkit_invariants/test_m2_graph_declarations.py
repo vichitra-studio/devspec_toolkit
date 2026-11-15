@@ -228,3 +228,100 @@ def test_term_kind_is_context_and_only_declares_replaces_link(decls) -> None:
     fname = "03_glossary.schema.json"
     assert [n.value["role"] for n in _nodes(decls, fname)] == ["context"]
     assert [lk.field_name for lk in _links(decls, fname)] == ["replaces"]
+
+
+def _same_step_edges(decls) -> set[tuple[str, str]]:
+    """``(holder kind, target kind)`` for every ``same_step_kinds`` entry on a 00-05 link."""
+    return {
+        (holder, target)
+        for link in decls.links
+        if _step_of(link.schema_file) in _M2_STEPS
+        for holder in link.holders
+        for target in link.value.get("same_step_kinds", [])
+    }
+
+
+def _has_cycle(edges: set[tuple[str, str]]) -> bool:
+    """True when *edges* (self-loops ignored) contain a cycle between distinct kinds."""
+    graph: dict[str, set[str]] = {}
+    for src, dst in edges:
+        if src != dst:
+            graph.setdefault(src, set()).add(dst)
+    done: set[str] = set()
+
+    def visit(kind: str, path: tuple[str, ...]) -> bool:
+        if kind in path:
+            return True
+        if kind in done:
+            return False
+        if any(visit(nxt, (*path, kind)) for nxt in graph.get(kind, ())):
+            return True
+        done.add(kind)
+        return False
+
+    return any(visit(kind, ()) for kind in list(graph))
+
+
+def test_same_step_self_loops_are_exactly_third_party_fr_api(decls) -> None:
+    edges = _same_step_edges(decls)
+    assert edges
+    assert {src for src, dst in edges if src == dst} == {"third-party", "fr", "api"}
+
+
+def test_same_step_kind_graph_has_no_cycle_between_distinct_kinds(decls) -> None:
+    assert not _has_cycle(_same_step_edges(decls))
+    assert _has_cycle({("a", "b"), ("b", "c"), ("c", "a")})
+
+
+def test_fr_depends_on_itself_parses_against_schema() -> None:
+    from specdev_tools.core.schema_validate import validate_data_against_schema
+
+    capability = {"id": "cn:project:capability:cap-sample", "kind": "capability"}
+
+    def fr(n: int, depends_on: list[str]) -> dict[str, Any]:
+        return {
+            "fr_id": f"fr-item-{n}",
+            "statement": "The system shall do the thing in a testable way",
+            "scope": "in",
+            "derives_from": ["cap-sample"],
+            "capability_ref": capability,
+            "acceptance_criteria": [
+                {"criterion_id": f"ac-{n}-{j}", "scope": "in", "text": "Observable outcome is verified by a test"}
+                for j in (1, 2)
+            ],
+            "depends_on": depends_on,
+        }
+
+    doc = {
+        "$schema": "vc:04-fr-list", "id": "fr-catalog", "owner": "api",
+        "created_at": "2025-01-01T00:00:00Z", "canonical_refs_used": [capability],
+        "functional_requirements": [fr(1, ["fr-item-1"]), fr(2, []), fr(3, [])],
+    }
+    assert validate_data_against_schema(str(_ROOT), doc) == []
+
+
+def _registry_entries_by_kind() -> dict[str, dict[str, Any]]:
+    """Every registered entry of ``tools/entry_key_registry.json`` keyed by kind, nested entries included."""
+    registry = json.loads((_ROOT / "tools" / "entry_key_registry.json").read_text())["registry"]
+    found: dict[str, dict[str, Any]] = {}
+
+    def collect(entries: list[dict[str, Any]]) -> None:
+        for entry in entries:
+            found[entry["kind"]] = entry
+            collect(entry.get("nested", []))
+
+    for file_entry in registry.values():
+        collect(file_entry.get("arrays", []))
+    return found
+
+
+@pytest.mark.parametrize(
+    ("kind", "id_field"),
+    [(kind, field) for kinds in _EXPECTED_KINDS.values() for kind, field in kinds.items()],
+)
+def test_every_m2_kind_in_registry_with_id_field(kind: str, id_field: str | None) -> None:
+    entry = _registry_entries_by_kind()[kind]
+    if id_field is None:
+        assert entry.get("map_keyed") is True and "id_field" not in entry
+    else:
+        assert entry["id_field"] == id_field

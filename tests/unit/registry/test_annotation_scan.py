@@ -554,11 +554,9 @@ def _wide_check(tmp_path, registry, spec_files):
 _NFR_REGISTRY = {"07_nfrs.json": _WIDE_REGISTRY["07_nfrs.json"]}
 
 
-def test_registry_check_wide_root_entry_absent_first_hop_is_e622(tmp_path):
-    errs = _wide_check(tmp_path, _NFR_REGISTRY, {"07_nfrs.json": {}})
-    assert [e.code for e in errs] == ["E622"] and "missing" in errs[0].message
-    errs = _wide_check(tmp_path / "b", _NFR_REGISTRY, {"07_nfrs.json": {"plan": {}}})
-    assert [e.code for e in errs] == ["E622"]
+def test_registry_check_wide_root_entry_absent_first_hop_is_not_drift(tmp_path):
+    assert _wide_check(tmp_path, _NFR_REGISTRY, {"07_nfrs.json": {}}) == []
+    assert _wide_check(tmp_path / "b", _NFR_REGISTRY, {"07_nfrs.json": {"plan": {}}}) == []
 
 
 def test_registry_check_wide_root_entry_wrong_type_is_e622_and_empty_is_silent(tmp_path):
@@ -567,9 +565,9 @@ def test_registry_check_wide_root_entry_wrong_type_is_e622_and_empty_is_silent(t
     assert _wide_check(tmp_path / "b", _NFR_REGISTRY, {"07_nfrs.json": {"plan": {"items": []}}}) == []
 
 
-def test_registry_check_wide_root_map_entry_absent_and_wrong_type(tmp_path):
+def test_registry_check_wide_root_map_entry_absent_is_silent_and_wrong_type_is_e622(tmp_path):
     reg = {"02a_delivery_baseline.json": _WIDE_REGISTRY["02a_delivery_baseline.json"]}
-    assert [e.code for e in _wide_check(tmp_path, reg, {"02a_delivery_baseline.json": {}})] == ["E622"]
+    assert _wide_check(tmp_path, reg, {"02a_delivery_baseline.json": {}}) == []
     errs = _wide_check(tmp_path / "b", reg, {"02a_delivery_baseline.json": {"environments": []}})
     assert [e.code for e in errs] == ["E622"] and "not a map" in errs[0].message
     assert _wide_check(tmp_path / "c", reg, {"02a_delivery_baseline.json": {"environments": {}}}) == []
