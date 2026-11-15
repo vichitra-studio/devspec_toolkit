@@ -21,13 +21,13 @@
   - `type`: Must be one of `service | db | queue | cache | job | ui | lib | external`.
   - `responsibilities`: Array of strings (minItems: 3, maxItems: 6) — present-tense action phrases.
   - `owner`: Canonical owner enum (`api | ui | system | ops | data | product | business | engineering`).
-  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type` and `id`.
+  - `derives_from`: Array of capability or constraint ids (minItems: 1).
 - `connections`: Required when 2 or more components exist (minItems: 1). Each entry requires:
-  - `from`: kebab-case component_id of the source.
-  - `to`: kebab-case component_id of the destination.
+  - `connection_id`: kebab-case identifier of the connection.
+  - `derives_from`: Array of component ids (minItems: 1) naming the source component.
+  - `connects_to`: Array of component or third-party ids (minItems: 1) naming the destination.
   - `protocol`: Must be one of `http | grpc | event | db | file`.
   - `trust_boundary`: Must be one of `internal | partner | public`.
-  - `trace`: Array of trace reference objects (minItems: 1).
   - When `trust_boundary` is `partner` or `public`: `auth` and `rate_limit` are also required.
   - When `protocol` is `event`: `reliability` is also required.
 
@@ -43,10 +43,9 @@ The migrated artifact MUST include:
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
 - `components[].tags`: Array of enum strings from the approved tag vocabulary (e.g., `critical-path`, `stateful`, `pii`).
 - `components[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity this component owns.
-- `connections[].schema_ref`: Reference to the interface schema (pattern: `file://`, `https://`, `glossary:`, `api:`, or `-tbd`).
+- `third_parties`: Array of third-party objects. Each requires `third_party_id` (kebab-case), `name`, `pin` (the pinned version) and `derives_from`; `rationale` is optional. Replaces `tech_stack`, which is deprecated.
 - `connections[].rate_limit`: **Conditionally required** — must be present when `trust_boundary` is `partner` or `public` (enforced by schema `if/then`). Object with `rps` (integer, 1–100000) and `scope` (`ip | client | token | global`) required; `burst` and `window_s` optional. Omit only for `internal` trust boundary connections where back-pressure is not needed.
 - `connections[].reliability`: Must be one of `best-effort | at-least-once | exactly-once` (required for event connections).
-- `connections[].interface_ref`: Canonical reference (kind: `entity`) for the named interface contract.
 - `connections[].event_ref`: Canonical reference (kind: `event`) for the event type (required when `protocol` is `event`).
 
 ## Validation

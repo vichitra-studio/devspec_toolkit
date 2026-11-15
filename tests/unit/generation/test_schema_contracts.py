@@ -98,7 +98,7 @@ class SchemaContractsTests(unittest.TestCase):
         expected_by_step = {
             "00": {"role", "unit"},
             "01": {"capability", "action", "entity", "role"},
-            "02": {"entity", "interface", "event"},
+            "02": {"entity", "event"},
             "02a": {"environment", "policy", "command"},
             "03": {"term", "acronym", "unit"},
             "04": {"capability", "action", "entity"},
@@ -197,23 +197,20 @@ class SchemaContractsTests(unittest.TestCase):
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:02a-delivery-baseline")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
+        environment = {"scope": "in", "derives_from": ["seed-delivery"]}
         payload = {
             "id": "delivery-baseline",
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
-            "environments": {
-                "dev": {"nested": {"a": 1}},
-                "ci": {"runner": "gha"},
-                "staging": {"url": "https://staging.example.com"},
-                "prod": {"url": "https://example.com"},
-            },
-            "ci_gates": ["validate-all"],
+            "environments": {name: dict(environment) for name in ("dev", "ci", "staging", "prod")},
+            "ci_gates": [{"gate_id": "unit-tests", "scope": "in", "derives_from": ["seed-delivery"]}],
             "canonical_refs_used": [],
-            "canonical_proposals": [],
-            "canonical_conflicts": [],
         }
-        errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertTrue(errors, msg="Nested free-form environment payload unexpectedly passed")
+        self.assertEqual([], list(validator.iter_errors(payload)), msg="baseline payload must be valid")
+
+        payload["environments"]["dev"]["config"] = {"nested": {"a": 1}}
+        paths = [list(e.absolute_path) for e in validator.iter_errors(payload)]
+        self.assertIn(["environments", "dev", "config", "nested"], paths)
 
     def test_validate_file_runtime_error_is_not_misclassified_as_ref_resolution(self):
         # Write a minimal valid-JSON sample with a registered $schema URI into
@@ -297,6 +294,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:01-capabilities": "schema/01_capabilities.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -310,6 +308,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             sample = root / "spec" / "01_capabilities.json"
@@ -328,6 +330,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "description": "valid description",
                                 "scope": "in",
                                 "owner": "api",
+                                "derives_from": ["scope-a"],
                             }
                         ],
                     }
@@ -353,6 +356,7 @@ class SchemaContractsTests(unittest.TestCase):
                 "vc:01-capabilities": "schema/01_capabilities.schema.json",
                 "vc:core:atoms": "schema/atoms.schema.json",
                 "vc:core:collections": "schema/collections.schema.json",
+                "vc:core:graph": "schema/graph.schema.json",
             }
             self._setup_step_base(root, registry_map)
             (root / "tools" / "schema_registry.json").write_text(json.dumps(registry_map), encoding="utf-8")
@@ -366,6 +370,10 @@ class SchemaContractsTests(unittest.TestCase):
             )
             (root / "schema" / "collections.schema.json").write_text(
                 (self.schema_root / "core" / "collections.schema.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (root / "schema" / "graph.schema.json").write_text(
+                (self.schema_root / "core" / "graph.schema.json").read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
             sample = root / "spec" / "artifact.json"
@@ -384,6 +392,7 @@ class SchemaContractsTests(unittest.TestCase):
                                 "description": "valid description",
                                 "scope": "in",
                                 "owner": "api",
+                                "derives_from": ["scope-a"],
                             }
                         ],
                     }

@@ -22,8 +22,9 @@
   - `version`: String matching pattern `^v\d+(?:\.\d+)*$` (e.g., `v1`, `v2.1`).
   - `protocol`: Must be one of `http | grpc | ws | mqtt`.
   - `owner`: Canonical owner enum (`api | ui | system | ops | data | product | business | engineering`).
-  - `interface_ref`: Canonical reference object (kind: `capability`) — required.
-  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type: implements` pointing to an `fr-*` or `cap-*` ID.
+  - `interface_ref`: Canonical reference object (kind: `interface`) — required.
+  - `scope`: Must be one of `in | later | out`; `later` and `out` also require `scope_reason`.
+  - `derives_from`: Array of functional requirement ids (minItems: 1) that this API implements.
 
 ## Output Contract
 
@@ -42,11 +43,12 @@ The migrated artifact MUST include:
 - `apis[].output_schema_ref`: Relative path to response body JSON Schema file (use `-tbd` as placeholder).
 - `apis[].errors`: Array of error state objects, each with `code` (SCREAMING_SNAKE_CASE), `http_status` (integer), and `condition`.
 - `apis[].parameters`: Array of parameter objects, each requiring `name`, `in` (`query | path | header`), and `required` (boolean).
-- `apis[].example_refs`: Array of fixture ID strings from Step 08.
+- `apis[].provided_by`: Array of component ids that provide this API.
+- `apis[].relies_on`: Array of third-party ids this API relies on.
 - `apis[].event_ref`: Canonical reference (kind: `event`) for events emitted or consumed.
 - `apis[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
 - `apis[].policy_ref`: Canonical reference (kind: `risk_category`) for access control policy.
-- `apis[].enum_provenance`: Object required when enum values are sourced from an external standard; needs `source_url`, `source_date`, and `resolved_at`.
+- `apis[].enum_provenance`: Object required when enum values are sourced from an external standard; needs `source_url`, `source_date`, and `resolved_at`; required whenever a parameter declares `enum`.
 
 ## Validation
 
@@ -63,9 +65,9 @@ Interface contracts define the API surface. The top-level array field is `apis`
 a canonical object (not a bare string). The `method` field accepts only
 `GET | POST | PUT | PATCH | DELETE` (not OPTIONS or HEAD — those are scaffold-only);
 ensure no lowercase or non-standard HTTP verbs remain. Duplicate `interface_ref`
-values will cause Step 15 (scaffold) validation failures. Each API must trace to
-at least one FR using `type: implements`. After migration, update `example_refs`
-on any API that has fixtures written in Step 08.
+values will cause Step 15 (scaffold) validation failures. Each API must list at least one FR in
+`derives_from`. Step 08 fixtures reference the API from the fixture side, so
+there is no fixture list to maintain on the API.
 
 
 ## Full Generation Reference

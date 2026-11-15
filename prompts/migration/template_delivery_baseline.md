@@ -16,8 +16,8 @@
 **Step-specific fields:**
 
 - `$schema`: Must reference the URI above for the target toolkit version.
-- `environments`: Object (not an array) mapping environment names to config objects. Must include all four keys: `dev`, `ci`, `staging`, `prod`. Each value is a key-value config map with environment-specific settings.
-- `ci_gates`: Array of kebab-case CI gate identifier strings (minItems: 1, pattern: `^[a-z0-9-]+$`). Each must match a pipeline job name.
+- `environments`: Object (not an array) mapping environment names to config objects. Must include all four keys: `dev`, `ci`, `staging`, `prod`. Each value is an environment object with `scope` (`in | later | out`), `derives_from` (ids of seeds, constraints or scope items) and an optional `config` map holding the environment-specific settings.
+- `ci_gates`: Array of gate objects (minItems: 1). Each requires `gate_id` (kebab-case, matching a pipeline job name), `scope` and `derives_from`.
 
 ## Output Contract
 
@@ -29,8 +29,7 @@ The migrated artifact MUST include:
 ## Optional Fields
 
 - `_migration_notes`: Array of strings — migration annotations written exclusively by specdev tooling (canonical-autofix, align apply). Do NOT populate manually.
-- `trace`: Array of trace reference objects linking this baseline to upstream capabilities or charter artifacts.
-- `secrets`: Array of secret name strings (environment variable keys required at runtime).
+- `secrets`: Array of secret objects. Each requires `secret_id` (kebab-case), `name` (the environment variable key required at runtime), `scope` and `derives_from`.
 - `compliance`: Array of compliance standard strings (e.g., `SOC2`, `GDPR`, `PCI-DSS`).
 - `environment_ref`: Canonical reference (kind: `environment`) to the environment definitions.
 - `command_ref`: Canonical reference (kind: `capability`) for the CI command.
@@ -49,9 +48,10 @@ After migration, run:
 The delivery baseline anchors the implementation plan (Step 09) and roadmap
 (Step 14). The `environments` field is an object keyed by environment name
 (not an array) — convert any array format from older versions. Each environment
-must have a separate key (`dev`, `ci`, `staging`, `prod`); only include config
+must have a separate key (`dev`, `ci`, `staging`, `prod`); move former environment
+settings under `config` and only include config
 keys whose values actually differ between environments. The `ci_gates` array
-must use kebab-case identifiers matching actual CI pipeline job names — no
+must carry kebab-case `gate_id` values matching actual CI pipeline job names — no
 uppercase letters or spaces.
 
 

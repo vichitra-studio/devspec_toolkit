@@ -706,8 +706,13 @@ def test_schema_ref_sibling_census():
     """Pin the set of ``$ref`` nodes carrying siblings across schema/**/*.json.
 
     A new sibling anywhere forces a deliberate update of this census.
-    226 = the original 224 plus two description-only siblings in
-    ``schema/core/graph.schema.json`` (``xNode.properties.kind`` and ``.role``).
+    262 = the 226 of the 1.1.1 shape (224 plus two description-only siblings in
+    ``schema/core/graph.schema.json``) with the net change of the M2 steps 00-05
+    schemas: the old-shape ``$ref`` arrays that carried ``items`` / ``minItems``
+    siblings are gone, and the graph-shape properties are annotated ``$ref``
+    nodes (``$ref`` plus ``description``). Per file, old -> new: 00 charter 12 -> 26,
+    01 capabilities 10 -> 11, 02 system sketch 14 -> 15, 02a delivery baseline
+    6 -> 15, 03 glossary 2 -> 3, 04 FR list 6 -> 11, 05 interfaces 11 -> 16.
     """
     from collections import Counter
 
@@ -726,11 +731,10 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 226
+    assert sum(counts.values()) == 262
     assert dict(counts) == {
-        ("description",): 214,
-        ("description", "items"): 5,
-        ("description", "items", "minItems"): 4,
+        ("description",): 255,
+        ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
         ("default", "description"): 1,
         ("$anchor", "description"): 1,

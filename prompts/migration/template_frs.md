@@ -21,7 +21,8 @@
   - `fr_id`: kebab-case identifier with `fr-` prefix (e.g., `fr-user-login`).
   - `statement`: String (minLength: 20) — falsifiable statement of a single system behavior.
   - `acceptance_criteria`: Array of criterion objects (minItems: 2). Each requires `criterion_id` (kebab-case) and `text` (string, minLength: 15).
-  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type` and `id`; at least one must use `type: implements` pointing to a `cap-*` ID.
+  - `scope`: Must be one of `in | later | out`; `later` and `out` also require `scope_reason`.
+  - `derives_from`: Array of capability ids (minItems: 1) that this requirement implements.
   - `capability_ref`: Canonical reference object (kind: `capability`) — required on every FR.
 
 ## Output Contract
@@ -55,8 +56,8 @@ Functional requirements are the primary traceability anchor. FR IDs appear in
 interface contracts (Step 05), fixtures (Step 08), the trace matrix, and roadmap
 tasks (Step 14). Never rename an `fr_id` without updating all downstream
 references. The field is `functional_requirements` (not `requirements`) — rename
-accordingly. Each FR requires a `capability_ref` canonical object and a `trace`
-array; FRs without these will fail canonical-integrity checks. The
+accordingly. Each FR requires a `capability_ref` canonical object and a `derives_from`
+array of capability ids; FRs without these will fail canonical-integrity checks. The
 `acceptance_criteria` field requires structured objects (`criterion_id` + `text`),
 not plain strings — convert any string-format criteria. The trace matrix must
 be regenerated after migration.

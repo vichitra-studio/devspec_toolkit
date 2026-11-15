@@ -20,9 +20,9 @@
 - `capabilities`: Array of capability objects (minItems: 1). Each entry requires:
   - `capability_id`: kebab-case identifier (e.g., `cap-user-authentication`).
   - `verb`: String (minLength: 2) — specific imperative action verb (e.g., `authenticate`, `reconcile`).
-  - `scope`: Must be one of `in | out | future`.
+  - `scope`: Must be one of `in | later | out`; `later` and `out` also require `scope_reason`.
   - `capability_ref`: Canonical reference object (kind: `capability`) — required.
-  - `trace`: Array of trace reference objects (minItems: 1) — each requires `type` and `id`.
+  - `derives_from`: Array of ids (minItems: 1) of the charter scope items, user segments or success metrics this capability serves.
 
 ## Output Contract
 
@@ -41,8 +41,7 @@ The migrated artifact MUST include:
 - `capabilities[].preconditions`: Array of strings — conditions that must hold before execution.
 - `capabilities[].postconditions`: Array of strings — conditions guaranteed after execution.
 - `capabilities[].name`: String (minLength: 2) — Title Case human-readable label.
-- `capabilities[].goal_id`: Kebab-case ID of the charter goal this capability directly serves.
-- `capabilities[].success_metric_refs`: Array of charter `metric_id` values this capability drives.
+- `capabilities[].assumes`: Array of charter `assumption_id` values this capability relies on.
 - `capabilities[].error_states`: Array of `errorState` objects with named error codes.
 - `capabilities[].action_ref`: Canonical reference (kind: `action`) for the verb.
 - `capabilities[].entity_ref`: Canonical reference (kind: `entity`) for the primary domain entity.
@@ -61,8 +60,8 @@ After migration, run:
 Capabilities bridge charter artifacts to functional requirements. Preserve all
 `capability_id` values since they are referenced by FRs in Step 04, NFRs in
 Step 07, and the system sketch in Step 02. The schema no longer uses `id` —
-rename any `id` field to `capability_id`. Each capability must have a `trace`
-array pointing back to charter artifacts using type `derives_from`. The `verb`
+rename any `id` field to `capability_id`. Each capability must have a `derives_from`
+array of ids pointing back to charter scope items, user segments or success metrics. The `verb`
 field drives downstream `action_ref` values; do not use generic verbs like
 `manage` or `handle`.
 

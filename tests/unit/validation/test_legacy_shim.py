@@ -57,20 +57,37 @@ def test_has_legacy_fields_false_for_new_shape():
     assert not has_legacy_fields(NEW_SHAPE.values(), LEGACY_FIELDS)
 
 
-def test_guarded_readers_silent_on_new_shape(tmp_path):
-    spec_dir = _write_spec(tmp_path, NEW_SHAPE)
-    arts = {f"spec/{name}": data for name, data in NEW_SHAPE.items()}
+def _assert_guarded_readers_silent(root: Path, spec_dir: str, files: dict[str, dict]) -> None:
+    arts = {f"spec/{name}": data for name, data in files.items()}
+    capability_ids = {c["capability_id"] for c in files["01_capabilities.json"]["capabilities"]}
 
     assert _closure_codes(spec_dir) == set()
-    matrix = build_trace_matrix(str(tmp_path), spec_dir)
+    matrix = build_trace_matrix(str(root), spec_dir)
     assert "integrity_errors" not in matrix
-    assert matrix["matrix"][0]["apis"] == []
-    assert check_step_02_integrity(arts, capability_ids={"cap-a"}) == []
-    assert check_step_04_integrity(arts, set(), {"cap-a"}) == []
+    assert all(row["apis"] == [] for row in matrix["matrix"])
+    assert check_step_02_integrity(arts, capability_ids=capability_ids) == []
+    assert check_step_04_integrity(arts, set(), capability_ids) == []
     _, adjacency = _build_trace_graph(spec_dir)
-    assert not adjacency["fr-a"]
-    review = _run_structural_pass(NEW_SHAPE["05_interface_contracts.json"], "", [("", NEW_SHAPE["04_fr_list.json"])])
+    assert not any(adjacency[fr["fr_id"]] for fr in files["04_fr_list.json"]["functional_requirements"])
+    review = _run_structural_pass(
+        files["05_interface_contracts.json"], "", [("", files["04_fr_list.json"])]
+    )
     assert review.upstream_coverage["covered"] == []
+
+
+def test_guarded_readers_silent_on_new_shape(tmp_path):
+    spec_dir = _write_spec(tmp_path, NEW_SHAPE)
+    _assert_guarded_readers_silent(tmp_path, spec_dir, NEW_SHAPE)
+
+
+def test_guarded_readers_silent_on_graph_example():
+    example = Path(__file__).parents[2] / "fixtures" / "graph_example"
+    spec_dir = example / "spec"
+    files = {
+        name: json.loads((spec_dir / name).read_text(encoding="utf-8"))
+        for name in NEW_SHAPE
+    }
+    _assert_guarded_readers_silent(example, str(spec_dir), files)
 
 
 def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):

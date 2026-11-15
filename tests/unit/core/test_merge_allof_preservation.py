@@ -51,7 +51,7 @@ _STEP_BASE_KEYS: frozenset[str] = frozenset(
 #
 # Chosen steps:
 #   "00"  — two-branch allOf schema: allOf[0] = step-base $ref, allOf[1] =
-#            own properties (title, problem_statement, in_scope, …); NO root
+#            own properties (title, problem_statement, scope_items, …); NO root
 #            `properties` block at schema top level
 #   "02"  — has both own properties (components, connections, tech_stack) AND
 #            allOf step-base; named explicitly in the F2 finding
@@ -66,7 +66,7 @@ _STEP_BASE_KEYS: frozenset[str] = frozenset(
 # ---------------------------------------------------------------------------
 
 _STEP_CASES: list[tuple[str, frozenset[str]]] = [
-    ("00", frozenset({"title", "problem_statement", "in_scope", "out_of_scope"})),
+    ("00", frozenset({"title", "problem_statement", "scope_items"})),
     ("02", frozenset({"components", "connections", "tech_stack"})),
     ("03", frozenset({"terms"})),
     ("04", frozenset({"functional_requirements"})),

@@ -18,13 +18,12 @@
 
 - `$schema`: Must reference the URI above for the target toolkit version.
 - `problem_statement`: String (minLength: 20). Describe the problem this project solves; must not use solution-language.
-- `in_scope`: Array of strings (minItems: 3). Each item names a concrete deliverable, capability, or integration point.
-- `out_of_scope`: Array of strings (minItems: 3). Each item explicitly names something excluded from this project.
-- `assumptions`: Array of strings (minItems: 1). Each is a falsifiable present-tense statement taken for granted during scoping.
-- `risks`: Array of strings (minItems: 1). Each names a specific risk that could affect project success or timeline.
-- `success_metrics`: Array of metric objects (minItems: 2). Each requires `metric_id` (kebab-case), `name`, `target`, `unit`, `measurement_method`, and `unit_ref`.
-- `stakeholders`: Array of stakeholder objects. Each requires `role` (string) and `needs` (array of strings, minItems: 1).
-- `user_segments`: Array of segment objects. Each requires `segment_id` (kebab-case), `description`, `jobs_to_be_done`, `pains`, and `gains`.
+- `scope_items`: Array of scope item objects (minItems: 1). Replaces `in_scope` and `out_of_scope`: each requires `scope_id` (kebab-case), `text`, `scope` (`in | later | out`) and `derives_from` (seed or need ids); `scope_reason` is required when `scope` is `later` or `out`.
+- `assumptions`: Array of assumption objects (minItems: 1). Each requires `assumption_id` (kebab-case), `text` (a falsifiable present-tense statement taken for granted during scoping) and `derives_from`.
+- `risks`: Array of risk objects (minItems: 1). Each requires `risk_id` (kebab-case), `text`, `scope` and `derives_from`.
+- `success_metrics`: Array of metric objects (minItems: 2). Each requires `metric_id` (kebab-case), `name`, `target`, `unit`, `measurement_method`, `unit_ref` and `derives_from`.
+- `stakeholders`: Array of stakeholder objects. Each requires `stakeholder_id` (kebab-case), `role` (string) and `needs` (array of need objects, each with `need_id`, `text` and `derives_from`).
+- `user_segments`: Array of segment objects. Each requires `segment_id` (kebab-case), `description`, `jobs_to_be_done`, `pains`, `gains` and `derives_from`.
 
 ## Output Contract
 
@@ -39,7 +38,7 @@ The migrated artifact MUST include:
 - `title`: Short human-readable title (2–6 words, Title Case noun phrase).
 - `stakeholders[].role_ref`: Canonical reference (kind: `entity`) for the stakeholder role.
 - `success_metrics[].baseline`: Current measured value before the project (number or string).
-- `links`: Array of external link objects (each with `rel` and `href`).
+- `constraints`: Array of constraint objects. Each requires `constraint_id` (kebab-case), `text`, `scope` and `derives_from`.
 
 ## Validation
 

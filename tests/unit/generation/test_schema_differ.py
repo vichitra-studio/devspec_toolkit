@@ -295,6 +295,57 @@ class TestDiffStepFields:
         assert diffs[0].diff_type == DiffType.TYPE_MISMATCH
 
 
+_SCHEMA_DIR = Path(__file__).resolve().parents[3] / "schema"
+
+_LEGACY_CHARTER = {
+    "$schema": "vc:00-charter",
+    "id": "charter",
+    "title": "Charter",
+    "problem_statement": "A legacy charter written against the 1.1.1 shape.",
+    "in_scope": ["billing"],
+    "out_of_scope": ["payroll"],
+}
+
+
+class TestDiffStepFieldsM2Schemas:
+    """The differ reads only the top level of a schema (``required``, ``properties``,
+    ``additionalProperties``). The M2 step 00-05 schemas keep their rules inside
+    ``allOf`` and ``unevaluatedProperties``, so item-level and graph-shape changes
+    are invisible to ``align``."""
+
+    def test_diff_step_fields_m2_02a_top_level_only(self, tmp_path):
+        user = tmp_path / "02a_delivery_baseline.json"
+        user.write_text(json.dumps({
+            "$schema": "vc:02a-delivery-baseline",
+            "id": "delivery-baseline",
+            "owner": "ops",
+            "created_at": "2026-01-01T00:00:00Z",
+            "environments": {
+                "dev": {"url": "http://localhost"},
+                "ci": {"runner": "gha"},
+                "staging": {"url": "https://staging.example.com"},
+                "prod": {"url": "https://example.com"},
+            },
+            "ci_gates": ["validate-all"],
+        }))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "02a_delivery_baseline.schema.json")
+        assert diffs == []
+
+    def test_diff_step_fields_m2_00_in_scope_not_reported_by_top_level_differ(self, tmp_path):
+        """Pins a known limit of the differ (the migration of steps 00-05 does not rely on it)."""
+        user = tmp_path / "00_charter.json"
+        user.write_text(json.dumps(_LEGACY_CHARTER))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
+        assert not [d for d in diffs if d.diff_type == DiffType.EXTRA_FIELD]
+
+    def test_diff_step_fields_m2_00_scope_items_not_reported_by_top_level_differ(self, tmp_path):
+        """Pins a known limit of the differ (the migration of steps 00-05 does not rely on it)."""
+        user = tmp_path / "00_charter.json"
+        user.write_text(json.dumps(_LEGACY_CHARTER))
+        diffs = diff_step_fields(user, _SCHEMA_DIR / "00_charter.schema.json")
+        assert not [d for d in diffs if d.diff_type == DiffType.MISSING_REQUIRED]
+
+
 # ---------------------------------------------------------------------------
 # detect_paradigm_shifts
 # ---------------------------------------------------------------------------
