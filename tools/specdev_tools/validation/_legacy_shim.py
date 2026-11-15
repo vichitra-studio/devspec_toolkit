@@ -3,7 +3,8 @@
 A guarded reader runs only when the artifacts that reader itself reads still carry a field that
 reader itself reads (one constant per reader or group of readers; never "any loaded artifact").
 There is no old-to-new translation: new-shape data skips the reader and yields no finding.
-Deleting this module means deleting every use of ``has_legacy_fields`` and the ``LEGACY_*`` names.
+Deleting this module means deleting every use of ``has_legacy_fields`` and the ``LEGACY_*`` names;
+the callers of ``is_parked_any_shape`` go back to ``core.scope_helpers.is_parked``.
 """
 from __future__ import annotations
 

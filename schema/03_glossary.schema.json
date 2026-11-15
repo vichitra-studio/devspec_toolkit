@@ -35,7 +35,7 @@
             "additionalProperties": false,
             "properties": {
               "term_id": {
-                "description": "Unique kebab-case identifier for this glossary term. Convention: term-{domain}-{noun}. Examples: 'term-billing-reconciliation', 'term-auth-session-token', 'term-payment-settlement'. The domain segment should match the 'domain' field value. Must be stable — downstream steps reference this ID in trace links. Anti-pattern: 'term-1', 'term-concept-a' — sequential labels cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this glossary term. Convention: term-{domain}-{noun}. Examples: 'term-billing-reconciliation', 'term-auth-session-token', 'term-payment-settlement'. The domain segment should match the 'domain' field value. Must be stable — downstream steps reference this ID. Anti-pattern: 'term-1', 'term-concept-a' — sequential labels cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "term": {

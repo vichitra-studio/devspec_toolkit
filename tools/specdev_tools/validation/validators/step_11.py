@@ -424,7 +424,10 @@ def _fr_ids_from_trace(entity: dict[str, Any]) -> set[str]:
 
 
 def _fr_ids_from_derives_from(entity: dict[str, Any]) -> set[str]:
-    """Ids in an entity's ``derives_from``; the subset test against the FR set ignores non-FR ids."""
+    """Every non-empty string in an entity's ``derives_from``, not filtered to FR ids.
+
+    An API's ``derives_from`` lists FRs only; an id that is not a parked FR keeps the entity out of the
+    "only parked FRs" subset test of ``_only_traces_wont_have_frs``."""
     return {str(ref) for ref in entity.get("derives_from", []) if isinstance(ref, str) and ref}
 
 

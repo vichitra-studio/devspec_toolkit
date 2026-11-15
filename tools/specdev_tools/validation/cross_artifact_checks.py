@@ -75,6 +75,54 @@ def collect_capability_ids(artifacts: dict[str, Any]) -> set[str]:
 _SCHEMA_REF_RE = re.compile(r"^(?:-tbd|(file://|https://|glossary:|api:).+)$")
 
 
+def _legacy_connection_errors(
+    connections: list[Any],
+    component_id_set: set[str],
+    component_types: dict[str, str | None],
+    basename: str,
+) -> list[SpecError]:
+    """Connection endpoint, schema_ref and trust-boundary checks of the 1.1.1 shape.
+
+    Reads the connection fields ``from`` / ``to`` / ``schema_ref``; called only when the
+    connections carry them. M6c deletes this with the other legacy blocks.
+    """
+    errors: list[SpecError] = []
+    for idx, conn in enumerate(connections):
+        source = conn.get("from")
+        target = conn.get("to")
+        if source and source not in component_id_set:
+            errors.append(make_error(
+                "E590",
+                f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found.",
+            ))
+        if target and target not in component_id_set:
+            errors.append(make_error(
+                "E590",
+                f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found.",
+            ))
+
+        # schema_ref format
+        schema_ref = conn.get("schema_ref")
+        if schema_ref and not _SCHEMA_REF_RE.match(schema_ref):
+            errors.append(make_error(
+                "E520",
+                f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid.",
+            ))
+
+        # Trust boundary vs external component
+        if (
+            (source and component_types.get(source) == "external")
+            or (target and component_types.get(target) == "external")
+        ):
+            trust_boundary = conn.get("trust_boundary")
+            if trust_boundary == "internal":
+                errors.append(make_error(
+                    "E520",
+                    f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component.",
+                ))
+    return errors
+
+
 def check_step_02_integrity(
     artifacts: dict[str, Any],
     capability_ids: set[str],
@@ -123,39 +171,7 @@ def check_step_02_integrity(
         # connection fields from/to/schema_ref; the guard is given the connections only.
         component_id_set = set(component_ids)
         if has_legacy_fields([connections], LEGACY_CONNECTION_FIELDS):
-            for idx, conn in enumerate(connections):
-                source = conn.get("from")
-                target = conn.get("to")
-                if source and source not in component_id_set:
-                    errors.append(make_error(
-                        "E590",
-                        f"Step 02 Integrity in {basename}: connection[{idx}] from '{source}' not found.",
-                    ))
-                if target and target not in component_id_set:
-                    errors.append(make_error(
-                        "E590",
-                        f"Step 02 Integrity in {basename}: connection[{idx}] to '{target}' not found.",
-                    ))
-
-                # schema_ref format
-                schema_ref = conn.get("schema_ref")
-                if schema_ref and not _SCHEMA_REF_RE.match(schema_ref):
-                    errors.append(make_error(
-                        "E520",
-                        f"Step 02 Integrity in {basename}: connection[{idx}] schema_ref '{schema_ref}' is invalid.",
-                    ))
-
-                # Trust boundary vs external component
-                if (
-                    (source and component_types.get(source) == "external")
-                    or (target and component_types.get(target) == "external")
-                ):
-                    trust_boundary = conn.get("trust_boundary")
-                    if trust_boundary == "internal":
-                        errors.append(make_error(
-                            "E520",
-                            f"Step 02 Integrity in {basename}: connection[{idx}] uses internal trust_boundary with external component.",
-                        ))
+            errors.extend(_legacy_connection_errors(connections, component_id_set, component_types, basename))
 
         # Capability coverage. This is the legacy block (M6c deletes): it reads component
         # trace / trace_refs. The check that survives is the one in validators/step_02.py,

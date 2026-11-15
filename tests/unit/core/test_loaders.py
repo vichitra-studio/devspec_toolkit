@@ -303,6 +303,16 @@ class TestLoadSiblingArtifact:
         )
         assert result == {"fr-fb"}
 
+    def test_malformed_first_candidate_then_valid_one_returns_valid_ids(self, tmp_path):
+        (tmp_path / "04_a.json").write_text("NOT JSON", encoding="utf-8")
+        (tmp_path / "04_b.json").write_text(
+            json.dumps({"requirements": [{"fr_id": "fr-b"}]}), encoding="utf-8"
+        )
+        artifact = tmp_path / "08_fixtures.json"
+        artifact.write_text("{}", encoding="utf-8")
+        result = load_sibling_artifact(str(artifact), "04", "requirements", "fr_id")
+        assert result == {"fr-b"}
+
     def test_invalid_json_returns_empty(self, tmp_path):
         (tmp_path / "04_frs.json").write_text("NOT JSON", encoding="utf-8")
         artifact = tmp_path / "08_fixtures.json"
@@ -346,9 +356,13 @@ class TestLoadSiblingJson:
         self._write(tmp_path, "01_c.json", {"n": "c"})
         assert load_sibling_json(tmp_path / "02_x.json", "01") == {"n": "c"}
 
-    def test_none_when_nothing_usable_and_never_raises(self, tmp_path):
+    def test_none_when_no_candidate_exists(self, tmp_path):
         assert load_sibling_json(tmp_path / "02_x.json", "01") is None
+
+    def test_none_when_the_only_directory_is_missing(self, tmp_path):
         assert load_sibling_json(None, "01", spec_root=tmp_path / "missing") is None
+
+    def test_none_when_the_only_candidates_are_unusable(self, tmp_path):
         self._write(tmp_path, "01_a.json", "{bad")
         (tmp_path / "01_dir.json").mkdir()
         assert load_sibling_json(tmp_path / "02_x.json", "01") is None

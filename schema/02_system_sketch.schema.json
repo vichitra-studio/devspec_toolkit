@@ -30,7 +30,7 @@
             "additionalProperties": false,
             "properties": {
               "component_id": {
-                "description": "Unique kebab-case identifier for this system component. Format: descriptive kebab-case identifier. Examples: 'api-gateway', 'user-service', 'postgres-db', 'auth-service'. Should be stable across spec versions — downstream connections, links, and interface refs all reference this ID.",
+                "description": "Unique kebab-case identifier for this system component. Format: descriptive kebab-case identifier. Examples: 'api-gateway', 'user-service', 'postgres-db', 'auth-service'. Should be stable across spec versions — connections (connects_to) and downstream nodes (derives_from) reference this ID.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "type": {

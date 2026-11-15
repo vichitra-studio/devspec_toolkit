@@ -2,6 +2,7 @@
 import json
 import shutil
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 
@@ -74,39 +75,47 @@ def test_has_legacy_fields_false_for_new_shape():
         assert not has_legacy_fields(NEW_SHAPE.values(), names)
 
 
-def _silent_closure(root, spec_dir, files):
-    assert _closure_codes(spec_dir) == set()
+class _Spec(NamedTuple):
+    """A spec folder under test: its root, its ``spec`` directory and the files written into it."""
+
+    root: Path
+    spec_dir: str
+    files: dict
 
 
-def _silent_matrix_integrity(root, spec_dir, files):
-    assert "integrity_errors" not in build_trace_matrix(str(root), spec_dir)
+def _silent_closure(spec):
+    assert _closure_codes(spec.spec_dir) == set()
 
 
-def _silent_matrix_fr_to_api(root, spec_dir, files):
-    matrix = build_trace_matrix(str(root), spec_dir)
+def _silent_matrix_integrity(spec):
+    assert "integrity_errors" not in build_trace_matrix(str(spec.root), spec.spec_dir)
+
+
+def _silent_matrix_fr_to_api(spec):
+    matrix = build_trace_matrix(str(spec.root), spec.spec_dir)
     assert all(row["apis"] == [] for row in matrix["matrix"])
 
 
-def _silent_step_02_integrity(root, spec_dir, files):
-    arts = {f"spec/{name}": data for name, data in files.items()}
-    capability_ids = {c["capability_id"] for c in files["01_capabilities.json"]["capabilities"]}
+def _silent_step_02_integrity(spec):
+    arts = {f"spec/{name}": data for name, data in spec.files.items()}
+    capability_ids = {c["capability_id"] for c in spec.files["01_capabilities.json"]["capabilities"]}
     assert check_step_02_integrity(arts, capability_ids=capability_ids) == []
 
 
-def _silent_step_04_integrity(root, spec_dir, files):
-    arts = {f"spec/{name}": data for name, data in files.items()}
-    capability_ids = {c["capability_id"] for c in files["01_capabilities.json"]["capabilities"]}
+def _silent_step_04_integrity(spec):
+    arts = {f"spec/{name}": data for name, data in spec.files.items()}
+    capability_ids = {c["capability_id"] for c in spec.files["01_capabilities.json"]["capabilities"]}
     assert check_step_04_integrity(arts, set(), capability_ids) == []
 
 
-def _silent_scope_resolver(root, spec_dir, files):
-    _, adjacency = _build_trace_graph(spec_dir)
-    assert not any(adjacency[fr["fr_id"]] for fr in files["04_fr_list.json"]["functional_requirements"])
+def _silent_scope_resolver(spec):
+    _, adjacency = _build_trace_graph(spec.spec_dir)
+    assert not any(adjacency[fr["fr_id"]] for fr in spec.files["04_fr_list.json"]["functional_requirements"])
 
 
-def _silent_reviewer(root, spec_dir, files):
+def _silent_reviewer(spec):
     review = _run_structural_pass(
-        files["05_interface_contracts.json"], "", [("", files["04_fr_list.json"])]
+        spec.files["05_interface_contracts.json"], "", [("", spec.files["04_fr_list.json"])]
     )
     assert review.upstream_coverage["covered"] == []
 
@@ -125,7 +134,7 @@ SILENT_READERS = {
 @pytest.mark.parametrize("reader", sorted(SILENT_READERS))
 def test_guarded_reader_silent_on_new_shape(tmp_path, reader):
     spec_dir = _write_spec(tmp_path, NEW_SHAPE)
-    SILENT_READERS[reader](tmp_path, spec_dir, NEW_SHAPE)
+    SILENT_READERS[reader](_Spec(tmp_path, spec_dir, NEW_SHAPE))
 
 
 @pytest.mark.parametrize("reader", sorted(SILENT_READERS))
@@ -136,7 +145,7 @@ def test_guarded_reader_silent_on_graph_example(reader):
         name: json.loads((spec_dir / name).read_text(encoding="utf-8"))
         for name in NEW_SHAPE
     }
-    SILENT_READERS[reader](example, str(spec_dir), files)
+    SILENT_READERS[reader](_Spec(example, str(spec_dir), files))
 
 
 def test_guarded_readers_unchanged_on_legacy_shape(tmp_path):
@@ -197,7 +206,8 @@ def test_legacy_later_file_does_not_switch_on_00_05_readers(tmp_path, name):
     # The only integrity line is the added file's own dangling reference. The old tree also
     # reported a W592 fr_coverage warning here, in the plain and in the mixed spec.
     assert "integrity_errors" not in plain_matrix
-    assert [line for line in mixed_matrix["integrity_errors"] if name not in line] == []
+    assert len(mixed_matrix["integrity_errors"]) == 1
+    assert mixed_matrix["integrity_errors"][0].startswith("E590 ")
 
 
 def test_matrix_reports_no_fr_to_api_threshold_on_new_shape():

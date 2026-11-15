@@ -509,7 +509,7 @@
             "additionalProperties": false,
             "properties": {
               "segment_id": {
-                "description": "Unique kebab-case identifier for this user segment. Convention: seg-{descriptive-noun}. Examples: 'seg-finance-admin', 'seg-api-integrator', 'seg-self-service-customer', 'seg-support-agent'. Should be stable — downstream steps (01 capabilities, 04 FRs) reference this ID in trace links. Anti-pattern: 'seg-1', 'seg-power-user' — sequential labels and generic names cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this user segment. Convention: seg-{descriptive-noun}. Examples: 'seg-finance-admin', 'seg-api-integrator', 'seg-self-service-customer', 'seg-support-agent'. Should be stable — downstream nodes (01 capabilities) reference this ID from their derives_from. Anti-pattern: 'seg-1', 'seg-power-user' — sequential labels and generic names cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "description": {
@@ -627,7 +627,7 @@
             "additionalProperties": false,
             "properties": {
               "metric_id": {
-                "description": "Unique kebab-case identifier for this metric. Convention: metric-{noun-phrase}. Examples: 'metric-checkout-conversion', 'metric-api-p95-latency', 'metric-monthly-active-users', 'metric-reconciliation-error-rate'. Must be stable across spec versions — downstream steps reference this ID in capability success_metric_refs. Anti-pattern: 'metric-1', 'metric-kpi-3' — sequential labels cannot be traced to meaning.",
+                "description": "Unique kebab-case identifier for this metric. Convention: metric-{noun-phrase}. Examples: 'metric-checkout-conversion', 'metric-api-p95-latency', 'metric-monthly-active-users', 'metric-reconciliation-error-rate'. Must be stable across spec versions — downstream nodes (such as 01 capabilities) reference this ID from their derives_from. Anti-pattern: 'metric-1', 'metric-kpi-3' — sequential labels cannot be traced to meaning.",
                 "$ref": "vc:core:atoms#kebabId"
               },
               "name": {

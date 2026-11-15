@@ -181,6 +181,19 @@ def _sibling_candidates(
     ]
 
 
+def _first_json_object(candidates: list[Path]) -> dict | None:
+    """Return the first candidate that reads and parses as a JSON object, else ``None``."""
+    for path in candidates:
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return None
+
+
 def load_sibling_json(
     artifact_path: str | Path | None,
     prefix: str,
@@ -195,15 +208,7 @@ def load_sibling_json(
     Returns the first candidate that parses as a JSON object, or ``None`` when
     there is none. Never raises for a missing or unreadable file.
     """
-    for path in _sibling_candidates(artifact_path, prefix, spec_root, fallback_root):
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict):
-            return data
-    return None
+    return _first_json_object(_sibling_candidates(artifact_path, prefix, spec_root, fallback_root))
 
 
 def load_sibling_artifact(
@@ -218,27 +223,30 @@ def load_sibling_artifact(
 
     If the sibling is not found beside *artifact_path* and *fallback_root* is
     given, checks ``<fallback_root>/spec/<sibling_prefix>_*.json`` as well.
-    The lookup is :func:`load_sibling_json`.
+    Candidates are listed once and the first one that parses as a JSON object
+    wins (the rule of :func:`load_sibling_json`), so a malformed candidate
+    followed by a valid one yields the valid one's IDs.
 
     Returns
     -------
     None
-        No candidate file was found in either the sibling directory or the
+        There is no candidate file in the sibling directory or the
         ``fallback_root`` spec dir.  Callers should treat this as "upstream
         absent, skip cross-ref check".
     set[str]
         A (possibly empty) set of extracted IDs.  An **empty set is not
-        None**: it signals "upstream present but contained no IDs", and
+        None**: it signals "upstream present but yielded no IDs", and
         callers should still run cross-ref validation (so stray references
         get flagged) while skipping coverage checks over an empty set.
-        Malformed JSON or read errors also yield an empty set — the file
-        was found but could not be mined, which is distinct from absent.
+        The empty set is also returned when candidates exist and none of them
+        parses as a JSON object (malformed, unreadable or not an object):
+        the file was found but could not be mined, which is distinct from absent.
     """
-    data = load_sibling_json(artifact_path, sibling_prefix, fallback_root=fallback_root)
-    if data is not None:
-        return _extract_ids(data, array_key, id_field)
-    found_any = bool(_sibling_candidates(artifact_path, sibling_prefix, None, fallback_root))
-    return set() if found_any else None
+    candidates = _sibling_candidates(artifact_path, sibling_prefix, None, fallback_root)
+    if not candidates:
+        return None
+    data = _first_json_object(candidates)
+    return _extract_ids(data, array_key, id_field) if data is not None else set()
 
 
 def _match_prefix(directory: Path, prefix: str) -> list[str]:

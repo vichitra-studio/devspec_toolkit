@@ -1987,10 +1987,9 @@ class CliTests(unittest.TestCase):
         """scope:"out" and scope:"later" capabilities must not count toward
         capability_fr_coverage's total_caps denominator (DEVSPEC-122
         follow-up). Both are parked by design -- "out" permanently, "later"
-        deferred. The denominator uses core.scope_helpers.is_parked. It does
-        not mirror the W568 exemption in traceability_closure.py, which is a
-        separate set (out, and the 1.1.1 future) read only by the legacy-guarded
-        W568 on a 1.1.1 spec."""
+        deferred. The denominator uses _legacy_shim.is_parked_any_shape, the
+        same function as the W568 capability exemption in traceability_closure.py
+        (parked in the current shape, or the 1.1.1 scope future)."""
         with tempfile.TemporaryDirectory() as td:
             repo_root = Path(td)
             spec_dir = repo_root / "spec"

@@ -266,7 +266,7 @@
                 ]
               },
               "entity_ref": {
-                "description": "Canonical reference to the primary domain entity this API operates on. Links to the canonical entity registry and helps downstream code generation target the correct model. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"} for a user-management API; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"Order\"} for an order-management API. The id must match an entry in canon/manifest.json under the 'entity' namespace. Anti-pattern: using a 'ref' field instead of 'id' — canonicalRef requires the 'id' field (additionalProperties: false rejects 'ref'); listing multiple entities here — use entity_ref for the single primary entity only; secondary entity relationships belong in the API description or trace links.",
+                "description": "Canonical reference to the primary domain entity this API operates on. Links to the canonical entity registry and helps downstream code generation target the correct model. Example: {\"id\": \"cn:project:entity:user\", \"kind\": \"entity\", \"label\": \"User\"} for a user-management API; {\"id\": \"cn:project:entity:order\", \"kind\": \"entity\", \"label\": \"Order\"} for an order-management API. The id must match an entry in canon/manifest.json under the 'entity' namespace. Anti-pattern: using a 'ref' field instead of 'id' — canonicalRef requires the 'id' field (additionalProperties: false rejects 'ref'); listing multiple entities here — use entity_ref for the single primary entity only; secondary entity relationships belong in the API description.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "entity" } } }
@@ -442,7 +442,7 @@
           }
         },
         "out_of_scope": {
-          "description": "Functional requirements explicitly excluded from API contract coverage, with rationale. Use when an FR has no observable API boundary — e.g., internal code constraints, CSS rendering concerns, phase-deferred features. Every uncovered FR must appear here or as a trace on an existing API.",
+          "description": "Functional requirements explicitly excluded from API contract coverage, with rationale. Use when an FR has no observable API boundary — e.g., internal code constraints, CSS rendering concerns, phase-deferred features. Every uncovered FR must appear here or be listed in the derives_from of an API that covers it.",
           "type": "array",
           "items": {
             "type": "object",
