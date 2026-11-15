@@ -565,12 +565,165 @@
       ],
       "step": "02"
     },
+    "02a_delivery_baseline.json": {
+      "arrays": [
+        {
+          "array_path": ".environments{}",
+          "contract": [
+            "scope",
+            "scope_reason",
+            "config"
+          ],
+          "kind": "environment",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "seed",
+                "constraint",
+                "scope-item"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "map_keyed": true,
+          "role": "obligation-delivery",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".ci_gates",
+          "contract": [
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "gate_id",
+          "kind": "gate",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "component",
+                "constraint"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-delivery",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".secrets",
+          "contract": [
+            "name",
+            "scope",
+            "scope_reason"
+          ],
+          "id_field": "secret_id",
+          "kind": "secret",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "connection",
+                "component",
+                "constraint"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "obligation-delivery",
+          "source": "x-node"
+        }
+      ],
+      "step": "02a"
+    },
     "03_glossary.json": {
       "arrays": [
         {
           "array_path": ".terms",
+          "contract": [
+            "term",
+            "acronym",
+            "definition",
+            "domain",
+            "units",
+            "term_ref",
+            "acronym_ref",
+            "unit_ref"
+          ],
           "id_field": "term_id",
-          "kind": "term"
+          "kind": "term",
+          "links": [
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
         }
       ],
       "step": "03"
@@ -579,15 +732,96 @@
       "arrays": [
         {
           "array_path": ".functional_requirements",
+          "contract": [
+            "statement",
+            "rationale",
+            "priority",
+            "preconditions",
+            "postconditions",
+            "capability_ref",
+            "action_ref",
+            "entity_ref",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "fr_id",
           "kind": "fr",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "capability"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "depends_on",
+              "kinds": [
+                "fr"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "fr"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
           "nested": [
             {
               "array_path": ".acceptance_criteria",
+              "contract": [
+                "text",
+                "scope",
+                "scope_reason"
+              ],
               "id_field": "criterion_id",
-              "kind": "criterion"
+              "kind": "criterion",
+              "links": [
+                {
+                  "built": false,
+                  "field": "assumes",
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                },
+                {
+                  "built": false,
+                  "field": "replaces",
+                  "kinds": "*",
+                  "required": false,
+                  "same_step_kinds": []
+                }
+              ],
+              "role": "obligation-system",
+              "source": "x-node"
             }
-          ]
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "04"
@@ -596,8 +830,131 @@
       "arrays": [
         {
           "array_path": ".apis",
+          "contract": [
+            "name",
+            "version",
+            "protocol",
+            "path",
+            "method",
+            "input_schema_ref",
+            "output_schema_ref",
+            "parameters",
+            "security",
+            "event_ref",
+            "entity_ref",
+            "policy_ref",
+            "interface_ref",
+            "enum_provenance",
+            "scope",
+            "scope_reason"
+          ],
           "id_field": "api_id",
-          "kind": "api"
+          "kind": "api",
+          "links": [
+            {
+              "built": true,
+              "field": "derives_from",
+              "kinds": [
+                "fr"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "provided_by",
+              "kinds": [
+                "component"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "relies_on",
+              "kinds": [
+                "third-party"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "depends_on",
+              "kinds": [
+                "api"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "api"
+              ]
+            },
+            {
+              "built": false,
+              "field": "assumes",
+              "kinds": [
+                "assumption"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "assumption"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "nested": [
+            {
+              "array_path": ".errors",
+              "contract": [
+                "code",
+                "message",
+                "severity",
+                "scope",
+                "scope_reason"
+              ],
+              "id_field": "error_id",
+              "kind": "api-error",
+              "links": [
+                {
+                  "built": true,
+                  "field": "derives_from",
+                  "kinds": [
+                    "criterion"
+                  ],
+                  "required": true,
+                  "same_step_kinds": []
+                },
+                {
+                  "built": false,
+                  "field": "assumes",
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                },
+                {
+                  "built": false,
+                  "field": "replaces",
+                  "kinds": "*",
+                  "required": false,
+                  "same_step_kinds": []
+                }
+              ],
+              "role": "obligation-system",
+              "source": "x-node"
+            }
+          ],
+          "role": "obligation-system",
+          "source": "x-node"
         }
       ],
       "step": "05"
@@ -729,10 +1086,6 @@
     }
   ],
   "steps_without_entry_arrays": [
-    {
-      "rationale": "no top-level array properties with id fields",
-      "step": "02a"
-    },
     {
       "rationale": "no top-level array properties with id fields",
       "step": "10"

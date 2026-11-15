@@ -10,24 +10,99 @@
     {
       "type": "object",
       "properties": {
-        "trace": {
-          "description": "Traceability links connecting this delivery baseline to upstream spec artifacts. Use type 'capability' to reference capabilities (cap-*) this baseline operationalises (the kind of the target; describe the 'implements' relationship in note). Use type 'charter-goal' to reference charter goals (goal-*) that constrain this environment configuration (describe the 'derives_from' relationship in note). Example: [{\"type\": \"capability\", \"id\": \"cap-continuous-deployment\", \"note\": \"Implements this capability; baseline defines the CI/CD pipeline\"}, {\"type\": \"charter-goal\", \"id\": \"goal-deployment-scope\", \"note\": \"Derives from this charter goal; environment structure follows the charter deployment scope\"}]. At least one trace entry per baseline. Anti-pattern: omitting trace entirely — baselines without trace links cannot be validated against charter scope. Anti-pattern: using verb-types such as 'implements' or 'derives_from' — type must be the canonical kind of the target artifact, not a relationship verb; put the relationship verb in note.",
-          "type": "array",
-          "items": {
-            "$ref": "vc:core:collections#traceRef",
-            "description": "A traceability reference linking this delivery baseline to the upstream spec artifacts it formalises. At step 02a, set type to the canonical kind of the target artifact — e.g., 'capability' for cap-* targets (describe the operationalising relationship in note), 'charter-goal' for goal-* charter targets (describe the constraint relationship in note). Verbs like 'implements' and 'derives_from' are NOT valid types — put the relationship verb in note. Example: {\"type\": \"capability\", \"id\": \"cap-continuous-deployment\", \"note\": \"Implements this capability; baseline formalises the component topology\"}."
-          }
-        },
         "environments": {
-          "description": "Map of environment names to their configuration objects. Each key must be one of the canonical environment names (dev, ci, staging, prod). The value is a key-value config map capturing environment-specific overrides for infrastructure, scaling, and feature flags. Decision rule: include only keys whose value differs across at least two environments — if a key has the same value in every environment, omit it; shared defaults belong in application configuration, not here. Worked example: if 'api_url' is 'https://api.staging.example.com' in staging and 'https://api.example.com' in prod, include it; if 'log_level' is always 'info' in every environment, omit it entirely. Correct: {\"dev\": {\"replica_count\": 1, \"log_level\": \"debug\", \"api_url\": \"https://api.dev.example.com\"}, \"prod\": {\"replica_count\": 3, \"log_level\": \"warn\", \"api_url\": \"https://api.example.com\"}}. Anti-pattern: duplicating keys with identical values across all environments (e.g., {\"dev\": {\"timeout\": 30}, \"staging\": {\"timeout\": 30}, \"prod\": {\"timeout\": 30}}) — this creates a false impression that values vary and pollutes the diff when values do change; also avoid listing every possible config key regardless of whether it actually varies between environments.",
+          "description": "Map of environment names to environment nodes. Each key must be one of the canonical environment names (dev, ci, staging, prod) and all four are required. Each value is an environment node (scope, derives_from, ...) whose optional config object is a key-value map capturing environment-specific overrides for infrastructure, scaling, and feature flags. Decision rule: put in config only keys whose value differs across at least two environments — if a key has the same value in every environment, omit it; shared defaults belong in application configuration, not here. Correct: {\"dev\": {\"scope\": \"in\", \"derives_from\": [\"seed-delivery\"], \"config\": {\"replica_count\": 1, \"log_level\": \"debug\"}}}. Anti-pattern: a host key at the environment level (it must sit under config); duplicating keys with identical values across all environments, which creates a false impression that values vary.",
           "type": "object",
           "propertyNames": {
             "$ref": "vc:core:collections#environmentName",
             "description": "Environment name constraint: must be a valid environment (dev, ci, staging, prod)."
           },
           "additionalProperties": {
-            "$ref": "vc:core:collections#environmentConfig",
-            "description": "Configuration block for one deployment environment. Must capture the settings that differ between tiers — e.g., replica count, database URL pattern, feature flags, resource limits. Values should reflect actual delivery targets, not placeholder strings."
+            "description": "One deployment environment: node fields (scope, derives_from, ...) plus an optional config object holding the settings that differ between tiers — e.g., replica count, database URL pattern, feature flags, resource limits. Values should reflect actual delivery targets, not placeholder strings.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "config": {
+                "description": "Host configuration for this environment: the key-value settings that differ between tiers. Optional; every host key lives here, never beside the node fields.",
+                "$ref": "vc:core:collections#environmentConfig"
+              },
+              "scope": {
+                "description": "Delivery scope for this environment: 'in' for the current release, 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this environment is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "derives_from": {
+                "description": "Ids of the seeds, constraints or scope items this environment is derived from. At least one is required; every environment must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "seed",
+                    "constraint",
+                    "scope-item"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this environment relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this environment: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this environment, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this environment replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
           },
           "required": [
             "dev",
@@ -35,21 +110,226 @@
             "staging",
             "prod"
           ],
-          "minProperties": 4
+          "minProperties": 4,
+          "x-node": {
+            "kind": "environment",
+            "role": "obligation-delivery",
+            "contract": [
+              "scope",
+              "scope_reason",
+              "config"
+            ],
+            "map_keyed": true
+          }
         },
         "ci_gates": {
-          "description": "Ordered list of CI gate identifiers that must all pass before a deployment is considered promotable. At least one gate must be provided (enforced by minItems). Decision rule: the name must be recognizable to a developer reading the CI log — use kebab-case that matches what the gate actually validates. Standard names: 'unit-tests', 'lint', 'type-check', 'security-scan', 'integration-tests', 'e2e-smoke', 'coverage-check'. Worked examples: ['unit-tests', 'lint', 'type-check', 'security-scan'] for a typical backend service; ['unit-tests', 'integration-tests', 'e2e-smoke', 'coverage-check'] for a full-stack app. Anti-pattern: 'tests' (ambiguous — unit, integration, or e2e?), 'CI' (too generic to be actionable), 'checks' (not machine-identifiable); also avoid capital letters and spaces as they break pipeline job name matching.",
+          "description": "Ordered list of CI gates that must all pass before a deployment is considered promotable. At least one gate must be provided (enforced by minItems). Decision rule: the name must be recognizable to a developer reading the CI log — use kebab-case that matches what the gate actually validates. Standard names: 'unit-tests', 'lint', 'type-check', 'security-scan', 'integration-tests', 'e2e-smoke', 'coverage-check'. Worked examples (gate_id values): unit-tests, lint, type-check, security-scan for a typical backend service; unit-tests, integration-tests, e2e-smoke, coverage-check for a full-stack app. Anti-pattern: 'tests' (ambiguous — unit, integration, or e2e?), 'CI' (too generic to be actionable), 'checks' (not machine-identifiable); also avoid capital letters and spaces as they break pipeline job name matching.",
           "type": "array",
           "minItems": 1,
+          "x-node": {
+            "kind": "gate",
+            "role": "obligation-delivery",
+            "contract": [
+              "scope",
+              "scope_reason"
+            ],
+            "id": "gate_id"
+          },
           "items": {
-            "description": "CI gate identifier in kebab-case (e.g., 'unit-tests', 'lint', 'security-scan'). Should match a pipeline job name in the host repo's CI configuration.",
-            "type": "string",
-            "pattern": "^[a-z0-9-]+$"
+            "description": "A single CI gate that must pass before a deployment is promotable, with its scope and the components or constraints it derives from.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "gate_id": {
+                "description": "Unique kebab-case identifier of this CI gate (e.g., 'unit-tests', 'lint', 'security-scan'). Should match a pipeline job name in the host repo's CI configuration.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "scope": {
+                "description": "Delivery scope for this CI gate: 'in' for the current release, 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this CI gate is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "derives_from": {
+                "description": "Ids of the components or constraints this CI gate is derived from. At least one is required; every CI gate must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "component",
+                    "constraint"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this CI gate relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this CI gate: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this CI gate, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this CI gate replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "gate_id",
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
           }
         },
         "secrets": {
-          "description": "List of secret names (environment variable keys) that the delivery pipeline requires at runtime. Each entry should be the exact env-var name injected by the secrets manager — e.g., 'DATABASE_URL', 'API_KEY_STRIPE', 'JWT_SECRET'. Do not include values or partial keys. This list drives audit trails and helps reviewers confirm all secrets are provisioned before deployment. Omit internal framework secrets that are auto-injected by the platform.",
-          "$ref": "vc:core:collections#stringArray"
+          "description": "List of secrets (environment variable keys) that the delivery pipeline requires at runtime. Each entry is a secret node whose name is the exact env-var name injected by the secrets manager. This list drives audit trails and helps reviewers confirm all secrets are provisioned before deployment. Omit internal framework secrets that are auto-injected by the platform.",
+          "type": "array",
+          "x-node": {
+            "kind": "secret",
+            "role": "obligation-delivery",
+            "contract": [
+              "name",
+              "scope",
+              "scope_reason"
+            ],
+            "id": "secret_id"
+          },
+          "items": {
+            "description": "A single secret the delivery pipeline requires, with its env-var name, scope and the nodes it derives from.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "secret_id": {
+                "description": "Unique kebab-case identifier of this secret node (e.g., 'secret-database-url'). Minted; the env-var name itself is the name field.",
+                "$ref": "vc:core:atoms#kebabId"
+              },
+              "name": {
+                "description": "Exact env-var name injected by the secrets manager — e.g., 'DATABASE_URL', 'API_KEY_STRIPE', 'JWT_SECRET'. Do not include values or partial keys.",
+                "type": "string",
+                "minLength": 1
+              },
+              "scope": {
+                "description": "Delivery scope for this secret: 'in' for the current release, 'later' for deferred work, 'out' for explicitly excluded work. 'later' and 'out' require scope_reason.",
+                "$ref": "vc:core:graph#scope"
+              },
+              "scope_reason": {
+                "description": "Why this secret is later or out of scope. Required when scope is later or out.",
+                "$ref": "vc:core:graph#scopeReason"
+              },
+              "derives_from": {
+                "description": "Ids of the connections, components or constraints this secret is derived from. At least one is required; every secret must be justified by what it derives from.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "connection",
+                    "component",
+                    "constraint"
+                  ],
+                  "required": true,
+                  "built": true
+                },
+                "minItems": 1
+              },
+              "assumes": {
+                "description": "Ids of the charter assumptions this secret relies on. Optional; omit when it rests on no recorded assumption.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": [
+                    "assumption"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "assumption"
+                  ]
+                }
+              },
+              "lifecycle": {
+                "description": "Lifecycle state of this secret: active (default), deprecated or not_applicable.",
+                "$ref": "vc:core:graph#lifecycle"
+              },
+              "aliases": {
+                "description": "Former or alternative ids of this secret, kept so that older references still resolve. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:atoms#kebabId"
+                },
+                "uniqueItems": true
+              },
+              "replaces": {
+                "description": "Ids of nodes that this secret replaces. Optional.",
+                "type": "array",
+                "items": {
+                  "$ref": "vc:core:graph#nodeId"
+                },
+                "uniqueItems": true,
+                "x-link": {
+                  "kinds": "*",
+                  "required": false
+                }
+              }
+            },
+            "required": [
+              "secret_id",
+              "name",
+              "scope",
+              "derives_from"
+            ],
+            "allOf": [
+              {
+                "$ref": "vc:core:graph#scopeReasonRule"
+              }
+            ]
+          }
         },
         "compliance": {
           "description": "List of compliance standards or regulatory frameworks this delivery baseline must satisfy. Use canonical short names: 'SOC2', 'GDPR', 'HIPAA', 'PCI-DSS', 'ISO27001'. Each entry should reflect an actual external or internal obligation — not aspirational standards. If no formal compliance applies, use an empty array rather than inventing entries. This list is consumed by the governance check (step 10) to verify that compliance-gating CI gates are present.",

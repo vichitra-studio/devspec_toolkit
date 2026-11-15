@@ -159,19 +159,17 @@ Before emitting, verify:
       "acceptance_criteria": [
         {
           "criterion_id": "ac-auth-login-success",
+          "scope": "in",
           "text": "Valid credentials return a signed token and user id."
         },
         {
           "criterion_id": "ac-auth-login-failure",
+          "scope": "in",
           "text": "Invalid credentials return a 401 error with no token."
         }
       ],
-      "trace": [
-        {
-          "type": "capability",
-          "id": "cap-user-auth"
-        }
-      ],
+      "scope": "in",
+      "derives_from": ["cap-user-auth"],
       "capability_ref": {
         "id": "cn:project:capability:user-authentication",
         "kind": "capability",
@@ -184,19 +182,17 @@ Before emitting, verify:
       "acceptance_criteria": [
         {
           "criterion_id": "ac-auth-logout-success",
+          "scope": "in",
           "text": "A valid session token is invalidated and subsequent requests with it return 401."
         },
         {
           "criterion_id": "ac-auth-logout-idempotent",
+          "scope": "in",
           "text": "Repeated logout requests with the same token return 401 without error."
         }
       ],
-      "trace": [
-        {
-          "type": "capability",
-          "id": "cap-user-auth"
-        }
-      ],
+      "scope": "in",
+      "derives_from": ["cap-user-auth"],
       "capability_ref": {
         "id": "cn:project:capability:user-authentication",
         "kind": "capability",

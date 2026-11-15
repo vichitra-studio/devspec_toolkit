@@ -97,36 +97,81 @@ Before emitting, verify:
   "created_at": "2025-01-01T00:01:00Z",
   "environments": {
     "dev": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 1,
-      "log_level": "debug"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 1,
+        "log_level": "debug"
+      }
     },
     "ci": {
-      "runner": "ubuntu-latest",
-      "region": "us-east-1",
-      "replica_count": 1
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runner": "ubuntu-latest",
+        "region": "us-east-1",
+        "replica_count": 1
+      }
     },
     "staging": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 2,
-      "log_level": "warn"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 2,
+        "log_level": "warn"
+      }
     },
     "prod": {
-      "runtime": "python3.11",
-      "region": "us-east-1",
-      "replica_count": 3,
-      "log_level": "warn"
+      "scope": "in",
+      "derives_from": ["seed-delivery"],
+      "config": {
+        "runtime": "python3.11",
+        "region": "us-east-1",
+        "replica_count": 3,
+        "log_level": "warn"
+      }
     }
   },
   "ci_gates": [
-    "schema-validate",
-    "fixtures-lint",
-    "invariants-check",
-    "governance-check"
+    {
+      "gate_id": "schema-validate",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "fixtures-lint",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "invariants-check",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "gate_id": "governance-check",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    }
   ],
-  "secrets": ["DATABASE_URL", "JWT_SECRET"],
+  "secrets": [
+    {
+      "secret_id": "secret-database-url",
+      "name": "DATABASE_URL",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    },
+    {
+      "secret_id": "secret-jwt-secret",
+      "name": "JWT_SECRET",
+      "scope": "in",
+      "derives_from": ["constraint-delivery"]
+    }
+  ],
   "compliance": ["SOC2"],
   "canonical_refs_used": []
 }

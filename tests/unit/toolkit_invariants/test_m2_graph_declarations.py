@@ -222,3 +222,9 @@ def test_replaces_optional_with_node_id_items_and_aliases_without_x_link(
         assert replaces["items"]["$ref"] == f"{_GRAPH}#nodeId", node.kind
         assert "x-link" not in aliases, node.kind
         assert aliases["items"]["$ref"] == "vc:core:atoms#kebabId", node.kind
+
+
+def test_term_kind_is_context_and_only_declares_replaces_link(decls) -> None:
+    fname = "03_glossary.schema.json"
+    assert [n.value["role"] for n in _nodes(decls, fname)] == ["context"]
+    assert [lk.field_name for lk in _links(decls, fname)] == ["replaces"]

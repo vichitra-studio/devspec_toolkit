@@ -156,7 +156,7 @@ def test_real_registry_lists_seed_external_kind():
 def test_scan_of_real_toolkit_finds_seed_and_no_step_kinds():
     scan = scan_annotations(str(_ROOT))
     assert [e["kind"] for e in scan.external_kinds] == ["seed"]
-    host = scan.host("schema/04_fr_list.schema.json")
+    host = scan.host("schema/06_invariants.schema.json")
     assert host is None
 
 
@@ -174,11 +174,16 @@ def test_unannotated_files_are_byte_identical_to_pre_m1():
             continue
         assert reg["registry"][key] == entry, key
     assert set(reg["registry"]) - set(pre["registry"]) == annotated - set(pre["registry"])
-    for key in ("_sentinels", "steps_without_entry_arrays", "steps_with_deferred_registration"):
+    for key in ("_sentinels", "steps_with_deferred_registration"):
         assert reg[key] == pre[key], key
+    annotated_steps = {k.split("_")[0] for k in annotated}
+    for key in ("steps_without_entry_arrays",):
+        assert [e for e in reg[key] if e["step"] not in annotated_steps] == [
+            e for e in pre[key] if e["step"] not in annotated_steps
+        ], key
     differing = {k for k in set(reg) | set(pre) if reg.get(k) != pre.get(k)}
     # the registry map itself differs once any step is annotated; its keys are compared above
-    assert differing - {"registry"} == {"_format_version", "external_kinds"}
+    assert differing - {"registry", "steps_without_entry_arrays"} == {"_format_version", "external_kinds"}
 
 
 def test_committed_registry_matches_generator_output():

@@ -142,10 +142,11 @@ Before emitting, verify:
       "protocol": "http",
       "owner": "api",
       "interface_ref": {"id": "cn:project:interface:example-resource", "kind": "interface"},
-      "trace": [{"type": "fr", "id": "fr-example", "note": "Implements: 'The system shall expose example resource data to authenticated clients.'"}],
+      "scope": "in",
+      "derives_from": ["fr-example"],
       "errors": [
-        {"code": "unauthenticated", "message": "No valid auth token provided"},
-        {"code": "resource-not-found", "message": "The requested resource does not exist"}
+        {"error_id": "err-example-unauthenticated", "scope": "in", "derives_from": ["ac-example-auth"], "code": "unauthenticated", "message": "No valid auth token provided"},
+        {"error_id": "err-example-not-found", "scope": "in", "derives_from": ["ac-example-lookup"], "code": "resource-not-found", "message": "The requested resource does not exist"}
       ]
     }
   ],
