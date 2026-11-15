@@ -35,7 +35,7 @@ from .hallucination_lint import lint_hallucinations
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
-from ..core.loaders import iter_spec_artifacts, load_json_artifact, load_sibling_artifact
+from ..core.loaders import iter_spec_artifacts, load_json_artifact
 from ..core.registry import SchemaRegistry, get_shared_registry
 from .spec_quality_lint import lint_spec_quality, lint_spec_quality_file
 from .validators import (
@@ -497,22 +497,6 @@ def _has_canonical_bootstrap_failure(errors: list[SpecError]) -> bool:
     return any(any(token in e.message for token in bootstrap_tokens) for e in errors)
 
 
-def _load_component_ids(repo_root: str, file_path: str) -> set[str] | None:
-    """Thin wrapper around ``load_sibling_artifact``.
-
-    ``load_sibling_artifact`` now distinguishes "file absent" (``None``) from
-    "file present but empty" (``set()``); this wrapper simply propagates that
-    contract so ``_build_validation_context`` consumers can run cross-ref
-    validation against a present-but-empty upstream and still flag stray refs.
-    """
-    return load_sibling_artifact(file_path, "02", "components", "component_id", fallback_root=repo_root)
-
-
-def _load_capability_ids(repo_root: str, file_path: str) -> set[str] | None:
-    """Thin wrapper: see ``_load_component_ids`` rationale."""
-    return load_sibling_artifact(file_path, "01", "capabilities", "capability_id", fallback_root=repo_root)
-
-
 def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
     """Load full NFR data dict (not just IDs) for step_03 and step_16 cross-ref validation.
 
@@ -565,8 +549,6 @@ def _build_validation_context(
     return {
         "artifact_path": path,
         "spec_root": effective_spec_root,
-        "component_ids": _load_component_ids(repo_root, path),
-        "capability_ids": _load_capability_ids(repo_root, path),
         "nfrs_data": _load_nfrs_data(repo_root, path),
         "monitoring_data": _load_monitoring_data(repo_root, path),
     }
@@ -580,8 +562,8 @@ DeepValidator = Callable[[dict[str, Any], str, dict[str, Any]], list[SpecError]]
 # package, but the explicit dict keeps startup predictable and avoids import
 # side-effects.  See AUDIT-043 for the auto-discovery proposal.
 DEEP_VALIDATORS: dict[str, DeepValidator] = {
-    "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root, ctx.get("component_ids")),
-    "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("capability_ids")),
+    "01": lambda instance, root, ctx: step_01.validate_step_01(instance, root),
+    "02": lambda instance, root, ctx: step_02.validate_step_02(instance, root, ctx.get("spec_root")),
     "02a": lambda instance, root, ctx: step_02a.validate_step_02a(instance, root),
     "03": lambda instance, root, ctx: step_03.validate_step_03(
         instance,

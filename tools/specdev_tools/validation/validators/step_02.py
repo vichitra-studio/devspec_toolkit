@@ -1,7 +1,11 @@
-import warnings
-from typing import Optional, Set
+from __future__ import annotations
+
+import json
+import os
+from typing import Any
+
 from ...core.errors import make_error, SpecError
-from ...core.trace_types import is_valid_trace_type, normalize_trace_type
+from ...core.scope_helpers import is_parked
 
 def check_component_ids(components: list[dict]) -> list[SpecError]:
     errors: list[SpecError] = []
@@ -13,17 +17,6 @@ def check_component_ids(components: list[dict]) -> list[SpecError]:
         if comp_id in seen:
             errors.append(make_error("E520", f"Duplicate component_id: {comp_id}"))
         seen.add(comp_id)
-    return errors
-
-def check_connection_integrity(connections: list[dict], component_ids: set[str]) -> list[SpecError]:
-    errors: list[SpecError] = []
-    for idx, conn in enumerate(connections):
-        source = conn.get("from")
-        target = conn.get("to")
-        if source and source not in component_ids:
-            errors.append(make_error("E590", f"Connection[{idx}] from '{source}' not found in components"))
-        if target and target not in component_ids:
-            errors.append(make_error("E590", f"Connection[{idx}] to '{target}' not found in components"))
     return errors
 
 def check_rate_limits(connections: list[dict]) -> list[SpecError]:
@@ -40,78 +33,24 @@ def check_rate_limits(connections: list[dict]) -> list[SpecError]:
             )
     return errors
 
-def check_external_trust_boundaries(components: list[dict], connections: list[dict]) -> list[SpecError]:
+def check_external_trust_boundaries(connections: list[dict], third_party_ids: set[str]) -> list[SpecError]:
+    """A connection to a third party declared in this file must not be ``internal``."""
     errors: list[SpecError] = []
-    external_ids = {
-        comp.get("component_id")
-        for comp in components
-        if comp.get("component_id") and comp.get("type") == "external"
-    }
-    if not external_ids:
-        return errors
     for idx, conn in enumerate(connections):
-        source = conn.get("from")
-        target = conn.get("to")
-        if source not in external_ids and target not in external_ids:
-            continue
-        trust_boundary = conn.get("trust_boundary")
-        if trust_boundary == "internal":
+        targets = conn.get("connects_to") or []
+        if conn.get("trust_boundary") == "internal" and third_party_ids.intersection(targets):
             errors.append(
-                make_error("E520", f"Connection[{idx}] touches external component but trust_boundary is internal")
+                make_error("E520", f"Connection[{idx}] connects to a third party but trust_boundary is internal")
             )
     return errors
 
-# ---------------------------------------------------------------------------
-# Business-rule trace-type constant
-# ---------------------------------------------------------------------------
 
-# Business rule: component capability coverage accepts "doc" and "capability"
-# trace types.
-# Rationale: when a system-sketch component (Step 02) traces to a capability
-# ID (from Step 01), it may use type "doc" (legacy convention: the component
-# *documents* the capability) or type "capability" (explicit trace).  Both
-# are accepted for backwards compatibility.  Mirrors the identical constant
-# in cross_artifact_checks.py so the per-file validator and the matrix check
-# agree on what is valid.
-_CAPABILITY_COVERAGE_TYPES: frozenset[str] = frozenset({"doc", "capability"})
-
-_invalid_capability_types = {t for t in _CAPABILITY_COVERAGE_TYPES if not is_valid_trace_type(t)}
-if _invalid_capability_types:
-    warnings.warn(
-        f"step_02: _CAPABILITY_COVERAGE_TYPES contains unknown canon trace types: "
-        f"{_invalid_capability_types}",
-        stacklevel=1,
-    )
-
-
-def check_capability_coverage(components: list[dict], capability_ids: set[str]) -> list[SpecError]:
-    if not capability_ids:
-        return []
-    traced = set()
-    errors: list[SpecError] = []
-    accepted = sorted(_CAPABILITY_COVERAGE_TYPES)
-    for comp in components:
-        traces = (comp.get("trace") or []) + (comp.get("trace_refs") or [])
-        for trace in traces:
-            trace_id = trace.get("id")
-            trace_type = normalize_trace_type(trace.get("type", ""))
-            if not trace_id:
-                continue
-            if trace_type in _CAPABILITY_COVERAGE_TYPES:
-                traced.add(trace_id)
-            elif trace_id in capability_ids:
-                errors.append(
-                    make_error("E530", f"Capability trace must use one of {accepted}: {trace_id}")
-                )
-    missing = sorted(capability_ids - traced)
+def check_capability_coverage(components: list[dict], capabilities: dict[str, dict]) -> list[SpecError]:
+    """Every capability that is not parked must be named in some component's ``derives_from``."""
+    covered = {ref for comp in components for ref in comp.get("derives_from") or []}
+    missing = sorted(cap_id for cap_id, cap in capabilities.items() if cap_id not in covered and not is_parked(cap))
     if missing:
-        errors.append(make_error("E590", f"Missing capability coverage: {', '.join(missing)}"))
-    return errors
-
-def check_tech_stack_present(instance: dict) -> list[SpecError]:
-    """Check that tech_stack is present (mirrors schema required constraint for standalone test runs)."""
-    if "tech_stack" not in instance:
-        return [make_error("E520", "Missing required field: tech_stack")]
+        return [make_error("E590", f"Missing capability coverage: {', '.join(missing)}")]
     return []
 
 
@@ -126,31 +65,56 @@ def check_partner_public_rate_limit(connections: list[dict]) -> list[SpecError]:
     return errors
 
 
-def validate_step_02(
-    instance: dict,
-    repo_root: str,
-    capability_ids: Optional[Set[str]] = None
-) -> list[SpecError]:
+def _load_capabilities(repo_root: str, spec_root: str | None) -> dict[str, dict]:
+    """Read the Step 01 artifact and return its capabilities keyed by ``capability_id``.
+
+    Searches *spec_root* (when given), then ``<repo_root>/spec``. A missing or
+    unreadable file yields an empty mapping: no coverage data, no error.
+    """
+    search_dirs = [d for d in (spec_root, os.path.join(repo_root, "spec")) if d]
+    for directory in search_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for name in sorted(os.listdir(directory)):
+            if name.startswith("01_") and name.endswith(".json"):
+                return _read_capabilities(os.path.join(directory, name))
+    return {}
+
+
+def _read_capabilities(path: str) -> dict[str, dict]:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data: Any = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    items = data.get("capabilities") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return {}
+    return {c["capability_id"]: c for c in items if isinstance(c, dict) and isinstance(c.get("capability_id"), str)}
+
+
+def validate_step_02(instance: dict, repo_root: str, spec_root: str | None = None) -> list[SpecError]:
     """
     Deep validation logic for Step 02 (System Sketch).
 
     Schema validation is handled by the orchestrator (validate.py) before
     this function is called.  This function performs deep logic checks.
+    Capability coverage reads the Step 01 artifact from *spec_root* or
+    ``<repo_root>/spec``; without it the coverage check is skipped.
     """
     errors: list[SpecError] = []
 
     components = instance.get("components", [])
     connections = instance.get("connections", [])
-    comp_ids = {comp.get("component_id") for comp in components if comp.get("component_id")}
+    third_party_ids = {tp["third_party_id"] for tp in instance.get("third_parties", []) if tp.get("third_party_id")}
 
-    errors.extend(check_tech_stack_present(instance))
     errors.extend(check_component_ids(components))
-    errors.extend(check_connection_integrity(connections, comp_ids))
     errors.extend(check_rate_limits(connections))
     errors.extend(check_partner_public_rate_limit(connections))
-    errors.extend(check_external_trust_boundaries(components, connections))
+    errors.extend(check_external_trust_boundaries(connections, third_party_ids))
 
-    if capability_ids:
-        errors.extend(check_capability_coverage(components, capability_ids))
+    capabilities = _load_capabilities(repo_root, spec_root)
+    if capabilities:
+        errors.extend(check_capability_coverage(components, capabilities))
 
     return errors

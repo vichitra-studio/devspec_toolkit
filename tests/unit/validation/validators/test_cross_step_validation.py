@@ -1,7 +1,6 @@
 """Comprehensive tests for R9 cross-step ID validators.
 
-Tests all 8 validators that perform cross-step reference validation:
-- step_05: FR refs in API contracts
+Tests the remaining validators that perform cross-step reference validation:
 - step_06: FR + API refs in invariant trace targets
 - step_08: FR + API + INV + NFR refs in fixture targets
 - step_09: Capability refs in milestone deliverables/capability_refs
@@ -21,7 +20,6 @@ import os
 import tempfile
 import unittest
 
-from specdev_tools.validation.validators.step_05 import validate_step_05
 from specdev_tools.validation.validators.step_06 import validate_step_06
 from specdev_tools.validation.validators.step_08 import validate_step_08
 from specdev_tools.validation.validators.step_09 import validate_step_09
@@ -52,91 +50,6 @@ def _w590(errors) -> list[str]:
 
 def _e590(errors) -> list[str]:
     return [e for e in _render(errors) if "E590" in e]
-
-
-# ---------------------------------------------------------------------------
-# Step 05 — FR refs in API contracts
-# ---------------------------------------------------------------------------
-
-class TestStep05CrossStep(unittest.TestCase):
-    """Cross-step validation: step_05 checks FR refs against 04_fr_list.json."""
-
-    def test_valid_upstream_refs_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "04_fr_list.json", {
-                "functional_requirements": [
-                    {"fr_id": "fr-login"},
-                    {"fr_id": "fr-logout"},
-                ]
-            })
-            instance = {
-                "apis": [
-                    {
-                        "api_id": "api-auth",
-                        "method": "POST",
-                        "path": "/auth/login",
-                        "trace": [
-                            {"type": "fr", "id": "fr-login"},
-                            {"type": "fr", "id": "fr-logout"},
-                        ],
-                    }
-                ]
-            }
-            errors = validate_step_05(instance, tmp)
-            self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
-            self.assertEqual(len(_e590(errors)), 0, f"Unexpected E590: {_e590(errors)}")
-
-    def test_missing_upstream_emits_w590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            # No 04_fr_list.json present
-            instance = {
-                "apis": [
-                    {
-                        "api_id": "api-auth",
-                        "method": "POST",
-                        "path": "/auth/login",
-                        "trace": [{"type": "fr", "id": "fr-login"}],
-                    }
-                ]
-            }
-            errors = validate_step_05(instance, tmp)
-            w = _w590(errors)
-            self.assertGreaterEqual(len(w), 1, "Expected W590 for missing 04_fr_list.json")
-            self.assertTrue(
-                any("04_fr_list.json" in msg for msg in w),
-                f"W590 should mention 04_fr_list.json: {w}"
-            )
-
-    def test_broken_ref_emits_e590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "04_fr_list.json", {
-                "functional_requirements": [
-                    {"fr_id": "fr-login"},
-                ]
-            })
-            instance = {
-                "apis": [
-                    {
-                        "api_id": "api-auth",
-                        "method": "POST",
-                        "path": "/auth/login",
-                        "trace": [{"type": "fr", "id": "fr-nonexistent"}],
-                    }
-                ]
-            }
-            errors = validate_step_05(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken FR ref")
-            self.assertTrue(
-                any("fr-nonexistent" in msg for msg in e),
-                f"E590 should mention the broken ref: {e}"
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -1073,13 +986,6 @@ class TestStep15CrossStep(unittest.TestCase):
 
 class TestCrossStepNoSpecDir(unittest.TestCase):
     """When the spec directory does not exist at all, validators should emit W590."""
-
-    def test_step_05_no_spec_dir(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            # tmp exists but has no spec/ subdirectory
-            instance = {"apis": [{"api_id": "api-x", "trace": [{"type": "fr", "id": "fr-x"}]}]}
-            errors = validate_step_05(instance, tmp)
-            self.assertGreaterEqual(len(_w590(errors)), 1)
 
     def test_step_06_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

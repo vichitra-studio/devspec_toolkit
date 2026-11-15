@@ -2,18 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...core.errors import make_error, SpecError
+from ...core.errors import SpecError
+from ...validation.linter_utils import check_no_duplicates
 
 
 def validate_step_02a(instance: dict[str, Any], toolkit_root: str) -> list[SpecError]:
     errors: list[SpecError] = []
-    ci_gates = instance.get("ci_gates", [])
-    if isinstance(ci_gates, list):
-        seen: set[str] = set()
-        for i, gate in enumerate(ci_gates):
-            if not isinstance(gate, str):
-                continue
-            if gate in seen:
-                errors.append(make_error("E520", f"Duplicate ci_gates entry '{gate}' at index {i}"))
-            seen.add(gate)
+    for collection, id_field in (("ci_gates", "gate_id"), ("secrets", "secret_id")):
+        items = instance.get(collection, [])
+        if isinstance(items, list):
+            check_no_duplicates(items, id_field, id_field, errors)
     return errors

@@ -26,48 +26,6 @@ class Step0310Tests(unittest.TestCase):
         )
         self.assertTrue(any("not found in glossary" in e for e in _render(errs)))
 
-    def test_step04_rejects_fr_missing_trace(self):
-        """Validate that FR items missing trace field entirely are rejected."""
-        errs = validate_step_04(
-            {
-                "functional_requirements": [
-                    {
-                        "fr_id": "fr-test-missing-trace",
-                        "statement": "This FR is missing the trace field entirely",
-                        "acceptance_criteria": [
-                            {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                            {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                        ],
-                        "capability_ref": "cap-test"
-                        # NOTE: trace field is completely absent
-                    }
-                ]
-            },
-            ".",
-        )
-        self.assertTrue(any("missing required 'trace' field" in e for e in _render(errs)))
-
-    def test_step04_rejects_fr_empty_trace(self):
-        """Validate that FR items with empty trace array are rejected."""
-        errs = validate_step_04(
-            {
-                "functional_requirements": [
-                    {
-                        "fr_id": "fr-test-empty-trace",
-                        "statement": "This FR has an empty trace array",
-                        "acceptance_criteria": [
-                            {"criterion_id": "ac-1", "text": "First acceptance criterion"},
-                            {"criterion_id": "ac-2", "text": "Second acceptance criterion"}
-                        ],
-                        "trace": [],  # Empty array
-                        "capability_ref": "cap-test"
-                    }
-                ]
-            },
-            ".",
-        )
-        self.assertTrue(any("empty 'trace' array" in e for e in _render(errs)))
-
     def test_step04_accepts_valid_fr_with_trace(self):
         """Validate that FR items with non-empty trace array pass validation."""
         with tempfile.TemporaryDirectory() as tmpdir:

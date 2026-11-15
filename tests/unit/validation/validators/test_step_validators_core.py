@@ -22,10 +22,6 @@ def _render(errors):
 
 
 class StepValidatorsTests(unittest.TestCase):
-    def test_step_02a_duplicate_ci_gate(self):
-        errs = step_02a.validate_step_02a({"ci_gates": ["validate-all", "validate-all"]}, ".")
-        self.assertTrue(any("Duplicate ci_gates" in e for e in _render(errs)))
-
     def test_step_05_duplicate_api(self):
         errs = step_05.validate_step_05({"apis": [{"api_id": "a", "method": "GET", "path": "/"}, {"api_id": "a", "method": "GET", "path": "/"}]}, ".")
         self.assertTrue(errs)
@@ -199,3 +195,15 @@ class StepValidatorsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_step_02a_duplicate_gate_id():
+    gates = [{"gate_id": "gate-lint"}, {"gate_id": "gate-lint"}]
+    errs = _render(step_02a.validate_step_02a({"ci_gates": gates}, "."))
+    assert len(errs) == 1 and "E520" in errs[0] and "gate_id" in errs[0]
+
+
+def test_step_02a_duplicate_secret_id():
+    secrets = [{"secret_id": "sec-db"}, {"secret_id": "sec-db"}]
+    errs = _render(step_02a.validate_step_02a({"secrets": secrets}, "."))
+    assert len(errs) == 1 and "E520" in errs[0] and "secret_id" in errs[0]

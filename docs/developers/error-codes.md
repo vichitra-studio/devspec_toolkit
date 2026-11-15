@@ -771,9 +771,9 @@ Only fires when step 06 is present (absent step-06 file → check skipped silent
 
 ### E311 MISSING_ENUM_PROVENANCE
 
-**Trigger**: Fired by `step_05.py` when an API entry in `05_interface_contracts.json` declares enum values (in request/response fields) but has no `enum_provenance` field recording where those enum values originated, for reproducibility tracking.
+**Trigger**: Fired by `step_05.py` when an API entry in `05_interface_contracts.json` declares at least one `parameters[].enum` but has no `enum_provenance` field recording where the value set originated, for reproducibility tracking. Listing `errors` or `error_codes` does not fire it.
 
-**Resolution**: Add an `enum_provenance` field to the API entry documenting the source of the enum values (e.g. a canonical registry entry or an upstream spec artifact).
+**Resolution**: Add an `enum_provenance` field to the API entry documenting the source of the enum values (e.g. an external standard such as ISO 4217 or IANA language tags, a canonical registry entry, or an upstream spec artifact). An internal enum is asked for provenance too, because structure cannot tell internal from external value sets.
 
 **Promotable**: No (error only).
 

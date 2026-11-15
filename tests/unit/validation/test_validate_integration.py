@@ -414,8 +414,6 @@ class ValidateIntegrationTests(unittest.TestCase):
             artifact_path = str(root / "spec" / "02_system_sketch.json")
             context = {
                 "artifact_path": artifact_path,
-                "component_ids": {"component-a"},
-                "capability_ids": {"cap-a"},
                 "nfrs_data": {"nfrs": []},
                 "monitoring_data": {"metrics": []},
             }
@@ -426,7 +424,7 @@ class ValidateIntegrationTests(unittest.TestCase):
                 errs = _run_deep_validation("02", instance, str(root), artifact_path)
             self.assertEqual([], errs)
             p_ctx.assert_called_once_with(str(root), artifact_path, git_root=None, spec_root=None)
-            p_step.assert_called_once_with(instance, str(root), {"cap-a"})
+            p_step.assert_called_once_with(instance, str(root), None)
 
     def test_run_deep_validation_threads_git_root_and_spec_root_to_context(self):
         """Verify non-None git_root and spec_root are forwarded to _build_validation_context."""
@@ -438,8 +436,6 @@ class ValidateIntegrationTests(unittest.TestCase):
             artifact_path = str(spec / "02_system_sketch.json")
             context = {
                 "artifact_path": artifact_path,
-                "component_ids": None,
-                "capability_ids": None,
                 "nfrs_data": None,
                 "monitoring_data": None,
             }
