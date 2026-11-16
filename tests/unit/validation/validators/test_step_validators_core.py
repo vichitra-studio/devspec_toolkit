@@ -47,7 +47,7 @@ class StepValidatorsTests(unittest.TestCase):
         self.assertEqual(step_11.validate_step_11({"threats": [threat], "trace": [3]}, "."), [])
 
     def test_step_12_unknown_require(self):
-        errs = step_12.validate_step_12({"jobs": [{"job_id": "j1", "requires": ["j2"], "steps": [{"id": "s", "command": "echo"}]}]}, ".")
+        errs = step_12.validate_step_12({"jobs": [{"job_id": "j1", "depends_on": ["j2"], "steps": [{"name": "s", "command": "echo"}]}]}, ".")
         self.assertTrue(errs)
 
     def test_step_13_missing_required_schema_sections(self):
@@ -94,9 +94,21 @@ class StepValidatorsTests(unittest.TestCase):
         errs = step_13a.validate_step_13a({}, ".")
         self.assertTrue(any("MISSING_DIMENSIONS" in e for e in _render(errs)))
 
-    def test_step_14_external_dependency_missing_owner(self):
-        errs = step_14.validate_step_14({"milestones": [], "dependencies": [{"type": "external", "id": "auth-service"}]}, ".")
-        self.assertTrue(errs)
+    def test_step_14_duplicate_task_id(self):
+        milestone = {"milestone_id": "ms-a", "target_date": "2026-01-01", "tasks": [{"task_id": "task-a"}, {"task_id": "task-a"}]}
+        errs = step_14.validate_step_14({"milestones": [milestone]}, ".")
+        self.assertTrue(any("duplicate task_id" in e for e in _render(errs)))
+
+    def test_step_14_wrong_typed_values_do_not_raise(self):
+        for milestones in ("nope", [None, 3], [{"milestone_id": ["x"], "target_date": 5, "tasks": "t"}],
+                           [{"milestone_id": "ms-a", "tasks": [None, {"task_id": ["t"], "depends_on": "task-b"}, {"task_id": "task-b", "depends_on": [3, None]}]}]):
+            with self.subTest(milestones=milestones):
+                self.assertEqual(step_14.validate_step_14({"milestones": milestones}, "."), [])
+
+    def test_step_14_does_not_read_removed_fields(self):
+        milestone = {"milestone_id": "ms-a", "source_milestones": ["ghost"], "fr_refs": ["fr-ghost"], "tasks": []}
+        removed = {"tech_stack": {"languages": [{"name": "x"}]}, "dependencies": [{"type": "external", "id": "dep"}]}
+        self.assertEqual(step_14.validate_step_14({"milestones": [milestone], **removed}, "."), [])
 
 
     # T09a: step_04 tests
@@ -147,8 +159,8 @@ class StepValidatorsTests(unittest.TestCase):
     def test_step_12_circular_dependency(self):
         errs = step_12.validate_step_12(
             {"jobs": [
-                {"job_id": "j1", "requires": ["j2"], "steps": [{"id": "s", "command": "echo"}]},
-                {"job_id": "j2", "requires": ["j1"], "steps": [{"id": "s", "command": "echo"}]},
+                {"job_id": "j1", "depends_on": ["j2"], "steps": [{"name": "s", "command": "echo"}]},
+                {"job_id": "j2", "depends_on": ["j1"], "steps": [{"name": "s", "command": "echo"}]},
             ]}, "."
         )
         self.assertTrue(any("Circular" in e for e in _render(errs)))
@@ -156,8 +168,8 @@ class StepValidatorsTests(unittest.TestCase):
     def test_step_12_valid_dag(self):
         errs = step_12.validate_step_12(
             {"jobs": [
-                {"job_id": "j1", "requires": [], "steps": [{"id": "s", "command": "echo"}]},
-                {"job_id": "j2", "requires": ["j1"], "steps": [{"id": "s", "command": "echo"}]},
+                {"job_id": "j1", "depends_on": [], "steps": [{"name": "s", "command": "echo"}]},
+                {"job_id": "j2", "depends_on": ["j1"], "steps": [{"name": "s", "command": "echo"}]},
             ]}, "."
         )
         self.assertFalse(any("Circular" in e for e in _render(errs)))

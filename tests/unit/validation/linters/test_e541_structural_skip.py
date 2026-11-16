@@ -133,11 +133,11 @@ class TestSchemaResolverCtx:
             "_is_structurally_unbindable must return True for 09_impl_plan milestones item"
         )
 
-    def test_14_roadmap_milestones_item_is_ref_capable(self):
-        """14_roadmap.schema.json milestones items: ap:false but HAS fr_refs/capability_refs → ref-capable.
+    def test_14_roadmap_milestones_item_is_unbindable_once_its_ref_slots_are_gone(self):
+        """14_roadmap.schema.json milestones items: ap:false and, since M3, no ``*_ref`` / ``*_refs`` slots.
 
-        This is the critical near-twin: same ap:false but WITH ref slots.
-        _is_structurally_unbindable must return False here.
+        The milestone's ``fr_refs`` and ``capability_refs`` were removed (computed from what its task criteria
+        refine), so the near-twin of 09_impl_plan is now structurally unbindable too.
         """
         ctx = _SchemaResolverCtx(_TOOLKIT_ROOT)
         data: dict[str, Any] = {"$schema": "vc:14-roadmap", "milestones": []}
@@ -145,7 +145,6 @@ class TestSchemaResolverCtx:
         assert eff_root is not None, (
             "Schema resolver must return a non-None effective root for vc:14-roadmap"
         )
-        # Navigate to milestones items
         milestones_schema = eff_root.get("properties", {}).get("milestones")
         assert milestones_schema is not None, "milestones property must be present in 14_roadmap schema"
         eff_milestones = _nav_effective_schema(milestones_schema, resolve_fn, include_conditionals=True)
@@ -153,21 +152,12 @@ class TestSchemaResolverCtx:
         assert isinstance(items_raw, dict), "milestones.items must be a dict schema node"
         eff_items = _nav_effective_schema(items_raw, resolve_fn, include_conditionals=True)
 
-        # Key assertions: ap:false BUT has fr_refs and capability_refs
         assert eff_items.get("additionalProperties") is False, (
             "14_roadmap milestones item must have additionalProperties:false"
         )
-        ref_keys = {k for k in eff_items.get("properties", {}) if k.endswith("_ref") or k.endswith("_refs")}
-        assert "fr_refs" in ref_keys, (
-            f"14_roadmap milestones item must have fr_refs in properties; got: {sorted(ref_keys)}"
-        )
-        assert "capability_refs" in ref_keys, (
-            f"14_roadmap milestones item must have capability_refs in properties; got: {sorted(ref_keys)}"
-        )
-        assert _is_structurally_unbindable(eff_items) is False, (
-            "_is_structurally_unbindable must return False for 14_roadmap milestones item "
-            "(it has fr_refs/capability_refs ref slots)"
-        )
+        ref_keys = [k for k in eff_items.get("properties", {}) if k.endswith("_ref") or k.endswith("_refs")]
+        assert ref_keys == [], f"14_roadmap milestones item must have no *_ref/*_refs properties; found: {ref_keys}"
+        assert _is_structurally_unbindable(eff_items) is True
 
 
 # ---------------------------------------------------------------------------

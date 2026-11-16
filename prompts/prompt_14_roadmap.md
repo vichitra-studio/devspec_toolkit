@@ -230,20 +230,11 @@ The `$schema` field is required in the output and is stripped before validation 
   "owner": "system",
   "created_at": "2025-01-01T00:00:00Z",
   "migration_plan": "none",
-  "tech_stack": {
-    "languages": [
-      { "name": "python", "version": "3.11" }
-    ],
-    "frameworks": [
-      { "name": "fastapi", "version": "0.110.0" }
-    ]
-  },
   "milestones": [
     {
       "milestone_id": "ms-core-foundation",
       "name": "Core Foundation",
       "user_story": "As a developer, I want a stable base API so that I can build authentication features.",
-      "source_milestones": ["ms-core-foundation"],
       "tasks": [
         {
           "task_id": "init-fastapi-project",
@@ -251,21 +242,14 @@ The `$schema` field is required in the output and is stripped before validation 
           "acceptance_criteria": [
             {
               "criterion_id": "project-structure-ready",
-              "text": "Project boots with FastAPI app and expected folder layout."
+              "text": "Project boots with FastAPI app and expected folder layout.",
+              "refines": ["ac-project-boots-1"]
             }
           ]
         }
       ],
-      "deliverables": [
-        { "type": "component", "id": "comp-fastapi-scaffold", "note": "FastAPI project scaffold produced by this milestone" }
-      ],
-      "target_date": "2025-02-01",
-      "fr_refs": [],
-      "capability_refs": []
+      "target_date": "2025-02-01"
     }
-  ],
-  "trace": [
-    { "type": "charter-goal", "id": "goal-core-foundation", "note": "Whole-charter goal grounding this roadmap" }
   ],
   "canonical_refs_used": []
 }

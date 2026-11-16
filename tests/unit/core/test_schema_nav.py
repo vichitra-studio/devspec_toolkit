@@ -727,6 +727,11 @@ def test_schema_ref_sibling_census():
     ``scope`` and ``scope_reason`` added), 11 red team 9 -> 12 (``trace`` and ``target_ids`` removed; ``lifecycle``,
     ``scope`` and ``scope_reason`` added on the threat and the edge case), and the unreferenced core definition
     ``dependencyList`` removed (-1, its ``oneOf`` arm ``$ref`` carried a ``description``).
+    256 after M3 WI-M3-10..12 (steps 12, 14), per file old -> new: 12 CI gates 6 -> 4 (``trace``, ``requires`` and the
+    step ``id`` removed; the annotated ``lifecycle`` and ``replaces`` added, ``realises``, ``verifies`` and
+    ``depends_on`` carry no ``$ref`` sibling), 14 roadmap 15 -> 11 (``tech_stack``, ``trace``, ``dependencies``,
+    ``status`` and ``source_milestones`` removed, ``lifecycle`` added on the milestone, the task and the criterion),
+    core collections 19 -> 12 (``techStack*`` and ``dependency*`` definitions removed with their last ``$ref``).
     """
     from collections import Counter
 
@@ -745,9 +750,9 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 269
+    assert sum(counts.values()) == 256
     assert dict(counts) == {
-        ("description",): 257,
+        ("description",): 244,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
         ("default", "description"): 6,

@@ -103,8 +103,7 @@
   "14": {
     "14_roadmap.json": [
       ".ambiguities",
-      ".milestones",
-      ".dependencies"
+      ".milestones"
     ]
   },
   "15": {

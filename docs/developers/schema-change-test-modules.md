@@ -258,19 +258,19 @@ Terms: `trace`, `requires`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `trace`
 - [ ] `tests/fixtures/spec_corpus/`: `trace`
-- [ ] `tests/fixtures/step_12/`: `requires`, `trace`
+- [x] `tests/fixtures/step_12/`: `requires`, `trace`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
-- [ ] `tests/integration/test_step_12.py`: `requires`
+- [x] `tests/integration/test_step_12.py`: `requires`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
 - [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_12/ fixtures
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_12/ fixtures
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
 - [ ] `tests/unit/context/test_reviewer.py`: `trace`
 - [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
 - [ ] `tests/unit/core/test_resolve_pointers.py`: `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
 - [ ] `tests/unit/test_cli.py`: `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `requires`, `trace`
@@ -282,33 +282,33 @@ Terms: `trace`, `requires`
 - [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `trace`
 - [ ] `tests/unit/validation/test_legacy_shim.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `trace`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `requires`, `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `requires`, `trace`
 
 ## WI-M3-11: step 13 and 13a
 
 Terms: (none: no removed token)
 
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_13/ fixtures
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_13/ fixtures
 
 ## WI-M3-12: step 14 roadmap
 
 Terms: `milestone_status_reason`, `status_reason`, `source_milestones`, `deliverables`, `fr_refs`, `capability_refs`, `tech_stack`, `tech_stack_ref`, `trace`, `assumptions`, `exit_conditions`, `invariant_refs`, `fixture_ref`, `dependencies`, `dependency_ref`, `W602`, `W605`
 
 - [ ] `tests/fixtures/entry_key_registry/`: `deliverables`, `trace`
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `assumptions`, `dependencies`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `assumptions`, `dependencies`
 - [ ] `tests/fixtures/entry_key_registry_pre_m1.json`: `dependencies`
 - [ ] `tests/fixtures/graph_example/`: `assumptions`
 - [ ] `tests/fixtures/spec_corpus/`: `capability_refs`, `deliverables`, `dependencies`, `fr_refs`, `source_milestones`, `trace`
-- [ ] `tests/fixtures/step_14/`: `assumptions`, `capability_refs`, `deliverables`, `dependencies`, `exit_conditions`, `fr_refs`, `invariant_refs`, `source_milestones`, `tech_stack`, `trace`
+- [x] `tests/fixtures/step_14/`: `assumptions`, `capability_refs`, `deliverables`, `dependencies`, `exit_conditions`, `fr_refs`, `invariant_refs`, `source_milestones`, `tech_stack`, `trace`
 - [ ] `tests/integration/_anchor_factories.py`: `fixture_ref`, `fr_refs`
 - [ ] `tests/integration/test_matrix_spec_corpus.py`: `fr_refs`, `trace`
 - [ ] `tests/integration/test_step_13a.py`: `trace`
-- [ ] `tests/integration/test_step_14.py`: `deliverables`, `source_milestones`, `status_reason`, `tech_stack`
+- [x] `tests/integration/test_step_14.py`: `deliverables`, `source_milestones`, `status_reason`, `tech_stack`
 - [ ] `tests/integration/test_step_16.py`: `fixture_ref`, `fr_refs`, `status_reason`, `trace`
 - [ ] `tests/integration/test_step_16_anchor.py`: `deliverables`, `fr_refs`
 - [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
@@ -320,14 +320,14 @@ Terms: `milestone_status_reason`, `status_reason`, `source_milestones`, `deliver
 - [ ] `tests/unit/core/test_json_utils_dry_run.py`: `fixture_ref`
 - [ ] `tests/unit/core/test_merge_allof_preservation.py`: `tech_stack`, `tech_stack_ref`
 - [ ] `tests/unit/core/test_resolve_pointers.py`: `deliverables`, `dependencies`, `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `dependencies`, `trace`
-- [ ] `tests/unit/generation/test_schema_contracts.py`: `dependencies`, `tech_stack`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `dependencies`, `trace`
+- [x] `tests/unit/generation/test_schema_contracts.py`: `dependencies`, `tech_stack`
 - [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_generate.py`: `deliverables`, `dependencies`, `trace`
+- [x] `tests/unit/registry/test_generate.py`: `deliverables`, `dependencies`, `trace`
 - [ ] `tests/unit/test_cli.py`: `dependencies`, `dependency_ref`, `tech_stack`, `tech_stack_ref`, `trace`
 - [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
 - [ ] `tests/unit/test_update_command.py`: `dependencies`
-- [ ] `tests/unit/validation/linters/test_e541_structural_skip.py`: `capability_refs`, `deliverables`, `fr_refs`
+- [x] `tests/unit/validation/linters/test_e541_structural_skip.py`: `capability_refs`, `deliverables`, `fr_refs`
 - [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `fr_refs`, `trace`
 - [ ] `tests/unit/validation/linters/test_invariants.py`: `trace`
 - [ ] `tests/unit/validation/linters/test_invariants_cel.py`: `trace`
@@ -346,7 +346,7 @@ Terms: `milestone_status_reason`, `status_reason`, `source_milestones`, `deliver
 - [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
 - [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `dependencies`, `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `dependencies`, `trace`
 
 ## WI-M3-13: step 15 scaffold
 

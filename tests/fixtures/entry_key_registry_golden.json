@@ -1664,13 +1664,80 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".jobs",
+          "contract": [
+            "name",
+            "steps",
+            "environment_ref",
+            "role_ref",
+            "security"
+          ],
           "id_field": "job_id",
-          "kind": "job"
+          "kind": "job",
+          "links": [
+            {
+              "built": true,
+              "field": "realises",
+              "kinds": [
+                "environment",
+                "gate",
+                "secret",
+                "rule"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "verifies",
+              "kinds": [
+                "nfr"
+              ],
+              "required": false,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "depends_on",
+              "kinds": [
+                "job"
+              ],
+              "required": false,
+              "same_step_kinds": [
+                "job"
+              ]
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "verifier",
+          "source": "x-node"
         }
       ],
       "step": "12"
@@ -1694,32 +1761,146 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
         },
         {
           "array_path": ".milestones",
+          "contract": [
+            "name",
+            "target_date",
+            "user_story",
+            "risk_status",
+            "risks",
+            "spikes"
+          ],
           "id_field": "milestone_id",
-          "kind": "milestone",
+          "kind": "roadmap-milestone",
+          "links": [
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
           "nested": [
             {
               "array_path": ".tasks",
+              "contract": [
+                "description",
+                "environment_ref",
+                "metric_ref"
+              ],
               "id_field": "task_id",
               "kind": "task",
+              "links": [
+                {
+                  "built": false,
+                  "field": "depends_on",
+                  "kinds": [
+                    "task"
+                  ],
+                  "required": false,
+                  "same_step_kinds": [
+                    "task"
+                  ]
+                },
+                {
+                  "built": false,
+                  "field": "replaces",
+                  "kinds": "*",
+                  "required": false,
+                  "same_step_kinds": []
+                }
+              ],
               "nested": [
                 {
                   "array_path": ".acceptance_criteria",
+                  "contract": [
+                    "text"
+                  ],
                   "id_field": "criterion_id",
-                  "kind": "criterion"
+                  "kind": "task-criterion",
+                  "links": [
+                    {
+                      "built": true,
+                      "field": "refines",
+                      "kinds": [
+                        "scope-item",
+                        "risk",
+                        "constraint",
+                        "capability",
+                        "environment",
+                        "gate",
+                        "secret",
+                        "fr",
+                        "criterion",
+                        "api",
+                        "api-error",
+                        "invariant",
+                        "nfr",
+                        "rule",
+                        "threat",
+                        "edge-case"
+                      ],
+                      "required": false,
+                      "same_step_kinds": []
+                    },
+                    {
+                      "built": false,
+                      "field": "removes",
+                      "kinds": "*",
+                      "required": false,
+                      "same_step_kinds": []
+                    },
+                    {
+                      "built": false,
+                      "field": "verified_by",
+                      "kinds": [
+                        "fixture",
+                        "job",
+                        "rule"
+                      ],
+                      "required": false,
+                      "same_step_kinds": []
+                    },
+                    {
+                      "built": false,
+                      "field": "replaces",
+                      "kinds": "*",
+                      "required": false,
+                      "same_step_kinds": []
+                    }
+                  ],
+                  "role": "plan",
+                  "source": "x-node"
                 }
-              ]
+              ],
+              "role": "plan",
+              "source": "x-node"
             }
-          ]
-        },
-        {
-          "array_path": ".dependencies",
-          "id_field": "id",
-          "kind": "dependency"
+          ],
+          "role": "plan",
+          "source": "x-node"
         }
       ],
       "step": "14"

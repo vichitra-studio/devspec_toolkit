@@ -116,7 +116,6 @@ Before emitting, verify:
       "name": "Validate All Spec Artifacts",
       "steps": [
         {
-          "id": "step-spec-check",
           "name": "Run schema validation",
           "command": "./tools/run_specdev.sh spec-check spec --repo-root ./devspec_toolkit --spec-root ./spec --git-root ."
         }

@@ -118,7 +118,7 @@
       "step": "11",
       "role": "obligation-system"
     },
-    "ci-job": {
+    "job": {
       "step": "12",
       "role": "verifier"
     },

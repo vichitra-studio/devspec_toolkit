@@ -1,57 +1,58 @@
 {
+  "$schema": "vc:12-ci-gates",
   "id": "cycle-ci-pipeline",
   "owner": "api",
   "created_at": "2026-01-01T00:00:00Z",
-  "trace": [
-    {
-      "type": "doc",
-      "id": "10-governance-policy"
-    }
-  ],
   "jobs": [
     {
       "job_id": "job-a",
       "name": "Job A",
-      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
-      "requires": [
-        "job-b"
-      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      },
       "steps": [
         {
-          "id": "step-a",
           "name": "Step A",
           "command": "echo A"
         }
+      ],
+      "depends_on": [
+        "job-b"
       ]
     },
     {
       "job_id": "job-b",
       "name": "Job B",
-      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
-      "requires": [
-        "job-c"
-      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      },
       "steps": [
         {
-          "id": "step-b",
           "name": "Step B",
           "command": "echo B"
         }
+      ],
+      "depends_on": [
+        "job-c"
       ]
     },
     {
       "job_id": "job-c",
       "name": "Job C",
-      "environment_ref": {"id": "cn:core:environment:ci", "kind": "environment"},
-      "requires": [
-        "job-a"
-      ],
+      "environment_ref": {
+        "id": "cn:core:environment:ci",
+        "kind": "environment"
+      },
       "steps": [
         {
-          "id": "step-c",
           "name": "Step C",
           "command": "echo C"
         }
+      ],
+      "depends_on": [
+        "job-a"
       ]
     }
   ],

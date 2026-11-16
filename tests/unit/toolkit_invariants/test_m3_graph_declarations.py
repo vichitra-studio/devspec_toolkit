@@ -42,14 +42,25 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "09": {"design-milestone": "milestone_id"},
     "10": {"rule": "rule_id"},
     "11": {"threat": "threat_id", "edge-case": "id"},
+    "12": {"job": "job_id"},
+    "14": {"roadmap-milestone": "milestone_id", "task": "task_id", "task-criterion": "criterion_id"},
 }
 
 # The kinds a threat or an edge case may be ``mitigated_by``: every obligation kind except capability, and fixtures.
 _MITIGATION_KINDS = ["api", "api-error", "constraint", "criterion", "environment", "fixture", "fr", "gate", "invariant", "nfr", "rule", "secret"]
 
-# Link fields that count toward the built computation (link table of the M3 plan, section 3.2). Step 12 and 14 add
-# ``realises`` and ``refines``.
-_BUILT_LINK_FIELDS = frozenset({"derives_from", "mitigated_by"})
+# Link fields that count toward the built computation (link table of the M3 plan, section 3.2): ``realises`` on a job
+# (step 12) and ``refines`` on a task criterion (step 14) join the first two.
+_BUILT_LINK_FIELDS = frozenset({"derives_from", "mitigated_by", "realises", "refines"})
+
+# A task's ``disposition`` is stored outside the hash (design L194), so it is not part of the node's contract.
+_EXCLUDED_FROM_M3_CONTRACT = _EXCLUDED_FROM_CONTRACT | {"disposition"}
+
+# Every obligation kind with ids: what a task criterion may refine.
+_REFINABLE_KINDS = [
+    "api", "api-error", "capability", "constraint", "criterion", "edge-case", "environment", "fr", "gate",
+    "invariant", "nfr", "risk", "rule", "scope-item", "secret", "threat",
+]
 
 # Every ``x-link`` of the M3 schemas: (schema file, JSON pointer of the link field, sorted ``kinds`` or "*").
 # Written out by hand on purpose: a change of one link's ``kinds`` list must be a deliberate change of this table.
@@ -79,6 +90,17 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/mitigated_by", _MITIGATION_KINDS),
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/assumes", ["assumption"]),
     ("11_redteam.schema.json", "/allOf/1/properties/edge_cases/items/properties/replaces", "*"),
+    ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/realises", ["environment", "gate", "rule", "secret"]),
+    ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/verifies", ["nfr"]),
+    ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/depends_on", ["job"]),
+    ("12_ci_gates.schema.json", "/allOf/1/properties/jobs/items/properties/replaces", "*"),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/replaces", "*"),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/depends_on", ["task"]),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/replaces", "*"),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/refines", _REFINABLE_KINDS),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/removes", "*"),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/verified_by", ["fixture", "job", "rule"]),
+    ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/replaces", "*"),
 ]
 
 
@@ -111,6 +133,7 @@ def test_m3_schema_files_are_found() -> None:
     assert set(_FILES) == {
         "06_invariants.schema.json", "07_nfrs.schema.json", "08_fixtures.schema.json",
         "09_impl_plan.schema.json", "10_governance.schema.json", "11_redteam.schema.json",
+        "12_ci_gates.schema.json", "14_roadmap.schema.json",
     }
 
 
@@ -200,7 +223,7 @@ def test_contract_equals_computed_content_set(decls, reader, fname: str) -> None
         id_field = node.value["id"]
         links = _link_fields(reader, props)
         assert id_field not in contract and not set(contract) & links, node.kind
-        computed = set(props) - {id_field} - links - _node_arrays(reader, props) - _EXCLUDED_FROM_CONTRACT
+        computed = set(props) - {id_field} - links - _node_arrays(reader, props) - _EXCLUDED_FROM_M3_CONTRACT
         assert set(contract) == computed, node.kind
         assert len(contract) == len(set(contract)), node.kind
 
@@ -319,3 +342,49 @@ def test_step_11_threat_and_edge_case_declare_threatens_and_mitigated_by(decls) 
     }
     for link in _links(decls, "11_redteam.schema.json"):
         assert link.field_name != "mitigated_by" or link.value["built"] is True
+
+
+def test_step_12_job_verifies_link_is_nfr_only_and_not_built(decls) -> None:
+    fname = "12_ci_gates.schema.json"
+    _assert_links(
+        decls, fname,
+        {
+            "realises": (["environment", "gate", "rule", "secret"], False),
+            "verifies": (["nfr"], False),
+            "depends_on": (["job"], False),
+            "replaces": ("*", False),
+        },
+    )
+    assert _link(decls, fname, "verifies").value.get("built", False) is False
+    assert _link(decls, fname, "realises").value["built"] is True
+    assert _link(decls, fname, "depends_on").value["same_step_kinds"] == ["job"]
+
+
+def test_step_14_milestone_stores_no_link_task_depends_on_and_criterion_refines(decls) -> None:
+    fname = "14_roadmap.schema.json"
+    by_holder: dict[str, dict[str, tuple[Any, bool]]] = {}
+    for link in _links(decls, fname):
+        kinds = link.value["kinds"]
+        for holder in link.holders:
+            by_holder.setdefault(holder, {})[link.field_name] = (kinds if kinds == "*" else sorted(kinds), link.value["required"])
+    assert by_holder == {
+        "roadmap-milestone": {"replaces": ("*", False)},
+        "task": {"depends_on": (["task"], False), "replaces": ("*", False)},
+        "task-criterion": {
+            "refines": (_REFINABLE_KINDS, False),
+            "removes": ("*", False),
+            "verified_by": (["fixture", "job", "rule"], False),
+            "replaces": ("*", False),
+        },
+    }
+    assert _link(decls, fname, "refines").value["built"] is True
+    assert _link(decls, fname, "depends_on").value["same_step_kinds"] == ["task"]
+
+
+def test_step_14_task_criterion_requires_refines_or_removes_and_task_disposition_is_outside_the_contract(decls, reader) -> None:
+    fname = "14_roadmap.schema.json"
+    nodes = {n.kind: n for n in _nodes(decls, fname)}
+    criterion_item, uri = _item(reader, nodes["task-criterion"])
+    assert reader.get(criterion_item, uri, "anyOf")[0] == [{"required": ["refines"]}, {"required": ["removes"]}]
+    assert "disposition" in _props(reader, nodes["task"])
+    assert "disposition" not in nodes["task"].value["contract"]

@@ -111,7 +111,7 @@ class SchemaContractsTests(unittest.TestCase):
             "11": {"risk_category", "policy"},
             "12": {"command", "environment", "role"},
             "13": {"tag", "policy", "id_pattern", "governance_label"},
-            "14": {"environment", "metric", "tech_stack", "dependency"},
+            "14": {"environment", "metric"},
             "15": {"command"},
             "16": {"command", "policy", "risk_category"},
         }
@@ -129,7 +129,7 @@ class SchemaContractsTests(unittest.TestCase):
             missing = sorted(expected_kinds - present)
             self.assertEqual([], missing, msg=f"{target.name} missing canonical kinds {missing}")
 
-    def test_d022_targeted_schemas_reuse_shared_environment_stage_and_dependency_anchors(self):
+    def test_d022_targeted_schemas_reuse_shared_environment_and_stage_anchors(self):
         expected_refs = {
             "02a_delivery_baseline.schema.json": {
                 "#environmentName",
@@ -137,10 +137,6 @@ class SchemaContractsTests(unittest.TestCase):
             },
             "07_nfrs.schema.json": {
                 "#stageName",
-            },
-            "14_roadmap.schema.json": {
-                "#techStack",
-                "#dependencyObjectList",
             },
             "16_impl_context.schema.json": {
                 "#environmentName",
@@ -180,14 +176,6 @@ class SchemaContractsTests(unittest.TestCase):
             ref_kinds.update(_collect_canonical_ref_kinds(schema))
         missing = sorted(kind for kind in ref_kinds if kind not in manifest_kinds)
         self.assertEqual([], missing, msg=f"Missing canonical bootstrap kinds: {missing}")
-
-    def test_dependency_item_requires_owner_and_note_when_external(self):
-        registry = SchemaRegistry(str(self.repo_root))
-        core = registry.load("vc:core:collections")
-        dep_item = core["$defs"]["dependencyItem"]
-        validator = Draft202012Validator(dep_item, registry=registry.to_referencing_registry())
-        errors = list(validator.iter_errors({"type": "external", "id": "dep-a"}))
-        self.assertTrue(errors)
 
     def test_02a_environment_config_rejects_unbounded_nested_values(self):
         registry = SchemaRegistry(str(self.repo_root))

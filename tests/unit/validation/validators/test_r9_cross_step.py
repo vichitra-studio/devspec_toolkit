@@ -1,7 +1,7 @@
 """Comprehensive tests for R9 cross-step ID validators.
 
 Tests the remaining validators that perform cross-step reference validation:
-- step_12: FR + NFR refs in CI job trace
+- step_12: job depends_on (same-step; no cross-step checks)
 - step_13: Governance label refs in extensions
 - step_13a: FR + API refs in missing_elements spec_refs/related_ids
 - step_15: API refs in scaffold interface_map
@@ -50,116 +50,48 @@ def _e590(errors) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Step 12 — FR + NFR refs in CI job trace/coverage_gaps
+# Step 12 — job depends_on (same-step links; no cross-step checks)
 # ---------------------------------------------------------------------------
 
 class TestStep12CrossStep(unittest.TestCase):
-    """Cross-step validation: step_12 checks FR/NFR refs in CI jobs."""
+    """step_12 checks only its own ``depends_on`` links; link targets of other steps belong to the resolver."""
 
-    def test_valid_upstream_refs_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "04_fr_list.json", {
-                "functional_requirements": [{"fr_id": "fr-login"}]
-            })
-            _write_json(spec_dir, "07_nfrs.json", {
-                "nfrs": [{"nfr_id": "nfr-latency"}]
-            })
-            instance = {
-                "jobs": [
-                    {
-                        "job_id": "job-lint",
-                        "steps": [{"id": "step-lint", "command": "npm run lint"}],
-                    }
-                ],
-                "trace": [
-                    {"type": "fr", "id": "fr-login"},
-                ],
-            }
-            errors = validate_step_12(instance, tmp)
-            self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
-            self.assertEqual(len(_e590(errors)), 0, f"Unexpected E590: {_e590(errors)}")
+    @staticmethod
+    def _job(job_id, depends_on=None):
+        job = {"job_id": job_id, "steps": [{"name": "Run", "command": "npm run lint"}]}
+        if depends_on is not None:
+            job["depends_on"] = depends_on
+        return job
 
-    def test_missing_upstream_emits_w590(self):
+    def _validate(self, jobs):
         with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            # No upstream files
-            instance = {
-                "jobs": [
-                    {
-                        "job_id": "job-lint",
-                        "steps": [{"id": "step-lint", "command": "npm run lint"}],
-                    }
-                ],
-                "trace": [
-                    {"type": "fr", "id": "fr-login"},
-                ],
-            }
-            errors = validate_step_12(instance, tmp)
-            w = _w590(errors)
-            self.assertGreaterEqual(len(w), 2, f"Expected W590 for both missing upstreams: {w}")
-            combined = " ".join(w)
-            self.assertIn("04_fr_list.json", combined)
-            self.assertIn("07_nfrs.json", combined)
+            return validate_step_12({"jobs": jobs}, tmp)
 
-    def test_broken_ref_emits_e590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "04_fr_list.json", {
-                "functional_requirements": [{"fr_id": "fr-login"}]
-            })
-            _write_json(spec_dir, "07_nfrs.json", {
-                "nfrs": [{"nfr_id": "nfr-latency"}]
-            })
-            instance = {
-                "jobs": [
-                    {
-                        "job_id": "job-lint",
-                        "steps": [{"id": "step-lint", "command": "npm run lint"}],
-                    }
-                ],
-                "trace": [
-                    {"type": "fr", "id": "fr-phantom"},
-                    {"type": "nfr", "id": "nfr-ghost"},
-                ],
-            }
-            errors = validate_step_12(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 2, f"Expected E590 for broken refs: {e}")
-            combined = " ".join(e)
-            self.assertIn("fr-phantom", combined)
-            self.assertIn("nfr-ghost", combined)
+    def test_valid_depends_on_passes(self):
+        errors = self._validate([self._job("job-a"), self._job("job-b", ["job-a"])])
+        self.assertEqual(_render(errors), [])
 
-    def test_broken_ref_in_job_deep_scan_emits_e590(self):
-        """Deep-scan of jobs should catch fr-*/nfr-* string values."""
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "04_fr_list.json", {
-                "functional_requirements": [{"fr_id": "fr-login"}]
-            })
-            _write_json(spec_dir, "07_nfrs.json", {
-                "nfrs": [{"nfr_id": "nfr-latency"}]
-            })
-            instance = {
-                "jobs": [
-                    {
-                        "job_id": "job-check",
-                        "steps": [{"id": "step-check", "command": "echo test"}],
-                        "coverage_target": "fr-does-not-exist",
-                    }
-                ],
-            }
-            errors = validate_step_12(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, f"Expected E590 for deep-scan broken ref: {e}")
-            self.assertTrue(
-                any("fr-does-not-exist" in msg for msg in e),
-                f"E590 should mention the broken deep-scan ref: {e}"
-            )
+    def test_unknown_depends_on_job_yields_e590(self):
+        errors = self._validate([self._job("job-a", ["job-ghost"])])
+        self.assertTrue(any("job-ghost" in msg for msg in _e590(errors)), _render(errors))
+
+    def test_depends_on_cycle_yields_e141(self):
+        errors = self._validate([self._job("job-a", ["job-b"]), self._job("job-b", ["job-a"])])
+        self.assertEqual([e.code for e in errors], ["E141"])
+
+    def test_no_cross_step_checks_on_upstream_ids(self):
+        jobs = [dict(self._job("job-lint"), verifies=["nfr-ghost"], realises=["fr-phantom"])]
+        self.assertEqual(_render(self._validate(jobs)), [])
+
+    def test_depends_on_wrong_type_does_not_raise(self):
+        for bad in ("job-a", 3, {"job-a": 1}, [None, 4]):
+            with self.subTest(bad=bad):
+                self.assertEqual(_render(self._validate([self._job("job-a", bad)])), [])
+
+    def test_job_and_step_wrong_type_do_not_raise(self):
+        for jobs in ("nope", ["job-a", None], [{"job_id": "job-a", "steps": "echo"}]):
+            with self.subTest(jobs=jobs):
+                self.assertEqual(_render(self._validate(jobs)), [])
 
 
 # ---------------------------------------------------------------------------
@@ -502,12 +434,9 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
 
     def test_step_12_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
-            instance = {
-                "jobs": [{"job_id": "job-x", "steps": [{"id": "s1", "command": "echo"}]}],
-                "trace": [{"type": "fr", "id": "fr-x"}],
-            }
+            instance = {"jobs": [{"job_id": "job-x", "steps": [{"name": "Echo", "command": "echo"}], "verifies": ["nfr-x"]}]}
             errors = validate_step_12(instance, tmp)
-            self.assertGreaterEqual(len(_w590(errors)), 1)
+            self.assertEqual(_w590(errors), [])  # no cross-step check: the resolver owns link targets
 
     def test_step_13_no_spec_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -332,15 +332,16 @@ class TestKindInferenceBareId:
             f"Expected 'edge-case' (singularize edge_cases + snake→kebab), got '{arr['kind']}'"
         )
 
-    def test_14_roadmap_dependencies_kind(self) -> None:
-        """14_roadmap.json → .dependencies: id → singularize('dependencies') = 'dependency' → kind: dependency"""
+    def test_14_roadmap_has_no_dependencies_array_and_declares_graph_kinds(self) -> None:
+        """14_roadmap.json: the top-level ``dependencies`` array is gone; the nodes are declared by ``x-node``."""
         reg_doc, _ = _run_generator()
         entry = reg_doc["registry"]["14_roadmap.json"]
-        arr = next(a for a in entry["arrays"] if a["array_path"] == ".dependencies")
-        assert arr["id_field"] == "id"
-        assert arr["kind"] == "dependency", (
-            f"Expected 'dependency' (singularize dependencies 'ies'→'y'), got '{arr['kind']}'"
-        )
+        assert ".dependencies" not in {a["array_path"] for a in entry["arrays"]}
+        milestones = next(a for a in entry["arrays"] if a["array_path"] == ".milestones")
+        assert milestones["kind"] == "roadmap-milestone"
+        tasks = next(n for n in milestones["nested"] if n["array_path"] == ".tasks")
+        criteria = next(n for n in tasks["nested"] if n["array_path"] == ".acceptance_criteria")
+        assert (tasks["kind"], criteria["kind"], criteria["id_field"]) == ("task", "task-criterion", "criterion_id")
 
     def test_11_redteam_threats_uses_id_suffix_not_bare_id(self) -> None:
         """Confirm .threats uses threat_id (not bare id), validating Rule A priority."""

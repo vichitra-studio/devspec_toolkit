@@ -1,84 +1,61 @@
 from __future__ import annotations
 
-import re
-from typing import Any, Optional, Set
+from typing import Any
 
 from ...core.errors import make_error, SpecError
-from ...core.loaders import load_upstream_ids
 from ...validation.linter_utils import check_no_duplicates
 
 
-# Pattern to match FR and NFR IDs in string values
-_FR_ID_RE = re.compile(r"^fr-[a-z0-9]+(?:-[a-z0-9]+)*$")
-_NFR_ID_RE = re.compile(r"^nfr-[a-z0-9]+(?:-[a-z0-9]+)*$")
-
-
 def validate_step_12(instance: dict[str, Any], toolkit_root: str, spec_root: str | None = None) -> list[SpecError]:
+    """Deep checks of a step 12 artifact: unique job ids, steps with a command, known and acyclic ``depends_on``.
+
+    Reads only values of the expected type, so a malformed ``jobs``, job, step or ``depends_on`` is skipped here and
+    left to the schema's own error. Never raises on wrong-typed input.
+    """
     errors: list[SpecError] = []
-    check_no_duplicates(instance.get("jobs", []), "job_id", "job_id", errors)
-    job_ids = {j["job_id"] for j in instance.get("jobs", []) if isinstance(j, dict) and isinstance(j.get("job_id"), str)}
-    for job in instance.get("jobs", []):
-        job_id = job.get("job_id")
-        for step in job.get("steps", []):
-            if not step.get("id") or not step.get("command"):
-                errors.append(make_error("E520", f"Job '{job_id}' has step missing id/command"))
-    for job in instance.get("jobs", []):
-        for req in job.get("requires", []):
-            if req not in job_ids:
-                errors.append(make_error("E590", f"Job '{job.get('job_id')}' requires unknown job '{req}'"))
-    # DAG cycle detection
-    graph: dict[str, list[str]] = {}
-    for job in instance.get("jobs", []):
-        jid = job.get("job_id", "")
-        graph[jid] = list(job.get("requires", []))
-    cycle = _has_cycle(graph)
+    jobs = _job_dicts(instance)
+    check_no_duplicates(jobs, "job_id", "job_id", errors)
+    job_ids = {j["job_id"] for j in jobs if isinstance(j.get("job_id"), str)}
+    for job in jobs:
+        errors.extend(_step_errors(job))
+        errors.extend(_unknown_dependency_errors(job, job_ids))
+    cycle = _has_cycle({j["job_id"]: _depends_on(j) for j in jobs if isinstance(j.get("job_id"), str)})
     if cycle:
-        errors.append(make_error("E141", f"Circular dependency detected in job requires graph: {cycle}"))
-
-    # Cross-step FR/NFR reference validation
-    fr_ids = load_upstream_ids(toolkit_root, "04", "functional_requirements", "fr_id", spec_root=spec_root)
-    nfr_ids = load_upstream_ids(toolkit_root, "07", "nfrs", "nfr_id", spec_root=spec_root)
-
-    upstream_map: dict[str, tuple[set[str] | None, str, str]] = {
-        "fr-": (fr_ids, "04_fr_list.json", "FR"),
-        "nfr-": (nfr_ids, "07_nfrs.json", "NFR"),
-    }
-
-    # Emit W590 once per missing upstream file
-    warned_missing: set[str] = set()
-    for prefix, (id_set, filename, type_label) in upstream_map.items():
-        if id_set is None and filename not in warned_missing:
-            errors.append(
-                make_error("W590", f"CROSS_STEP_UPSTREAM_MISSING {filename} not found; "
-                f"skipping {type_label} reference validation")
-            )
-            warned_missing.add(filename)
-
-    # Collect and validate spec references from trace and jobs
-    # 1. Top-level trace references
-    for trace_entry in instance.get("trace", []):
-        if not isinstance(trace_entry, dict):
-            continue
-        trace_id = trace_entry.get("id", "")
-        if isinstance(trace_id, str):
-            _check_ref(trace_id, "trace", upstream_map, errors)
-
-    # 2. Deep-scan jobs for string values matching fr-* or nfr-* patterns
-    for job in instance.get("jobs", []):
-        job_id = job.get("job_id", "<unknown>")
-        refs = _collect_refs_from_value(job)
-        for ref in refs:
-            for prefix, (id_set, filename, _type_label) in upstream_map.items():
-                if ref.startswith(prefix):
-                    if id_set is not None and ref not in id_set:
-                        errors.append(
-                            make_error("E590", f"CROSS_STEP_ID_NOT_FOUND job '{job_id}' "
-                            f"references unknown {_type_label} '{ref}' "
-                            f"(not in {filename})")
-                        )
-                    break
-
+        errors.append(make_error("E141", f"Circular dependency detected in job depends_on graph: {cycle}"))
     return errors
+
+
+def _job_dicts(instance: dict[str, Any]) -> list[dict[str, Any]]:
+    """The object entries of ``jobs``; empty when ``jobs`` is not a list."""
+    jobs = instance.get("jobs")
+    return [j for j in jobs if isinstance(j, dict)] if isinstance(jobs, list) else []
+
+
+def _depends_on(job: dict[str, Any]) -> list[str]:
+    """The string entries of a job's ``depends_on``; empty when the field is absent or not a list."""
+    deps = job.get("depends_on")
+    return [d for d in deps if isinstance(d, str)] if isinstance(deps, list) else []
+
+
+def _step_errors(job: dict[str, Any]) -> list[SpecError]:
+    """E520 for every step of *job* that has no command."""
+    steps = job.get("steps")
+    if not isinstance(steps, list):
+        return []
+    return [
+        make_error("E520", f"Job '{job.get('job_id')}' has step missing command")
+        for step in steps
+        if isinstance(step, dict) and not step.get("command")
+    ]
+
+
+def _unknown_dependency_errors(job: dict[str, Any], job_ids: set[str]) -> list[SpecError]:
+    """E590 for every ``depends_on`` entry of *job* that names no job of this spec."""
+    return [
+        make_error("E590", f"Job '{job.get('job_id')}' depends_on unknown job '{dep}'")
+        for dep in _depends_on(job)
+        if dep not in job_ids
+    ]
 
 
 def _has_cycle(graph: dict[str, list[str]]) -> list[str] | None:
@@ -109,38 +86,3 @@ def _has_cycle(graph: dict[str, list[str]]) -> list[str] | None:
             if result is not None:
                 return result
     return None
-
-
-
-
-def _check_ref(
-    ref: str,
-    source_label: str,
-    upstream_map: dict[str, tuple[set[str] | None, str, str]],
-    errors: list[SpecError],
-) -> None:
-    """Check a single reference string against the upstream ID sets."""
-    for prefix, (id_set, filename, type_label) in upstream_map.items():
-        if ref.startswith(prefix):
-            if id_set is not None and ref not in id_set:
-                errors.append(
-                    make_error("E590", f"CROSS_STEP_ID_NOT_FOUND {source_label} "
-                    f"references unknown {type_label} '{ref}' "
-                    f"(not in {filename})")
-                )
-            break
-
-
-def _collect_refs_from_value(value: Any) -> set[str]:
-    """Recursively collect all string values matching fr-* or nfr-* patterns from a data structure."""
-    refs: set[str] = set()
-    if isinstance(value, str):
-        if _FR_ID_RE.match(value) or _NFR_ID_RE.match(value):
-            refs.add(value)
-    elif isinstance(value, dict):
-        for v in value.values():
-            refs.update(_collect_refs_from_value(v))
-    elif isinstance(value, list):
-        for item in value:
-            refs.update(_collect_refs_from_value(item))
-    return refs
