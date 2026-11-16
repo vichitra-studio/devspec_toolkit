@@ -158,8 +158,10 @@ The required sequence after any spec edit:
 1. validate          -- JSON Schema validation of the changed artifact
 2. seed-lint         -- verify seed usage matches seed_manifest step_requirements
 3. matrix            -- regenerate spec/extras/trace_matrix.json (if traceability changed)
-4. fixtures-lint     -- check that each fixture has input and expected
+4. fixtures-lint     -- check that each fixture has input and expected (see the note below)
 ```
+
+`fixtures-lint` recognises a step 08 file by a `$schema` that ends in `/08_fixtures.schema.json`. A file that carries the registry id `vc:08-fixtures`, which is what the step 08 prompt writes, is not read and the command prints `OK` (DEVSPEC-237).
 
 **When to run each check:**
 
@@ -167,7 +169,7 @@ The required sequence after any spec edit:
 |---|---|
 | Any spec file edit | `validate`, `seed-lint` |
 | Trace field changed on a 1.1.1-shaped spec (`trace`, `targets`, `_ref`) | Add `matrix` |
-| Fixture `input` or `expected` changed | Add `fixtures-lint` |
+| Fixture `input` or `expected` changed | Add `fixtures-lint` (reads no `vc:08-fixtures` file, see the note above) |
 | New canon entry added | `canonical-lint`, `canonical-integrity` |
 | Commit | `governance-check` against commit message |
 | Upstream step changed | `forward-replay-check` to verify all downstream steps are replayed |

@@ -96,7 +96,7 @@ def is_parked_any_shape(node: Mapping[str, Any]) -> bool:
 
     The 1.1.1 forms are ``scope: future`` and ``priority: wont-have``. For readers that can meet
     a legacy file and a new-shape file in the same run. When this module is deleted its callers
-    go back to ``is_parked``. Never raises on a wrong-typed value.
+    go back to ``is_parked``. Never raises on a wrong-typed value inside *node*.
     """
     return (
         is_parked(node)

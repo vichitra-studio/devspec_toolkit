@@ -15,6 +15,8 @@ import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Load tier0_checks as a module from its script path
 # ---------------------------------------------------------------------------
@@ -206,4 +208,11 @@ def test_t10_clean_tree_has_no_generator_drift():
     if any(f["message"].startswith("T0-10 skipped") for f in findings):
         pytest.skip("the check found no specdev to run")
     assert findings == []
+
+
+def test_t10_clean_tree_test_skips_when_specdev_is_not_found():
+    """Without ``specdev`` the clean-tree test skips; it neither fails nor passes."""
+    not_found = MagicMock(returncode=1, stdout="", stderr="specdev: command not found")
+    with patch("subprocess.run", return_value=not_found), pytest.raises(pytest.skip.Exception):
+        test_t10_clean_tree_has_no_generator_drift()
 

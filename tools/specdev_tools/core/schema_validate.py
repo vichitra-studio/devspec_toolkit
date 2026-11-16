@@ -155,7 +155,7 @@ def validate_data_against_schema(
     data:
         The document to validate.  Must be a ``dict``; the ``"$schema"``
         field is read from it and then stripped from the validation payload
-        (mirrors ``validate.py:215-216``).
+        (mirrors ``validate.py``).
 
     Returns
     -------
@@ -223,7 +223,7 @@ def validate_data_against_schema(
     except json.JSONDecodeError as exc:
         raise SchemaDecodeError(uri=schema_uri, detail=str(exc)) from exc
 
-    # --- Step 4: build validation payload (strip $schema, mirror validate.py:215-216) ---
+    # --- Step 4: build validation payload (strip $schema, mirror validate.py) ---
     payload = dict(data)
     payload.pop("$schema", None)
 

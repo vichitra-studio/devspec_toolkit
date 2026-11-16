@@ -237,14 +237,14 @@
           "properties": {
             "requirements_summary": {
               "type": "array",
-              "description": "2–4 themed requirement groups, each with a business-domain name and 2–6 requirements. Themes are business-domain names (e.g., 'Authentication & Authorization', 'Payment Handling'), not technical layers. Anti-pattern: one giant unthemed list, or themes named 'Theme 1', 'General', 'Misc'.",
+              "description": "2–4 themes, each with a business-domain name and a summary. Themes are business-domain names (e.g., 'Authentication & Authorization', 'Payment Handling'), not technical layers. Anti-pattern: one giant unthemed list, or themes named 'Theme 1', 'General', 'Misc'.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
                   "theme": {
                     "type": "string",
-                    "description": "Business-domain label grouping related requirements — NOT a technical layer. Group by what the system does for users, not how it is built. Examples: 'Authentication & Authorization', 'Order Processing', 'Payment Handling'. A good theme has 2–6 requirements; split if >8. Anti-pattern: 'Utils', 'Helpers', 'Services' (technical layers); 'Theme 1', 'General', 'Misc' (generic/empty labels). Keep under 50 characters."
+                    "description": "Business-domain label grouping related requirements — NOT a technical layer. Group by what the system does for users, not how it is built. Examples: 'Authentication & Authorization', 'Order Processing', 'Payment Handling'. Anti-pattern: 'Utils', 'Helpers', 'Services' (technical layers); 'Theme 1', 'General', 'Misc' (generic/empty labels). Keep under 50 characters."
                   },
                   "summary": {
                     "type": "string",
@@ -1521,7 +1521,7 @@
           "properties": {
             "fr_coverage": {
               "type": "array",
-              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. Should cover every FR referenced in the plan's spec_alignment. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence.",
+              "description": "Coverage assessment for each functional requirement. Each entry maps an fr_id to evidence of its implementation. A complete entry includes: the fr_id in kebab-case, a boolean satisfied flag, an evidence_summary citing specific checklist IDs or test output, and the checklist_ids that provide the evidence.",
               "items": {
                 "type": "object",
                 "properties": {

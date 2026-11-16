@@ -5,7 +5,7 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 ## Schema Change Workflow
 
 1. [ ] Update the JSON Schema file in `schema/`
-2. [ ] Add a row to `tools/schema_changes.json` for each path added, removed or changed since the 1.1.1 baseline (the closure test `tests/unit/registry/test_schema_change_checklist.py` fails without it)
+2. [ ] Add a row to `tools/schema_changes.json` for each path added, removed or changed since the 1.1.1 baseline (the closure test `tests/unit/registry/test_schema_change_checklist.py` fails without it). For a new property of an annotated node, also declare it in the schema: list it in the node's `x-node.contract`, or give it an `x-link` when it holds ids (`tests/unit/toolkit_invariants/test_m3_graph_declarations.py` fails otherwise; see `docs/developers/schema-annotations.md`)
 3. [ ] Run `specdev registry-generate --repo-root .` and commit the five generated files (CI's "Registry up-to-date check" diffs them)
 4. [ ] Update the corresponding prompt in `prompts/`
 5. [ ] Run `specdev prompt-sync` to verify prompt ↔ schema alignment
@@ -19,7 +19,7 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 1. [ ] Edit the prompt file in `prompts/prompt_NN_*.md`
 2. [ ] Run `specdev prompt-sync` to verify alignment with schema
 3. [ ] Update `docs/agents/manifest.json` if agent protocol changed
-4. [ ] Run `pytest tests/test_prompt_contracts.py -v`
+4. [ ] Run `pytest tests/unit/generation/test_prompt_contracts.py -v`
 5. [ ] Test the prompt with an AI assistant to verify output quality
 
 ## Canonical Registry Change Workflow
@@ -34,8 +34,8 @@ Standard operating procedure for changes to the DevSpec Toolkit. Follow the appl
 
 1. [ ] Edit or create template in `prompts/migration/`
 2. [ ] Ensure all `{{VARIABLE}}` placeholders are documented
-3. [ ] Add/update test in `tests/test_migration_templates.py`
-4. [ ] Run `pytest tests/test_migration_templates.py -v`
+3. [ ] Add/update test in `tests/unit/migration/test_migration_templates.py`
+4. [ ] Run `pytest tests/unit/migration/test_migration_templates.py -v`
 
 ## Release Checklist
 

@@ -164,7 +164,9 @@ changes:
       shape, completeness-check reports FR-to-API coverage and
       capability-to-FR coverage as complete (ratio 1.0), because the checks
       behind those two numbers do not run on it, until graph coverage later in
-      this release. For the same spec, specdev matrix writes a trace matrix
+      this release (once steps 06 to 16 have the new shape as well,
+      FR-to-fixture and FR-to-milestone coverage join them: see
+      completeness-check under Changed). For the same spec, specdev matrix writes a trace matrix
       which omits fr_with_api and the apis of each FR row and names them in a top-level not_computed list, because its FR-to-API reader does not run on it; no W592 / E592
       follows from that. The W583 reader of step 11 reads API derives_from: a 1.1.1
       step-05 API linked only to parked requirements through trace is no

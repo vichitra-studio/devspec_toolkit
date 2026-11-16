@@ -399,13 +399,14 @@ def _declared_edges_problems(hand: dict[str, Any]) -> list[str]:
     """Problems of ``declared_edges`` (optional): a list of ``[producer, consumer]`` pairs of listed steps."""
     if "declared_edges" not in hand:
         return []
-    steps, edges = hand.get("steps"), hand["declared_edges"]
-    listed = set(steps) if isinstance(steps, list) and all(isinstance(s, str) for s in steps) else set()
+    edges = hand["declared_edges"]
     if not isinstance(edges, list) or not all(
-        isinstance(e, list) and len(e) == 2 and all(isinstance(x, str) for x in e) for e in edges
+        isinstance(e, list) and len(e) == 2 and all(isinstance(x, str) for x in e) and e[0] != e[1] for e in edges
     ):
-        return ["declared_edges: must be a list of [producer, consumer] pairs of step ids"]
-    unlisted = sorted({x for e in edges for x in e} - listed)
+        return ["declared_edges: must be a list of [producer, consumer] pairs of two different step ids"]
+    if _steps_problems(hand):
+        return []  # which steps are listed is not known; the steps problem is reported on its own
+    unlisted = sorted({x for e in edges for x in e} - set(hand["steps"]))
     return [f"declared_edges: names step(s) {', '.join(unlisted)} that steps does not list"] if unlisted else []
 
 

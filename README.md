@@ -39,6 +39,8 @@ A schema-first, AI-assisted workflow that turns **spec → implementation** into
       │                      #   traceability, invariants, governance, matrix)
       ├─ generation/         # prompt_generator, prompt_schema_sync, schema_differ
       ├─ canonical/          # autofix, integrity, lint, registry
+      ├─ registry/           # registry-generate: annotations, entry-key registry, step order, checklist
+      ├─ lifecycle/          # milestone plan files (impl_context)
       └─ migration/          # planner, runner
 
 ```
