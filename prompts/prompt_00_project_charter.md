@@ -99,7 +99,7 @@ Before emitting, verify:
   "id": "charter-v1",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
-  "title": "Project Charter",
+  "title": "Authentication Session Service",
   "problem_statement": "Authentication and session handling are inconsistent across user-facing flows.",
   "scope_items": [
     {

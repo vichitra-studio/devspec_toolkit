@@ -78,7 +78,9 @@ changes:
     description: >
       Breaking for host specs: steps 00 to 05 move to the spec-graph shape.
       Step 00 (charter): in_scope / out_of_scope merge into scope_items (each
-      with scope in | later | out, scope_reason for later / out, scope_id);
+      with scope in | later | out, scope_reason for later / out, scope_id), and
+      the 1.1.1 floor of three entries in each of the two lists becomes one
+      entry in scope_items;
       assumptions, risks and stakeholder needs become objects with ids (they
       were strings); stakeholders gain stakeholder_id; new constraints list; links removed; derives_from added to scope items,
       assumptions, risks, needs, segments, metrics and constraints. Step 01:

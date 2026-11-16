@@ -16,7 +16,7 @@
 **Step-specific fields:**
 
 - `$schema`: Must reference the URI above for the target toolkit version.
-- `environments`: Object (not an array) mapping environment names to config objects. Must include all four keys: `dev`, `ci`, `staging`, `prod`. Each value is an environment object with `scope` (`in | later | out`), `derives_from` (ids of seeds, constraints or scope items) and an optional `config` map holding the environment-specific settings.
+- `environments`: Object (not an array) mapping environment names to config objects. Must include all four keys: `dev`, `ci`, `staging`, `prod`. Each value is an environment object with `scope` (`in | later | out`), `derives_from` (ids of seeds, constraints or scope items) and an optional `config` map holding the environment-specific settings (when present: at least one key; keys lowercase, matching `^[a-z][a-z0-9_-]*$`, so rename a key such as `LOG_LEVEL` to `log_level`).
 - `ci_gates`: Array of gate objects (minItems: 1). Each requires `gate_id` (kebab-case, matching a pipeline job name), `scope` and `derives_from`.
 
 ## Output Contract

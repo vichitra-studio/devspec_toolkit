@@ -39,7 +39,7 @@
                 "$ref": "vc:core:atoms#kebabId"
               },
               "term": {
-                "description": "The glossary term being defined. Use the canonical form of the term as it appears in project documentation. Capitalization should match usage: capitalize proper nouns and acronyms (e.g., 'JWT Token', 'REST API'), lowercase common technical terms ('endpoint', 'payload'). The term should be a noun or noun phrase. Avoid defining verbs or phrases.",
+                "description": "The glossary term being defined. Use the canonical form of the term as it appears in project documentation. Capitalization should match usage: capitalize proper nouns and acronyms (e.g., 'JWT Token', 'REST API'), lowercase common technical terms ('endpoint', 'payload'). The term should be a noun or noun phrase. Avoid defining verbs or phrases. Each term must be unique within the glossary, compared case-insensitively (the step 03 validator rejects a duplicate, E520).",
                 "type": "string",
                 "minLength": 2
               },

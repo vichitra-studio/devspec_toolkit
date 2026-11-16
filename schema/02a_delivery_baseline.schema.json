@@ -23,7 +23,7 @@
             "additionalProperties": false,
             "properties": {
               "config": {
-                "description": "Host configuration for this environment: the key-value settings that differ between tiers. Optional; every host key lives here, never beside the node fields.",
+                "description": "Host configuration for this environment: the key-value settings that differ between tiers. Optional; every host key lives here, never beside the node fields. When present it holds at least one key, and each key is lowercase (letters, digits, '-' and '_', starting with a letter).",
                 "$ref": "vc:core:collections#environmentConfig"
               },
               "scope": {

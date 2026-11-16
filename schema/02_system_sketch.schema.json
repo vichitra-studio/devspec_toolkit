@@ -84,7 +84,7 @@
                 ]
               },
               "derives_from": {
-                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from.",
+                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from. Every Step 01 capability whose scope is 'in' must be named in the derives_from of at least one component (step 02 validator, E590).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
@@ -220,7 +220,7 @@
                 "$ref": "vc:core:atoms#connectionProtocol"
               },
               "trust_boundary": {
-                "description": "Security trust boundary classification: 'internal' (same trust zone, no external exposure), 'partner' (B2B or machine-to-machine with a known external party), or 'public' (internet-facing, untrusted callers). Partner and public trust boundaries require auth and rate_limit.",
+                "description": "Security trust boundary classification: 'internal' (same trust zone, no external exposure), 'partner' (B2B or machine-to-machine with a known external party), or 'public' (internet-facing, untrusted callers). Partner and public trust boundaries require auth and rate_limit. A connection whose connects_to names a third_parties entry of this file must be 'partner' or 'public': the step 02 validator rejects 'internal' there (E520).",
                 "$ref": "vc:core:atoms#trustBoundary"
               },
               "auth": {
@@ -228,7 +228,7 @@
                 "$ref": "vc:core:atoms#connectionAuth"
               },
               "rate_limit": {
-                "description": "Rate limiting configuration for this connection. Required when trust_boundary is 'partner' or 'public' (enforced by schema conditional). For 'internal' trust boundaries, omit unless the connection is a hot path requiring back-pressure. Populate all three sub-fields (rps, burst, window_s) as a consistent set.",
+                "description": "Rate limiting configuration for this connection. Required when trust_boundary is 'partner' or 'public' (enforced by schema conditional). For 'internal' trust boundaries, omit unless the connection is a hot path requiring back-pressure. rps and scope are required; burst and window_s are optional and, when given, should be consistent with rps.",
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
@@ -271,7 +271,7 @@
                 "$ref": "vc:core:atoms#messageReliability"
               },
               "event_ref": {
-                "description": "Canonical reference to the event type flowing through this connection. Required when protocol is 'event'. Kind must be 'event'. Example: {\"id\": \"cn:project:event:order-placed\", \"kind\": \"event\", \"label\": \"order-placed\"}. The event ID should match the topic or event type name in your message broker. Anti-pattern: using event_ref for REST endpoint connections — event_ref is only for async message-passing.",
+                "description": "Canonical reference to the event type flowing through this connection. Used when protocol is 'event' (the schema does not require it). Kind must be 'event'. Example: {\"id\": \"cn:project:event:order-placed\", \"kind\": \"event\", \"label\": \"order-placed\"}. The event ID should match the topic or event type name in your message broker. Anti-pattern: using event_ref for REST endpoint connections — event_ref is only for async message-passing.",
                 "allOf": [
                   { "$ref": "vc:core:collections#canonicalRef" },
                   { "properties": { "kind": { "const": "event" } } }
