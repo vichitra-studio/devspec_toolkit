@@ -6,7 +6,7 @@
   "$defs": {
     "specRef": {
       "type": "object",
-      "description": "A reference to a spec artifact with precise code location binding.",
+      "description": "A reference to a spec artifact by type and id. Used by review findings.",
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -30,26 +30,11 @@
         "note": {
           "type": "string",
           "description": "Optional contextual note about this reference."
-        },
-        "line_range": {
-          "type": "string",
-          "pattern": "^L\\d+-L\\d+$",
-          "description": "Line range in the source file (e.g., 'L10-L25')."
-        },
-        "commit_hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{40}$",
-          "not": {
-            "pattern": "^0{40}$"
-          },
-          "description": "Full 40-character git commit hash pinning this reference. Must not be all zeros."
         }
       },
       "required": [
         "type",
-        "id",
-        "line_range",
-        "commit_hash"
+        "id"
       ]
     },
     "severityLevel": {
@@ -112,24 +97,6 @@
       "description": "Structured extensions for host-repo-specific additions that do not fit standard fields. Examples: {\"deployment_runbook\": \"https://runbooks.example.com/auth-deploy\"}, {\"slack_channel\": \"#auth-team\"}. Anti-pattern: duplicating data already captured in standard fields (e.g., restating plan.status here).",
       "additionalProperties": false,
       "properties": {
-        "review_state": {
-          "type": "object",
-          "description": "Records the outcome of a human or automated review pass on this implementation context. Populate after a review cycle completes — leave absent until a review has run. Sub-fields: outcome (the result of the review), verified_by (reviewer identity as a GitHub handle or CI system name), review_date (ISO 8601 timestamp of when the review occurred). Example: {outcome: 'approved', verified_by: '@alice', review_date: '2025-10-16T10:00:00Z'}. Anti-pattern: populating review_state with outcome: 'pending' before any review has occurred — leave the entire field absent until a review cycle has completed.",
-          "additionalProperties": false,
-          "properties": {
-            "outcome": {
-              "type": "string",
-              "description": "Review outcome. Standard values with decision rules: 'verified' = all checklist items satisfied and tests pass; 'partial' = majority done, 1–2 non-blocking gaps; 'failed' = blocking finding present; 'changes_requested' = reviewer has blocking findings (use this, not 'rejected' — findings are fixable); 'blocked' = cannot review until upstream issues resolved; 'pending' = not yet reviewed. Anti-pattern: 'done' (not a standard value)."
-            },
-            "verified_by": {
-              "type": "string",
-              "description": "Identity of the person or system that verified the review. Format: GitHub handle or CI system name. Examples: '@alice', 'github-actions[bot]', 'ci-pipeline-12345'. Anti-pattern: 'me' or 'developer' (not traceable)."
-            }
-          },
-          "required": [
-            "outcome"
-          ]
-        },
         "execution_context": {
           "type": "object",
           "description": "Extension for execution-time overrides and configuration.",
@@ -152,18 +119,6 @@
       "additionalProperties": false,
       "description": "Trinity loop plan (scope, checklist, review requirements, and documentation impact).",
       "properties": {
-        "status": {
-          "type": "string",
-          "enum": [
-            "active",
-            "deferred"
-          ],
-          "description": "Plan lifecycle status. Decision rules: 'active' = plan is being worked; 'deferred' = explicitly postponed with documented reason. Transition: active → deferred requires populating deferred_reason. Anti-pattern: using 'deferred' without populating deferred_reason."
-        },
-        "deferred_reason": {
-          "type": "string",
-          "description": "Explanation for why this plan was deferred. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition)."
-        },
         "summary": {
           "type": "object",
           "description": "High-level scope summary including what is in and out of scope.",
@@ -199,7 +154,8 @@
                 "type": "string",
                 "description": "Glob pattern relative to repo root. Examples: 'src/auth/**/*.py', 'tests/unit/auth/test_*.py'. Anti-pattern: '*.py' (matches entire repo)."
               },
-              "description": "Per-milestone file globs that bound execution.files_touched. Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) does not carry this field — scope at the anchor level is expressed via scope_in/scope_out, file-level enforcement is per-milestone."
+              "description": "Per-milestone file globs that bound execution.files_touched. Lives on each 16a milestone plan; the Trinity Anchor (vc:16-anchor) does not carry this field — scope at the anchor level is expressed via scope_in/scope_out, file-level enforcement is per-milestone.",
+              "minItems": 1
             },
             "milestone_supporting_files": {
               "type": "array",
@@ -293,26 +249,18 @@
                   "summary": {
                     "type": "string",
                     "description": "1–2 sentences naming the key actors, interactions, and constraints that define this theme's scope. Include what the system does and for whom. Examples: 'User authentication flows using JWT tokens with 24-hour TTL; covers login, token refresh, and revocation endpoints.' 'Order lifecycle management from cart submission to fulfilment confirmation; includes payment capture and inventory reservation.' Anti-pattern: 'This theme covers authentication.' (too brief, no actors or constraints); copy-pasting requirement statements directly into the summary."
-                  },
-                  "spec_refs": {
-                    "type": "array",
-                    "description": "Spec references that belong to this thematic group.",
-                    "items": {
-                      "$ref": "#/$defs/specRef",
-                      "description": "A specRef object pointing to the spec artifact this requirement derives from. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].statement'}. Anti-pattern: pointing to a code file instead of a spec document."
-                    }
                   }
                 },
                 "required": [
                   "theme",
                   "summary"
                 ],
-                "description": "A thematic grouping of related spec requirements with optional references."
+                "description": "A thematic grouping of related requirements."
               }
             },
             "checklist": {
               "type": "array",
-              "description": "Checklist items that must be satisfied for spec compliance.",
+              "description": "Plan items: the units of implementation work of this milestone. Each item realises one or more acceptance criteria of the milestone's roadmap tasks.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
@@ -321,9 +269,20 @@
                     "$ref": "vc:core:atoms#screamingSnakeId",
                     "description": "Unique SCREAMING_SNAKE_CASE identifier for this checklist item. Name it after the requirement it verifies. Examples: 'AUTH_JWT_VALIDATION', 'PAYMENT_IDEMPOTENCY_KEY', 'RATE_LIMIT_ENFORCEMENT'. Anti-pattern: 'ITEM_1', 'CHECK_001' (sequential numbers are not traceable to a spec requirement)."
                   },
-                  "spec_ref": {
-                    "$ref": "#/$defs/specRef",
-                    "description": "Reference to the spec artifact this checklist item verifies. Use type='doc' for schema/spec references. Example: {type: 'doc', id: 'vc:06-invariants', field: 'rules[0].expression'} for an item verifying an invariant expression. Example: {type: 'doc', id: 'vc:04-fr-list', field: 'functional_requirements[0].acceptance_criteria[0].text'} for an acceptance criterion. Anti-pattern: pointing to a code file (type='code') — checklist spec_refs should point to the spec document, not the implementation."
+                  "realises": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "$ref": "vc:core:atoms#kebabId"
+                    },
+                    "x-link": {
+                      "kinds": [
+                        "task-criterion"
+                      ],
+                      "required": true
+                    },
+                    "description": "Ids of the Step 14 task acceptance criteria this item realises (the criterion ids). At least one. The task, the milestone, the fixtures and the NFRs of the item are computed from them. Example: [\"tc-confirm-expired-token\"]. Anti-pattern: naming a task id, a functional requirement or a criterion the roadmap does not define."
                   },
                   "description": {
                     "type": "string",
@@ -358,74 +317,11 @@
                     ],
                     "description": "Architecture layer this checklist item targets. Decision rules: 'api' = HTTP routes and request handling; 'service' = business/domain logic and rules; 'db' = database schema, migrations, storage operations; 'security' = auth/authz/crypto/input validation middleware; 'tests' = test files and fixtures; 'config' = environment config and feature flags; 'docs' = documentation files; 'model' = domain objects and type definitions; 'integration' = external system calls and adapters. Example: use 'api' for the route handler; use 'service' for the token validation logic called by that handler. Anti-pattern: using 'api' for business logic that happens to be triggered via an API call."
                   },
-                  "checklist_status": {
-                    "type": "string",
-                    "enum": [
-                      "active",
-                      "deferred",
-                      "wont_do"
-                    ],
-                    "default": "active",
-                    "description": "Lifecycle of this checklist item. Decision rules: 'active' = required for the current plan; 'deferred' = explicitly postponed (requires this item's own `deferred_reason`), will resume later under a named condition; 'wont_do' = permanently cancelled (requires this item's own `wont_do_reason`), will never be built. Impact: any 'deferred' or 'wont_do' item is excluded from milestone phase-position computation and exempt from proof-of-work requirements. Anti-pattern: 'deferred' as a synonym for 'not started yet' — use 'active' with implementation.status 'pending' for items not yet begun. Anti-pattern: deleting a checklist item to work around coverage validation instead of marking it 'deferred'/'wont_do' with a reason."
-                  },
-                  "deferred_reason": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Required when checklist_status is 'deferred'. Explanation for why this specific item was postponed. Format: name the blocker and the condition required to undefer. Example: 'Waiting for auth service API contract finalisation (expected Sprint 3). Unblock: auth-service publishes OpenAPI 3.0 spec.' Anti-pattern: 'TBD' or 'not ready' (provides no actionable condition). This is independent of `plan.deferred_reason`, which documents deferral of the whole plan, not a single item."
-                  },
-                  "wont_do_reason": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Required when checklist_status is 'wont_do'. Explanation for why this specific item will never be built. Format: name the decision and, if applicable, what supersedes it. Example: 'Superseded by checklist item CHK_UNIFIED_ROUTING; wallet-specific routing folded into that flow.' Anti-pattern: 'not doing this' (provides no actionable context). Independent of `deferred_reason` — a 'wont_do' item is permanently cancelled, not paused."
-                  },
-                  "linked_test_expectation": {
-                    "description": "Test expectation(s) that validate this checklist item. Required when checklist_status is 'active'; optional when 'deferred' or 'wont_do' (the eventual test contract isn't always known before work starts, or will never be needed). Format: test function name or test description string. Examples: 'test_login_invalid_credentials_returns_401', 'POST /auth/login with unknown email → 401 INVALID_CREDENTIALS'. Can be a single string or array of strings. Anti-pattern: 'see tests' (not traceable to a specific test).",
-                    "oneOf": [
-                      {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "A single test expectation string — test function name or description."
-                      },
-                      {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "description": "A test expectation string — test function name or description (non-empty)."
-                        },
-                        "description": "An array of test expectation strings."
-                      }
-                    ]
-                  },
-                  "nfr_refs": {
-                    "$ref": "vc:core:collections#kebabIdArray",
-                    "description": "Kebab-case IDs of the NFRs from 07_nfrs.json that this checklist item verifies. Example: ['nfr-auth-p95-latency', 'nfr-auth-availability']. Anti-pattern: using the nfr display name as a string instead of the kebab-case nfr_id format."
-                  },
-                  "fixture_ref": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Fixture ID from 08_fixtures.json that validates this checklist item. Example: 'fix-auth-login-invalid-credentials'. Anti-pattern: referencing a test file path instead of a fixture ID."
-                  },
-                  "milestone_ref": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                    "description": "Milestone ID from step 14 (spec/14_roadmap.json) that this checklist item belongs to. Format: kebab-case matching a milestones[*].milestone_id value from the roadmap. Example: 'milestone-q1-core-auth'. When an impl_context covers a single milestone, all checklist items share the same milestone_ref. When it spans multiple milestones, set milestone_ref on each item to enable per-milestone progress tracking."
-                  },
                   "implementation": {
                     "type": "object",
                     "description": "Atomic work definition for this specific requirement.",
                     "additionalProperties": false,
                     "properties": {
-                      "status": {
-                        "type": "string",
-                        "enum": [
-                          "pending",
-                          "in_progress",
-                          "verified",
-                          "deferred"
-                        ],
-                        "description": "Current implementation status. Transition rules: pending → in_progress (when first file is touched) → verified (all checklist items have evidence) → deferred (if paused mid-implementation with documented reason). Anti-pattern: jumping to 'verified' without populating action evidence."
-                      },
                       "files_touched": {
                         "type": "array",
                         "description": "Files modified or created to implement this checklist item.",
@@ -542,137 +438,56 @@
                       }
                     },
                     "required": [
-                      "status",
                       "actions"
-                    ],
-                    "allOf": [
-                      {
-                        "if": {
-                          "properties": {
-                            "status": {
-                              "const": "verified"
-                            }
-                          },
-                          "required": [
-                            "status"
-                          ]
-                        },
-                        "then": {
-                          "properties": {
-                            "actions": {
-                              "items": {
-                                "required": [
-                                  "evidence"
-                                ]
-                              }
-                            }
-                          }
-                        }
-                      }
                     ]
+                  },
+                  "lifecycle": {
+                    "$ref": "vc:core:graph#lifecycle",
+                    "description": "Lifecycle state of this plan item: active (default), deprecated or not_applicable."
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "vc:core:atoms#kebabId"
+                    },
+                    "uniqueItems": true,
+                    "description": "Former or alternative ids of this plan item, kept so that older references still resolve. Optional."
+                  },
+                  "replaces": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "vc:core:graph#nodeId"
+                    },
+                    "uniqueItems": true,
+                    "x-link": {
+                      "kinds": "*",
+                      "required": false
+                    },
+                    "description": "Ids of nodes that this plan item replaces. Optional."
                   }
                 },
                 "required": [
                   "id",
-                  "spec_ref",
-                  "description"
+                  "realises",
+                  "description",
+                  "implementation"
                 ],
-                "allOf": [
-                  {
-                    "if": {
-                      "not": {
-                        "properties": {
-                          "checklist_status": {
-                            "enum": ["deferred", "wont_do"]
-                          }
-                        },
-                        "required": [
-                          "checklist_status"
-                        ]
-                      }
-                    },
-                    "then": {
-                      "required": [
-                        "implementation",
-                        "linked_test_expectation"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "allOf": [
-                        {
-                          "not": {
-                            "properties": {
-                              "checklist_status": {
-                                "enum": ["deferred", "wont_do"]
-                              }
-                            },
-                            "required": [
-                              "checklist_status"
-                            ]
-                          }
-                        },
-                        {
-                          "properties": {
-                            "type": {
-                              "enum": [
-                                "behavior",
-                                "constraint",
-                                "validation",
-                                "perf",
-                                "security"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "type"
-                          ]
-                        }
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "fixture_ref"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "properties": {
-                        "checklist_status": {
-                          "const": "deferred"
-                        }
-                      },
-                      "required": [
-                        "checklist_status"
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "deferred_reason"
-                      ]
-                    }
-                  },
-                  {
-                    "if": {
-                      "properties": {
-                        "checklist_status": {
-                          "const": "wont_do"
-                        }
-                      },
-                      "required": [
-                        "checklist_status"
-                      ]
-                    },
-                    "then": {
-                      "required": [
-                        "wont_do_reason"
-                      ]
-                    }
-                  }
+                "description": "A plan item: one unit of implementation work, bound to the acceptance criteria it realises, with the actions that carry it out."
+              },
+              "x-node": {
+                "kind": "plan-item",
+                "role": "plan",
+                "contract": [
+                  "description",
+                  "type",
+                  "layer",
+                  "implementation"
                 ],
-                "description": "A single checklist item binding a spec requirement to its implementation, tests, and evidence."
+                "id": "id",
+                "step": "16a",
+                "files": [
+                  "impl_context/ms_*_plan.json"
+                ]
               }
             }
           },
@@ -852,7 +667,8 @@
                   }
                 ],
                 "description": "A test command. Use string form for a single shell command; use object form when structured metadata (timeout, env vars, expected exit code) is needed. Example string: 'pytest tests/unit/auth/ --tb=short -q'. Example object: {command: 'pytest tests/integration/auth/', timeout_seconds: 120, expected_exit_code: 0}. Anti-pattern: 'run tests' (string form must be executable as-is)."
-              }
+              },
+              "minItems": 1
             },
             "nfr_measurement_methods": {
               "type": "object",
@@ -974,7 +790,7 @@
           ]
         },
         "security": {
-          "description": "Security plan: either not applicable with a reason, or planned with fixtures and spec mutations.",
+          "description": "Security plan: either not applicable with a reason, or planned.",
           "oneOf": [
             {
               "type": "object",
@@ -1002,44 +818,12 @@
                 "status": {
                   "const": "planned",
                   "description": "Whether a security review is required for this change. Decision rule: use 'planned' when the implementation touches authentication/authorization logic, input validation for user-supplied data, cryptographic operations, secrets handling, or any public-facing endpoint. Use 'not_applicable' only for test-only changes, documentation-only updates, or purely internal refactors that do not alter security surfaces. When in doubt, use 'planned' — it is safer to include a security review than to skip one. Anti-pattern: always writing 'not_applicable' for every implementation task (defeats the security review gate)."
-                },
-                "new_fixtures": {
-                  "$ref": "vc:core:collections#kebabIdArray",
-                  "description": "IDs of new security fixtures to create."
-                },
-                "spec_mutations": {
-                  "type": "array",
-                  "description": "Planned mutations to security-related spec artifacts.",
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                      "ref": {
-                        "$ref": "vc:core:collections#traceRef",
-                        "description": "Trace reference to the spec artifact being mutated."
-                      },
-                      "change": {
-                        "type": "string",
-                        "description": "Description of the change to make."
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "Reason for the security-related spec mutation."
-                      }
-                    },
-                    "required": [
-                      "ref",
-                      "change",
-                      "reason"
-                    ],
-                    "description": "A planned security-related mutation to a spec artifact."
-                  }
                 }
               },
               "required": [
                 "status"
               ],
-              "description": "Security status when changes are planned, with fixtures and spec mutations."
+              "description": "Security status when changes are planned."
             }
           ]
         },
@@ -1231,39 +1015,6 @@
             }
           ]
         },
-        "coverage_status": {
-          "type": "object",
-          "description": "Summary counts of checklist item states.",
-          "additionalProperties": false,
-          "properties": {
-            "total": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Total number of checklist items."
-            },
-            "verified": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items that have been verified."
-            },
-            "deferred": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items that have been deferred."
-            },
-            "pending": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of checklist items still pending."
-            }
-          },
-          "required": [
-            "total",
-            "verified",
-            "deferred",
-            "pending"
-          ]
-        },
         "scope_validation": {
           "type": "object",
           "description": "Validation that implementation stayed within declared scope.",
@@ -1317,89 +1068,13 @@
           ]
         }
       },
-      "required": [
-        "status"
-      ],
+      "required": [],
       "allOf": [
         {
-          "if": {
-            "required": [
-              "status"
-            ],
-            "properties": {
-              "status": {
-                "const": "deferred"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "deferred_reason"
-            ],
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "maxItems": 0
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "maxItems": 0
-                  }
-                }
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "summary": {
-                "properties": {
-                  "target_file_patterns": {
-                    "minItems": 1
-                  }
-                }
-              },
-              "review_requirements": {
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "status": {
-                "const": "active"
-              }
-            },
-            "required": [
-              "status"
-            ]
-          },
-          "then": {
-            "required": [
-              "review_requirements"
-            ],
-            "properties": {
-              "review_requirements": {
-                "required": [
-                  "test_commands"
-                ],
-                "properties": {
-                  "test_commands": {
-                    "minItems": 1
-                  }
-                }
-              }
-            }
-          }
+          "required": [
+            "review_requirements"
+          ],
+          "description": "Every plan names the commands that prove it: review_requirements is required."
         }
       ]
     },
@@ -1448,53 +1123,6 @@
                 "type": "string",
                 "description": "External reference or URI pointing to the evidence source."
               },
-              "evidence_binding": {
-                "type": "object",
-                "description": "Cryptographic binding proving evidence authenticity.",
-                "additionalProperties": false,
-                "properties": {
-                  "timestamp": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "ISO 8601 timestamp of when the evidence was captured."
-                  },
-                  "sha256": {
-                    "type": "string",
-                    "pattern": "^[a-f0-9]{64}$",
-                    "description": "SHA-256 hash of the evidence content."
-                  },
-                  "exit_code": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 255,
-                    "description": "Exit code returned by the command."
-                  },
-                  "command": {
-                    "type": "string",
-                    "description": "The command that produced this evidence."
-                  },
-                  "command_ref": {
-                    "description": "Canonical reference for the command in the registry.",
-                    "allOf": [
-                      {
-                        "$ref": "vc:core:collections#canonicalRef"
-                      },
-                      {
-                        "properties": {
-                          "kind": {
-                            "const": "command"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "timestamp",
-                  "sha256",
-                  "exit_code"
-                ]
-              },
               "command_ref": {
                 "description": "Canonical reference for the command in the registry.",
                 "allOf": [
@@ -1532,8 +1160,7 @@
                 },
                 "then": {
                   "required": [
-                    "evidence_ref",
-                    "evidence_binding"
+                    "evidence_ref"
                   ],
                   "properties": {
                     "evidence": {
@@ -1544,29 +1171,6 @@
               }
             ],
             "description": "Result from running a single test or verification command during execution."
-          }
-        },
-        "critical_evidence": {
-          "type": "object",
-          "description": "Summary of critical evidence linking checklist items to test outcomes.",
-          "additionalProperties": false,
-          "properties": {
-            "satisfied_checklist_ids": {
-              "type": "array",
-              "description": "Checklist item IDs that have been satisfied with evidence.",
-              "items": {
-                "type": "string",
-                "description": "A checklist item ID that has been satisfied with evidence."
-              }
-            },
-            "passed_test_commands": {
-              "type": "array",
-              "description": "Test commands that passed during execution.",
-              "items": {
-                "type": "string",
-                "description": "A test command that passed during execution."
-              }
-            }
           }
         },
         "config_validation": {
@@ -1831,42 +1435,10 @@
           "properties": {
             "implemented_interfaces": {
               "type": "array",
-              "description": "Trace IDs of interfaces that have been implemented.",
+              "description": "Ids of interfaces that have been implemented.",
               "items": {
-                "$ref": "vc:core:collections#traceId",
-                "description": "Trace ID of an implemented interface."
-              }
-            },
-            "test_results": {
-              "type": "array",
-              "description": "Per-fixture test outcomes.",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "fixture_ref": {
-                    "$ref": "vc:core:atoms#kebabId",
-                    "description": "Fixture ID being tested."
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pass",
-                      "fail",
-                      "skip"
-                    ],
-                    "description": "Test result: pass, fail, or skip."
-                  },
-                  "notes": {
-                    "type": "string",
-                    "description": "Additional notes about this test result."
-                  }
-                },
-                "required": [
-                  "fixture_ref",
-                  "status"
-                ],
-                "description": "Per-fixture test result with pass/fail/skip status."
+                "$ref": "vc:core:atoms#kebabId",
+                "description": "Id of an implemented interface."
               }
             },
             "ci_status": {
@@ -1880,7 +1452,6 @@
           },
           "required": [
             "implemented_interfaces",
-            "test_results",
             "ci_status"
           ]
         },
@@ -2088,10 +1659,15 @@
           }
         }
       ]
+    },
+    "milestone": {
+      "$ref": "vc:core:atoms#kebabId",
+      "description": "Id of the Step 14 roadmap milestone this plan file is for. A file-level key: the plan names its milestone here, and the anchor row about that milestone is found through it. Example: 'ms-account-recovery'. Anti-pattern: naming a task or a spec requirement, or a milestone the roadmap does not define."
     }
   },
   "required": [
-    "plan"
+    "plan",
+    "milestone"
   ],
   "allOf": [
     {

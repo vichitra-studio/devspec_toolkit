@@ -6,12 +6,15 @@ Covers:
 - ``validators`` sub-package importability
 - Migration runner ``execute_single_step`` importability
 - ``init_project.py`` support for ``--venv-name`` argument
+- the verb-named property rule on the step 16 plan schema
 """
 
 from __future__ import annotations
 
 import importlib
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -130,3 +133,39 @@ class TestInitProjectVenvName:
         source = self._INIT_SCRIPT.read_text()
         # The default value should be devspec_env
         assert 'default="devspec_env"' in source
+
+
+# ---------------------------------------------------------------------------
+# 6. Verb-named properties of the step 16 plan schema
+# ---------------------------------------------------------------------------
+
+_SCHEMA_DIR = Path(__file__).resolve().parents[4] / "schema"
+
+
+def _verb_named_properties(node: Any, verbs: frozenset[str], path: str = "") -> dict[str, dict[str, Any]]:
+    """Every property named like a link verb anywhere under *node*, keyed by its path."""
+    found: dict[str, dict[str, Any]] = {}
+    if isinstance(node, dict):
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for name, sub in props.items():
+                if name in verbs and isinstance(sub, dict):
+                    found[f"{path}.{name}"] = sub
+        for key, value in node.items():
+            found.update(_verb_named_properties(value, verbs, f"{path}.{key}"))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found.update(_verb_named_properties(value, verbs, f"{path}[{index}]"))
+    return found
+
+
+def test_verb_named_property_rule_in_impl_context_schema():
+    """Every verb-named property of the plan schema declares ``x-link``; the old ``review_state.verified_by`` is gone."""
+    verbs = frozenset(
+        json.loads((_SCHEMA_DIR / "core" / "graph.schema.json").read_text())["$defs"]["linkVerb"]["enum"]
+    )
+    schema = json.loads((_SCHEMA_DIR / "16_impl_context.schema.json").read_text())
+    found = _verb_named_properties(schema, verbs)
+    assert found, "the plan item declares at least its realises link"
+    assert [path for path, sub in found.items() if "x-link" not in sub] == []
+    assert "review_state" not in schema["properties"]["extensions"]["properties"]

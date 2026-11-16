@@ -1,6 +1,6 @@
 {
   "$schema": "vc:16-impl-context",
-  "id": "step-impl-unexecuted-planned",
+  "id": "step-impl-legacy-planned-unexecuted",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",
   "plan": {
@@ -40,7 +40,16 @@
           "nfr_refs": [
             "nfr-availability-uptime"
           ],
-          "fixture_ref": "fixture-auth-login"
+          "fixture_ref": "fixture-auth-login",
+          "implementation": {
+            "status": "pending",
+            "actions": [
+              {
+                "type": "manual_verification",
+                "description": "Verify the login endpoint"
+              }
+            ]
+          }
         },
         {
           "id": "cl-002",

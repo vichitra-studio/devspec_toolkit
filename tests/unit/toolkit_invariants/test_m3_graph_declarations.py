@@ -34,7 +34,7 @@ from .test_m2_graph_declarations import (  # noqa: F401  (decls and reader are p
 
 _M3_STEPS = frozenset({"06", "07", "08", "09", "10", "11", "12", "14", "15", "16"})
 
-# Kind -> id field, by step (PD-1 of the M3 plan).
+# Kind -> id field, by step (PD-1 of the M3 plan); step 16 is keyed by schema file (anchor and plan share the step).
 _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "06": {"invariant": "inv_id"},
     "07": {"nfr": "nfr_id"},
@@ -45,8 +45,14 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "12": {"job": "job_id"},
     "14": {"roadmap-milestone": "milestone_id", "task": "task_id", "task-criterion": "criterion_id"},
     "15": {"scaffold-row": "row_id"},
-    "16": {"anchor-row": "anchor_id"},
+    "16_anchor": {"anchor-row": "anchor_id"},
+    "16_impl_context": {"plan-item": "id"},
 }
+
+
+def _expected_kinds(fname: str) -> dict[str, str]:
+    """The kinds a schema file declares: by file stem where the two step 16 schemas share a step, else by step."""
+    return _EXPECTED_KINDS.get(fname.removesuffix(".schema.json")) or _EXPECTED_KINDS[_step_of(fname)]
 
 # The kinds a threat or an edge case may be ``mitigated_by``: every obligation kind except capability, and fixtures.
 _MITIGATION_KINDS = ["api", "api-error", "constraint", "criterion", "environment", "fixture", "fr", "gate", "invariant", "nfr", "rule", "secret"]
@@ -62,9 +68,9 @@ _EXCLUDED_FROM_M3_CONTRACT = _EXCLUDED_FROM_CONTRACT | {"disposition"}
 # ``close``, so only ``summary`` and ``checklist_id_prefix`` are its contract.
 _OUTSIDE_THE_HASH_BY_KIND: dict[str, frozenset[str]] = {"anchor-row": frozenset({"status", "deferral_reason", "close"})}
 
-# A scaffold row's ``realises`` and an anchor row's ``about`` build nothing (link table of the M3 plan, section 3.2),
-# although ``realises`` is a built field on a job.
-_UNBUILT_HOLDERS = frozenset({"scaffold-row", "anchor-row"})
+# A scaffold row's and a plan item's ``realises`` and an anchor row's ``about`` build nothing (link table of the M3
+# plan, section 3.2), although ``realises`` is a built field on a job.
+_UNBUILT_HOLDERS = frozenset({"scaffold-row", "anchor-row", "plan-item"})
 
 # Every obligation kind with ids: what a task criterion may refine.
 _REFINABLE_KINDS = [
@@ -114,6 +120,8 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("15_scaffold.schema.json", "/properties/interface_map/items/properties/realises", ["api"]),
     ("15_scaffold.schema.json", "/properties/interface_map/items/properties/replaces", "*"),
     ("16_anchor.schema.json", "/properties/plan/properties/milestone_index/items/properties/about", ["roadmap-milestone"]),
+    ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/realises", ["task-criterion"]),
+    ("16_impl_context.schema.json", "/properties/plan/properties/spec_alignment/properties/checklist/items/properties/replaces", "*"),
 ]
 
 
@@ -147,15 +155,16 @@ def test_m3_schema_files_are_found() -> None:
         "06_invariants.schema.json", "07_nfrs.schema.json", "08_fixtures.schema.json",
         "09_impl_plan.schema.json", "10_governance.schema.json", "11_redteam.schema.json",
         "12_ci_gates.schema.json", "14_roadmap.schema.json", "15_scaffold.schema.json", "16_anchor.schema.json",
+        "16_impl_context.schema.json",
     }
 
 
 @pytest.mark.parametrize("fname", _FILES)
 def test_every_kind_declares_id_role_and_contract(decls, fname: str) -> None:
     declared = {n.kind: n.value for n in _nodes(decls, fname)}
-    assert set(declared) == set(_EXPECTED_KINDS[_step_of(fname)])
+    assert set(declared) == set(_expected_kinds(fname))
     for kind, value in declared.items():
-        assert value.get("id") == _EXPECTED_KINDS[_step_of(fname)][kind], kind
+        assert value.get("id") == _expected_kinds(fname)[kind], kind
         assert value.get("role"), kind
         assert value.get("contract"), kind
 
@@ -166,7 +175,7 @@ def test_roles_match_kind_role_table(decls, fname: str) -> None:
         row = _ROLE_TABLE[node.kind]
         assert node.value["role"] == row["role"], node.kind
         assert node.value.get("coarse", False) == row.get("coarse", False), node.kind
-        assert _step_of(fname) == row["step"], node.kind
+        assert node.value.get("step", _step_of(fname)) == row["step"], node.kind
 
 
 @pytest.mark.parametrize("fname", _FILES)
@@ -426,3 +435,16 @@ def test_step_16_anchor_row_is_a_record_about_exactly_one_roadmap_milestone(decl
     assert node.value["role"] == "record"
     assert node.value["contract"] == ["summary", "checklist_id_prefix"]
     assert not {"lifecycle", "scope", "scope_reason", "replaces", "aliases"} & set(_props(reader, node))
+
+
+def test_step_16_plan_item_realises_task_criteria_builds_nothing_and_is_a_16a_kind_in_plan_files(decls, reader) -> None:
+    fname = "16_impl_context.schema.json"
+    _assert_links(decls, fname, {"realises": (["task-criterion"], True), "replaces": ("*", False)})
+    assert _link(decls, fname, "realises").value.get("built", False) is False
+    node = next(iter(_nodes(decls, fname)))
+    assert (node.kind, node.value["role"], node.value["step"]) == ("plan-item", "plan", "16a")
+    assert node.value["files"] == ["impl_context/ms_*_plan.json"]
+    assert node.value["contract"] == ["description", "type", "layer", "implementation"]
+    required = reader.get(*_item(reader, node), "required")[0]
+    assert {"id", "realises"} <= set(required)
+    assert {"spec_ref", "checklist_status", "milestone_ref", "nfr_refs", "fixture_ref"}.isdisjoint(_props(reader, node))

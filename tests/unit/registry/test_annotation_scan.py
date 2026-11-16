@@ -65,8 +65,8 @@ def _by_path(arrays: list[dict]) -> dict[str, dict]:
 def test_make_ref_resolver_anchor_pointer_and_whole_schema():
     reg = SchemaRegistry(str(_ROOT))
     resolve = make_ref_resolver(reg)
-    trace, uri, ptr = resolve("vc:core:collections#traceRef")
-    assert uri == "vc:core:collections" and trace.get("$anchor") == "traceRef"
+    id_array, uri, ptr = resolve("vc:core:collections#kebabIdArray")
+    assert uri == "vc:core:collections" and id_array.get("$anchor") == "kebabIdArray"
     kebab, uri, _ = resolve("vc:core:atoms#kebabId")
     assert uri == "vc:core:atoms" and kebab["type"] == "string"
     via_pointer, uri, ptr = resolve(f"vc:core:atoms#{ptr_of(resolve, 'vc:core:atoms#kebabId')}")

@@ -23,62 +23,6 @@
         "description": "A string entry in the array. Each string should be specific, bounded, and self-contained — the meaning must be clear without reading the surrounding context. Minimum 10 characters is recommended; single words are almost always too vague to be actionable. Examples of good entries: 'user authentication via OAuth2' (capability label), 'must complete within 200ms at p99' (NFR constraint), 'rejected when cart is empty' (exclusion rule). Examples of poor entries: 'auth' (ambiguous — which auth?), 'TODO' (placeholder that adds no information), '' (empty string carries no meaning). Anti-patterns: empty strings, single-word entries like 'payments' or 'login', filler text like 'N/A' or 'TBD' when the actual value is known."
       }
     },
-    "traceId": {
-      "$anchor": "traceId",
-      "description": "Kebab-case identifier used as a traceability target, linking requirements to implementations.",
-      "$ref": "vc:core:atoms#kebabId"
-    },
-    "traceRef": {
-      "$anchor": "traceRef",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_-]*$",
-          "description": "The trace type identifying what kind of upstream artifact this link points to. Must match a canonical trace type from canon/kinds/trace_type.json. Common values: 'fr' (functional requirement), 'api' (interface contract), 'capability' (system capability), 'charter-goal' (charter goal or in-scope item), 'nfr' (non-functional requirement), 'invariant' (system invariant), 'fixture' (test fixture), 'doc' (documentation), 'component' (system component), 'threat' (security threat), 'glossary' (glossary term). Use 'external' for cross-system references (triggers additional required fields: owner, note).",
-          "examples": ["fr", "api", "capability", "charter-goal", "nfr", "invariant", "fixture", "doc", "component", "threat", "glossary", "external"]
-        },
-        "id": {
-          "$ref": "vc:core:atoms#kebabId",
-          "description": "Kebab-case ID of the target artifact this trace link points to. The prefix determines the upstream step: 'cap-*' = Step 01 capabilities, 'fr-*' = Step 04 functional requirements, 'api-*' = Step 05 interface contracts, 'inv-*' = Step 06 invariants, 'nfr-*' = Step 07 NFRs, 'ms-*' = Step 09 milestones, 'gate-*' = Step 12 CI gates, 'threat-*' = Step 11 threats. Must match the ID exactly as it appears in the upstream spec file — a typo here causes traceability-check failures silently. Anti-pattern: inventing an ID that doesn't exist in the referenced step file."
-        },
-        "note": {
-          "type": "string",
-          "description": "Optional free-text annotation explaining why this trace link exists and what aspect of the upstream artifact is being referenced. Required when the link is non-obvious (e.g., a capability that is only partially fulfilled, or a constraint that applies only under specific conditions). Example: 'Only the authentication sub-path of this capability is implemented here — token refresh is in a separate FR'. Anti-pattern: leaving note empty on a link expressing derivation where the derivation rationale is not obvious from the IDs alone."
-        },
-        "owner": {
-          "description": "Responsible party for this trace reference. Deliberately unconstrained (not the 8-value owner enum) because external dependency owners may be arbitrary team or organization names.",
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "type",
-        "id"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "external"
-              }
-            },
-            "required": [
-              "type"
-            ]
-          },
-          "then": {
-            "required": [
-              "owner",
-              "note"
-            ]
-          }
-        }
-      ],
-      "description": "Typed cross-reference linking one spec artifact to another for traceability. External traces require an owner and note."
-    },
     "canonicalRef": {
       "$anchor": "canonicalRef",
       "type": "object",

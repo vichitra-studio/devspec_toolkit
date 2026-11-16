@@ -4,10 +4,20 @@
       "milestone_id": "m1-auth",
       "tasks": [
         {
-          "task_id": "implement-login"
+          "task_id": "implement-login",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "tc-login-succeeds"
+            }
+          ]
         },
         {
-          "task_id": "implement-logout"
+          "task_id": "implement-logout",
+          "acceptance_criteria": [
+            {
+              "criterion_id": "tc-logout-clears-session"
+            }
+          ]
         }
       ]
     }

@@ -312,8 +312,8 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
   "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "milestone": "milestone-auth",
   "plan": {
-    "status": "active",
     "summary": {
       "functional_summary": "Implement core API login endpoint.",
       "scope_in": ["Login", "Logout"],
@@ -324,19 +324,9 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
       "checklist": [
         {
           "id": "AUTH_LOGIN_01",
-          "spec_ref": {
-            "type": "fr",
-            "id": "fr-user-login",
-            "line_range": "L5-L8",
-            "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
-          },
+          "realises": ["tc-login-returns-jwt"],
           "description": "POST /login validates credentials and returns a signed JWT.",
-          "checklist_status": "active",
-          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt",
-          "nfr_refs": ["nfr-auth-availability"],
-          "fixture_ref": "fix-auth-login-success",
           "implementation": {
-            "status": "pending",
             "actions": [
               {
                 "type": "file_edit",
@@ -344,8 +334,7 @@ Use these fields to capture high-fidelity context that doesn't fit into standard
                 "target": "src/auth/routes.py"
               }
             ]
-          },
-          "milestone_ref": "milestone-auth"
+          }
         }
       ]
     },

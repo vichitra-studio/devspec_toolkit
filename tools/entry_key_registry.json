@@ -2008,6 +2008,42 @@
         }
       ],
       "step": "16"
+    },
+    "impl_context/ms_*_plan.json": {
+      "arrays": [
+        {
+          "array_path": ".plan.spec_alignment.checklist",
+          "contract": [
+            "description",
+            "type",
+            "layer",
+            "implementation"
+          ],
+          "id_field": "id",
+          "kind": "plan-item",
+          "links": [
+            {
+              "built": false,
+              "field": "realises",
+              "kinds": [
+                "task-criterion"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "plan",
+          "source": "x-node"
+        }
+      ],
+      "step": "16a"
     }
   },
   "steps_with_deferred_registration": [

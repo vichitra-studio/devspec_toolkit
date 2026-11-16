@@ -498,7 +498,7 @@ def _has_canonical_bootstrap_failure(errors: list[SpecError]) -> bool:
 
 
 def _load_nfrs_data(repo_root: str, file_path: str) -> dict[str, Any] | None:
-    """Load full NFR data dict (not just IDs) for step_03 and step_16 cross-ref validation.
+    """Load full NFR data dict (not just IDs) for step_03 cross-ref validation.
 
     Cannot use ``load_upstream_ids`` because step_03 needs the entire JSON dict,
     not a set of IDs (AUDIT-019).
@@ -592,9 +592,9 @@ DEEP_VALIDATORS: dict[str, DeepValidator] = {
     #   validators (16c→16b→16a→base) preserves downstream checks; _step16_cache
     #   deduplicates the base pass so chain-up is O(1) in base work.
     "16": lambda instance, root, ctx: step_16_anchor.validate_step_16_anchor(instance, root, ctx.get("artifact_path")),
-    "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
-    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
-    "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path"), ctx.get("spec_root"), ctx.get("nfrs_data")),
+    "16a": lambda instance, root, ctx: step_16a.validate_step_16a(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
+    "16b": lambda instance, root, ctx: step_16b.validate_step_16b(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
+    "16c": lambda instance, root, ctx: step_16c.validate_step_16c(instance, root, ctx.get("artifact_path"), ctx.get("spec_root")),
 }
 
 

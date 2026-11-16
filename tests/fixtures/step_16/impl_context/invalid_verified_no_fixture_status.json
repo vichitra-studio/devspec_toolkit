@@ -3,8 +3,8 @@
   "id": "step-impl-verified-no-fixture-status",
   "owner": "api",
   "created_at": "2024-01-15T10:00:00Z",
+  "milestone": "ms-fixture",
   "plan": {
-    "status": "active",
     "summary": {
       "functional_summary": "Implementation with verified verdict but no fixture_status at all.",
       "scope_in": [
@@ -27,22 +27,13 @@
       "checklist": [
         {
           "id": "cl-001",
-          "spec_ref": {
-            "type": "fr",
-            "id": "fr-user-login",
-            "line_range": "L1-L10",
-            "commit_hash": "1111111111111111111111111111111111111111"
-          },
+          "realises": [
+            "tc-fr-user-login"
+          ],
           "description": "Implement user login endpoint",
           "type": "behavior",
           "layer": "api",
-          "linked_test_expectation": "POST /auth/login returns 200 with JWT",
-          "nfr_refs": [
-            "nfr-availability-uptime"
-          ],
-          "fixture_ref": "fixture-auth-login",
           "implementation": {
-            "status": "verified",
             "files_touched": [
               "src/api/auth.py"
             ],

@@ -737,6 +737,11 @@ def test_schema_ref_sibling_census():
     16 anchor 4 -> 4 (``milestone_id`` becomes ``anchor_id``), core collections 12 -> 11 (the ``link`` definition
     removed with its last ``$ref``).
     Anchor row ``status`` gains ``default: pending`` (a description-only node becomes a default-and-description one).
+    246 after M3 WI-M3-15 (step 16 plan, execution, review), per file old -> new: 16 impl context 27 -> 22 (the item's
+    ``spec_ref``, ``nfr_refs`` and ``fixture_ref``, ``requirements_summary[].spec_refs``, ``plan.security.new_fixtures``,
+    ``spec_mutations[].ref`` and ``fixture_status.test_results[].fixture_ref`` removed; the root ``milestone`` and the
+    item's ``lifecycle`` added), core collections 11 -> 9 (the ``traceRef`` and ``traceId`` definitions removed with
+    their last ``$ref``; ``traceId`` was the one ``$anchor``-and-description node).
     """
     from collections import Counter
 
@@ -755,11 +760,10 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 253
+    assert sum(counts.values()) == 246
     assert dict(counts) == {
-        ("description",): 240,
+        ("description",): 234,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
         ("default", "description"): 7,
-        ("$anchor", "description"): 1,
     }

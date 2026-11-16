@@ -39,6 +39,10 @@ _GOLDEN_PATH = _TOOLKIT_ROOT / "tests" / "fixtures" / "entry_key_registry_golden
 _STEP_ORDER_PATH = _TOOLKIT_ROOT / "tools" / "step_order.json"
 """step_order.json for Test 4."""
 
+_ANNOTATED_DEFERRED = frozenset({"16a"})
+"""Step 16a holds the ``plan-item`` kind (registered through its ``x-node`` ``files`` glob) while the generator still
+lists it among the deferred steps; the generator's deferred list is WI-M3-18's."""
+
 
 def _run_generator() -> tuple[dict[str, Any], dict[str, Any]]:
     """Run generate_registry against toolkit's own schemas."""
@@ -207,7 +211,7 @@ class TestStepCoverageCompleteness:
         without_and_deferred = without_steps & deferred_steps
 
         assert not reg_and_without, f"Steps in both registry and without-entry-arrays: {reg_and_without}"
-        assert not reg_and_deferred, f"Steps in both registry and deferred: {reg_and_deferred}"
+        assert not reg_and_deferred - _ANNOTATED_DEFERRED, f"Steps in both registry and deferred: {reg_and_deferred}"
         assert not without_and_deferred, f"Steps in both without-entry-arrays and deferred: {without_and_deferred}"
 
 
@@ -267,10 +271,21 @@ class TestDeferredRegistration:
         reg_doc, _ = _run_generator()
         registry_steps = {entry["step"] for entry in reg_doc["registry"].values()}
         for step in ("16a", "16b", "16c"):
+            if step in _ANNOTATED_DEFERRED:
+                continue
             assert step not in registry_steps, (
                 f"Deferred step '{step}' found as a 'step' value in registry — "
                 "deferred steps should not have registry entries."
             )
+
+    def test_plan_item_kind_is_registered_under_the_plan_file_glob(self) -> None:
+        """The plan-item kind reaches the registry through its ``x-node`` ``files`` glob, as step 16a."""
+        reg_doc, _ = _run_generator()
+        entry = reg_doc["registry"]["impl_context/ms_*_plan.json"]
+        assert entry["step"] == "16a"
+        arr = next(a for a in entry["arrays"] if a["array_path"] == ".plan.spec_alignment.checklist")
+        assert (arr["kind"], arr["id_field"], arr["role"]) == ("plan-item", "id", "plan")
+        assert [lk["field"] for lk in arr["links"]] == ["realises", "replaces"]
 
 
 # ---------------------------------------------------------------------------

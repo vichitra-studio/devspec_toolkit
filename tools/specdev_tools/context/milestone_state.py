@@ -74,6 +74,11 @@ from typing import Any
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _stored_status(value: Any) -> str:
+    """A stored status string, or ``""`` when the value is absent or not a string."""
+    return value if isinstance(value, str) else ""
+
+
 def _load_json(path: str) -> Any:
     """Load JSON from *path*, returning the parsed value."""
     with open(path, "r", encoding="utf-8") as fh:
@@ -228,9 +233,11 @@ def derive_group_state(
     fixtures_exercised: list[str] = [fixture_ref] if fixture_ref else []
 
     # --- State derivation (precedence: deferred/wont_do > verified > blocked > code_converged > pending) --
-    checklist_status: str = group.get("checklist_status", "")
-    impl: dict = group.get("implementation", {}) or {}
-    impl_status: str = impl.get("status", "")
+    # M8 rewrites these two reads. A 1.2.0 plan item stores neither status, so both read as absent and the group
+    # stays `pending` (or `code_converged` / `blocked` from its findings) until M8 derives the state from records.
+    checklist_status = _stored_status(group.get("checklist_status"))
+    impl = group.get("implementation")
+    impl_status = _stored_status(impl.get("status") if isinstance(impl, dict) else None)
 
     if checklist_status == "deferred":
         state = "deferred"

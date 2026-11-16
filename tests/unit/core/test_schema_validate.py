@@ -192,8 +192,8 @@ class TestConstructionWrap:
         with pytest.raises(JsonUtilsError) as exc_info:
             json_patch(
                 str(dst),
-                ".plan.spec_alignment.checklist[1].implementation.status",
-                '"in_progress"',
+                ".plan.spec_alignment.checklist[1].layer",
+                '"service"',
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
@@ -434,8 +434,8 @@ class TestHappyPath:
         and the str is the error message from jsonschema.
         """
         doc = _load_valid_full()
-        # Introduce an invalid enum value in checklist[1].implementation.status.
-        doc["plan"]["spec_alignment"]["checklist"][1]["implementation"]["status"] = "verifyed"
+        # Introduce an invalid enum value in checklist[1].layer.
+        doc["plan"]["spec_alignment"]["checklist"][1]["layer"] = "verifyed"
 
         result = validate_data_against_schema(_TOOLKIT_ROOT, doc)
 

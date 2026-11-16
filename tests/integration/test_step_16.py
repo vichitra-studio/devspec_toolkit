@@ -45,9 +45,10 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid empty execution/review fixture should pass. Errors: {errors}")
 
-    def test_invalid_missing_evidence(self):
-        # Expect failure because 'verified' implementation requires evidence in actions
-        path = os.path.join(self.fixtures_dir, "invalid_missing_evidence.json")
+    def test_legacy_verified_item_without_evidence_fires_e301(self):
+        # A 1.1.1-shaped item (implementation.status 'verified') with no evidence in its actions: the guarded
+        # status-keyed rule still fires. # M8 rewrites
+        path = os.path.join(self.fixtures_dir, "legacy_verified_missing_evidence.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "Invalid fixture (missing evidence) should fail validation")
         self.assertTrue(any(e.code == "E301" for e in errors), f"Expected E301. Got: {errors}")
@@ -59,342 +60,6 @@ class TestStep16(unittest.TestCase):
         self.assertTrue(len(errors) > 0, "Invalid fixture (bad enum) should fail validation")
         self.assertTrue(any(e.code == "E530" for e in errors), f"Expected E530. Got: {errors}")
 
-    def test_invalid_deferred_checklist_item_missing_reason(self):
-        # DEVSPEC-122: checklist_status=="deferred" on a single item requires that
-        # item's own deferred_reason, independent of plan.status (which stays
-        # "active" here — deferring one item must not require deferring the plan).
-        path = os.path.join(self.fixtures_dir, "invalid_deferred_missing_reason.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(
-            len(errors) > 0,
-            "Invalid fixture (deferred checklist item missing deferred_reason) should fail validation"
-        )
-        self.assertTrue(
-            any("deferred_reason" in e.message for e in errors),
-            f"Expected a schema error mentioning deferred_reason. Got: {errors}"
-        )
-
-    def test_invalid_wont_do_checklist_item_missing_reason(self):
-        # DEVSPEC-122 follow-up: checklist_status=="wont_do" on a single item
-        # requires that item's own wont_do_reason, mirroring the enforced
-        # deferred_reason pattern (not the unenforced prose used elsewhere).
-        path = os.path.join(self.fixtures_dir, "invalid_wont_do_missing_reason.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(
-            len(errors) > 0,
-            "Invalid fixture (wont_do checklist item missing wont_do_reason) should fail validation"
-        )
-        self.assertTrue(
-            any("wont_do_reason" in e.message for e in errors),
-            f"Expected a schema error mentioning wont_do_reason. Got: {errors}"
-        )
-
-    def test_valid_wont_do_item_with_reason_and_no_linked_test_expectation(self):
-        # A wont_do item with its own wont_do_reason, and no linked_test_expectation
-        # (optional for wont_do, mirroring the deferred exemption), should pass fully.
-        path = os.path.join(self.fixtures_dir, "valid_wont_do_item.json")
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        wont_do_items = [
-            item for item in data["plan"]["spec_alignment"]["checklist"]
-            if item.get("checklist_status") == "wont_do"
-        ]
-        self.assertTrue(wont_do_items, "Fixture should contain at least one wont_do checklist item")
-        for item in wont_do_items:
-            self.assertTrue(
-                item.get("wont_do_reason"),
-                f"wont_do item {item.get('id')} must carry its own wont_do_reason"
-            )
-            self.assertNotIn(
-                "linked_test_expectation", item,
-                f"wont_do item {item.get('id')} should legitimately omit linked_test_expectation in this fixture"
-            )
-        errors = validate_file(self.repo_root, path)
-        self.assertEqual(errors, [], f"valid_wont_do_item.json should pass validation. Errors: {errors}")
-
-    def test_valid_full_covers_single_item_deferred_with_active_plan(self):
-        # DEVSPEC-122 regression guard: valid_full.json defers one checklist item
-        # (REQ_DB_SCHEMA) while plan.status stays "active" and other items remain
-        # active/verified — confirms per-item deferral doesn't require plan-wide
-        # deferred status.
-        path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.assertEqual(data["plan"]["status"], "active")
-        deferred_items = [
-            item for item in data["plan"]["spec_alignment"]["checklist"]
-            if item.get("checklist_status") == "deferred"
-        ]
-        self.assertTrue(deferred_items, "Fixture should contain at least one deferred checklist item")
-        for item in deferred_items:
-            self.assertTrue(
-                item.get("deferred_reason"),
-                f"Deferred item {item.get('id')} must carry its own deferred_reason"
-            )
-        errors = validate_file(self.repo_root, path)
-        self.assertEqual(errors, [], f"valid_full.json should still pass validation. Errors: {errors}")
-
-    def test_valid_deferred_item_may_omit_linked_test_expectation(self):
-        # DEVSPEC-122: linked_test_expectation was unconditionally required for every
-        # checklist item, including deferred ones -- the eventual test contract isn't
-        # always known before work starts. Now optional when checklist_status=="deferred".
-        path = os.path.join(self.fixtures_dir, "valid_deferred_missing_linked_test_expectation.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertEqual(
-            errors, [],
-            f"Deferred item without linked_test_expectation should pass validation. Errors: {errors}"
-        )
-
-    def test_invalid_active_item_still_requires_linked_test_expectation(self):
-        # DEVSPEC-122 regression guard: the relaxation above must not become universal --
-        # an active (non-deferred) checklist item still requires linked_test_expectation.
-        path = os.path.join(self.fixtures_dir, "invalid_active_missing_linked_test_expectation.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(
-            len(errors) > 0,
-            "Active checklist item missing linked_test_expectation should fail validation"
-        )
-        self.assertTrue(
-            any("linked_test_expectation" in e.message for e in errors),
-            f"Expected a schema error mentioning linked_test_expectation. Got: {errors}"
-        )
-
-    def test_nfr_refs_gate_skips_entirely_when_07_nfrs_absent(self):
-        # Path A: 07_nfrs.json absent → nfrs_data is None → gate silently skips.
-        # The fixture has no sibling 07_nfrs.json and the toolkit spec/ has none either.
-        # Filter on the validator's specific message text, not the filename (which also
-        # contains "nfr_refs" and would falsely match every error from this fixture).
-        path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        errors = validate_file(self.repo_root, path)
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertEqual(nfr_e520, [], f"Absent 07_nfrs.json must skip the nfr_refs gate entirely. Got: {nfr_e520}")
-
-    def test_e520_nfr_refs_required_when_fr_has_nfrs(self):
-        # Enforcement: behavior-type item for an FR that IS referenced by an NFR
-        # must supply nfr_refs.  Uses the secondary search path (sibling of plan) rather
-        # than the production layout; see test_e520_nfr_refs_required_production_layout
-        # for the primary search path test.
-        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        nfrs_data = {
-            "$schema": "vc:07-nfrs",
-            "nfrs": [
-                {
-                    "nfr_id": "nfr-login-perf",
-                    "title": "Login response time",
-                    "category": "performance",
-                    "trace": [{"type": "fr", "id": "fr-core-login"}]
-                }
-            ]
-        }
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # 07_nfrs.json in artifact sibling dir so _load_nfrs_data finds it first
-            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertTrue(
-            len(nfr_e520) > 0,
-            f"Expected E520 for missing nfr_refs when FR has NFRs. Got: {errors}"
-        )
-        self.assertTrue(
-            any("fr-core-login" in e.message for e in nfr_e520),
-            f"Expected E520 message to name the FR. Got: {[e.message for e in nfr_e520]}"
-        )
-
-    def test_e520_nfr_refs_required_production_layout(self):
-        # Enforcement: production layout — 07_nfrs.json at spec root (parent of impl_context/),
-        # not as a sibling of the plan.  This is the primary search path and the main use case
-        # for this gate.  Verifies _load_nfrs_data correctly ascends to the spec root when the
-        # plan is nested inside impl_context/.
-        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        nfrs_data = {
-            "$schema": "vc:07-nfrs",
-            "nfrs": [
-                {
-                    "nfr_id": "nfr-login-perf",
-                    "title": "Login response time",
-                    "category": "performance",
-                    "trace": [{"type": "fr", "id": "fr-core-login"}]
-                }
-            ]
-        }
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Production layout: 07_nfrs.json lives at spec root (parent of impl_context/)
-            (tmp_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertTrue(
-            len(nfr_e520) > 0,
-            f"Expected E520 for missing nfr_refs (production layout). Got: {errors}"
-        )
-        self.assertTrue(
-            any("fr-core-login" in e.message for e in nfr_e520),
-            f"Expected E520 message to name the FR. Got: {[e.message for e in nfr_e520]}"
-        )
-
-    def test_nfr_refs_gate_does_not_fire_when_fr_not_in_nfrs_traces(self):
-        # Path B: 07_nfrs.json is present but traces a *different* FR.
-        # The checklist item's FR (fr-core-login) has no NFR trace → gate must not fire.
-        # This is the core new behavior: eliminated false-positives for FRs with no NFRs.
-        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        nfrs_data = {
-            "$schema": "vc:07-nfrs",
-            "nfrs": [
-                {
-                    "nfr_id": "nfr-checkout-perf",
-                    "title": "Checkout response time",
-                    "category": "performance",
-                    "trace": [{"type": "fr", "id": "fr-checkout-flow"}]
-                }
-            ]
-        }
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertEqual(nfr_e520, [], f"FR not present in NFR traces must not trigger nfr_refs E520. Got: {nfr_e520}")
-
-    def test_nfr_refs_gate_does_not_fire_when_nfrs_list_is_empty(self):
-        # Edge case: 07_nfrs.json exists with an empty nfrs array.
-        # _build_fr_ids_with_nfrs returns an empty set → no FR is in it → gate does not fire.
-        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        nfrs_data = {"$schema": "vc:07-nfrs", "nfrs": []}
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertEqual(nfr_e520, [], f"Empty nfrs array must not trigger nfr_refs E520. Got: {nfr_e520}")
-
-    def test_nfr_refs_gate_does_not_fire_for_non_fr_spec_ref_type(self):
-        # A behavior-type item with spec_ref.type != "fr" (e.g. "api") must never trigger
-        # the nfr_refs gate regardless of what 07_nfrs.json contains.
-        # spec_ref_fr_id is None for non-fr types; None is never in fr_ids_with_nfrs.
-        base_path = os.path.join(self.fixtures_dir, "invalid_missing_nfr_refs.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        # Patch the checklist item's spec_ref to type "api" so it's non-FR
-        data["plan"]["spec_alignment"]["checklist"][0]["spec_ref"]["type"] = "api"
-        data["plan"]["spec_alignment"]["checklist"][0]["spec_ref"]["id"] = "api-login-endpoint"
-        nfrs_data = {
-            "$schema": "vc:07-nfrs",
-            "nfrs": [
-                {
-                    "nfr_id": "nfr-login-perf",
-                    "title": "Login response time",
-                    "category": "performance",
-                    "trace": [{"type": "fr", "id": "fr-core-login"}]
-                }
-            ]
-        }
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            (impl_context_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        nfr_e520 = [e for e in errors if e.code == "E520" and "has no nfr_refs" in e.message]
-        self.assertEqual(nfr_e520, [], f"Non-FR spec_ref must not trigger nfr_refs E520. Got: {nfr_e520}")
-
-    def test_false_positive_eliminated_proof_type_no_nfr_trace(self):
-        # End-to-end proof that the false positive is fully gone at every layer (schema + validator).
-        # A proof-type item with fixture_ref but no nfr_refs, whose FR is absent from 07_nfrs.json
-        # traces, must produce zero errors — not just zero nfr_refs-specific errors.
-        base_path = os.path.join(self.fixtures_dir, "valid_minimal.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        # Strip nfr_refs from the item; fixture_ref remains so fixture_ref gate cannot fire.
-        item = data["plan"]["spec_alignment"]["checklist"][0]
-        item.pop("nfr_refs", None)
-        # 07_nfrs.json is present but traces a different FR — fr-core-login is not traced.
-        nfrs_data = {
-            "$schema": "vc:07-nfrs",
-            "nfrs": [
-                {
-                    "nfr_id": "nfr-checkout-perf",
-                    "title": "Checkout response time",
-                    "category": "performance",
-                    "trace": [{"type": "fr", "id": "fr-checkout-flow"}]
-                }
-            ]
-        }
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Production layout: 07_nfrs.json at spec root (parent of impl_context/).
-            (tmp_dir / "07_nfrs.json").write_text(json.dumps(nfrs_data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-        self.assertEqual(errors, [],
-            f"Valid proof-type item with no nfr_refs (FR not in NFR traces) must pass fully. Got: {errors}")
-
-    def test_invalid_missing_fixture_ref(self):
-        # Expect failure because non-deferred item has no fixture_ref
-        path = os.path.join(self.fixtures_dir, "invalid_missing_fixture_ref.json")
-        errors = validate_file(self.repo_root, path)
-        self.assertTrue(len(errors) > 0, "Invalid fixture (missing fixture_ref) should fail validation")
-        self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
-    
     def test_valid_metadata_item_without_proof(self):
         # A non-deferred metadata item legitimately omits nfr_refs and fixture_ref.
         # The fixture_ref requirement (schema allOf branch + step_16 TYPES_REQUIRING_PROOF)
@@ -404,71 +69,6 @@ class TestStep16(unittest.TestCase):
         errors = validate_file(self.repo_root, path)
         self.assertEqual(errors, [], f"Valid metadata-without-proof fixture should pass. Errors: {errors}")
         self.assertFalse(any(e.code == "E520" for e in errors), f"Metadata item must not trigger E520. Got: {errors}")
-
-    def test_types_requiring_proof_exemption_deferred_and_wont_do_zero_e520(self):
-        # DEVSPEC-122 follow-up regression guard: a TYPES_REQUIRING_PROOF item
-        # (behavior/constraint/validation/perf/security) that is deferred or
-        # wont_do is exempt from both the nfr_refs and fixture_ref proof-of-work
-        # gates (see PAUSED_OR_CANCELLED_CHECKLIST_STATUSES in step_16.py). This
-        # must hold even when both fields are entirely absent -- not just when
-        # one of them is present.
-        base_path = os.path.join(self.fixtures_dir, "valid_full.json")
-        with open(base_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        data["plan"]["spec_alignment"]["checklist"] = [
-            {
-                "id": "REQ_DEFERRED_PROOF_TYPE",
-                "spec_ref": {
-                    "type": "fr",
-                    "id": "task-login-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Implement login endpoint (paused)",
-                "type": "behavior",
-                "layer": "api",
-                "checklist_status": "deferred",
-                "deferred_reason": "Blocked on upstream auth contract; resume once finalised."
-            },
-            {
-                "id": "REQ_WONT_DO_PROOF_TYPE",
-                "spec_ref": {
-                    "type": "fr",
-                    "id": "task-login-impl",
-                    "line_range": "L1-L50",
-                    "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                },
-                "description": "Validate login endpoint edge cases (cancelled)",
-                "type": "validation",
-                "layer": "tests",
-                "checklist_status": "wont_do",
-                "wont_do_reason": "Superseded by unified-auth validation suite; this path will never be built."
-            }
-        ]
-        data.pop("execution", None)
-        data["review"] = {}
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_test_plan.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-                encoding="utf-8"
-            )
-            errors = validate_file(self.repo_root, str(fixture_path))
-
-        e520_errors = [e for e in errors if e.code == "E520"]
-        self.assertEqual(
-            [], e520_errors,
-            f"Deferred/wont_do TYPES_REQUIRING_PROOF items must not trigger E520 "
-            f"even with nfr_refs and fixture_ref both absent. Got: {e520_errors}"
-        )
 
     def test_invalid_invalid_type(self):
         # Expect failure due to invalid type
@@ -494,9 +94,10 @@ class TestStep16(unittest.TestCase):
             f"Expected E303 error. Got: {errors}"
         )
 
-    def test_invalid_unexecuted_planned(self):
-        # E305: active checklist item not in satisfied_checklist_ids when CI is green
-        path = os.path.join(self.fixtures_dir, "invalid_unexecuted_planned.json")
+    def test_legacy_unexecuted_planned_item_fires_e305(self):
+        # E305 (guarded, runs on a plan whose item carries implementation.status): an active item not in
+        # satisfied_checklist_ids when CI is green. # M8 rewrites
+        path = os.path.join(self.fixtures_dir, "legacy_planned_unexecuted.json")
         errors = validate_file(self.repo_root, path)
         self.assertTrue(len(errors) > 0, "E305 fixture should fail validation")
         self.assertTrue(
@@ -508,7 +109,7 @@ class TestStep16(unittest.TestCase):
         """E305 exempts wont_do items from the planned-vs-executed diff, same as
         deferred (DEVSPEC-122 follow-up): a wont_do item was never intended to
         be executed, so it should not count as an unexecuted planned item."""
-        path = os.path.join(self.fixtures_dir, "invalid_unexecuted_planned.json")
+        path = os.path.join(self.fixtures_dir, "legacy_planned_unexecuted.json")
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         # cl-002 was 'deferred' in the base fixture; make it 'wont_do' instead.
@@ -704,12 +305,10 @@ class TestStep16(unittest.TestCase):
             f"Expected E304 error for malformed roadmap JSON. Got: {errors2}"
         )
 
-    def test_e304_plan_not_a_dict_does_not_crash_milestone_ref_collection(self):
+    def test_e304_plan_not_a_dict_does_not_crash_roadmap_check(self):
         """validate_step_16 must not crash when 'plan' is not a dict and a real
-        roadmap is present (regression: validate_step_16 guards its own local
-        'plan' var, but the _collect_milestone_refs helper it calls for E304
-        independently re-read the raw 'plan' field without the same guard,
-        raising AttributeError on data={"plan": None, ...})."""
+        roadmap is present (regression: data={"plan": None, ...} once raised
+        AttributeError in the E304 helper)."""
         base_path = os.path.join(self.fixtures_dir, "valid_with_semantic_review.json")
         with open(base_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -897,184 +496,198 @@ class TestStep16(unittest.TestCase):
             f"Deferred validation item should still satisfy E307 pairing. Got: {e307_errors}"
         )
 
-    def _make_milestone_ref_fixture(self, tmpdir, checklist_items, roadmap_milestones):
-        """Helper to create a step_16 fixture with roadmap for milestone_ref tests."""
-        tmp_dir = Path(tmpdir)
-        data = {
+    # --- 1.2.0 plan shape: milestone key, realises, no pins ---
+
+    def _doc_plan_example(self):
+        """The plan file of the design example (DOC section 12.19): one item realising one task criterion."""
+        return {
             "$schema": "vc:16-impl-context",
-            "id": "step-ms-ref-test",
+            "id": "step-ms-account-recovery-plan",
             "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
+            "created_at": "2026-01-01T00:00:00Z",
+            "milestone": "ms-account-recovery",
             "plan": {
-                "status": "active",
                 "summary": {
-                    "functional_summary": "Test milestone_ref binding.",
-                    "scope_in": ["core"],
+                    "functional_summary": "Reject an expired password-reset token.",
+                    "scope_in": ["confirm handler"],
                     "scope_out": [],
-                    "target_file_patterns": ["src/main.py"]
+                    "target_file_patterns": ["src/routes/**"],
                 },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": checklist_items
-                },
-                "docs_impact": {
-                    "status": "required",
-                    "rationale": "Code changes.",
-                    "docs_touched": ["README.md"]
-                },
-                "review_requirements": {"test_commands": ["pytest tests/"]}
+                "spec_alignment": {"checklist": [{
+                    "id": "PWRESET_CONFIRM_EXPIRED_01",
+                    "realises": ["tc-confirm-expired-token"],
+                    "description": "The confirm handler returns 410 token-expired for a token older than 30 minutes.",
+                    "type": "behavior",
+                    "layer": "api",
+                    "implementation": {
+                        "files_touched": ["src/routes/password-resets/confirm.ts"],
+                        "actions": [{
+                            "type": "file_edit",
+                            "target": "src/routes/password-resets/confirm.ts",
+                            "description": "Reject expired tokens before the password update.",
+                        }],
+                    },
+                }]},
+                "docs_impact": {"status": "required", "rationale": "A new status code.", "docs_touched": ["README.md"]},
+                "review_requirements": {"test_commands": ["pytest tests/"]},
             },
             "canonical_refs_used": [],
-            "canonical_proposals": [],
-            "canonical_conflicts": []
         }
-        impl_context_dir = tmp_dir / "impl_context"
-        impl_context_dir.mkdir(exist_ok=True)
-        fixture_path = impl_context_dir / "ms_test_plan.json"
-        fixture_path.write_text(json.dumps(data), encoding="utf-8")
 
-        roadmap = {"milestones": roadmap_milestones}
-        (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
-
-        common_dir = tmp_dir / "common"
-        common_dir.mkdir()
-        (common_dir / "seed_manifest.json").write_text(
-            json.dumps({"doc_paths": ["README.md", "docs/**"]}),
-            encoding="utf-8"
-        )
-        return str(fixture_path)
-
-    def test_checklist_missing_milestone_ref_warns_W581(self):
-        """W581: checklist item without milestone_ref field emits W581."""
-        checklist = [{
-            "id": "CHK_01",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Implement login",
-            "type": "behavior",
-            "layer": "api",
-            "linked_test_expectation": "pytest test_login",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login"
-        }, {
-            "id": "CHK_01_VAL",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Validate login",
-            "type": "validation",
-            "layer": "tests",
-            "linked_test_expectation": "pytest test_login_val",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login"
-        }]
-        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
-
+    def _validate_plan_data(self, data, roadmap_milestones=None):
+        """Write *data* as ``impl_context/ms_test_plan.json`` beside a seed manifest (and a roadmap) and validate it."""
         with tempfile.TemporaryDirectory() as td:
-            path = self._make_milestone_ref_fixture(td, checklist, milestones)
-            errors = validate_file(self.repo_root, path)
+            path = self._make_e304_fixture(td, data, roadmap_milestones) if roadmap_milestones is not None else None
+            if path is None:
+                impl_context_dir = Path(td) / "impl_context"
+                impl_context_dir.mkdir()
+                path = str(impl_context_dir / "ms_test_plan.json")
+                Path(path).write_text(json.dumps(data), encoding="utf-8")
+                (Path(td) / "common").mkdir()
+                (Path(td) / "common" / "seed_manifest.json").write_text(json.dumps({"doc_paths": ["README.md"]}), encoding="utf-8")
+            return validate_file(self.repo_root, path)
 
+    def test_doc_plan_example_validates(self):
+        errors = self._validate_plan_data(self._doc_plan_example())
+        self.assertEqual(errors, [], f"The design's plan example must validate. Got: {errors}")
+
+    def test_item_without_realises_fails(self):
+        path = os.path.join(self.fixtures_dir, "invalid_missing_realises.json")
+        errors = validate_file(self.repo_root, path)
         self.assertTrue(
-            any(e.code == "W581" for e in errors),
-            f"Expected W581 MILESTONE_REF_MISSING. Got: {errors}"
+            any(e.code == "E520" and "'realises' is a required property" in e.message for e in errors),
+            f"Expected a schema error for the missing realises. Got: {errors}"
         )
 
-    def test_wont_do_item_missing_milestone_ref_does_not_warn_w581(self):
-        """W581 exempts wont_do items from milestone_ref, same as deferred
-        (DEVSPEC-122 follow-up)."""
-        checklist = [{
-            "id": "CHK_01",
-            "description": "Wallet routing (cancelled)",
-            "type": "behavior",
-            "layer": "api",
-            "checklist_status": "wont_do",
-            "wont_do_reason": "Superseded by unified checkout flow.",
-        }]
-        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": []}]
+    def test_item_with_empty_realises_fails(self):
+        data = self._doc_plan_example()
+        data["plan"]["spec_alignment"]["checklist"][0]["realises"] = []
+        errors = self._validate_plan_data(data)
+        self.assertTrue(any(e.code == "E520" and "realises" in e.message for e in errors), f"Got: {errors}")
 
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_milestone_ref_fixture(td, checklist, milestones)
-            errors = validate_file(self.repo_root, path)
-
-        w581 = [e for e in errors if e.code == "W581"]
-        self.assertEqual(w581, [], f"Did not expect W581 for wont_do item. Got: {w581}")
-
-    def test_checklist_valid_milestone_ref_passes(self):
-        """Valid milestone_ref matching roadmap should not emit W581 or E582."""
-        checklist = [{
-            "id": "CHK_01",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Implement login",
-            "type": "behavior",
-            "layer": "api",
-            "linked_test_expectation": "pytest test_login",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login",
-            "milestone_ref": "ms-v1"
-        }, {
-            "id": "CHK_01_VAL",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Validate login",
-            "type": "validation",
-            "layer": "tests",
-            "linked_test_expectation": "pytest test_login_val",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login",
-            "milestone_ref": "ms-v1"
-        }]
-        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_milestone_ref_fixture(td, checklist, milestones)
-            errors = validate_file(self.repo_root, path)
-
-        w581 = [e for e in errors if e.code == "W581"]
-        e582 = [e for e in errors if e.code == "E582"]
-        self.assertEqual(w581, [], f"Did not expect W581. Got: {w581}")
-        self.assertEqual(e582, [], f"Did not expect E582. Got: {e582}")
-
-    def test_checklist_wrong_milestone_ref_errors(self):
-        """milestone_ref not matching task_to_milestone mapping should emit E582."""
-        checklist = [{
-            "id": "CHK_01",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Implement login",
-            "type": "behavior",
-            "layer": "api",
-            "linked_test_expectation": "pytest test_login",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login",
-            "milestone_ref": "ms-WRONG"
-        }, {
-            "id": "CHK_01_VAL",
-            "spec_ref": {"type": "fr", "id": "task-login", "line_range": "L1-L10",
-                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-            "description": "Validate login",
-            "type": "validation",
-            "layer": "tests",
-            "linked_test_expectation": "pytest test_login_val",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-login",
-            "milestone_ref": "ms-v1"
-        }]
-        milestones = [{"milestone_id": "ms-v1", "fr_refs": [], "tasks": [{"task_id": "task-login"}]}]
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_milestone_ref_fixture(td, checklist, milestones)
-            errors = validate_file(self.repo_root, path)
-
+    def test_plan_without_milestone_fails(self):
+        path = os.path.join(self.fixtures_dir, "invalid_missing_milestone.json")
+        errors = validate_file(self.repo_root, path)
         self.assertTrue(
-            any(e.code == "E582" for e in errors),
-            f"Expected E582 milestone_ref mismatch. Got: {errors}"
+            any(e.code == "E520" and "'milestone' is a required property" in e.message for e in errors),
+            f"Expected a schema error for the missing milestone. Got: {errors}"
         )
+
+    def test_old_spec_ref_line_range_commit_hash_rejected(self):
+        path = os.path.join(self.fixtures_dir, "invalid_old_spec_ref_pins.json")
+        errors = validate_file(self.repo_root, path)
+        self.assertTrue(
+            any(e.code == "E520" and "'spec_ref' was unexpected" in e.message for e in errors),
+            f"The plan item's old spec_ref must be rejected. Got: {errors}"
+        )
+        data = self._doc_plan_example()
+        data["review"] = {"findings": [{
+            "id": "finding-one", "type": "bug", "severity": "minor", "description": "A finding.",
+            "spec_ref": {"type": "api", "id": "api-one", "line_range": "L1-L10", "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
+            "metadata": {"source": "reviewer", "impact": "none"},
+        }]}
+        errors = self._validate_plan_data(data)
+        message = " ".join(e.message for e in errors)
+        self.assertIn("'line_range'", message)
+        self.assertIn("'commit_hash'", message)
+
+    def test_removed_plan_status_and_item_fields_are_rejected(self):
+        data = self._doc_plan_example()
+        data["plan"]["status"] = "active"
+        item = data["plan"]["spec_alignment"]["checklist"][0]
+        item.update({"checklist_status": "active", "linked_test_expectation": "t", "fixture_ref": "fix-a", "nfr_refs": ["nfr-a"], "milestone_ref": "m"})
+        item["implementation"]["status"] = "pending"
+        message = " ".join(e.message for e in self._validate_plan_data(data))
+        for name in ("status", "checklist_status", "linked_test_expectation", "fixture_ref", "nfr_refs", "milestone_ref"):
+            self.assertIn(f"'{name}'", message, name)
+
+    def test_plan_item_needs_no_nfr_or_fixture_link(self):
+        errors = self._validate_plan_data(self._doc_plan_example())
+        self.assertEqual([e for e in errors if e.code == "E520"], [])
+
+    def test_e305_e307_and_status_keyed_e301_guarded_on_new_shape(self):
+        """A plan whose items carry no implementation.status gets none of the status-keyed findings."""
+        data = self._doc_plan_example()
+        data["plan"]["spec_alignment"]["checklist"][0]["implementation"]["actions"][0]["evidence"] = {"type": "log", "content": "short"}
+        data["execution"] = {"final_status": {"ci_status": "green"}}
+        data["review"] = {}
+        codes = {e.code for e in self._run_step16_validate(data)}
+        self.assertFalse(codes & {"E305", "E307", "E301", "W599", "W600", "W601"}, codes)
+
+    def test_e305_e307_and_status_keyed_e301_still_fire_on_legacy_status(self):
+        data = self._minimal_impl_context(checklist_items=[{
+            "id": "CHK_LEGACY", "spec_ref": {"type": "fr", "id": "fr-legacy"}, "description": "Legacy item",
+            "type": "behavior", "layer": "api", "implementation": {"status": "verified", "actions": []},
+        }])
+        data["execution"] = {"final_status": {"ci_status": "green"}, "critical_evidence": {"satisfied_checklist_ids": []}}  # 1.1.1 key
+        codes = {e.code for e in self._run_step16_validate(data)}
+        self.assertTrue({"E301", "E305", "E307"} <= codes, codes)
+
+    def test_w616_and_w582_removed(self):
+        """A deferred item marked verified (W616) and an uncovered milestone FR at a verified verdict (W582) say nothing."""
+        data = self._minimal_impl_context(checklist_items=[{
+            "id": "CHK_STALE", "spec_ref": {"type": "fr", "id": "fr-stale"}, "description": "Stale item",
+            "type": "behavior", "layer": "api", "checklist_status": "deferred",
+            "implementation": {"status": "verified", "actions": [{"type": "manual_verification", "description": "x"}]},
+        }], milestone="m1")
+        data["review"] = {"verdict": "verified", "semantic_review": {"fr_coverage": []}}
+        roadmap = [{"milestone_id": "m1", "fr_refs": ["fr-uncovered"], "tasks": []}]
+        errors = self._validate_plan_data(data, roadmap)
+        self.assertFalse({e.code for e in errors} & {"W616", "W582"}, [e.code for e in errors])
+
+    # --- E304: the plan's milestone, covered through realised criteria ---
+
+    def _roadmap_task(self, task_id, criterion_ids, disposition=None):
+        task = {"task_id": task_id, "acceptance_criteria": [{"criterion_id": c} for c in criterion_ids]}
+        if disposition is not None:
+            task["disposition"] = {"value": disposition, "reason": "Set aside for this test."}
+        return task
+
+    def _e304_messages(self, data, roadmap_milestones):
+        errors = self._validate_plan_data(data, roadmap_milestones)
+        return [e.message for e in errors if e.code == "E304"]
+
+    def test_e304_uncovered_task_of_plans_milestone(self):
+        """Only the tasks of the plan's own milestone count: t2 is uncovered, t1 is realised, t3 belongs to m2."""
+        roadmap = [
+            {"milestone_id": "m1", "tasks": [self._roadmap_task("t1", ["tc-t1"]), self._roadmap_task("t2", ["tc-t2"])]},
+            {"milestone_id": "m2", "tasks": [self._roadmap_task("t3", ["tc-t3"])]},
+        ]
+        data = self._minimal_impl_context([self._make_checklist_item("CHK_T1", ["tc-t1"])], milestone="m1")
+        messages = self._e304_messages(data, roadmap)
+        self.assertEqual(len(messages), 1, messages)
+        self.assertIn("'t2'", messages[0])
+
+    def test_e304_task_is_covered_by_any_one_of_its_criteria(self):
+        roadmap = [{"milestone_id": "m1", "tasks": [self._roadmap_task("t1", ["tc-a", "tc-b"])]}]
+        data = self._minimal_impl_context([self._make_checklist_item("CHK_B", ["tc-b"])], milestone="m1")
+        self.assertEqual(self._e304_messages(data, roadmap), [])
+
+    def test_e304_milestone_status_does_not_exempt_a_task(self):
+        roadmap = [{"milestone_id": "m1", "status": "done", "tasks": [self._roadmap_task("t1", ["tc-t1"])]}]
+        data = self._minimal_impl_context([], milestone="m1")
+        self.assertEqual(len(self._e304_messages(data, roadmap)), 1)
+
+    def test_e304_skips_deferred_or_wont_do_disposition_task(self):
+        roadmap = [{"milestone_id": "m1", "tasks": [
+            self._roadmap_task("t1", ["tc-t1"], disposition="deferred"),
+            self._roadmap_task("t2", ["tc-t2"], disposition="wont_do"),
+        ]}]
+        data = self._minimal_impl_context([], milestone="m1")
+        self.assertEqual(self._e304_messages(data, roadmap), [])
+
+    def test_e304_unknown_plan_milestone_is_reported(self):
+        roadmap = [{"milestone_id": "m1", "tasks": [self._roadmap_task("t1", ["tc-t1"])]}]
+        data = self._minimal_impl_context([self._make_checklist_item("CHK_T1", ["tc-t1"])], milestone="ms-ghost")
+        messages = self._e304_messages(data, roadmap)
+        self.assertEqual(len(messages), 1, messages)
+        self.assertIn("ms-ghost", messages[0])
 
     def _make_e304_fixture(self, tmpdir, impl_context_data, roadmap_milestones):
         """Helper to write a step_16 fixture + roadmap for E304 tests.
 
         The fixture is placed inside impl_context/ so _is_anchor() correctly
-        identifies it as a 16a plan (not an anchor) and E304/W581 fire as expected.
+        identifies it as a 16a plan (not an anchor) and E304 fires as expected.
         The roadmap is at the parent level (tmp_dir/14_roadmap.json).
         """
         tmp_dir = Path(tmpdir)
@@ -1092,15 +705,14 @@ class TestStep16(unittest.TestCase):
         )
         return str(fixture_path)
 
-    def _minimal_impl_context(self, checklist_items, milestone_ref=None):
-        """Build a minimal impl_context dict for E304 tests."""
+    def _minimal_impl_context(self, checklist_items, milestone=None):
+        """Build a minimal impl_context dict; *milestone* is the plan's file-level ``milestone`` key."""
         data = {
             "$schema": "vc:16-impl-context",
             "id": "step-e304-test",
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "E304 test case.",
                     "scope_in": ["core"],
@@ -1117,271 +729,20 @@ class TestStep16(unittest.TestCase):
             "canonical_proposals": [],
             "canonical_conflicts": []
         }
-        if milestone_ref is not None:
-            data["milestone_ref"] = milestone_ref
+        if milestone is not None:
+            data["milestone"] = milestone
         return data
 
-    def _make_checklist_item(self, item_id, task_id, milestone_ref=None):
-        """Build a minimal valid checklist item referencing a roadmap task_id."""
-        item = {
+    def _make_checklist_item(self, item_id, criterion_ids):
+        """Build a minimal plan item that realises the given acceptance-criterion ids."""
+        return {
             "id": item_id,
-            "spec_ref": {
-                "type": "fr",
-                "id": task_id,
-                "line_range": "L1-L10",
-                "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
-            },
-            "description": f"Implement {task_id}",
+            "realises": list(criterion_ids),
+            "description": f"Implement {item_id}",
             "type": "behavior",
             "layer": "api",
-            "linked_test_expectation": f"pytest test_{task_id}",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": f"fixture-{task_id}",
+            "implementation": {"actions": [{"type": "manual_verification", "description": f"Verify {item_id}"}]},
         }
-        if milestone_ref is not None:
-            item["milestone_ref"] = milestone_ref
-        return item
-
-    def test_e304_milestone_ref_scoping(self):
-        """E304 fires for uncovered tasks only within the scoped milestone (m1), not m2."""
-        # Checklist only covers t1; t2 is in m1 (uncovered); t3 is in m2 (out of scope)
-        checklist = [
-            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="m1"),
-            self._make_checklist_item("CHK_T1_V", "t1", milestone_ref="m1"),
-        ]
-        # Add validation pair for t1 so E307 doesn't fire
-        checklist[1]["type"] = "validation"
-        checklist[1]["layer"] = "tests"
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "m1",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}, {"task_id": "t2"}]
-            },
-            {
-                "milestone_id": "m2",
-                "status": "planned",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t3"}]
-            }
-        ]
-
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        e304_messages = [e.message for e in e304_errors]
-
-        # t2 is in m1 (the scoped milestone) and uncovered — must fire E304
-        self.assertTrue(
-            any("t2" in msg for msg in e304_messages),
-            f"Expected E304 for uncovered task 't2' in milestone m1. Got E304 errors: {e304_messages}"
-        )
-        # t3 is in m2 (out of scope) — must NOT fire E304
-        self.assertFalse(
-            any("t3" in msg for msg in e304_messages),
-            f"Did not expect E304 for task 't3' in out-of-scope milestone m2. Got E304 errors: {e304_messages}"
-        )
-
-    def test_e304_skips_done_milestones(self):
-        """E304 skips milestones with status 'done'; fires only for in_progress milestones."""
-        # Checklist is empty — no tasks covered
-        checklist = []
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "ms-done",
-                "status": "done",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}]
-            },
-            {
-                "milestone_id": "ms-active",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t2"}]
-            }
-        ]
-
-        # No milestone_ref set — should include non-done milestones only
-        impl_context = self._minimal_impl_context(checklist)
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        e304_messages = [e.message for e in e304_errors]
-
-        # t2 is in in_progress milestone — must fire E304
-        self.assertTrue(
-            any("t2" in msg for msg in e304_messages),
-            f"Expected E304 for uncovered task 't2' in in_progress milestone. Got E304 errors: {e304_messages}"
-        )
-        # t1 is in done milestone — must NOT fire E304
-        self.assertFalse(
-            any("t1" in msg for msg in e304_messages),
-            f"Did not expect E304 for task 't1' in done milestone. Got E304 errors: {e304_messages}"
-        )
-
-    def test_e304_deferred_checklist_item_still_counts_as_coverage(self):
-        """A deferred checklist item still covers its roadmap task -- paused, not absent."""
-        checklist = [
-            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="m1"),
-        ]
-        checklist[0]["checklist_status"] = "deferred"
-        checklist[0]["deferred_reason"] = "Blocked on upstream contract; resume once finalised."
-        del checklist[0]["linked_test_expectation"]  # optional when deferred
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "m1",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}]
-            }
-        ]
-
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        self.assertEqual(
-            [], e304_errors,
-            f"Deferred checklist item should still cover its task; expected no E304. Got: {e304_errors}"
-        )
-
-    def test_e304_control_active_uncovered_task_still_fires(self):
-        """Control: an active (non-deferred) uncovered task must still fire E304."""
-        checklist = []  # no checklist items at all -- t1 genuinely uncovered
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "m1",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}]
-            }
-        ]
-
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        self.assertTrue(
-            any("t1" in e.message for e in e304_errors),
-            f"Expected E304 for genuinely uncovered task 't1'. Got: {e304_errors}"
-        )
-
-    def test_e304_deferred_task_status_exempts_from_coverage(self):
-        """A roadmap task marked status:"deferred" (its own status_reason, not a
-        checklist item) is already the authored acknowledgment that it's
-        paused -- it must not also need a checklist item to avoid E304."""
-        checklist = []  # no checklist items at all -- t1 is deferred at the task layer itself
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "m1",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{
-                    "task_id": "t1",
-                    "status": "deferred",
-                    "status_reason": "Blocked on upstream contract; resume once finalised.",
-                }]
-            }
-        ]
-
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        self.assertEqual(
-            [], e304_errors,
-            f"Task-level deferred status should exempt from E304 without any checklist item. Got: {e304_errors}"
-        )
-
-    def test_e304_wont_do_task_status_exempts_from_coverage(self):
-        """A roadmap task marked status:"wont_do" is permanently cancelled --
-        it must not need a checklist item to avoid E304 either."""
-        checklist = []
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "m1",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{
-                    "task_id": "t1",
-                    "status": "wont_do",
-                    "status_reason": "Superseded by task-implement-unified-checkout.",
-                }]
-            }
-        ]
-
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="m1")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        self.assertEqual(
-            [], e304_errors,
-            f"Task-level wont_do status should exempt from E304 without any checklist item. Got: {e304_errors}"
-        )
-
-    def test_e304_skips_deferred_milestones(self):
-        """E304's milestone-fallback branch skips 'deferred' milestones, like 'done'."""
-        checklist = []  # no checklist items — no coverage for either milestone
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "ms-deferred",
-                "status": "deferred",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}]
-            },
-            {
-                "milestone_id": "ms-active",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t2"}]
-            }
-        ]
-
-        # No milestone_ref set — exercises the fallback skip-list branch
-        impl_context = self._minimal_impl_context(checklist)
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e304_errors = [e for e in errors if e.code == "E304"]
-        e304_messages = [e.message for e in e304_errors]
-
-        self.assertTrue(
-            any("t2" in msg for msg in e304_messages),
-            f"Expected E304 for uncovered task 't2' in in_progress milestone. Got: {e304_messages}"
-        )
-        self.assertFalse(
-            any("t1" in msg for msg in e304_messages),
-            f"Did not expect E304 for task 't1' in deferred milestone. Got: {e304_messages}"
-        )
 
     def test_invalid_verified_no_semantic_review(self):
         """E520: verified verdict without semantic_review triggers schema allOf violation."""
@@ -1416,202 +777,6 @@ class TestStep16(unittest.TestCase):
         )
         self.assertTrue(any(e.code == "E520" for e in errors), f"Expected E520. Got: {errors}")
 
-    def test_e582_artifact_milestone_ref_not_in_roadmap(self):
-        """E582: top-level milestone_ref pointing to a non-existent roadmap milestone fires E582."""
-        # Roadmap has milestone 'ms-real'; artifact claims milestone_ref='ms-ghost' (does not exist)
-        checklist = [
-            self._make_checklist_item("CHK_T1_B", "t1", milestone_ref="ms-ghost"),
-            self._make_checklist_item("CHK_T1_V", "t1", milestone_ref="ms-ghost"),
-        ]
-        checklist[1]["type"] = "validation"
-        checklist[1]["layer"] = "tests"
-
-        roadmap_milestones = [
-            {
-                "milestone_id": "ms-real",
-                "status": "in_progress",
-                "fr_refs": [],
-                "tasks": [{"task_id": "t1"}, {"task_id": "t2"}]
-            }
-        ]
-
-        # milestone_ref at artifact level points to a non-existent milestone
-        impl_context = self._minimal_impl_context(checklist, milestone_ref="ms-ghost")
-
-        with tempfile.TemporaryDirectory() as td:
-            path = self._make_e304_fixture(td, impl_context, roadmap_milestones)
-            errors = validate_file(self.repo_root, path)
-
-        e582_errors = [e for e in errors if e.code == "E582"]
-        self.assertTrue(
-            len(e582_errors) > 0,
-            f"Expected E582 for artifact milestone_ref 'ms-ghost' not in roadmap. Got: {errors}"
-        )
-        self.assertTrue(
-            any("ms-ghost" in e.message for e in e582_errors),
-            f"Expected E582 message to contain 'ms-ghost'. Got E582 errors: {[e.message for e in e582_errors]}"
-        )
-
-
-    def test_step_16c_w582_fires_when_milestone_fr_not_in_fr_coverage(self):
-        """When verdict=='verified' and a milestone FR is not in semantic_review.fr_coverage, W582 fires."""
-        from specdev_tools.validation.validators.step_16c import validate_step_16c
-
-        # Build a valid 16c artifact with verdict=verified and fr_coverage only covering fr-login.
-        # The roadmap milestone ms-v1 has fr_refs: [fr-login, fr-logout].
-        # W582 should fire for fr-logout (present in milestone but absent from fr_coverage).
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-w582-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "W582 test: milestone FR not covered.",
-                    "scope_in": ["auth-api"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/auth.py"]
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": [
-                        {
-                            "id": "CHK_LOGIN_B",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
-                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-                            "description": "Implement login",
-                            "type": "behavior",
-                            "layer": "api",
-                            "linked_test_expectation": "POST /login returns 200",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login",
-                            "milestone_ref": "ms-v1",
-                            "implementation": {
-                                "status": "verified",
-                                "files_touched": ["src/auth.py"],
-                                "actions": [
-                                    {
-                                        "type": "file_edit",
-                                        "target": "src/auth.py",
-                                        "description": "Add login handler",
-                                        "evidence": {"type": "snippet", "content": "def login(): pass"}
-                                    }
-                                ]
-                            }
-                        },
-                        {
-                            "id": "CHK_LOGIN_V",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
-                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-                            "description": "Validate login",
-                            "type": "validation",
-                            "layer": "tests",
-                            "linked_test_expectation": "pytest test_login",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login",
-                            "milestone_ref": "ms-v1",
-                            "implementation": {
-                                "status": "verified",
-                                "files_touched": ["tests/test_auth.py"],
-                                "actions": [
-                                    {
-                                        "type": "manual_verification",
-                                        "description": "Verify test passes",
-                                        "evidence": {"type": "log", "content": "PASSED test_login"}
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]}
-            },
-            "execution": {
-                "execution_results": [
-                    {
-                        "command": "pytest tests/",
-                        "status": "passed",
-                        "outcome_description": "All tests passed.",
-                        "reasoning": "Tests cover login.",
-                        "evidence": "1 passed",
-                        "evidence_ref": "ci-001",
-                        "evidence_binding": {
-                            "timestamp": "2024-01-01T00:00:00Z",
-                            "sha256": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-                            "exit_code": 0,
-                            "command": "pytest tests/"
-                        }
-                    }
-                ],
-                "final_status": {"ci_status": "green"},
-                "critical_evidence": {
-                    "passed_test_commands": ["pytest tests/"],
-                    "satisfied_checklist_ids": ["CHK_LOGIN_B", "CHK_LOGIN_V"]
-                }
-            },
-            "review": {
-                "verdict": "verified",
-                "fixture_status": {
-                    "implemented_interfaces": ["auth-login"],
-                    "test_results": [{"fixture_ref": "fixture-login", "status": "pass"}],
-                    "ci_status": "green"
-                },
-                "semantic_review": {
-                    "fr_coverage": [
-                        {
-                            "fr_id": "fr-login",
-                            "satisfied": True,
-                            "evidence_summary": "Login endpoint implemented and verified.",
-                            "checklist_ids": ["CHK_LOGIN_B"]
-                        }
-                    ],
-                    "hallucinated_features": [],
-                    "scope_delta": "None."
-                }
-            },
-            "canonical_refs_used": []
-        }
-
-        # Roadmap has fr_refs: [fr-login, fr-logout] for ms-v1
-        roadmap = {
-            "milestones": [
-                {
-                    "milestone_id": "ms-v1",
-                    "fr_refs": ["fr-login", "fr-logout"],
-                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}]
-                }
-            ]
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": []}), encoding="utf-8"
-            )
-
-            errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
-
-        w582_errors = [e for e in errors if e.code == "W582"]
-
-        # W582 should fire for fr-logout (in milestone but not in fr_coverage)
-        self.assertTrue(
-            any("fr-logout" in e.message for e in w582_errors),
-            f"Expected W582 for 'fr-logout'. Got W582 errors: {[e.message for e in w582_errors]}"
-        )
-
-        # W582 should NOT fire for fr-login (covered in fr_coverage)
-        self.assertFalse(
-            any("fr-login" in e.message for e in w582_errors),
-            f"Did not expect W582 for 'fr-login'. Got W582 errors: {[e.message for e in w582_errors]}"
-        )
-
     def test_impl_context_16c_dispatch_fires_verdict_enum_check(self):
         """Content-based dispatch: an impl_context/ artifact with review.verdict
         must route to validate_step_16c, which enforces the verdict enum.
@@ -1626,7 +791,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "16c dispatch test.",
                     "scope_in": ["auth"],
@@ -1686,7 +850,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "16b dispatch test.",
                     "scope_in": ["auth"],
@@ -1709,12 +872,6 @@ class TestStep16(unittest.TestCase):
                         "reasoning": "OK.",
                         "evidence": "1 passed",
                         "evidence_ref": "ci-001",
-                        "evidence_binding": {
-                            "timestamp": "2024-01-01T00:00:00Z",
-                            "sha256": "a" * 64,
-                            "exit_code": 0,
-                            "command": "pytest tests/",
-                        },
                     },
                     {
                         # Duplicate command — 16b validator flags this
@@ -1724,12 +881,6 @@ class TestStep16(unittest.TestCase):
                         "reasoning": "OK.",
                         "evidence": "1 passed",
                         "evidence_ref": "ci-002",
-                        "evidence_binding": {
-                            "timestamp": "2024-01-01T00:00:00Z",
-                            "sha256": "b" * 64,
-                            "exit_code": 0,
-                            "command": "pytest tests/",
-                        },
                     },
                 ],
                 "final_status": {"ci_status": "green"},
@@ -1766,11 +917,11 @@ class TestStep16(unittest.TestCase):
 
         plan_only = {
             "$schema": "vc:16-impl-context",
-            "plan": {"status": "active"},
+            "plan": {},
         }
         plan_plus_empty_exec = {
             "$schema": "vc:16-impl-context",
-            "plan": {"status": "active"},
+            "plan": {},
             "execution": {"execution_results": []},
             "review": {},
         }
@@ -1937,214 +1088,6 @@ class TestStep16(unittest.TestCase):
             f"Got {len(e307_errors)} occurrences. Full errors: {errors}"
         )
 
-    def test_step_16c_w582_fires_when_milestone_file_lives_in_impl_context(self):
-        """W582 must fire even when the 16c artifact lives inside spec/impl_context/.
-
-        Before the _load_roadmap DRY refactor, step_16c looked for 14_roadmap.json
-        as a direct sibling of the artifact — which meant 16c reviews under
-        spec/impl_context/ silently skipped W582 because the roadmap is one
-        directory up.  This test pins the corrected path resolution.
-        """
-        from specdev_tools.validation.validators.step_16c import validate_step_16c
-
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-w582-impl-context-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "W582 test inside impl_context/.",
-                    "scope_in": ["auth-api"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/auth.py"],
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": [],
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]},
-            },
-            "review": {
-                "verdict": "verified",
-                "fixture_status": {
-                    "implemented_interfaces": [],
-                    "test_results": [],
-                    "ci_status": "green",
-                },
-                "semantic_review": {
-                    # fr-login covered, fr-logout not
-                    "fr_coverage": [
-                        {
-                            "fr_id": "fr-login",
-                            "satisfied": True,
-                            "evidence_summary": "Login verified.",
-                            "checklist_ids": [],
-                        }
-                    ],
-                    "hallucinated_features": [],
-                    "scope_delta": "None.",
-                },
-            },
-            "canonical_refs_used": [],
-            "milestone_ref": "ms-v1",
-        }
-        roadmap = {
-            "milestones": [
-                {
-                    "milestone_id": "ms-v1",
-                    "fr_refs": ["fr-login", "fr-logout"],
-                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}],
-                }
-            ]
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            fixture_path = impl_context_dir / "ms_v1_review.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            # Roadmap lives at spec-root level (one dir up from impl_context/)
-            (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
-
-            errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
-
-        w582_errors = [e for e in errors if e.code == "W582"]
-        self.assertTrue(
-            any("fr-logout" in e.message for e in w582_errors),
-            f"Expected W582 for 'fr-logout' when 16c lives in impl_context/. "
-            f"Got W582 errors: {[e.message for e in w582_errors]}"
-        )
-
-    def test_step_16c_w582_does_not_fire_when_verdict_is_not_verified(self):
-        """W582 must NOT fire when verdict is needs_work, blocked, or deferred."""
-        from specdev_tools.validation.validators.step_16c import validate_step_16c
-
-        # Roadmap has fr_refs for ms-v1 but fr_coverage is empty/absent.
-        # W582 must stay silent for all non-verified verdicts.
-        roadmap = {
-            "milestones": [
-                {
-                    "milestone_id": "ms-v1",
-                    "fr_refs": ["fr-login", "fr-logout"],
-                    "tasks": [{"task_id": "fr-login"}, {"task_id": "fr-logout"}]
-                }
-            ]
-        }
-
-        base_data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-w582-negative-test",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "W582 negative test.",
-                    "scope_in": ["auth-api"],
-                    "scope_out": [],
-                    "target_file_patterns": ["src/auth.py"]
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Auth", "summary": "Test"}],
-                    "checklist": [
-                        {
-                            "id": "CHK_LOGIN_B",
-                            "spec_ref": {"type": "fr", "id": "fr-login", "line_range": "L1-L10",
-                                         "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"},
-                            "description": "Implement login",
-                            "type": "behavior",
-                            "layer": "api",
-                            "linked_test_expectation": "POST /login returns 200",
-                            "nfr_refs": ["nfr-availability-uptime"],
-                            "fixture_ref": "fixture-login",
-                            "milestone_ref": "ms-v1",
-                            "implementation": {
-                                "status": "verified",
-                                "files_touched": ["src/auth.py"],
-                                "actions": [
-                                    {
-                                        "type": "file_edit",
-                                        "target": "src/auth.py",
-                                        "description": "Add login handler",
-                                        "evidence": {"type": "snippet", "content": "def login(): pass"}
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No doc changes."},
-                "review_requirements": {"test_commands": ["pytest tests/"]}
-            },
-            "execution": {
-                "execution_results": [
-                    {
-                        "command": "pytest tests/",
-                        "status": "passed",
-                        "outcome_description": "All tests passed.",
-                        "reasoning": "Tests cover login.",
-                        "evidence": "1 passed",
-                        "evidence_ref": "ci-001",
-                        "evidence_binding": {
-                            "timestamp": "2024-01-01T00:00:00Z",
-                            "sha256": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
-                            "exit_code": 0,
-                            "command": "pytest tests/"
-                        }
-                    }
-                ],
-                "final_status": {"ci_status": "green"},
-                "critical_evidence": {
-                    "passed_test_commands": ["pytest tests/"],
-                    "satisfied_checklist_ids": ["CHK_LOGIN_B"]
-                }
-            },
-            "canonical_refs_used": []
-        }
-
-        for non_verified_verdict in ("needs_work", "blocked", "deferred"):
-            data = dict(base_data)
-            data["review"] = {
-                "verdict": non_verified_verdict,
-                "fixture_status": {
-                    "implemented_interfaces": [],
-                    "test_results": [],
-                    "ci_status": "green"
-                },
-                # fr_coverage is empty — W582 must still NOT fire
-                "semantic_review": {
-                    "fr_coverage": [],
-                    "hallucinated_features": [],
-                    "scope_delta": "None."
-                }
-            }
-
-            with tempfile.TemporaryDirectory() as td:
-                tmp_dir = Path(td)
-                fixture_path = tmp_dir / "16_impl_context.json"
-                fixture_path.write_text(json.dumps(data), encoding="utf-8")
-                (tmp_dir / "14_roadmap.json").write_text(json.dumps(roadmap), encoding="utf-8")
-                common_dir = tmp_dir / "common"
-                common_dir.mkdir()
-                (common_dir / "seed_manifest.json").write_text(
-                    json.dumps({"doc_paths": []}), encoding="utf-8"
-                )
-
-                errors = validate_step_16c(data, self.repo_root, spec_path=str(fixture_path))
-
-            w582_errors = [e for e in errors if e.code == "W582"]
-            self.assertEqual(
-                [],
-                w582_errors,
-                f"W582 must NOT fire when verdict='{non_verified_verdict}'. "
-                f"Got: {[e.message for e in w582_errors]}"
-            )
-
-
     # --- Evidence validation tests (Bug fixes: W599, W600, E301) ---
 
     def _make_evidence_test_data(self, item_id, actions):
@@ -2155,7 +1098,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "Evidence validation test case.",
                     "scope_in": ["core"],
@@ -2206,165 +1148,6 @@ class TestStep16(unittest.TestCase):
             },
             "canonical_refs_used": []
         }
-
-    def test_w616_fires_for_deferred_item_marked_verified(self):
-        """W616 fires when checklist_status='deferred' but implementation.status='verified'."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Check output",
-                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W616_CONTRADICTION", actions)
-        item = data["plan"]["spec_alignment"]["checklist"][0]
-        item["checklist_status"] = "deferred"
-        item["deferred_reason"] = "Marked deferred after verification without reconciling implementation status."
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w616_errors = [e for e in errors if e.code == "W616"]
-        self.assertTrue(
-            len(w616_errors) > 0,
-            f"Expected W616 for deferred item marked verified. Got: {errors}"
-        )
-        self.assertTrue(
-            any("CHK_W616_CONTRADICTION" in e.message for e in w616_errors),
-            f"Expected W616 message to reference item id. Got: {[e.message for e in w616_errors]}"
-        )
-
-    def test_w616_control_active_verified_item_does_not_fire(self):
-        """Control: an active (non-deferred) verified item must not fire W616."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Check output",
-                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W616_CONTROL", actions)
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w616_errors = [e for e in errors if e.code == "W616"]
-        self.assertEqual(
-            [], w616_errors,
-            f"Did not expect W616 for active verified item. Got: {w616_errors}"
-        )
-
-    def test_w616_control_deferred_pending_item_does_not_fire(self):
-        """Control: a deferred item with implementation.status='pending' (not
-        verified) must not fire W616 -- no contradiction to reconcile."""
-        actions = []
-        data = self._make_evidence_test_data("CHK_W616_PENDING", actions)
-        item = data["plan"]["spec_alignment"]["checklist"][0]
-        item["checklist_status"] = "deferred"
-        item["deferred_reason"] = "Blocked on upstream dependency."
-        item["implementation"]["status"] = "pending"
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w616_errors = [e for e in errors if e.code == "W616"]
-        self.assertEqual(
-            [], w616_errors,
-            f"Did not expect W616 for deferred+pending item. Got: {w616_errors}"
-        )
-
-    def test_w616_fires_for_wont_do_item_marked_verified(self):
-        """W616 also fires when checklist_status='wont_do' but implementation.status='verified'
-        -- the same stale contradiction as deferred+verified, just for a permanently
-        cancelled item instead of a paused one."""
-        actions = [
-            {
-                "type": "manual_verification",
-                "description": "Check output",
-                "evidence": {"type": "log", "content": "PASS " + ("x" * 60)}
-            }
-        ]
-        data = self._make_evidence_test_data("CHK_W616_WONT_DO_CONTRADICTION", actions)
-        item = data["plan"]["spec_alignment"]["checklist"][0]
-        item["checklist_status"] = "wont_do"
-        item["wont_do_reason"] = "Superseded after verification without reconciling implementation status."
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w616_errors = [e for e in errors if e.code == "W616"]
-        self.assertTrue(
-            len(w616_errors) > 0,
-            f"Expected W616 for wont_do item marked verified. Got: {errors}"
-        )
-        self.assertTrue(
-            any("CHK_W616_WONT_DO_CONTRADICTION" in e.message for e in w616_errors),
-            f"Expected W616 message to reference item id. Got: {[e.message for e in w616_errors]}"
-        )
-
-    def test_w616_control_wont_do_pending_item_does_not_fire(self):
-        """Control: a wont_do item with implementation.status='pending' (not
-        verified) must not fire W616 -- no contradiction to reconcile."""
-        actions = []
-        data = self._make_evidence_test_data("CHK_W616_WONT_DO_PENDING", actions)
-        item = data["plan"]["spec_alignment"]["checklist"][0]
-        item["checklist_status"] = "wont_do"
-        item["wont_do_reason"] = "Superseded by a different checklist item."
-        item["implementation"]["status"] = "pending"
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        w616_errors = [e for e in errors if e.code == "W616"]
-        self.assertEqual(
-            [], w616_errors,
-            f"Did not expect W616 for wont_do+pending item. Got: {w616_errors}"
-        )
 
     def test_w599_fires_for_short_evidence(self):
         """W599 fires when verified action evidence content is shorter than 50 characters."""
@@ -2604,7 +1387,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "Execution files_touched scope test.",
                     "scope_in": ["core"],
@@ -2756,7 +1538,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "W603 test for files outside task scope.",
                     "scope_in": ["core"],
@@ -2832,7 +1613,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "W603 negative test.",
                     "scope_in": ["core"],
@@ -2905,7 +1685,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "E302 test — verified verdict without execution.",
                     "scope_in": ["core"],
@@ -2952,7 +1731,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "E302 test — verified verdict with empty execution_results.",
                     "scope_in": ["core"],
@@ -2967,11 +1745,7 @@ class TestStep16(unittest.TestCase):
                 "review_requirements": {"test_commands": ["pytest tests/"]}
             },
             "execution": {
-                "execution_results": [],
-                "critical_evidence": {
-                    "passed_test_commands": [],
-                    "satisfied_checklist_ids": []
-                }
+                "execution_results": []
             },
             "review": {
                 "verdict": "verified",
@@ -3007,7 +1781,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "E302 test — unproven test commands.",
                     "scope_in": ["core"],
@@ -3024,11 +1797,7 @@ class TestStep16(unittest.TestCase):
             "execution": {
                 "execution_results": [
                     {"command": "pytest tests/", "status": "passed", "output": "ok"}
-                ],
-                "critical_evidence": {
-                    "passed_test_commands": ["pytest tests/"],
-                    "satisfied_checklist_ids": []
-                }
+                ]
             },
             "review": {
                 "verdict": "verified",
@@ -3056,64 +1825,6 @@ class TestStep16(unittest.TestCase):
             f"Expected E302 for unproven 'npm test' command. Got E302: {[e.message for e in e302_errors]}"
         )
 
-    def test_e302_fires_missing_passed_test_commands(self):
-        """E302 fires when test command not in critical_evidence.passed_test_commands."""
-        data = {
-            "$schema": "vc:16-impl-context",
-            "id": "step-e302-missing-passed",
-            "owner": "api",
-            "created_at": "2024-01-01T00:00:00Z",
-            "plan": {
-                "status": "active",
-                "summary": {
-                    "functional_summary": "E302 test — missing passed_test_commands.",
-                    "scope_in": ["core"],
-                    "scope_out": [],
-                    "target_file_patterns": []
-                },
-                "spec_alignment": {
-                    "requirements_summary": [{"theme": "Core", "summary": "Test"}],
-                    "checklist": []
-                },
-                "docs_impact": {"status": "not_required", "rationale": "No changes."},
-                "review_requirements": {"test_commands": ["pytest tests/", "npm test"]}
-            },
-            "execution": {
-                "execution_results": [
-                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
-                    {"command": "npm test", "status": "passed", "output": "ok"}
-                ],
-                "critical_evidence": {
-                    "passed_test_commands": ["pytest tests/"],
-                    "satisfied_checklist_ids": []
-                }
-            },
-            "review": {
-                "verdict": "verified",
-                "findings": [],
-                "fixture_status": {"ci_status": "green"}
-            },
-            "canonical_refs_used": []
-        }
-
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            fixture_path = tmp_dir / "16_impl_context.json"
-            fixture_path.write_text(json.dumps(data), encoding="utf-8")
-            common_dir = tmp_dir / "common"
-            common_dir.mkdir()
-            (common_dir / "seed_manifest.json").write_text(
-                json.dumps({"doc_paths": ["README.md", "docs/**"]}), encoding="utf-8"
-            )
-            from specdev_tools.validation.validators.step_16 import validate_step_16
-            errors = validate_step_16(data, self.repo_root, spec_path=str(fixture_path))
-
-        e302_errors = [e for e in errors if e.code == "E302"]
-        self.assertTrue(
-            any("npm test" in e.message and "passed_test_commands" in e.message for e in e302_errors),
-            f"Expected E302 for 'npm test' not in passed_test_commands. Got E302: {[e.message for e in e302_errors]}"
-        )
-
     # --- Object-form test_commands tests (E301 + E302) ---
 
     def _run_step16_validate(self, data):
@@ -3137,7 +1848,6 @@ class TestStep16(unittest.TestCase):
         summary="Object-form test_commands.",
         test_commands=None,
         execution_results=None,
-        passed_test_commands=None,
         review=None,
     ):
         """Minimal valid-shape Step 16 artifact for E301/E302 tests.
@@ -3152,7 +1862,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": summary,
                     "scope_in": ["core"], "scope_out": [], "target_file_patterns": [],
@@ -3166,10 +1875,6 @@ class TestStep16(unittest.TestCase):
             },
             "execution": {
                 "execution_results": execution_results or [],
-                "critical_evidence": {
-                    "passed_test_commands": passed_test_commands or [],
-                    "satisfied_checklist_ids": [],
-                },
             },
             "canonical_refs_used": [],
         }
@@ -3190,7 +1895,6 @@ class TestStep16(unittest.TestCase):
                 {"command": "pytest tests/", "status": "passed", "output": "ok"},
                 {"command": "npm test", "status": "passed", "output": "ok"},
             ],
-            passed_test_commands=["pytest tests/", "npm test"],
         )
         errors = self._run_step16_validate(data)
         e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
@@ -3208,57 +1912,12 @@ class TestStep16(unittest.TestCase):
             execution_results=[
                 {"command": "pytest tests/", "status": "passed", "output": "ok"},
             ],
-            passed_test_commands=["pytest tests/"],
         )
         errors = self._run_step16_validate(data)
         e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
         self.assertTrue(
             any("npm test" in e.message for e in e301),
             f"Expected E301 MISSING_PROOF_CLOSURE for 'npm test'; got: {[e.message for e in e301]}"
-        )
-
-    def test_e302_object_form_test_commands_against_passed_test_commands(self):
-        """E302 fires for object-form test_commands missing from passed_test_commands when verdict=verified."""
-        def build(passed_list):
-            return self._base_step16_artifact(
-                artifact_id="step-e302-objform",
-                summary="Object-form test_commands E302 path.",
-                test_commands=[
-                    make_object_test_command("pytest tests/"),
-                    make_object_test_command("npm test"),
-                ],
-                execution_results=[
-                    {"command": "pytest tests/", "status": "passed", "output": "ok"},
-                    {"command": "npm test", "status": "passed", "output": "ok"},
-                ],
-                passed_test_commands=passed_list,
-                review={
-                    "verdict": "verified",
-                    "findings": [],
-                    "fixture_status": {"ci_status": "green"},
-                },
-            )
-
-        # Both commands present in passed_test_commands → no E302 from this check.
-        errors_ok = self._run_step16_validate(build(["pytest tests/", "npm test"]))
-        e302_missing = [
-            e for e in errors_ok
-            if e.code == "E302" and "passed_test_commands" in e.message
-        ]
-        self.assertEqual(
-            e302_missing, [],
-            f"Expected no E302 passed_test_commands errors when all object-form commands listed; got: {[e.message for e in e302_missing]}"
-        )
-
-        # Drop 'npm test' from passed_test_commands → E302 must fire for 'npm test'.
-        errors_bad = self._run_step16_validate(build(["pytest tests/"]))
-        e302_bad = [
-            e for e in errors_bad
-            if e.code == "E302" and "npm test" in e.message and "passed_test_commands" in e.message
-        ]
-        self.assertTrue(
-            e302_bad,
-            f"Expected E302 for 'npm test' missing from passed_test_commands; got E302 errors: {[e.message for e in errors_bad if e.code == 'E302']}"
         )
 
     def test_string_form_and_object_form_test_commands_produce_identical_e301(self):
@@ -3273,7 +1932,6 @@ class TestStep16(unittest.TestCase):
                 execution_results=[
                     {"command": "pytest tests/", "status": "passed", "output": "ok"},
                 ],
-                passed_test_commands=["pytest tests/"],
             )
 
         string_form_errors = self._run_step16_validate(build([
@@ -3326,7 +1984,6 @@ class TestStep16(unittest.TestCase):
             execution_results=[
                 {"command": "echo placeholder", "status": "passed", "output": "ok"},
             ],
-            passed_test_commands=["echo placeholder"],
         )
         errors = self._run_step16_validate(data)
         e301 = [e for e in errors if e.code == "E301" and "MISSING_PROOF_CLOSURE" in e.message]
@@ -3388,7 +2045,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {
                     "functional_summary": "Invalid test.",
                     "scope_in": ["core"],
@@ -3460,7 +2116,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {"functional_summary": "amb test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
                 "spec_alignment": {"requirements_summary": [{"theme": "Core", "summary": "x"}], "checklist": []},
                 "docs_impact": {"status": "not_required", "rationale": "n/a"},
@@ -3501,7 +2156,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {"functional_summary": "amb test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
                 "spec_alignment": {"requirements_summary": [{"theme": "Core", "summary": "x"}], "checklist": []},
                 "docs_impact": {"status": "not_required", "rationale": "n/a"},
@@ -3533,7 +2187,6 @@ class TestStep16(unittest.TestCase):
             "owner": "api",
             "created_at": "2024-01-01T00:00:00Z",
             "plan": {
-                "status": "active",
                 "summary": {"functional_summary": "doc test.", "scope_in": ["core"], "scope_out": [], "target_file_patterns": ["src/**"]},
                 "spec_alignment": {
                     "requirements_summary": [{"theme": "Core", "summary": "x"}],
@@ -3593,7 +2246,6 @@ class TestStep16(unittest.TestCase):
 
     def _w603_data(self, milestone_supporting_files=None):
         plan = {
-            "status": "active",
             "summary": {
                 "functional_summary": "W603 fix test.",
                 "scope_in": ["core"],

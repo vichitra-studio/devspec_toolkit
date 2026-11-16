@@ -468,25 +468,16 @@ Before emitting, verify:
   "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "milestone": "milestone-auth",
   "plan": {
-    "status": "active",
     "summary": { "functional_summary": "Implement core API login endpoint with JWT issuance.", "scope_in": ["POST /login handler", "JWT token issuance"], "scope_out": ["OAuth login", "password reset"], "target_file_patterns": ["src/auth/routes.py"] },
     "spec_alignment": {
       "checklist": [
         {
           "id": "AUTH_LOGIN_01",
-          "spec_ref": {
-            "type": "fr",
-            "id": "fr-user-login",
-            "line_range": "L5-L8",
-            "commit_hash": "a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4"
-          },
+          "realises": ["tc-login-returns-jwt"],
           "description": "POST /login validates credentials and returns a signed JWT.",
-          "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
-          "nfr_refs": ["nfr-auth-availability"],
-          "fixture_ref": "fix-auth-login-success",
           "implementation": {
-            "status": "verified",
             "actions": [
               {
                 "type": "file_edit",
@@ -512,7 +503,6 @@ Before emitting, verify:
         "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
       }
     ],
-    "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []
   },
   "canonical_refs_used": [{ "id": "cn:core:unit:ms", "kind": "unit" }]

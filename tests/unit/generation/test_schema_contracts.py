@@ -495,7 +495,7 @@ class SchemaContractsTests(unittest.TestCase):
             errs = validate_file(str(root), str(sample))
             self.assertTrue(any("canonical_refs_used_missing" in e.render() for e in errs))
 
-    def test_step_16_plan_requires_explicit_status(self):
+    def test_step_16_plan_file_names_its_milestone_and_takes_no_status(self):
         registry = SchemaRegistry(str(self.repo_root))
         schema = registry.load("vc:16-impl-context")
         validator = Draft202012Validator(schema, registry=registry.to_referencing_registry())
@@ -504,6 +504,7 @@ class SchemaContractsTests(unittest.TestCase):
             "owner": "api",
             "created_at": "2026-01-01T00:00:00Z",
             "plan": {
+                "status": "active",
                 "summary": {
                     "functional_summary": "Implement auth core",
                     "scope_in": ["Login"],
@@ -514,7 +515,8 @@ class SchemaContractsTests(unittest.TestCase):
             },
         }
         errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
-        self.assertTrue(any(list(e.path) == ["plan"] and "'status' is a required property" in e.message for e in errors))
+        self.assertTrue(any(list(e.path) == [] and "'milestone' is a required property" in e.message for e in errors))
+        self.assertTrue(any(list(e.path) == ["plan"] and "'status' was unexpected" in e.message for e in errors))
 
     def test_canonical_autofix_does_not_add_schema_invalid_unit_ref_from_units(self):
         with tempfile.TemporaryDirectory() as td:

@@ -417,25 +417,25 @@ Terms: `context_path`, `fr_refs`, `W607`, `W612`
 
 Terms: `coverage_status`, `spec_ref`, `milestone_ref`, `nfr_refs`, `fixture_ref`, `checklist_status`, `deferred_reason`, `wont_do_reason`, `linked_test_expectation`, `spec_refs`, `new_fixtures`, `spec_mutations`, `evidence_binding`, `critical_evidence`, `review_state`, `line_range`, `commit_hash`, `emergent_ambiguities`
 
-- [ ] `tests/fixtures/analysis/`: `emergent_ambiguities`
-- [ ] `tests/fixtures/step_16/`: `checklist_status`, `commit_hash`, `critical_evidence`, `deferred_reason`, `emergent_ambiguities`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`, `spec_refs`, `wont_do_reason`
-- [ ] `tests/integration/_anchor_factories.py`: `commit_hash`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`
-- [ ] `tests/integration/analysis/test_upstream_backlog_cli.py`: `emergent_ambiguities`
-- [ ] `tests/integration/test_step_16.py`: `checklist_status`, `commit_hash`, `critical_evidence`, `deferred_reason`, `emergent_ambiguities`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`, `wont_do_reason`
-- [ ] `tests/integration/test_step_16_anchor.py`: `milestone_ref`, `spec_ref`
-- [ ] `tests/unit/analysis/test_classification.py`: `emergent_ambiguities`
-- [ ] `tests/unit/analysis/test_coerce.py`: `emergent_ambiguities`
-- [ ] `tests/unit/context/test_milestone_state.py`: `checklist_status`, `emergent_ambiguities`, `fixture_ref`
-- [ ] `tests/unit/context/test_reviewer.py`: `checklist_status`
-- [ ] `tests/unit/core/test_json_output.py`: `linked_test_expectation`
-- [ ] `tests/unit/core/test_json_utils_dry_run.py`: `checklist_status`, `commit_hash`, `deferred_reason`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `nfr_refs`, `spec_ref`
-- [ ] `tests/unit/validation/linters/test_e541_structural_skip.py`: `critical_evidence`, `emergent_ambiguities`
-- [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `linked_test_expectation`, `nfr_refs`
-- [ ] `tests/unit/validation/linters/test_linter_utils.py`: `nfr_refs`
-- [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `checklist_status`, `critical_evidence`, `spec_ref`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `spec_refs`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `spec_refs`
-- [ ] `tests/unit/validation/validators/test_step_16a_deep.py`: `checklist_status`, `deferred_reason`, `spec_ref`, `wont_do_reason`
+- [x] `tests/fixtures/analysis/`: `emergent_ambiguities`
+- [x] `tests/fixtures/step_16/`: `checklist_status`, `commit_hash`, `critical_evidence`, `deferred_reason`, `emergent_ambiguities`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`, `spec_refs`, `wont_do_reason`
+- [x] `tests/integration/_anchor_factories.py`: `commit_hash`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`
+- [x] `tests/integration/analysis/test_upstream_backlog_cli.py`: `emergent_ambiguities`
+- [x] `tests/integration/test_step_16.py`: `checklist_status`, `commit_hash`, `critical_evidence`, `deferred_reason`, `emergent_ambiguities`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `milestone_ref`, `nfr_refs`, `spec_ref`, `wont_do_reason`
+- [x] `tests/integration/test_step_16_anchor.py`: `milestone_ref`, `spec_ref`
+- [x] `tests/unit/analysis/test_classification.py`: `emergent_ambiguities`
+- [x] `tests/unit/analysis/test_coerce.py`: `emergent_ambiguities`
+- [x] `tests/unit/context/test_milestone_state.py`: `checklist_status`, `emergent_ambiguities`, `fixture_ref`
+- [x] `tests/unit/context/test_reviewer.py`: `checklist_status`
+- [x] `tests/unit/core/test_json_output.py`: `linked_test_expectation`
+- [x] `tests/unit/core/test_json_utils_dry_run.py`: `checklist_status`, `commit_hash`, `deferred_reason`, `evidence_binding`, `fixture_ref`, `line_range`, `linked_test_expectation`, `nfr_refs`, `spec_ref`
+- [x] `tests/unit/validation/linters/test_e541_structural_skip.py`: `critical_evidence`, `emergent_ambiguities`
+- [x] `tests/unit/validation/linters/test_hallucination_lint.py`: `linked_test_expectation`, `nfr_refs`
+- [x] `tests/unit/validation/linters/test_linter_utils.py`: `nfr_refs`
+- [x] `tests/unit/validation/linters/test_traceability_closure.py`: `checklist_status`, `critical_evidence`, `spec_ref`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `spec_refs`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `spec_refs`
+- [x] `tests/unit/validation/validators/test_step_16a_deep.py`: `checklist_status`, `deferred_reason`, `spec_ref`, `wont_do_reason`
 
 ## WI-M3-17: legacy-consumer shim (matrix guard fields)
 

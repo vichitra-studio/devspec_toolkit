@@ -296,7 +296,7 @@ Before emitting, verify:
       "checklist": [
         {
           "id": "CHK_AUTH_01",
-          "spec_ref": { "type": "api", "id": "api-auth-login", "line_range": "L12-L15", "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+          "spec_ref": { "type": "api", "id": "api-auth-login" },
           "description": "POST /login returns JWT",
           "linked_test_expectation": "pytest tests/auth/test_login.py::test_jwt -q",
           "nfr_refs": ["nfr-auth-availability"],
@@ -336,8 +336,8 @@ Before emitting, verify:
   "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2025-01-01T00:00:00Z",
+  "milestone": "milestone-auth",
   "plan": {
-    "status": "active",
     "summary": { "functional_summary": "Implement core API login", "scope_in": ["login"], "scope_out": ["oauth"], "target_file_patterns": ["src/auth/routes.py"] },
     "review_requirements": { "test_commands": ["pytest tests/auth/test_login.py::test_jwt -q"] }
   },
@@ -352,7 +352,6 @@ Before emitting, verify:
         "evidence": "FAILED tests/auth/test_login.py::test_jwt - AssertionError: token field missing"
       }
     ],
-    "critical_evidence": { "satisfied_checklist_ids": [], "passed_test_commands": [] },
     "emergent_ambiguities": []
   },
   "review": {
@@ -369,7 +368,7 @@ Before emitting, verify:
         "id": "finding-auth-01",
         "type": "bug",
         "severity": "major",
-        "spec_ref": { "type": "api", "id": "api-auth-login", "line_range": "L12-L15", "commit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        "spec_ref": { "type": "api", "id": "api-auth-login" },
         "description": "src/auth/routes.py:L14 — login response omits token field required by api-auth-login contract.",
         "remediation_task": {
           "task_id": "rev-api-core-01",

@@ -106,7 +106,7 @@ class TestWS1DifferentialValidation:
     # ------------------------------------------------------------------
 
     def test_devspec37_leaf_invalid_enum_is_refused(self, tmp_path: pathlib.Path) -> None:
-        """Patching a nested status to an invalid enum is refused with the enum message.
+        """Patching a nested enum leaf to an invalid value is refused with the enum message.
 
         This is the canonical DEVSPEC-37 repro: step 16 has TWO schemas;
         ``vc:16-impl-context`` is selected by the document's own ``$schema``,
@@ -115,36 +115,35 @@ class TestWS1DifferentialValidation:
         """
         f = _copy_fixture(tmp_path, "valid_full.json")
 
-        # checklist[1] has implementation.status = "verified"
+        # checklist[1] has layer = "api"
         with pytest.raises(Exception, match="'verifyed' is not one of"):
             json_patch(
                 str(f),
-                ".plan.spec_alignment.checklist[1].implementation.status",
+                ".plan.spec_alignment.checklist[1].layer",
                 '"verifyed"',
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
 
     def test_devspec37_leaf_valid_enum_succeeds(self, tmp_path: pathlib.Path) -> None:
-        """Patching a nested status to a valid enum writes successfully.
+        """Patching a nested enum leaf to a valid value writes successfully.
 
-        Uses checklist[1] (which already has ``implementation.status = "verified"``)
-        and patches to ``"in_progress"`` — a valid enum value that introduces
-        no new schema violations (empirically verified).
+        Uses checklist[1] (which has ``layer = "api"``) and patches to
+        ``"service"`` — a valid enum value that introduces no new schema violations.
         """
         f = _copy_fixture(tmp_path, "valid_full.json")
 
         result = json_patch(
             str(f),
-            ".plan.spec_alignment.checklist[1].implementation.status",
-            '"in_progress"',
+            ".plan.spec_alignment.checklist[1].layer",
+            '"service"',
             validate=True,
             repo_root=_TOOLKIT_ROOT,
         )
 
         assert "[dry-run]" not in result
         content = json.loads(f.read_text(encoding="utf-8"))
-        assert content["plan"]["spec_alignment"]["checklist"][1]["implementation"]["status"] == "in_progress"
+        assert content["plan"]["spec_alignment"]["checklist"][1]["layer"] == "service"
 
     # ------------------------------------------------------------------
     # §5: Incremental fix (no deadlock)
@@ -207,20 +206,11 @@ class TestWS1DifferentialValidation:
         # Fully-valid item to prepend (all required fields present, valid enum values).
         valid_prepend = {
             "id": "REQ_VALID_PREPEND",
-            "spec_ref": {
-                "type": "code",
-                "id": "schema-user-table",
-                "line_range": "L1-L100",
-                "commit_hash": "2222222222222222222222222222222222222222",
-            },
+            "realises": ["tc-user-table-migrates"],
             "description": "Valid prepended item",
             "type": "metadata",
             "layer": "db",
-            "linked_test_expectation": "migration applies successfully",
-            "nfr_refs": ["nfr-availability-uptime"],
-            "fixture_ref": "fixture-database-migration",
-            "checklist_status": "deferred",
-            "deferred_reason": "Waiting for schema owner sign-off on the migration's rollback strategy. Unblock: rollback plan reviewed and approved.",
+            "implementation": {"actions": [{"type": "manual_verification", "description": "Verify the migration applies"}]},
         }
         new_checklist = [valid_prepend, bad_item]
 
@@ -312,46 +302,46 @@ class TestWS1DifferentialValidation:
             )
 
     def test_number_type_enforced(self, tmp_path: pathlib.Path) -> None:
-        """Patching an integer exit_code field with a string is refused: type violation.
+        """Patching an integer rating with a string is refused: type violation.
 
-        ``valid_with_semantic_review.json`` contains
-        ``.execution.execution_results[0].evidence_binding.exit_code`` whose schema
-        declares ``type: integer``.  Patching it to a string value exercises genuine
-        number-type enforcement, producing the ``is not of type 'integer'`` message.
+        ``review.ratings.*`` declare ``type: integer``.  Adding a ratings object whose
+        ``spec_completeness`` is a string exercises genuine number-type enforcement,
+        producing the ``is not of type 'integer'`` message.
         """
         f = _copy_fixture(tmp_path, "valid_with_semantic_review.json")
 
         with pytest.raises(Exception, match="is not of type 'integer'"):
             json_patch(
                 str(f),
-                ".execution.execution_results[0].evidence_binding.exit_code",
-                '"not-an-integer"',  # string, not integer
+                ".review.ratings",
+                '{"spec_completeness": "high", "code_quality": 4, "tests_completeness": 4, '
+                '"docs_completeness": 4, "metadata_usage": 4}',  # string, not integer
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
 
     def test_pattern_enforced(self, tmp_path: pathlib.Path) -> None:
-        """Patching commit_hash with a non-hex-40 string is refused: pattern violation."""
+        """Patching an item id with a non-SCREAMING_SNAKE string is refused: pattern violation."""
         f = _copy_fixture(tmp_path, "ms_auth_plan.json")
 
         with pytest.raises(Exception, match="does not match"):
             json_patch(
                 str(f),
-                ".plan.spec_alignment.checklist[0].spec_ref.commit_hash",
-                '"INVALID_HASH_NOT_HEX40"',
+                ".plan.spec_alignment.checklist[0].id",
+                '"not-a-screaming-snake-id"',
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
 
     def test_enum_enforced(self, tmp_path: pathlib.Path) -> None:
-        """Patching a status field with a non-enum value is refused: enum violation."""
+        """Patching an enum field with a non-enum value is refused: enum violation."""
         f = _copy_fixture(tmp_path, "valid_full.json")
 
         with pytest.raises(Exception, match="is not one of"):
             json_patch(
                 str(f),
-                ".plan.spec_alignment.checklist[1].implementation.status",
-                '"bad_status_value"',
+                ".plan.spec_alignment.checklist[1].layer",
+                '"bad_layer_value"',
                 validate=True,
                 repo_root=_TOOLKIT_ROOT,
             )
@@ -384,8 +374,8 @@ class TestWS1DifferentialValidation:
         with pytest.raises(Exception, match="is not one of"):
             json_patch(
                 str(f),
-                ".plan.spec_alignment.checklist[1].implementation.status",
-                '"bad_status_for_regression_test"',
+                ".plan.spec_alignment.checklist[1].layer",
+                '"bad_layer_for_regression_test"',
                 validate=True,
                 repo_root=str(tmp_path),  # abspath of dir WITHOUT tools/schema_registry.json
             )
@@ -406,8 +396,8 @@ class TestWS1DifferentialValidation:
                 sys.executable, "-m", "specdev_tools.core.json_utils",
                 "patch",
                 str(plan_file),
-                ".plan.spec_alignment.checklist[1].implementation.status",
-                '"subprocess_bad_status"',
+                ".plan.spec_alignment.checklist[1].layer",
+                '"subprocess_bad_layer"',
                 # No --repo-root → defaults to "." → tmp_path has no schema_registry.json
                 # → package-relative fallback must kick in.
             ],

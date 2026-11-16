@@ -135,9 +135,10 @@ def make_milestone_plan(
     Produces the minimal shape the anchor validator reads during E308 scope
     drift and E309 checklist drift checks: ``$schema``, ``plan.summary``
     (scope_in/scope_out), and ``plan.spec_alignment.checklist``.  This is
-    **not** a fully schema-valid ``vc:16-impl-context`` artifact — optional
-    fields like ``milestone_ref`` and ``implementation`` are omitted because
-    the anchor validator never schema-validates the milestone files it loads.
+    **not** a fully schema-valid ``vc:16-impl-context`` artifact — the plan
+    items a caller passes in (see ``make_checklist_item``) may omit
+    ``realises`` and ``implementation`` because the anchor validator never
+    schema-validates the milestone files it loads.
     """
     ms: dict[str, Any] = {
         "$schema": "vc:16-impl-context",
@@ -145,7 +146,6 @@ def make_milestone_plan(
         "owner": "api",
         "created_at": "2024-01-01T00:00:00Z",
         "plan": {
-            "status": "active",
             "summary": {
                 "functional_summary": f"Test milestone authored by {filename}.",
                 "scope_in": scope_in or ["auth"],
@@ -202,25 +202,18 @@ def make_checklist_item(
     *,
     item_type: str = "behavior",
 ) -> dict[str, Any]:
-    """Build one ``plan.spec_alignment.checklist[]`` item for a milestone plan.
+    """Build one 1.1.1-shaped ``plan.spec_alignment.checklist[]`` item for a milestone plan.
 
     Produces a structurally sufficient item for the anchor validator's
     cross-file drift checks (E309, W610).  The anchor validator reads
-    ``id`` and ``spec_ref.id`` — it does not schema-validate the milestone
-    plan itself.  Optional fields (``nfr_refs``, ``implementation``) are
-    omitted rather than populated with schema-invalid defaults.
+    ``id`` and ``spec_ref.id`` (its ``spec_ref`` arm is the legacy one, # M8 rewrites)
+    — it does not schema-validate the milestone plan itself, so the item
+    stays in the old shape on purpose.
     """
     return {
         "id": item_id,
-        "spec_ref": {
-            "type": "fr",
-            "id": spec_ref_id,
-            "line_range": "L1-L10",
-            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678",
-        },
+        "spec_ref": {"type": "fr", "id": spec_ref_id},
         "description": f"Checklist item {item_id}.",
         "type": item_type,
         "layer": "api",
-        "linked_test_expectation": "pytest test_auth",
-        "fixture_ref": "fixture-auth",
     }

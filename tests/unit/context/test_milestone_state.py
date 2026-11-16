@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from specdev_tools.context.milestone_state import (
     compute_milestone_state,
     derive_group_state,
@@ -93,6 +95,23 @@ class TestGroupStatePending:
         result = derive_group_state(group, str(findings_dir), [])
         assert result["state"] == "pending"
         assert result["reviewer_rounds"] == 1
+
+    @pytest.mark.parametrize(
+        "group",
+        [
+            {"id": "GRP_NEW", "realises": ["tc-one"], "implementation": {"actions": []}},
+            {"id": "GRP_NO_IMPL", "realises": ["tc-one"]},
+            {"id": "GRP_WRONG_TYPES", "checklist_status": 3, "implementation": ["not", "a", "dict"]},
+            {"id": "GRP_WRONG_STATUS", "implementation": {"status": ["verified"]}},
+        ],
+    )
+    def test_absent_statuses_read_as_pending(self, tmp_path: Path, group: dict) -> None:
+        """A 1.2.0 plan item stores no status: it reads as pending, and a wrong-typed one does not raise."""
+        findings_dir = tmp_path / ".specdev" / "findings"
+        findings_dir.mkdir(parents=True)
+        result = derive_group_state(group, str(findings_dir), [])
+        assert result["state"] == "pending"
+        assert result["fixtures_exercised"] == []
 
     def test_round_output_with_findings(self, tmp_path: Path) -> None:
         """Round output file has non-empty findings → pending."""

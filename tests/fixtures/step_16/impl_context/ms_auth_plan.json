@@ -3,8 +3,8 @@
   "id": "ms-auth-plan",
   "owner": "api",
   "created_at": "2024-01-01T00:00:00Z",
+  "milestone": "ms-auth",
   "plan": {
-    "status": "active",
     "summary": {
       "functional_summary": "JWT issuance and refresh endpoints for the ms-auth milestone.",
       "scope_in": [
@@ -31,23 +31,13 @@
       "checklist": [
         {
           "id": "AUTH_LOGIN_01",
-          "spec_ref": {
-            "type": "fr",
-            "id": "fr-user-login",
-            "line_range": "L10-L20",
-            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
-          },
+          "realises": [
+            "tc-fr-user-login"
+          ],
           "description": "Implement login endpoint returning a signed JWT.",
           "type": "behavior",
           "layer": "service",
-          "linked_test_expectation": "login endpoint issues valid JWT",
-          "nfr_refs": [
-            "nfr-availability-uptime"
-          ],
-          "fixture_ref": "fixture-login-success",
-          "milestone_ref": "ms-auth",
           "implementation": {
-            "status": "verified",
             "files_touched": [
               "src/auth.py"
             ],
@@ -67,23 +57,13 @@
         },
         {
           "id": "AUTH_LOGIN_01_VAL",
-          "spec_ref": {
-            "type": "fr",
-            "id": "fr-user-login",
-            "line_range": "L10-L20",
-            "commit_hash": "a1b2c3d4e5f61234567890123456789012345678"
-          },
+          "realises": [
+            "tc-fr-user-login"
+          ],
           "description": "Validate login endpoint issues valid JWT.",
           "type": "validation",
           "layer": "tests",
-          "linked_test_expectation": "login validation passes",
-          "nfr_refs": [
-            "nfr-availability-uptime"
-          ],
-          "fixture_ref": "fixture-login-success",
-          "milestone_ref": "ms-auth",
           "implementation": {
-            "status": "verified",
             "files_touched": [
               "tests/test_auth.py"
             ],
