@@ -133,18 +133,17 @@ Before emitting, verify:
     },
     "milestone_index": [
       {
-        "milestone_id": "ms-auth",
-        "context_path": "spec/impl_context/ms_auth_plan.json",
+        "anchor_id": "anchor-ms-auth",
+        "about": ["ms-auth"],
         "status": "done",
-        "fr_refs": ["fr-user-login", "fr-token-refresh"],
+        "close": {"signed_off_by": "legacy-migration", "source": "spec/impl_context/ms_auth_plan.json final_status"},
         "checklist_id_prefix": "AUTH",
         "summary": "Auth token issuance — all 4 checklist items verified, CI green"
       },
       {
-        "milestone_id": "ms-session",
-        "context_path": "spec/impl_context/ms_session_plan.json",
+        "anchor_id": "anchor-ms-session",
+        "about": ["ms-session"],
         "status": "in_progress",
-        "fr_refs": ["fr-session-create", "fr-session-revoke"],
         "checklist_id_prefix": "SESSION",
         "summary": "Session management — 2/4 checklist items in progress"
       }

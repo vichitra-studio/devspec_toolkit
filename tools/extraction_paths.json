@@ -108,7 +108,8 @@
   },
   "15": {
     "15_scaffold.json": [
-      ".ambiguities"
+      ".ambiguities",
+      ".interface_map"
     ]
   },
   "16": {

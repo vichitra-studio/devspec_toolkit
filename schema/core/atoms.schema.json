@@ -103,20 +103,6 @@
       ],
       "description": "Standard HTTP methods for REST API interface contracts. Decision rules: GET — read without side effects, safe and idempotent; POST — create a new resource or trigger a non-idempotent action; PUT — full replacement of an existing resource, idempotent; PATCH — partial update of an existing resource, use when only some fields change; DELETE — remove a resource. Anti-pattern: using POST for idempotent updates (use PUT/PATCH) or using GET for actions with side effects."
     },
-    "httpMethodFull": {
-      "$anchor": "httpMethodFull",
-      "type": "string",
-      "enum": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "PATCH",
-        "OPTIONS",
-        "HEAD"
-      ],
-      "description": "Extended HTTP method set including OPTIONS and HEAD, used for scaffold interface mappings. Includes all five standard REST methods plus: OPTIONS — returns allowed methods for a resource (used in CORS preflight); HEAD — returns headers only, no response body (used for existence checks). Use OPTIONS and HEAD only when the scaffold explicitly maps them to a route handler."
-    },
     "componentType": {
       "$anchor": "componentType",
       "type": "string",

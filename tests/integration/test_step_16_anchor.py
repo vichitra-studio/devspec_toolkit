@@ -2,7 +2,7 @@
 
 Covers:
   - Schema validation: valid fixtures pass; invalid fixtures fail on the right signal
-  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction + FR/API ownership conflict
+  - E308 (ANCHOR_SCOPE_DRIFT): scope contradiction; the FR/API ownership arm is a no-op on the 1.2.0 row shape
   - E309 (ANCHOR_CHECKLIST_DRIFT): cross-milestone checklist ID collision
                                   + checklist_id_prefix collision in milestone_index
   - W585 (ANCHOR_DRIFT_SKIP): spec_path is None — filesystem checks skipped
@@ -18,6 +18,7 @@ artifacts are constructed via the shared factories in ``_anchor_factories.py``
 to keep schema-evolution churn in one place.
 """
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -35,6 +36,7 @@ if str(_INTEGRATION_DIR) not in sys.path:
 from _anchor_factories import (  # noqa: E402  — sys.path tweak above
     make_anchor,
     make_checklist_item,
+    make_legacy_milestone_entry,
     make_milestone_entry,
     make_milestone_plan,
 )
@@ -63,16 +65,25 @@ class _AnchorTestBase(unittest.TestCase):
 class TestStep16AnchorSchema(_AnchorTestBase):
     """Schema-level tests using pre-built fixture files."""
 
+    def _validate_isolated(self, fixture_name: str) -> list:
+        """Validate a copy of an anchor fixture in an empty directory.
+
+        The shared fixture directory also holds the ``impl_context/`` plan fixtures of the 16a tests, which the
+        anchor validator would scan beside the anchor; a valid anchor is judged on its own.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            copy = Path(td) / fixture_name
+            shutil.copy(self.fixtures_dir / fixture_name, copy)
+            return validate_file(self.repo_root, str(copy))
+
     def test_valid_anchor_minimal_passes(self):
         """Minimal valid anchor with empty milestone_index should pass."""
-        path = self.fixtures_dir / "valid_anchor_minimal.json"
-        errors = validate_file(self.repo_root, str(path))
+        errors = self._validate_isolated("valid_anchor_minimal.json")
         self.assertEqual(errors, [], f"Expected no errors. Got: {errors}")
 
     def test_valid_anchor_with_milestones_passes(self):
-        """Anchor with populated milestone_index and drift checks should pass."""
-        path = self.fixtures_dir / "valid_anchor_with_milestones.json"
-        errors = validate_file(self.repo_root, str(path))
+        """Anchor with populated milestone_index (a done row with a legacy-migration close, an in-flight row) passes."""
+        errors = self._validate_isolated("valid_anchor_with_milestones.json")
         self.assertEqual(errors, [], f"Expected no errors. Got: {errors}")
 
     def test_invalid_anchor_missing_drift_fails(self):
@@ -233,165 +244,92 @@ class TestStep16AnchorSchema(_AnchorTestBase):
             f"Expected E520 'spec_alignment' additionalProperties error. Got: {errors}"
         )
 
-    def test_invalid_context_path_pattern_rejected(self):
-        """milestone_index[].context_path must match ^(spec/)?impl_context/<file>.json$.
 
-        Downstream validators (traceability_closure, anchor drift checks) read
-        this path directly — a path that doesn't resolve to impl_context/ would
-        silently skip the milestone from coverage. The schema pattern catches
-        typos and mislocations at author time.
-        """
+    def _validate_rows(self, rows: list[dict]) -> list:
+        """Validate an anchor holding *rows* in ``milestone_index`` (with a drift check, so W587 stays quiet)."""
         with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-            # Valid anchor shape except for the bogus context_path.
             anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry(
-                        "ms-auth",
-                        # Not under impl_context/ — pattern must reject.
-                        context_path="spec/plans/ms_auth_plan.json",
-                    ),
-                ],
+                Path(td),
+                milestone_index=rows,
+                drift_checks=["Verified the row shapes against the schema (2026-11-16)"],
             )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertTrue(
-            any(e.code == "E520" and "context_path" in e.message for e in errors),
-            f"Expected E520 rejecting non-impl_context context_path. Got: {errors}",
-        )
+            return validate_file(self.repo_root, str(anchor_path))
 
-    def test_w607_fires_when_declared_context_path_is_missing_on_disk(self):
-        """W607 fires when milestone_index declares a context_path that does not exist.
-
-        The schema pattern only catches malformed paths (wrong directory, wrong
-        extension).  A well-formed path pointing at a filename that was never
-        created on disk passes the pattern but silently drops the milestone
-        from drift detection.  W607 surfaces that mismatch at author time.
-        """
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            (tmp_dir / "impl_context").mkdir()
-            anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry(
-                        "ms-ghost",
-                        context_path="spec/impl_context/ms_ghost_plan.json",
-                    ),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertTrue(
-            any(
-                e.code == "W607"
-                and "ms-ghost" in e.message
-                and "ms_ghost_plan.json" in e.message
-                for e in errors
-            ),
-            f"Expected W607 identifying the missing ms-ghost plan. Got: {errors}",
-        )
-
-    def test_w607_does_not_fire_when_declared_context_path_exists(self):
-        """W607 stays quiet when every declared context_path resolves on disk."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            impl_context_dir = tmp_dir / "impl_context"
-            impl_context_dir.mkdir()
-            make_milestone_plan(
-                impl_context_dir,
-                "ms_present.json",
-                scope_in=["scope-present"],
-                scope_out=[],
-            )
-            anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry(
-                        "ms-present",
-                        context_path="spec/impl_context/ms_present.json",
-                    ),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertFalse(
-            any(e.code == "W607" for e in errors),
-            f"W607 should not fire when the declared context_path exists. Got: {errors}",
-        )
-
-
-class TestStep16AnchorW612PhantomMilestone(_AnchorTestBase):
-    """W612 ANCHOR_PHANTOM_MILESTONE — milestone_id not in 14_roadmap.json."""
-
-    def _write_roadmap(self, parent: Path, milestone_ids: list[str]) -> None:
-        """Write a minimal 14_roadmap.json with the given milestone IDs."""
-        roadmap = {
-            "$schema": "vc:14-roadmap",
-            "id": "roadmap",
-            "owner": "product",
-            "milestones": [
-                {"milestone_id": mid, "title": mid, "status": "active",
-                 "deliverables": [{"id": f"task-{mid}", "title": "t"}]}
-                for mid in milestone_ids
-            ],
+    def test_doc_example_row_validates(self):
+        """The design's anchor row (DOC L1830-1833) validates with no error."""
+        row = {
+            "anchor_id": "anchor-ms-account-recovery",
+            "about": ["ms-account-recovery"],
+            "status": "in_progress",
+            "checklist_id_prefix": "PWRESET",
+            "summary": "Confirm endpoint in progress.",
         }
-        (parent / "14_roadmap.json").write_text(json.dumps(roadmap))
+        self.assertEqual(self._validate_rows([row]), [])
 
-    def test_w612_fires_when_milestone_id_not_in_roadmap(self):
-        """W612 fires when a milestone_index entry has no match in the roadmap."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            self._write_roadmap(tmp_dir, ["ms-real"])
-            anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry("ms-typo"),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
+    def test_row_without_status_validates(self):
+        """status is optional: an author-written row carries none (it reads as pending)."""
+        row = make_milestone_entry("ms-auth")
+        del row["status"]
+        self.assertEqual(self._validate_rows([row]), [])
+
+    def test_deferred_without_deferral_reason_fails(self):
+        """A row with status 'deferred' and no deferral_reason fails."""
+        row = make_milestone_entry("ms-auth", status="deferred")
+        del row["deferral_reason"]
+        errors = self._validate_rows([row])
         self.assertTrue(
-            any(
-                e.code == "W612" and "ms-typo" in e.message
-                for e in errors
-            ),
-            f"Expected W612 for phantom milestone 'ms-typo'. Got: {errors}",
+            any(e.code == "E520" and "deferral_reason" in e.message for e in errors),
+            f"Expected E520 for the missing deferral_reason. Got: {errors}",
         )
 
-    def test_w612_silent_when_milestone_id_matches_roadmap(self):
-        """W612 stays quiet when every milestone_id exists in 14_roadmap.json."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            self._write_roadmap(tmp_dir, ["ms-auth", "ms-payments"])
-            anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry("ms-auth"),
-                    make_milestone_entry("ms-payments", checklist_id_prefix="PAY"),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertFalse(
-            any(e.code == "W612" for e in errors),
-            f"W612 should not fire when all IDs match roadmap. Got: {errors}",
+    def test_done_without_close_fails(self):
+        """A row with status 'done' and no close fails."""
+        row = make_milestone_entry("ms-auth", status="done")
+        del row["close"]
+        errors = self._validate_rows([row])
+        self.assertTrue(
+            any(e.code == "E520" and "'close'" in e.message for e in errors),
+            f"Expected E520 for the missing close. Got: {errors}",
         )
 
-    def test_w612_silent_when_no_roadmap_file(self):
-        """W612 stays quiet when 14_roadmap.json does not exist (no cross-check possible)."""
-        with tempfile.TemporaryDirectory() as td:
-            tmp_dir = Path(td)
-            # No roadmap written
-            anchor_path = make_anchor(
-                tmp_dir,
-                milestone_index=[
-                    make_milestone_entry("ms-anything"),
-                ],
-            )
-            errors = validate_file(self.repo_root, str(anchor_path))
-        self.assertFalse(
-            any(e.code == "W612" for e in errors),
-            f"W612 should not fire when 14_roadmap.json is absent. Got: {errors}",
-        )
+    def test_done_with_close_and_deferred_with_reason_pass(self):
+        """The two required companions satisfy the schema."""
+        rows = [
+            make_milestone_entry("ms-auth", status="done"),
+            make_milestone_entry("ms-session", status="deferred", checklist_id_prefix="SESSION"),
+        ]
+        self.assertEqual(self._validate_rows(rows), [])
 
+    def test_legacy_migration_close_without_source_fails(self):
+        """close.signed_off_by 'legacy-migration' needs close.source."""
+        row = make_milestone_entry("ms-auth", status="done")
+        row["close"] = {"signed_off_by": "legacy-migration"}
+        errors = self._validate_rows([row])
+        self.assertTrue(
+            any(e.code == "E520" and "source" in e.message for e in errors),
+            f"Expected E520 for the missing close.source. Got: {errors}",
+        )
+        row["close"]["source"] = "spec/impl_context/ms_auth_plan.json final_status"
+        self.assertEqual(self._validate_rows([row]), [])
+
+    def test_about_must_have_exactly_one_item(self):
+        """about is an array of exactly one milestone id: none and two both fail."""
+        for about in ([], ["ms-a", "ms-b"]):
+            with self.subTest(about=about):
+                row = make_milestone_entry("ms-a")
+                row["about"] = about
+                errors = self._validate_rows([row])
+                self.assertTrue(
+                    any(e.code == "E520" and "about" in e.message for e in errors),
+                    f"Expected E520 for about={about}. Got: {errors}",
+                )
+
+    def test_removed_row_fields_rejected(self):
+        """milestone_id, context_path and fr_refs are no longer row fields."""
+        errors = self._validate_rows([make_legacy_milestone_entry("ms-auth")])
+        message = " ".join(e.message for e in errors)
+        for field in ("milestone_id", "context_path", "fr_refs"):
+            self.assertIn(field, message)
 
 class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
     """E308 ANCHOR_SCOPE_DRIFT — bidirectional scope check + FR/API ownership."""
@@ -407,9 +345,10 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-oauth")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_oauth.json",
+                impl_context_dir, "ms_oauth.json", milestone="ms-oauth",
                 scope_in=["oauth-flows"],  # contradicts anchor scope_out
                 scope_out=[],
             )
@@ -432,9 +371,10 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-jwt")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_jwt.json",
+                impl_context_dir, "ms_jwt.json", milestone="ms-jwt",
                 scope_in=[],
                 scope_out=["jwt-token-validation"],  # contradicts anchor scope_in
             )
@@ -457,9 +397,10 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["JWT-Token-Validation"],
                 scope_out=["OAuth-Flows"],
+                milestone_index=[make_milestone_entry("ms-oauth")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_oauth.json",
+                impl_context_dir, "ms_oauth.json", milestone="ms-oauth",
                 scope_in=["oauth-flows"],  # differs in case from anchor scope_out
                 scope_out=[],
             )
@@ -481,9 +422,9 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-a", status="in_progress",
+                    make_legacy_milestone_entry("ms-a", status="in_progress",
                                          fr_refs=["fr-login"], checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", status="in_progress",
+                    make_legacy_milestone_entry("ms-b", status="in_progress",
                                          fr_refs=["fr-login"], checklist_id_prefix="MSB"),
                 ],
             )
@@ -505,9 +446,9 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["api"],
                 milestone_index=[
-                    make_milestone_entry("ms-a", status="in_progress",
+                    make_legacy_milestone_entry("ms-a", status="in_progress",
                                          fr_refs=["api-session-create"], checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", status="pending",
+                    make_legacy_milestone_entry("ms-b", status="pending",
                                          fr_refs=["api-session-create"], checklist_id_prefix="MSB"),
                 ],
             )
@@ -529,9 +470,9 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-done", status="done",
+                    make_legacy_milestone_entry("ms-done", status="done",
                                          fr_refs=["fr-login"], checklist_id_prefix="DONE"),
-                    make_milestone_entry("ms-active", status="in_progress",
+                    make_legacy_milestone_entry("ms-active", status="in_progress",
                                          fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
                 ],
             )
@@ -544,15 +485,13 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
         # regression re-labels the FR-ownership signal under a different code
         # (e.g. re-uses E309), this test would otherwise still appear green.
         # W587 (drift-checks-stale) fires because drift.checks is intentionally
-        # empty in this factory, and W607 fires because the factory declares
-        # milestone context_paths without authoring the backing files.  Neither
-        # is an FR-ownership signal; both are orthogonal anchor-hygiene codes
-        # exercised by their own dedicated tests.
-        allowed_orthogonal = {"W587", "W607"}
+        # empty in this factory, and E520 because the old-shape entries no longer
+        # satisfy the schema.  Neither is an FR-ownership signal.
+        allowed_orthogonal = {"W587", "E520"}
         unexpected = [e for e in errors if e.code not in allowed_orthogonal]
         self.assertEqual(
             unexpected, [],
-            f"Only W587/W607 (anchor-hygiene orthogonal signals) are expected here. "
+            f"Only W587/E520 (orthogonal signals) are expected here. "
             f"Got unexpected codes: {[e.code for e in unexpected]}",
         )
 
@@ -573,9 +512,9 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-deferred", status="deferred",
+                    make_legacy_milestone_entry("ms-deferred", status="deferred",
                                          fr_refs=["fr-login"], checklist_id_prefix="DEFER"),
-                    make_milestone_entry("ms-active", status="in_progress",
+                    make_legacy_milestone_entry("ms-active", status="in_progress",
                                          fr_refs=["fr-login"], checklist_id_prefix="ACTIVE"),
                 ],
             )
@@ -589,6 +528,30 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
             f"E308 FR-ownership conflict. Got: {[e.message for e in errors]}",
         )
 
+    def test_row_without_status_is_read_as_pending(self):
+        """A row with no status is not done: it takes part in prefix checks and raises nothing else."""
+        row = make_milestone_entry("ms-a", checklist_id_prefix="SAME")
+        other = make_milestone_entry("ms-b", checklist_id_prefix="SAME")
+        del row["status"], other["status"]
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(Path(td), milestone_index=[row, other], drift_checks=["Verified rows (2026-11-16)"])
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertEqual([e.code for e in errors], ["E309"], f"Got: {errors}")
+
+    def test_ownership_arm_noop_on_new_shape(self):
+        """Two in-flight rows about different milestones raise no E308: the ownership arm reads the removed fr_refs."""
+        with tempfile.TemporaryDirectory() as td:
+            anchor_path = make_anchor(
+                Path(td),
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", status="in_progress", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status="pending", checklist_id_prefix="MSB"),
+                ],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
+
     def test_no_e308_when_no_scope_overlap(self):
         """No E308 when milestone scope does not overlap anchor scope."""
         with tempfile.TemporaryDirectory() as td:
@@ -600,9 +563,10 @@ class TestStep16AnchorE308ScopeDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["jwt-token-validation"],
                 scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-jwt")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_jwt.json",
+                impl_context_dir, "ms_jwt.json", milestone="ms-jwt",
                 scope_in=["jwt-token-validation"],  # matches anchor scope_in — fine
                 scope_out=[],
             )
@@ -623,13 +587,20 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
+                ],
+            )
             make_milestone_plan(
-                impl_context_dir, "ms_a.json",
+                impl_context_dir, "ms_a.json", milestone="ms-a",
                 checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_b.json",
+                impl_context_dir, "ms_b.json", milestone="ms-b",
                 # Same ID "AUTH_LOGIN" but different spec_ref.id — E309
                 checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v2")],
             )
@@ -648,13 +619,20 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
+                ],
+            )
             make_milestone_plan(
-                impl_context_dir, "ms_a.json",
+                impl_context_dir, "ms_a.json", milestone="ms-a",
                 checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_b.json",
+                impl_context_dir, "ms_b.json", milestone="ms-b",
                 checklist=[make_checklist_item("AUTH_LOGIN", "fr-login-v1")],  # same — ok
             )
 
@@ -670,13 +648,20 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
             impl_context_dir = tmp_dir / "impl_context"
             impl_context_dir.mkdir()
 
-            anchor_path = make_anchor(tmp_dir, scope_in=["auth"])
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
+                ],
+            )
             make_milestone_plan(
-                impl_context_dir, "ms_a.json",
+                impl_context_dir, "ms_a.json", milestone="ms-a",
                 checklist=[make_checklist_item("AUTH_LOGIN", "fr-login")],
             )
             make_milestone_plan(
-                impl_context_dir, "ms_b.json",
+                impl_context_dir, "ms_b.json", milestone="ms-b",
                 checklist=[make_checklist_item("AUTH_SESSION", "fr-session")],
             )
 
@@ -698,10 +683,8 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-auth-v1", status="done",
-                                         fr_refs=["fr-login"], checklist_id_prefix="AUTH"),
-                    make_milestone_entry("ms-auth-v2", status="in_progress",
-                                         fr_refs=["fr-mfa"], checklist_id_prefix="AUTH"),
+                    make_milestone_entry("ms-auth-v1", status="done", checklist_id_prefix="AUTH"),
+                    make_milestone_entry("ms-auth-v2", status="in_progress", checklist_id_prefix="AUTH"),
                 ],
             )
 
@@ -720,10 +703,8 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-a", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="MSA"),
-                    make_milestone_entry("ms-b", status="pending",
-                                         fr_refs=["fr-signup"], checklist_id_prefix="MSB"),
+                    make_milestone_entry("ms-a", status="in_progress", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", status="pending", checklist_id_prefix="MSB"),
                 ],
             )
 
@@ -732,6 +713,29 @@ class TestStep16AnchorE309ChecklistDrift(_AnchorTestBase):
         e309 = [e for e in errors if e.code == "E309"]
         self.assertEqual(e309, [], f"Did not expect E309 with unique prefixes. Got: {e309}")
 
+
+    def test_spec_ref_arm_noop_on_new_shape(self):
+        """A bare task id as spec_ref (the 1.2.0 plan item) raises no E309 even when the same id maps differently."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                milestone_index=[
+                    make_milestone_entry("ms-a", checklist_id_prefix="MSA"),
+                    make_milestone_entry("ms-b", checklist_id_prefix="MSB"),
+                ],
+            )
+            for name, milestone, task in (("ms_a.json", "ms-a", "task-one"), ("ms_b.json", "ms-b", "task-two")):
+                plan = make_milestone_plan(
+                    impl_context_dir, name, milestone=milestone,
+                    checklist=[{"id": "AUTH_LOGIN", "spec_ref": task}],
+                )
+                self.assertIn(task, plan.read_text(encoding="utf-8"))
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertEqual([e for e in errors if e.code == "E309"], [], f"Got: {errors}")
 
 class TestStep16AnchorGuards(_AnchorTestBase):
     """W585 / W586 guards plus the "anchor route never emits E304" contract."""
@@ -755,19 +759,17 @@ class TestStep16AnchorGuards(_AnchorTestBase):
     def test_w585_spec_path_none_skips_filesystem_checks(self):
         """W585 fires when spec_path is None — filesystem checks are skipped.
 
-        In-memory checks (E308 ownership, E309 prefix) still run because they
-        operate purely on the anchor's milestone_index data.  Only filesystem-
-        dependent checks (W607 path existence, E308 scope drift, E309 checklist
-        mapping, W610 prefix violations) are skipped.
+        In-memory checks (E309 prefix) still run because they operate purely on
+        the anchor's milestone_index data.  Only filesystem-dependent checks
+        (E308 scope drift, E309 checklist mapping, W610 prefix violations) are
+        skipped.
 
-        This test constructs data with FR-ownership and prefix conflicts to
-        verify that in-memory E308/E309 fire even without spec_path, while W585
-        confirms the filesystem checks were skipped.
+        This test constructs two rows with the same checklist_id_prefix to verify
+        that the in-memory E309 fires even without spec_path, while W585 confirms
+        the filesystem checks were skipped.
         """
         from specdev_tools.validation.validators.step_16_anchor import validate_step_16_anchor
 
-        # Two non-done milestones claiming the same FR → E308 ownership.
-        # Same checklist_id_prefix → E309 prefix.
         data = {
             "$schema": "vc:16-anchor",
             "artifact_role": "anchor",
@@ -776,46 +778,20 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                 "ambiguities": [],
                 "drift": {"checks": []},
                 "milestone_index": [
-                    {
-                        "milestone_id": "ms-a",
-                        "context_path": "spec/impl_context/ms_a_plan.json",
-                        "status": "in_progress",
-                        "fr_refs": ["fr-shared"],
-                        "checklist_id_prefix": "SHARED",
-                        "summary": "Milestone A shares FR with B.",
-                    },
-                    {
-                        "milestone_id": "ms-b",
-                        "context_path": "spec/impl_context/ms_b_plan.json",
-                        "status": "in_progress",
-                        "fr_refs": ["fr-shared"],
-                        "checklist_id_prefix": "SHARED",
-                        "summary": "Milestone B shares FR with A and same prefix.",
-                    },
+                    make_milestone_entry("ms-a", checklist_id_prefix="SHARED"),
+                    make_milestone_entry("ms-b", checklist_id_prefix="SHARED"),
                 ],
             },
         }
         errors = validate_step_16_anchor(data, self.repo_root, spec_path=None)
 
-        # W585 must fire — signals filesystem checks were skipped.
         self.assertTrue(
             any(e.code == "W585" for e in errors),
             f"Expected W585 for None spec_path. Got: {errors}"
         )
-        # In-memory E308 ownership conflict must fire (no filesystem needed).
-        self.assertTrue(
-            any(e.code == "E308" for e in errors),
-            f"Expected E308 ownership conflict from in-memory check. Got: {errors}"
-        )
-        # In-memory E309 prefix collision must fire (no filesystem needed).
         self.assertTrue(
             any(e.code == "E309" for e in errors),
             f"Expected E309 prefix collision from in-memory check. Got: {errors}"
-        )
-        # W607 must NOT fire — it requires filesystem access.
-        self.assertFalse(
-            any(e.code == "W607" for e in errors),
-            f"W607 requires spec_path; should not fire. Got: {errors}"
         )
 
     def test_non_milestone_file_in_impl_context_is_ignored(self):
@@ -835,6 +811,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                 scope_in=["auth"],
                 scope_out=["payments"],
                 functional_summary="Anchor with stray non-milestone files.",
+                milestone_index=[make_milestone_entry("ms-real")],
             )
             anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
 
@@ -864,6 +841,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                 json.dumps({
                     "$schema": "vc:16-impl-context",
                     "id": "ms-real",
+                    "milestone": "ms-real",
                     "plan": {
                         "summary": {"scope_in": ["auth"], "scope_out": []},
                         "spec_alignment": {
@@ -915,8 +893,7 @@ class TestStep16AnchorGuards(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry("ms-auth", status="in_progress",
-                                         fr_refs=["fr-login"], checklist_id_prefix="AUTH"),
+                    make_milestone_entry("ms-auth", status="in_progress", checklist_id_prefix="AUTH"),
                 ],
                 drift_checks=["Verified ms-auth scope (2026-04-15)"],
             )
@@ -925,6 +902,66 @@ class TestStep16AnchorGuards(_AnchorTestBase):
 
         e304 = [e for e in errors if e.code == "E304"]
         self.assertEqual(e304, [], f"Anchor route must never emit E304. Got: {e304}")
+
+    def test_plan_file_whose_milestone_names_no_anchor_row_is_w611_not_crash(self):
+        """A plan naming a milestone no anchor row is about is skipped with W611 and takes no part in drift checks."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-auth")],
+                drift_checks=["Verified scope (2026-11-16)"],
+            )
+            make_milestone_plan(
+                impl_context_dir, "ms_ghost.json", milestone="ms-ghost",
+                scope_in=["oauth-flows"],  # would be E308 if the plan took part
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        w611 = [e for e in errors if e.code == "W611"]
+        self.assertEqual(len(w611), 1, f"Expected one W611. Got: {errors}")
+        self.assertIn("ms_ghost.json", w611[0].message)
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
+
+    def test_legacy_plan_file_without_milestone_is_skipped_with_notice(self):
+        """A plan with no file-level milestone key is skipped with a W608 notice (never raises, no drift finding)."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            impl_context_dir = tmp_dir / "impl_context"
+            impl_context_dir.mkdir()
+            anchor_path = make_anchor(
+                tmp_dir,
+                scope_in=["auth"],
+                scope_out=["oauth-flows"],
+                milestone_index=[make_milestone_entry("ms-auth")],
+                drift_checks=["Verified scope (2026-11-16)"],
+            )
+            make_milestone_plan(impl_context_dir, "ms_auth_plan.json", scope_in=["oauth-flows"])
+            errors = validate_file(self.repo_root, str(anchor_path))
+        notices = [e for e in errors if e.code == "W608" and "ms_auth_plan.json" in e.message]
+        self.assertEqual(len(notices), 1, f"Expected one W608 notice. Got: {errors}")
+        self.assertIn("milestone", notices[0].message)
+        self.assertEqual([e for e in errors if e.code == "E308"], [], f"Got: {errors}")
+
+    def test_w607_and_w612_not_emitted(self):
+        """W607 (context_path missing) and W612 (milestone not in the roadmap) are retired: no row field feeds them."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp_dir = Path(td)
+            (tmp_dir / "impl_context").mkdir()
+            (tmp_dir / "14_roadmap.json").write_text(
+                json.dumps({"$schema": "vc:14-roadmap", "id": "roadmap", "owner": "product", "milestones": []}),
+                encoding="utf-8",
+            )
+            anchor_path = make_anchor(
+                tmp_dir,
+                milestone_index=[make_milestone_entry("ms-typo")],
+                drift_checks=["Verified scope (2026-11-16)"],
+            )
+            errors = validate_file(self.repo_root, str(anchor_path))
+        self.assertEqual({e.code for e in errors} & {"W607", "W612"}, set(), f"Got: {errors}")
 
     def test_misfiled_anchor_inside_impl_context_dir_routes_to_anchor_validator(self):
         """M5: an anchor file misplaced under impl_context/ should be demoted to the anchor route.
@@ -1384,11 +1421,7 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry(
-                        "ms-auth", status="in_progress",
-                        fr_refs=["fr-login"], checklist_id_prefix="AUTH",
-                        context_path="impl_context/ms_auth_plan.json",
-                    ),
+                    make_milestone_entry("ms-auth", status="in_progress", checklist_id_prefix="AUTH"),
                 ],
                 drift_checks=["Verified ms-auth scope (2026-04-17)"],
             )
@@ -1396,7 +1429,7 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
 
             # Milestone plan with IDs that DON'T start with "AUTH_"
             make_milestone_plan(
-                impl_context_dir, "ms_auth_plan.json",
+                impl_context_dir, "ms_auth_plan.json", milestone="ms-auth",
                 scope_in=["auth"],
                 checklist=[
                     make_checklist_item("BILLING_LOGIN_01", spec_ref_id="fr-login"),
@@ -1426,18 +1459,14 @@ class TestStep16AnchorW610PrefixViolation(_AnchorTestBase):
                 tmp_dir,
                 scope_in=["auth"],
                 milestone_index=[
-                    make_milestone_entry(
-                        "ms-auth", status="in_progress",
-                        fr_refs=["fr-login"], checklist_id_prefix="AUTH",
-                        context_path="impl_context/ms_auth_plan.json",
-                    ),
+                    make_milestone_entry("ms-auth", status="in_progress", checklist_id_prefix="AUTH"),
                 ],
                 drift_checks=["Verified ms-auth scope (2026-04-17)"],
             )
             anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
 
             make_milestone_plan(
-                impl_context_dir, "ms_auth_plan.json",
+                impl_context_dir, "ms_auth_plan.json", milestone="ms-auth",
                 scope_in=["auth"],
                 checklist=[
                     make_checklist_item("AUTH_LOGIN_01", spec_ref_id="fr-login"),
@@ -1496,6 +1525,7 @@ class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
             anchor_path = make_anchor(
                 tmp_dir,
                 scope_in=["auth"],
+                milestone_index=[make_milestone_entry("ms-good")],
                 drift_checks=["Verified scope (2026-04-17)"],
             )
             anchor_data = json.loads(anchor_path.read_text(encoding="utf-8"))
@@ -1504,7 +1534,7 @@ class TestStep16AnchorW611DriftSuppressed(_AnchorTestBase):
             (impl_context_dir / "ms_bad.json").write_text(
                 json.dumps({"$schema": "vc:wrong"}), encoding="utf-8",
             )
-            make_milestone_plan(impl_context_dir, "ms_good.json", scope_in=["auth"])
+            make_milestone_plan(impl_context_dir, "ms_good.json", scope_in=["auth"], milestone="ms-good")
 
             errors = validate_step_16_anchor(anchor_data, self.repo_root, str(anchor_path))
 

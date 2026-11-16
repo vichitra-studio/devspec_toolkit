@@ -352,66 +352,66 @@ Terms: `milestone_status_reason`, `status_reason`, `source_milestones`, `deliver
 
 Terms: `trace`, `links`, `interface_ref`, `method`
 
-- [ ] `tests/fixtures/entry_key_registry/`: `trace`
-- [ ] `tests/fixtures/entry_key_registry_golden.json`: `interface_ref`, `links`, `method`
-- [ ] `tests/fixtures/graph_example/`: `interface_ref`, `method`
-- [ ] `tests/fixtures/spec_corpus/`: `trace`
-- [ ] `tests/fixtures/step_15/`: `interface_ref`, `links`, `method`, `trace`
-- [ ] `tests/integration/test_annotation_pipeline.py`: `links`
-- [ ] `tests/integration/test_graph_example_steps_00_05.py`: `links`
-- [ ] `tests/integration/test_matrix_spec_corpus.py`: `trace`
-- [ ] `tests/integration/test_step_13a.py`: `trace`
-- [ ] `tests/integration/test_step_16.py`: `trace`
-- [ ] `tests/integration/test_step_scripts_bridge.py`: pins step_15/ fixtures
-- [ ] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
-- [ ] `tests/unit/context/test_reviewer.py`: `trace`
-- [ ] `tests/unit/core/test_entry_key_registry.py`: `trace`
-- [ ] `tests/unit/core/test_resolve_pointers.py`: `trace`
-- [ ] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
-- [ ] `tests/unit/registry/test_annotation_scan.py`: `links`
-- [ ] `tests/unit/registry/test_annotation_schema.py`: `trace`
-- [ ] `tests/unit/registry/test_annotations.py`: `links`
-- [ ] `tests/unit/registry/test_generate.py`: `trace`
-- [ ] `tests/unit/registry/test_step_order_gen.py`: `links`
-- [ ] `tests/unit/test_cli.py`: `interface_ref`, `trace`
-- [ ] `tests/unit/test_spec_dir_walker.py`: `trace`
-- [ ] `tests/unit/toolkit_invariants/test_m2_graph_declarations.py`: `links`
-- [ ] `tests/unit/toolkit_invariants/test_m2_prerequisites.py`: `links`
-- [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_invariants.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_invariants_cel.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_linter_utils.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_matrix_rules.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_registry_check.py`: `trace`
-- [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `interface_ref`, `trace`
-- [ ] `tests/unit/validation/test_legacy_shim.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_cross_step_validation.py`: `interface_ref`, `method`, `trace`
-- [ ] `tests/unit/validation/validators/test_r9_cross_step.py`: `interface_ref`, `method`, `trace`
-- [ ] `tests/unit/validation/validators/test_step_05_e311.py`: `method`
-- [ ] `tests/unit/validation/validators/test_step_05_route_fix.py`: `method`
-- [ ] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
-- [ ] `tests/unit/validation/validators/test_step_validators_core.py`: `method`, `trace`
+- [x] `tests/fixtures/entry_key_registry/`: `trace`
+- [x] `tests/fixtures/entry_key_registry_golden.json`: `interface_ref`, `links`, `method`
+- [x] `tests/fixtures/graph_example/`: `interface_ref`, `method`
+- [x] `tests/fixtures/spec_corpus/`: `trace`
+- [x] `tests/fixtures/step_15/`: `interface_ref`, `links`, `method`, `trace`
+- [x] `tests/integration/test_annotation_pipeline.py`: `links`
+- [x] `tests/integration/test_graph_example_steps_00_05.py`: `links`
+- [x] `tests/integration/test_matrix_spec_corpus.py`: `trace`
+- [x] `tests/integration/test_step_13a.py`: `trace`
+- [x] `tests/integration/test_step_16.py`: `trace`
+- [x] `tests/integration/test_step_scripts_bridge.py`: pins step_15/ fixtures
+- [x] `tests/unit/canonical/test_canonical_integrity_drift.py`: `trace`
+- [x] `tests/unit/context/test_reviewer.py`: `trace`
+- [x] `tests/unit/core/test_entry_key_registry.py`: `trace`
+- [x] `tests/unit/core/test_resolve_pointers.py`: `trace`
+- [x] `tests/unit/generation/test_prompt_schema_sync.py`: `trace`
+- [x] `tests/unit/registry/test_annotation_scan.py`: `links`
+- [x] `tests/unit/registry/test_annotation_schema.py`: `trace`
+- [x] `tests/unit/registry/test_annotations.py`: `links`
+- [x] `tests/unit/registry/test_generate.py`: `trace`
+- [x] `tests/unit/registry/test_step_order_gen.py`: `links`
+- [x] `tests/unit/test_cli.py`: `interface_ref`, `trace`
+- [x] `tests/unit/test_spec_dir_walker.py`: `trace`
+- [x] `tests/unit/toolkit_invariants/test_m2_graph_declarations.py`: `links`
+- [x] `tests/unit/toolkit_invariants/test_m2_prerequisites.py`: `links`
+- [x] `tests/unit/validation/linters/test_hallucination_lint.py`: `trace`
+- [x] `tests/unit/validation/linters/test_invariants.py`: `trace`
+- [x] `tests/unit/validation/linters/test_invariants_cel.py`: `trace`
+- [x] `tests/unit/validation/linters/test_linter_utils.py`: `trace`
+- [x] `tests/unit/validation/linters/test_matrix_rules.py`: `trace`
+- [x] `tests/unit/validation/linters/test_registry_check.py`: `trace`
+- [x] `tests/unit/validation/linters/test_traceability_closure.py`: `interface_ref`, `trace`
+- [x] `tests/unit/validation/test_legacy_shim.py`: `trace`
+- [x] `tests/unit/validation/validators/test_cross_artifact_checks.py`: `trace`
+- [x] `tests/unit/validation/validators/test_cross_step_validation.py`: `interface_ref`, `method`, `trace`
+- [x] `tests/unit/validation/validators/test_r9_cross_step.py`: `interface_ref`, `method`, `trace`
+- [x] `tests/unit/validation/validators/test_step_05_e311.py`: `method`
+- [x] `tests/unit/validation/validators/test_step_05_route_fix.py`: `method`
+- [x] `tests/unit/validation/validators/test_step_10_deep.py`: `trace`
+- [x] `tests/unit/validation/validators/test_step_11_deep.py`: `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_03_10.py`: `trace`
+- [x] `tests/unit/validation/validators/test_step_validators_core.py`: `method`, `trace`
 
 ## WI-M3-14: step 16 anchor
 
 Terms: `context_path`, `fr_refs`, `W607`, `W612`
 
-- [ ] `tests/fixtures/spec_corpus/`: `fr_refs`
-- [ ] `tests/fixtures/step_16/`: `context_path`, `fr_refs`
-- [ ] `tests/integration/_anchor_factories.py`: `context_path`, `fr_refs`
-- [ ] `tests/integration/test_matrix_spec_corpus.py`: `fr_refs`
-- [ ] `tests/integration/test_step_16.py`: `fr_refs`
-- [ ] `tests/integration/test_step_16_anchor.py`: `W607`, `W612`, `context_path`, `fr_refs`
-- [ ] `tests/unit/core/test_error_code_coverage.py`: `W607`, `W612`, `context_path`
-- [ ] `tests/unit/validation/linters/test_e541_structural_skip.py`: `fr_refs`
-- [ ] `tests/unit/validation/linters/test_hallucination_lint.py`: `fr_refs`
-- [ ] `tests/unit/validation/linters/test_matrix_rules.py`: `fr_refs`
-- [ ] `tests/unit/validation/linters/test_traceability_closure.py`: `W607`, `context_path`, `fr_refs`
-- [ ] `tests/unit/validation/test_legacy_shim.py`: `fr_refs`
-- [ ] `tests/unit/validation/validators/test_step_07_deep.py`: `fr_refs`
+- [x] `tests/fixtures/spec_corpus/`: `fr_refs`
+- [x] `tests/fixtures/step_16/`: `context_path`, `fr_refs`
+- [x] `tests/integration/_anchor_factories.py`: `context_path`, `fr_refs`
+- [x] `tests/integration/test_matrix_spec_corpus.py`: `fr_refs`
+- [x] `tests/integration/test_step_16.py`: `fr_refs`
+- [x] `tests/integration/test_step_16_anchor.py`: `W607`, `W612`, `context_path`, `fr_refs`
+- [x] `tests/unit/core/test_error_code_coverage.py`: `W607`, `W612`, `context_path`
+- [x] `tests/unit/validation/linters/test_e541_structural_skip.py`: `fr_refs`
+- [x] `tests/unit/validation/linters/test_hallucination_lint.py`: `fr_refs`
+- [x] `tests/unit/validation/linters/test_matrix_rules.py`: `fr_refs`
+- [x] `tests/unit/validation/linters/test_traceability_closure.py`: `W607`, `context_path`, `fr_refs`
+- [x] `tests/unit/validation/test_legacy_shim.py`: `fr_refs`
+- [x] `tests/unit/validation/validators/test_step_07_deep.py`: `fr_refs`
 
 ## WI-M3-15: step 16 plan, execution, review
 

@@ -1909,8 +1909,53 @@
       "arrays": [
         {
           "array_path": ".ambiguities",
+          "contract": [
+            "description",
+            "decision",
+            "proposed_assumption",
+            "missing_kind"
+          ],
           "id_field": "id",
-          "kind": "ambiguity"
+          "kind": "ambiguity-item",
+          "links": [
+            {
+              "built": false,
+              "field": "about",
+              "kinds": "*",
+              "required": true,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "record",
+          "source": "x-node"
+        },
+        {
+          "array_path": ".interface_map",
+          "contract": [
+            "path"
+          ],
+          "id_field": "row_id",
+          "kind": "scaffold-row",
+          "links": [
+            {
+              "built": false,
+              "field": "realises",
+              "kinds": [
+                "api"
+              ],
+              "required": true,
+              "same_step_kinds": []
+            },
+            {
+              "built": false,
+              "field": "replaces",
+              "kinds": "*",
+              "required": false,
+              "same_step_kinds": []
+            }
+          ],
+          "role": "context",
+          "source": "x-node"
         }
       ],
       "step": "15"

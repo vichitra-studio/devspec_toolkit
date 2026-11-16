@@ -4,7 +4,6 @@ Tests the remaining validators that perform cross-step reference validation:
 - step_12: job depends_on (same-step; no cross-step checks)
 - step_13: Governance label refs in extensions
 - step_13a: FR + API refs in missing_elements spec_refs/related_ids
-- step_15: API refs in scaffold interface_map
 
 Each test class covers three scenarios:
 (a) Valid upstream refs pass with no W590/E590
@@ -23,7 +22,6 @@ from specdev_tools.validation.validators.step_09 import validate_step_09
 from specdev_tools.validation.validators.step_12 import validate_step_12
 from specdev_tools.validation.validators.step_13 import validate_step_13
 from specdev_tools.validation.validators.step_13a import validate_step_13a
-from specdev_tools.validation.validators.step_15 import validate_step_15
 
 
 # ---------------------------------------------------------------------------
@@ -324,90 +322,6 @@ class TestStep13aCrossStep(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Step 15 — API refs in scaffold interface_map
-# ---------------------------------------------------------------------------
-
-class TestStep15CrossStep(unittest.TestCase):
-    """Cross-step validation: step_15 checks interface_map interface_ref against 05_interface_contracts.json."""
-
-    def test_valid_upstream_refs_pass(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "05_interface_contracts.json", {
-                "apis": [
-                    {"api_id": "api-auth"},
-                    {"api_id": "api-users"},
-                ]
-            })
-            instance = {
-                "id": "scaffold-main",
-                "owner": "api",
-                "created_at": "2026-03-01",
-                "project_skeleton": {"language": "python"},
-                "interface_map": [
-                    {"interface_ref": "api-auth", "method": "POST", "path": "/auth"},
-                    {"interface_ref": "api-users", "method": "GET", "path": "/users"},
-                ],
-                "validators": [{"id": "v1", "command": "pytest"}],
-                "build_status": "green",
-            }
-            errors = validate_step_15(instance, tmp)
-            self.assertEqual(len(_w590(errors)), 0, f"Unexpected W590: {_w590(errors)}")
-            self.assertEqual(len(_e590(errors)), 0, f"Unexpected E590: {_e590(errors)}")
-
-    def test_missing_upstream_emits_w590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            # No 05_interface_contracts.json
-            instance = {
-                "id": "scaffold-main",
-                "owner": "api",
-                "created_at": "2026-03-01",
-                "project_skeleton": {"language": "python"},
-                "interface_map": [
-                    {"interface_ref": "api-auth", "method": "POST", "path": "/auth"},
-                ],
-                "validators": [{"id": "v1", "command": "pytest"}],
-                "build_status": "green",
-            }
-            errors = validate_step_15(instance, tmp)
-            w = _w590(errors)
-            self.assertGreaterEqual(len(w), 1, "Expected W590 for missing 05_interface_contracts.json")
-            self.assertTrue(
-                any("05_interface_contracts.json" in msg for msg in w),
-                f"W590 should mention 05_interface_contracts.json: {w}"
-            )
-
-    def test_broken_ref_emits_e590(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            spec_dir = os.path.join(tmp, "spec")
-            os.makedirs(spec_dir)
-            _write_json(spec_dir, "05_interface_contracts.json", {
-                "apis": [{"api_id": "api-auth"}]
-            })
-            instance = {
-                "id": "scaffold-main",
-                "owner": "api",
-                "created_at": "2026-03-01",
-                "project_skeleton": {"language": "python"},
-                "interface_map": [
-                    {"interface_ref": "api-nonexistent", "method": "POST", "path": "/ghost"},
-                ],
-                "validators": [{"id": "v1", "command": "pytest"}],
-                "build_status": "green",
-            }
-            errors = validate_step_15(instance, tmp)
-            e = _e590(errors)
-            self.assertGreaterEqual(len(e), 1, "Expected E590 for broken interface_ref")
-            self.assertTrue(
-                any("api-nonexistent" in msg for msg in e),
-                f"E590 should mention the broken ref: {e}"
-            )
-
-
-# ---------------------------------------------------------------------------
 # Edge cases — no spec dir at all
 # ---------------------------------------------------------------------------
 
@@ -468,20 +382,6 @@ class TestCrossStepNoSpecDir(unittest.TestCase):
                 }
             }
             errors = validate_step_13a(instance, tmp)
-            self.assertGreaterEqual(len(_w590(errors)), 1)
-
-    def test_step_15_no_spec_dir(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            instance = {
-                "id": "scaffold-x",
-                "owner": "api",
-                "created_at": "2026-03-01",
-                "project_skeleton": {},
-                "interface_map": [{"interface_ref": "api-x", "method": "GET", "path": "/x"}],
-                "validators": [{"id": "v1", "command": "pytest"}],
-                "build_status": "green",
-            }
-            errors = validate_step_15(instance, tmp)
             self.assertGreaterEqual(len(_w590(errors)), 1)
 
 

@@ -732,6 +732,11 @@ def test_schema_ref_sibling_census():
     ``depends_on`` carry no ``$ref`` sibling), 14 roadmap 15 -> 11 (``tech_stack``, ``trace``, ``dependencies``,
     ``status`` and ``source_milestones`` removed, ``lifecycle`` added on the milestone, the task and the criterion),
     core collections 19 -> 12 (``techStack*`` and ``dependency*`` definitions removed with their last ``$ref``).
+    253 after M3 WI-M3-13, 14 (steps 15, 16 anchor), per file old -> new: 15 scaffold 8 -> 6 (``trace``, ``links`` and
+    the row's ``method`` ``$ref`` nodes removed, the row's ``interface_ref`` becomes ``row_id``, ``lifecycle`` added),
+    16 anchor 4 -> 4 (``milestone_id`` becomes ``anchor_id``), core collections 12 -> 11 (the ``link`` definition
+    removed with its last ``$ref``).
+    Anchor row ``status`` gains ``default: pending`` (a description-only node becomes a default-and-description one).
     """
     from collections import Counter
 
@@ -750,11 +755,11 @@ def test_schema_ref_sibling_census():
     for f in sorted((_REPO_ROOT / "schema").rglob("*.json")):
         walk(json.loads(f.read_text(encoding="utf-8")))
 
-    assert sum(counts.values()) == 256
+    assert sum(counts.values()) == 253
     assert dict(counts) == {
-        ("description",): 244,
+        ("description",): 240,
         ("description", "items"): 4,
         ("description", "maxItems", "minItems"): 1,
-        ("default", "description"): 6,
+        ("default", "description"): 7,
         ("$anchor", "description"): 1,
     }

@@ -8,37 +8,53 @@
   "plan": {
     "summary": {
       "functional_summary": "Full authentication and session management across two milestones.",
-      "scope_in": ["jwt-token-validation", "login-endpoint", "session-management"],
-      "scope_out": ["oauth-flows", "third-party-sso", "mobile-push-auth"]
+      "scope_in": [
+        "jwt-token-validation",
+        "login-endpoint",
+        "session-management"
+      ],
+      "scope_out": [
+        "oauth-flows",
+        "third-party-sso",
+        "mobile-push-auth"
+      ]
     },
     "ambiguities": [
       {
         "id": "token-ttl-decision",
         "description": "JWT token TTL not confirmed by security team — 24h vs 8h.",
-        "about": ["fr-token-refresh"],
+        "about": [
+          "fr-token-refresh"
+        ],
         "proposed_assumption": "Work proceeds on 24h until security confirms."
       }
     ],
     "drift": {
       "checks": [
         "Verified ms-auth scope_in does not overlap anchor scope_out (2026-04-10)",
-        "Verified ms-session fr_refs do not conflict with ms-auth fr_refs (2026-04-12)"
+        "Verified the ms-auth and ms-session plans name distinct milestones (2026-04-12)"
       ]
     },
     "milestone_index": [
       {
-        "milestone_id": "ms-auth",
-        "context_path": "spec/impl_context/ms_auth_plan.json",
+        "anchor_id": "anchor-ms-auth",
+        "about": [
+          "ms-auth"
+        ],
         "status": "done",
-        "fr_refs": ["fr-user-login", "fr-token-refresh"],
+        "close": {
+          "signed_off_by": "legacy-migration",
+          "source": "spec/impl_context/ms_auth_plan.json final_status"
+        },
         "checklist_id_prefix": "AUTH",
         "summary": "Auth token issuance — all 4 checklist items verified, CI green"
       },
       {
-        "milestone_id": "ms-session",
-        "context_path": "spec/impl_context/ms_session_plan.json",
+        "anchor_id": "anchor-ms-session",
+        "about": [
+          "ms-session"
+        ],
         "status": "in_progress",
-        "fr_refs": ["fr-session-create", "fr-session-revoke"],
         "checklist_id_prefix": "SESSION",
         "summary": "Session management — 2/4 checklist items in progress"
       }

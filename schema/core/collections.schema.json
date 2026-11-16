@@ -23,30 +23,6 @@
         "description": "A string entry in the array. Each string should be specific, bounded, and self-contained — the meaning must be clear without reading the surrounding context. Minimum 10 characters is recommended; single words are almost always too vague to be actionable. Examples of good entries: 'user authentication via OAuth2' (capability label), 'must complete within 200ms at p99' (NFR constraint), 'rejected when cart is empty' (exclusion rule). Examples of poor entries: 'auth' (ambiguous — which auth?), 'TODO' (placeholder that adds no information), '' (empty string carries no meaning). Anti-patterns: empty strings, single-word entries like 'payments' or 'login', filler text like 'N/A' or 'TBD' when the actual value is known."
       }
     },
-    "link": {
-      "$anchor": "link",
-      "type": "object",
-      "description": "Hyperlink object representing a relationship between artifacts, with an optional spec cross-reference.",
-      "additionalProperties": false,
-      "properties": {
-        "rel": {
-          "type": "string",
-          "description": "Relationship type describing how the linked resource relates to this artifact. Decision rule: 'source' = the original requirements document, product brief, or stakeholder request that motivated this artifact (e.g., a Notion brief, a customer ticket, a Jira epic); 'design' = a visual or structural design artifact such as a Figma wireframe, Miro board, or architecture diagram; 'research' = user research, usability study, or market analysis report that informed a decision; 'documentation' = existing API reference, product docs, or runbook that describes an interface this artifact depends on. Examples: {\"rel\": \"source\", \"href\": \"https://linear.app/team/issue/ENG-412\"} (requirement ticket), {\"rel\": \"design\", \"href\": \"https://www.figma.com/file/abc123/checkout-wireframes\"} (Figma file), {\"rel\": \"documentation\", \"href\": \"https://stripe.com/docs/api/payment_intents\"} (upstream API docs). Anti-pattern: generic values like 'related', 'linked', or 'reference' — these carry no semantic meaning and are rejected by hallucination-lint."
-        },
-        "href": {
-          "type": "string",
-          "description": "URL or path to the linked resource. Decision rule: use absolute HTTPS URLs for all external resources; use forward-slash relative paths (no leading ./) for in-repo files. Examples: 'https://www.figma.com/file/abc123/checkout-wireframes' (external design link), 'https://stripe.com/docs/api/payment_intents' (external API docs), 'docs/seed/seed_overview.md' (in-repo seed document), 'docs/architecture/auth-flow.png' (in-repo diagram). Anti-patterns: file:// URLs (not portable across machines), Windows backslash paths like 'docs\\auth\\flow.png' (breaks on non-Windows), localhost URLs like 'http://localhost:3000/api' (not resolvable outside the author's machine), paths starting with ./ (use 'spec/foo.md' not './spec/foo.md')."
-        },
-        "spec_ref": {
-          "$ref": "vc:core:atoms#kebabId",
-          "description": "Optional kebab-case ID referencing another spec artifact related to this link."
-        }
-      },
-      "required": [
-        "rel",
-        "href"
-      ]
-    },
     "traceId": {
       "$anchor": "traceId",
       "description": "Kebab-case identifier used as a traceability target, linking requirements to implementations.",

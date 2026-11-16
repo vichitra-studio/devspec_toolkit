@@ -44,6 +44,8 @@ _EXPECTED_KINDS: dict[str, dict[str, str]] = {
     "11": {"threat": "threat_id", "edge-case": "id"},
     "12": {"job": "job_id"},
     "14": {"roadmap-milestone": "milestone_id", "task": "task_id", "task-criterion": "criterion_id"},
+    "15": {"scaffold-row": "row_id"},
+    "16": {"anchor-row": "anchor_id"},
 }
 
 # The kinds a threat or an edge case may be ``mitigated_by``: every obligation kind except capability, and fixtures.
@@ -55,6 +57,14 @@ _BUILT_LINK_FIELDS = frozenset({"derives_from", "mitigated_by", "realises", "ref
 
 # A task's ``disposition`` is stored outside the hash (design L194), so it is not part of the node's contract.
 _EXCLUDED_FROM_M3_CONTRACT = _EXCLUDED_FROM_CONTRACT | {"disposition"}
+
+# An anchor row is a status record (PD-4): the milestone commands write ``status``, ``deferral_reason`` and
+# ``close``, so only ``summary`` and ``checklist_id_prefix`` are its contract.
+_OUTSIDE_THE_HASH_BY_KIND: dict[str, frozenset[str]] = {"anchor-row": frozenset({"status", "deferral_reason", "close"})}
+
+# A scaffold row's ``realises`` and an anchor row's ``about`` build nothing (link table of the M3 plan, section 3.2),
+# although ``realises`` is a built field on a job.
+_UNBUILT_HOLDERS = frozenset({"scaffold-row", "anchor-row"})
 
 # Every obligation kind with ids: what a task criterion may refine.
 _REFINABLE_KINDS = [
@@ -101,6 +111,9 @@ _EXPECTED_LINK_KINDS: list[tuple[str, str, Any]] = [
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/removes", "*"),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/verified_by", ["fixture", "job", "rule"]),
     ("14_roadmap.schema.json", "/allOf/1/properties/milestones/items/properties/tasks/items/properties/acceptance_criteria/items/properties/replaces", "*"),
+    ("15_scaffold.schema.json", "/properties/interface_map/items/properties/realises", ["api"]),
+    ("15_scaffold.schema.json", "/properties/interface_map/items/properties/replaces", "*"),
+    ("16_anchor.schema.json", "/properties/plan/properties/milestone_index/items/properties/about", ["roadmap-milestone"]),
 ]
 
 
@@ -133,7 +146,7 @@ def test_m3_schema_files_are_found() -> None:
     assert set(_FILES) == {
         "06_invariants.schema.json", "07_nfrs.schema.json", "08_fixtures.schema.json",
         "09_impl_plan.schema.json", "10_governance.schema.json", "11_redteam.schema.json",
-        "12_ci_gates.schema.json", "14_roadmap.schema.json",
+        "12_ci_gates.schema.json", "14_roadmap.schema.json", "15_scaffold.schema.json", "16_anchor.schema.json",
     }
 
 
@@ -182,6 +195,8 @@ def test_verifier_kinds_carry_no_scope(decls, reader, fname: str) -> None:
 @pytest.mark.parametrize("fname", _FILES)
 def test_every_non_record_kind_carries_lifecycle_aliases_and_replaces(decls, reader, fname: str) -> None:
     for node in _nodes(decls, fname):
+        if node.value["role"] == "record":
+            continue
         item, uri = _item(reader, node)
         props = reader.properties(item, uri)
         required = reader.get(item, uri, "required")[0] or []
@@ -223,7 +238,8 @@ def test_contract_equals_computed_content_set(decls, reader, fname: str) -> None
         id_field = node.value["id"]
         links = _link_fields(reader, props)
         assert id_field not in contract and not set(contract) & links, node.kind
-        computed = set(props) - {id_field} - links - _node_arrays(reader, props) - _EXCLUDED_FROM_M3_CONTRACT
+        excluded = _EXCLUDED_FROM_M3_CONTRACT | _OUTSIDE_THE_HASH_BY_KIND.get(node.kind, frozenset())
+        computed = set(props) - {id_field} - links - _node_arrays(reader, props) - excluded
         assert set(contract) == computed, node.kind
         assert len(contract) == len(set(contract)), node.kind
 
@@ -231,7 +247,8 @@ def test_contract_equals_computed_content_set(decls, reader, fname: str) -> None
 @pytest.mark.parametrize("fname", _FILES)
 def test_built_true_only_on_the_built_link_fields(decls, fname: str) -> None:
     for link in _links(decls, fname):
-        assert link.value.get("built", False) is (link.field_name in _BUILT_LINK_FIELDS), link.field_name
+        expected = link.field_name in _BUILT_LINK_FIELDS and not link.holders <= _UNBUILT_HOLDERS
+        assert link.value.get("built", False) is expected, link.field_name
 
 
 @pytest.mark.parametrize("fname", _FILES)
@@ -388,3 +405,24 @@ def test_step_14_task_criterion_requires_refines_or_removes_and_task_disposition
     assert reader.get(criterion_item, uri, "anyOf")[0] == [{"required": ["refines"]}, {"required": ["removes"]}]
     assert "disposition" in _props(reader, nodes["task"])
     assert "disposition" not in nodes["task"].value["contract"]
+
+
+def test_step_15_scaffold_row_realises_apis_and_builds_nothing(decls, reader) -> None:
+    fname = "15_scaffold.schema.json"
+    _assert_links(decls, fname, {"realises": (["api"], True), "replaces": ("*", False)})
+    assert _link(decls, fname, "realises").value.get("built", False) is False
+    nodes = {n.kind: n for n in _nodes(decls, fname)}
+    assert nodes["scaffold-row"].value["contract"] == ["path"]
+    assert "method" not in _props(reader, nodes["scaffold-row"])
+
+
+def test_step_16_anchor_row_is_a_record_about_exactly_one_roadmap_milestone(decls, reader) -> None:
+    fname = "16_anchor.schema.json"
+    _assert_links(decls, fname, {"about": (["roadmap-milestone"], True)})
+    link = _link(decls, fname, "about")
+    assert link.value.get("built", False) is False
+    assert reader.get(link.container, link.uri, "maxItems")[0] == 1
+    node = next(iter(_nodes(decls, fname)))
+    assert node.value["role"] == "record"
+    assert node.value["contract"] == ["summary", "checklist_id_prefix"]
+    assert not {"lifecycle", "scope", "scope_reason", "replaces", "aliases"} & set(_props(reader, node))

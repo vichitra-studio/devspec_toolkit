@@ -1,5 +1,6 @@
 {
-  "id": "invalid-duplicate-api",
+  "$schema": "vc:15-scaffold",
+  "id": "invalid-duplicate-row-id",
   "owner": "api",
   "created_at": "2025-01-01T12:00:00Z",
   "project_skeleton": {
@@ -7,14 +8,14 @@
   },
   "interface_map": [
     {
-      "interface_ref": "api-same",
-      "path": "/one",
-      "method": "GET"
+      "row_id": "scaffold-same",
+      "realises": ["api-one"],
+      "path": "src/one.py"
     },
     {
-      "interface_ref": "api-same",
-      "path": "/two",
-      "method": "POST"
+      "row_id": "scaffold-same",
+      "realises": ["api-two"],
+      "path": "src/two.py"
     }
   ],
   "validators": [
