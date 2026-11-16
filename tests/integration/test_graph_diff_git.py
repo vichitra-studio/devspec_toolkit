@@ -1,6 +1,7 @@
 """Library cases of ``diff`` over a real git history (WI-M4-10): a temporary repository with tags the test creates."""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -11,7 +12,7 @@ import pytest
 from specdev_tools.graph import gitview
 from specdev_tools.graph.diff import ADDED, CHANGED, MINOR, NO_BUMP, diff_refs
 from specdev_tools.graph.gitview import GitViewError, archive_ref, load_graph_at, spec_path_in_repo
-from unit.graph._synth import ROOT, write_json, write_spec
+from unit.graph._synth import ROOT, run_specdev, write_json, write_spec
 
 _FR_FILE = "04_fr_list.json"
 _SEED_MANIFEST = "common/seed_manifest.json"
@@ -215,3 +216,42 @@ def test_archive_ref_extracts_the_paths_at_the_ref(host: Path) -> None:
     assert "It is fast." not in text and "It works." in text
     assert "It is fast." in (spec / _FR_FILE).read_text(encoding="utf-8")
     assert not Path(archived).exists()
+
+
+# --- the command ---------------------------------------------------------------------------------------------------
+
+def _diff_cli(host: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return run_specdev("diff", *args, "--repo-root", str(ROOT), "--spec-root", str(host / "spec"), "--git-root", str(host))
+
+
+def test_cli_diff_prints_the_changes_and_the_bump(host: Path) -> None:
+    _two_tag_host(host)
+    result = _diff_cli(host, "v1", "v2")
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    assert lines[0] == "diff v1 -> v2: 2 node(s) changed"
+    assert lines[-1] == "suggested bump: minor"
+
+
+def test_cli_diff_json_has_the_groups_and_the_bump(host: Path) -> None:
+    _two_tag_host(host)
+    document = json.loads(_diff_cli(host, "v1", "v2", "--json").stdout)
+    assert {"from", "to", "bump", "groups", "new_removes"} == set(document) and document["bump"] == "minor"
+
+
+def test_cli_diff_of_equal_refs_is_empty(host: Path) -> None:
+    _two_tag_host(host)
+    result = _diff_cli(host, "v2", "v2")
+    assert result.returncode == 0 and result.stdout.splitlines()[0] == "diff v2 -> v2: 0 node(s) changed"
+
+
+def test_cli_diff_unresolvable_ref_is_e708_on_stderr(host: Path) -> None:
+    _two_tag_host(host)
+    result = _diff_cli(host, "v1", "v9")
+    assert result.returncode == 1 and result.stderr.startswith("E708") and "v9" in result.stderr
+
+
+def test_cli_diff_unresolvable_ref_as_json_envelope(host: Path) -> None:
+    _two_tag_host(host)
+    document = json.loads(_diff_cli(host, "v1", "v9", "--json").stdout)
+    assert (document["command"], document["status"], document["errors"][0]["code"]) == ("diff", "FAIL", "E708")

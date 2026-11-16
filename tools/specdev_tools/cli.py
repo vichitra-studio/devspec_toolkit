@@ -19,6 +19,7 @@ from pathlib import Path
 
 from .core.config import get_config, reset_config
 from .core.errors import SpecError
+from .core.toolkit_root import detect_toolkit_root
 from .validation._legacy_shim import is_parked_any_shape, out_of_scope_fr_ids
 
 WARNING_CODE_RE = re.compile(r"^\s*W\d{3}\b")
@@ -570,6 +571,10 @@ def build_parser() -> _SpecdevParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     json_p.add_argument("args", nargs=argparse.REMAINDER, help="json subcommand and arguments")
+
+    # --- graph commands: node (REMAINDER group), trace, diff ---
+    from .graph.commands import add_graph_parsers
+    add_graph_parsers(sub)
     p.ctx_parser = ctx_p
     return p
 
@@ -595,13 +600,7 @@ def main():
 
     if getattr(args, "repo_root", None) == ".":
         # Auto-detect toolkit root by scanning immediate subdirectories
-        current_dir = Path(".")
-        for child in current_dir.iterdir():
-            if child.is_dir():
-                potential_marker = child / "tools" / "specdev_tools" / "__init__.py"
-                if potential_marker.exists():
-                    args.repo_root = str(child)
-                    break
+        args.repo_root = detect_toolkit_root(args.repo_root)
 
     if args.cmd == "validate":
         from .validation.validate import validate_file
@@ -2141,6 +2140,16 @@ def main():
                 i += 1
         sys.argv = [sys.argv[0]] + filtered
         json_main()
+
+    elif args.cmd == "node":
+        from .graph.commands import run_node
+        sys.exit(run_node(args.args))
+    elif args.cmd == "trace":
+        from .graph.commands import run_trace
+        sys.exit(run_trace(args))
+    elif args.cmd == "diff":
+        from .graph.commands import run_diff
+        sys.exit(run_diff(args))
 
     elif args.cmd == "guide":
         from .core.guide import format_guide_text, load_guides, lookup_guide

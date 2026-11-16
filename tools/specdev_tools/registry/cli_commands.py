@@ -3,7 +3,7 @@
 ``tools/cli_commands.json`` names every command a user can type after ``specdev``: the
 top-level commands, the sub-commands of groups that declare sub-parsers (``context``), the
 positional ``choices`` of ``align``, and the sub-commands of REMAINDER passthrough groups
-whose real parser lives elsewhere (``json``).  Paths only; flags are not listed.
+whose real parser lives elsewhere (``json``, ``node``).  Paths only; flags are not listed.
 
 ``PASSTHROUGH_BUILDERS`` maps a passthrough group to the zero-argument builder of its own
 parser.  Later milestones add one entry per further passthrough group.
@@ -14,6 +14,7 @@ import argparse
 from typing import Callable, Mapping
 
 from specdev_tools.core.json_utils import build_json_parser
+from specdev_tools.graph.commands import build_node_parser
 
 FORMAT_VERSION = "1.0.0"
 NOTE = (
@@ -25,7 +26,7 @@ NOTE = (
 CHOICE_GROUPS: dict[str, str] = {"align": "action"}
 
 # REMAINDER passthrough groups: group -> builder of the parser that owns the sub-commands.
-PASSTHROUGH_BUILDERS: dict[str, Callable[[], argparse.ArgumentParser]] = {"json": build_json_parser}
+PASSTHROUGH_BUILDERS: dict[str, Callable[[], argparse.ArgumentParser]] = {"json": build_json_parser, "node": build_node_parser}
 
 
 def _subparser_choices(parser: argparse.ArgumentParser) -> dict[str, argparse.ArgumentParser]:

@@ -79,6 +79,9 @@
       "path": "dependency-order-lint"
     },
     {
+      "path": "diff"
+    },
+    {
       "path": "env-check"
     },
     {
@@ -145,6 +148,18 @@
       "path": "milestone-state"
     },
     {
+      "path": "node"
+    },
+    {
+      "path": "node candidates"
+    },
+    {
+      "path": "node show"
+    },
+    {
+      "path": "node status"
+    },
+    {
       "path": "prompt-context"
     },
     {
@@ -167,6 +182,9 @@
     },
     {
       "path": "spec-quality-lint"
+    },
+    {
+      "path": "trace"
     },
     {
       "path": "traceability-check"

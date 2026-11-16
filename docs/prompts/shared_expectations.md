@@ -99,6 +99,8 @@ After generating or modifying a spec artifact, run the unified check command to 
 specdev spec-check <spec_dir> --repo-root ./devspec_toolkit
 ```
 
+`spec-check` includes the `graph` check: a link that names no node or a node of the wrong kind, a link cycle within one step, and an id defined in two places are reported as E700 to E704. A single-file `validate` does not report a job or task cycle, an unknown job in `depends_on`, or an id defined in two files; run `spec-check` for those.
+
 For submodule deployments, add `--spec-root ./spec --git-root .` to resolve seed paths correctly.
 
 For single-file quick validation during iterative editing:

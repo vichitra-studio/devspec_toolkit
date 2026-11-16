@@ -390,12 +390,14 @@ changes:
       target. Step 11 no longer reports E520, E530 or E590 for the ids a threat
       names: W583 is satisfied by a threat threatens and W615 by a threat
       mitigated_by, and both still skip an API or invariant whose every linked FR
-      is parked. Step 12: E141 reads depends_on, and E590 now means a depends_on
-      entry names no job. Step 14 no longer reports E590 for source_milestones,
-      fr_refs or capability_refs, or E520 / E530 for dependency entries; the cycle
-      check (E141), duplicate ids and date checks stay. Step 15: a duplicate
-      row_id is reported as E520; the E520 check for a duplicate interface_ref and
-      the E530 check for method are gone. The deep validators of steps 01 to 16 do
+      is parked. Step 12 no longer reports E141 or E590 for depends_on: the graph
+      check of spec-check reports an unknown job (E700) and a cycle (E703). Step 14
+      no longer reports E590 for source_milestones, fr_refs or capability_refs, or
+      E520 / E530 for dependency entries, or E141 for a task depends_on cycle
+      (E703 from spec-check); its date checks stay. A duplicate id, a step 15
+      row_id included, is reported as E704 (see the graph check below), no longer
+      as E520; the E520 check for a duplicate interface_ref and the E530 check for
+      method are gone. The deep validators of steps 01 to 16 do
       not raise on a value of the wrong type, in the file they validate or in a
       file they read; the schema reports it for the file that holds it (a
       validator may also report its own finding). traceability-check,
@@ -418,9 +420,8 @@ changes:
     description: >
       The step validators of steps 06 to 16 do not check that the id in a link
       field (a field the schema marks x-link, such as verifies, refines or
-      realises) exists, except a step 12 depends_on entry, which must name a job
-      of the same file (E590); the link resolver of a later 1.2.0 change checks
-      the rest. The checks that
+      realises) exists; the graph check of spec-check does (E700 to E703). The
+      checks that
       read 1.1.1 plan fields run only on plan items that carry them: E301 (item
       shapes), E305, W599, W600 and W601 key on implementation.status, and E307 on
       an object spec_ref. On a 1.2.0 plan item they report nothing.
@@ -541,5 +542,89 @@ changes:
       (the values they read are among those specdev matrix leaves out); and
       prompt_13a_completeness_assessment.md, which copies the four coverage
       numbers that completeness-check does not compute on that shape.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      New commands for reading the spec as a graph (graph/commands.py); each takes
+      --repo-root, --spec-root (default ./spec), --git-root (default .) and --json.
+      specdev node <id> [<id> ...] [--full] (also specdev node show <id>, which
+      reads an id that is itself a subcommand name) shows a node: file and jq
+      path, content, links out and the number of links in. specdev node candidates
+      (--kind KIND | --for ID) --field FIELD [--query TEXT] [--limit N] lists the
+      nodes a link field may point at. specdev node status <id>
+      active|deprecated|not_applicable writes the node's lifecycle into its spec
+      file (active removes the key) and prints <id>: <old> -> <new> (<file>).
+      specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V]
+      [--no-containment] lists what the node rests on and what rests on it.
+      specdev trace <id> --recipe 16a|16b|16c [--expand] [--since REF] prints the
+      context pack of a role. specdev diff <refA> <refB> compares the graph at two
+      git refs (the working tree is not read) and prints a suggested version bump.
+      A command that cannot answer prints one finding on stderr (with --json, the
+      status / errors envelope on stdout) and exits 1: E705 for a lifecycle change
+      that is refused (for example a seed node), E706 for an unknown id, kind or
+      field, E707 for a recipe start node of the wrong kind, E708 for a ref that
+      does not resolve, E709 for a ref whose tree has no node ids. The commands are
+      listed in tools/cli_commands.json.
+    migration:
+      action: none
+
+  - type: add_module
+    description: >
+      specdev spec-check runs a new check, graph (before registry-check), over the
+      whole spec: E700 (a link names an id no node has), E701 (a node of a kind the
+      field does not accept), E702 (a node of a later step), E703 (a cycle within
+      one step, one finding per cycle) and E704 (an id defined more than once). In
+      spec-check --json these findings carry owner (for example step:12) and
+      node_id. W720 (a link to a deprecated node) is registered; no check emits it
+      yet. validate-all does not run the check.
+    migration:
+      action: none
+
+  - type: remove_validator
+    description: >
+      Removed from the step validators, and reported by the graph check of
+      spec-check instead: the per-step duplicate-id checks (E520, for example step 15
+      row_id), the step 12 E590 for a depends_on entry that names no job, and E141
+      (a job or task depends_on cycle, steps 12 and 14), which is retired in favour
+      of E703. A single-file specdev validate therefore no longer reports a job or
+      task cycle, an unknown job in depends_on, or an id defined in two files;
+      spec-check does (E703, E700, E704). validate still reports an id defined
+      twice inside the one file (E704).
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      specdev context scope is now an alias of specdev trace: it prints the same
+      keys as before (entry, resolved_ids, source_files) for the nodes a trace of
+      the entry reaches in both directions, with resolved_ids grouped by node kind,
+      and one deprecation line on stderr. It no longer writes
+      spec/extras/trace_matrix.json, which the 1.1.1 command wrote.
+      Two procedures still read that file, which only specdev matrix writes now, so
+      it can be missing or stale: Step 2 of prompts/prompt_16b_impl_coder.md ("Query
+      trace_matrix.json", in two places; the prompt still says context commands
+      regenerate the file) and .claude/skills/specdev-context/SKILL.md (the concept
+      lookup by FR prefix and the impact set of the Action flow). Until they are
+      rewritten, run specdev matrix <spec_dir> --repo-root <toolkit> first (on a
+      1.2.0-shaped spec it writes the interim form described above), or use
+      specdev trace and specdev node.
+    migration:
+      action: none
+
+  - type: change_config
+    description: >
+      hallucination-lint, spec-quality-lint and spec-check take the ids a spec
+      defines from the spec graph for every file that has graph nodes: a *_id field
+      of a collection that is not a node no longer counts as a definition, so a *_ref
+      that names only such an id is now reported (E530 by hallucination-lint, E520
+      by spec-quality-lint; on a copy of the worked example, a note_ref naming an
+      id that appears only in a coverage_notes[].fr_id was not reported by the
+      1.1.1 commands). Files
+      with no graph node (13a, 16b, 16c, unregistered names) keep the scan. specdev
+      json resolve-pointers reports an id defined more than once in the file with
+      "ambiguous": true and each definition under "locations" (it returned the first
+      definition alone in 1.1.1).
     migration:
       action: none

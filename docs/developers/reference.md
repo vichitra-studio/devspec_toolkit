@@ -185,7 +185,7 @@ arguments").
 | `specdev json patch <file> <jq-path> <value>` | used | Set one value; differential schema-validated before write |
 | `specdev json insert <file> <jq-path> <value>` | used | Append into an array; differential schema-validated before write |
 | `specdev json delete <file> <jq-path>` | ✗ | Remove one node (jq `del()`; **no** schema validation) |
-| `specdev json resolve-pointers` (pointer list on **stdin**) | required | Resolve a canonical-ref pointer list; report to `--out <path>` or stdout (also accepts `--git-root`, default cwd) |
+| `specdev json resolve-pointers` (pointer list on **stdin**) | required | Resolve a canonical-ref pointer list; report to `--out <path>` or stdout (also accepts `--git-root`, default cwd). An id defined more than once in the file is reported with `"ambiguous": true` and each definition under `locations` |
 
 `patch` and `insert` perform always-on differential whole-document validation using
 the file's own `$schema` URI: a write is refused only if it *introduces* a new
@@ -204,11 +204,35 @@ that feed targeted `specdev json` calls, rather than reading `spec/*.json` direc
 | Subcommand | Required flags | Purpose |
 |------------|-----------------|---------|
 | `specdev context structure <spec_dir> --step STEP` | `--step` | Print the artifact shape (keys/types) scoped to one step, for Orientation reads |
-| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | Resolve the scoped read/jq plan for one canon or spec entry |
+| `specdev context scope <spec_dir> --entry ENTRY` | `--entry` | **Deprecated alias of `specdev trace`.** Prints JSON (`entry`, `resolved_ids` grouped by node kind, `source_files`) for the nodes a trace of the entry reaches up and down, and one deprecation line on stderr. It does not write `spec/extras/trace_matrix.json`; `specdev matrix` does |
 | `specdev context canon --step STEP [--spec-root SPEC_ROOT]` | `--step` | List canon entries relevant to a step; `--spec-root` optionally includes project-tier canon alongside toolkit canon |
 | `specdev context freshness <spec_dir> [--git-root GIT_ROOT]` | none | Report staleness of loaded context relative to upstream step edits |
 | `specdev context review <artifact_path> --step STEP [--entry ENTRY] [--spec-dir SPEC_DIR] [--git-root GIT_ROOT]` | `--step` | Prepare review context for one artifact ahead of a review pass |
 | `specdev context extract` | — | **Removed.** Errors with a message directing to `specdev json read <file> '<jq>'`, scoped via `specdev context structure` + `specdev json schema` |
+
+### `specdev node`, `trace`, `diff` — spec graph family
+
+These commands read the spec as a graph: a node is an entry with an id (an FR, an acceptance criterion, an API, a job), and a link field such as `derives_from` or `verifies` points from a node to the nodes it rests on. Ids and links are followed across files. Each command takes `--repo-root`, `--spec-root` (default `./spec`), `--git-root` (default `.`) and `--json`, so the three-flag default of CLAUDE.md ("Submodule deployment") is accepted by each. A finding is printed on stderr (with `--json`, as the `status` / `errors` envelope on stdout) and the command exits 1.
+
+| Command | Purpose |
+|---------|---------|
+| `specdev node <id> [<id> ...] [--full]` | For each id: kind, step, role, lifecycle, scope, file and jq path, the node's content (child nodes by id; `--full` includes them), its links out with each target's kind, step and label, and the number of links in by field and kind. `node show <id>` is the same command and also reads an id that is itself a subcommand name. An unknown id is E706 and names the nearest ids |
+| `specdev node candidates (--kind KIND \| --for ID) --field FIELD [--query TEXT] [--limit N]` | List the nodes a link field may point at, for a node of kind `KIND` or for the existing node `ID` (which also leaves out the node itself and what it already links to in that field). Exactly one of `--kind` and `--for` is required |
+| `specdev node status <id> active\|deprecated\|not_applicable` | Write the node's `lifecycle` into its spec file (`active` removes the key) and print `<id>: <old> -> <new> (<file>)`. `not_applicable` is for a closed milestone's historical step-14 nodes whose built target was deleted. E705 for an unknown or duplicated id, and for a node with no lifecycle, for example a seed |
+| `specdev trace <id> [--up] [--down] [--depth N] [--kinds K,K] [--verbs V,V] [--no-containment]` | List what the node rests on (`--up`) and what rests on it (`--down`); neither flag prints both. `--depth` counts edges, `--kinds` keeps the listed kinds in the output, `--verbs` limits the link fields followed, `--no-containment` stops following the parent / child edge of the JSON tree |
+| `specdev trace <id> --recipe 16a\|16b\|16c [--expand] [--since REF]` | Print the context pack of a role from a start node: a task for `16a`, a plan item for `16b`, a roadmap milestone for `16c` (E707 for another kind). `--expand` adds each node's content; `--since` sets the git ref the `16b` dependency report compares against. Not combined with the walk flags above |
+| `specdev diff <refA> <refB>` | Compare the graph at two git refs (tags, branches or commits; the working tree is not read): nodes added, removed, changed, whose lifecycle or kind changed, grouped by role and kind, then a suggested version bump (advisory). E708 for a ref that does not resolve; E709 for a tree with no node ids |
+
+```bash
+./tools/run_specdev.sh node ac-password-reset-3 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh node candidates --kind api --field derives_from --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh node status ac-password-reset-3 deprecated --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh trace ac-password-reset-3 --down --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh trace PWRESET_CONFIRM_EXPIRED_01 --recipe 16b --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+./tools/run_specdev.sh diff v1.0.0 v1.1.0 --repo-root ./devspec_toolkit --spec-root ./spec --git-root .
+```
+
+`spec-check` also runs a `graph` check over these links: E700 to E704 (a link to an id no node has, to a node of a kind the field does not accept, to a node of a later step; a cycle within one step; an id defined twice). A single-file `validate` does not report a link cycle, an unknown job in `depends_on` or an id defined in two files; `spec-check` does. Codes: [Spec Graph (70x / 72x)](error-codes.md#spec-graph-70x--72x).
 
 ### Registry, Canon & Prompt Maintenance Commands
 

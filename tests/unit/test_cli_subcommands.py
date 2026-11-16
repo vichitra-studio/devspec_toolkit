@@ -7,6 +7,7 @@ produce expected output, and respect the --repo-root flag.
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 import unittest
@@ -16,6 +17,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from specdev_tools import cli
+from specdev_tools.core.toolkit_root import detect_toolkit_root
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -279,6 +281,114 @@ class TestExtractionIntentCheck(_CliMixin, unittest.TestCase):
             # Empty directory — no step_order.json → should exit 0 (graceful skip)
             code, _, _ = self._run_cli(["extraction-intent-check", "--repo-root", tmpdir])
             self.assertEqual(code, 0)
+
+
+EXAMPLE_SPEC = REPO_ROOT / "tests" / "fixtures" / "graph_example" / "spec"
+_EXAMPLE_ID = "ac-password-reset-3"
+_ROOT_FLAGS = ["--repo-root", str(REPO_ROOT), "--spec-root", str(EXAMPLE_SPEC)]
+
+
+class TestGraphCommands(_CliMixin, unittest.TestCase):
+    """The graph commands ``node``, ``trace`` and ``diff`` (WI-M4-11)."""
+
+    def _example_copy(self) -> Path:
+        import shutil
+        import tempfile
+
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        return Path(shutil.copytree(EXAMPLE_SPEC, tmp / "spec"))
+
+    def test_node_trace_diff_accept_three_root_flags(self):
+        """The three-flag default of CLAUDE.md never gives "unrecognized arguments" on a graph command."""
+        flags = ["--repo-root", "tk", "--spec-root", "sp", "--git-root", "host"]
+        parsed = cli.build_parser()
+        for argv in (["trace", "an-id", *flags], ["diff", "v1", "v2", *flags]):
+            with self.subTest(command=argv[0]):
+                args = parsed.parse_args(argv)
+                self.assertEqual((args.repo_root, args.spec_root, args.git_root), ("tk", "sp", "host"))
+        code, out, err = self._run_cli(["node", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(REPO_ROOT)])
+        self.assertEqual(code, 0, err)
+        self.assertIn(_EXAMPLE_ID, out)
+        code, _, err = self._run_cli(["trace", _EXAMPLE_ID, *_ROOT_FLAGS, "--git-root", str(REPO_ROOT)])
+        self.assertEqual(code, 0, err)
+
+    def test_node_status_subcommand_dispatch(self):
+        spec = self._example_copy()
+        flags = ["--repo-root", str(REPO_ROOT), "--spec-root", str(spec)]
+        code, out, err = self._run_cli(["node", "status", _EXAMPLE_ID, "deprecated", *flags])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), f"{_EXAMPLE_ID}: active -> deprecated (04_fr_list.json)")
+        self.assertIn('"lifecycle": "deprecated"', (spec / "04_fr_list.json").read_text(encoding="utf-8"))
+        code, out, err = self._run_cli(["node", "status", _EXAMPLE_ID, "active", *flags])
+        self.assertEqual(code, 0, err)
+        self.assertNotIn('"lifecycle"', (spec / "04_fr_list.json").read_text(encoding="utf-8"))
+        code, _, err = self._run_cli(["node", "status", "ac-no-such-node", "active", *flags])
+        self.assertEqual(code, 1)
+        self.assertTrue(err.startswith("E705"), err)
+
+    def test_node_explicit_repo_root_after_id(self):
+        """``node <id> --repo-root X --json`` works without the auto-detect of the default ``.``."""
+        code, out, err = self._run_cli(["node", _EXAMPLE_ID, *_ROOT_FLAGS, "--json"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual([node["id"] for node in json.loads(out)["nodes"]], [_EXAMPLE_ID])
+
+    def test_node_show_disambiguates(self):
+        """An id that is also a subcommand name is read through ``node show``; the bare form is the subcommand."""
+        for word in ("status", "candidates"):
+            with self.subTest(word=word):
+                code, _, err = self._run_cli(["node", "show", word, *_ROOT_FLAGS])
+                self.assertEqual(code, 1)
+                self.assertTrue(err.startswith("E706") and f"'{word}'" in err, err)
+                code, _, _ = self._run_cli(["node", word, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+
+    def test_json_flag_shapes(self):
+        spec = self._example_copy()
+        flags = ["--repo-root", str(REPO_ROOT), "--spec-root", str(spec), "--json"]
+        shapes = {
+            ("node", _EXAMPLE_ID): {"nodes", "errors"},
+            ("node", "candidates", "--kind", "api", "--field", "derives_from"): {"kind", "field", "total", "candidates"},
+            ("node", "status", _EXAMPLE_ID, "deprecated"): {"node_id", "old", "new", "file", "jq_path"},
+            ("trace", _EXAMPLE_ID): {"entry", "up", "down"},
+            ("trace", "PWRESET_CONFIRM_EXPIRED_01", "--recipe", "16b"): {"role", "start", "sections", "counts", "ambiguity_report", "dependency_report"},
+        }
+        for argv, keys in shapes.items():
+            with self.subTest(argv=argv):
+                code, out, err = self._run_cli([*argv, *flags])
+                self.assertEqual(code, 0, err)
+                self.assertEqual(set(json.loads(out)), keys)
+
+    def test_json_flag_prints_a_finding_as_the_standard_envelope(self):
+        code, out, _ = self._run_cli(["trace", "no-such-id", *_ROOT_FLAGS, "--json"])
+        self.assertEqual(code, 1)
+        document = json.loads(out)
+        self.assertEqual((document["command"], document["status"], document["errors"][0]["code"]), ("trace", "FAIL", "E706"))
+
+    def test_trace_recipe_flags_are_checked(self):
+        for argv in (["--recipe", "16b", "--up"], ["--expand"], ["--since", "v1"]):
+            with self.subTest(argv=argv):
+                code, _, err = self._run_cli(["trace", _EXAMPLE_ID, *argv, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+                self.assertIn("specdev trace: error:", err)
+
+    def test_candidates_needs_exactly_one_of_kind_and_for(self):
+        for argv in (["--field", "derives_from"], ["--kind", "api", "--for", _EXAMPLE_ID, "--field", "derives_from"]):
+            with self.subTest(argv=argv):
+                code, _, _ = self._run_cli(["node", "candidates", *argv, *_ROOT_FLAGS])
+                self.assertEqual(code, 2)
+
+    def test_detect_toolkit_root_finds_the_submodule_only_for_the_default(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "devspec_toolkit" / "tools" / "specdev_tools" / "__init__.py"
+            marker.parent.mkdir(parents=True)
+            marker.touch()
+            self.assertEqual(detect_toolkit_root(".", cwd=tmp), str(Path(tmp) / "devspec_toolkit"))
+            self.assertEqual(detect_toolkit_root("elsewhere", cwd=tmp), "elsewhere")
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(detect_toolkit_root(".", cwd=tmp), ".")
 
 
 if __name__ == "__main__":

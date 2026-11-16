@@ -14,6 +14,7 @@ from specdev_tools import cli
 from specdev_tools.cli import build_parser
 from specdev_tools.core.json_utils import build_json_parser
 from specdev_tools.core.registry import SchemaRegistry, clear_shared_caches
+from specdev_tools.graph.commands import build_node_parser
 from specdev_tools.registry.cli_commands import (
     PASSTHROUGH_BUILDERS,
     collect_command_paths,
@@ -34,9 +35,10 @@ def _top_level() -> list[str]:
 
 def test_counts_match_the_parsers():
     paths = _paths()
-    assert len(_top_level()) == 38
+    assert len(_top_level()) == 41
     assert len([p for p in paths if p.startswith("context ")]) == 6
     assert len([p for p in paths if p.startswith("json ")]) == 9
+    assert len([p for p in paths if p.startswith("node ")]) == 3
     assert len([p for p in paths if p.startswith("align ")]) == 7
     assert paths == sorted(paths)
 
@@ -44,6 +46,13 @@ def test_counts_match_the_parsers():
 def test_spot_paths():
     paths = set(_paths())
     assert {"spec-check", "context structure", "json patch", "align apply", "json resolve-pointers"} <= paths
+
+
+def test_cli_commands_lists_graph_commands():
+    committed = {entry["path"] for entry in json.loads((_ROOT / "tools" / "cli_commands.json").read_text())["commands"]}
+    expected = {"node", "node show", "node candidates", "node status", "trace", "diff"}
+    assert expected <= set(_paths())
+    assert expected <= committed
 
 
 def test_top_level_commands_equal_specdev_help():
@@ -83,9 +92,9 @@ def test_every_command_path_answers_help(path):
 
 
 def test_json_group_sub_commands_come_only_from_build_json_parser():
-    assert PASSTHROUGH_BUILDERS == {"json": build_json_parser}
+    assert PASSTHROUGH_BUILDERS == {"json": build_json_parser, "node": build_node_parser}
     assert collect_command_paths(build_parser(), passthrough={}) != _paths()
-    assert not [p for p in collect_command_paths(build_parser(), passthrough={}) if p.startswith("json ")]
+    assert not [p for p in collect_command_paths(build_parser(), passthrough={}) if p.startswith(("json ", "node "))]
 
 
 def test_passthrough_constant_is_iterated():
