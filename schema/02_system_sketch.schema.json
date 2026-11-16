@@ -84,7 +84,7 @@
                 ]
               },
               "derives_from": {
-                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from. Every Step 01 capability whose scope is 'in' must be named in the derives_from of at least one component (step 02 validator, E590).",
+                "description": "Ids of the upstream nodes this component is derived from (capabilities from Step 01 or charter constraints). At least one is required; every component must be justified by what it derives from. Every Step 01 capability whose scope is 'in' must be named in the derives_from of at least one component (step 02 validator, E590; the check runs when the Step 01 file is present).",
                 "type": "array",
                 "items": {
                   "$ref": "vc:core:atoms#kebabId"
