@@ -4,7 +4,7 @@ import json
 import os
 import re
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..canonical.lint import lint_canon_dirs
 from ..canonical.registry import CanonicalRegistry
@@ -14,13 +14,19 @@ from ..core.registry import derive_allowed_upstream
 from ..core.schema_nav import effective_schema as _nav_effective_schema
 from ..core.trace_types import is_valid_trace_type
 from .linter_utils import (
+    build_lint_graph,
     collect_ids_and_refs,
+    graph_covered_files,
+    graph_known_ids,
     is_resolved_canonical_ref,
     iter_json,
     load_canonical_stages,
     tokenize_free_text,
     DERIVATION_STOPWORDS,
 )
+
+if TYPE_CHECKING:
+    from ..graph.model import Graph
 
 
 KNOWN_STAGES = {"dev", "ci", "staging", "prod"}
@@ -44,9 +50,18 @@ def lint_hallucinations(
     require_manifest_schema_registration: bool = True,
     project_canon_dir: str | None = None,
     git_root: str | None = None,
+    *,
+    graph: Graph | None = None,
 ) -> list[SpecError]:
+    """Hallucination checks over every artifact of *spec_dir*; returns the findings, never raises.
+
+    Ids a ``*_ref`` may name come from *graph* (built from the toolkit at *repo_root* when ``None``) for the files it
+    covers and from a scan of the file for the others.
+    """
     errors: list[SpecError] = []
-    known_ids: set[str] = set()
+    graph = build_lint_graph(spec_dir, repo_root) if graph is None else graph
+    covered = graph_covered_files(graph)
+    known_ids = graph_known_ids(graph)
     refs: list[tuple[str, str, str]] = []
     root = repo_root or spec_dir
     # path_root: for host-file existence checks in submodule deployments,
@@ -107,7 +122,7 @@ def lint_hallucinations(
         # Derivation reads step_order.json from the toolkit (repo_root/tools/),
         # not the host repo, so it uses `root` (toolkit root), not `path_root`.
         errors.extend(_check_content_derivation(rel, data, spec_dir, root))
-        collect_ids_and_refs(data, rel, known_ids, refs)
+        collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
     for rel, p, ref_id in refs:
         if ref_id.startswith(("external:", "file:", "refs/", "cn:")):
             continue

@@ -765,3 +765,35 @@ class TestCLIResolvePointers:
                 with pytest.raises(SystemExit) as exc_info:
                     json_main()
         assert exc_info.value.code != 0
+
+
+class TestResolvePointersAmbiguity:
+    """An id with several definitions in one file is reported as ambiguous, with every location."""
+
+    def test_resolve_pointers_flags_duplicate_definition(self) -> None:
+        spec = {
+            "functional_requirements": [
+                {"fr_id": "fr-dup", "statement": "first"},
+                {"fr_id": "fr-other", "statement": "other"},
+                {"fr_id": "fr-dup", "statement": "second"},
+            ]
+        }
+        with TmpSpecDir(spec) as ctx:
+            report = resolve_pointers([{"file": ctx.rel_name, "id": "fr-dup"}], git_root=ctx.dir, repo_root=_FIXTURE_DIR)
+        hit = report["results"][0]
+        assert hit["exists"] is True
+        assert hit["ambiguous"] is True
+        assert hit["jq_path"] == ".functional_requirements[0]"
+        assert [loc["jq_path"] for loc in hit["locations"]] == [
+            ".functional_requirements[0]",
+            ".functional_requirements[2]",
+        ]
+
+    def test_single_definition_carries_no_ambiguity_keys(self) -> None:
+        with TmpSpecDir(SAMPLE_SPEC) as ctx:
+            report = resolve_pointers(
+                [{"file": ctx.rel_name, "id": "fr-newsletter-subscribe"}], git_root=ctx.dir, repo_root=_FIXTURE_DIR
+            )
+        hit = report["results"][0]
+        assert "ambiguous" not in hit
+        assert "locations" not in hit

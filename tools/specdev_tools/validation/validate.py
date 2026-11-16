@@ -33,6 +33,7 @@ from .dependency_order_lint import lint_dependency_order
 from .forward_replay_check import check_forward_replay
 from .extraction_intent_check import check_extraction_intent
 from .hallucination_lint import lint_hallucinations
+from .linter_utils import build_lint_graph
 from ..generation.prompt_schema_sync import run_prompt_schema_sync
 from ..core.config import get_config, reset_config
 from ..core.errors import ERROR_CODES, PROMOTABLE_PAIRS, SpecError, make_error
@@ -335,7 +336,8 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
             )
         )
 
-    failures.extend(lint_spec_quality(spec_dir))
+    lint_graph = build_lint_graph(spec_dir, repo_root)
+    failures.extend(lint_spec_quality(spec_dir, graph=lint_graph))
     if canonical_preflight_errors:
         failures.extend(canonical_preflight_errors)
     else:
@@ -347,6 +349,7 @@ def validate_dir(repo_root: str, spec_dir: str, project_canon_dir: str | None = 
                 require_manifest_schema_registration=True,
                 project_canon_dir=project_canon_dir,
                 git_root=git_root,
+                graph=lint_graph,
             )
         )
         failures.extend(

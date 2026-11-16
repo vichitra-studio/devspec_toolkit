@@ -3,10 +3,21 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..core.errors import SpecError, make_error
-from .linter_utils import collect_ids_and_refs, is_reference_context, iter_json
+from .linter_utils import (
+    build_file_graph_or_none,
+    build_lint_graph,
+    collect_ids_and_refs,
+    graph_covered_files,
+    graph_known_ids,
+    is_reference_context,
+    iter_json,
+)
+
+if TYPE_CHECKING:
+    from ..graph.model import Graph
 
 
 PLACEHOLDER_RE = re.compile(r"\b(TBD|TODO|FIXME|XXX|placeholder|<[^>]+>)\b", re.IGNORECASE)
@@ -35,9 +46,16 @@ CRITICAL_ARRAY_KEYS = {"functional_requirements", "terms", "apis", "rules", "nfr
 _ASSUMPTION_THRESHOLD = 10
 
 
-def lint_spec_quality(spec_dir: str) -> list[SpecError]:
+def lint_spec_quality(spec_dir: str, *, graph: Graph | None = None) -> list[SpecError]:
+    """Quality checks over every artifact of *spec_dir*, plus reference closure over the ids the spec defines.
+
+    Definitions come from *graph* (built here when ``None``) for the files it covers and from a scan of the file
+    for the others.  Returns the findings; never raises.
+    """
     errors: list[SpecError] = []
-    known_ids: set[str] = set()
+    graph = build_lint_graph(spec_dir) if graph is None else graph
+    covered = graph_covered_files(graph)
+    known_ids = graph_known_ids(graph)
     refs: list[tuple[str, str, str]] = []
 
     for path in iter_json(spec_dir):
@@ -56,7 +74,7 @@ def lint_spec_quality(spec_dir: str) -> list[SpecError]:
         errors.extend(placeholder_errs)
         errors.extend(_check_critical_arrays(rel, data))
         errors.extend(_check_free_text_vague(rel, data))
-        collect_ids_and_refs(data, rel, known_ids, refs)
+        collect_ids_and_refs(data, rel, known_ids, refs, skip_ids_for_files=covered)
 
     # Second pass: assumption checks with full cross-artifact known_ids
     for path in iter_json(spec_dir):
@@ -79,11 +97,12 @@ def lint_spec_quality(spec_dir: str) -> list[SpecError]:
     return errors
 
 
-def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[SpecError]:
+def lint_spec_quality_file(path: str, spec_dir: str | None = None, *, graph: Graph | None = None) -> list[SpecError]:
     """Run per-artifact quality checks used by single-file validation.
 
     This enforces deterministic top-level and placeholder/array checks without
-    requiring full-directory reference closure.
+    requiring full-directory reference closure.  The ids an assumption may name come from *graph* (the one-file
+    graph slice when ``None``), or from a scan of the file when the graph holds no node of it.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -103,12 +122,20 @@ def lint_spec_quality_file(path: str, spec_dir: str | None = None) -> list[SpecE
     errs.extend(placeholder_errs)
     errs.extend(_check_critical_arrays(rel, data))
     errs.extend(_check_free_text_vague(rel, data))
-    # Intra-artifact assumption check (single-file mode: no cross-artifact IDs)
-    single_ids: set[str] = set()
-    single_refs: list[tuple[str, str, str]] = []
-    collect_ids_and_refs(data, rel, single_ids, single_refs)
-    errs.extend(_check_assumptions(rel, data, single_ids))
+    errs.extend(_check_assumptions(rel, data, _single_file_known_ids(path, rel, data, graph)))
     return errs
+
+
+def _single_file_known_ids(path: str, rel: str, data: Any, graph: Graph | None) -> set[str]:
+    """Ids an assumption of the single file *path* may name: graph nodes, else the ids the file's fields define."""
+    if graph is None:
+        graph = build_file_graph_or_none(path, data)
+        covered = frozenset({rel.replace(os.sep, "/")}) if graph is not None and graph.nodes else frozenset()
+    else:
+        covered = graph_covered_files(graph)
+    known_ids = graph_known_ids(graph)
+    collect_ids_and_refs(data, rel, known_ids, [], skip_ids_for_files=covered)
+    return known_ids
 
 
 def _check_assumptions(rel: str, data: Any, known_ids: set[str], path: str = "") -> list[SpecError]:

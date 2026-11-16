@@ -21,7 +21,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 # Entry-key registry — deterministic id-field lookup per spec file.
 from specdev_tools.core import entry_key_registry as _ekreg
@@ -994,12 +994,20 @@ def _nearest_ids(target: str, candidates: List[str], top_n: int = 3) -> List[Dic
 # ---------------------------------------------------------------------------
 
 
-def _collect_ids_from_file(
+class _IdDefinition(NamedTuple):
+    """One definition of an id in a spec file: the singular kind label, its jq path, and the raw entry."""
+
+    kind: str
+    jq_path: str
+    entry: Any
+
+
+def _collect_id_definitions(
     data: Any,
     spec_file: str,
     repo_root: str,
-) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
-    """Walk a parsed JSON object and collect all entry ids.
+) -> Tuple[List[str], Dict[str, List[_IdDefinition]]]:
+    """Walk a parsed JSON object and collect every definition of every entry id.
 
     For each spec file, the entry-key registry (``<repo_root>/tools/entry_key_registry.json``)
     is the sole source of truth for which arrays to scan and which id field to use.
@@ -1016,13 +1024,12 @@ def _collect_ids_from_file(
 
     Returns:
       - ``all_ids``: flat list of every discovered id (for nearest-search).
-      - ``id_map``: {id_value -> (kind, jq_path, entry_object)}
-        where kind is the singular kind label (e.g. "functional_requirement"),
-        jq_path is the resolved path (e.g. ".functional_requirements[2]"),
-        and entry_object is the raw dict.
+      - ``id_map``: {id_value -> [definitions in document order]}; each
+        definition is an ``_IdDefinition`` (kind, jq_path, entry).  More than
+        one definition means the id is ambiguous.
     """
     all_ids: List[str] = []
-    id_map: Dict[str, Tuple[str, str, Any]] = {}
+    id_map: Dict[str, List[_IdDefinition]] = {}
 
     if not isinstance(data, dict):
         return all_ids, id_map
@@ -1069,11 +1076,23 @@ def _collect_ids_from_file(
                 if not isinstance(found_id, str) or not found_id:
                     continue
                 all_ids.append(found_id)
-                # On id collision, keep first occurrence (deterministic).
-                if found_id not in id_map:
-                    id_map[found_id] = (entry.kind, jq_path, item)
+                id_map.setdefault(found_id, []).append(_IdDefinition(entry.kind, jq_path, item))
 
     return all_ids, id_map
+
+
+def _collect_ids_from_file(
+    data: Any,
+    spec_file: str,
+    repo_root: str,
+) -> Tuple[List[str], Dict[str, Tuple[str, str, Any]]]:
+    """Like ``_collect_id_definitions`` but ``id_map`` keeps the first definition of each id as a tuple.
+
+    Returns ``(all_ids, {id_value -> (kind, jq_path, entry_object)})``; on a collision the first
+    occurrence wins (deterministic).
+    """
+    all_ids, definitions = _collect_id_definitions(data, spec_file, repo_root)
+    return all_ids, {found_id: (found[0].kind, found[0].jq_path, found[0].entry) for found_id, found in definitions.items()}
 
 
 def _resolve_single_pointer(
@@ -1216,20 +1235,25 @@ def _resolve_single_pointer(
     # so -O (optimised) builds don't silently skip the guard.
     if id_val is None:
         raise JsonUtilsError("internal: id_val is None; pointer shape check failed")
-    all_ids, id_map = _collect_ids_from_file(data, spec_file=file_val, repo_root=repo_root)
+    all_ids, id_map = _collect_id_definitions(data, spec_file=file_val, repo_root=repo_root)
 
     if id_val in id_map:
-        kind_found, resolved_jq, entry = id_map[id_val]
+        definitions = id_map[id_val]
+        first = definitions[0]
         # Build value_preview (first 3 keys)
-        preview_keys = list(entry.keys())[:3]
-        value_preview = {k: entry[k] for k in preview_keys}
-        return {
+        preview_keys = list(first.entry.keys())[:3]
+        value_preview = {k: first.entry[k] for k in preview_keys}
+        hit: Dict[str, Any] = {
             "pointer": pointer,
             "exists": True,
-            "kind": kind_found,
-            "jq_path": resolved_jq,
+            "kind": first.kind,
+            "jq_path": first.jq_path,
             "value_preview": value_preview,
         }
+        if len(definitions) > 1:
+            hit["ambiguous"] = True
+            hit["locations"] = [{"kind": d.kind, "jq_path": d.jq_path} for d in definitions]
+        return hit
     else:
         # Miss — compute nearest ids from the file's id corpus
         nearest = _nearest_ids(id_val, all_ids, top_n=3)

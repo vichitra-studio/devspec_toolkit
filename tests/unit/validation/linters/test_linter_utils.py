@@ -4,6 +4,8 @@ Created by FIX-044 (Batch 5).
 """
 from __future__ import annotations
 
+import os
+
 from specdev_tools.validation.linter_utils import (
     CONTENT_STOPWORDS,
     DERIVATION_STOPWORDS,
@@ -231,3 +233,24 @@ class TestCollectIdsAndRefs:
         obj = {"items": [{"fr_id": "fr-a"}, {"fr_id": "fr-b"}]}
         collect_ids_and_refs(obj, "test.json", ids, refs)
         assert ids == {"fr-a", "fr-b"}
+
+    def test_skip_ids_for_files_collects_refs_but_no_ids(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        obj = {"items": [{"fr_id": "fr-a", "id": "x-1"}], "api_ref": "api-create"}
+        collect_ids_and_refs(obj, "04_fr_list.json", ids, refs, skip_ids_for_files={"04_fr_list.json"})
+        assert ids == set()
+        assert [ref[2] for ref in refs] == ["api-create"]
+
+    def test_skip_ids_for_files_matches_a_platform_path(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        rel = os.path.join("impl_context", "ms_x_plan.json")
+        collect_ids_and_refs({"fr_id": "fr-a"}, rel, ids, refs, skip_ids_for_files={"impl_context/ms_x_plan.json"})
+        assert ids == set()
+
+    def test_skip_ids_for_other_files_keeps_ids(self):
+        ids: set[str] = set()
+        refs: list[tuple[str, str, str]] = []
+        collect_ids_and_refs({"fr_id": "fr-a"}, "other.json", ids, refs, skip_ids_for_files={"04_fr_list.json"})
+        assert ids == {"fr-a"}

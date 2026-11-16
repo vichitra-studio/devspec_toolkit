@@ -18,6 +18,7 @@ from ..core.errors import SpecError
 from ..core.json_output import error_to_dict
 from ..core.loaders import iter_spec_artifacts, read_json_object
 from ..graph.ownership import stamp_file_owner, step_for_file
+from .linter_utils import build_lint_graph
 
 
 def _classify(errors: list[SpecError]) -> dict[str, Any]:
@@ -164,7 +165,8 @@ def _run_checks(
     # --- 2. Spec quality lint ---
     from .spec_quality_lint import lint_spec_quality
 
-    quality_errs = lint_spec_quality(spec_dir)
+    lint_graph = build_lint_graph(spec_dir, repo_root)
+    quality_errs = lint_spec_quality(spec_dir, graph=lint_graph)
     checks["spec-quality-lint"] = _check_result(quality_errs)
 
     # --- 3. Canonical preflight ---
@@ -211,6 +213,7 @@ def _run_checks(
             require_manifest_schema_registration=True,
             project_canon_dir=project_canon_dir,
             git_root=git_root,
+            graph=lint_graph,
         )
         checks["hallucination-lint"] = _check_result(hall_errs)
     else:
@@ -284,7 +287,10 @@ def _run_checks(
     # --- 10b. Spec graph: unique ids (E704) and links (E700-E703) ---
     from ..graph.check import run_graph_check
 
-    checks["graph"] = _check_result(run_graph_check(spec_root or spec_dir, repo_root))
+    shares_lint_graph = os.path.abspath(spec_root or spec_dir) == os.path.abspath(spec_dir)
+    checks["graph"] = _check_result(
+        run_graph_check(spec_root or spec_dir, repo_root, graph=lint_graph if shares_lint_graph else None)
+    )
 
     # --- 11. Registry check (R001-R003) ---
     # Registry now lives toolkit-side at <repo_root>/tools/entry_key_registry.json

@@ -10,9 +10,14 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any, Iterator
+from collections.abc import Collection
+from typing import TYPE_CHECKING, Any, Iterator
 
+from ..core.json_utils import _resolve_effective_toolkit_root
 from ..core.loaders import iter_spec_artifacts
+
+if TYPE_CHECKING:
+    from ..graph.model import Graph
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +83,45 @@ def iter_json(spec_dir: str) -> Iterator[str]:
 
 
 # ---------------------------------------------------------------------------
+# Definition source — the graph for files it covers, the legacy scan for the rest
+# ---------------------------------------------------------------------------
+
+def build_lint_graph(spec_dir: str, repo_root: str | None = None) -> Graph | None:
+    """Build the spec graph of *spec_dir* for the linters, or ``None`` when the registry is unavailable.
+
+    *repo_root* is the toolkit root; ``None`` selects the toolkit this package belongs to.  ``None`` is the "no graph" answer: callers then scan every file for ids, as before the graph.
+    """
+    from ..graph.build import build_graph
+    from ..graph.kinds import KindRegistryError
+
+    try:
+        return build_graph(spec_dir, repo_root or _resolve_effective_toolkit_root(None))
+    except KindRegistryError:
+        return None
+
+
+def build_file_graph_or_none(path: str, document: dict[str, Any]) -> Graph | None:
+    """The one-file graph slice of the spec file *path* (parsed content *document*), or ``None`` without a registry."""
+    from ..graph.build import build_file_graph
+    from ..graph.kinds import KindRegistryError
+
+    try:
+        return build_file_graph(path, _resolve_effective_toolkit_root(None), document)
+    except KindRegistryError:
+        return None
+
+
+def graph_covered_files(graph: Graph | None) -> frozenset[str]:
+    """Spec-relative paths (``/``-separated) of the files that contribute at least one node to *graph*."""
+    return frozenset(node.file for node in graph.nodes) if graph is not None else frozenset()
+
+
+def graph_known_ids(graph: Graph | None) -> set[str]:
+    """Every id the graph defines (the first definition of each; duplicates are E704's)."""
+    return set(graph.by_id) if graph is not None else set()
+
+
+# ---------------------------------------------------------------------------
 # collect_ids_and_refs — replaces duplicates in hallucination_lint & spec_quality_lint
 # ---------------------------------------------------------------------------
 
@@ -87,12 +131,15 @@ def collect_ids_and_refs(
     ids: set[str],
     refs: list[tuple[str, str, str]],
     path: str = "",
+    skip_ids_for_files: Collection[str] = frozenset(),
 ) -> None:
     """Walk *obj* and populate *ids* (definitions) and *refs* (references).
 
     An ID is any value under a key ending in ``_id``, or ``"id"`` when NOT in
     a reference context.  A ref is ``"id"`` or ``"target_id"`` inside a
     reference context, any ``*_ref`` string, or any item in ``*_refs`` lists.
+    A file the graph covers (*skip_ids_for_files*) defines its ids through the
+    graph, so none of its fields is added to *ids*; its refs are still collected.
 
     Parameters
     ----------
@@ -106,14 +153,30 @@ def collect_ids_and_refs(
         Accumulator for discovered references as ``(rel, path, ref_id)``.
     path : str
         Current JSON path (dot-separated).
+    skip_ids_for_files : Collection[str]
+        Spec-relative paths (``/``-separated) of the files whose ids come from
+        the graph.  *rel* is compared after its separators are normalised.
     """
+    covered = rel.replace(os.sep, "/") in skip_ids_for_files
+    _walk_ids_and_refs(obj, rel, None if covered else ids, refs, path)
+
+
+def _walk_ids_and_refs(
+    obj: Any,
+    rel: str,
+    ids: set[str] | None,
+    refs: list[tuple[str, str, str]],
+    path: str,
+) -> None:
+    """Recursive body of :func:`collect_ids_and_refs`; ``ids=None`` collects references only."""
     if isinstance(obj, dict):
         for k, v in obj.items():
             p = f"{path}.{k}" if path else k
-            if k.endswith("_id") and isinstance(v, str):
-                ids.add(v)
-            if k == "id" and isinstance(v, str) and not is_reference_context(path):
-                ids.add(v)
+            if ids is not None:
+                if k.endswith("_id") and isinstance(v, str):
+                    ids.add(v)
+                if k == "id" and isinstance(v, str) and not is_reference_context(path):
+                    ids.add(v)
             if k in {"id", "target_id"} and isinstance(v, str) and is_reference_context(path):
                 refs.append((rel, p, v))
             if k.endswith("_ref") and isinstance(v, str):
@@ -122,10 +185,10 @@ def collect_ids_and_refs(
                 for idx, item in enumerate(v):
                     if isinstance(item, str):
                         refs.append((rel, f"{p}[{idx}]", item))
-            collect_ids_and_refs(v, rel, ids, refs, p)
+            _walk_ids_and_refs(v, rel, ids, refs, p)
     elif isinstance(obj, list):
         for i, item in enumerate(obj):
-            collect_ids_and_refs(item, rel, ids, refs, f"{path}[{i}]")
+            _walk_ids_and_refs(item, rel, ids, refs, f"{path}[{i}]")
 
 
 # ---------------------------------------------------------------------------
